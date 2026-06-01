@@ -1,18 +1,17 @@
-# Plugin Workflow: Adapters and Guards
+# Plugin Workflow: Adapters, Guards, and Edits
 
-InvarLock's plugin system extends model loading and guard capabilities. Plugins do
-not add additional edit algorithms beyond the built-in RTN dequantized
-simulation edit.
+InvarLock's plugin system extends model loading, guard checks, and edit
+algorithms through explicit entry points and ABI checks.
 
 ## Overview
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Extend InvarLock with custom adapters and guards. |
+| **Purpose** | Extend InvarLock with custom adapters, guards, and edits. |
 | **Audience** | Developers adding model support or custom validation. |
-| **Plugin types** | Adapters (model loading), Guards (validation checks). |
+| **Plugin types** | Adapters (model loading), Guards (validation checks), Edits (model modifications). |
 | **Registration** | Via `pyproject.toml` entry points. |
-| **Source of truth** | `src/invarlock/plugins/__init__.py` owns the demo guard and optional adapter plugins. |
+| **Source of truth** | Plugin discovery in `src/invarlock/core/registry.py`, built-in catalog metadata in `src/invarlock/core/builtin_plugin_catalog.py`, and the ABI contract in `contracts/plugin_compatibility.json`. Optional/demo implementations live in `src/invarlock/plugins/__init__.py`. |
 
 ## Contents
 
@@ -61,6 +60,7 @@ my_invarlock_plugin/
 # src/my_plugin/my_guard.py
 """A simple guard that checks for NaN values in weights."""
 
+from invarlock.core import INVARLOCK_CORE_ABI
 from invarlock.core.api import Guard
 
 
@@ -160,6 +160,7 @@ This example shows a policy-aware guard with tests.
 
 from typing import Any
 
+from invarlock.core import INVARLOCK_CORE_ABI
 from invarlock.core.api import Guard
 
 
@@ -384,6 +385,7 @@ skeleton for a custom adapter.
 from pathlib import Path
 from typing import Any
 
+from invarlock.core import INVARLOCK_CORE_ABI
 from invarlock.core.api import ModelAdapter
 
 
@@ -396,6 +398,10 @@ class CustomFormatAdapter(ModelAdapter):
     """
 
     name = "custom_format"
+
+    def can_handle(self, model_id: str, **kwargs) -> bool:
+        """Return true for local paths in the custom format."""
+        return Path(model_id).exists()
 
     def load_model(
         self,
@@ -488,12 +494,12 @@ custom_format = "my_plugin.custom_adapter:CustomFormatAdapter"
 
 ```bash
 # Verify plugin is discovered
-invarlock advanced plugins list --verbose
+invarlock advanced plugins list --verbose --allow-third-party-plugins
 
 # Get details for specific plugin
-invarlock advanced plugins adapters --explain custom_format
+invarlock advanced plugins adapters --explain custom_format --allow-third-party-plugins
 # For guards, use --verbose to show module and entry point details
-invarlock advanced plugins guards --verbose
+invarlock advanced plugins guards --verbose --allow-third-party-plugins
 ```
 
 ### Debug Loading Issues

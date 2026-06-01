@@ -48,7 +48,9 @@ output:
   existing single-run `model.adapter` field.
 - **Programmatic access**: `load_config()` returns an explicit mapping-backed
   `InvarLockConfig`. Use `cfg["model"]["id"]` or
-  `cfg.require_section("model")["id"]`; attribute-style access is unsupported.
+  `cfg.require_section("model")["id"]` as the canonical form. Typed
+  attribute access is also available for known sections, for example
+  `cfg.model.id`, when callers want the typed section-object view.
 - **Unsupported keys**: `edit.kind`, `edit.parameters`, unknown
   `assurance.*` keys, and `guards.{spectral,rmt}.mode` are rejected to keep the
   config surface explicit.

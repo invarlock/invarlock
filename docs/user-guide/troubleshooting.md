@@ -6,8 +6,8 @@
 | --- | --- |
 | **Purpose** | Consolidated error code reference and troubleshooting guide. |
 | **Audience** | Users encountering errors during `evaluate`, `verify`, or advanced workflows. |
-| **Exit codes** | `0=success`, `1=generic failure`, `2=schema/config invalid`, `3=hard abort (CI/Release)`. |
-| **Source of truth** | `src/invarlock/cli/commands/run.py`, `src/invarlock/reporting/verify_contract.py`, `src/invarlock/core/doctor_findings.py`. |
+| **Exit codes** | Core verify/evaluate use `0=success`, `1=generic failure`, `2=schema/config invalid`, `3=hard abort (CI/Release)`. Evidence-pack verification also uses structured pack codes `4`-`7`. |
+| **Source of truth** | `src/invarlock/cli/commands/run.py`, `src/invarlock/cli/commands/verify.py`, `src/invarlock/evidence_pack_support.py`, `src/invarlock/reporting/verify_contract.py`, `src/invarlock/core/doctor_findings.py`. |
 
 ## Quick Start
 
@@ -24,8 +24,9 @@ INVARLOCK_DEBUG_TRACE=1 \
 ```
 
 For container-backed outputs, `verify` expects `runtime.manifest.json` next to
-the evaluation report. Host-mode outputs are supported with host runtime
-provenance and assurance off.
+the evaluation report. Host-mode outputs are an unverified provenance path; use
+`--runtime-provenance host --assurance off` only when that non-assurance mode is
+intentional.
 
 ## Error Code Reference
 
@@ -254,12 +255,12 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 | --- | --- |
 | **Code** | `E601` |
 | **Category** | Verification |
-| **Severity** | Hard abort |
-| **Exit code** | `3` |
+| **Severity** | Verification failure |
+| **Exit code** | `2` for malformed/schema-invalid input; `3` for CI/Release policy or gate failure |
 
 **Triggers:**
 
-- report fails schema validation
+- report fails schema validation or is malformed
 - Pairing math recomputation fails
 - Gate checks fail in CI/Release profile
 
@@ -291,6 +292,10 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 | `1` | Generic failure | Unknown error, missing dependencies |
 | `2` | Schema/config invalid | YAML parse error, invalid config keys, `ValidationError` |
 | `3` | Hard abort | E001–E006, E111, E601 in CI/Release profile |
+| `4` | Evidence-pack format failure | Manifest or pack contract malformed |
+| `5` | Evidence-pack signature failure | Missing/invalid `manifest.signature.json` or untrusted signer |
+| `6` | Evidence-pack integrity failure | Checksum or digest binding mismatch |
+| `7` | Evidence-pack report failure | Bundled report verification failed |
 
 ## Common Issues
 

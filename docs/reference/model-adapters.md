@@ -11,7 +11,7 @@
 | **Network** | Offline by default; use `evaluate --allow-network` when a run needs model downloads. |
 | **Inputs** | `model.id` (HF repo or local path), adapter name, device. |
 | **Outputs / Artifacts** | Loaded model object; optional snapshots; exported model directories when enabled. |
-| **Source of truth** | `src/invarlock/adapters/*`, `src/invarlock/plugins/hf_*_adapter.py`. |
+| **Source of truth** | `src/invarlock/adapters/*`, built-in plugin metadata in `src/invarlock/core/builtin_plugin_catalog.py`, optional adapter implementations in `src/invarlock/plugins/__init__.py`, and adapter entry points in `pyproject.toml`. |
 
 ## Quick Start
 
