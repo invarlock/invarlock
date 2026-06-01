@@ -79,6 +79,19 @@ sitecustomize.py
 final_model/
 step_*/
 
+# Integration example generated outputs
+/examples/integrations/**/models/
+/examples/integrations/**/runs/
+/examples/integrations/**/reports/
+/examples/integrations/**/artifacts/
+/examples/integrations/**/evidence_pack/
+/examples/integrations/**/*.html
+/examples/integrations/**/evaluation.report.json
+/examples/integrations/**/runtime.manifest.json
+/examples/integrations/**/verify.json
+/examples/integrations/**/checkpoint_refs.json
+/examples/integrations/**/run_command.txt
+
 # Documentation and frontend build outputs
 /site/
 /node_modules/

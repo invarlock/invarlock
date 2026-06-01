@@ -62,6 +62,7 @@ boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 - [Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)
 - [Primary Metric Smoke](user-guide/primary-metric-smoke.md)
 - [Live Examples](user-guide/live-examples.md)
+- [Integration Examples](user-guide/integrations.md)
 - [Public Evidence Walkthrough](user-guide/public-evidence-walkthrough.md)
 - [Configuration Gallery](user-guide/config-gallery.md)
 - [Example Reports](user-guide/example-reports.md)
