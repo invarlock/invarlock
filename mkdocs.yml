@@ -57,11 +57,11 @@ nav:
       - RMT ε-Rule: assurance/06-rmt-epsilon-rule.md
       - VE Predictive Gate: assurance/07-ve-gate-power.md
       - Determinism Contracts: assurance/08-determinism-contracts.md
-      - Tier v1.0 Calibration (Pilot): assurance/09-tier-v1-calibration.md
+      - Tier Policy v1 Calibration (Pilot): assurance/09-tier-v1-calibration.md
       - Guard Overhead Method: assurance/10-guard-overhead-method.md
       - Policy Provenance & Digest: assurance/11-policy-provenance.md
       - Device Drift Bands: assurance/12-device-drift-bands.md
-      - GPU/MPS-First Guards: assurance/13-gpu-mps-first-guards.md
+      - GPU/MPS-First Guard Measurement Contracts: assurance/13-gpu-mps-first-guards.md
       - Guard Validation Smoke: assurance/16-guard-validation-smoke.md
       - Empirical Guard Evidence: assurance/17-empirical-guard-evidence.md
   - Security:
@@ -96,10 +96,8 @@ plugins:
   - mermaid2:
       enabled: !ENV [INVARLOCK_DOCS_MERMAID, false]
 
-# Gate extra JavaScript behind an environment variable to avoid network usage by default.
-# Provide a YAML/JSON list of URLs via INVARLOCK_DOCS_EXTRA_JS to include CDN scripts.
-# Example:
-#   INVARLOCK_DOCS_EXTRA_JS='["https://polyfill.io/v3/polyfill.min.js?features=es6",
-#                         "https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js"]' \
-#   mkdocs build --strict
-extra_javascript: !ENV [INVARLOCK_DOCS_EXTRA_JS, []]
+# MathJax is referenced but not fetched during `mkdocs build`; browsers load it
+# when viewing the generated site so Arithmatex formulas render correctly.
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js

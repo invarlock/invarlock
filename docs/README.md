@@ -21,7 +21,7 @@ running paired evaluation on text workflows plus the included image-text path.
 
 1. **[Getting Started](user-guide/getting-started.md)** – environment setup and the first `evaluate` → `verify` → `report html` loop.
 2. **[Quickstart](user-guide/quickstart.md)** – CLI highlights for common workflows.
-3. **[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)** – baseline ↔ subject paired evaluation with guardchain.
+3. **[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)** – baseline ↔ subject paired evaluation with the guard chain.
 4. **[Primary Metric Smoke](user-guide/primary-metric-smoke.md)** – tiny examples for ppl/accuracy kinds.
 
 ### Choose Your Path
@@ -76,6 +76,7 @@ boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 
 - [Reference Index](reference/index.md)
 - [CLI Reference](reference/cli.md)
+- [Public Contracts](reference/contracts.md)
 - [Tier Policy Tuning CLI (Calibration)](reference/calibration.md) — `invarlock advanced calibrate` for tier policy sweeps
 - [Configuration Schema](reference/config-schema.md)
 - [Guards](reference/guards.md)
@@ -108,11 +109,11 @@ this public docs index.
 - [RMT ε-Rule](assurance/06-rmt-epsilon-rule.md)
 - [VE Predictive Gate](assurance/07-ve-gate-power.md)
 - [Determinism Contracts](assurance/08-determinism-contracts.md)
-- [Tier v1.0 Calibration](assurance/09-tier-v1-calibration.md)
+- [Tier Policy v1 Calibration](assurance/09-tier-v1-calibration.md)
 - [Guard Overhead Method](assurance/10-guard-overhead-method.md)
 - [Policy Provenance & Digest](assurance/11-policy-provenance.md)
 - [Device Drift Bands](assurance/12-device-drift-bands.md)
-- [GPU/MPS-First Guards (Decision Memo)](assurance/13-gpu-mps-first-guards.md)
+- [GPU/MPS-First Guard Measurement Contracts](assurance/13-gpu-mps-first-guards.md)
 - [Guard Validation Smoke](assurance/16-guard-validation-smoke.md)
 - [Empirical Guard Evidence](assurance/17-empirical-guard-evidence.md)
 
@@ -120,7 +121,7 @@ Note: Every assurance claim is backed by automated tests and cross-referenced in
 the docs. See Guard Contracts → Coverage Reference
 (assurance/04-guard-contracts.md) for the test index.
 
-Calibration CSVs and proof reports referenced in these notes are produced by
+Calibration CSVs and evidence reports referenced in these notes are produced by
 local or CI runs (typically under `runs/null_sweeps/**` and
 `reports/calibration/**`) and are not committed to the repository. Attach them
 to change proposals or releases when you update calibration.
@@ -190,17 +191,19 @@ configured acceptance envelopes even when aggressive compression is attempted.
 ## Building Docs Offline vs Online
 
 - Offline (default): mkdocs builds without contacting the Internet. Mermaid
-  diagrams are disabled by default to keep builds fully local.
-  - Command: `mkdocs build` or run `make docs` without `--strict`.
+  diagrams are disabled by default to keep builds fully local. The generated
+  HTML references MathJax so formulas render in browsers with network access;
+  MathJax is not fetched during the build.
+  - Command: `make docs` or `mkdocs build --strict`.
 - Online (enable networked assets explicitly): enable Mermaid diagrams (via CDN)
   and keep strict checks.
   - Command: `INVARLOCK_DOCS_MERMAID=1 mkdocs build --strict`
 
 Notes
 
-- The configuration references CDNs (MathJax/Polyfill) via `extra_javascript` in
-  the generated HTML. These are not fetched at build time; they load when you
-  view the HTML in a browser with network access.
+- The configuration references MathJax via `extra_javascript` in the generated
+  HTML. This is required for Arithmatex formulas to render on the published
+  docs site.
 - The mermaid2 plugin pings the CDN; we gate it behind the
   `INVARLOCK_DOCS_MERMAID` environment variable to avoid network dependencies by
   default.
@@ -291,7 +294,7 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
 ```bash
 invarlock advanced plugins adapters
 invarlock advanced calibrate --help
-bash scripts/checks/verify_ci_matrix.sh
+make ci-matrix
 ```
 
 ### Production Evaluation
@@ -347,10 +350,10 @@ output:
 <!-- Quick CPU demos are intentionally omitted from this public docs index. -->
 
 ```bash
-NET=1 INCLUDE_MEASURED_CLS=1 RUN=0 bash scripts/smoke/run_tiny_all_matrix.sh
+bash scripts/smoke/run_tiny_all_matrix.sh
 ```
 
-Run with `RUN=1` to execute the matrix.
+Run with `RUN=1 NET=1` to execute the matrix and allow downloads.
 
 ---
 

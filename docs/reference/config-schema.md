@@ -55,9 +55,10 @@ output:
 
 **Precedence (highest → lowest)**
 
-1. CLI flags (e.g. `--device`, `--tier`, `--probes`).
+1. Public CLI flags (e.g. `--device`, `--tier`); advanced/internal config
+   runners also accept runner-specific flags such as `--probes`.
 2. Profile selection (`--profile ci|release`) — window counts + determinism knobs.
-3. YAML config (`-c config.yaml`).
+3. YAML config selected through `--preset` or an internal config runner.
 4. `defaults:` block in YAML (DRY base).
 5. Packaged runtime defaults (fallback).
 
@@ -68,7 +69,7 @@ output:
 | `model.device` | `--device` | — | ✅ | ✅ | CLI wins. |
 | `dataset.preview_n/final_n` | — | ✅ | ✅ | ✅ | Profile wins. |
 | `auto.tier` | `--tier` | — | ✅ | ✅ | CLI wins. |
-| `auto.probes` | `--probes` | — | ✅ | ✅ | CLI wins. |
+| `auto.probes` | internal `--probes` | — | ✅ | ✅ | Internal runner flag wins. |
 
 Confirm in `report.meta.device`, `report.meta.auto`, and `report.data.preview_n/final_n`.
 
@@ -146,7 +147,7 @@ auto:
   enabled: true
   tier: balanced
   probes: 0
-  target_pm_ratio: 2.0
+  target_pm_ratio: 1.0
 ```
 
 ### Primary metric policy hints
@@ -217,7 +218,7 @@ output:
 eval:
   max_pm_ratio: 1.5
   metric:
-    kind: auto            # auto|ppl_causal|ppl_mlm|ppl_seq2seq|accuracy
+    kind: auto            # resolver value; report kinds include ppl_causal, ppl_mlm, ppl_seq2seq, accuracy, bleu, f1, rouge
     reps: 2000
     ci_level: 0.95
 ```

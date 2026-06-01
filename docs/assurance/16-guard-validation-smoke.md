@@ -1,5 +1,9 @@
 # Guard Validation Smoke
 
+> **Plain language:** The smoke command proves the synthetic guard-validation
+> harness still runs and records deterministic guard behavior; it does not
+> replace real model-family evidence.
+
 ## Overview
 
 | Aspect | Details |
@@ -36,8 +40,8 @@ They only provide a repeatable harness shape for:
 - type-I error reporting
 - power reporting
 - calibration-window sensitivity
-- model-family sensitivity placeholders
-- injected-defect detection examples
+- model-family placeholder rows
+- synthetic shifted-power rates
 
 Release reviewers should treat the smoke as a floor. Empirical artifacts for
 real model families still belong in the release evidence bundle when a release

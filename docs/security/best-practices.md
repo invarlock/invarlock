@@ -22,7 +22,8 @@ Copy-paste checklist for production or CI deployments:
 ```markdown
 ## Pre-deployment
 - [ ] Network-off by default (`INVARLOCK_ALLOW_NETWORK` unset)
-- [ ] Dependencies locked (`pip freeze > requirements.lock`)
+- [ ] Dependencies locked with repo tooling (`make lock-sync` / `uv.lock`);
+      downstream deployments may still export an environment snapshot when needed
 - [ ] Python ≥ 3.12
 - [ ] pip-audit clean or exceptions documented
 - [ ] SBOM generated from the installed release surface (`scripts/security/generate_sbom.sh --scope install-surface --python ...`)

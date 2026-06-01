@@ -99,7 +99,7 @@ Note: clean edits require tuned preset parameters. Either set
 
 The evidence-pack shell wrappers do not expose the public core
 `--execution-mode` / `--runtime-provenance` flags directly. For host-side
-host execution in these repo-only wrappers, set `INVARLOCK_ALLOW_HOST_EXECUTION=1`
+execution in these repo-only wrappers, set `INVARLOCK_ALLOW_HOST_EXECUTION=1`
 in the environment before calling `run_pack.sh` or `run_suite.sh`.
 Installed-wheel/public workflows should use
 `invarlock evaluate --execution-mode host` instead. Otherwise, the
@@ -143,16 +143,17 @@ models via `MODEL_1`–`MODEL_8`.
 | Suite | Models | Notes |
 | --- | --- | --- |
 | `subset` | `mistralai/Mistral-7B-v0.1` | Single-GPU friendly |
-| `showcase` | 7B–14B ungated models | Multi-GPU recommended; adds guard-focused scenarios |
-| `workshop3` | 7B–32B ungated models | Workshop-friendly 3-model suite (architecture diversity) |
-| `full` | 7B–72B ungated models | Multi-GPU recommended |
+| `showcase` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B` | Multi-GPU recommended; adds guard-focused scenarios |
+| `workshop3` | `mistralai/Mistral-7B-v0.1`, `mistralai/Mixtral-8x7B-v0.1`, `01-ai/Yi-34B` | Workshop-friendly 3-model suite (architecture diversity) |
+| `full` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B`, `01-ai/Yi-34B`, `mistralai/Mixtral-8x7B-v0.1`, `Qwen/Qwen1.5-72B` | Multi-GPU recommended |
 
-Storage note: a default `subset` run on Mistral-7B typically needs about 42 GB
-of model-weight space on the output filesystem with the default
-`PACK_BASELINE_STORAGE_MODE=snapshot_symlink` when the Hugging Face cache lives
-on the same filesystem as `OUTPUT_DIR`, or about 28 GB if the cache is on a
-separate volume. `snapshot_copy` is heavier at about 56 GB. The suite's disk
-preflight also enforces `MIN_FREE_DISK_GB` headroom (200 GB by default).
+Storage note: a default `subset` run on Mistral-7B typically needs about 56 GB
+of model-weight space on the output filesystem with the wrapper default
+`PACK_BASELINE_STORAGE_MODE=snapshot_copy`. If you explicitly opt into
+`snapshot_symlink`, the same run typically needs about 42 GB when the Hugging
+Face cache lives on the same filesystem as `OUTPUT_DIR`, or about 28 GB if the
+cache is on a separate volume. The suite's disk preflight also enforces
+`MIN_FREE_DISK_GB` headroom (200 GB by default).
 
 Scenario selection is driven by `scripts/evidence_packs/scenarios.json`. Scenarios can
 optionally declare `suites: ["subset", "showcase", "full", ...]`; during execution the

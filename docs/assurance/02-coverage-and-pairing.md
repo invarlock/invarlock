@@ -4,19 +4,28 @@
 > Baseline and edited runs reuse the exact same windows. Tier‑based minima are
 > validated at runtime and surfaced in the report.
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Define the pairing, non-overlap, seed, and tier-floor requirements for evaluation windows. |
+| **Audience** | Evaluation pipeline maintainers, release reviewers, and operators preparing paired evidence. |
+| **Contract scope** | Baseline/subject window reuse, pairing statistics, coverage floors, and report-verifier checks. |
+| **Source of truth** | `src/invarlock/core/runner_pairing.py`, `src/invarlock/eval/window_planning.py`, and report pairing tests. |
+
 ## Claim
 
 A valid evaluation schedule uses non‑overlapping, paired windows with fixed
 seeds and reuses the baseline window IDs for edited runs. The runner enforces
-tier‑based minima and aborts in CI/Release when pairing or coverage is
-insufficient.
+tier-based minima. CI/Release runs hard-fail pairing/count drift when a baseline
+pairing context exists, and report verification rejects invalid pairing.
 
 ## Window Selection (assumptions)
 
 - **Non‑overlap:** set `seq_len == stride` so windows do not overlap.
 - **Deterministic:** record and reuse the seed bundle (`python`, `numpy`, `torch`) and bootstrap seed (when applicable).
 - **Dedupe:** deduplication is allowed for pilots/probes; **release evidence uses strict non‑overlap on the full plan**.
-- **Exact pairing:** preview/final counts must match and the edited run must reuse baseline window IDs; mixing schedules voids the paired Δlog guarantees.
+- **Exact pairing:** preview/final counts must match and the edited run must reuse baseline window IDs; mixing schedules invalidates the paired Δlog assumptions.
 
 ## Pairing Reuse (baseline → edited)
 
@@ -24,7 +33,8 @@ insufficient.
 - report lints pairing and overlap:
   - `dataset.windows.stats.window_match_fraction == 1.0`
   - `dataset.windows.stats.window_overlap_fraction == 0.0`
-- CI/Release abort if counts differ, pairing < 1.0, or overlap > 0.0.
+- CI/Release abort if counts differ, pairing < 1.0, or overlap > 0.0 when a
+  baseline pairing context exists.
 
 ## Tier Minima (runner defaults)
 
@@ -38,14 +48,18 @@ request higher counts):
 | Aggressive   | 140              | 140           |   800                |
 
 These minima are derived from half‑width targets on paired Δlog‑loss (see
-Tier v1.0 Calibration). CI/Release profiles treat shortfalls as hard errors;
-dev flows surface warnings but also record coverage in the container-backed report bundle.
+[Tier Policy v1 Calibration](09-tier-v1-calibration.md)). CI/Release profiles treat
+shortfalls as hard errors; dev flows surface warnings but also record coverage
+in the generated report bundle.
 
 ## Runtime Contract (report)
 
 - Window plan: `dataset.windows.stats.{requested_preview,requested_final,actual_preview,actual_final}`
 - Pairing/overlap: `dataset.windows.stats.{window_match_fraction,window_overlap_fraction,paired_windows}`
-- Bootstrap coverage: `dataset.windows.stats.bootstrap.{replicates,seed}` meets/exceeds the tier floor (profiles may request higher counts)
+- Coverage floors: `dataset.windows.stats.coverage.{preview,final}` meets/exceeds
+  the window tier floor (profiles may request higher counts)
+- Bootstrap metadata: `dataset.windows.stats.bootstrap.{method,alpha,replicates,seed}`
+  records the interval method, replicate count, and RNG seed
 
 ## Observability
 
@@ -59,6 +73,6 @@ dev flows surface warnings but also record coverage in the container-backed repo
 - Dataset or tokenizer changes that affect tokenization invalidate recorded
   pairing schedules.
 - Window pairing must be exact (ID reuse) and non‑overlapping; mixing schedules
-  voids paired Δlog guarantees.
+  invalidate paired Δlog assumptions.
 - This plan is calibrated for Linux/macOS environments and the tier profiles
-  documented in Tier v1.0 Calibration.
+  documented in [Tier Policy v1 Calibration](09-tier-v1-calibration.md).

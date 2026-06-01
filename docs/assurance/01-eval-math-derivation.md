@@ -5,15 +5,24 @@
 > exponentiating the same paired bootstrap; this note derives both facts in the
 > report's operating context.
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Derive the paired log-space primary-metric ratio and its displayed confidence interval. |
+| **Audience** | Report verifier maintainers, statistics reviewers, and contributors changing paired metric code. |
+| **Contract scope** | PPL-like metrics on paired evaluation windows with known token counts and non-overlapping schedules. |
+| **Source of truth** | `src/invarlock/core/bootstrap.py`, report pairing logic, and paired-CI contract tests. |
+
 ## Claim
 
-For paired evaluation windows `i = 1..n` with token counts `t_i`, the reported
+For ppl-like metrics on paired evaluation windows `i = 1..n` with token counts `t_i`, the reported
 **ratio** between two arms A and B (e.g., preview/final or edited/baseline)
 satisfies
 
 $$
 \text{ratio} = \exp\!\Big(\overline{\Delta \ell}_{\text{w}}\Big),\quad
-\Delta \ell_i = \ell^{(B)}_i - \ell^{(A)}_i,
+\Delta \ell_i = \ell^{(B)}_i - \ell^{(A)}_i
 $$
 
 where $\ell_i$ is the **per‑token** log‑loss on window $i$, and the **weighted** mean is
@@ -77,7 +86,14 @@ token‑weighted).
 
 ## Derivation (sketch)
 
-For ppl-like primary metrics (perplexity), $\text{PPL} = \exp(\bar{\ell})$ where $\bar{\ell} = \sum t_i \ell_i / \sum t_i$.
+For ppl-like primary metrics (perplexity):
+
+$$
+\text{PPL} = \exp(\bar{\ell}),
+\qquad
+\bar{\ell} = \frac{\sum_i t_i \ell_i}{\sum_i t_i}
+$$
+
 Thus the ratio:
 
 $$
@@ -97,7 +113,9 @@ Let the token‑weighted mean be $\overline{\Delta \ell}_{\text{w}} = \sum_i t_i
 $$
 \mathbb{E}\big[\overline{\Delta \ell}_{\text{w}}\big]
 = \frac{\sum_i t_i\, \mathbb{E}[\Delta \ell_i]}{\sum_i t_i}
-= \log\Bigg(\prod_i \Big(\tfrac{p_i^{(B)}}{p_i^{(A)}}\Big)^{\,t_i/\sum_j t_j}\Bigg),
+= \log\Bigg(\prod_i
+\Bigg(\frac{p_i^{(B)}}{p_i^{(A)}}\Bigg)^{t_i/\sum_j t_j}
+\Bigg)
 $$
 
 so, under the stated window-level assumptions, the estimator targets the log of
@@ -106,12 +124,23 @@ the point estimator converges to the population log‑ratio.
 
 ### Jensen inequality note
 
-Let $r_i = \exp(\Delta \ell_i) = \mathrm{PPL}^{(B)}_i / \mathrm{PPL}^{(A)}_i$. Then
-$\exp\big(\overline{\Delta \ell}_{\text{w}}\big)$ is the weighted geometric mean
-of $r_i$. By AM-GM (equivalently Jensen on $\log$), the weighted geometric mean
-is $\le$ the weighted arithmetic mean of $r_i$. The ratio of mean perplexities
-is a different quantity and can be larger or smaller; see the counter-example
-below.
+Let
+
+$$
+r_i = \exp(\Delta \ell_i) =
+\frac{\mathrm{PPL}^{(B)}_i}{\mathrm{PPL}^{(A)}_i}
+$$
+
+Then
+
+$$
+\exp\big(\overline{\Delta \ell}_{\text{w}}\big)
+$$
+
+is the weighted geometric mean of $r_i$. By AM-GM (equivalently Jensen on
+$\log$), the weighted geometric mean is $\le$ the weighted arithmetic mean of
+$r_i$. The ratio of mean perplexities is a different quantity and can be larger
+or smaller; see the counter-example below.
 
 ## Why log‑space vs ratio of means (counter‑example)
 
@@ -148,7 +177,9 @@ InvarLock uses the exponential of the token‑weighted mean ΔlogNLL
   - `dataset.windows.stats.paired_delta_summary` records `{mean,std,degenerate}` for the paired Δ distribution.
   - `dataset.windows.stats.window_match_fraction == 1.0` and `dataset.windows.stats.window_overlap_fraction == 0.0`.
 
-- Runs **abort** in CI/Release profiles if preview/final counts differ or pairing < 1.0.
+- Runs hard-fail in CI/Release profiles when a baseline pairing context exists
+  and preview/final counts differ, pairing is incomplete, or windows overlap.
+  Verification also rejects invalid pairing in generated reports.
 
 ## Observability
 
@@ -168,3 +199,5 @@ InvarLock uses the exponential of the token‑weighted mean ΔlogNLL
 
 - Jurafsky, D., & Martin, J. H. (2023). *Speech and Language Processing* (3rd ed. draft), chapters on language modeling and perplexity. <https://web.stanford.edu/~jurafsky/slp3/>
 - Manning, C. D., & Schütze, H. (1999). *Foundations of Statistical Natural Language Processing.* MIT Press.
+- Hugging Face Transformers. “Perplexity of fixed-length models.”
+  <https://huggingface.co/docs/transformers/perplexity>

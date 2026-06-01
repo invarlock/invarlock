@@ -3,13 +3,23 @@
 > **Plain language:** Confidence intervals come from a paired, token‑weighted
 > BCa bootstrap on Δlog‑loss; the ratio CI is just the exponentiated Δlog CI.
 > When Δ is degenerate, or BCa’s acceleration term is undefined, we fall back
-> safely.
+> transparently.
+
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Document the paired token-weighted bootstrap method and its transparent fallback behavior. |
+| **Audience** | Statistics reviewers, report-verifier maintainers, and contributors changing CI computation. |
+| **Contract scope** | Paired delta-log-loss confidence intervals and ratio-CI conversion for report evidence. |
+| **Source of truth** | `src/invarlock/core/bootstrap.py`, `src/invarlock/core/runner_eval_metrics_stats.py`, and bootstrap tests. |
 
 ## Claim
 
 Paired, token‑weighted BCa on Δlog‑loss yields a ratio CI by exponentiation.
 When Δ is degenerate or acceleration is undefined, the implementation falls
-back safely (e.g., percentile CI or a collapsed interval).
+back transparently (e.g., percentile CI or a collapsed interval) and records the
+fallback in report evidence.
 
 ## Method (paired, token‑weighted)
 
@@ -25,7 +35,10 @@ Given per‑window token counts `t_i` and log‑losses `ℓ_i^A`, `ℓ_i^B`, def
 
 ## Fallbacks
 
-- Degenerate Δ (all equal, no pairs, or single pair): mark `degenerate=true`; CI collapses to `[μ, μ]` with `μ = mean(Δ)`.
+- Empty or no-pair input is rejected by the bootstrap helper and surfaced by the
+  report pipeline as invalid/degraded pairing evidence.
+- Degenerate Δ (all equal values or a single pair): mark `degenerate=true`; CI
+  collapses to `[μ, μ]` with `μ = mean(Δ)`.
 - Undefined acceleration (jackknife variance is zero): fall back to a percentile bootstrap CI.
 
 ## Runtime Contract (report)
@@ -35,7 +48,8 @@ Given per‑window token counts `t_i` and log‑losses `ℓ_i^A`, `ℓ_i^B`, def
 - Identity checks:
   - `primary_metric.display_ci == exp(primary_metric.ci)`
   - preview/final drift ratio is computed from `primary_metric.{preview,final}`
-- `dataset.windows.stats.bootstrap.{replicates,seed,method}`
+- `dataset.windows.stats.bootstrap.{replicates,seed,method,alpha}`
+- `dataset.windows.stats.coverage.{preview,final}` — tier-floor window coverage enforcement
 - `dataset.windows.stats.paired_delta_summary.{mean,std,degenerate}`
 
 ## Defaults & Tuning (tiers)
@@ -48,7 +62,8 @@ enforce minima strictly when pairing is established.
 
 ## Notes
 
-- Pairing and non‑overlap are required; see Coverage & Pairing Plan.
+- Pairing and non‑overlap are required; see
+  [Coverage & Pairing Plan](02-coverage-and-pairing.md).
 - BCa is numerically stable under typical window counts; for extreme small‑n, expect more frequent fallbacks.
 
 ## Assumptions & Scope
@@ -57,6 +72,9 @@ enforce minima strictly when pairing is established.
   to hold.
 - Degenerate Δ cases are rare in practice at tier coverage; when they occur,
   the report records the fallback explicitly.
+- Percentile and collapsed intervals are fallback evidence surfaces for
+  auditability; they should not be treated as stronger than a normal BCa
+  interval.
 
 ## References
 

@@ -1,7 +1,8 @@
 # Tier Policy Tuning CLI (Calibration)
 
 > Scope note: this page covers **Tier Policy Tuning** via `invarlock advanced calibrate ...`.
-> It outputs `tiers_patch_*.yaml` recommendations for `runtime/tiers.yaml`.
+> It outputs `tiers_patch_*.yaml` recommendations for a reviewed tier-policy
+> override or the packaged source tier file (`src/invarlock/_data/runtime/tiers.yaml`).
 > For evidence-pack run-scoped preset derivation (`CALIBRATION_RUN -> GENERATE_PRESET`),
 > see [Evidence Pack Internals](../user-guide/evidence-packs-internals.md).
 
@@ -175,7 +176,8 @@ Runs VE predictive-gate sweeps and recommends `min_effect_lognll` per tier.
 
 ### Applying recommendations
 
-After a sweep, merge the `tiers_patch_*.yaml` into your `runtime/tiers.yaml`:
+After a sweep, merge the `tiers_patch_*.yaml` into a reviewed
+`runtime/tiers.yaml` override or the source tier policy:
 
 ```bash
 # Review recommendations

@@ -445,7 +445,7 @@ html = render_report_html(report)
 - **Schema validation fails**: check `schema_version` and required top-level
   fields (`run_id`, `meta`, `dataset`, `artifacts`, `primary_metric`).
 - **Unexpected validation keys**: ensure `validation.*` keys match the allow-list
-  in `report_schema`.
+  in `contracts/validation_keys.json`.
 
 ### Telemetry Issues
 
@@ -454,7 +454,8 @@ html = render_report_html(report)
 
 ### HTML Export Issues
 
-- **Missing report**: generate one first via `invarlock report --format report`.
+- **Missing report**: generate one first via
+  `invarlock report generate --run <subject report.json> --baseline-run-report <baseline report.json> --format report -o <output-dir>`.
 - **HTML missing styles**: omit `--no-embed-css` or apply custom CSS later in your publishing layer.
 
 ---

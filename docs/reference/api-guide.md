@@ -126,7 +126,7 @@ report = CoreRunner().execute(
 | `enabled` | Whether auto mode is enabled. |
 | `tier` | Tier label (`balanced`, `conservative`, `aggressive`). |
 | `probes` | Micro-probe count (0–10). |
-| `target_pm_ratio` | Target ratio for auto tuning (CLI default: 2.0). |
+| `target_pm_ratio` | Target ratio for auto tuning (default: 1.0 when unset). |
 
 ### RunReport fields
 

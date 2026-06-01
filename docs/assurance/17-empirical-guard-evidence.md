@@ -1,5 +1,9 @@
 # Empirical Guard Evidence
 
+> **Plain language:** Empirical guard evidence is the portable manifest layer
+> that points reviewers to real model/checkpoint runs for spectral, RMT, and
+> variance behavior.
+
 ## Overview
 
 | Aspect | Details |
@@ -97,8 +101,11 @@ root.
 ## Interpretation
 
 Passing the empirical checker means the release bundle contains portable
-non-synthetic evidence references with the required guard coverage. It does not
-mean every threshold is statistically final, and it does not replace
+manifest references that self-declare non-synthetic evidence with the required
+guard coverage. The checker validates manifest shape, required guard/model rows,
+declared evidence kinds/statuses, command markers, and relative nonempty
+artifact paths. It does not parse artifact contents, authenticate the producer,
+or prove every threshold is statistically final, and it does not replace
 `invarlock verify --assurance strict` for strict report acceptance.
 
 ## Related Documentation
@@ -107,6 +114,6 @@ mean every threshold is statistically final, and it does not replace
 - [Spectral False-Positive Control](05-spectral-fpr-derivation.md)
 - [RMT Epsilon Rule](06-rmt-epsilon-rule.md)
 - [VE Predictive Gate](07-ve-gate-power.md)
-- [Tier v1.0 Calibration](09-tier-v1-calibration.md)
+- [Tier Policy v1 Calibration](09-tier-v1-calibration.md)
 - [Calibration Reference](../reference/calibration.md)
 - [Evidence Packs](../user-guide/evidence-packs.md)

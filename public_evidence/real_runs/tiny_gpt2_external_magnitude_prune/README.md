@@ -12,13 +12,21 @@ evaluate` consumes that subject with `--edit-label custom`.
 Verify the report:
 
 ```bash
-uv run invarlock verify   public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json   --profile release   --assurance strict
+uv run invarlock verify \
+  public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json \
+  --profile release \
+  --assurance strict
 ```
 
 Verify the signed pack with signer pinning:
 
 ```bash
-uv run invarlock advanced evidence-pack verify   public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack   --strict   --profile release   --report-assurance strict   --expected-fingerprint sha256:e01c40a94c89b22306a2670b032f623aa5428351d06e18f9b3e9e6a39b42c41b
+uv run invarlock advanced evidence-pack verify \
+  public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack \
+  --strict \
+  --profile release \
+  --report-assurance strict \
+  --expected-fingerprint sha256:e01c40a94c89b22306a2670b032f623aa5428351d06e18f9b3e9e6a39b42c41b
 ```
 
 Non-goals: this does not vendor model weights, does not claim sparse runtime

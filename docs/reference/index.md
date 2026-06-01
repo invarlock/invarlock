@@ -43,7 +43,7 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 1. [Guards](guards.md) — Configuration and evidence
 2. [Tier Policy Catalog](tier-policy-catalog.md) — Threshold rationale
 3. [Tier Policy Tuning CLI (Calibration)](calibration.md) — Sweep harnesses for recalibrating thresholds
-4. [GPU/MPS-First Guards](../assurance/13-gpu-mps-first-guards.md) — Design decisions
+4. [GPU/MPS-First Guard Measurement Contracts](../assurance/13-gpu-mps-first-guards.md) — Accelerator guard evidence contracts
 
 ### Programming Against InvarLock
 

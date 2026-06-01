@@ -20,6 +20,25 @@ The checked taxonomy lives in `scripts/scripts_inventory.toml`:
 - `security-supply-chain`: SBOM, CVE audit, pip-audit, requirements pinning, and
   scorecard helpers.
 
+High-signal workflow front doors:
+
+- `bash scripts/smoke/run_tiny_all_matrix.sh`: write a dry-run checklist for the
+  tiny model evaluation matrix. Set `RUN=1` to execute it and `NET=1` when model
+  downloads are allowed. This covers compact causal-LM, encoder-MLM, and quant
+  demo evaluation paths.
+- `make model-evidence-list`: print the maintained shipped-model evidence lane
+  manifest.
+- `make model-evidence-sweep MODEL_EVIDENCE_ARGS='--dry-run'`: inspect the
+  commands for the maintained model-evidence sweep without running downloads or
+  evaluations. Remove `--dry-run` for a real sweep; use `MODEL_EVIDENCE_ARGS`
+  for `--suite`, `--slug`, `--lane-id`, `--device`, sharding, and execution-mode
+  overrides.
+- `scripts/evidence_packs/run_suite.sh`: run evidence-pack scenarios without
+  packaging the result. This is for development/debugging.
+- `scripts/evidence_packs/run_pack.sh`: run the suite and build a distributable
+  evidence pack. Prefer this over `run_suite.sh` for release or reviewer-facing
+  artifacts.
+
 Each family records owner, purpose, stability, audience, expected runtime,
 network/GPU needs, and known callers. The audit expands those family entries to
 one row per file:

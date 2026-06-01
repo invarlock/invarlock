@@ -15,7 +15,7 @@
 # Check environment and configuration
 invarlock doctor --config <config.yaml> --profile ci
 
-# Validate an container-backed report bundle
+# Validate a container-backed report bundle
 invarlock verify reports/eval/evaluation.report.json --profile ci
 
 # Enable debug output for detailed traces
@@ -23,7 +23,9 @@ INVARLOCK_DEBUG_TRACE=1 \
   invarlock evaluate --allow-network --execution-mode host --baseline gpt2 --subject gpt2 --preset <config.yaml>
 ```
 
-`verify` expects `runtime.manifest.json` next to evaluation outputs.
+For container-backed outputs, `verify` expects `runtime.manifest.json` next to
+the evaluation report. Host-mode outputs are supported with host runtime
+provenance and assurance off.
 
 ## Error Code Reference
 
@@ -309,9 +311,9 @@ invarlock evaluate --allow-network --baseline gpt2 --subject gpt2
 **Fix:**
 
 ```bash
-pip install "invarlock[hf]"      # HF adapters + eval
-pip install "invarlock[guards]"  # Guard math
-pip install "invarlock[adapters]" # All adapters
+pip install "invarlock[hf]"       # HF adapters + evaluation stack
+pip install "invarlock[guards]"   # Guard math
+pip install "invarlock[adapters]" # Core HF adapters
 ```
 
 ### Calibration Data Not Indexable
@@ -349,9 +351,9 @@ context:
 
 ### Explicit CUDA Request Rejected Before Container Launch
 
-**Symptom:** Default runtime-container `evaluate`, `run`, or `calibrate` exits early with a
-message that `--device cuda` was requested but no NVIDIA runtime is visible on
-the host.
+**Symptom:** Default runtime-container `evaluate`, advanced calibration, or
+internal config-runner flows exit early with a message that `--device cuda` was
+requested but no NVIDIA runtime is visible on the host.
 
 **Cause:** Explicit CUDA requests are fail-closed for delegated container runs.
 InvarLock requires either `/dev/nvidiactl` or `nvidia-smi` to be visible before
