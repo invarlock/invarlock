@@ -97,8 +97,11 @@ root.
 ## Interpretation
 
 Passing the empirical checker means the release bundle contains portable
-non-synthetic evidence references with the required guard coverage. It does not
-mean every threshold is statistically final, and it does not replace
+manifest references that self-declare non-synthetic evidence with the required
+guard coverage. The checker validates manifest shape, required guard/model rows,
+declared evidence kinds/statuses, command markers, and relative nonempty
+artifact paths. It does not parse artifact contents, authenticate the producer,
+or prove every threshold is statistically final, and it does not replace
 `invarlock verify --assurance strict` for strict report acceptance.
 
 ## Related Documentation

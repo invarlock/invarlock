@@ -62,8 +62,8 @@ ties the runtime contract back to reproducible maths:
   regenerating reports on the **same backend** (see
   `tests/reporting/policy/test_report_paired_ci_identity.py::test_paired_ci_identity_holds`).
 - Cross-device drift must stay within the bands listed in
-  `docs/assurance/04-guard-contracts.md`; use `scripts/smoke/check_device_drift.py` in
-  CI to guard the limit.
+  [Cross-Device Drift Bands](12-device-drift-bands.md); use
+  `scripts/smoke/check_device_drift.py` in CI to guard the limit.
 - Some hardware backends (e.g., GPUs without deterministic kernels) may exceed
   float tolerances despite the flags; document deviations in the report
   metadata.

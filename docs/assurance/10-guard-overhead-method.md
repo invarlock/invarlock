@@ -9,10 +9,13 @@
 
 ## Claim
 
-- overhead_ratio = PM(guarded) / PM(bare)  (for ppl‑like kinds this is a ratio; for accuracy use Δ pp)
+- overhead_ratio = PM(guarded) / PM(bare) for ppl‑like/lower-is-better primary
+  metrics.
 - overhead_percent = (overhead_ratio − 1) × 100
 
 PM(bare) is computed with guards disabled; PM(guarded) with the full GuardChain enabled.
+Accuracy-style quality deltas are handled outside this ratio gate; do not read
+`guard_overhead.overhead_ratio` as an accuracy percentage-point delta.
 
 ## Protocol (single toggle, paired schedule)
 
@@ -59,7 +62,9 @@ Release verifier behavior:
 
 ## Observability & Provenance
 
-- Seeds and device: `meta.seeds.*`, `meta.device` recorded for both bare and guarded arms.
+- Seeds and device: `meta.seeds.*`, `meta.device`, paired overhead metrics, and
+  the schedule/policy digest are recorded in the final report. Embedded
+  bare/guarded arm metadata is sanitized before report publication.
 - Policy snapshot & digest: `/resolved_policy`, `/policy_provenance.policy_digest`, `/auto.policy_digest`, and `/policy_digest` (thresholds digest) pin the evaluated policy and floors.
 
 ## Remediation (if the gate fails)
@@ -71,5 +76,5 @@ Release verifier behavior:
 
 ## References
 
-- report Schema → Guard Overhead section (field list and example JSON)
-- Guard Contracts → Overview of guards and expected budgets
+- [Reports Reference](../reference/reports.md) — Guard overhead field list and example JSON
+- [Guard Contracts](04-guard-contracts.md) — Overview of guards and expected budgets

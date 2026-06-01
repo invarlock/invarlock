@@ -25,7 +25,10 @@ Given per‑window token counts `t_i` and log‑losses `ℓ_i^A`, `ℓ_i^B`, def
 
 ## Fallbacks
 
-- Degenerate Δ (all equal, no pairs, or single pair): mark `degenerate=true`; CI collapses to `[μ, μ]` with `μ = mean(Δ)`.
+- Empty or no-pair input is rejected by the bootstrap helper and surfaced by the
+  report pipeline as invalid/degraded pairing evidence.
+- Degenerate Δ (all equal values or a single pair): mark `degenerate=true`; CI
+  collapses to `[μ, μ]` with `μ = mean(Δ)`.
 - Undefined acceleration (jackknife variance is zero): fall back to a percentile bootstrap CI.
 
 ## Runtime Contract (report)
@@ -49,7 +52,8 @@ enforce minima strictly when pairing is established.
 
 ## Notes
 
-- Pairing and non‑overlap are required; see Coverage & Pairing Plan.
+- Pairing and non‑overlap are required; see
+  [Coverage & Pairing Plan](02-coverage-and-pairing.md).
 - BCa is numerically stable under typical window counts; for extreme small‑n, expect more frequent fallbacks.
 
 ## Assumptions & Scope

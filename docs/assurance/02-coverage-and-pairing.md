@@ -39,8 +39,9 @@ request higher counts):
 | Aggressive   | 140              | 140           |   800                |
 
 These minima are derived from half‑width targets on paired Δlog‑loss (see
-Tier v1.0 Calibration). CI/Release profiles treat shortfalls as hard errors;
-dev flows surface warnings but also record coverage in the container-backed report bundle.
+[Tier v1.0 Calibration](09-tier-v1-calibration.md)). CI/Release profiles treat
+shortfalls as hard errors; dev flows surface warnings but also record coverage
+in the generated report bundle.
 
 ## Runtime Contract (report)
 
@@ -65,4 +66,4 @@ dev flows surface warnings but also record coverage in the container-backed repo
 - Window pairing must be exact (ID reuse) and non‑overlapping; mixing schedules
   voids paired Δlog guarantees.
 - This plan is calibrated for Linux/macOS environments and the tier profiles
-  documented in Tier v1.0 Calibration.
+  documented in [Tier v1.0 Calibration](09-tier-v1-calibration.md).

@@ -20,20 +20,23 @@ CPU (e.g., ≤ 0.5% MPS, ≤ 1.0% CUDA).
 Bands were empirically derived on pilot models. The repo ships and tests
 `scripts/smoke/check_device_drift.py`; CI enforces the checker behavior on fixtures,
 while real CPU/MPS/CUDA drift enforcement requires CI or release evidence to
-provide comparable reports from those devices. Actual values may vary slightly
-by family/precision; verify on your setup.
+provide comparable reports from those devices. The checker compares absolute
+drift in `primary_metric.ratio_vs_baseline`; it assumes the reports have already
+passed normal verification and does not independently prove matching devices,
+seeds, policy digests, or window schedules. Actual values may vary slightly by
+family/precision; verify on your setup.
 
 ## Determinism & Setup
 
 - Enable framework determinism (PyTorch deterministic algorithms; disable TF32 where applicable).
-- Record seed bundle and device in the container-backed report bundle: `meta.seeds.*`, `meta.device`.
+- Record seed bundle and device in the report bundle: `meta.seeds.*`, `meta.device`.
 - Use identical window plans (paired, non‑overlapping) and the same resolved policy/digest.
 
 ## Reproducible Check
 
 ```bash
 # Baseline on CPU → report
-invarlock evaluate --execution-mode host \
+invarlock evaluate --allow-network --execution-mode host \
   --baseline gpt2 \
   --subject gpt2 \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \
@@ -43,7 +46,7 @@ invarlock evaluate --execution-mode host \
   --report-out reports/baseline_cpu
 
 # Same schedule on MPS → report
-invarlock evaluate --execution-mode host \
+invarlock evaluate --allow-network --execution-mode host \
   --baseline gpt2 \
   --subject gpt2 \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \

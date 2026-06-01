@@ -6,9 +6,9 @@
 
 ## Claim
 
-VE proposes scales only when the **predictive** paired ΔlogNLL CI excludes 0
-with the tier's sidedness and the mean effect exceeds `min_effect_lognll`
-in the **improvement** direction (negative ΔlogNLL).
+VE proposes scales only when the **predictive** paired ΔlogNLL CI upper bound
+and mean effect both meet or beat −`min_effect_lognll` in the **improvement**
+direction (negative ΔlogNLL), using the tier's sidedness.
 
 - **Balanced**: **one‑sided improvement** test. VE enables only when the
   predictive CI **upper bound** ≤ −`min_effect_lognll` and the mean Δ ≤
@@ -43,17 +43,23 @@ stricter tiers.
 | balanced      | 0.02     | 0.012          | 0.03           | 0.0               | ✅ (one-sided)          | 1                      |
 | conservative  | 0.03     | 0.02           | 0.015          | 0.016             | ❌ (two-sided)          | 0                      |
 
-Values are stored in the packaged `tiers.yaml` and maintain VE responsiveness
-without triggering false positives under the chosen window budgets.
+Values are stored in packaged `src/invarlock/_data/runtime/tiers.yaml` and
+maintain VE responsiveness without triggering false positives under the chosen
+window budgets.
 
-> **Source of truth:** tier thresholds are drawn from the packaged `tiers.yaml`.
+> **Source of truth:** tier thresholds are drawn from packaged
+> `src/invarlock/_data/runtime/tiers.yaml`; overrides use
+> `INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml`.
+>
+> **Note:** `max_adjusted_modules = 0` means no module-count cap is enforced in
+> the current VE scaling policy, not "adjust zero modules."
 
 ## Calibration
 
 The `min_effect_lognll` values are derived from paired ΔlogNLL statistics on
 calibration windows using the formula `min_effect ≈ z × σ_pred / √n` with the
 appropriate z-quantile per tier. Calibrated values are stored in the packaged
-`tiers.yaml`. See the full calibration methodology in
+`src/invarlock/_data/runtime/tiers.yaml`. See the full calibration methodology in
 [09-tier-v1-calibration.md](09-tier-v1-calibration.md).
 
 To recalibrate, run null baselines (no edit) and compute the paired Δ standard

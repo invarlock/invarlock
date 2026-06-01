@@ -23,19 +23,21 @@ $$
 z = \frac{s - \mu_f}{\sigma_f}
 $$
 
-for a spectral statistic $s$ (e.g., top singular value). A WARN is issued if
-$|z| \ge \kappa_f$. Under a **modeled null** where $z \approx \mathcal{N}(0,1)$, the
+for a spectral statistic $s$ (e.g., top singular value). A WARN is issued when
+$|z| > \kappa_f$. Under a **modeled null** where $z \approx \mathcal{N}(0,1)$, the
 per-module two-sided tail probability becomes
 
 $$
 p_{\text{tail}} \approx 2\big(1 - \Phi(\kappa_f)\big).
 $$
 
-Applying **Bonferroni** across the $m_f$ modules controls the family-wise error
-rate (FWER); applying **Benjamini–Hochberg (BH)** controls the expected
-false-discovery proportion (FDR). Balanced tiers choose BH (α=0.05, m=4);
-Conservative tiers choose Bonferroni (α=0.000625, m=4). Document the policy
-alongside $\kappa_f$ so auditors can recover the expected per-run WARN rate.
+Applying **Bonferroni** across the tested families controls the family-wise
+error rate (FWER); applying **Benjamini–Hochberg (BH)** controls the expected
+false-discovery proportion (FDR). Module-level WARN volume is budgeted
+separately by `max_caps`. Balanced tiers choose BH (α=0.05, m=4 families);
+Conservative tiers choose Bonferroni (α=0.000625, m=4 families). Document the
+policy alongside $\kappa_f$ so auditors can recover the expected per-run WARN
+rate.
 
 ## Assumptions & Scope
 
@@ -88,7 +90,8 @@ summary.
   $\kappa_f \rightarrow$ modeled Gaussian tails. Sentinel caps should be audited
   as operational thresholds, not as FPR-controlled family caps.
 - Policy metadata records the multiple-testing method
-  (`spectral.multiple_testing`) and the cap limit (`spectral.max_caps`).
+  (`spectral.multiple_testing`) and the cap limit (`spectral.max_caps`, mirrored
+  in `spectral.summary.max_caps` where present).
 
 ## Observability
 
@@ -115,11 +118,12 @@ values are stored in the packaged `tiers.yaml`
 (`src/invarlock/_data/runtime/tiers.yaml`; overrides use
 `INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml`).
 
-To recalibrate, run null baselines (no edit) and collect per-module z-scores.
-Allocate the WARN budget across families proportionally by module count, then
-set κ(f) via order-statistic (the B(f)-th largest |z| in that family) or
-parametric inversion of the tail probability. Add a small safety margin
-(η ≈ 0.05–0.10) and validate that subsequent null runs stay within the budget.
+To recalibrate, run null baselines (no edit) and collect per-family maximum
+z-scores through the null-sweep summary tooling. The current summarizer
+recommends κ(f) from the maximum observed family z-score plus a safety margin
+and can lower the multiple-testing α if the observed any-warning rate exceeds
+the target. Validate that subsequent null runs stay within the published
+`max_caps` budget.
 
 > *Basis column in Quality Gates tables: "point" = point estimate gate,
 > "upper" = upper-bound gate, "point & upper" = both point and upper bounds must

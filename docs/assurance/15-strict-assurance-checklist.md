@@ -20,24 +20,30 @@ for numbered error codes.
 invarlock verify --assurance strict reports/eval/evaluation.report.json
 ```
 
-A green exit from this command satisfies the machine-checkable items below.
-The remaining items are reviewer judgment about policy allowances and bundle
-contents.
+A green exit from this command satisfies the report/manifest checks that are
+machine-checkable from the submitted evidence. The remaining items are reviewer
+judgment about policy allowances and bundle contents.
 
-## Command Surface
+## Machine-Checked Command Surface
 
 - [ ] `invarlock evaluate` ran with `--assurance strict` or the default strict mode.
 - [ ] `--profile` was `ci` or `release`.
 - [ ] `--tier` was `balanced` or `conservative`.
 - [ ] Runtime execution was container-backed.
 - [ ] Unverified provenance was not allowed.
+
+## Reviewer-Confirmed Policy Context
+
 - [ ] Network and remote-code allowances were reviewed and recorded.
+- [ ] The original evaluate command and staged bundle contents match the
+  release/review intent.
 
 ## Guard Chain
 
 - [ ] The observed guard chain is exactly:
   `invariants -> spectral -> rmt -> variance -> invariants`.
-- [ ] No guard evidence is missing.
+- [ ] No guard evidence is missing; the single `invariants` evidence block
+  covers both pre/post invariant stages in the current report contract.
 - [ ] No guard was skipped, duplicated outside the canonical chain, or marked
   monitor-only for a pass.
 - [ ] Unsupported guard/model statuses are explicit and block assurance.

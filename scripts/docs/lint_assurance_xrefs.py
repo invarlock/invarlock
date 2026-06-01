@@ -294,6 +294,7 @@ def _sample_reports() -> list[dict[str, Any]]:
             "ci": [1.01, 1.09],
             "reps": 200,
         },
+        "ppl": {"ratio_ci": [1.01, 1.09]},
         "provenance": {
             "baseline": {
                 "model_id": "baseline",
@@ -318,8 +319,12 @@ def _sample_reports() -> list[dict[str, Any]]:
                 "margin": 1.5,
                 "deadband": 0.10,
                 "epsilon_by_family": {"ffn": 0.10},
+                "measurement_contract": {"kind": "activation_edge_risk"},
             },
-            "spectral": {"max_caps": 5},
+            "spectral": {
+                "max_caps": 5,
+                "measurement_contract": {"kind": "spectral_norm_power_iter"},
+            },
             "variance": {
                 "min_effect_lognll": 0.0009,
                 "predictive_one_sided": True,
@@ -343,6 +348,8 @@ def _sample_reports() -> list[dict[str, Any]]:
                 }
             ],
             "measurement_contract_hash": "rmt-hash",
+            "baseline_measurement_contract_hash": "rmt-hash",
+            "measurement_contract_match": True,
             "stable": True,
             "status": "ok",
             "mode": "warn",
@@ -356,6 +363,8 @@ def _sample_reports() -> list[dict[str, Any]]:
             "family_caps": {"ffn": {"kappa": 3.0}},
             "max_caps": 5,
             "measurement_contract_hash": "spectral-hash",
+            "baseline_measurement_contract_hash": "spectral-hash",
+            "measurement_contract_match": True,
             "multiple_testing": {"method": "bh", "alpha": 0.05, "m": 4},
             "sigma_quantile": 0.99,
             "summary": {

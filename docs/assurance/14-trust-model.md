@@ -37,7 +37,9 @@ The current strict assurance contract requires:
 - CI or release profile
 - balanced or conservative tier
 - canonical guard chain: `invariants -> spectral -> rmt -> variance -> invariants`
-- complete guard evidence for every chain stage
+- complete guard evidence for every guard name in the canonical chain; the
+  single `invariants` evidence block covers both pre/post invariant stages in
+  the current report contract
 - no synthesized, repaired, fallback, degraded, or monitor-only evidence
 - strict paired-window counts and zero overlap
 - primary metric log-space/display-space CI identity
