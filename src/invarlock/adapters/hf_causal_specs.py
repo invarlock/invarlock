@@ -113,7 +113,7 @@ def _safe_total_params(model: Any) -> int:
 
 def _safe_model_device(model: Any) -> torch.device:
     try:
-        return next(model.parameters()).device
+        return torch.device(next(model.parameters()).device)
     except (AttributeError, RuntimeError, StopIteration, TypeError):
         return torch.device("cpu")
 

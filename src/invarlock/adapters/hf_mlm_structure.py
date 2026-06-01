@@ -240,7 +240,7 @@ def _prediction_head_tied_to_embeddings(
     if getattr(config, "model_type", None) != "roberta":
         return False
     try:
-        return decoder_weight.shape == embedding_weight.shape
+        return bool(decoder_weight.shape == embedding_weight.shape)
     except _HF_MLM_PROBE_ERRORS:
         return False
 

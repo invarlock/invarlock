@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+from typing import Any, Protocol
+
 import torch
 
 from invarlock.core.exceptions import ValidationError
+
+
+class _MemoryProcess(Protocol):
+    def memory_info(self) -> Any: ...
 
 
 def latency_validation_error(
@@ -30,7 +36,9 @@ def maybe_cuda_synchronize(device: torch.device) -> None:
         torch.cuda.synchronize()
 
 
-def memory_measurement_baseline(device: torch.device) -> tuple[float, object | None]:
+def memory_measurement_baseline(
+    device: torch.device,
+) -> tuple[float, _MemoryProcess | None]:
     if device.type == "cuda":
         torch.cuda.empty_cache()
         baseline_memory = torch.cuda.memory_allocated() / (1024 * 1024)
@@ -40,15 +48,15 @@ def memory_measurement_baseline(device: torch.device) -> tuple[float, object | N
     import psutil
 
     process = psutil.Process()
-    baseline_memory = process.memory_info().rss / (1024 * 1024)
+    baseline_memory = float(process.memory_info().rss) / (1024 * 1024)
     return baseline_memory, process
 
 
-def current_memory_mb(device: torch.device, process: object | None) -> float:
+def current_memory_mb(device: torch.device, process: _MemoryProcess | None) -> float:
     if device.type == "cuda":
         return torch.cuda.memory_allocated() / (1024 * 1024)
     assert process is not None
-    return process.memory_info().rss / (1024 * 1024)
+    return float(process.memory_info().rss) / (1024 * 1024)
 
 
 def cleanup_memory_measurement_failure(device: torch.device) -> None:

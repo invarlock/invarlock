@@ -338,18 +338,18 @@ def restore_model_chunked(
     )
 
     for name in params_manifest:
-        target = param_map[name]
-        target_device = torch.device(device_map.get(name, str(target.device)))
+        param_target = param_map[name]
+        target_device = torch.device(device_map.get(name, str(param_target.device)))
         tensor = _load_chunked_tensor(param_paths[str(name)])
         with torch.no_grad():
-            target.copy_(tensor.to(target_device))
+            param_target.copy_(tensor.to(target_device))
 
     for name in buffers_manifest:
-        target = buffer_map[name]
+        buffer_target = buffer_map[name]
         key = f"buffer::{name}"
-        target_device = torch.device(device_map.get(key, str(target.device)))
+        target_device = torch.device(device_map.get(key, str(buffer_target.device)))
         tensor = _load_chunked_tensor(buffer_paths[str(name)])
-        target.copy_(tensor.to(target_device))
+        buffer_target.copy_(tensor.to(target_device))
 
     original_tying = manifest.get("weight_tying", {})
     if isinstance(original_tying, dict) and original_tying:
