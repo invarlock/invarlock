@@ -45,7 +45,7 @@ CLAIM_REQUIRED_BY_FILE = {
     ],
     "README.md": ["docs/assurance/00-assurance-case.md"],
     "docs/user-guide/reading-report.md": ["Assurance Case"],
-    "docs/reference/index.md": ["Assurance claims and derivations"],
+    "docs/reference/index.md": ["Assurance rationale and derivations"],
     "docs/reference/contracts.md": ["Model family catalog"],
     "docs/reference/model-family-catalog.md": [
         "support tier",

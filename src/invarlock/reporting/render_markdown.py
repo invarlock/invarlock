@@ -743,7 +743,7 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
         "*This InvarLock Evaluation Report summarizes baseline‑paired evaluation results for a subject model relative to the provided baseline snapshot under the configured profile/preset.*"
     )
     lines.append(
-        "*It reports regression-risk indicators for the measured signals; it is not a broad AI safety, alignment, or content-safety guarantee.*"
+        "*It reports regression-risk indicators for the measured signals; broader application-policy and alignment review require separate evidence.*"
     )
 
     return "\n".join(lines)

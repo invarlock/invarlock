@@ -273,7 +273,7 @@ If you use InvarLock in scientific work, please cite it (canonical metadata is i
 ## Limitations
 
 - Results are baseline-relative to a specific configuration and evidence profile.
-- The project scope is edited-checkpoint regression evidence; content-safety and alignment assessment are outside that scope.
+- The project scope is edited-checkpoint regression evidence; application-level policy and alignment assessment require separate review.
 - Linux is the primary support target; Windows users should use WSL2 or Linux.
 
 ## Support matrix

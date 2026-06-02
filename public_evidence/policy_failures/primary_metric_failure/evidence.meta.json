@@ -10,7 +10,7 @@
     "Real model weights are outside this fixture."
   ],
   "schema": "invarlock.public_evidence.meta.v1",
-  "summary": "Policy-failure fixture where the primary metric ratio exceeds the release gate.",
+  "summary": "Policy-failure fixture where the primary metric ratio exceeds the strict threshold.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/policy_failures/primary_metric_failure/evaluation.report.json --profile release --assurance strict"
   ]

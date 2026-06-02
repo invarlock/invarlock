@@ -72,7 +72,7 @@ invarlock advanced evidence-pack verify \
 ```
 
 The expected pack result is `ok=true` with `authenticity=pinned`. Without
-`--expected-fingerprint`, the signature still proves integrity but not signer
+`--expected-fingerprint`, the signature still confirms integrity but not signer
 authenticity.
 
 ## Real model runs
@@ -146,14 +146,14 @@ invarlock verify --profile release --assurance strict \
 Each example includes `checkpoint_refs.json` beside the report. The pruning
 fixture is a dense magnitude-pruned subject reference, and the LoRA fixture is a
 merged-adapter/fine-tune style subject reference. Both are validation-subject
-fixtures only: they do not claim sparse runtime speedups, packed quantized
-storage, or a deployable optimized backend.
+fixtures only; sparse runtime speedups, packed quantized storage, and deployable
+optimized backend behavior are outside their scope.
 
 ## Caught regressions
 
 The caught-regression fixtures keep the naive primary metric acceptable
 (`ratio_vs_baseline = 1.0`) while one guard fails. They cover the three
-non-primary guard families exposed in the release gate:
+non-primary guard families exposed in strict verification:
 
 ```bash
 invarlock verify --profile release --assurance strict \
@@ -215,4 +215,5 @@ invarlock verify --profile release --assurance strict \
 
 Keep `evaluation.report.json` and `runtime.manifest.json` together. Use
 `invarlock advanced runtime-verify` only when you specifically want to inspect
-the manifest/report binding; use `invarlock verify` for the full release gate.
+the manifest/report binding; use `invarlock verify` for the full strict
+verification result.

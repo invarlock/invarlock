@@ -345,7 +345,7 @@ Package-native signed packs store the detached Ed25519 signature bundle in
 `manifest.signature.json` and record `signing_key_fingerprint` in the manifest
 for audit trails.
 
-Signature verification proves that `manifest.json` has not changed since the
+Signature verification confirms that `manifest.json` has not changed since the
 holder of the matching private key signed it. To also prove signer authenticity,
 pin the expected signer fingerprint or use a local trust store. Without pinning,
 the verifier reports the signer fingerprint for review, but a different key can

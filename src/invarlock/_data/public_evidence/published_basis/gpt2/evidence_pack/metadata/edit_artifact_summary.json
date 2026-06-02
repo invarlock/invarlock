@@ -2,6 +2,6 @@
   "actual_quantization_backend": false,
   "baseline_checkpoint": "sshleifer/tiny-gpt2@fixture-public-basis",
   "edit_workflow": "BYOE validation fixture",
-  "note": "The public pack proves the verifier contract on a small published-basis fixture; large real-model artifacts are intentionally not committed.",
+  "note": "The public pack validates the verifier contract on a small published-basis fixture; large real-model artifacts are intentionally not committed.",
   "subject_checkpoint": "sshleifer/tiny-gpt2@fixture-public-basis-noop"
 }

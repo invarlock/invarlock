@@ -151,7 +151,7 @@ The default guard chain is `invariants` (pre) → `spectral` → `RMT` → `vari
 
 | Aspect | Details |
 | --- | --- |
-| **Context** | Core safety checks in `evaluate` and internal config-runner flows |
+| **Context** | Core guard checks in `evaluate` and internal config-runner flows |
 | **Canonical order** | `invariants` (pre), `spectral`, `rmt`, `variance`, `invariants` (post) |
 | **Related terms** | Guard Chain, Guard Overhead |
 | **See also** | [Guards Reference](../reference/guards.md) |

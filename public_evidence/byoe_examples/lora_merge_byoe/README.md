@@ -18,7 +18,7 @@ invarlock verify --profile release --assurance strict \
   public_evidence/byoe_examples/lora_merge_byoe/evaluation.report.json
 ```
 
-The fixture proves report/verifier wiring for an external BYOE subject. Its
+The fixture validates report/verifier wiring for an external BYOE subject. Its
 scope is artifact verification for the edited checkpoint reference; runtime
 compression, packed storage, and production edit-backend behavior are outside
 this fixture.

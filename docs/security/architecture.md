@@ -22,7 +22,7 @@ Overview of the core security-related components and defaults.
   container-backed `evaluate` path, while
   `make container-front-door-smoke` covers the fuller
   `evaluate -> verify -> report html` journey. `make runtime-smoke` only
-  proves the local runtime image can import its core dependencies.
+  confirms the local runtime image can import its core dependencies.
 - Third-party plugin discovery and remote model code execution are separate
   explicit opt-ins (`INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1`,
   `INVARLOCK_ALLOW_REMOTE_CODE=1`).
