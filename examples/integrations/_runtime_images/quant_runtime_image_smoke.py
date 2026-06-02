@@ -171,10 +171,7 @@ def main(argv: list[str] | None = None) -> int:
         require_gpu=args.require_gpu,
     )
     _check_adapter_backend_contract(selected_adapters)
-    print(
-        "quant runtime image imports ok: "
-        + ", ".join(sorted(selected_adapters))
-    )
+    print("quant runtime image imports ok: " + ", ".join(sorted(selected_adapters)))
     return 0
 
 

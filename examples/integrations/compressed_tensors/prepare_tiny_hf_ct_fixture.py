@@ -214,7 +214,9 @@ def _packed_weight_summary(model_dir: Path, *, load_file: Any) -> dict[str, obje
             if key.endswith("_packed") or key.endswith("_shape"):
                 packed_keys.append(key)
     return {
-        "packed_tensor_count": len([key for key in packed_keys if key.endswith("_packed")]),
+        "packed_tensor_count": len(
+            [key for key in packed_keys if key.endswith("_packed")]
+        ),
         "packed_metadata_count": len(
             [key for key in packed_keys if key.endswith("_shape")]
         ),
