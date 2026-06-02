@@ -239,6 +239,14 @@ def build_adapter_inventory_rows(
             backend = "gptqmodel"
         elif name == "hf_bnb":
             backend = "bitsandbytes"
+        elif name == "hf_torchao":
+            backend = "torchao"
+        elif name == "hf_hqq":
+            backend = "hqq"
+        elif name == "hf_quanto":
+            backend = "optimum.quanto"
+        elif name == "hf_ct":
+            backend = "compressed_tensors"
 
         if support == "optional":
             present = (
@@ -252,6 +260,10 @@ def build_adapter_inventory_rows(
                     "hf_gptq": "invarlock[gptq]",
                     "hf_awq": "invarlock[awq]",
                     "hf_bnb": "invarlock[gpu]",
+                    "hf_torchao": "invarlock[torchao]",
+                    "hf_hqq": "invarlock[hqq]",
+                    "hf_quanto": "invarlock[quanto]",
+                    "hf_ct": "invarlock[compressed-tensors]",
                 }.get(name)
                 if hint:
                     required_extra = hint

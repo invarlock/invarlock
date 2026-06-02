@@ -4,6 +4,8 @@ from typing import Any
 
 import torch
 
+from .quantized_weights import is_quantized_weight
+
 _SPECTRAL_CONTROL_ERRORS = (
     ArithmeticError,
     AttributeError,
@@ -21,10 +23,6 @@ def _is_matrix_weight(weight: Any) -> bool:
     except (TypeError, ValueError):
         # guard-fallback-ok: malformed weight metadata is classified as not a matrix.
         return False
-
-
-def _is_quantized_weight(weight: Any) -> bool:
-    return getattr(weight, "dtype", None) in {torch.int8, torch.uint8}
 
 
 def _spectral_norm(weight: torch.Tensor) -> float:
@@ -90,7 +88,7 @@ def apply_weight_rescale(
                 weight = getattr(module, "weight", None)
                 if not _is_matrix_weight(weight):
                     continue
-                if _is_quantized_weight(weight):
+                if is_quantized_weight(weight):
                     continue
                 with torch.no_grad():
                     weight.mul_(scale_factor)
@@ -153,7 +151,7 @@ def apply_relative_spectral_cap(
                 weight = getattr(module, "weight", None)
                 if not _is_matrix_weight(weight):
                     continue
-                if _is_quantized_weight(weight):
+                if is_quantized_weight(weight):
                     continue
                 current_sigma = compute_sigma_max_fn(weight)
                 baseline_sigma = baseline_sigmas.get(name, current_sigma)

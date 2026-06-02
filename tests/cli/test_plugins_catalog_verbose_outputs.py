@@ -127,12 +127,27 @@ def test_plugins_adapters_explain_variants(monkeypatch):
         "hf_auto": {"module": "invarlock.adapters.hf", "entry_point": "auto"},
         "hf_core": {"module": "invarlock.adapters.core", "entry_point": "core"},
         "hf_bnb": {"module": "invarlock.plugins.bitsandbytes", "entry_point": "bnb"},
+        "hf_torchao": {
+            "module": "invarlock.plugins.torchao",
+            "entry_point": "torchao",
+        },
+        "hf_hqq": {"module": "invarlock.plugins.hqq", "entry_point": "hqq"},
+        "hf_quanto": {"module": "invarlock.plugins.quanto", "entry_point": "quanto"},
+        "hf_ct": {"module": "invarlock.plugins.ct", "entry_point": "ct"},
     }
     _patch_registry(monkeypatch, adapters)
 
     def fake_extract(name):
         if name == "hf_bnb":
             return SimpleNamespace(library="bitsandbytes", version=None)
+        if name == "hf_torchao":
+            return SimpleNamespace(library="torchao", version=None)
+        if name == "hf_hqq":
+            return SimpleNamespace(library="hqq", version=None)
+        if name == "hf_quanto":
+            return SimpleNamespace(library="optimum-quanto", version=None)
+        if name == "hf_ct":
+            return SimpleNamespace(library="compressed-tensors", version=None)
         return SimpleNamespace(library="transformers", version="1.0")
 
     # Patch at the provenance module level so the import inside the function gets it
@@ -144,7 +159,27 @@ def test_plugins_adapters_explain_variants(monkeypatch):
     monkeypatch.setattr(
         plugins_mod,
         "_check_plugin_extras",
-        lambda name, kind: "⚠️ missing invarlock[gpu]" if name == "hf_bnb" else "",
+        lambda name, kind: (
+            "⚠️ missing invarlock[gpu]"
+            if name == "hf_bnb"
+            else (
+                "⚠️ missing invarlock[torchao]"
+                if name == "hf_torchao"
+                else (
+                    "⚠️ missing invarlock[hqq]"
+                    if name == "hf_hqq"
+                    else (
+                        "⚠️ missing invarlock[quanto]"
+                        if name == "hf_quanto"
+                        else (
+                            "⚠️ missing invarlock[compressed-tensors]"
+                            if name == "hf_ct"
+                            else ""
+                        )
+                    )
+                )
+            )
+        ),
         raising=False,
     )
     dummy_console = DummyConsole()
@@ -162,6 +197,23 @@ def test_plugins_adapters_explain_variants(monkeypatch):
     # The explain output shows adapter details; with needs_extra status it may show
     # Enable or Status info depending on the enable field being populated
     assert any("hf_bnb" in line or "Status" in line for line in dummy_console.lines)
+
+    dummy_console.lines.clear()
+    plugins_command(category="adapters", explain="hf_torchao")
+    assert any(
+        "hf_torchao" in line or "torchao" in line for line in dummy_console.lines
+    )
+    dummy_console.lines.clear()
+    plugins_command(category="adapters", explain="hf_hqq")
+    assert any("hf_hqq" in line or "HQQ" in line for line in dummy_console.lines)
+    dummy_console.lines.clear()
+    plugins_command(category="adapters", explain="hf_quanto")
+    assert any("hf_quanto" in line or "Quanto" in line for line in dummy_console.lines)
+    dummy_console.lines.clear()
+    plugins_command(category="adapters", explain="hf_ct")
+    assert any(
+        "hf_ct" in line or "compressed-tensors" in line for line in dummy_console.lines
+    )
 
 
 def test_plugins_plugins_category_json(monkeypatch, capsys):

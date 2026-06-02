@@ -32,6 +32,10 @@ def test_adapter_capabilities_contract_is_exposed_through_plugins_json() -> None
         "hf_bnb",
         "hf_awq",
         "hf_gptq",
+        "hf_torchao",
+        "hf_hqq",
+        "hf_quanto",
+        "hf_ct",
     ):
         assert adapter_name in expected
         assert items[adapter_name]["capability"] == expected[adapter_name]

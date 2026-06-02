@@ -29,6 +29,38 @@ def _prov(name: str):
             supported=False,
             tested=[],
         )
+    if name == "hf_torchao":
+        return SimpleNamespace(
+            family="torchao_int8",
+            library="torchao",
+            version=None,
+            supported=False,
+            tested=[],
+        )
+    if name == "hf_hqq":
+        return SimpleNamespace(
+            family="hqq",
+            library="hqq",
+            version=None,
+            supported=False,
+            tested=[],
+        )
+    if name == "hf_quanto":
+        return SimpleNamespace(
+            family="quanto",
+            library="optimum-quanto",
+            version=None,
+            supported=False,
+            tested=[],
+        )
+    if name == "hf_ct":
+        return SimpleNamespace(
+            family="compressed_tensors",
+            library="compressed-tensors",
+            version=None,
+            supported=False,
+            tested=[],
+        )
     # Core adapters → transformers present
     return SimpleNamespace(
         family="hf", library="transformers", version="4.40.0", supported=True, tested=[]
@@ -66,8 +98,16 @@ def test_plugins_adapters_json_backend_and_filters(monkeypatch):
     # gptq/awq missing → needs_extra
     gptq = next((x for x in items if x.get("name") == "hf_gptq"), None)
     awq = next((x for x in items if x.get("name") == "hf_awq"), None)
+    torchao = next((x for x in items if x.get("name") == "hf_torchao"), None)
+    hqq = next((x for x in items if x.get("name") == "hf_hqq"), None)
+    quanto = next((x for x in items if x.get("name") == "hf_quanto"), None)
+    ct = next((x for x in items if x.get("name") == "hf_ct"), None)
     assert gptq and gptq.get("status") == "needs_extra"
     assert awq and awq.get("status") == "needs_extra"
+    assert torchao and torchao.get("status") == "needs_extra"
+    assert hqq and hqq.get("status") == "needs_extra"
+    assert quanto and quanto.get("status") == "needs_extra"
+    assert ct and ct.get("status") == "needs_extra"
 
     # only=missing filter should return only needs_extra
     r2 = CliRunner().invoke(

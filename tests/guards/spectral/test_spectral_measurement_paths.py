@@ -260,7 +260,7 @@ def test_capture_sigmas_prefers_scoped_modules_and_handles_quantized_weights() -
         ),
     )
 
-    assert sigmas["quantized"] == 1.0
+    assert "quantized" not in sigmas
     assert sigmas["floaty"] > 0.0
 
 

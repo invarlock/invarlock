@@ -5,6 +5,8 @@ from typing import Any
 
 import torch
 
+from .quantized_weights import is_quantized_weight
+
 __all__ = [
     "power_iter_sigma_max",
     "frobenius_norm_sq",
@@ -45,7 +47,7 @@ def power_iter_sigma_max(
         return 0.0
     if matrix.numel() == 0:
         return 0.0
-    if matrix.dtype in {torch.int8, torch.uint8}:
+    if is_quantized_weight(matrix):
         return 0.0
 
     W = _as_matrix(matrix.detach())

@@ -162,6 +162,7 @@ def test_equalise_residual_variance_handles_moe_proj_with_non_tensor_weight():
     class ToyModel(nn.Module):
         def __init__(self) -> None:
             super().__init__()
+            self.dummy = nn.Parameter(torch.tensor(0.0))
             self.transformer = nn.Module()
             self.transformer.h = nn.ModuleList([ToyBlock()])
 
@@ -186,6 +187,111 @@ def test_equalise_residual_variance_handles_moe_proj_with_non_tensor_weight():
     )
     # Should not crash even if the expert "projection" has a non-tensor weight.
     assert "block0.mlp" in out
+
+
+def test_equalise_residual_variance_direct_targets_skip_no_weight_modules():
+    class NoWeightProj(nn.Module):
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return x * 2.0
+
+    class ToyBlock(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.attn = nn.Module()
+            self.attn.c_proj = NoWeightProj()
+            self.mlp = nn.Module()
+            self.mlp.c_proj = NoWeightProj()
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return self.mlp.c_proj(self.attn.c_proj(x))
+
+    class ToyModel(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.dummy = nn.Parameter(torch.tensor(0.0))
+            self.transformer = nn.Module()
+            self.transformer.h = nn.ModuleList([ToyBlock()])
+
+        def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
+            x = input_ids.float()
+            if x.dim() == 2:
+                x = x.unsqueeze(-1).repeat(1, 1, 4)
+            for blk in self.transformer.h:
+                x = blk(x)
+            return x
+
+    out = equalise_residual_variance(
+        ToyModel(),
+        [{"input_ids": torch.ones(2, 3, dtype=torch.long)}],
+        windows=1,
+        tol=0.0,
+        clamp_range=None,
+        apply=True,
+        allow_empty=False,
+    )
+
+    assert out == {}
+
+
+def test_equalise_residual_variance_moe_quantized_experts_are_not_reported_applied():
+    class QuantizedProj(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.weight = torch.zeros(4, 4, dtype=torch.int8)
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return x
+
+    class ToyExpert(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.down_proj = QuantizedProj()
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return self.down_proj(x)
+
+    class ToyMoE(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.experts = nn.ModuleList([ToyExpert()])
+            self.dummy = nn.Parameter(torch.tensor(0.0))
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return x * 2.0
+
+    class ToyBlock(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.mlp = ToyMoE()
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return self.mlp(x)
+
+    class ToyModel(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.transformer = nn.Module()
+            self.transformer.h = nn.ModuleList([ToyBlock()])
+
+        def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
+            x = input_ids.float()
+            if x.dim() == 2:
+                x = x.unsqueeze(-1).repeat(1, 1, 4)
+            for blk in self.transformer.h:
+                x = blk(x)
+            return x
+
+    out = equalise_residual_variance(
+        ToyModel(),
+        [{"input_ids": torch.ones(2, 3, dtype=torch.long)}],
+        windows=1,
+        tol=0.0,
+        clamp_range=None,
+        apply=True,
+        allow_empty=False,
+    )
+
+    assert out == {}
 
 
 def test_variance_guard_resolves_moe_targets_with_module_dict_experts():

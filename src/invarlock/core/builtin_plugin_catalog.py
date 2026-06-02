@@ -73,6 +73,34 @@ BUILTIN_PLUGIN_CATALOG: dict[str, tuple[BuiltinPluginSpec, ...]] = {
             required_deps=("bitsandbytes",),
             support_tier="optional_backend_loader",
         ),
+        BuiltinPluginSpec(
+            name="hf_torchao",
+            module="invarlock.plugins",
+            class_name="HF_TorchAO_Adapter",
+            required_deps=("torchao",),
+            support_tier="optional_backend_loader",
+        ),
+        BuiltinPluginSpec(
+            name="hf_hqq",
+            module="invarlock.plugins",
+            class_name="HF_HQQ_Adapter",
+            required_deps=("hqq",),
+            support_tier="optional_backend_loader",
+        ),
+        BuiltinPluginSpec(
+            name="hf_quanto",
+            module="invarlock.plugins",
+            class_name="HF_Quanto_Adapter",
+            required_deps=("optimum.quanto",),
+            support_tier="optional_backend_loader",
+        ),
+        BuiltinPluginSpec(
+            name="hf_ct",
+            module="invarlock.plugins",
+            class_name="HF_CompressedTensors_Adapter",
+            required_deps=("compressed_tensors",),
+            support_tier="optional_backend_loader",
+        ),
     ),
     "edits": (
         BuiltinPluginSpec(

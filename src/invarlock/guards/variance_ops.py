@@ -5,6 +5,8 @@ from typing import Any
 import torch
 import torch.nn as nn
 
+from .quantized_weights import is_packed_quantized_module, is_quantized_weight
+
 _VARIANCE_OPERATION_ERRORS = (
     ArithmeticError,
     AttributeError,
@@ -15,6 +17,44 @@ _VARIANCE_OPERATION_ERRORS = (
 )
 
 
+def _record_quantized_mutation_unsupported(
+    guard: Any, *, module_name: str, weight: Any, operation: str
+) -> None:
+    entry = {
+        "module": module_name,
+        "dtype": str(getattr(weight, "dtype", "unknown")),
+        "operation": operation,
+        "reason": "packed_quantized_weight_mutation_unsupported",
+        "assurance_blocking": True,
+    }
+    guard._stats.setdefault("quantized_mutation_unsupported", []).append(entry)
+
+
+def _quantized_mutation_marker(module: Any) -> Any | None:
+    weight = getattr(module, "weight", None)
+    if weight is not None and is_quantized_weight(weight):
+        return weight
+    if is_packed_quantized_module(module):
+        for attr in ("weight", "qweight", "packed_weight", "packed_weights"):
+            try:
+                marker = getattr(module, attr, None)
+            except (RuntimeError, TypeError, ValueError):
+                return module
+            if marker is not None:
+                return marker
+        return module
+    return None
+
+
+def _target_module_for_scale(guard: Any, scale_name: str) -> Any | None:
+    for target_name, target_module in guard._target_modules.items():
+        if scale_name == target_name:
+            return target_module
+        if guard._scale_matches_target(scale_name, target_name):
+            return target_module
+    return None
+
+
 def push_checkpoint(guard: Any, model: nn.Module) -> None:
     """Push current target-module weights to the checkpoint stack."""
     if not guard._target_modules:
@@ -22,8 +62,12 @@ def push_checkpoint(guard: Any, model: nn.Module) -> None:
 
     checkpoint: dict[str, torch.Tensor] = {}
     for name, module in guard._target_modules.items():
-        if hasattr(module, "weight"):
-            checkpoint[name] = module.weight.data.clone().detach()
+        weight = getattr(module, "weight", None)
+        if not isinstance(weight, torch.Tensor):
+            continue
+        if is_quantized_weight(weight) or is_packed_quantized_module(module):
+            continue
+        checkpoint[name] = weight.data.clone().detach()
 
     guard._checkpoint_stack.append(checkpoint)
     guard._log_event(
@@ -105,6 +149,47 @@ def enable_guard(guard: Any, model: nn.Module, adapter=None) -> bool:
         )
         return True
 
+    quantized_unsupported: list[str] = []
+    for scale_name in guard._scales:
+        module = _target_module_for_scale(guard, scale_name)
+        if module is None:
+            continue
+        quantized_marker = _quantized_mutation_marker(module)
+        if quantized_marker is None:
+            continue
+        _record_quantized_mutation_unsupported(
+            guard,
+            module_name=scale_name,
+            weight=quantized_marker,
+            operation="enable",
+        )
+        quantized_unsupported.append(scale_name)
+        guard._log_event(
+            "scale_unsupported_quantized",
+            level="WARN",
+            message=(
+                "Cannot apply variance scaling to packed quantized "
+                f"weights in {scale_name}"
+            ),
+            module_name=scale_name,
+            dtype=str(getattr(quantized_marker, "dtype", "unknown")),
+            assurance_blocking=True,
+        )
+
+    if quantized_unsupported:
+        guard._log_event(
+            "enable_failed_quantized_unsupported",
+            level="ERROR",
+            message=(
+                "Packed quantized variance targets are not safely mutable; "
+                "skipping checkpoint and scale application"
+            ),
+            quantized_modules=quantized_unsupported,
+            assurance_blocking=True,
+        )
+        guard._enabled = False
+        return False
+
     push_checkpoint(guard, model)
     guard._log_event(
         "enable_start",
@@ -115,31 +200,37 @@ def enable_guard(guard: Any, model: nn.Module, adapter=None) -> bool:
     try:
         applied_count = 0
         failed_modules: list[str] = []
+        late_quantized_unsupported: list[str] = []
 
         for scale_name, scale_factor in guard._scales.items():
             try:
-                module = None
-                for target_name, target_module in guard._target_modules.items():
-                    if scale_name == target_name:
-                        module = target_module
-                        break
-                    if guard._scale_matches_target(scale_name, target_name):
-                        module = target_module
-                        break
+                module = _target_module_for_scale(guard, scale_name)
 
-                if module is not None and hasattr(module, "weight"):
-                    if hasattr(module.weight, "dtype") and module.weight.dtype in [
-                        torch.int8
-                    ]:
-                        guard._log_event(
-                            "scale_skipped",
-                            level="WARN",
-                            message=f"Skipping quantized weights in {scale_name}",
+                if module is not None:
+                    quantized_marker = _quantized_mutation_marker(module)
+                    if quantized_marker is not None:
+                        _record_quantized_mutation_unsupported(
+                            guard,
                             module_name=scale_name,
-                            dtype=str(module.weight.dtype),
+                            weight=quantized_marker,
+                            operation="enable",
+                        )
+                        late_quantized_unsupported.append(scale_name)
+                        failed_modules.append(scale_name)
+                        guard._log_event(
+                            "scale_unsupported_quantized",
+                            level="WARN",
+                            message=(
+                                "Cannot apply variance scaling to packed quantized "
+                                f"weights in {scale_name}"
+                            ),
+                            module_name=scale_name,
+                            dtype=str(getattr(quantized_marker, "dtype", "unknown")),
+                            assurance_blocking=True,
                         )
                         continue
 
+                if module is not None and hasattr(module, "weight"):
                     if scale_name not in guard._original_scales:
                         guard._original_scales[scale_name] = 1.0
 
@@ -172,6 +263,22 @@ def enable_guard(guard: Any, model: nn.Module, adapter=None) -> bool:
                     module_name=scale_name,
                     error=str(error),
                 )
+
+        if late_quantized_unsupported:
+            pop_checkpoint(guard, model)
+            guard._log_event(
+                "enable_failed_quantized_unsupported",
+                level="ERROR",
+                message=(
+                    "Packed quantized variance targets are not safely mutable; "
+                    "rolling back"
+                ),
+                failed_modules=failed_modules,
+                quantized_modules=late_quantized_unsupported,
+                assurance_blocking=True,
+            )
+            guard._enabled = False
+            return False
 
         if applied_count == 0:
             pop_checkpoint(guard, model)
@@ -265,19 +372,29 @@ def disable_guard(guard: Any, model: nn.Module, adapter=None) -> bool:
                         module = target_module
                         break
 
-                if module is not None and hasattr(module, "weight"):
-                    if hasattr(module.weight, "dtype") and module.weight.dtype in [
-                        torch.int8
-                    ]:
-                        guard._log_event(
-                            "revert_skipped",
-                            level="WARN",
-                            message=f"Skipping quantized weights in {scale_name}",
+                if module is not None:
+                    quantized_marker = _quantized_mutation_marker(module)
+                    if quantized_marker is not None:
+                        _record_quantized_mutation_unsupported(
+                            guard,
                             module_name=scale_name,
-                            dtype=str(module.weight.dtype),
+                            weight=quantized_marker,
+                            operation="disable",
+                        )
+                        guard._log_event(
+                            "revert_unsupported_quantized",
+                            level="WARN",
+                            message=(
+                                "Cannot revert variance scaling for packed "
+                                f"quantized weights in {scale_name}"
+                            ),
+                            module_name=scale_name,
+                            dtype=str(getattr(quantized_marker, "dtype", "unknown")),
+                            assurance_blocking=True,
                         )
                         continue
 
+                if module is not None and hasattr(module, "weight"):
                     revert_factor = 1.0 / scale_factor
                     with torch.no_grad():
                         original_device = module.weight.device

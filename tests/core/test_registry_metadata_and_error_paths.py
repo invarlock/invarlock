@@ -249,6 +249,14 @@ def test_registry_optional_plugin_metadata_tracks_missing_dependencies(
             return ["gptqmodel"]
         if deps == ["bitsandbytes"]:
             return ["bitsandbytes"]
+        if deps == ["torchao"]:
+            return ["torchao"]
+        if deps == ["hqq"]:
+            return ["hqq"]
+        if deps == ["optimum.quanto"]:
+            return ["optimum.quanto"]
+        if deps == ["compressed_tensors"]:
+            return ["compressed_tensors"]
         return []
 
     monkeypatch.setattr(reg.CoreRegistry, "_check_runtime_dependencies", _fake_missing)
@@ -257,6 +265,10 @@ def test_registry_optional_plugin_metadata_tracks_missing_dependencies(
     gptq_info = registry.get_plugin_info("hf_gptq", "adapters")
     awq_info = registry.get_plugin_info("hf_awq", "adapters")
     bnb_info = registry.get_plugin_info("hf_bnb", "adapters")
+    torchao_info = registry.get_plugin_info("hf_torchao", "adapters")
+    hqq_info = registry.get_plugin_info("hf_hqq", "adapters")
+    quanto_info = registry.get_plugin_info("hf_quanto", "adapters")
+    ct_info = registry.get_plugin_info("hf_ct", "adapters")
 
     assert gptq_info["available"] is False
     assert gptq_info["status"] == "Needs extra: gptqmodel"
@@ -264,6 +276,14 @@ def test_registry_optional_plugin_metadata_tracks_missing_dependencies(
     assert awq_info["status"] == "Needs extra: gptqmodel"
     assert bnb_info["available"] is False
     assert bnb_info["status"] == "Needs extra: bitsandbytes"
+    assert torchao_info["available"] is False
+    assert torchao_info["status"] == "Needs extra: torchao"
+    assert hqq_info["available"] is False
+    assert hqq_info["status"] == "Needs extra: hqq"
+    assert quanto_info["available"] is False
+    assert quanto_info["status"] == "Needs extra: optimum.quanto"
+    assert ct_info["available"] is False
+    assert ct_info["status"] == "Needs extra: compressed_tensors"
 
 
 def test_registry_optional_plugin_metadata_tracks_available_dependencies(
@@ -280,6 +300,10 @@ def test_registry_optional_plugin_metadata_tracks_available_dependencies(
     gptq_info = registry.get_plugin_info("hf_gptq", "adapters")
     awq_info = registry.get_plugin_info("hf_awq", "adapters")
     bnb_info = registry.get_plugin_info("hf_bnb", "adapters")
+    torchao_info = registry.get_plugin_info("hf_torchao", "adapters")
+    hqq_info = registry.get_plugin_info("hf_hqq", "adapters")
+    quanto_info = registry.get_plugin_info("hf_quanto", "adapters")
+    ct_info = registry.get_plugin_info("hf_ct", "adapters")
 
     assert gptq_info["available"] is True
     assert gptq_info["status"] == "Built-in"
@@ -287,6 +311,14 @@ def test_registry_optional_plugin_metadata_tracks_available_dependencies(
     assert awq_info["status"] == "Built-in"
     assert bnb_info["available"] is True
     assert bnb_info["status"] == "Built-in"
+    assert torchao_info["available"] is True
+    assert torchao_info["status"] == "Built-in"
+    assert hqq_info["available"] is True
+    assert hqq_info["status"] == "Built-in"
+    assert quanto_info["available"] is True
+    assert quanto_info["status"] == "Built-in"
+    assert ct_info["available"] is True
+    assert ct_info["status"] == "Built-in"
 
 
 def test_registry_additional_paths(monkeypatch):

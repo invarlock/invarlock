@@ -7,6 +7,7 @@ import numpy as np
 import torch
 
 from ._estimators import power_iter_sigma_max
+from .quantized_weights import is_quantized_weight
 
 _SPECTRAL_MEASUREMENT_ERRORS = (RuntimeError, TypeError, ValueError)
 
@@ -23,10 +24,6 @@ def _is_matrix_weight(weight: Any) -> bool:
     except (TypeError, ValueError):
         # guard-fallback-ok: malformed weight metadata is classified as not a matrix.
         return False
-
-
-def _is_quantized_weight(weight: Any) -> bool:
-    return getattr(weight, "dtype", None) in {torch.int8, torch.uint8}
 
 
 def _scalarize_stat(value: Any) -> float:
@@ -57,6 +54,29 @@ def _append_measurement_diagnostic(
         payload["module"] = module_name
     payload.update(details)
     diagnostics.append(payload)
+
+
+def _record_unmeasurable_quantized_weight(
+    guard: Any,
+    *,
+    phase: str,
+    module_name: str,
+    weight: Any,
+) -> None:
+    diagnostics: list[dict[str, Any]] = []
+    _append_measurement_diagnostic(
+        diagnostics,
+        kind="spectral_sigma_unavailable_quantized_weight",
+        severity="warning",
+        message=(
+            "Spectral sigma measurement skipped a quantized weight without a "
+            "dense matrix view."
+        ),
+        module_name=module_name,
+        fallback_value=0.0,
+        dtype=str(getattr(weight, "dtype", "unknown")),
+    )
+    _record_guard_measurement_diagnostics(guard, diagnostics, phase=phase)
 
 
 def _record_guard_measurement_diagnostics(
@@ -160,7 +180,7 @@ def compute_sigma_max(
             observed_type=type(weight_matrix).__name__,
         )
         return 1.0
-    if weight_matrix.dtype in {torch.int8, torch.uint8}:
+    if is_quantized_weight(weight_matrix):
         _append_measurement_diagnostic(
             diagnostics,
             kind="spectral_sigma_fallback_quantized_weight",
@@ -245,7 +265,7 @@ def auto_sigma_target(
         spectral_norms = []
         for _name, module in model.named_modules():
             weight = getattr(module, "weight", None)
-            if not _is_matrix_weight(weight) or _is_quantized_weight(weight):
+            if not _is_matrix_weight(weight) or is_quantized_weight(weight):
                 continue
             sigma = compute_sigma_max_fn(weight)
             if _is_real_number(sigma) and sigma > 0:
@@ -294,7 +314,7 @@ def capture_baseline_sigmas(
             if (
                 not isinstance(weight, torch.Tensor)
                 or not _is_matrix_weight(weight)
-                or _is_quantized_weight(weight)
+                or is_quantized_weight(weight)
             ):
                 continue
             baseline_sigmas[name] = _compute_sigma_with_optional_diagnostics(
@@ -347,7 +367,7 @@ def scan_model_gains(
                 if (
                     not isinstance(weight, torch.Tensor)
                     or not _is_matrix_weight(weight)
-                    or _is_quantized_weight(weight)
+                    or is_quantized_weight(weight)
                 ):
                     continue
                 results["scanned_modules"] += 1
@@ -435,6 +455,14 @@ def capture_sigmas(
     for name, module in module_iter:
         weight = getattr(module, "weight", None)
         if not isinstance(weight, torch.Tensor) or weight.ndim != 2:
+            continue
+        if is_quantized_weight(weight):
+            _record_unmeasurable_quantized_weight(
+                guard,
+                phase=phase,
+                module_name=name,
+                weight=weight,
+            )
             continue
         diagnostics: list[dict[str, Any]] = []
         sigmas[name] = compute_sigma_max(

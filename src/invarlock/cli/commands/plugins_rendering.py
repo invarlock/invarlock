@@ -237,6 +237,22 @@ def _explain_adapter(name: str, *, rows: list[dict[str, Any]], console: Any) -> 
         console.print(
             "  Notes       : GPU recommended; falls back to metadata only on CPU"
         )
+    elif row["name"] == "hf_torchao":
+        console.print("  Matches     : Hugging Face causal LMs quantized with torchao")
+        console.print(
+            "  Notes       : Runtime applies torchao int8 weight-only quantization"
+        )
+    elif row["name"] == "hf_hqq":
+        console.print("  Matches     : Hugging Face causal LMs quantized with HQQ")
+        console.print(
+            "  Notes       : Runtime applies HQQ quantization through Transformers"
+        )
+    elif row["name"] == "hf_quanto":
+        console.print("  Matches     : Hugging Face causal LMs quantized with Quanto")
+        console.print("  Notes       : Runtime applies Quanto weight-only quantization")
+    elif row["name"] == "hf_ct":
+        console.print("  Matches     : HF repos using compressed-tensors checkpoints")
+        console.print("  Notes       : Loads pre-quantized compressed-tensors subjects")
     else:
         console.print("  Matches     : Hugging Face Transformers (core adapters)")
     console.print(f"  Module      : {row['module']}")

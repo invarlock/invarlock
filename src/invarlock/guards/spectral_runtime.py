@@ -70,9 +70,10 @@ def prepare_guard(
     percentile_fn: Any = np.percentile,
 ) -> dict[str, Any]:
     """Prepare spectral guard by capturing baseline spectral properties."""
-    _ = adapter
     _ = calib
     start_time = time.time()
+    guard._adapter_ref = adapter
+    guard._scoped_modules_model_id = None
 
     if policy:
         apply_policy_overrides_fn(guard, policy)

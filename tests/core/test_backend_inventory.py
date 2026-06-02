@@ -103,6 +103,86 @@ def test_backend_inventory_counts_awq_and_gptq_modules() -> None:
     ]
 
 
+def test_backend_inventory_counts_torchao_modules() -> None:
+    class AffineQuantizedLinear:
+        __module__ = "torchao.dtypes.affine_quantized_tensor"
+
+    class Model:
+        def modules(self):
+            return [AffineQuantizedLinear()]
+
+    inventory = build_backend_inventory_for_adapter(
+        adapter="hf_torchao",
+        model=Model(),
+    )
+
+    assert inventory is not None
+    assert inventory["backend"] == "torchao"
+    assert inventory["quantized_module_count"] == 1
+    assert inventory["quantized_module_types"] == [
+        "torchao.dtypes.affine_quantized_tensor.AffineQuantizedLinear"
+    ]
+
+
+def test_backend_inventory_counts_hqq_modules() -> None:
+    class HQQLinear:
+        __module__ = "hqq.core.quantize"
+
+    class Model:
+        def modules(self):
+            return [HQQLinear()]
+
+    inventory = build_backend_inventory_for_adapter(
+        adapter="hf_hqq",
+        model=Model(),
+    )
+
+    assert inventory is not None
+    assert inventory["backend"] == "hqq"
+    assert inventory["quantized_module_count"] == 1
+    assert inventory["quantized_module_types"] == ["hqq.core.quantize.HQQLinear"]
+
+
+def test_backend_inventory_counts_quanto_modules() -> None:
+    class QLinear:
+        __module__ = "optimum.quanto.nn.qlinear"
+
+    class Model:
+        def modules(self):
+            return [QLinear()]
+
+    inventory = build_backend_inventory_for_adapter(
+        adapter="hf_quanto",
+        model=Model(),
+    )
+
+    assert inventory is not None
+    assert inventory["backend"] == "optimum-quanto"
+    assert inventory["quantized_module_count"] == 1
+    assert inventory["quantized_module_types"] == ["optimum.quanto.nn.qlinear.QLinear"]
+
+
+def test_backend_inventory_counts_compressed_tensors_modules() -> None:
+    class CompressedLinear:
+        __module__ = "compressed_tensors.quantization.linear"
+
+    class Model:
+        def modules(self):
+            return [CompressedLinear()]
+
+    inventory = build_backend_inventory_for_adapter(
+        adapter="hf_ct",
+        model=Model(),
+    )
+
+    assert inventory is not None
+    assert inventory["backend"] == "compressed-tensors"
+    assert inventory["quantized_module_count"] == 1
+    assert inventory["quantized_module_types"] == [
+        "compressed_tensors.quantization.linear.CompressedLinear"
+    ]
+
+
 def test_backend_inventory_counts_gptq_named_modules_for_gptq_adapter() -> None:
     class GptqLinear:
         __module__ = "vendor.layers.gptq"

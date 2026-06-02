@@ -121,6 +121,37 @@ awq = [
   "triton>=2.3.0; platform_system == \"Linux\"",
 ]
 
+torchao = [
+  "torch>=2.12.0",
+  "transformers>=5.5.0",
+  "safetensors>=0.4.0",
+  "torchao>=0.17.0",
+]
+
+hqq = [
+  "torch>=2.12.0",
+  "transformers>=5.5.0",
+  "safetensors>=0.4.0",
+  "accelerate>=0.27",
+  "hqq>=0.2.8",
+]
+
+quanto = [
+  "torch>=2.12.0",
+  "transformers>=5.5.0",
+  "safetensors>=0.4.0",
+  "accelerate>=0.27",
+  "optimum-quanto>=0.2.7",
+]
+
+compressed-tensors = [
+  "torch>=2.12.0",
+  "transformers>=5.5.0",
+  "safetensors>=0.4.0",
+  "accelerate>=0.27",
+  "compressed-tensors>=0.10.0",
+]
+
 # GPU helper stack (optional extras for CUDA/MPS optimisations)
 gpu = [
   "torch>=2.12.0",
@@ -145,6 +176,10 @@ advanced = [
   "accelerate>=0.27",
   "bitsandbytes>=0.41",
   "gptqmodel>=5.8.0",
+  "torchao>=0.17.0",
+  "hqq>=0.2.8",
+  "optimum-quanto>=0.2.7",
+  "compressed-tensors>=0.10.0",
   "triton>=2.3.0; platform_system == \"Linux\"",
   "aiohttp>=3.12.14",
   "h2>=4.3.0",
@@ -168,6 +203,10 @@ all = [
   "accelerate>=0.27",
   "bitsandbytes>=0.41",
   "gptqmodel>=5.8.0",
+  "torchao>=0.17.0",
+  "hqq>=0.2.8",
+  "optimum-quanto>=0.2.7",
+  "compressed-tensors>=0.10.0",
   "triton>=2.3.0; platform_system == \"Linux\"",
   "aiohttp>=3.12.14",
   "h2>=4.3.0",
@@ -254,6 +293,10 @@ hf_multimodal = "invarlock.adapters.hf_multimodal:HF_Multimodal_Adapter"
 hf_gptq = "invarlock.plugins:HF_GPTQ_Adapter"
 hf_awq = "invarlock.plugins:HF_AWQ_Adapter"
 hf_bnb = "invarlock.plugins:HF_BNB_Adapter"
+hf_torchao = "invarlock.plugins:HF_TorchAO_Adapter"
+hf_hqq = "invarlock.plugins:HF_HQQ_Adapter"
+hf_quanto = "invarlock.plugins:HF_Quanto_Adapter"
+hf_ct = "invarlock.plugins:HF_CompressedTensors_Adapter"
 
 # Console scripts
 [project.scripts]
