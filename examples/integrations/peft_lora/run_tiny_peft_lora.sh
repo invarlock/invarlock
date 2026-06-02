@@ -13,6 +13,8 @@ Options:
                                Default: sshleifer/tiny-gpt2
   --subject-dir DIR            Output directory for the merged subject.
                                Default: examples/integrations/peft_lora/models/tiny-gpt2-peft-lora-merged
+  --fixture-dir DIR            Generated local JSONL/preset directory.
+                               Default: examples/integrations/peft_lora/artifacts/tiny-peft-lora-fixture
   --report-out DIR             Output directory for InvarLock artifacts.
                                Default: examples/integrations/peft_lora/reports/tiny-peft-lora
   --profile NAME               InvarLock profile. Default: release
@@ -35,6 +37,7 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/../../.." && pwd)"
 
 baseline="sshleifer/tiny-gpt2"
 subject_dir="$SCRIPT_DIR/models/tiny-gpt2-peft-lora-merged"
+fixture_dir="$SCRIPT_DIR/artifacts/tiny-peft-lora-fixture"
 report_out="$SCRIPT_DIR/reports/tiny-peft-lora"
 profile="release"
 tier="balanced"
@@ -53,6 +56,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --subject-dir)
       subject_dir="${2:-}"
+      shift 2
+      ;;
+    --fixture-dir)
+      fixture_dir="${2:-}"
       shift 2
       ;;
     --report-out)
@@ -103,8 +110,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$baseline" || -z "$subject_dir" || -z "$report_out" ]]; then
-  echo "Missing required baseline, subject, or report path." >&2
+if [[ -z "$baseline" || -z "$subject_dir" || -z "$fixture_dir" || -z "$report_out" ]]; then
+  echo "Missing required baseline, subject, fixture, or report path." >&2
   usage >&2
   exit 2
 fi
@@ -137,6 +144,7 @@ materialize_cmd=(
   "$SCRIPT_DIR/materialize_tiny_peft_lora_subject.py"
   --baseline "$baseline"
   --output-dir "$subject_dir"
+  --fixture-dir "$fixture_dir"
 )
 if [[ "$allow_network" -eq 1 ]]; then
   materialize_cmd+=(--allow-network)
@@ -155,6 +163,7 @@ fi
 mkdir -p "$report_out"
 cp "$subject_dir/checkpoint_refs.json" "$report_out/checkpoint_refs.json"
 cp "$subject_dir/external_edit_summary.json" "$report_out/external_edit_summary.json"
+cp "$fixture_dir/fixture_summary.json" "$report_out/fixture_summary.json"
 
 compare_cmd=(
   "$REPO_ROOT/examples/integrations/_shared/run_invarlock_compare.sh"
@@ -164,6 +173,7 @@ compare_cmd=(
   --subject-adapter hf_causal
   --profile "$profile"
   --tier "$tier"
+  --preset "$fixture_dir/preset.yaml"
   --report-out "$report_out"
   --execution-mode "$execution_mode"
   --assurance "$assurance"

@@ -8,10 +8,34 @@ import hashlib
 import json
 import random
 import shutil
+import sys
 from datetime import UTC, datetime
 from importlib import metadata
 from pathlib import Path
 from typing import Any
+
+TERMS = (
+    "invarlock",
+    "peft",
+    "lora",
+    "baseline",
+    "subject",
+    "regression",
+    "metric",
+    "window",
+    "evidence",
+    "runtime",
+    "loader",
+    "dataset",
+    "guard",
+    "report",
+    "verify",
+    "token",
+    "checkpoint",
+    "comparison",
+    "policy",
+    "profile",
+)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -30,6 +54,11 @@ def _parse_args() -> argparse.Namespace:
         "--output-dir",
         required=True,
         help="Directory where the merged subject checkpoint will be written.",
+    )
+    parser.add_argument(
+        "--fixture-dir",
+        required=True,
+        help="Directory where the generated local JSONL fixture will be written.",
     )
     parser.add_argument(
         "--target-module",
@@ -54,6 +83,11 @@ def _parse_args() -> argparse.Namespace:
         default=1.0,
         help="Standard deviation for deterministic normal LoRA initialization.",
     )
+    parser.add_argument("--rows", type=int, default=860)
+    parser.add_argument("--terms-per-row", type=int, default=180)
+    parser.add_argument("--seq-len", type=int, default=256)
+    parser.add_argument("--preview-n", type=int, default=400)
+    parser.add_argument("--final-n", type=int, default=400)
     parser.add_argument(
         "--allow-network",
         action="store_true",
@@ -85,6 +119,59 @@ def _require_dependencies() -> tuple[Any, Any, Any, Any, Any]:
         TaskType,
         get_peft_model,
     )
+
+
+def _is_quantized_model(model: Any) -> bool:
+    quantization_config = getattr(
+        getattr(model, "config", None), "quantization_config", None
+    )
+    return quantization_config is not None or bool(
+        getattr(model, "is_quantized", False)
+    )
+
+
+def _is_missing_optimum_error(exc: BaseException) -> bool:
+    text = str(exc)
+    return "optimum" in text and "gptqmodel" in text
+
+
+def _is_peft_gptqmodel_awq_dispatch_error(exc: BaseException) -> bool:
+    text = str(exc)
+    return (
+        "AwqGEMMQuantLinear" in text or "gptqmodel.nn_modules.qlinear.gemm_awq" in text
+    )
+
+
+def _disable_quantized_peft_dispatch_for_dense_example() -> bool:
+    patched = False
+    for module_name in ("peft.import_utils", "peft.tuners.lora.awq"):
+        module = sys.modules.get(module_name)
+        if module is None:
+            try:
+                module = __import__(module_name, fromlist=["dummy"])
+            except (ImportError, ModuleNotFoundError):
+                continue
+        if hasattr(module, "is_gptqmodel_available"):
+            module.is_gptqmodel_available = lambda: False  # type: ignore[attr-defined]
+            patched = True
+    return patched
+
+
+def _get_dense_peft_model(
+    model: Any,
+    config: Any,
+    get_peft_model: Any,
+) -> Any:
+    try:
+        return get_peft_model(model, config)
+    except ImportError as exc:
+        if _is_quantized_model(model) or not (
+            _is_missing_optimum_error(exc) or _is_peft_gptqmodel_awq_dispatch_error(exc)
+        ):
+            raise
+        if not _disable_quantized_peft_dispatch_for_dense_example():
+            raise
+        return get_peft_model(model, config)
 
 
 def _prepare_output_dir(output_dir: Path, *, force: bool) -> None:
@@ -197,9 +284,103 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     )
 
 
+def _row_text(row_index: int, *, terms_per_row: int) -> str:
+    return " ".join(
+        f"{TERMS[(row_index + offset) % len(TERMS)]}-{row_index}-{offset}"
+        for offset in range(terms_per_row)
+    )
+
+
+def write_text_fixture(
+    output_dir: Path,
+    *,
+    model_id: str = "sshleifer/tiny-gpt2",
+    rows: int,
+    terms_per_row: int,
+    seq_len: int,
+    preview_n: int,
+    final_n: int,
+) -> dict[str, Any]:
+    if rows < preview_n + final_n:
+        raise ValueError("rows must be at least preview_n + final_n")
+    if terms_per_row < 1:
+        raise ValueError("terms_per_row must be positive")
+    if seq_len < 8:
+        raise ValueError("seq_len must be at least 8")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    data_path = output_dir / "tiny_causal_text.jsonl"
+    preset_path = output_dir / "preset.yaml"
+    summary_path = output_dir / "fixture_summary.json"
+
+    with data_path.open("w", encoding="utf-8") as handle:
+        for row_index in range(rows):
+            payload = {"text": _row_text(row_index, terms_per_row=terms_per_row)}
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+
+    preset_text = f"""model:
+  id: "{model_id}"
+  adapter: "hf_causal"
+  device: "auto"
+
+dataset:
+  provider:
+    kind: "local_jsonl"
+    file: "{data_path}"
+    text_field: "text"
+    max_samples: {rows}
+  split: "validation"
+  seq_len: {seq_len}
+  stride: {seq_len}
+  preview_n: {preview_n}
+  final_n: {final_n}
+  seed: 43
+
+eval:
+  metric:
+    kind: "ppl_causal"
+  loss:
+    type: "causal"
+
+edit:
+  name: "noop"
+  plan: {{}}
+
+auto:
+  enabled: true
+  tier: "balanced"
+  probes: 0
+
+guards:
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+
+output:
+  dir: "runs"
+  save_model: false
+  save_report: true
+"""
+    preset_path.write_text(preset_text, encoding="utf-8")
+
+    summary: dict[str, Any] = {
+        "format_version": "peft-lora-fixture-v1",
+        "data_path": str(data_path),
+        "preset_path": str(preset_path),
+        "rows": rows,
+        "terms_per_row": terms_per_row,
+        "seq_len": seq_len,
+        "preview_n": preview_n,
+        "final_n": final_n,
+        "data_sha256": _sha256(data_path),
+        "preset_sha256": _sha256(preset_path),
+    }
+    _write_json(summary_path, summary)
+    return summary
+
+
 def main() -> None:
     args = _parse_args()
     output_dir = Path(args.output_dir)
+    fixture_dir = Path(args.fixture_dir)
     target_modules = args.target_module or ["c_attn"]
     local_files_only = not bool(args.allow_network)
 
@@ -210,6 +391,16 @@ def main() -> None:
     random.seed(args.seed)
     torch.manual_seed(args.seed)
     _prepare_output_dir(output_dir, force=bool(args.force))
+    _prepare_output_dir(fixture_dir, force=bool(args.force))
+    fixture = write_text_fixture(
+        fixture_dir,
+        model_id=str(args.baseline),
+        rows=int(args.rows),
+        terms_per_row=int(args.terms_per_row),
+        seq_len=int(args.seq_len),
+        preview_n=int(args.preview_n),
+        final_n=int(args.final_n),
+    )
 
     tokenizer = auto_tokenizer.from_pretrained(
         args.baseline,
@@ -238,7 +429,7 @@ def main() -> None:
         fan_in_fan_out=True,
         bias="none",
     )
-    peft_model = get_peft_model(model, config)
+    peft_model = _get_dense_peft_model(model, config, get_peft_model)
     initialized_layers = _initialize_lora_weights(
         peft_model,
         torch=torch,
@@ -283,6 +474,7 @@ def main() -> None:
             "init_distribution": "normal",
             "init_scale": float(args.lora_init_scale),
         },
+        "fixture": fixture,
         "delta_summary": delta_summary,
         "files": files,
     }

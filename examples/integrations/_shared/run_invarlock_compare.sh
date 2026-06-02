@@ -181,6 +181,17 @@ report_json="$report_out/evaluation.report.json"
 verify_json="$report_out/verify.json"
 html_out="$report_out/evaluation.html"
 
+if [[ ! -s "$report_json" ]]; then
+  cat >&2 <<MSG
+Evaluate completed but did not write the expected report:
+  $report_json
+
+Check --report-out path mapping and the evaluate command recorded in:
+  $report_out/run_command.txt
+MSG
+  exit 1
+fi
+
 verify_cmd=(
   invarlock verify
   --json \

@@ -519,7 +519,7 @@ runtime-smoke-cuda-quant:  ## Smoke the local CUDA quant runtime image
 	$(CONTAINER_ENGINE) run --rm \
 		--entrypoint python \
 		$(RUNTIME_IMAGE) \
-		-c "import shutil; from torch.utils.cpp_extension import CUDA_HOME; import bitsandbytes, datasets, gptqmodel, safetensors, torch, transformers; assert shutil.which('nvcc'), 'nvcc missing'; assert CUDA_HOME, 'CUDA_HOME missing'; print('quant runtime image imports ok')"
+		-c "import shutil, sysconfig; from pathlib import Path; from torch.utils.cpp_extension import CUDA_HOME; import bitsandbytes, datasets, gptqmodel, safetensors, torch, transformers; assert shutil.which('nvcc'), 'nvcc missing'; assert CUDA_HOME, 'CUDA_HOME missing'; assert (Path(sysconfig.get_paths()['include']) / 'Python.h').is_file(), 'Python.h missing'; print('quant runtime image imports ok')"
 
 runtime-smoke-cuda-quant-podman: CONTAINER_ENGINE=podman
 runtime-smoke-cuda-quant-podman: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA_QUANT)

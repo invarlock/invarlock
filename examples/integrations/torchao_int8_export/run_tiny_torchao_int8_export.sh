@@ -14,6 +14,8 @@ Options:
                                Default: examples/integrations/torchao_int8_export/models/tiny-llama-baseline
   --subject-dir DIR            Output directory for the exported subject.
                                Default: examples/integrations/torchao_int8_export/models/tiny-llama-torchao-int8-export
+  --fixture-dir DIR            Generated local JSONL/preset directory.
+                               Default: examples/integrations/torchao_int8_export/artifacts/tiny-torchao-int8-export-fixture
   --report-out DIR             Output directory for InvarLock artifacts.
                                Default: examples/integrations/torchao_int8_export/reports/tiny-torchao-int8-export
   --tokenizer-source VALUE     Tokenizer ID or local path. Default: sshleifer/tiny-gpt2
@@ -37,6 +39,7 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/../../.." && pwd)"
 
 baseline_dir="$SCRIPT_DIR/models/tiny-llama-baseline"
 subject_dir="$SCRIPT_DIR/models/tiny-llama-torchao-int8-export"
+fixture_dir="$SCRIPT_DIR/artifacts/tiny-torchao-int8-export-fixture"
 report_out="$SCRIPT_DIR/reports/tiny-torchao-int8-export"
 tokenizer_source="sshleifer/tiny-gpt2"
 profile="release"
@@ -56,6 +59,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --subject-dir)
       subject_dir="${2:-}"
+      shift 2
+      ;;
+    --fixture-dir)
+      fixture_dir="${2:-}"
       shift 2
       ;;
     --report-out)
@@ -110,8 +117,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$baseline_dir" || -z "$subject_dir" || -z "$report_out" ]]; then
-  echo "Missing required baseline, subject, or report path." >&2
+if [[ -z "$baseline_dir" || -z "$subject_dir" || -z "$fixture_dir" || -z "$report_out" ]]; then
+  echo "Missing required baseline, subject, fixture, or report path." >&2
   usage >&2
   exit 2
 fi
@@ -144,6 +151,7 @@ materialize_cmd=(
   "$SCRIPT_DIR/materialize_tiny_torchao_int8_subject.py"
   --baseline-dir "$baseline_dir"
   --subject-dir "$subject_dir"
+  --fixture-dir "$fixture_dir"
   --tokenizer-source "$tokenizer_source"
 )
 if [[ "$allow_network" -eq 1 ]]; then
@@ -164,6 +172,7 @@ fi
 mkdir -p "$report_out"
 cp "$subject_dir/checkpoint_refs.json" "$report_out/checkpoint_refs.json"
 cp "$subject_dir/external_edit_summary.json" "$report_out/external_edit_summary.json"
+cp "$fixture_dir/fixture_summary.json" "$report_out/fixture_summary.json"
 
 compare_cmd=(
   "$REPO_ROOT/examples/integrations/_shared/run_invarlock_compare.sh"
@@ -173,6 +182,7 @@ compare_cmd=(
   --subject-adapter hf_causal
   --profile "$profile"
   --tier "$tier"
+  --preset "$fixture_dir/preset.yaml"
   --report-out "$report_out"
   --execution-mode "$execution_mode"
   --assurance "$assurance"

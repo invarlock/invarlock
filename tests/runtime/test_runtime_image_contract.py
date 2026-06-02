@@ -31,6 +31,8 @@ def test_runtime_dockerfile_installs_hf_stack() -> None:
     assert 'arm64) echo "/opt/invarlock/${RUNTIME_REQUIREMENTS_ARM64}"' in text
     assert "apt-get install -y --no-install-recommends build-essential" in text
     assert "python3 python3-pip python3-venv python-is-python3" in text
+    assert 'if [ "${RUNTIME_KEEP_BUILD_TOOLCHAIN}" = "1" ]' in text
+    assert "apt-get install -y --no-install-recommends python3-dev" in text
     assert 'if [ "${RUNTIME_KEEP_BUILD_TOOLCHAIN}" != "1" ]' in text
     assert "apt-get purge -y --auto-remove build-essential" in text
     assert "python -m pip install" in text

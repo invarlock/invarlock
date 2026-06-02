@@ -1,6 +1,6 @@
 # PEFT LoRA-Merge Integration Example
 
-Status: `runnable`
+Status: `runnable`; strict container evidence verified on CUDA.
 
 This example shows how to attach InvarLock regression evidence to a checkpoint
 created by an external PEFT LoRA merge. It materializes a tiny deterministic
@@ -50,6 +50,8 @@ examples/integrations/peft_lora/run_tiny_peft_lora.sh \
 
 The runner defaults to the `release` profile so the strict verification path has
 enough evaluation tokens for a stable primary-metric verdict.
+Set `INVARLOCK_RUNTIME_IMAGE` and `INVARLOCK_RUNTIME_IMAGE_DIGEST` when the
+strict container artifact will be shared for review.
 
 ## Outputs
 
@@ -58,6 +60,9 @@ The runner writes generated outputs under ignored local directories:
 | Path | Role |
 | --- | --- |
 | `models/tiny-gpt2-peft-lora-merged/` | HF-loadable merged subject checkpoint. |
+| `artifacts/tiny-peft-lora-fixture/tiny_causal_text.jsonl` | Deterministic local text fixture for evaluation. |
+| `artifacts/tiny-peft-lora-fixture/preset.yaml` | Generated preset pointing at the local fixture. |
+| `artifacts/tiny-peft-lora-fixture/fixture_summary.json` | Fixture parameters and file hashes. |
 | `reports/tiny-peft-lora/evaluation.report.json` | Canonical verifier input. |
 | `reports/tiny-peft-lora/verify.json` | Machine-readable verifier result. |
 | `reports/tiny-peft-lora/evaluation.html` | Human-readable report. |
@@ -67,6 +72,8 @@ The runner writes generated outputs under ignored local directories:
 
 The subject materializer writes a non-zero LoRA delta and fails if the merged
 checkpoint does not change the target attention weights.
+When PEFT is installed into a broad quantization environment, the materializer
+keeps this dense LoRA path isolated from optional GPTQModel/AWQ dispatch.
 
 ## Public Evidence Anchor
 

@@ -35,6 +35,9 @@ RUN apt-get update \
     && if ! command -v python >/dev/null 2>&1; then \
       apt-get install -y --no-install-recommends ca-certificates python3 python3-pip python3-venv python-is-python3; \
     fi \
+    && if [ "${RUNTIME_KEEP_BUILD_TOOLCHAIN}" = "1" ]; then \
+      apt-get install -y --no-install-recommends python3-dev; \
+    fi \
     && requirements_path="$(case "${TARGETARCH:-amd64}" in \
       amd64) echo "/opt/invarlock/${RUNTIME_REQUIREMENTS_AMD64}" ;; \
       arm64) echo "/opt/invarlock/${RUNTIME_REQUIREMENTS_ARM64}" ;; \

@@ -1,6 +1,6 @@
 # AWQ Integration Example
 
-Status: `runnable` on CUDA hosts.
+Status: `runnable` on CUDA hosts; strict container runtime provenance verified.
 
 This example shows how to attach InvarLock regression evidence to a checkpoint
 quantized with GPTQModel's AWQ flow. It creates a deterministic small
@@ -43,17 +43,24 @@ The default path uses `--execution-mode host --assurance off` because the AWQ
 runtime depends on the selected CUDA host and installed GPTQModel wheel. To
 exercise a different AWQ backend, pass `--awq-backend VALUE`.
 
-For strict container-backed evidence, run on a CUDA host with the quant runtime
-image configured and pass:
+For a CUDA/container run that completes with runtime provenance verification,
+run on a CUDA host with the quant runtime image configured and pass:
 
 ```bash
+INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-quant \
 uv run --extra awq \
   examples/integrations/awq/run_tiny_awq.sh \
   --allow-network \
   --force \
   --execution-mode container \
-  --assurance strict
+  --assurance off \
+  --runtime-provenance container \
+  --device cuda
 ```
+
+Use a digest-pinned runtime image when the artifact is being shared for review.
+The `--assurance strict` path is reserved for quantized-checkpoint guard
+contract work until variance target coverage for AWQ modules is expanded.
 
 ## Generated Artifacts
 
