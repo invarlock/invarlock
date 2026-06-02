@@ -22,17 +22,30 @@ update it only to announce a new target directory.
   examples.
 - `_shared/expected-artifacts.md` lists the review artifacts each runnable
   example should produce.
+- `_shared/preflight.sh` contains shared host-lane preflight and artifact-lane
+  labeling helpers.
 - `_shared/run_invarlock_compare.sh` is a reusable baseline-vs-subject wrapper
-  for HF-loadable paths.
+  for HF-loadable checkpoints and adapter-backed subject paths.
+- `_runtime_images/` contains example-only CUDA image definitions for optional
+  quant backends. These images are not the regular InvarLock runtime images.
 
 ## Example Lifecycle
 
 1. Confirm the optional backend and adapter status with `invarlock doctor` and
    `invarlock advanced plugins list --json`.
-2. Create or reference a subject checkpoint from the external tool.
-3. Run `invarlock evaluate` against the baseline and subject.
-4. Run `invarlock verify --json` and render `evaluation.html`.
-5. Record the output paths and any backend limitations in the target README.
+2. Create or reference the subject path, whether that is a materialized
+   checkpoint or a runtime adapter loading mode.
+3. Document and, where possible, run `cuda-container-strict` as the primary
+   review path. Host lanes are secondary comparison paths: `cuda-host-off` for
+   host CUDA bring-up and `cpu-host-off` for non-CUDA local bring-up when that
+   backend actually supports CPU. The user-facing shortcuts remain `--lane cuda`
+   and `--lane host`; host lanes should pass an explicit `--device cpu` or
+   `--device cuda` when comparing lanes. Optional quant examples should use the
+   narrowest matching image under `_runtime_images/`; dense examples should use
+   the regular CUDA runtime.
+4. Run `invarlock evaluate` against the baseline and subject.
+5. Run `invarlock verify --json` and render `evaluation.html`.
+6. Record the output paths and any backend limitations in the target README.
 
 Use target examples as public review aids before opening external issues or
 docs pull requests. The target README should make the runnable status explicit:

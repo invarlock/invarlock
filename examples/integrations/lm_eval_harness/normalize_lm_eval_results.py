@@ -25,6 +25,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tasks", required=True)
     parser.add_argument("--limit", required=True)
     parser.add_argument("--device", required=True)
+    parser.add_argument("--lane-label", required=True)
     parser.add_argument("--command-log", type=Path)
     parser.add_argument("--output", required=True, type=Path)
     return parser.parse_args()
@@ -176,6 +177,7 @@ def main() -> int:
         "tasks_requested": args.tasks,
         "limit_requested": args.limit,
         "device_requested": args.device,
+        "lane_artifact_label": args.lane_label,
         "command_log": str(args.command_log) if args.command_log else None,
         "baseline_model_requested": args.baseline_model,
         "subject_model_requested": args.subject_model,

@@ -17,6 +17,10 @@ _QUANTIZED_ADAPTER_BACKENDS = {
     "hf_bnb": "bitsandbytes",
     "hf_awq": "gptqmodel",
     "hf_gptq": "gptqmodel",
+    "hf_torchao": "torchao",
+    "hf_hqq": "hqq",
+    "hf_quanto": "optimum-quanto",
+    "hf_ct": "compressed-tensors",
 }
 
 _VERSION_ERRORS = (PackageNotFoundError, OSError, RuntimeError, TypeError, ValueError)
@@ -24,6 +28,10 @@ _ADAPTER_PROVENANCE_FAMILY_MAP: dict[str, tuple[str, str, list[str]]] = {
     "hf_gptq": ("gptq", "gptqmodel", []),
     "hf_awq": ("awq", "gptqmodel", []),
     "hf_bnb": ("bnb", "bitsandbytes", []),
+    "hf_torchao": ("torchao_int8", "torchao", []),
+    "hf_hqq": ("hqq", "hqq", []),
+    "hf_quanto": ("quanto", "optimum-quanto", []),
+    "hf_ct": ("compressed_tensors", "compressed-tensors", []),
 }
 
 
@@ -194,6 +202,18 @@ def _quantized_module_inventory(
             )
         elif adapter_key == "hf_gptq":
             is_quantized = "gptq" in normalized or "quantlinear" in normalized
+        elif adapter_key == "hf_torchao":
+            is_quantized = "torchao" in normalized or "affinequantized" in normalized
+        elif adapter_key == "hf_hqq":
+            is_quantized = "hqq" in normalized or "hqqlinear" in normalized
+        elif adapter_key == "hf_quanto":
+            is_quantized = "optimum.quanto" in normalized or ".quanto." in normalized
+        elif adapter_key == "hf_ct":
+            is_quantized = (
+                "compressed_tensors" in normalized
+                or "compressedtensors" in normalized
+                or "compressedlinear" in normalized
+            )
         if not is_quantized:
             continue
         count += 1

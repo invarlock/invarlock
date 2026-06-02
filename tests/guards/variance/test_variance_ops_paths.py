@@ -23,6 +23,18 @@ class _Module:
             self.weight = weight
 
 
+class _UnreadablePackedProjection:
+    weight = None
+
+    @property
+    def qweight(self):
+        raise RuntimeError("packed metadata unavailable")
+
+
+class _AwqProjectionNoMarker:
+    pass
+
+
 class _MPSWeight:
     def __init__(self, value: float) -> None:
         self.data = torch.full((2, 2), value)
@@ -41,6 +53,7 @@ def _guard() -> SimpleNamespace:
         _log_event=lambda operation, **data: events.append((operation, data)),
         _events=events,
         _enabled=True,
+        _stats={},
         _disable_attempt_count=0,
         _enable_attempt_count=0,
         _scales={},
@@ -59,6 +72,30 @@ def test_push_checkpoint_skips_modules_without_weight() -> None:
 
     assert len(guard._checkpoint_stack) == 1
     assert guard._checkpoint_stack[0] == {}
+
+
+def test_push_checkpoint_skips_quantized_tensor_weights() -> None:
+    guard = _guard()
+    guard._target_modules = {
+        "packed": _Module(torch.zeros(4, 4, dtype=torch.int8)),
+    }
+
+    push_checkpoint(guard, model=None)
+
+    assert len(guard._checkpoint_stack) == 1
+    assert guard._checkpoint_stack[0] == {}
+
+
+def test_quantized_mutation_marker_handles_unreadable_packed_metadata() -> None:
+    module = _UnreadablePackedProjection()
+
+    assert variance_ops._quantized_mutation_marker(module) is module
+
+
+def test_quantized_mutation_marker_returns_module_for_markerless_packed_class() -> None:
+    module = _AwqProjectionNoMarker()
+
+    assert variance_ops._quantized_mutation_marker(module) is module
 
 
 def test_pop_checkpoint_ignores_missing_targets_and_missing_weight() -> None:
@@ -130,6 +167,29 @@ def test_enable_guard_logs_catastrophic_failure_when_commit_raises(
 
     assert enable_guard(guard, model=None) is False
     assert any(event[0] == "enable_catastrophic_failure" for event in guard._events)
+
+
+def test_enable_guard_rolls_back_late_quantized_mutation_detection(monkeypatch) -> None:
+    guard = _guard()
+    guard._enabled = False
+    guard._target_modules = {"layer": _Module(torch.ones((2, 2)))}
+    guard._scales = {"layer": 1.5}
+    markers = iter([None, object()])
+
+    monkeypatch.setattr(
+        variance_ops,
+        "_quantized_mutation_marker",
+        lambda _module: next(markers),
+    )
+
+    assert enable_guard(guard, model=None) is False
+    assert guard._enabled is False
+    assert any(
+        event[0] == "enable_failed_quantized_unsupported"
+        and event[1]["quantized_modules"] == ["layer"]
+        for event in guard._events
+    )
+    assert guard._stats["quantized_mutation_unsupported"][0]["module"] == "layer"
 
 
 def test_disable_guard_uses_mps_revert_path() -> None:

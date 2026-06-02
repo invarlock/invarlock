@@ -19,16 +19,21 @@ Options:
                                Default: examples/integrations/peft_lora/reports/tiny-peft-lora
   --profile NAME               InvarLock profile. Default: release
   --tier NAME                  InvarLock tier. Default: balanced
+  --lane MODE                  Standard lane shortcut: host or cuda.
   --execution-mode MODE        container or host. Default: container
   --assurance MODE             strict or off. Default: strict
+  --runtime-provenance MODE    container or host for verify. Defaults to
+                               execution mode.
+  --device VALUE               Optional device override.
   --allow-network              Allow model/dataset downloads.
   --force                      Replace an existing subject directory.
   --materialize-only           Stop after writing the merged subject checkpoint.
   --no-html                    Skip HTML rendering in the compare wrapper.
   -h, --help                   Show this help.
 
-The default compare path is strict/container-backed. For local host bring-up,
-pass --execution-mode host --assurance off.
+The default compare path is strict/container-backed. Use --lane host --device
+cpu for cpu-host-off, --lane host --device cuda for cuda-host-off, and
+--lane cuda for cuda-container-strict evidence.
 USAGE
 }
 
@@ -41,8 +46,11 @@ fixture_dir="$SCRIPT_DIR/artifacts/tiny-peft-lora-fixture"
 report_out="$SCRIPT_DIR/reports/tiny-peft-lora"
 profile="release"
 tier="balanced"
+lane=""
 execution_mode="container"
 assurance="strict"
+runtime_provenance=""
+device=""
 allow_network=0
 force=0
 materialize_only=0
@@ -74,12 +82,24 @@ while [[ $# -gt 0 ]]; do
       tier="${2:-}"
       shift 2
       ;;
+    --lane)
+      lane="${2:-}"
+      shift 2
+      ;;
     --execution-mode)
       execution_mode="${2:-}"
       shift 2
       ;;
     --assurance)
       assurance="${2:-}"
+      shift 2
+      ;;
+    --runtime-provenance)
+      runtime_provenance="${2:-}"
+      shift 2
+      ;;
+    --device)
+      device="${2:-}"
       shift 2
       ;;
     --allow-network)
@@ -125,6 +145,20 @@ if [[ -z "$PYTHON_BIN" ]]; then
   fi
 fi
 
+# shellcheck source=../_shared/preflight.sh
+source "$REPO_ROOT/examples/integrations/_shared/preflight.sh"
+effective_execution_mode="$(integration_effective_execution_mode "$lane" "$execution_mode")"
+effective_assurance="$(integration_effective_assurance "$lane" "$assurance")"
+device="$(integration_default_host_device "$effective_execution_mode" "$device")"
+effective_device="$(integration_effective_device "$lane" "$device")"
+lane_artifact_label="$(integration_lane_artifact_label "$effective_execution_mode" "$effective_assurance" "$effective_device")"
+
+integration_log_header "PEFT LoRA integration example"
+integration_log_kv "lane" "$lane_artifact_label"
+integration_log_kv "python" "$PYTHON_BIN"
+integration_log_kv "device" "$effective_device"
+integration_log_kv "report_out" "$report_out"
+
 if ! "$PYTHON_BIN" -c 'import peft' >/dev/null 2>&1; then
   cat >&2 <<'MSG'
 Missing example dependency: peft
@@ -136,6 +170,8 @@ The core InvarLock install intentionally does not require PEFT.
 MSG
   exit 2
 fi
+
+integration_preflight_host_cuda_device "$PYTHON_BIN" "$effective_execution_mode" "$effective_device" "PEFT LoRA" || exit $?
 
 export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 
@@ -153,6 +189,7 @@ if [[ "$force" -eq 1 ]]; then
   materialize_cmd+=(--force)
 fi
 
+integration_log_step "materialize tiny LoRA subject and local fixture"
 "${materialize_cmd[@]}"
 
 if [[ "$materialize_only" -eq 1 ]]; then
@@ -160,6 +197,7 @@ if [[ "$materialize_only" -eq 1 ]]; then
   exit 0
 fi
 
+integration_log_step "collect checkpoint, edit, and fixture metadata"
 mkdir -p "$report_out"
 cp "$subject_dir/checkpoint_refs.json" "$report_out/checkpoint_refs.json"
 cp "$subject_dir/external_edit_summary.json" "$report_out/external_edit_summary.json"
@@ -180,6 +218,15 @@ compare_cmd=(
   --edit-label lora_merge
 )
 
+if [[ -n "$lane" ]]; then
+  compare_cmd+=(--lane "$lane")
+fi
+if [[ -n "$runtime_provenance" ]]; then
+  compare_cmd+=(--runtime-provenance "$runtime_provenance")
+fi
+if [[ -n "$device" ]]; then
+  compare_cmd+=(--device "$device")
+fi
 if [[ "$allow_network" -eq 1 ]]; then
   compare_cmd+=(--allow-network)
 fi
@@ -187,4 +234,5 @@ if [[ "$render_html" -eq 0 ]]; then
   compare_cmd+=(--no-html)
 fi
 
+integration_log_step "run InvarLock comparison"
 "${compare_cmd[@]}"

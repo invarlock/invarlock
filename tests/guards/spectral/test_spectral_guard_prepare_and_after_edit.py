@@ -44,11 +44,16 @@ def test_capture_sigmas_clamps_iters_defaults_init_and_skips_non_tensor(
             yield from self._mods.items()
 
     sigmas = guard._capture_sigmas(Model(), phase="after_edit")
-    assert sigmas["int8"] == 1.0
+    assert "int8" not in sigmas
     assert "np" not in sigmas
     assert sigmas["fp"] == 2.0
     assert calls["iters"] == 1
     assert calls["init"] == "ones"
+    assert any(
+        item["kind"] == "spectral_sigma_unavailable_quantized_weight"
+        and item["module"] == "int8"
+        for item in guard._measurement_diagnostics
+    )
 
 
 def test_prepare_degeneracy_skips_non_tensor_and_invalid_sigma(monkeypatch) -> None:

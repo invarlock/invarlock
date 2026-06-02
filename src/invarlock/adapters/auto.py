@@ -77,10 +77,23 @@ def _detect_quant_family_from_cfg(cfg: dict[str, Any]) -> str | None:
         ).lower()
     except _MODEL_CONFIG_ERRORS:
         return None
+    normalized_method = method.replace("-", "_")
+    if (
+        "compressed_tensors" in normalized_method
+        or "compressedtensors" in normalized_method
+        or "llmcompressor" in normalized_method
+    ):
+        return "hf_ct"
     if "gptq" in method:
         return "hf_gptq"
     if "awq" in method:
         return "hf_awq"
+    if "torchao" in method:
+        return "hf_torchao"
+    if "hqq" in method:
+        return "hf_hqq"
+    if "quanto" in method:
+        return "hf_quanto"
     if "bitsandbytes" in method or "bnb" in method:
         return "hf_bnb"
     return None
@@ -126,6 +139,22 @@ def resolve_auto_adapter(
         return "hf_gptq"
     if any(key in lower_id for key in ["awq", "-awq", "_awq"]):
         return "hf_awq"
+    if any(key in lower_id for key in ["torchao", "-torchao", "_torchao"]):
+        return "hf_torchao"
+    if any(key in lower_id for key in ["hqq", "-hqq", "_hqq"]):
+        return "hf_hqq"
+    if any(key in lower_id for key in ["quanto", "-quanto", "_quanto"]):
+        return "hf_quanto"
+    if any(
+        key in lower_id
+        for key in [
+            "compressed-tensors",
+            "compressed_tensors",
+            "compressedtensors",
+            "llmcompressor",
+        ]
+    ):
+        return "hf_ct"
     if any(
         key in lower_id
         for key in ["bnb", "bitsandbytes", "-4bit", "-8bit", "4bit", "8bit"]
@@ -170,7 +199,9 @@ def _detect_quantization_from_path(model_id: str) -> str | None:
     Detect quantization method from a local checkpoint path.
 
     Returns:
-        Quantization adapter name ("hf_bnb", "hf_awq", "hf_gptq") or None.
+        Quantization adapter name ("hf_bnb", "hf_awq", "hf_gptq",
+        "hf_torchao", "hf_hqq", "hf_quanto",
+        "hf_ct") or None.
     """
     config_data = _read_local_hf_config(model_id)
     if not isinstance(config_data, dict):
@@ -183,7 +214,9 @@ def _detect_quantization_from_model(model: Any) -> str | None:
     Detect quantization method from a loaded model instance.
 
     Returns:
-        Quantization adapter name ("hf_bnb", "hf_awq", "hf_gptq") or None.
+        Quantization adapter name ("hf_bnb", "hf_awq", "hf_gptq",
+        "hf_torchao", "hf_hqq", "hf_quanto",
+        "hf_ct") or None.
     """
     config = getattr(model, "config", None)
     if config is None:
@@ -204,10 +237,23 @@ def _detect_quantization_from_model(model: Any) -> str | None:
         if not isinstance(quant_method, str):
             return None
         quant_method = quant_method.lower()
+        normalized_method = quant_method.replace("-", "_")
+        if (
+            "compressed_tensors" in normalized_method
+            or "compressedtensors" in normalized_method
+            or "llmcompressor" in normalized_method
+        ):
+            return "hf_ct"
         if quant_method == "awq":
             return "hf_awq"
         elif quant_method == "gptq":
             return "hf_gptq"
+        elif "torchao" in quant_method:
+            return "hf_torchao"
+        elif "hqq" in quant_method:
+            return "hf_hqq"
+        elif "quanto" in quant_method:
+            return "hf_quanto"
         elif "bitsandbytes" in quant_method or "bnb" in quant_method:
             return "hf_bnb"
     else:
@@ -217,6 +263,18 @@ def _detect_quantization_from_model(model: Any) -> str | None:
             return "hf_awq"
         elif cfg_class in ("GPTQConfig",):
             return "hf_gptq"
+        elif "TorchAO" in cfg_class or "Int8WeightOnly" in cfg_class:
+            return "hf_torchao"
+        elif (
+            cfg_class in ("HqqConfig", "HQQConfig")
+            or "Hqq" in cfg_class
+            or "HQQ" in cfg_class
+        ):
+            return "hf_hqq"
+        elif cfg_class in ("QuantoConfig",) or "Quanto" in cfg_class:
+            return "hf_quanto"
+        elif "CompressedTensors" in cfg_class or "Compressed" in cfg_class:
+            return "hf_ct"
         elif cfg_class in ("BitsAndBytesConfig", "BnbConfig"):
             return "hf_bnb"
 
@@ -273,6 +331,32 @@ class _DelegatingAdapter(ModelAdapter):
             adapter_cls = cast(
                 type[_LoadableAdapter],
                 _importlib.import_module("invarlock.plugins").HF_GPTQ_Adapter,
+            )
+            return adapter_cls()
+        elif adapter_name == "hf_torchao":
+            adapter_cls = cast(
+                type[_LoadableAdapter],
+                _importlib.import_module("invarlock.plugins").HF_TorchAO_Adapter,
+            )
+            return adapter_cls()
+        elif adapter_name == "hf_hqq":
+            adapter_cls = cast(
+                type[_LoadableAdapter],
+                _importlib.import_module("invarlock.plugins").HF_HQQ_Adapter,
+            )
+            return adapter_cls()
+        elif adapter_name == "hf_quanto":
+            adapter_cls = cast(
+                type[_LoadableAdapter],
+                _importlib.import_module("invarlock.plugins").HF_Quanto_Adapter,
+            )
+            return adapter_cls()
+        elif adapter_name == "hf_ct":
+            adapter_cls = cast(
+                type[_LoadableAdapter],
+                _importlib.import_module(
+                    "invarlock.plugins"
+                ).HF_CompressedTensors_Adapter,
             )
             return adapter_cls()
         else:

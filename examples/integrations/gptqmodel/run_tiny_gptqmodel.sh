@@ -20,6 +20,7 @@ Options:
   --tokenizer-source VALUE     Tokenizer ID or local path. Default: sshleifer/tiny-gpt2
   --profile NAME               InvarLock profile. Default: ci
   --tier NAME                  InvarLock tier. Default: balanced
+  --lane MODE                  Standard lane shortcut: host or cuda.
   --execution-mode MODE        container or host. Default: host
   --assurance MODE             strict or off. Default: off
   --runtime-provenance MODE    container or host for verify. Defaults to
@@ -32,8 +33,8 @@ Options:
   -h, --help                   Show this help.
 
 The default path is host-mode so it can validate a local GPTQModel runtime.
-For a strict CUDA/container run, pass --execution-mode container --assurance strict
-and provide a quant runtime image through the documented runtime-image settings.
+Use --lane host --device cpu for cpu-host-off, --lane host --device cuda for
+cuda-host-off, and --lane cuda for cuda-container-strict evidence.
 USAGE
 }
 
@@ -47,6 +48,7 @@ report_out="$SCRIPT_DIR/reports/tiny-gptqmodel"
 tokenizer_source="sshleifer/tiny-gpt2"
 profile="ci"
 tier="balanced"
+lane=""
 execution_mode="host"
 assurance="off"
 runtime_provenance=""
@@ -84,6 +86,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --tier)
       tier="${2:-}"
+      shift 2
+      ;;
+    --lane)
+      lane="${2:-}"
       shift 2
       ;;
     --execution-mode)
@@ -145,6 +151,20 @@ if [[ -z "$PYTHON_BIN" ]]; then
   fi
 fi
 
+# shellcheck source=../_shared/preflight.sh
+source "$REPO_ROOT/examples/integrations/_shared/preflight.sh"
+effective_execution_mode="$(integration_effective_execution_mode "$lane" "$execution_mode")"
+effective_assurance="$(integration_effective_assurance "$lane" "$assurance")"
+device="$(integration_default_host_device "$effective_execution_mode" "$device")"
+effective_device="$(integration_effective_device "$lane" "$device")"
+lane_artifact_label="$(integration_lane_artifact_label "$effective_execution_mode" "$effective_assurance" "$effective_device")"
+
+integration_log_header "GPTQModel integration example"
+integration_log_kv "lane" "$lane_artifact_label"
+integration_log_kv "python" "$PYTHON_BIN"
+integration_log_kv "device" "$effective_device"
+integration_log_kv "report_out" "$report_out"
+
 if ! "$PYTHON_BIN" -c 'import gptqmodel' >/dev/null 2>&1; then
   cat >&2 <<'MSG'
 Missing example dependency: GPTQModel
@@ -158,7 +178,9 @@ MSG
 fi
 
 export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
-if [[ "$execution_mode" == "host" && -z "${TORCHDYNAMO_DISABLE:-}" ]]; then
+integration_preflight_host_cuda_device "$PYTHON_BIN" "$effective_execution_mode" "$effective_device" "GPTQModel" || exit $?
+integration_preflight_gptqmodel_host_runtime "$PYTHON_BIN" "$effective_execution_mode" || exit $?
+if [[ "$effective_execution_mode" == "host" && -z "${TORCHDYNAMO_DISABLE:-}" ]]; then
   export TORCHDYNAMO_DISABLE=1
 fi
 
@@ -177,6 +199,7 @@ if [[ "$force" -eq 1 ]]; then
   materialize_cmd+=(--force)
 fi
 
+integration_log_step "materialize tiny GPTQ subject and local fixture"
 "${materialize_cmd[@]}"
 
 if [[ "$materialize_only" -eq 1 ]]; then
@@ -186,6 +209,7 @@ if [[ "$materialize_only" -eq 1 ]]; then
   exit 0
 fi
 
+integration_log_step "collect checkpoint, edit, and fixture metadata"
 mkdir -p "$report_out"
 cp "$subject_dir/checkpoint_refs.json" "$report_out/checkpoint_refs.json"
 cp "$subject_dir/external_edit_summary.json" "$report_out/external_edit_summary.json"
@@ -206,6 +230,9 @@ compare_cmd=(
   --edit-label gptqmodel_gptq_4bit
 )
 
+if [[ -n "$lane" ]]; then
+  compare_cmd+=(--lane "$lane")
+fi
 if [[ -n "$runtime_provenance" ]]; then
   compare_cmd+=(--runtime-provenance "$runtime_provenance")
 fi
@@ -219,4 +246,5 @@ if [[ "$render_html" -eq 0 ]]; then
   compare_cmd+=(--no-html)
 fi
 
+integration_log_step "run InvarLock comparison"
 "${compare_cmd[@]}"

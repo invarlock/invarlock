@@ -287,7 +287,7 @@ class HFAdapterMixin:
         """
         Safely move model to device, respecting quantization constraints.
 
-        For quantized models (BNB, AWQ, GPTQ), device movement may be
+        For quantized models (BNB, AWQ, GPTQ, torchao, HQQ), device movement may be
         impossible or already handled by the loading mechanism. This
         method checks the model's capabilities before attempting .to().
 
@@ -311,7 +311,7 @@ class HFAdapterMixin:
 
         # Check if model can be moved
         if capabilities is not None and not capabilities.device_movable:
-            # Model handles its own device placement (e.g., BNB, AWQ, GPTQ)
+            # Model handles its own device placement (e.g., BNB, AWQ, GPTQ, torchao, HQQ)
             # Log this decision for debugging but don't attempt .to()
             return model
 
@@ -337,7 +337,7 @@ class HFAdapterMixin:
 
     def _is_quantized_model(self, model: torch.nn.Module) -> bool:
         """
-        Check if a model is quantized (BNB, AWQ, GPTQ).
+        Check if a model is quantized (BNB, AWQ, GPTQ, torchao, HQQ).
 
         This is a quick heuristic check that doesn't require full
         capability detection.
@@ -368,7 +368,14 @@ class HFAdapterMixin:
             module_name = module.__class__.__name__.lower()
             if any(
                 q in module_name
-                for q in ["linear8bit", "linear4bit", "quantlinear", "awqlinear"]
+                for q in [
+                    "linear8bit",
+                    "linear4bit",
+                    "quantlinear",
+                    "awqlinear",
+                    "torchao",
+                    "hqq",
+                ]
             ):
                 return True
 

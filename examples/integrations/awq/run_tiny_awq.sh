@@ -22,11 +22,13 @@ Options:
   --awq-backend VALUE          GPTQModel/Transformers AWQ backend. Default: torch_awq
   --profile NAME               InvarLock profile. Default: ci
   --tier NAME                  InvarLock tier. Default: balanced
+  --lane MODE                  Standard lane shortcut: host or cuda.
   --execution-mode MODE        container or host. Default: host
   --assurance MODE             strict or off. Default: off
   --runtime-provenance MODE    container or host for verify. Defaults to
                                execution mode.
-  --device VALUE               Optional InvarLock device override. Default: cuda
+  --device VALUE               InvarLock device. AWQ supports cuda only here.
+                               Default: cuda
   --allow-network              Allow tokenizer downloads.
   --force                      Replace existing generated model and fixture dirs.
   --materialize-only           Stop after writing checkpoints and fixture.
@@ -34,9 +36,9 @@ Options:
   -h, --help                   Show this help.
 
 The default path is host-mode on a CUDA host so it can validate the local
-GPTQModel AWQ runtime. For a strict CUDA/container run, pass
---execution-mode container --assurance strict and provide a quant runtime image
-through the documented runtime-image settings.
+GPTQModel AWQ runtime. Use --lane host for cuda-host-off and --lane cuda for
+cuda-container-strict evidence. AWQ materialization and evaluation use CUDA in
+this example.
 USAGE
 }
 
@@ -52,6 +54,7 @@ quantize_device="cuda:0"
 awq_backend="torch_awq"
 profile="ci"
 tier="balanced"
+lane=""
 execution_mode="host"
 assurance="off"
 runtime_provenance=""
@@ -97,6 +100,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --tier)
       tier="${2:-}"
+      shift 2
+      ;;
+    --lane)
+      lane="${2:-}"
       shift 2
       ;;
     --execution-mode)
@@ -162,6 +169,39 @@ if [[ -x "$python_bin_dir/ninja" ]]; then
   export PATH="$python_bin_dir:$PATH"
 fi
 
+# shellcheck source=../_shared/preflight.sh
+source "$REPO_ROOT/examples/integrations/_shared/preflight.sh"
+effective_execution_mode="$(integration_effective_execution_mode "$lane" "$execution_mode")"
+effective_assurance="$(integration_effective_assurance "$lane" "$assurance")"
+device="$(integration_default_host_device "$effective_execution_mode" "$device")"
+effective_device="$(integration_effective_device "$lane" "$device")"
+lane_artifact_label="$(integration_lane_artifact_label "$effective_execution_mode" "$effective_assurance" "$effective_device")"
+
+integration_log_header "AWQ integration example"
+integration_log_kv "lane" "$lane_artifact_label"
+integration_log_kv "python" "$PYTHON_BIN"
+integration_log_kv "quantize_device" "$quantize_device"
+integration_log_kv "report_out" "$report_out"
+
+if [[ "$effective_device" != cuda* ]]; then
+  cat >&2 <<'MSG'
+AWQ lanes in this example are CUDA-only.
+
+Use --lane host --device cuda for cuda-host-off, or use --lane cuda with the
+documented runtime image for cuda-container-strict evidence.
+MSG
+  exit 2
+fi
+
+if [[ "$quantize_device" != cuda* ]]; then
+  cat >&2 <<'MSG'
+AWQ materialization requires a CUDA quantization device.
+
+Use --quantize-device cuda:0 or another CUDA device visible to torch.
+MSG
+  exit 2
+fi
+
 if ! "$PYTHON_BIN" -c 'import gptqmodel' >/dev/null 2>&1; then
   cat >&2 <<'MSG'
 Missing example dependency: GPTQModel
@@ -174,6 +214,9 @@ The core InvarLock install intentionally does not require GPTQModel.
 MSG
   exit 2
 fi
+
+integration_preflight_host_cuda_device "$PYTHON_BIN" "$effective_execution_mode" "$effective_device" "AWQ" || exit $?
+integration_preflight_gptqmodel_host_runtime "$PYTHON_BIN" "$effective_execution_mode" || exit $?
 
 if ! "$PYTHON_BIN" -c 'import torch; raise SystemExit(0 if torch.cuda.is_available() else 1)' >/dev/null 2>&1; then
   cat >&2 <<'MSG'
@@ -204,6 +247,7 @@ if [[ "$force" -eq 1 ]]; then
   materialize_cmd+=(--force)
 fi
 
+integration_log_step "materialize tiny AWQ subject and local fixture"
 "${materialize_cmd[@]}"
 
 if [[ "$materialize_only" -eq 1 ]]; then
@@ -213,6 +257,7 @@ if [[ "$materialize_only" -eq 1 ]]; then
   exit 0
 fi
 
+integration_log_step "collect checkpoint, edit, and fixture metadata"
 mkdir -p "$report_out"
 cp "$subject_dir/checkpoint_refs.json" "$report_out/checkpoint_refs.json"
 cp "$subject_dir/external_edit_summary.json" "$report_out/external_edit_summary.json"
@@ -233,6 +278,9 @@ compare_cmd=(
   --edit-label gptqmodel_awq_4bit
 )
 
+if [[ -n "$lane" ]]; then
+  compare_cmd+=(--lane "$lane")
+fi
 if [[ -n "$runtime_provenance" ]]; then
   compare_cmd+=(--runtime-provenance "$runtime_provenance")
 fi
@@ -246,4 +294,5 @@ if [[ "$render_html" -eq 0 ]]; then
   compare_cmd+=(--no-html)
 fi
 
+integration_log_step "run InvarLock comparison"
 "${compare_cmd[@]}"

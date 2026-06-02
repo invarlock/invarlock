@@ -53,6 +53,8 @@ release tooling.
 | pillow | [python-pillow/Pillow](https://github.com/python-pillow/Pillow) | MIT-CMU | Optional image handling for multimodal/runtime helpers |
 | bitsandbytes | [bitsandbytes-foundation/bitsandbytes](https://github.com/bitsandbytes-foundation/bitsandbytes) | MIT | Optional GPU quantization/runtime kernels |
 | gptqmodel | [ModelCloud/GPTQModel](https://github.com/ModelCloud/GPTQModel) | Apache License 2.0 | Optional GPTQ and AWQ backend loading |
+| optimum-quanto | [huggingface/optimum-quanto](https://github.com/huggingface/optimum-quanto) | Apache License 2.0 | Optional Quanto runtime quantization backend |
+| compressed-tensors | [neuralmagic/compressed-tensors](https://github.com/neuralmagic/compressed-tensors) | Apache License 2.0 | Optional pre-quantized checkpoint loading backend |
 | triton | [triton-lang/triton](https://github.com/triton-lang/triton) | MIT | Optional GPU kernel compilation/runtime support |
 
 ## Representative Reference Models

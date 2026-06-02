@@ -44,6 +44,23 @@ _VARIANCE_PREPARE_ERRORS = (
 )
 
 
+def _tap_patterns_from_policy(policy: dict[str, Any]) -> list[str]:
+    tap_config = policy.get("tap")
+    if isinstance(tap_config, str):
+        tap_patterns = [tap_config]
+    elif isinstance(tap_config, list | tuple):
+        tap_patterns = [
+            str(pattern)
+            for pattern in tap_config
+            if isinstance(pattern, str) and pattern.strip()
+        ]
+    else:
+        tap_patterns = []
+    if not tap_patterns:
+        tap_patterns = ["transformer.h.*.mlp.c_proj"]
+    return tap_patterns
+
+
 def prepare_guard(
     guard: Any,
     model: nn.Module,
@@ -53,6 +70,7 @@ def prepare_guard(
 ) -> dict[str, Any]:
     """Prepare variance guard by resolving targets, scales, and calibration state."""
     start_time = time.time()
+    guard._prepare_failure = None
 
     if policy:
         for key in [
@@ -77,6 +95,7 @@ def prepare_guard(
             "monitor_only",
             "calibration",
             "target_modules",
+            "tap",
         ]:
             if key in policy:
                 guard._policy[key] = policy[key]
@@ -106,6 +125,9 @@ def prepare_guard(
             if guard._focus_modules:
                 guard._policy["target_modules"] = sorted(guard._focus_modules)
                 guard._stats["focus_modules"] = sorted(guard._focus_modules)
+        if "tap" in policy:
+            guard._tap_patterns = _tap_patterns_from_policy(guard._policy)
+            guard._stats["tap"] = list(guard._tap_patterns)
 
     guard._log_event(
         "prepare",
@@ -122,6 +144,11 @@ def prepare_guard(
         if not guard._target_modules:
             guard._prepared = False
             guard._adapter_ref = adapter
+            guard._prepare_failure = {
+                "reason": "no_variance_targets",
+                "message": "No target modules found for variance equalization",
+                "target_resolution": guard._stats.get("target_resolution", {}),
+            }
             return build_prepare_result(
                 policy=guard._policy,
                 target_modules=guard._target_modules,
@@ -259,6 +286,12 @@ def prepare_guard(
     except _VARIANCE_PREPARE_ERRORS as error:
         guard._prepared = False
         guard._adapter_ref = adapter
+        guard._prepare_failure = {
+            "reason": "prepare_error",
+            "message": str(error),
+            "target_resolution": guard._stats.get("target_resolution", {}),
+            "target_module_names": guard._stats.get("target_module_names", []),
+        }
         guard._log_event(
             "prepare_failed",
             level="ERROR",
@@ -366,6 +399,7 @@ class VarianceGuard(Guard):
         }
         self._target_modules: dict[str, nn.Module] = {}
         self._original_scales: dict[str, float] = {}
+        self._prepare_failure: dict[str, Any] | None = None
         self._focus_modules = {
             self._normalize_module_name(name)
             for name in (self._policy.get("target_modules") or [])
@@ -374,20 +408,7 @@ class VarianceGuard(Guard):
         if self._focus_modules:
             self._policy["target_modules"] = sorted(self._focus_modules)
 
-        tap_config = self._policy.get("tap")
-        if isinstance(tap_config, str):
-            tap_patterns = [tap_config]
-        elif isinstance(tap_config, list | tuple):
-            tap_patterns = [
-                str(pattern)
-                for pattern in tap_config
-                if isinstance(pattern, str) and pattern.strip()
-            ]
-        else:
-            tap_patterns = []
-        if not tap_patterns:
-            tap_patterns = ["transformer.h.*.mlp.c_proj"]
-        self._tap_patterns = tap_patterns
+        self._tap_patterns = _tap_patterns_from_policy(self._policy)
 
         self._checkpoint_stack: list[dict[str, Any]] = []
         self._enable_attempt_count = 0

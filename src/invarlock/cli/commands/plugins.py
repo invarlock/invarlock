@@ -185,6 +185,16 @@ def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
         "hf_gptq": {"packages": ["gptqmodel"], "extra": "invarlock[gptq]"},
         "hf_awq": {"packages": ["gptqmodel"], "extra": "invarlock[awq]"},
         "hf_bnb": {"packages": ["bitsandbytes"], "extra": "invarlock[gpu]"},
+        "hf_torchao": {"packages": ["torchao"], "extra": "invarlock[torchao]"},
+        "hf_hqq": {"packages": ["hqq"], "extra": "invarlock[hqq]"},
+        "hf_quanto": {
+            "packages": ["optimum.quanto"],
+            "extra": "invarlock[quanto]",
+        },
+        "hf_ct": {
+            "packages": ["compressed_tensors"],
+            "extra": "invarlock[compressed-tensors]",
+        },
     }
 
     plugin_info = extras_map.get(plugin_name)

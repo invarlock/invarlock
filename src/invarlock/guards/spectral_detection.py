@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 
 from ._estimators import frobenius_norm_sq, row_col_norm_extrema
+from .quantized_weights import is_quantized_weight
 from .spectral_measurement import compute_sigma_max
 from .spectral_policy import default_family_caps
 
@@ -258,6 +259,19 @@ def detect_spectral_violations(
             if getattr(weight, "ndim", None) == 2:
                 sigma_max = metrics.get(name)
                 if sigma_max is None:
+                    if is_quantized_weight(weight):
+                        guard._log_event(
+                            "spectral_quantized_weight_unmeasurable",
+                            level="WARN",
+                            message=(
+                                "Skipping spectral z-score enforcement for "
+                                "quantized weight without a dense matrix view"
+                            ),
+                            module=name,
+                            phase=phase,
+                            dtype=str(getattr(weight, "dtype", "unknown")),
+                        )
+                        continue
                     sigma_max = compute_sigma_max_fn(weight)
 
                 baseline_sigma = guard.baseline_sigmas.get(name, guard.target_sigma)

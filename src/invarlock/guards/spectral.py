@@ -21,6 +21,7 @@ from . import spectral_measurement as _spectral_measurement
 from . import spectral_policy as _spectral_policy
 from . import spectral_results as _spectral_results
 from . import spectral_runtime as _spectral_runtime
+from .adapter_modules import iter_named_adapter_scoped_modules
 
 INVARLOCK_CORE_ABI = CORE_ABI
 
@@ -271,7 +272,9 @@ class SpectralGuard(Guard):
         self._run_profile: str | None = None
         self._scoped_modules_model_id: int | None = None
         self._scoped_modules_scope: str | None = None
+        self._scoped_modules_adapter_id: int | None = None
         self._scoped_modules: tuple[tuple[str, Any], ...] = ()
+        self._adapter_ref: Any | None = None
 
     def _log_event(
         self, operation: str, level: str = "INFO", message: str = "", **data: Any
@@ -337,9 +340,12 @@ class SpectralGuard(Guard):
 
     def _get_scoped_modules(self, model: Any) -> tuple[tuple[str, Any], ...]:
         model_id = id(model)
+        adapter = self._adapter_ref
+        adapter_id = id(adapter) if adapter is not None else None
         if (
             self._scoped_modules_model_id == model_id
             and self._scoped_modules_scope == self.scope
+            and self._scoped_modules_adapter_id == adapter_id
         ):
             return self._scoped_modules
 
@@ -348,10 +354,26 @@ class SpectralGuard(Guard):
             for name, module in model.named_modules()
             if self._should_check_module(name, module)
         )
+        if not scoped_modules:
+            scoped_modules = self._get_adapter_scoped_modules(model, adapter)
+
         self._scoped_modules_model_id = model_id
         self._scoped_modules_scope = self.scope
+        self._scoped_modules_adapter_id = adapter_id
         self._scoped_modules = scoped_modules
         return scoped_modules
+
+    def _get_adapter_scoped_modules(
+        self, model: Any, adapter: Any | None
+    ) -> tuple[tuple[str, Any], ...]:
+        return tuple(
+            iter_named_adapter_scoped_modules(
+                model,
+                adapter,
+                should_include=self._should_check_module,
+                log_event=self._log_event,
+            )
+        )
 
     def prepare(
         self, model: Any, adapter: Any, calib: Any, policy: dict[str, Any]

@@ -467,6 +467,14 @@ def test_check_plugin_extras_missing(monkeypatch):
     monkeypatch.setattr("builtins.__import__", fake_import)
     result = plugins_mod._check_plugin_extras("hf_gptq", "adapters")
     assert "invarlock[gptq]" in result
+    result = plugins_mod._check_plugin_extras("hf_torchao", "adapters")
+    assert "invarlock[torchao]" in result
+    result = plugins_mod._check_plugin_extras("hf_hqq", "adapters")
+    assert "invarlock[hqq]" in result
+    result = plugins_mod._check_plugin_extras("hf_quanto", "adapters")
+    assert "invarlock[quanto]" in result
+    result = plugins_mod._check_plugin_extras("hf_ct", "adapters")
+    assert "invarlock[compressed-tensors]" in result
 
 
 def test_plugins_adapters_verbose_console(monkeypatch):
@@ -618,6 +626,13 @@ def test_plugins_adapters_explain_special_notes(monkeypatch):
     adapters = {
         "hf_gptq": {"module": "invarlock.plugins.gptq", "entry_point": "gptq"},
         "hf_awq": {"module": "invarlock.plugins.awq", "entry_point": "awq"},
+        "hf_torchao": {
+            "module": "invarlock.plugins.torchao",
+            "entry_point": "torchao",
+        },
+        "hf_hqq": {"module": "invarlock.plugins.hqq", "entry_point": "hqq"},
+        "hf_quanto": {"module": "invarlock.plugins.quanto", "entry_point": "quanto"},
+        "hf_ct": {"module": "invarlock.plugins.ct", "entry_point": "ct"},
     }
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setattr(
@@ -643,6 +658,22 @@ def test_plugins_adapters_explain_special_notes(monkeypatch):
     assert any(
         "Transformers AWQ through GPTQModel" in line for line in dummy_console.lines
     )
+    dummy_console.lines.clear()
+    plugins_command(category="adapters", explain="hf_torchao")
+    assert any("torchao" in line for line in dummy_console.lines)
+    assert any("int8 weight-only" in line for line in dummy_console.lines)
+    dummy_console.lines.clear()
+    plugins_command(category="adapters", explain="hf_hqq")
+    assert any("HQQ" in line or "hqq" in line for line in dummy_console.lines)
+    assert any("Runtime applies HQQ" in line for line in dummy_console.lines)
+    dummy_console.lines.clear()
+    plugins_command(category="adapters", explain="hf_quanto")
+    assert any("Quanto" in line or "quanto" in line for line in dummy_console.lines)
+    assert any("Runtime applies Quanto" in line for line in dummy_console.lines)
+    dummy_console.lines.clear()
+    plugins_command(category="adapters", explain="hf_ct")
+    assert any("compressed-tensors" in line for line in dummy_console.lines)
+    assert any("pre-quantized" in line for line in dummy_console.lines)
 
 
 def test_plugins_adapters_provenance_failure_graceful(monkeypatch, capsys):

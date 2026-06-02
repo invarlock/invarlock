@@ -147,6 +147,10 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
             language_model = getattr(model.model, "language_model", None)
             if language_model is not None and hasattr(language_model, "layers"):
                 return language_model, language_model.layers, config
+        if hasattr(model, "model") and hasattr(model.model, "model"):
+            nested_model = getattr(model.model, "model", None)
+            if nested_model is not None and hasattr(nested_model, "layers"):
+                return nested_model, nested_model.layers, config
         if hasattr(model, "model") and hasattr(model.model, "layers"):
             return model.model, model.model.layers, config
         if hasattr(model, "gpt_neox") and hasattr(model.gpt_neox, "layers"):

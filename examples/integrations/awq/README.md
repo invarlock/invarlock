@@ -1,6 +1,7 @@
 # AWQ Integration Example
 
-Status: `runnable` on CUDA hosts; strict container runtime provenance verified.
+Status: `runnable` on CUDA hosts; strict container evidence is verified on
+CUDA for this tiny AWQ example with the example-only GPTQModel/AWQ image.
 
 This example shows how to attach InvarLock regression evidence to a checkpoint
 quantized with GPTQModel's AWQ flow. It creates a deterministic small
@@ -32,35 +33,57 @@ uv run --extra awq python -c "import gptqmodel"
 
 ## Run
 
+## Lane Support
+
+| Artifact lane label | Command shape | Notes |
+| --- | --- | --- |
+| `cuda-container-strict` | `--lane cuda` | Primary review path with the example-only GPTQModel/AWQ image. |
+| `cuda-host-off` | `--lane host` | Secondary local CUDA dependency bring-up without strict container evidence. |
+
+Host lanes run prerequisite preflight before model materialization and
+evaluation. This AWQ example is CUDA-only because AWQ materialization requires
+CUDA regardless of the final evaluator device.
+
+### cuda-container-strict lane
+
+Build and smoke the example-only GPTQModel/AWQ image, then run this lane on a
+CUDA host with that image configured:
+
 ```bash
-uv run --extra awq \
-  examples/integrations/awq/run_tiny_awq.sh \
-  --allow-network \
-  --force
-```
+examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-gptqmodel
+examples/integrations/_runtime_images/smoke_example_runtime_image.sh cuda-gptqmodel
 
-The default path uses `--execution-mode host --assurance off` because the AWQ
-runtime depends on the selected CUDA host and installed GPTQModel wheel. To
-exercise a different AWQ backend, pass `--awq-backend VALUE`.
-
-For a CUDA/container run that completes with runtime provenance verification,
-run on a CUDA host with the quant runtime image configured and pass:
-
-```bash
-INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-quant \
+INVARLOCK_RUNTIME_IMAGE=invarlock-example-runtime:cuda-gptqmodel \
 uv run --extra awq \
   examples/integrations/awq/run_tiny_awq.sh \
   --allow-network \
   --force \
-  --execution-mode container \
-  --assurance off \
-  --runtime-provenance container \
-  --device cuda
+  --lane cuda
 ```
 
-Use a digest-pinned runtime image when the artifact is being shared for review.
-The `--assurance strict` path is reserved for quantized-checkpoint guard
-contract work until variance target coverage for AWQ modules is expanded.
+Use the digest-pinned image reference recorded in `runtime.manifest.json` when
+the artifact is being shared for review.
+
+This strict lane proves the configured tiny AWQ checkpoint and runtime image. It
+is not a blanket claim for every AWQ wheel, backend, kernel, or model shape;
+rerun the strict lane for the target runtime before using the result as outreach
+evidence.
+
+### cuda-host-off lane
+
+Use this lane on a CUDA host for local dependency bring-up:
+
+```bash
+uv run --extra awq \
+  examples/integrations/awq/run_tiny_awq.sh \
+  --allow-network \
+  --force \
+  --lane host
+```
+
+The host path uses `--execution-mode host --assurance off` because the AWQ
+runtime depends on the selected CUDA host and installed GPTQModel wheel. To
+exercise a different AWQ backend, pass `--awq-backend VALUE`.
 
 ## Generated Artifacts
 
@@ -77,10 +100,19 @@ The default run writes ignored local artifacts under this directory:
 | `reports/tiny-awq/verify.json` | Machine-readable verifier result. |
 | `reports/tiny-awq/evaluation.html` | Human-readable report. |
 | `reports/tiny-awq/backend_inventory.json` | GPTQModel backend version and AWQ module inventory when exposed. |
+| `reports/tiny-awq/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
 | `reports/tiny-awq/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
+| `reports/tiny-awq/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
 | `reports/tiny-awq/checkpoint_refs.json` | Baseline and subject checkpoint references. |
 | `reports/tiny-awq/external_edit_summary.json` | AWQ quantization metadata and checkpoint file hashes. |
+
+A successful run ends with the shared completion block documented in
+`examples/integrations/_shared/README.md#expected-run-output`. If a run fails,
+check the prerequisite message first, then inspect `reports/tiny-awq/run_command.txt`.
 
 The helper fails if CUDA is unavailable, if GPTQModel does not expose a
 quantized checkpoint configuration, or if the subject cannot be loaded back
 through the Transformers AWQ loader with the selected backend.
+
+`backend_inventory.json` is emitted by InvarLock report persistence when adapter
+provenance is available; the shell runner does not write that sidecar directly.

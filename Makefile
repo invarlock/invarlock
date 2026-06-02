@@ -517,9 +517,10 @@ runtime-smoke-cuda-quant: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA_QUANT)
 runtime-smoke-cuda-quant:  ## Smoke the local CUDA quant runtime image
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
 	$(CONTAINER_ENGINE) run --rm \
+		-v "$(CURDIR)/examples/integrations/_runtime_images/quant_runtime_image_smoke.py:/tmp/quant_runtime_image_smoke.py:ro" \
 		--entrypoint python \
 		$(RUNTIME_IMAGE) \
-		-c "import shutil, sysconfig; from pathlib import Path; from torch.utils.cpp_extension import CUDA_HOME; import bitsandbytes, datasets, gptqmodel, safetensors, torch, transformers; assert shutil.which('nvcc'), 'nvcc missing'; assert CUDA_HOME, 'CUDA_HOME missing'; assert (Path(sysconfig.get_paths()['include']) / 'Python.h').is_file(), 'Python.h missing'; print('quant runtime image imports ok')"
+		/tmp/quant_runtime_image_smoke.py --require-cuda-toolchain
 
 runtime-smoke-cuda-quant-podman: CONTAINER_ENGINE=podman
 runtime-smoke-cuda-quant-podman: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA_QUANT)

@@ -12,6 +12,10 @@ def test_extract_adapter_provenance_known_families():
             ("hf_gptq", "gptq"),
             ("hf_awq", "awq"),
             ("hf_bnb", "bnb"),
+            ("hf_torchao", "torchao_int8"),
+            ("hf_hqq", "hqq"),
+            ("hf_quanto", "quanto"),
+            ("hf_ct", "compressed_tensors"),
             ("hf_causal", "hf"),
         ):
             prov = extract_adapter_provenance(name).to_dict()

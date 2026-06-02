@@ -30,10 +30,33 @@ def test_resolve_auto_adapter_detects_quant_families_from_config(
     _write_cfg(bnb_dir, {"quantization_config": {"quant_method": "bitsandbytes"}})
     assert resolve_auto_adapter(str(bnb_dir)) == "hf_bnb"
 
+    torchao_dir = tmp_path / "torchao"
+    _write_cfg(torchao_dir, {"quantization_config": {"quant_method": "torchao"}})
+    assert resolve_auto_adapter(str(torchao_dir)) == "hf_torchao"
+
+    hqq_dir = tmp_path / "hqq"
+    _write_cfg(hqq_dir, {"quantization_config": {"quant_method": "hqq"}})
+    assert resolve_auto_adapter(str(hqq_dir)) == "hf_hqq"
+
+    quanto_dir = tmp_path / "quanto"
+    _write_cfg(quanto_dir, {"quantization_config": {"quant_method": "quanto"}})
+    assert resolve_auto_adapter(str(quanto_dir)) == "hf_quanto"
+
+    compressed_dir = tmp_path / "compressed"
+    _write_cfg(
+        compressed_dir,
+        {"quantization_config": {"quant_method": "compressed-tensors"}},
+    )
+    assert resolve_auto_adapter(str(compressed_dir)) == "hf_ct"
+
 
 def test_resolve_auto_adapter_name_heuristics() -> None:
     assert resolve_auto_adapter("company/model-gptq") == "hf_gptq"
     assert resolve_auto_adapter("org/model-awq") == "hf_awq"
+    assert resolve_auto_adapter("org/model-torchao") == "hf_torchao"
+    assert resolve_auto_adapter("org/model-hqq") == "hf_hqq"
+    assert resolve_auto_adapter("org/model-quanto") == "hf_quanto"
+    assert resolve_auto_adapter("org/model-compressed-tensors") == "hf_ct"
     assert resolve_auto_adapter("org/model-8bit") == "hf_bnb"
     assert resolve_auto_adapter("org/decoder-7b") == "hf_causal"
     assert resolve_auto_adapter("mistralai/Mixtral-8x7B-v0.1") == "hf_causal"

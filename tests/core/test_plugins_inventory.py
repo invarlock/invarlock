@@ -133,6 +133,70 @@ def test_gather_adapter_inventory_rows_and_json_payloads() -> None:
     assert bnb_item["deployment_claim"] is False
 
 
+def test_gather_adapter_inventory_rows_marks_quanto_missing_extra() -> None:
+    class _QuantoRegistry(_Registry):
+        def __init__(self) -> None:
+            super().__init__()
+            self._adapters = {
+                "hf_quanto": {
+                    "module": "invarlock.plugins.quanto",
+                    "entry_point": "quanto",
+                }
+            }
+
+    rows = gather_adapter_inventory_rows(
+        registry=_QuantoRegistry(),
+        minimal=False,
+        has_cuda=False,
+        is_linux=True,
+        extras_checker=lambda name, _kind: (
+            "⚠️ missing invarlock[quanto]" if name == "hf_quanto" else ""
+        ),
+        provenance_extractor=lambda _name: SimpleNamespace(
+            library="optimum-quanto",
+            version=None,
+        ),
+        bitsandbytes_runtime_available=lambda: True,
+    )
+
+    item = adapter_inventory_json_items(rows)[0]
+    assert item["name"] == "hf_quanto"
+    assert item["status"] == "needs_extra"
+    assert item["backend"] == {"name": "optimum-quanto", "present": False}
+
+
+def test_gather_adapter_inventory_rows_marks_ct_missing_extra() -> None:
+    class _CompressedTensorsRegistry(_Registry):
+        def __init__(self) -> None:
+            super().__init__()
+            self._adapters = {
+                "hf_ct": {
+                    "module": "invarlock.plugins.ct",
+                    "entry_point": "ct",
+                }
+            }
+
+    rows = gather_adapter_inventory_rows(
+        registry=_CompressedTensorsRegistry(),
+        minimal=False,
+        has_cuda=False,
+        is_linux=True,
+        extras_checker=lambda name, _kind: (
+            "⚠️ missing invarlock[compressed-tensors]" if name == "hf_ct" else ""
+        ),
+        provenance_extractor=lambda _name: SimpleNamespace(
+            library="compressed-tensors",
+            version=None,
+        ),
+        bitsandbytes_runtime_available=lambda: True,
+    )
+
+    item = adapter_inventory_json_items(rows)[0]
+    assert item["name"] == "hf_ct"
+    assert item["status"] == "needs_extra"
+    assert item["backend"] == {"name": "compressed-tensors", "present": False}
+
+
 def test_filter_inventory_rows_support_tier_modes() -> None:
     rows = [
         {"name": "spectral", "support_tier": "core_supported", "status": "ready"},

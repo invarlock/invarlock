@@ -163,7 +163,7 @@ Strictness/tiny-relax/overhead-skip are also config/profile policy:
 | `INVARLOCK_CONTAINER_ENGINE` | unset | Force the OCI engine used for default runtime-container execution (`podman` or `docker`). |
 | `INVARLOCK_RUNTIME_IMAGE` | unset | Override the OCI image used for containerized model execution. |
 | `INVARLOCK_RUNTIME_IMAGE_DIGEST` | unset | Supply the immutable digest recorded into `runtime.manifest.json`. |
-| `PACK_RUNTIME_IMAGE_FLAVOR` | `default` | Remote evidence-pack setup helper image selector. Use `quant` on CUDA hosts to build/use `invarlock-runtime:cuda-quant` for containerized `hf_bnb`, `hf_gptq`, and `hf_awq` evidence. The quant image uses a pinned CUDA devel base so GPTQModel can JIT-compile kernels with `nvcc`; strict custom-image evidence still requires `INVARLOCK_RUNTIME_IMAGE_DIGEST`. |
+| `PACK_RUNTIME_IMAGE_FLAVOR` | `default` | Remote evidence-pack setup helper image selector. Use `quant` on CUDA hosts to build/use `invarlock-runtime:cuda-quant` for containerized `hf_bnb`, `hf_gptq`, `hf_awq`, `hf_torchao`, `hf_hqq`, `hf_quanto`, and `hf_ct` evidence. The quant image uses a pinned CUDA devel base so GPTQModel can JIT-compile kernels with `nvcc`; strict custom-image evidence still requires `INVARLOCK_RUNTIME_IMAGE_DIGEST`. |
 
 ### Docs build
 

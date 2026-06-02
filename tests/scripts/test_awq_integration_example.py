@@ -7,6 +7,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE_DIR = REPO_ROOT / "examples" / "integrations" / "awq"
+README = EXAMPLE_DIR / "README.md"
 RUNNER = EXAMPLE_DIR / "run_tiny_awq.sh"
 HELPER = EXAMPLE_DIR / "materialize_tiny_awq_subject.py"
 
@@ -31,9 +32,58 @@ def test_awq_runner_has_expected_adapter_contract() -> None:
     assert 'execution_mode="host"' in text
     assert 'assurance="off"' in text
     assert 'device="cuda"' in text
+    assert "--lane MODE" in text
+    assert 'compare_cmd+=(--lane "$lane")' in text
     assert 'awq_backend="torch_awq"' in text
     assert "--awq-backend" in text
     assert "torch.cuda.is_available()" in text
+    assert "integration_default_host_device" in text
+    assert "integration_preflight_host_cuda_device" in text
+    assert "integration_preflight_gptqmodel_host_runtime" in text
+    assert "integration_log_header" in text
+    assert "integration_log_step" in text
+    assert "lane_artifact_label" in text
+    assert "AWQ lanes in this example are CUDA-only" in text
+    assert '[[ "$effective_device" != cuda* ]]' in text
+    assert '[[ "$quantize_device" != cuda* ]]' in text
+
+
+def test_awq_runner_rejects_cpu_lane_before_materialization(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            str(RUNNER),
+            "--baseline-dir",
+            str(tmp_path / "baseline"),
+            "--subject-dir",
+            str(tmp_path / "subject"),
+            "--fixture-dir",
+            str(tmp_path / "fixture"),
+            "--report-out",
+            str(tmp_path / "reports"),
+            "--device",
+            "cpu",
+            "--materialize-only",
+        ],
+        check=False,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    assert "AWQ lanes in this example are CUDA-only" in result.stderr
+    assert not (tmp_path / "baseline").exists()
+    assert not (tmp_path / "subject").exists()
+    assert not (tmp_path / "fixture").exists()
+
+
+def test_awq_readme_scopes_strict_evidence_to_tiny_runtime() -> None:
+    text = README.read_text(encoding="utf-8")
+
+    assert "strict container evidence is verified" in text
+    assert "for this tiny AWQ example" in text
+    assert "not a blanket claim for every AWQ wheel" in text
+    assert "rerun the strict lane for the target runtime" in text
+    assert "`backend_inventory.json` is emitted by InvarLock report persistence" in text
 
 
 def test_awq_helper_defaults_are_awq_compatible() -> None:

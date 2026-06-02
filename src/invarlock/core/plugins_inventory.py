@@ -94,6 +94,14 @@ def get_adapter_rows() -> list[dict[str, Any]]:
                     "unsupported",
                     "Requires CUDA or a compatible bitsandbytes runtime",
                 )
+        elif name == "hf_torchao":
+            backend = "torchao"
+        elif name == "hf_hqq":
+            backend = "hqq"
+        elif name == "hf_quanto":
+            backend = "optimum.quanto"
+        elif name == "hf_ct":
+            backend = "compressed_tensors"
 
         rows.append(
             {
@@ -224,6 +232,10 @@ def gather_adapter_inventory_rows(
             "hf_gptq": "invarlock[gptq]",
             "hf_awq": "invarlock[awq]",
             "hf_bnb": "invarlock[gpu]",
+            "hf_torchao": "invarlock[torchao]",
+            "hf_hqq": "invarlock[hqq]",
+            "hf_quanto": "invarlock[quanto]",
+            "hf_ct": "invarlock[compressed-tensors]",
         }.get(name)
         if status == "needs_extra" and extra_hint:
             enable = f"pip install '{extra_hint}'"

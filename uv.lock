@@ -503,6 +503,21 @@ wheels = [
 ]
 
 [[package]]
+name = "compressed-tensors"
+version = "0.16.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "loguru" },
+    { name = "pydantic" },
+    { name = "torch" },
+    { name = "transformers" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/07/e8/326475705b466d4095de387ee1fa95bd5bcc2d0d9b197a50642179de81ab/compressed_tensors-0.16.0.tar.gz", hash = "sha256:51232ea943bf973d77fc1f3f6044fe3c05adfe6dba26f085b7f6b578a5bd9ba3", size = 256137, upload-time = "2026-05-28T14:31:45.601Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2d/db/145316e011baa643d7f01acf34b639028352aecbc8ec49c8986bddbd45b8/compressed_tensors-0.16.0-py3-none-any.whl", hash = "sha256:bfaabb87b6dce9cf68fab5512926a861d0e04115cc279cab5e4293998ae71982", size = 211357, upload-time = "2026-05-28T14:31:44.27Z" },
+]
+
+[[package]]
 name = "contourpy"
 version = "1.3.3"
 source = { registry = "https://pypi.org/simple" }
@@ -917,6 +932,15 @@ wheels = [
 ]
 
 [[package]]
+name = "einops"
+version = "0.8.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/2c/77/850bef8d72ffb9219f0b1aac23fbc1bf7d038ee6ea666f331fa273031aa2/einops-0.8.2.tar.gz", hash = "sha256:609da665570e5e265e27283aab09e7f279ade90c4f01bcfca111f3d3e13f2827", size = 56261, upload-time = "2026-01-26T04:13:17.638Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2a/09/f8d8f8f31e4483c10a906437b4ce31bdf3d6d417b73fe33f1a8b59e34228/einops-0.8.2-py3-none-any.whl", hash = "sha256:54058201ac7087911181bfec4af6091bb59380360f069276601256a76af08193", size = 65638, upload-time = "2026-01-26T04:13:18.546Z" },
+]
+
+[[package]]
 name = "filelock"
 version = "3.25.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1184,6 +1208,22 @@ wheels = [
 ]
 
 [[package]]
+name = "hqq"
+version = "0.2.8.post1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "accelerate" },
+    { name = "einops" },
+    { name = "huggingface-hub" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
+    { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14'" },
+    { name = "termcolor" },
+    { name = "tqdm" },
+    { name = "transformers" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7b/ed/2d7008137d46c3b978c40d1ea06010ef1f7d0357e4b7795d23aaca3b3132/hqq-0.2.8.post1.tar.gz", hash = "sha256:8fa34c074df43b32acf10173abbc7dfdeff1ae529b673acfc2628a1c9c61fc8a", size = 58368, upload-time = "2025-10-20T15:38:39.485Z" }
+
+[[package]]
 name = "httpcore"
 version = "1.0.9"
 source = { registry = "https://pypi.org/simple" }
@@ -1332,12 +1372,15 @@ advanced = [
     { name = "accelerate" },
     { name = "aiohttp" },
     { name = "bitsandbytes" },
+    { name = "compressed-tensors" },
     { name = "datasets" },
     { name = "gptqmodel" },
     { name = "h2" },
+    { name = "hqq" },
     { name = "huggingface-hub" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
     { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14'" },
+    { name = "optimum-quanto" },
     { name = "pillow" },
     { name = "protobuf" },
     { name = "requests" },
@@ -1345,6 +1388,7 @@ advanced = [
     { name = "sentencepiece" },
     { name = "tiktoken" },
     { name = "torch" },
+    { name = "torchao" },
     { name = "torchvision" },
     { name = "transformers" },
     { name = "triton", marker = "sys_platform == 'linux'" },
@@ -1353,12 +1397,15 @@ all = [
     { name = "accelerate" },
     { name = "aiohttp" },
     { name = "bitsandbytes" },
+    { name = "compressed-tensors" },
     { name = "datasets" },
     { name = "gptqmodel" },
     { name = "h2" },
+    { name = "hqq" },
     { name = "huggingface-hub" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
     { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14'" },
+    { name = "optimum-quanto" },
     { name = "pillow" },
     { name = "protobuf" },
     { name = "requests" },
@@ -1366,6 +1413,7 @@ all = [
     { name = "sentencepiece" },
     { name = "tiktoken" },
     { name = "torch" },
+    { name = "torchao" },
     { name = "torchvision" },
     { name = "transformers" },
     { name = "triton", marker = "sys_platform == 'linux'" },
@@ -1392,6 +1440,13 @@ ci = [
     { name = "requests" },
     { name = "ruff" },
     { name = "wheel" },
+]
+compressed-tensors = [
+    { name = "accelerate" },
+    { name = "compressed-tensors" },
+    { name = "safetensors" },
+    { name = "torch" },
+    { name = "transformers" },
 ]
 dev = [
     { name = "bitsandbytes" },
@@ -1463,11 +1518,25 @@ hf = [
     { name = "torch" },
     { name = "transformers" },
 ]
+hqq = [
+    { name = "accelerate" },
+    { name = "hqq" },
+    { name = "safetensors" },
+    { name = "torch" },
+    { name = "transformers" },
+]
 precommit-ci = [
     { name = "pre-commit" },
 ]
 probes = [
     { name = "scikit-learn" },
+]
+quanto = [
+    { name = "accelerate" },
+    { name = "optimum-quanto" },
+    { name = "safetensors" },
+    { name = "torch" },
+    { name = "transformers" },
 ]
 release-ci = [
     { name = "build" },
@@ -1480,14 +1549,23 @@ security-ci = [
     { name = "pip-audit" },
     { name = "requests" },
 ]
+torchao = [
+    { name = "safetensors" },
+    { name = "torch" },
+    { name = "torchao" },
+    { name = "transformers" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "accelerate", marker = "extra == 'advanced'", specifier = ">=0.27" },
     { name = "accelerate", marker = "extra == 'all'", specifier = ">=0.27" },
     { name = "accelerate", marker = "extra == 'awq'", specifier = ">=0.27" },
+    { name = "accelerate", marker = "extra == 'compressed-tensors'", specifier = ">=0.27" },
     { name = "accelerate", marker = "extra == 'gpu'", specifier = ">=0.27" },
     { name = "accelerate", marker = "extra == 'hf'", specifier = ">=0.26.0" },
+    { name = "accelerate", marker = "extra == 'hqq'", specifier = ">=0.27" },
+    { name = "accelerate", marker = "extra == 'quanto'", specifier = ">=0.27" },
     { name = "aiohttp", marker = "extra == 'advanced'", specifier = ">=3.12.14" },
     { name = "aiohttp", marker = "extra == 'all'", specifier = ">=3.12.14" },
     { name = "aiohttp", marker = "extra == 'hf'", specifier = ">=3.12.14" },
@@ -1500,6 +1578,9 @@ requires-dist = [
     { name = "build", marker = "extra == 'dev'", specifier = ">=0.10.0" },
     { name = "build", marker = "extra == 'release-ci'", specifier = ">=0.10.0" },
     { name = "click", specifier = ">=8.1" },
+    { name = "compressed-tensors", marker = "extra == 'advanced'", specifier = ">=0.10.0" },
+    { name = "compressed-tensors", marker = "extra == 'all'", specifier = ">=0.10.0" },
+    { name = "compressed-tensors", marker = "extra == 'compressed-tensors'", specifier = ">=0.10.0" },
     { name = "cryptography", specifier = ">=46.0.0" },
     { name = "cyclonedx-bom", marker = "extra == 'release-ci'", specifier = ">=4.1" },
     { name = "cyclonedx-bom", marker = "extra == 'security-ci'", specifier = ">=4.1" },
@@ -1514,6 +1595,9 @@ requires-dist = [
     { name = "h2", marker = "extra == 'advanced'", specifier = ">=4.3.0" },
     { name = "h2", marker = "extra == 'all'", specifier = ">=4.3.0" },
     { name = "h2", marker = "extra == 'hf'", specifier = ">=4.3.0" },
+    { name = "hqq", marker = "extra == 'advanced'", specifier = ">=0.2.8" },
+    { name = "hqq", marker = "extra == 'all'", specifier = ">=0.2.8" },
+    { name = "hqq", marker = "extra == 'hqq'", specifier = ">=0.2.8" },
     { name = "huggingface-hub", marker = "extra == 'advanced'", specifier = ">=1.0.0" },
     { name = "huggingface-hub", marker = "extra == 'all'", specifier = ">=1.0.0" },
     { name = "huggingface-hub", marker = "extra == 'hf'", specifier = ">=1.0.0" },
@@ -1537,6 +1621,9 @@ requires-dist = [
     { name = "numpy", marker = "extra == 'docs-ci'", specifier = ">=1.24" },
     { name = "numpy", marker = "extra == 'guards'", specifier = ">=1.24" },
     { name = "numpy", marker = "extra == 'hf'", specifier = ">=1.24" },
+    { name = "optimum-quanto", marker = "extra == 'advanced'", specifier = ">=0.2.7" },
+    { name = "optimum-quanto", marker = "extra == 'all'", specifier = ">=0.2.7" },
+    { name = "optimum-quanto", marker = "extra == 'quanto'", specifier = ">=0.2.7" },
     { name = "pillow", marker = "extra == 'adapters'", specifier = ">=11.3.0" },
     { name = "pillow", marker = "extra == 'advanced'", specifier = ">=11.3.0" },
     { name = "pillow", marker = "extra == 'all'", specifier = ">=11.3.0" },
@@ -1571,9 +1658,13 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.15.15" },
     { name = "safetensors", marker = "extra == 'adapters'", specifier = ">=0.4.0" },
     { name = "safetensors", marker = "extra == 'awq'", specifier = ">=0.4.0" },
+    { name = "safetensors", marker = "extra == 'compressed-tensors'", specifier = ">=0.4.0" },
     { name = "safetensors", marker = "extra == 'gptq'", specifier = ">=0.4.0" },
     { name = "safetensors", marker = "extra == 'gpu'", specifier = ">=0.4.0" },
     { name = "safetensors", marker = "extra == 'hf'", specifier = ">=0.4.0" },
+    { name = "safetensors", marker = "extra == 'hqq'", specifier = ">=0.4.0" },
+    { name = "safetensors", marker = "extra == 'quanto'", specifier = ">=0.4.0" },
+    { name = "safetensors", marker = "extra == 'torchao'", specifier = ">=0.4.0" },
     { name = "scikit-learn", marker = "extra == 'advanced'", specifier = ">=1.4" },
     { name = "scikit-learn", marker = "extra == 'all'", specifier = ">=1.4" },
     { name = "scikit-learn", marker = "extra == 'probes'", specifier = ">=1.4" },
@@ -1591,12 +1682,19 @@ requires-dist = [
     { name = "torch", marker = "extra == 'advanced'", specifier = ">=2.12.0" },
     { name = "torch", marker = "extra == 'all'", specifier = ">=2.12.0" },
     { name = "torch", marker = "extra == 'awq'", specifier = ">=2.12.0" },
+    { name = "torch", marker = "extra == 'compressed-tensors'", specifier = ">=2.12.0" },
     { name = "torch", marker = "extra == 'edits'", specifier = ">=2.12.0" },
     { name = "torch", marker = "extra == 'eval'", specifier = ">=2.12.0" },
     { name = "torch", marker = "extra == 'gptq'", specifier = ">=2.12.0" },
     { name = "torch", marker = "extra == 'gpu'", specifier = ">=2.12.0" },
     { name = "torch", marker = "extra == 'guards'", specifier = ">=2.12.0" },
     { name = "torch", marker = "extra == 'hf'", specifier = ">=2.12.0" },
+    { name = "torch", marker = "extra == 'hqq'", specifier = ">=2.12.0" },
+    { name = "torch", marker = "extra == 'quanto'", specifier = ">=2.12.0" },
+    { name = "torch", marker = "extra == 'torchao'", specifier = ">=2.12.0" },
+    { name = "torchao", marker = "extra == 'advanced'", specifier = ">=0.17.0" },
+    { name = "torchao", marker = "extra == 'all'", specifier = ">=0.17.0" },
+    { name = "torchao", marker = "extra == 'torchao'", specifier = ">=0.17.0" },
     { name = "torchvision", marker = "extra == 'advanced'", specifier = ">=0.23.0" },
     { name = "torchvision", marker = "extra == 'all'", specifier = ">=0.23.0" },
     { name = "torchvision", marker = "extra == 'awq'", specifier = ">=0.23.0" },
@@ -1605,8 +1703,12 @@ requires-dist = [
     { name = "transformers", marker = "extra == 'advanced'", specifier = ">=5.5.0" },
     { name = "transformers", marker = "extra == 'all'", specifier = ">=5.5.0" },
     { name = "transformers", marker = "extra == 'awq'", specifier = ">=5.5.0" },
+    { name = "transformers", marker = "extra == 'compressed-tensors'", specifier = ">=5.5.0" },
     { name = "transformers", marker = "extra == 'gptq'", specifier = ">=5.5.0" },
     { name = "transformers", marker = "extra == 'hf'", specifier = ">=5.5.0" },
+    { name = "transformers", marker = "extra == 'hqq'", specifier = ">=5.5.0" },
+    { name = "transformers", marker = "extra == 'quanto'", specifier = ">=5.5.0" },
+    { name = "transformers", marker = "extra == 'torchao'", specifier = ">=5.5.0" },
     { name = "triton", marker = "sys_platform == 'linux' and extra == 'advanced'", specifier = ">=2.3.0" },
     { name = "triton", marker = "sys_platform == 'linux' and extra == 'all'", specifier = ">=2.3.0" },
     { name = "triton", marker = "sys_platform == 'linux' and extra == 'awq'", specifier = ">=2.3.0" },
@@ -1617,7 +1719,7 @@ requires-dist = [
     { name = "wheel", marker = "extra == 'ci'", specifier = ">=0.46.0" },
     { name = "wheel", marker = "extra == 'dev'", specifier = ">=0.46.0" },
 ]
-provides-extras = ["adapters", "hf", "guards", "edits", "eval", "probes", "gptq", "awq", "gpu", "advanced", "all", "dev", "ci", "docs-ci", "precommit-ci", "release-ci", "security-ci"]
+provides-extras = ["adapters", "hf", "guards", "edits", "eval", "probes", "gptq", "awq", "torchao", "hqq", "quanto", "compressed-tensors", "gpu", "advanced", "all", "dev", "ci", "docs-ci", "precommit-ci", "release-ci", "security-ci"]
 
 [[package]]
 name = "isoduration"
@@ -1959,6 +2061,19 @@ name = "logbar"
 version = "0.4.3"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/61/98/88aa2105f78364b06816df8edd53b5334718d66c87241b40369d37efd906/logbar-0.4.3.tar.gz", hash = "sha256:0da5d1c30e38ca2996ea82e00a7009d94aa91e35552e7866475fb51851c925f8", size = 97828, upload-time = "2026-04-15T11:58:55.175Z" }
+
+[[package]]
+name = "loguru"
+version = "0.7.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "win32-setctime", marker = "sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3a/05/a1dae3dffd1116099471c643b8924f5aa6524411dc6c63fdae648c4f1aca/loguru-0.7.3.tar.gz", hash = "sha256:19480589e77d47b8d85b2c827ad95d49bf31b0dcde16593892eb51dd18706eb6", size = 63559, upload-time = "2024-12-06T11:20:56.608Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0c/29/0348de65b8cc732daa3e33e67806420b2ae89bdce2b04af740289c5c6c8c/loguru-0.7.3-py3-none-any.whl", hash = "sha256:31a33c10c8e1e10422bfd431aeb5d351c7cf7fa671e3c4df004162264b28220c", size = 61595, upload-time = "2024-12-06T11:20:54.538Z" },
+]
 
 [[package]]
 name = "lxml"
@@ -2858,6 +2973,23 @@ source = { registry = "https://pypi.org/simple" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c2/f3/d86c845465a2723ad7e1e5c36dcd75ddb82898b3f53be47ebd429fb2fa5d/nvidia_nvtx-13.0.85-py3-none-manylinux1_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:4936d1d6780fbe68db454f5e72a42ff64d1fd6397df9f363ae786930fd5c1cd4", size = 148047, upload-time = "2025-09-04T08:29:01.761Z" },
     { url = "https://files.pythonhosted.org/packages/a8/64/3708a90d1ebe202ffdeb7185f878a3c84d15c2b2c31858da2ce0583e2def/nvidia_nvtx-13.0.85-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:cb7780edb6b14107373c835bf8b72e7a178bac7367e23da7acb108f973f157a6", size = 148878, upload-time = "2025-09-04T08:28:53.627Z" },
+]
+
+[[package]]
+name = "optimum-quanto"
+version = "0.2.7"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "huggingface-hub" },
+    { name = "ninja" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
+    { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14'" },
+    { name = "safetensors" },
+    { name = "torch" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3e/df/03ae85090b33d81f06b4dd7a43b16cef6ee5f1d36d8fdcce864964895c70/optimum_quanto-0.2.7.tar.gz", hash = "sha256:91b5c2dc8a9100297dc7924a93747fb77ab010784b5e1f6d0208976ba054dade", size = 361601, upload-time = "2025-03-06T08:07:51.578Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8d/33/4ad914b0ae7e46296fe00d76d084be351fef69816b3498ed32a178471c8a/optimum_quanto-0.2.7-py3-none-any.whl", hash = "sha256:1369b1d9a4a197f88c0d1c67e8d950694e5b86ce4c9f3878e178d5be35339f61", size = 165285, upload-time = "2025-03-06T08:07:32.913Z" },
 ]
 
 [[package]]
@@ -4233,6 +4365,15 @@ wheels = [
 ]
 
 [[package]]
+name = "termcolor"
+version = "3.3.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/46/79/cf31d7a93a8fdc6aa0fbb665be84426a8c5a557d9240b6239e9e11e35fc5/termcolor-3.3.0.tar.gz", hash = "sha256:348871ca648ec6a9a983a13ab626c0acce02f515b9e1983332b17af7979521c5", size = 14434, upload-time = "2025-12-29T12:55:21.882Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/33/d1/8bb87d21e9aeb323cc03034f5eaf2c8f69841e40e4853c2627edf8111ed3/termcolor-3.3.0-py3-none-any.whl", hash = "sha256:cf642efadaf0a8ebbbf4bc7a31cec2f9b5f21a9f726f4ccbb08192c9c26f43a5", size = 7734, upload-time = "2025-12-29T12:55:20.718Z" },
+]
+
+[[package]]
 name = "threadpoolctl"
 version = "3.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4651,6 +4792,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/89/24/a2eb353a6edac9a0303977c4cb048134959dd2a51b48a269dfc9dde00c8a/wheel-0.46.3.tar.gz", hash = "sha256:e3e79874b07d776c40bd6033f8ddf76a7dad46a7b8aa1b2787a83083519a1803", size = 60605, upload-time = "2026-01-22T12:39:49.136Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/87/22/b76d483683216dde3d67cba61fb2444be8d5be289bf628c13fc0fd90e5f9/wheel-0.46.3-py3-none-any.whl", hash = "sha256:4b399d56c9d9338230118d705d9737a2a468ccca63d5e813e2a4fc7815d8bc4d", size = 30557, upload-time = "2026-01-22T12:39:48.099Z" },
+]
+
+[[package]]
+name = "win32-setctime"
+version = "1.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b3/8f/705086c9d734d3b663af0e9bb3d4de6578d08f46b1b101c2442fd9aecaa2/win32_setctime-1.2.0.tar.gz", hash = "sha256:ae1fdf948f5640aae05c511ade119313fb6a30d7eabe25fef9764dca5873c4c0", size = 4867, upload-time = "2024-12-07T15:28:28.314Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e1/07/c6fe3ad3e685340704d314d765b7912993bcb8dc198f0e7a89382d37974b/win32_setctime-1.2.0-py3-none-any.whl", hash = "sha256:95d644c4e708aba81dc3704a116d8cbc974d70b3bdb8be1d150e36be6e9d1390", size = 4083, upload-time = "2024-12-07T15:28:26.465Z" },
 ]
 
 [[package]]

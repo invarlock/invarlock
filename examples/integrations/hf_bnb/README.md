@@ -1,6 +1,7 @@
 # hf_bnb Bitsandbytes Runtime-Load Integration Example
 
-Status: `runnable`; strict container evidence verified on CUDA.
+Status: `runnable`; strict container evidence is verified on CUDA for this tiny
+bitsandbytes runtime-load example with the example-only bitsandbytes image.
 
 This example shows how to attach InvarLock regression evidence to a subject
 loaded through the built-in `hf_bnb` adapter. By default it creates a tiny
@@ -32,35 +33,62 @@ uv run --extra hf --extra gpu python -c "import bitsandbytes"
 
 ## Run
 
+## Lane Support
+
+| Artifact lane label | Command shape | Notes |
+| --- | --- | --- |
+| `cuda-container-strict` | `--lane cuda` | Primary review path with the example-only bitsandbytes image. |
+| `cuda-host-off` | `--lane host --device cuda` | Secondary local CUDA comparison path without strict container evidence. |
+| `cpu-host-off` | `--lane host --device cpu` | Secondary local non-CUDA bring-up when the installed bitsandbytes backend supports it. |
+
+Host lanes run prerequisite preflight before model preparation and evaluation.
+The `cuda-host-off` lane checks `torch.cuda.is_available()` before the backend run.
+
+### cuda-container-strict lane
+
+Build and smoke the example-only bitsandbytes image, then run this lane on a
+CUDA host with that image configured:
+
+```bash
+examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-bnb
+examples/integrations/_runtime_images/smoke_example_runtime_image.sh cuda-bnb
+
+INVARLOCK_RUNTIME_IMAGE=invarlock-example-runtime:cuda-bnb \
+uv run --extra hf --extra gpu \
+  examples/integrations/hf_bnb/run_tiny_hf_bnb_8bit.sh \
+  --allow-network \
+  --force \
+  --lane cuda
+```
+
+Strict container evidence should use the digest-pinned image reference recorded
+in `runtime.manifest.json` when the artifact is being shared for review.
+
+This strict lane proves the configured tiny runtime-loaded BNB subject and
+runtime image. It is not a blanket claim for every bitsandbytes wrapper,
+backend, kernel, or model shape; rerun the strict lane for the target runtime
+before using the result as outreach evidence.
+
+### cpu-host-off lane
+
 From the repository root:
 
 ```bash
 uv run --extra hf --extra gpu \
   examples/integrations/hf_bnb/run_tiny_hf_bnb_8bit.sh \
   --allow-network \
-  --force
+  --force \
+  --lane host \
+  --device cpu
 ```
 
 The default path uses `--execution-mode host --assurance off` because
-bitsandbytes runtime support is platform-dependent. It still runs the
-InvarLock evaluator, verifier, backend inventory, and HTML renderer.
+bitsandbytes runtime support is platform-dependent. Use this lane for local
+dependency bring-up; non-CUDA execution depends on the installed bitsandbytes
+backend. It still runs the InvarLock evaluator, verifier, backend inventory,
+and HTML renderer.
 
-For a strict CUDA/container run, provide the quant runtime image and switch the
-runner to container mode:
-
-```bash
-INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-quant \
-uv run --extra hf --extra gpu \
-  examples/integrations/hf_bnb/run_tiny_hf_bnb_8bit.sh \
-  --allow-network \
-  --force \
-  --execution-mode container \
-  --assurance strict \
-  --device cuda
-```
-
-Strict container evidence should use a digest-pinned runtime image when the
-artifact is being shared for review.
+For `cuda-host-off` evaluation, use the same command with `--device cuda`.
 
 ## Outputs
 
@@ -76,8 +104,18 @@ The runner writes generated outputs under ignored local directories:
 | `reports/tiny-hf-bnb-8bit/verify.json` | Machine-readable verifier result. |
 | `reports/tiny-hf-bnb-8bit/evaluation.html` | Human-readable report. |
 | `reports/tiny-hf-bnb-8bit/backend_inventory.json` | bitsandbytes backend version, quantized module types, and smoke results. |
+| `reports/tiny-hf-bnb-8bit/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
 | `reports/tiny-hf-bnb-8bit/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
+| `reports/tiny-hf-bnb-8bit/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
+
+A successful run ends with the shared completion block documented in
+`examples/integrations/_shared/README.md#expected-run-output`. If a run fails,
+check the prerequisite message first, then inspect
+`reports/tiny-hf-bnb-8bit/run_command.txt`.
 
 The generated preset uses local JSONL data so the evaluation data path is
 offline after fixture creation. `--allow-network` is only needed for the HF
 model files when they are not already cached.
+
+`backend_inventory.json` is emitted by InvarLock report persistence when adapter
+provenance is available; the shell runner does not write that sidecar directly.

@@ -7,6 +7,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE_DIR = REPO_ROOT / "examples" / "integrations" / "gptqmodel"
+README = EXAMPLE_DIR / "README.md"
 RUNNER = EXAMPLE_DIR / "run_tiny_gptqmodel.sh"
 HELPER = EXAMPLE_DIR / "materialize_tiny_gptqmodel_subject.py"
 
@@ -30,8 +31,27 @@ def test_gptqmodel_runner_has_expected_adapter_contract() -> None:
     assert "materialize_tiny_gptqmodel_subject.py" in text
     assert 'execution_mode="host"' in text
     assert 'assurance="off"' in text
+    assert "--lane MODE" in text
+    assert 'compare_cmd+=(--lane "$lane")' in text
     assert "TORCHDYNAMO_DISABLE=1" in text
     assert "--device" in text
+    assert "--lane cuda" in text
+    assert "integration_default_host_device" in text
+    assert "integration_preflight_host_cuda_device" in text
+    assert "integration_preflight_gptqmodel_host_runtime" in text
+    assert "integration_log_header" in text
+    assert "integration_log_step" in text
+    assert "lane_artifact_label" in text
+
+
+def test_gptqmodel_readme_scopes_strict_evidence_to_tiny_runtime() -> None:
+    text = README.read_text(encoding="utf-8")
+
+    assert "strict container evidence is verified" in text
+    assert "this tiny\nGPTQModel example" in text
+    assert "not a blanket claim for every GPTQModel wheel" in text
+    assert "rerun the strict lane for the target runtime" in text
+    assert "`backend_inventory.json` is emitted by InvarLock report persistence" in text
 
 
 def test_gptqmodel_helper_writes_local_jsonl_and_preset(tmp_path: Path) -> None:

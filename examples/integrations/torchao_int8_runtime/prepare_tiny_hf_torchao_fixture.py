@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Materialize a tiny torchao int8-export subject checkpoint."""
+"""Prepare a tiny HF checkpoint and fixture for the hf_torchao adapter."""
 
 from __future__ import annotations
 
@@ -41,20 +41,15 @@ TERMS = (
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Create a deterministic tiny HF baseline, apply torchao int8 "
-            "weight-only quantization, and export a dequantized HF-loadable "
-            "subject checkpoint."
+            "Create a deterministic tiny HF causal checkpoint, probe torchao "
+            "int8 weight-only runtime quantization, and write a local fixture "
+            "for the hf_torchao integration example."
         )
     )
     parser.add_argument(
-        "--baseline-dir",
+        "--model-dir",
         required=True,
-        help="Directory where the generated baseline checkpoint will be written.",
-    )
-    parser.add_argument(
-        "--subject-dir",
-        required=True,
-        help="Directory where the exported subject checkpoint will be written.",
+        help="Directory where the generated HF checkpoint will be written.",
     )
     parser.add_argument(
         "--fixture-dir",
@@ -103,7 +98,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Replace existing baseline and subject directories.",
+        help="Replace existing generated model and fixture directories.",
     )
     return parser.parse_args()
 
@@ -152,6 +147,13 @@ def _version(package: str) -> str | None:
         return metadata.version(package)
     except metadata.PackageNotFoundError:
         return None
+
+
+def _torchao_int8_weight_only_config(config_cls: Any) -> Any:
+    try:
+        return config_cls(version=2)
+    except TypeError:
+        return config_cls()
 
 
 def _checkpoint_files(root: Path) -> list[Path]:
@@ -271,11 +273,11 @@ def _quantized_tensor_type(value: Any) -> str | None:
     return fqcn if "torchao" in fqcn.lower() else None
 
 
-def _dense_state_dict(
+def _runtime_delta_summary(
     quantized_model: Any,
     baseline_state: dict[str, Any],
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    exported: dict[str, Any] = {}
+) -> dict[str, Any]:
+    checked = 0
     changed = 0
     max_abs_delta = 0.0
     quantized_tensors = 0
@@ -289,7 +291,7 @@ def _dense_state_dict(
             quantized_types.add(quantized_type)
         dense = value.dequantize() if hasattr(value, "dequantize") else value
         dense = dense.detach().cpu().to(dtype=baseline_state[name].dtype)
-        exported[name] = dense
+        checked += 1
         delta = (dense - baseline_state[name].detach().cpu()).abs()
         parameter_delta = float(delta.max().item())
         by_parameter[name] = parameter_delta
@@ -297,8 +299,8 @@ def _dense_state_dict(
         if parameter_delta > 0.0:
             changed += 1
 
-    return exported, {
-        "checked_parameters": len(exported),
+    return {
+        "checked_parameters": checked,
         "changed_parameters": changed,
         "max_abs_delta": max_abs_delta,
         "quantized_tensors": quantized_tensors,
@@ -327,11 +329,8 @@ def _probe_native_quantized_save(
 
 def main() -> None:
     args = _parse_args()
-    baseline_dir = Path(args.baseline_dir)
-    subject_dir = Path(args.subject_dir)
+    model_dir = Path(args.model_dir)
     fixture_dir = Path(args.fixture_dir)
-    if baseline_dir.resolve() == subject_dir.resolve():
-        raise SystemExit("--baseline-dir and --subject-dir must be different paths.")
     local_files_only = not bool(args.allow_network)
     (
         torch,
@@ -345,12 +344,10 @@ def main() -> None:
 
     random.seed(args.seed)
     torch.manual_seed(args.seed)
-    _prepare_output_dirs(
-        [baseline_dir, subject_dir, fixture_dir], force=bool(args.force)
-    )
+    _prepare_output_dirs([model_dir, fixture_dir], force=bool(args.force))
     fixture = write_text_fixture(
         fixture_dir,
-        model_id=str(baseline_dir),
+        model_id=str(model_dir),
         rows=int(args.rows),
         terms_per_row=int(args.terms_per_row),
         seq_len=int(args.seq_len),
@@ -380,46 +377,39 @@ def main() -> None:
     )
 
     baseline_model = llama_model(config).eval()
-    baseline_model.save_pretrained(baseline_dir, safe_serialization=True)
-    tokenizer.save_pretrained(baseline_dir)
+    baseline_model.save_pretrained(model_dir, safe_serialization=True)
+    tokenizer.save_pretrained(model_dir)
 
     baseline_state = {
         name: value.detach().cpu().clone()
         for name, value in baseline_model.state_dict().items()
     }
-    quantized_model = auto_model.from_pretrained(baseline_dir).eval()
-    quantize(quantized_model, int8_config())
+    quantized_model = auto_model.from_pretrained(model_dir).eval()
+    quantization_config = _torchao_int8_weight_only_config(int8_config)
+    quantize(quantized_model, quantization_config)
     native_save_probe = _probe_native_quantized_save(
         quantized_model,
-        scratch_parent=subject_dir.parent,
+        scratch_parent=model_dir.parent,
     )
 
-    exported_state, delta_summary = _dense_state_dict(quantized_model, baseline_state)
+    delta_summary = _runtime_delta_summary(quantized_model, baseline_state)
     if int(delta_summary["quantized_tensors"]) <= 0:
         raise SystemExit("torchao did not produce quantized tensor-backed weights.")
     if float(delta_summary["max_abs_delta"]) <= 0.0:
-        raise SystemExit("Exported subject checkpoint did not change any weights.")
-
-    export_model = llama_model(config).eval()
-    export_model.load_state_dict(exported_state, strict=True)
-    export_model.save_pretrained(subject_dir, safe_serialization=True)
-    tokenizer.save_pretrained(subject_dir)
+        raise SystemExit("Runtime quantized subject did not change any weights.")
 
     timestamp = datetime.now(UTC).replace(microsecond=0).isoformat()
-    baseline_files = {
-        str(path.relative_to(baseline_dir)): _sha256(path)
-        for path in _checkpoint_files(baseline_dir)
-    }
-    subject_files = {
-        str(path.relative_to(subject_dir)): _sha256(path)
-        for path in _checkpoint_files(subject_dir)
+    checkpoint_files = {
+        str(path.relative_to(model_dir)): _sha256(path)
+        for path in _checkpoint_files(model_dir)
     }
     summary = {
-        "format_version": "integration-example-edit-summary-v1",
+        "format_version": "integration-example-adapter-runtime-summary-v1",
         "created_at": timestamp,
-        "baseline_checkpoint_path": str(baseline_dir),
-        "subject_checkpoint_path": str(subject_dir),
-        "external_edit_type": "torchao_int8_weight_only_export",
+        "checkpoint_path": str(model_dir),
+        "baseline_adapter": "hf_causal",
+        "subject_adapter": "hf_torchao",
+        "adapter_runtime_type": "torchao_int8_weight_only_runtime",
         "toolchain": "torchao",
         "toolchain_versions": {
             "torch": _version("torch"),
@@ -435,45 +425,46 @@ def main() -> None:
         },
         "fixture": fixture,
         "torchao": {
+            "adapter": "hf_torchao",
             "quantization": "Int8WeightOnlyConfig",
-            "export_mode": "dequantized_hf_checkpoint",
+            "config_version": getattr(quantization_config, "version", None),
+            "runtime_mode": "adapter_load_time_weight_only_int8",
             "native_quantized_save_probe": native_save_probe,
         },
         "delta_summary": delta_summary,
         "files": {
-            "baseline": baseline_files,
-            "subject": subject_files,
+            "checkpoint": checkpoint_files,
         },
     }
     checkpoint_refs = {
         "format_version": "checkpoint-refs-v1",
-        "lane_id": "tiny-llama-torchao-int8-export",
+        "lane_id": "tiny-hf-torchao-int8",
         "created_at": timestamp,
         "baseline": {
             "kind": "byoe_checkpoint_ref",
-            "path": str(baseline_dir),
+            "path": str(model_dir),
             "purpose": "Deterministic tiny HF baseline for the torchao example.",
         },
         "subject": {
-            "kind": "byoe_checkpoint_ref",
-            "path": str(subject_dir),
-            "edit_workflow": "External torchao int8 weight-only quantize/export",
-            "external_edit_type": "torchao_int8_weight_only_export",
+            "kind": "adapter_runtime_checkpoint_ref",
+            "path": str(model_dir),
+            "adapter": "hf_torchao",
+            "runtime_quantization": "torchao_int8_weight_only",
             "purpose": (
-                "HF-loadable checkpoint exported from a torchao-quantized "
-                "tiny model after dequantizing tensor-subclass weights."
+                "The same HF checkpoint loaded through InvarLock's hf_torchao "
+                "adapter, which applies torchao int8 weight-only quantization "
+                "at runtime."
             ),
         },
         "artifacts": {
-            "external_edit_summary": "external_edit_summary.json",
+            "adapter_runtime_summary": "adapter_runtime_summary.json",
             "files": {
-                "baseline": baseline_files,
-                "subject": subject_files,
+                "checkpoint": checkpoint_files,
             },
         },
     }
-    _write_json(subject_dir / "external_edit_summary.json", summary)
-    _write_json(subject_dir / "checkpoint_refs.json", checkpoint_refs)
+    _write_json(model_dir / "adapter_runtime_summary.json", summary)
+    _write_json(model_dir / "checkpoint_refs.json", checkpoint_refs)
     print(json.dumps(summary, sort_keys=True))
 
 
