@@ -1,7 +1,7 @@
 # PEFT LoRA-Merge Integration Example
 
 Status: `runnable`; strict container evidence is verified on CUDA for this tiny
-PEFT LoRA-merge example with the regular CUDA runtime image.
+PEFT LoRA-merge example with the standard InvarLock CUDA runtime image.
 
 This example shows how to attach InvarLock regression evidence to a checkpoint
 created by an external PEFT LoRA merge. It materializes a tiny deterministic
@@ -34,7 +34,7 @@ fine:
 
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
-| `cuda-container-strict` | `--lane cuda` | Primary review path with the regular CUDA runtime image. |
+| `cuda-container-strict` | `--lane cuda` | Primary evidence path with the standard InvarLock CUDA runtime image. |
 | `cuda-host-off` | `--lane host --device cuda` | Secondary local CUDA comparison path without strict container evidence. |
 | `cpu-host-off` | `--lane host --device cpu` | Secondary local non-CUDA bring-up for the merged dense checkpoint. |
 
@@ -43,7 +43,7 @@ Host lanes run prerequisite preflight before materialization and evaluation. The
 
 ### cuda-container-strict lane
 
-Build the regular CUDA runtime image, then run this lane on a CUDA host with
+Build the standard InvarLock CUDA runtime image, then run this lane on a CUDA host with
 that image configured. This example evaluates a merged dense checkpoint, so it
 does not need the quant example images.
 
@@ -60,11 +60,10 @@ examples/integrations/peft_lora/run_tiny_peft_lora.sh \
 The runner defaults to the `release` profile so the strict verification path has
 enough evaluation tokens for a stable primary-metric verdict.
 Use the digest-pinned image reference recorded in `runtime.manifest.json` when
-the strict container artifact will be shared for review.
-This proves the configured tiny merged dense checkpoint and runtime image; it
-is not a blanket claim for every PEFT version, LoRA merge shape, model family,
-or runtime image. Rerun the strict lane for the target runtime before using the
-artifact as review evidence.
+the strict container artifact will be shared externally.
+This strict lane is scoped to the configured tiny merged dense checkpoint and
+runtime image. Rerun the strict lane for the target runtime before using the
+artifact as shared integration evidence.
 
 ### cpu-host-off lane
 
@@ -78,7 +77,7 @@ examples/integrations/peft_lora/run_tiny_peft_lora.sh \
   --device cpu
 ```
 
-Use this lane for local dependency bring-up and non-CUDA smoke runs.
+Use this lane for local dependency setup and non-CUDA compatibility runs.
 
 For `cuda-host-off` evaluation, use the same command with `--device cuda`.
 
@@ -92,7 +91,7 @@ produced subject. The LoRA merge step is represented by
 
 ## Outputs
 
-The runner writes generated outputs under ignored local directories:
+The runner writes generated outputs under local output directories:
 
 | Path | Role |
 | --- | --- |

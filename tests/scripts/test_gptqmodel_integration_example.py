@@ -49,8 +49,8 @@ def test_gptqmodel_readme_scopes_strict_evidence_to_tiny_runtime() -> None:
 
     assert "strict container evidence is verified" in text
     assert "this tiny\nGPTQModel example" in text
-    assert "not a blanket claim for every GPTQModel wheel" in text
-    assert "rerun the strict lane for the target runtime" in text
+    assert "scoped to the configured tiny GPTQ checkpoint" in text
+    assert "shared integration evidence" in text
     assert "`backend_inventory.json` is emitted by InvarLock report persistence" in text
 
 

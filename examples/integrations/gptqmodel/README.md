@@ -31,7 +31,7 @@ uv run --extra gptq python -c "import gptqmodel"
 
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
-| `cuda-container-strict` | `--lane cuda` | Primary review path with the example-only GPTQModel/AWQ image. |
+| `cuda-container-strict` | `--lane cuda` | Primary evidence path with the example-specific GPTQModel/AWQ image. |
 | `cuda-host-off` | `--lane host --device cuda` | Secondary host CUDA comparison path; requires host CUDA plus the same GPTQModel/Triton prerequisites. |
 | `cpu-host-off` | `--lane host --device cpu` | Secondary local bring-up path when the host GPTQModel/Triton prerequisites support CPU. |
 
@@ -41,7 +41,7 @@ development headers because Triton may compile runtime helpers during loading.
 
 ### cuda-container-strict lane
 
-Build and smoke the example-only GPTQModel/AWQ image, then run this lane on a
+Build and check the example-specific GPTQModel/AWQ image, then run this lane on a
 CUDA host with that image configured:
 
 ```bash
@@ -57,12 +57,11 @@ uv run --extra gptq \
 ```
 
 Strict container evidence should use the digest-pinned image reference recorded
-in `runtime.manifest.json` when the artifact is being shared for review.
+in `runtime.manifest.json` when the artifact is being shared externally.
 
-This strict lane proves the configured tiny GPTQ checkpoint and runtime image.
-It is not a blanket claim for every GPTQModel wheel, kernel, backend, or model
-shape; rerun the strict lane for the target runtime before using the result as
-outreach evidence.
+This strict lane is scoped to the configured tiny GPTQ checkpoint and runtime
+image. Rerun the strict lane for the target runtime before using the result as
+shared integration evidence.
 
 ### cpu-host-off lane
 
@@ -79,9 +78,9 @@ uv run --extra gptq \
 
 The default path uses `--execution-mode host --assurance off` because GPTQModel
 runtime loading is platform-dependent. Use this lane for local dependency
-bring-up; non-CUDA execution depends on the installed GPTQModel backend. In
+setup; non-CUDA execution depends on the installed GPTQModel backend. In
 host mode the runner sets `TORCHDYNAMO_DISABLE=1` unless you already set it,
-which avoids platform-local Torch compile failures during tiny smoke runs. It
+which avoids platform-local Torch compile failures during tiny compatibility runs. It
 still runs the InvarLock evaluator, verifier, backend inventory, and HTML
 renderer.
 
@@ -97,7 +96,7 @@ produced subject. The GPTQModel materialization step is represented by
 
 ## Outputs
 
-The runner writes generated outputs under ignored local directories:
+The runner writes generated outputs under local output directories:
 
 | Path | Role |
 | --- | --- |

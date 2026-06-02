@@ -11,7 +11,7 @@ They are intentionally independent of optional third-party backends.
 | `expected-artifacts.md` | Artifact checklist for runnable examples. |
 | `preflight.sh` | Host-lane device checks, host default resolution, and artifact-lane labels. |
 | `run_invarlock_compare.sh` | Shared compare/verify/render wrapper for HF-loadable baseline and subject paths. |
-| `create_source_archive.sh` | Source-only archive helper for remote outreach-style validation. |
+| `create_source_archive.sh` | Source-only archive helper for sharing reproducible example inputs. |
 
 ## Preflight Checklist
 
@@ -35,9 +35,9 @@ Use the relevant module name for each target, such as `torchao`, `peft`,
 
 ## Source-Only Archive
 
-Outreach reviewers usually start from a GitHub source archive or a cloned
-branch, not from a local checkout with generated artifacts. For local pre-PR
-validation, build the same source-only shape with:
+When sharing an example, start from a GitHub source archive or a cloned branch,
+not from a local checkout with generated artifacts. To validate the same
+source-only shape locally, run:
 
 ```bash
 examples/integrations/_shared/create_source_archive.sh \
@@ -50,8 +50,8 @@ non-ignored files from the worktree. The worktree path sets
 `COPYFILE_DISABLE=1` and uses `--no-xattrs` when the local `tar` supports it,
 so macOS extended-attribute headers are not written into the tarball.
 
-Use `--committed` for external outreach archives. Use `--include-worktree` only
-for local pre-PR validation or when intentionally sharing uncommitted changes.
+Use `--committed` when sharing an archive. Use `--include-worktree` only when
+deliberately including local changes in an archive.
 
 ## Shared Compare Wrapper
 
@@ -61,21 +61,21 @@ The shared script expects an already loadable baseline and subject:
 examples/integrations/_shared/run_invarlock_compare.sh \
   --baseline sshleifer/tiny-gpt2 \
   --subject ./models/tiny-gpt2-subject \
-  --report-out ./reports/integration-smoke \
+  --report-out ./reports/integration-example \
   --allow-network
 ```
 
-Use the same run-lane shape in target README files when the lanes are
+Use the same run-lane shape in example README files when the lanes are
 meaningful. The CLI keeps simple shortcuts, while generated artifacts record a
 canonical lane label:
 
 | Artifact lane label | Purpose | Required flags |
 | --- | --- | --- |
-| `cuda-container-strict` | Primary review path: runtime manifest, container provenance, and strict verifier assurance on a CUDA host. | `--lane cuda` |
+| `cuda-container-strict` | Primary evidence path: runtime manifest, container provenance, and strict verifier assurance on a CUDA host. | `--lane cuda` |
 | `cuda-host-off` | Secondary comparison path: local CUDA dependency bring-up without strict container evidence. | `--lane host --device cuda` |
-| `cpu-host-off` | Secondary comparison path: local non-CUDA dependency bring-up and quick smoke runs when supported by the target backend. | `--lane host --device cpu` |
+| `cpu-host-off` | Secondary comparison path: local non-CUDA dependency setup and quick compatibility runs when supported by the target backend. | `--lane host --device cpu` |
 
-Use `--assurance off` only for local backend debugging or when documenting a
+Use `--assurance off` only for local backend investigation or when documenting a
 concrete blocker.
 
 Host lanes run preflight before model materialization and evaluation. Missing
@@ -89,7 +89,7 @@ exploratory run, pass the host lane and device explicitly:
 examples/integrations/_shared/run_invarlock_compare.sh \
   --baseline sshleifer/tiny-gpt2 \
   --subject ./models/tiny-gpt2-subject \
-  --report-out ./reports/integration-host-smoke \
+  --report-out ./reports/integration-host-example \
   --lane host \
   --device cpu \
   --allow-network

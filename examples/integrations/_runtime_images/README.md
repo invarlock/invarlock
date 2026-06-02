@@ -19,7 +19,7 @@ driver through the container runtime; the image supplies the pinned CUDA
 user-space libraries expected by the Python stack. It is not enough for the
 host to have some CUDA toolkit installed, because the strict evidence run needs
 the container's Python packages, CUDA user-space libraries, and image digest to
-be reproducible together. The smoke script detects whether a GPU is visible at
+be reproducible together. The image check detects whether a GPU is visible at
 runtime, but the image does not mutate itself by reusing host CUDA libraries or
 installing host-specific packages.
 
@@ -27,16 +27,16 @@ The slim families use PyTorch CUDA wheels and do not include a system CUDA
 toolkit. `cuda-gptqmodel` keeps a CUDA-devel base because GPTQModel/AWQ strict
 runs need toolchain surfaces that the slim wheel-only images do not provide.
 
-Build and smoke one image from the repository root:
+Build and check one image from the repository root:
 
 ```bash
 examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-hqq
 examples/integrations/_runtime_images/smoke_example_runtime_image.sh cuda-hqq
 ```
 
-On Docker hosts with `nvidia-smi`, the smoke automatically passes `--gpus all`
+On Docker hosts with `nvidia-smi`, the check automatically passes `--gpus all`
 and requires a visible CUDA device. Set
-`INVARLOCK_EXAMPLE_RUNTIME_REQUIRE_GPU=0` for import-only smoke checks.
+`INVARLOCK_EXAMPLE_RUNTIME_REQUIRE_GPU=0` for import-only checks.
 
 Then run the matching example with:
 

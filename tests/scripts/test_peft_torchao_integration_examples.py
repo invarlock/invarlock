@@ -239,9 +239,9 @@ def test_shared_example_docs_scope_source_archives_and_image_digests() -> None:
         REPO_ROOT / "examples" / "integrations" / "_runtime_images" / "README.md"
     ).read_text(encoding="utf-8")
 
-    assert "Use `--committed` for external outreach archives" in shared_readme
+    assert "Use `--committed` when sharing an archive" in shared_readme
     assert "Use `--include-worktree` only" in shared_readme
-    assert "for local pre-PR validation" in shared_readme
+    assert "deliberately including local changes" in shared_readme
     assert "may produce a different image digest" in image_readme
     assert "digest recorded in `runtime.manifest.json`" in image_readme
 
@@ -250,9 +250,8 @@ def test_peft_readme_scopes_strict_evidence_to_tiny_runtime() -> None:
     text = (PEFT_DIR / "README.md").read_text(encoding="utf-8")
 
     assert "strict container evidence is verified on CUDA for this tiny" in text
-    assert "not a blanket claim" in text
-    assert "Rerun the strict lane" in text
-    assert "for the target runtime" in text
+    assert "scoped to the configured tiny merged dense checkpoint" in text
+    assert "shared integration evidence" in text
 
 
 def test_integration_example_docs_use_canonical_lane_wording() -> None:
@@ -396,9 +395,8 @@ def test_torchao_readme_frames_hf_torchao_as_primary_path() -> None:
     assert "strict container evidence is verified" in text
     assert "this tiny\n`hf_torchao` runtime-load example" in text
     assert "runnable evidence path is the `hf_torchao` subject" in text
-    assert "does not claim blanket strict support" in text
-    assert "rerun the strict lane" in text
-    assert "for the target runtime" in text
+    assert "scoped to the configured tiny HF checkpoint" in text
+    assert "shared integration evidence" in text
     assert "run_tiny_hf_torchao_int8.sh" in text
 
 

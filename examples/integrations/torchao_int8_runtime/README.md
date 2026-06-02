@@ -38,7 +38,7 @@ fine:
 
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
-| `cuda-container-strict` | `--lane cuda` | Primary review path with the example-only TorchAO image. |
+| `cuda-container-strict` | `--lane cuda` | Primary evidence path with the example-specific TorchAO image. |
 | `cuda-host-off` | `--lane host --device cuda` | Secondary local CUDA comparison path without strict container evidence. |
 | `cpu-host-off` | `--lane host --device cpu` | Secondary local non-CUDA bring-up for `hf_torchao`. |
 
@@ -48,7 +48,7 @@ the backend run.
 
 ### cuda-container-strict lane
 
-Build and smoke the example-only TorchAO image, then run this lane on a CUDA
+Build and check the example-specific TorchAO image, then run this lane on a CUDA
 host with that image configured:
 
 ```bash
@@ -65,12 +65,11 @@ examples/integrations/torchao_int8_runtime/run_tiny_hf_torchao_int8.sh \
 The runner defaults to the `release` profile so the strict verification path has
 enough evaluation tokens for a stable primary-metric verdict.
 Use the digest-pinned image reference recorded in `runtime.manifest.json` when
-the strict container artifact will be shared for review.
+the strict container artifact will be shared externally.
 
-This strict lane proves the configured tiny HF checkpoint loaded through the
-`hf_torchao` adapter. It does not claim blanket strict support for every
-external torchao tensor-subclass wrapper or model shape; rerun the strict lane
-for the target runtime before using the result as outreach evidence.
+This strict lane is scoped to the configured tiny HF checkpoint loaded through
+the `hf_torchao` adapter. Rerun the strict lane for the target runtime before
+using the result as shared integration evidence.
 
 ### cpu-host-off lane
 
@@ -84,13 +83,13 @@ examples/integrations/torchao_int8_runtime/run_tiny_hf_torchao_int8.sh \
   --device cpu
 ```
 
-Use this lane for local dependency bring-up and non-CUDA smoke runs.
+Use this lane for local dependency setup and non-CUDA compatibility runs.
 
 For `cuda-host-off` evaluation, use the same command with `--device cuda`.
 
 ## Outputs
 
-The runner writes generated outputs under ignored local directories:
+The runner writes generated outputs under local output directories:
 
 | Path | Role |
 | --- | --- |

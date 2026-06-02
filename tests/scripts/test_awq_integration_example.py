@@ -81,8 +81,8 @@ def test_awq_readme_scopes_strict_evidence_to_tiny_runtime() -> None:
 
     assert "strict container evidence is verified" in text
     assert "for this tiny AWQ example" in text
-    assert "not a blanket claim for every AWQ wheel" in text
-    assert "rerun the strict lane for the target runtime" in text
+    assert "scoped to the configured tiny AWQ checkpoint" in text
+    assert "shared integration evidence" in text
     assert "`backend_inventory.json` is emitted by InvarLock report persistence" in text
 
 

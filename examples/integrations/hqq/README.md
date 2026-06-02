@@ -32,7 +32,7 @@ uv run --extra hqq python -c "import hqq"
 
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
-| `cuda-container-strict` | `--lane cuda` | Primary review path with the example-only HQQ image. |
+| `cuda-container-strict` | `--lane cuda` | Primary evidence path with the example-specific HQQ image. |
 | `cuda-host-off` | `--lane host --device cuda` | Secondary local CUDA comparison path without strict container evidence. |
 | `cpu-host-off` | `--lane host --device cpu` | Secondary local non-CUDA bring-up when the installed HQQ backend supports CPU. |
 
@@ -42,7 +42,7 @@ the backend run.
 
 ### cuda-container-strict lane
 
-Build and smoke the example-only HQQ image, then run this lane on a CUDA host
+Build and check the example-specific HQQ image, then run this lane on a CUDA host
 with that image configured:
 
 ```bash
@@ -58,11 +58,10 @@ uv run --extra hqq \
 ```
 
 Use the digest-pinned image reference recorded in `runtime.manifest.json` when
-the strict container artifact will be shared for review.
-This proves the configured tiny `hf_hqq` runtime-load subject and image; it is
-not a blanket claim for every HQQ version, kernel path, model shape, or runtime
-image. Rerun the strict lane for the target runtime before using the artifact
-as review evidence.
+the strict container artifact will be shared externally.
+This strict lane is scoped to the configured tiny `hf_hqq` runtime-load subject
+and image. Rerun the strict lane for the target runtime before using the
+artifact as shared integration evidence.
 
 ### cpu-host-off lane
 
@@ -77,14 +76,14 @@ uv run --extra hqq \
   --device cpu
 ```
 
-Use this lane for local dependency bring-up and non-CUDA smoke runs when the
+Use this lane for local dependency setup and non-CUDA compatibility runs when the
 installed HQQ backend supports the selected host.
 
 For `cuda-host-off` evaluation, use the same command with `--device cuda`.
 
 ## Outputs
 
-The runner writes generated outputs under ignored local directories:
+The runner writes generated outputs under local output directories:
 
 | Path | Role |
 | --- | --- |

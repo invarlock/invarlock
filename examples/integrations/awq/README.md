@@ -37,7 +37,7 @@ uv run --extra awq python -c "import gptqmodel"
 
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
-| `cuda-container-strict` | `--lane cuda` | Primary review path with the example-only GPTQModel/AWQ image. |
+| `cuda-container-strict` | `--lane cuda` | Primary evidence path with the example-specific GPTQModel/AWQ image. |
 | `cuda-host-off` | `--lane host` | Secondary local CUDA dependency bring-up without strict container evidence. |
 
 Host lanes run prerequisite preflight before model materialization and
@@ -46,7 +46,7 @@ CUDA regardless of the final evaluator device.
 
 ### cuda-container-strict lane
 
-Build and smoke the example-only GPTQModel/AWQ image, then run this lane on a
+Build and check the example-specific GPTQModel/AWQ image, then run this lane on a
 CUDA host with that image configured:
 
 ```bash
@@ -62,16 +62,15 @@ uv run --extra awq \
 ```
 
 Use the digest-pinned image reference recorded in `runtime.manifest.json` when
-the artifact is being shared for review.
+the artifact is being shared externally.
 
-This strict lane proves the configured tiny AWQ checkpoint and runtime image. It
-is not a blanket claim for every AWQ wheel, backend, kernel, or model shape;
-rerun the strict lane for the target runtime before using the result as outreach
-evidence.
+This strict lane is scoped to the configured tiny AWQ checkpoint and runtime
+image. Rerun the strict lane for the target runtime before using the result as
+shared integration evidence.
 
 ### cuda-host-off lane
 
-Use this lane on a CUDA host for local dependency bring-up:
+Use this lane on a CUDA host for local dependency setup:
 
 ```bash
 uv run --extra awq \
@@ -95,7 +94,7 @@ produced subject. The AWQ materialization step is represented by
 
 ## Generated Artifacts
 
-The default run writes ignored local artifacts under this directory:
+The default run writes generated artifacts under this directory:
 
 | Path | Purpose |
 | --- | --- |

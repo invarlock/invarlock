@@ -37,7 +37,7 @@ uv run --extra hf --extra gpu python -c "import bitsandbytes"
 
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
-| `cuda-container-strict` | `--lane cuda` | Primary review path with the example-only bitsandbytes image. |
+| `cuda-container-strict` | `--lane cuda` | Primary evidence path with the example-specific bitsandbytes image. |
 | `cuda-host-off` | `--lane host --device cuda` | Secondary local CUDA comparison path without strict container evidence. |
 | `cpu-host-off` | `--lane host --device cpu` | Secondary local non-CUDA bring-up when the installed bitsandbytes backend supports it. |
 
@@ -46,7 +46,7 @@ The `cuda-host-off` lane checks `torch.cuda.is_available()` before the backend r
 
 ### cuda-container-strict lane
 
-Build and smoke the example-only bitsandbytes image, then run this lane on a
+Build and check the example-specific bitsandbytes image, then run this lane on a
 CUDA host with that image configured:
 
 ```bash
@@ -62,12 +62,11 @@ uv run --extra hf --extra gpu \
 ```
 
 Strict container evidence should use the digest-pinned image reference recorded
-in `runtime.manifest.json` when the artifact is being shared for review.
+in `runtime.manifest.json` when the artifact is being shared externally.
 
-This strict lane proves the configured tiny runtime-loaded BNB subject and
-runtime image. It is not a blanket claim for every bitsandbytes wrapper,
-backend, kernel, or model shape; rerun the strict lane for the target runtime
-before using the result as outreach evidence.
+This strict lane is scoped to the configured tiny runtime-loaded bitsandbytes
+subject and runtime image. Rerun the strict lane for the target runtime before
+using the result as shared integration evidence.
 
 ### cpu-host-off lane
 
@@ -84,7 +83,7 @@ uv run --extra hf --extra gpu \
 
 The default path uses `--execution-mode host --assurance off` because
 bitsandbytes runtime support is platform-dependent. Use this lane for local
-dependency bring-up; non-CUDA execution depends on the installed bitsandbytes
+dependency setup; non-CUDA execution depends on the installed bitsandbytes
 backend. It still runs the InvarLock evaluator, verifier, backend inventory,
 and HTML renderer.
 
@@ -92,12 +91,12 @@ For `cuda-host-off` evaluation, use the same command with `--device cuda`.
 
 ## Outputs
 
-The runner writes generated outputs under ignored local directories:
+The runner writes generated outputs under local output directories:
 
 | Path | Role |
 | --- | --- |
 | `models/tiny-llama-bnb-baseline/` | Deterministic tiny HF checkpoint used as both dense baseline and bitsandbytes runtime-loaded subject. |
-| `artifacts/tiny-hf-bnb-8bit/tiny_causal_text.jsonl` | Deterministic local text fixture for the CI-sized comparison. |
+| `artifacts/tiny-hf-bnb-8bit/tiny_causal_text.jsonl` | Deterministic local text fixture for the small comparison. |
 | `artifacts/tiny-hf-bnb-8bit/preset.yaml` | Generated preset pointing at the local fixture. |
 | `artifacts/tiny-hf-bnb-8bit/fixture_summary.json` | Fixture parameters and file hashes. |
 | `reports/tiny-hf-bnb-8bit/<artifact-lane>/evaluation.report.json` | Canonical verifier input. |
