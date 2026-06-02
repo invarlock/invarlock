@@ -85,6 +85,7 @@ def test_integration_example_readmes_document_run_lanes() -> None:
         assert text.index("`cuda-container-strict`") < text.index("`cuda-host-off`")
         assert text.index("`cuda-container-strict`") < text.index("`cpu-host-off`")
         assert "run_summary.txt" in text
+        assert "verifier status, runtime provenance status" in text
         assert "shared completion block" in text
 
     awq_text = (integrations / "awq" / "README.md").read_text(encoding="utf-8")
@@ -96,6 +97,7 @@ def test_integration_example_readmes_document_run_lanes() -> None:
     assert "--device cpu" not in awq_text
     assert awq_text.index("`cuda-container-strict`") < awq_text.index("`cuda-host-off`")
     assert "run_summary.txt" in awq_text
+    assert "verifier status, runtime provenance status" in awq_text
 
     lm_eval_text = (integrations / "lm_eval_harness" / "README.md").read_text(
         encoding="utf-8"
@@ -107,6 +109,16 @@ def test_integration_example_readmes_document_run_lanes() -> None:
     )
     assert "primary evidence" in lm_eval_text
     assert "run_summary.txt" in lm_eval_text
+    assert "verifier status, runtime provenance status" in lm_eval_text
+
+
+def test_peft_readme_scopes_strict_evidence_to_tiny_runtime() -> None:
+    text = (PEFT_DIR / "README.md").read_text(encoding="utf-8")
+
+    assert "strict container evidence is verified on CUDA for this tiny" in text
+    assert "not a blanket claim" in text
+    assert "Rerun the strict lane" in text
+    assert "for the target runtime" in text
 
 
 def test_integration_example_docs_use_canonical_lane_wording() -> None:
@@ -184,6 +196,16 @@ def test_shared_source_archive_helper_avoids_macos_xattrs() -> None:
     assert "ls-files -z --cached --modified --others --exclude-standard" in text
 
 
+def test_shared_expected_artifacts_documents_backend_inventory() -> None:
+    text = (
+        REPO_ROOT / "examples" / "integrations" / "_shared" / "expected-artifacts.md"
+    ).read_text(encoding="utf-8")
+
+    assert "`backend_inventory.json`" in text
+    assert "InvarLock report persistence" in text
+    assert "adapter provenance is available" in text
+
+
 def test_shared_preflight_helper_defines_host_lane_contract() -> None:
     helper = REPO_ROOT / "examples" / "integrations" / "_shared" / "preflight.sh"
     subprocess.run(["bash", "-n", str(helper)], check=True)
@@ -232,7 +254,12 @@ def test_torchao_readme_frames_hf_torchao_as_primary_path() -> None:
 
     assert "torchao Int8 Runtime Integration Example" in text
     assert "`hf_torchao` adapter" in text
+    assert "strict container evidence is verified" in text
+    assert "this tiny\n`hf_torchao` runtime-load example" in text
     assert "runnable evidence path is the `hf_torchao` subject" in text
+    assert "does not claim blanket strict support" in text
+    assert "rerun the strict lane" in text
+    assert "for the target runtime" in text
     assert "run_tiny_hf_torchao_int8.sh" in text
 
 

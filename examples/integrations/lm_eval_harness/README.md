@@ -124,7 +124,7 @@ The runner writes generated outputs under ignored local directories:
 | `reports/tiny-lm-eval-sidecar/subject/` | Raw LM Eval output directory for the optional subject. |
 | `reports/tiny-lm-eval-sidecar/lm_eval_sidecar_summary.json` | Compact sidecar summary with task metrics, lane label, and optional baseline-vs-subject deltas. |
 | `reports/tiny-lm-eval-sidecar/run_command.txt` | Runner invocation and LM Eval commands. |
-| `reports/tiny-lm-eval-sidecar/run_summary.txt` | Concise success or failure status, lane label, and primary output paths. |
+| `reports/tiny-lm-eval-sidecar/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
 
 The default `--limit 1` setting is intentionally a smoke-test setting. Remove or
 raise the limit only when you want meaningful task metrics and have recorded the

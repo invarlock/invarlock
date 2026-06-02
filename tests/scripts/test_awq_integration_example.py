@@ -7,6 +7,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE_DIR = REPO_ROOT / "examples" / "integrations" / "awq"
+README = EXAMPLE_DIR / "README.md"
 RUNNER = EXAMPLE_DIR / "run_tiny_awq.sh"
 HELPER = EXAMPLE_DIR / "materialize_tiny_awq_subject.py"
 
@@ -73,6 +74,16 @@ def test_awq_runner_rejects_cpu_lane_before_materialization(tmp_path: Path) -> N
     assert not (tmp_path / "baseline").exists()
     assert not (tmp_path / "subject").exists()
     assert not (tmp_path / "fixture").exists()
+
+
+def test_awq_readme_scopes_strict_evidence_to_tiny_runtime() -> None:
+    text = README.read_text(encoding="utf-8")
+
+    assert "strict container evidence is verified" in text
+    assert "for this tiny AWQ example" in text
+    assert "not a blanket claim for every AWQ wheel" in text
+    assert "rerun the strict lane for the target runtime" in text
+    assert "`backend_inventory.json` is emitted by InvarLock report persistence" in text
 
 
 def test_awq_helper_defaults_are_awq_compatible() -> None:

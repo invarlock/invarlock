@@ -63,6 +63,10 @@ uv run --extra compressed-tensors \
 
 Use the digest-pinned image reference recorded in `runtime.manifest.json` when
 the strict container artifact will be shared for review.
+This proves the configured tiny `hf_ct` packed-checkpoint subject and image; it
+is not a blanket claim for every compressed-tensors version, packing recipe,
+model shape, or runtime image. Rerun the strict lane for the target runtime
+before using the artifact as review evidence.
 
 ### cpu-host-off lane
 
@@ -99,7 +103,7 @@ The runner writes generated outputs under ignored local directories:
 | `reports/tiny-hf-ct/backend_inventory.json` | compressed-tensors backend version and module inventory when exposed. |
 | `reports/tiny-hf-ct/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
 | `reports/tiny-hf-ct/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
-| `reports/tiny-hf-ct/run_summary.txt` | Concise success or failure status, lane label, and primary output paths. |
+| `reports/tiny-hf-ct/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
 | `reports/tiny-hf-ct/checkpoint_refs.json` | Baseline and subject checkpoint references. |
 | `reports/tiny-hf-ct/adapter_runtime_summary.json` | `hf_ct` adapter metadata, packed tensor inventory, quantization settings, and file hashes. |
 
@@ -113,3 +117,5 @@ and contains packed weight tensors plus the HF `quantization_config` metadata.
 Transformers may decompress those tensors for inference on the selected stack;
 the stable example claim is checkpoint-load regression evidence, not deployment
 throughput.
+`backend_inventory.json` is emitted by InvarLock report persistence when adapter
+provenance is available; the shell runner does not write it directly.

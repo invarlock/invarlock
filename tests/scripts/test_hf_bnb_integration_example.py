@@ -7,6 +7,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE_DIR = REPO_ROOT / "examples" / "integrations" / "hf_bnb"
+README = EXAMPLE_DIR / "README.md"
 RUNNER = EXAMPLE_DIR / "run_tiny_hf_bnb_8bit.sh"
 HELPER = EXAMPLE_DIR / "prepare_tiny_hf_bnb_fixture.py"
 
@@ -38,6 +39,16 @@ def test_hf_bnb_runner_has_expected_adapter_contract() -> None:
     assert "integration_log_header" in text
     assert "integration_log_step" in text
     assert "lane_artifact_label" in text
+
+
+def test_hf_bnb_readme_scopes_strict_evidence_to_tiny_runtime() -> None:
+    text = README.read_text(encoding="utf-8")
+
+    assert "strict container evidence is verified" in text
+    assert "this tiny\nbitsandbytes runtime-load example" in text
+    assert "not a blanket claim for every bitsandbytes wrapper" in text
+    assert "rerun the strict lane for the target runtime" in text
+    assert "`backend_inventory.json` is emitted by InvarLock report persistence" in text
 
 
 def test_prepare_tiny_hf_bnb_fixture_writes_local_jsonl_and_preset(

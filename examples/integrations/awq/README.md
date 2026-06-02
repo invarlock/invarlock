@@ -1,6 +1,7 @@
 # AWQ Integration Example
 
-Status: `runnable` on CUDA hosts; strict container evidence verified on CUDA.
+Status: `runnable` on CUDA hosts; strict container evidence is verified on
+CUDA for this tiny AWQ example with the example-only GPTQModel/AWQ image.
 
 This example shows how to attach InvarLock regression evidence to a checkpoint
 quantized with GPTQModel's AWQ flow. It creates a deterministic small
@@ -63,6 +64,11 @@ uv run --extra awq \
 Use the digest-pinned image reference recorded in `runtime.manifest.json` when
 the artifact is being shared for review.
 
+This strict lane proves the configured tiny AWQ checkpoint and runtime image. It
+is not a blanket claim for every AWQ wheel, backend, kernel, or model shape;
+rerun the strict lane for the target runtime before using the result as outreach
+evidence.
+
 ### cuda-host-off lane
 
 Use this lane on a CUDA host for local dependency bring-up:
@@ -96,7 +102,7 @@ The default run writes ignored local artifacts under this directory:
 | `reports/tiny-awq/backend_inventory.json` | GPTQModel backend version and AWQ module inventory when exposed. |
 | `reports/tiny-awq/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
 | `reports/tiny-awq/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
-| `reports/tiny-awq/run_summary.txt` | Concise success or failure status, lane label, and primary output paths. |
+| `reports/tiny-awq/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
 | `reports/tiny-awq/checkpoint_refs.json` | Baseline and subject checkpoint references. |
 | `reports/tiny-awq/external_edit_summary.json` | AWQ quantization metadata and checkpoint file hashes. |
 
@@ -107,3 +113,6 @@ check the prerequisite message first, then inspect `reports/tiny-awq/run_command
 The helper fails if CUDA is unavailable, if GPTQModel does not expose a
 quantized checkpoint configuration, or if the subject cannot be loaded back
 through the Transformers AWQ loader with the selected backend.
+
+`backend_inventory.json` is emitted by InvarLock report persistence when adapter
+provenance is available; the shell runner does not write that sidecar directly.

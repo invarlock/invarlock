@@ -60,6 +60,10 @@ uv run --extra quanto \
 
 Use the digest-pinned image reference recorded in `runtime.manifest.json` when
 the strict container artifact will be shared for review.
+This proves the configured tiny `hf_quanto` runtime-load subject and image; it
+is not a blanket claim for every Quanto version, kernel path, model shape, or
+runtime image. Rerun the strict lane for the target runtime before using the
+artifact as review evidence.
 
 ### cpu-host-off lane
 
@@ -95,7 +99,7 @@ The runner writes generated outputs under ignored local directories:
 | `reports/tiny-hf-quanto/backend_inventory.json` | Quanto backend version and quantized module inventory when exposed. |
 | `reports/tiny-hf-quanto/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
 | `reports/tiny-hf-quanto/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
-| `reports/tiny-hf-quanto/run_summary.txt` | Concise success or failure status, lane label, and primary output paths. |
+| `reports/tiny-hf-quanto/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
 | `reports/tiny-hf-quanto/checkpoint_refs.json` | Baseline and subject checkpoint references. |
 | `reports/tiny-hf-quanto/adapter_runtime_summary.json` | `hf_quanto` runtime adapter metadata, quantization settings, and file hashes. |
 
@@ -107,3 +111,5 @@ check the prerequisite message first, then inspect
 The example uses Quanto runtime quantization through the HF load path, so the
 subject remains an HF-loadable checkpoint plus adapter runtime configuration
 rather than a Quanto-only checkpoint format.
+`backend_inventory.json` is emitted by InvarLock report persistence when adapter
+provenance is available; the shell runner does not write it directly.

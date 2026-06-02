@@ -1,6 +1,7 @@
 # PEFT LoRA-Merge Integration Example
 
-Status: `runnable`; strict container evidence verified on CUDA.
+Status: `runnable`; strict container evidence is verified on CUDA for this tiny
+PEFT LoRA-merge example with the regular CUDA runtime image.
 
 This example shows how to attach InvarLock regression evidence to a checkpoint
 created by an external PEFT LoRA merge. It materializes a tiny deterministic
@@ -60,6 +61,10 @@ The runner defaults to the `release` profile so the strict verification path has
 enough evaluation tokens for a stable primary-metric verdict.
 Use the digest-pinned image reference recorded in `runtime.manifest.json` when
 the strict container artifact will be shared for review.
+This proves the configured tiny merged dense checkpoint and runtime image; it
+is not a blanket claim for every PEFT version, LoRA merge shape, model family,
+or runtime image. Rerun the strict lane for the target runtime before using the
+artifact as review evidence.
 
 ### cpu-host-off lane
 
@@ -92,7 +97,7 @@ The runner writes generated outputs under ignored local directories:
 | `reports/tiny-peft-lora/evaluation.html` | Human-readable report. |
 | `reports/tiny-peft-lora/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
 | `reports/tiny-peft-lora/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
-| `reports/tiny-peft-lora/run_summary.txt` | Concise success or failure status, lane label, and primary output paths. |
+| `reports/tiny-peft-lora/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
 | `reports/tiny-peft-lora/checkpoint_refs.json` | Baseline and subject checkpoint references. |
 | `reports/tiny-peft-lora/external_edit_summary.json` | PEFT merge metadata and checkpoint file hashes. |
 

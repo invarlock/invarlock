@@ -1,6 +1,7 @@
 # hf_bnb Bitsandbytes Runtime-Load Integration Example
 
-Status: `runnable`; strict container evidence verified on CUDA.
+Status: `runnable`; strict container evidence is verified on CUDA for this tiny
+bitsandbytes runtime-load example with the example-only bitsandbytes image.
 
 This example shows how to attach InvarLock regression evidence to a subject
 loaded through the built-in `hf_bnb` adapter. By default it creates a tiny
@@ -63,6 +64,11 @@ uv run --extra hf --extra gpu \
 Strict container evidence should use the digest-pinned image reference recorded
 in `runtime.manifest.json` when the artifact is being shared for review.
 
+This strict lane proves the configured tiny runtime-loaded BNB subject and
+runtime image. It is not a blanket claim for every bitsandbytes wrapper,
+backend, kernel, or model shape; rerun the strict lane for the target runtime
+before using the result as outreach evidence.
+
 ### cpu-host-off lane
 
 From the repository root:
@@ -100,7 +106,7 @@ The runner writes generated outputs under ignored local directories:
 | `reports/tiny-hf-bnb-8bit/backend_inventory.json` | bitsandbytes backend version, quantized module types, and smoke results. |
 | `reports/tiny-hf-bnb-8bit/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
 | `reports/tiny-hf-bnb-8bit/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
-| `reports/tiny-hf-bnb-8bit/run_summary.txt` | Concise success or failure status, lane label, and primary output paths. |
+| `reports/tiny-hf-bnb-8bit/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
 
 A successful run ends with the shared completion block documented in
 `examples/integrations/_shared/README.md#expected-run-output`. If a run fails,
@@ -110,3 +116,6 @@ check the prerequisite message first, then inspect
 The generated preset uses local JSONL data so the evaluation data path is
 offline after fixture creation. `--allow-network` is only needed for the HF
 model files when they are not already cached.
+
+`backend_inventory.json` is emitted by InvarLock report persistence when adapter
+provenance is available; the shell runner does not write that sidecar directly.

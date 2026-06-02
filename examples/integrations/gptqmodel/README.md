@@ -1,6 +1,7 @@
 # GPTQModel Integration Example
 
-Status: `runnable`; strict container evidence verified on CUDA.
+Status: `runnable`; strict container evidence is verified on CUDA for this tiny
+GPTQModel example with the example-only GPTQModel/AWQ image.
 
 This example shows how to attach InvarLock regression evidence to a checkpoint
 quantized by GPTQModel. It creates a deterministic tiny Llama-style Hugging Face
@@ -58,6 +59,11 @@ uv run --extra gptq \
 Strict container evidence should use the digest-pinned image reference recorded
 in `runtime.manifest.json` when the artifact is being shared for review.
 
+This strict lane proves the configured tiny GPTQ checkpoint and runtime image.
+It is not a blanket claim for every GPTQModel wheel, kernel, backend, or model
+shape; rerun the strict lane for the target runtime before using the result as
+outreach evidence.
+
 ### cpu-host-off lane
 
 From the repository root:
@@ -98,7 +104,7 @@ The runner writes generated outputs under ignored local directories:
 | `reports/tiny-gptqmodel/backend_inventory.json` | GPTQModel backend version and quantized module inventory when exposed. |
 | `reports/tiny-gptqmodel/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
 | `reports/tiny-gptqmodel/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
-| `reports/tiny-gptqmodel/run_summary.txt` | Concise success or failure status, lane label, and primary output paths. |
+| `reports/tiny-gptqmodel/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
 | `reports/tiny-gptqmodel/checkpoint_refs.json` | Baseline and subject checkpoint references. |
 | `reports/tiny-gptqmodel/external_edit_summary.json` | GPTQModel quantization metadata and checkpoint file hashes. |
 
@@ -109,3 +115,6 @@ check the prerequisite message first, then inspect
 
 The helper fails if GPTQModel does not produce a quantized checkpoint
 configuration or if the subject cannot be loaded back through GPTQModel.
+
+`backend_inventory.json` is emitted by InvarLock report persistence when adapter
+provenance is available; the shell runner does not write that sidecar directly.

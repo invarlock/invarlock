@@ -1,6 +1,7 @@
 # torchao Int8 Runtime Integration Example
 
-Status: `runnable`; strict container evidence verified on CUDA.
+Status: `runnable`; strict container evidence is verified on CUDA for this tiny
+`hf_torchao` runtime-load example with the example-only TorchAO image.
 
 This example shows how to attach InvarLock regression evidence to a Hugging Face
 causal checkpoint loaded through InvarLock's `hf_torchao` adapter. It creates a
@@ -66,6 +67,11 @@ enough evaluation tokens for a stable primary-metric verdict.
 Use the digest-pinned image reference recorded in `runtime.manifest.json` when
 the strict container artifact will be shared for review.
 
+This strict lane proves the configured tiny HF checkpoint loaded through the
+`hf_torchao` adapter. It does not claim blanket strict support for every
+external torchao tensor-subclass wrapper or model shape; rerun the strict lane
+for the target runtime before using the result as outreach evidence.
+
 ### cpu-host-off lane
 
 From the repository root:
@@ -97,7 +103,7 @@ The runner writes generated outputs under ignored local directories:
 | `reports/tiny-hf-torchao-int8/evaluation.html` | Human-readable report. |
 | `reports/tiny-hf-torchao-int8/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
 | `reports/tiny-hf-torchao-int8/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
-| `reports/tiny-hf-torchao-int8/run_summary.txt` | Concise success or failure status, lane label, and primary output paths. |
+| `reports/tiny-hf-torchao-int8/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
 | `reports/tiny-hf-torchao-int8/checkpoint_refs.json` | Baseline and subject checkpoint references. |
 | `reports/tiny-hf-torchao-int8/adapter_runtime_summary.json` | `hf_torchao` runtime adapter metadata, quantization probe, and file hashes. |
 
