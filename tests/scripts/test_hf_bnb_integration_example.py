@@ -31,6 +31,13 @@ def test_hf_bnb_runner_has_expected_adapter_contract() -> None:
     assert "--model-dir" in text
     assert 'execution_mode="host"' in text
     assert 'assurance="off"' in text
+    assert "--lane MODE" in text
+    assert 'compare_cmd+=(--lane "$lane")' in text
+    assert "integration_default_host_device" in text
+    assert "integration_preflight_host_cuda_device" in text
+    assert "integration_log_header" in text
+    assert "integration_log_step" in text
+    assert "lane_artifact_label" in text
 
 
 def test_prepare_tiny_hf_bnb_fixture_writes_local_jsonl_and_preset(

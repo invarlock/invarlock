@@ -13,6 +13,30 @@ NORMALIZER = (
     / "lm_eval_harness"
     / "normalize_lm_eval_results.py"
 )
+RUNNER = (
+    REPO_ROOT
+    / "examples"
+    / "integrations"
+    / "lm_eval_harness"
+    / "run_tiny_lm_eval_sidecar.sh"
+)
+
+
+def test_lm_eval_sidecar_runner_wires_preflight_and_lane_label() -> None:
+    subprocess.run(["bash", "-n", str(RUNNER)], check=True)
+
+    text = RUNNER.read_text(encoding="utf-8")
+    assert "integration_preflight_host_cuda_device" in text
+    assert "integration_lane_artifact_label" in text
+    assert "--lane-label" in text
+    assert "lm_eval_sidecar_summary.json" in text
+    assert "run_summary.txt" in text
+    assert "LM Eval sidecar run complete" in text
+    assert 'write_run_summary "success"' in text
+    assert "integration_log_header" in text
+    assert "integration_log_step" in text
+    assert "integration_log_kv" in text
+    assert '} > "$report_out/run_command.txt"' not in text
 
 
 def _write_lm_eval_report(path: Path, word_perplexity: float) -> None:
@@ -75,6 +99,8 @@ def test_lm_eval_sidecar_normalizer_preserves_raw_metric_keys(
             "1",
             "--device",
             "cpu",
+            "--lane-label",
+            "cpu-host-off",
             "--command-log",
             str(command_log),
             "--output",
@@ -93,6 +119,7 @@ def test_lm_eval_sidecar_normalizer_preserves_raw_metric_keys(
     assert task["metric_aliases"]["word_perplexity,none"] == "word_perplexity"
     assert task["stderrs"]["word_perplexity,none"] == "N/A"
     assert summary["baseline"]["seeds"]["torch"] == 1234
+    assert summary["lane_artifact_label"] == "cpu-host-off"
     assert summary["command_log"] == str(command_log)
     assert (
         summary["comparison"]["wikitext"]["word_perplexity,none"][
@@ -128,6 +155,8 @@ def test_lm_eval_sidecar_normalizer_rejects_missing_results(
             "1",
             "--device",
             "cpu",
+            "--lane-label",
+            "cpu-host-off",
             "--output",
             str(tmp_path / "summary.json"),
         ],

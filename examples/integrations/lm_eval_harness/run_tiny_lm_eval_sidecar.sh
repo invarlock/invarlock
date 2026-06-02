@@ -113,6 +113,9 @@ if [[ -z "$PYTHON_BIN" ]]; then
   fi
 fi
 
+# shellcheck source=../_shared/preflight.sh
+source "$REPO_ROOT/examples/integrations/_shared/preflight.sh"
+
 if ! "$PYTHON_BIN" -c 'import lm_eval' >/dev/null 2>&1; then
   cat >&2 <<'MSG'
 Missing example dependency: lm_eval
@@ -125,6 +128,17 @@ MSG
   exit 2
 fi
 
+integration_preflight_host_cuda_device "$PYTHON_BIN" "host" "$device" "LM Evaluation Harness sidecar" || exit $?
+lane_artifact_label="$(integration_lane_artifact_label "host" "off" "$device")"
+
+integration_log_header "LM Eval sidecar example"
+integration_log_kv "lane" "$lane_artifact_label"
+integration_log_kv "python" "$PYTHON_BIN"
+integration_log_kv "device" "$device"
+integration_log_kv "tasks" "$tasks"
+integration_log_kv "limit" "$limit"
+integration_log_kv "report_out" "$report_out"
+
 if [[ -e "$report_out" ]]; then
   if [[ "$force" -ne 1 ]]; then
     echo "Report directory already exists: $report_out" >&2
@@ -134,6 +148,58 @@ if [[ -e "$report_out" ]]; then
   rm -rf "$report_out"
 fi
 mkdir -p "$report_out"
+
+run_command_txt="$report_out/run_command.txt"
+sidecar_summary_json="$report_out/lm_eval_sidecar_summary.json"
+run_summary_txt="$report_out/run_summary.txt"
+rm -f "$run_command_txt" "$sidecar_summary_json" "$run_summary_txt"
+
+run_complete=0
+write_run_summary() {
+  local status="$1"
+  {
+    printf 'status: %s\n' "$status"
+    printf 'lane_artifact_label: %s\n' "$lane_artifact_label"
+    printf 'device: %s\n' "$device"
+    printf 'baseline: %s\n' "$baseline"
+    if [[ -n "$subject" ]]; then
+      printf 'subject: %s\n' "$subject"
+    fi
+    printf 'summary: %s\n' "$sidecar_summary_json"
+    printf 'run_command: %s\n' "$run_command_txt"
+  } > "$run_summary_txt"
+}
+
+print_success_summary() {
+  cat <<MSG
+
+LM Eval sidecar run complete
+  status: success
+  lane: $lane_artifact_label
+  sidecar summary: $sidecar_summary_json
+  command log: $run_command_txt
+  summary: $run_summary_txt
+MSG
+}
+
+on_exit() {
+  local rc=$?
+  if [[ "$run_complete" -eq 0 && "$rc" -ne 0 ]]; then
+    write_run_summary "failed" || true
+    cat >&2 <<MSG
+
+LM Eval sidecar run failed
+  lane: $lane_artifact_label
+  report out: $report_out
+  command log: $run_command_txt
+  summary: $run_summary_txt
+
+Use the sidecar summary only as task-score context. Pair it with an InvarLock
+comparison run for verifier evidence.
+MSG
+  fi
+}
+trap on_exit EXIT
 
 if [[ "$allow_network" -eq 0 ]]; then
   export HF_DATASETS_OFFLINE=1
@@ -160,7 +226,7 @@ append_command_log() {
     printf '  '
     printf '%q ' "$@"
     printf '\n\n'
-  } >> "$report_out/run_command.txt"
+  } >> "$run_command_txt"
 }
 
 run_lm_eval() {
@@ -185,6 +251,7 @@ run_lm_eval() {
   )
 
   append_command_log "$label" "${cmd[@]}"
+  integration_log_step "run LM Eval Harness: $label"
   "${cmd[@]}"
 }
 
@@ -211,7 +278,7 @@ find_result_json() {
   printf 'runner_invocation:\n  '
   printf '%q ' "$0" "${original_args[@]}"
   printf '\n\n'
-} > "$report_out/run_command.txt"
+} > "$run_command_txt"
 
 baseline_dir="$report_out/baseline"
 run_lm_eval "lm_eval_baseline" "$baseline" "$baseline_dir"
@@ -232,8 +299,9 @@ normalize_cmd=(
   --tasks "$tasks"
   --limit "$limit"
   --device "$device"
-  --command-log "$report_out/run_command.txt"
-  --output "$report_out/lm_eval_sidecar_summary.json"
+  --lane-label "$lane_artifact_label"
+  --command-log "$run_command_txt"
+  --output "$sidecar_summary_json"
 )
 
 if [[ -n "$subject_json" ]]; then
@@ -241,4 +309,8 @@ if [[ -n "$subject_json" ]]; then
 fi
 
 append_command_log "normalize_sidecar" "${normalize_cmd[@]}"
+integration_log_step "normalize LM Eval sidecar summary"
 "${normalize_cmd[@]}"
+write_run_summary "success"
+run_complete=1
+print_success_summary

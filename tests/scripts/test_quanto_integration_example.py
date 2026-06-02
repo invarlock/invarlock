@@ -6,13 +6,13 @@ import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-EXAMPLE_DIR = REPO_ROOT / "examples" / "integrations" / "gptqmodel"
-RUNNER = EXAMPLE_DIR / "run_tiny_gptqmodel.sh"
-HELPER = EXAMPLE_DIR / "materialize_tiny_gptqmodel_subject.py"
+EXAMPLE_DIR = REPO_ROOT / "examples" / "integrations" / "quanto"
+RUNNER = EXAMPLE_DIR / "run_tiny_hf_quanto.sh"
+HELPER = EXAMPLE_DIR / "prepare_tiny_hf_quanto_fixture.py"
 
 
 def _load_helper_module():
-    spec = importlib.util.spec_from_file_location("gptqmodel_example", HELPER)
+    spec = importlib.util.spec_from_file_location("quanto_example", HELPER)
     assert spec is not None
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -20,33 +20,30 @@ def _load_helper_module():
     return module
 
 
-def test_gptqmodel_runner_has_expected_adapter_contract() -> None:
+def test_quanto_runner_has_expected_adapter_contract() -> None:
     subprocess.run(["bash", "-n", str(RUNNER)], check=True)
 
     text = RUNNER.read_text(encoding="utf-8")
     assert "--baseline-adapter hf_causal" in text
-    assert "--subject-adapter hf_gptq" in text
-    assert "--edit-label gptqmodel_gptq_4bit" in text
-    assert "materialize_tiny_gptqmodel_subject.py" in text
-    assert 'execution_mode="host"' in text
-    assert 'assurance="off"' in text
+    assert "--subject-adapter hf_quanto" in text
+    assert "--edit-label quanto_runtime_quantization" in text
+    assert "prepare_tiny_hf_quanto_fixture.py" in text
     assert "--lane MODE" in text
     assert 'compare_cmd+=(--lane "$lane")' in text
-    assert "TORCHDYNAMO_DISABLE=1" in text
-    assert "--device" in text
     assert "--lane cuda" in text
+    assert "adapter_runtime_summary.json" in text
     assert "integration_default_host_device" in text
     assert "integration_preflight_host_cuda_device" in text
-    assert "integration_preflight_gptqmodel_host_runtime" in text
     assert "integration_log_header" in text
     assert "integration_log_step" in text
     assert "lane_artifact_label" in text
 
 
-def test_gptqmodel_helper_writes_local_jsonl_and_preset(tmp_path: Path) -> None:
+def test_quanto_helper_writes_local_jsonl_and_preset(tmp_path: Path) -> None:
     helper = _load_helper_module()
     summary = helper.write_text_fixture(
         tmp_path,
+        model_id="/tmp/tiny-llama-quanto-baseline",
         rows=6,
         terms_per_row=5,
         seq_len=32,
@@ -70,11 +67,37 @@ def test_gptqmodel_helper_writes_local_jsonl_and_preset(tmp_path: Path) -> None:
 
     preset = preset_path.read_text(encoding="utf-8")
     assert 'kind: "local_jsonl"' in preset
+    assert 'id: "/tmp/tiny-llama-quanto-baseline"' in preset
     assert f'file: "{data_path}"' in preset
     assert "seq_len: 32" in preset
     assert "preview_n: 3" in preset
     assert "final_n: 3" in preset
 
     persisted = json.loads(summary_path.read_text(encoding="utf-8"))
-    assert persisted["format_version"] == "gptqmodel-fixture-v1"
+    assert persisted["format_version"] == "quanto-fixture-v1"
     assert persisted["data_sha256"] == summary["data_sha256"]
+
+
+def test_quanto_helper_writes_runtime_metadata(tmp_path: Path) -> None:
+    helper = _load_helper_module()
+    model_dir = tmp_path / "model"
+    model_dir.mkdir()
+    (model_dir / "config.json").write_text("{}", encoding="utf-8")
+
+    model_summary = {"format_version": "quanto-model-v1", "model_path": str(model_dir)}
+    runtime_summary = helper.write_adapter_runtime_summary(
+        model_dir,
+        subject_adapter="hf_quanto",
+        weights="int8",
+        model_summary=model_summary,
+    )
+
+    assert runtime_summary["subject_adapter"] == "hf_quanto"
+    assert runtime_summary["runtime_quantization"] == {
+        "quant_method": "quanto",
+        "weights": "int8",
+    }
+    persisted = json.loads(
+        (model_dir / "adapter_runtime_summary.json").read_text(encoding="utf-8")
+    )
+    assert persisted == runtime_summary

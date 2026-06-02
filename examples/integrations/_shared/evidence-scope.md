@@ -1,7 +1,8 @@
 # Evidence Scope
 
 An integration example produces regression evidence for one configured
-baseline-vs-subject checkpoint comparison.
+baseline-vs-subject comparison. The subject may be a materialized checkpoint or
+the same checkpoint loaded through a runtime adapter.
 
 The evidence is strongest when the workflow runs in the default container-backed
 strict mode and the generated `evaluation.report.json` verifies with its sibling
@@ -15,12 +16,25 @@ strict mode and the generated `evaluation.report.json` verifies with its sibling
 | `exploratory-host` | The target workflow runs in host mode with `--assurance off`; useful for local debugging and backend bring-up. |
 | `compatibility-investigation` | The target artifact cannot yet be loaded or verified through the documented InvarLock path; the README records the blocker. |
 
+## Run Lanes
+
+Use consistent run lanes in target READMEs:
+
+| Artifact lane label | Meaning |
+| --- | --- |
+| `cpu-host-off` | Local optional-dependency bring-up with `--lane host --device cpu`; this is available only when the backend can run the selected comparison without CUDA. |
+| `cuda-host-off` | Local CUDA dependency bring-up with `--lane host --device cuda`; useful for backend validation before strict evidence. |
+| `cuda-container-strict` | CUDA-host runtime manifest, provenance evidence, and strict verifier assurance with `--lane cuda`. |
+
+When a lane is unavailable, state the concrete backend reason instead of
+omitting the lane.
+
 ## Maintainer-Facing Wording
 
 Use scoped language:
 
 > This example produces regression evidence for one configured baseline
-> checkpoint versus one edited subject checkpoint.
+> checkpoint versus one configured subject path.
 
 Keep public claims tied to the generated artifacts, the selected model family,
 the adapter, the dataset/window plan, and the verifier result.

@@ -29,29 +29,53 @@ fine:
 
 ## Run
 
+## Lane Support
+
+| Artifact lane label | Command shape | Notes |
+| --- | --- | --- |
+| `cuda-container-strict` | `--lane cuda` | Primary review path with the regular CUDA runtime image. |
+| `cuda-host-off` | `--lane host --device cuda` | Secondary local CUDA comparison path without strict container evidence. |
+| `cpu-host-off` | `--lane host --device cpu` | Secondary local non-CUDA bring-up for the merged dense checkpoint. |
+
+Host lanes run prerequisite preflight before materialization and evaluation. The
+`cuda-host-off` lane checks `torch.cuda.is_available()` before the backend run.
+
+### cuda-container-strict lane
+
+Build the regular CUDA runtime image, then run this lane on a CUDA host with
+that image configured. This example evaluates a merged dense checkpoint, so it
+does not need the quant example images.
+
+```bash
+make runtime-image-cuda
+
+INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-local \
+examples/integrations/peft_lora/run_tiny_peft_lora.sh \
+  --allow-network \
+  --force \
+  --lane cuda
+```
+
+The runner defaults to the `release` profile so the strict verification path has
+enough evaluation tokens for a stable primary-metric verdict.
+Use the digest-pinned image reference recorded in `runtime.manifest.json` when
+the strict container artifact will be shared for review.
+
+### cpu-host-off lane
+
 From the repository root:
 
 ```bash
 examples/integrations/peft_lora/run_tiny_peft_lora.sh \
   --allow-network \
-  --force
-```
-
-The default compare path is strict/container-backed. For host-only bring-up or
-dependency debugging, run the same example with explicit host mode:
-
-```bash
-examples/integrations/peft_lora/run_tiny_peft_lora.sh \
-  --allow-network \
   --force \
-  --execution-mode host \
-  --assurance off
+  --lane host \
+  --device cpu
 ```
 
-The runner defaults to the `release` profile so the strict verification path has
-enough evaluation tokens for a stable primary-metric verdict.
-Set `INVARLOCK_RUNTIME_IMAGE` and `INVARLOCK_RUNTIME_IMAGE_DIGEST` when the
-strict container artifact will be shared for review.
+Use this lane for local dependency bring-up and non-CUDA smoke runs.
+
+For `cuda-host-off` evaluation, use the same command with `--device cuda`.
 
 ## Outputs
 
@@ -66,9 +90,16 @@ The runner writes generated outputs under ignored local directories:
 | `reports/tiny-peft-lora/evaluation.report.json` | Canonical verifier input. |
 | `reports/tiny-peft-lora/verify.json` | Machine-readable verifier result. |
 | `reports/tiny-peft-lora/evaluation.html` | Human-readable report. |
+| `reports/tiny-peft-lora/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
 | `reports/tiny-peft-lora/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
+| `reports/tiny-peft-lora/run_summary.txt` | Concise success or failure status, lane label, and primary output paths. |
 | `reports/tiny-peft-lora/checkpoint_refs.json` | Baseline and subject checkpoint references. |
 | `reports/tiny-peft-lora/external_edit_summary.json` | PEFT merge metadata and checkpoint file hashes. |
+
+A successful run ends with the shared completion block documented in
+`examples/integrations/_shared/README.md#expected-run-output`. If a run fails,
+check the prerequisite message first, then inspect
+`reports/tiny-peft-lora/run_command.txt`.
 
 The subject materializer writes a non-zero LoRA delta and fails if the merged
 checkpoint does not change the target attention weights.
