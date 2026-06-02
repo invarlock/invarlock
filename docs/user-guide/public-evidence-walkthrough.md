@@ -4,8 +4,9 @@
 
 This walkthrough shows the shipped public evidence floor that reviewers can
 verify without downloading model weights. It is deliberately BYOE-oriented:
-InvarLock validates a baseline/subject comparison artifact; it does not produce
-deployable quantized checkpoints.
+InvarLock validates baseline/subject comparison artifacts for externally
+materialized subjects; deployable quantized checkpoint production is outside
+this public evidence floor.
 
 `public_evidence/README.md` defines the evidence taxonomy. In short, fixture
 artifacts prove verifier contracts, while real-run artifacts are produced by
@@ -173,7 +174,7 @@ Release verification requires validation.spectral_stable == true
 spectral did not pass
 ```
 
-That is the intended release-gate behavior: guard stability is required even
+That is the intended strict-verification behavior: guard stability is required even
 when the summary metric is clean.
 
 ## Policy failures

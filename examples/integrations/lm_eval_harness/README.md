@@ -7,13 +7,12 @@ InvarLock regression evidence for the same checkpoint-edit workflow. It runs a
 tiny `wikitext` task against a baseline model, and optionally a subject model,
 then normalizes the harness JSON into a compact sidecar summary.
 
-The sidecar summary is not an InvarLock verifier input. Keep
-`evaluation.report.json`, `verify.json`, and `evaluation.html` from an InvarLock
-comparison as the evidence artifacts for regression claims; use the LM Eval
-outputs as broader task-score context.
+Use `evaluation.report.json`, `verify.json`, and `evaluation.html` from an
+InvarLock comparison as the evidence artifacts for regression claims. The LM
+Eval sidecar provides broader task-score context beside those artifacts.
 
-The example is source-tree only. It does not add LM Evaluation Harness to the
-core InvarLock install.
+The example keeps LM Evaluation Harness in the example environment rather than
+the core InvarLock install.
 
 ## Prerequisites
 
@@ -111,9 +110,8 @@ examples/integrations/lm_eval_harness/run_tiny_lm_eval_sidecar.sh \
 ### mps-host-off lane
 
 Use `--device mps` on Apple Silicon when the local harness environment supports
-it. That writes an `mps-host-off` sidecar summary. This sidecar does not produce
-InvarLock runtime provenance; pair it with a `cuda-container-strict` InvarLock
-run for the strict evidence record.
+it. That writes an `mps-host-off` sidecar summary for task-score context. Pair
+it with a `cuda-container-strict` InvarLock run for the strict evidence record.
 
 ## Outputs
 

@@ -47,7 +47,7 @@
     }
   ],
   "non_goals": [
-    "This package does not vendor model weights.",
-    "This package does not claim quant_rtn is a deployable quantization backend."
+    "This package is weight-free by design.",
+    "Deployable quantization-backend behavior is outside this package."
   ]
 }

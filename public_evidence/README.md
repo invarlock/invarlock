@@ -4,7 +4,7 @@ This tree contains two different kinds of public evidence:
 
 - **Verifier fixtures**: small, intentionally fixture-sized artifacts that prove
   report schemas, runtime-manifest binding, signed-pack verification, and
-  release-gate failure behavior.
+  strict verification failure behavior.
 - **Real model runs**: artifacts produced by `invarlock evaluate` against
   materialized baseline and subject checkpoints, then verified and packaged.
 
@@ -30,8 +30,8 @@ with `--edit-label custom`.
 
 Every artifact directory that carries public evidence must include an
 `evidence.meta.json` file. The metadata declares the evidence class, lists the
-verifier commands, and records non-goals so fixtures cannot be mistaken for
-real-run evidence.
+verifier commands, and records scope boundaries so fixtures cannot be mistaken
+for real-run evidence.
 
 Run the audit with:
 

@@ -152,7 +152,7 @@ invarlock verify reports/eval/evaluation.report.json
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
-Wheel-only review path:
+Wheel-only verification path:
 `pip install invarlock`, `invarlock doctor`,
 `invarlock verify /path/to/evaluation.report.json`,
 `invarlock report html -i /path/to/evaluation.report.json -o /path/to/evaluation.html`,

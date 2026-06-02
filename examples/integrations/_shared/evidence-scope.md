@@ -13,7 +13,7 @@ strict mode and the generated `evaluation.report.json` verifies with its sibling
 | Label | Meaning |
 | --- | --- |
 | `runnable` | The target README provides commands that generate an evaluation report, verifier JSON, and HTML report in the documented environment. |
-| `exploratory-host` | The target workflow runs in host mode with `--assurance off`; useful for local debugging and backend bring-up. |
+| `exploratory-host` | The target workflow runs in host mode with `--assurance off`; useful for local dependency setup and backend investigation. |
 | `compatibility-investigation` | The target artifact cannot yet be loaded or verified through the documented InvarLock path; the README records the blocker. |
 
 ## Run Lanes

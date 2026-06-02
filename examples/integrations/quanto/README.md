@@ -10,8 +10,8 @@ uses the same checkpoint as the subject loaded through `hf_quanto`, where Quanto
 quantization is requested through the Transformers load-time quantization
 configuration.
 
-The example is source-tree only. It does not add Quanto to the core InvarLock
-install.
+The example keeps Quanto in the example environment rather than the core
+InvarLock install.
 
 ## Prerequisites
 
@@ -110,5 +110,5 @@ check the prerequisite message first, then inspect
 The example uses Quanto runtime quantization through the HF load path, so the
 subject remains an HF-loadable checkpoint plus adapter runtime configuration
 rather than a Quanto-only checkpoint format.
-`backend_inventory.json` is emitted by InvarLock report persistence when adapter
-provenance is available; the shell runner does not write it directly.
+The shell runner relies on InvarLock report persistence to emit
+`backend_inventory.json` when adapter provenance is available.
