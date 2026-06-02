@@ -87,6 +87,8 @@ test_setup_remote_verify_remote_stack_checks_quant_modules_when_requested() {
     cmd="$(cat "${TEST_TMPDIR}/smoke.cmd")"
     assert_match "--module bitsandbytes" "${cmd}" "quant smoke requires bitsandbytes"
     assert_match "--module gptqmodel" "${cmd}" "quant smoke requires gptqmodel"
+    assert_match "--module hqq" "${cmd}" "quant smoke requires hqq"
+    assert_match "--module torchao" "${cmd}" "quant smoke requires torchao"
     assert_match "--repo-root /opt/invarlock" "${cmd}" "repo root forwarded to smoke helper"
 
     unset PACK_RUNTIME_IMAGE_FLAVOR

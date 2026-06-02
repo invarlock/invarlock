@@ -430,7 +430,7 @@ InvarLock supports extension via entry points without modifying core code.
 
 | Extension Type | Entry Point Group | Example |
 | --- | --- | --- |
-| Adapters | `invarlock.adapters` | `hf_causal`, `hf_mlm`, `hf_seq2seq`, `hf_multimodal`, `hf_auto`, `hf_bnb`, `hf_awq`, `hf_gptq` |
+| Adapters | `invarlock.adapters` | `hf_causal`, `hf_mlm`, `hf_seq2seq`, `hf_multimodal`, `hf_auto`, `hf_bnb`, `hf_awq`, `hf_gptq`, `hf_torchao`, `hf_hqq`, `hf_quanto`, `hf_ct` |
 | Guards | `invarlock.guards` | `invariants`, `spectral`, `rmt`, `variance` |
 | Edits | `invarlock.edits` | `quant_rtn` (`noop` is built in for internal/catalog use, not a pyproject entry-point example) |
 

@@ -259,7 +259,7 @@ verify_remote_stack() {
         remote-setup-smoke
     )
     if [[ "$(pack_runtime_image_flavor)" == "quant" ]]; then
-        smoke_args+=(--module bitsandbytes --module gptqmodel)
+        smoke_args+=(--module bitsandbytes --module gptqmodel --module hqq --module torchao)
     fi
     smoke_args+=(--repo-root "${REPO_DIR}")
     pack_run_cmd python "${smoke_args[@]}"

@@ -740,7 +740,7 @@ Common knobs for the setup script:
 | `PACK_MODEL_REVISIONS_FILE` | `OUTPUT_DIR/state/model_revisions.json` | Revisions path |
 | `PACK_USE_BATCH_EDITS` | `auto` | Force/disable batch edit creation |
 | `PACK_DEFER_REPORT_RENDERING` | `0` (`1` under `--release-review`) | Skip optional markdown/reviewer bundle rendering during evaluation |
-| `PACK_RUNTIME_IMAGE_FLAVOR` | `default` | Remote setup runtime image flavor; use `quant` on CUDA hosts for optional quant adapter container evidence |
+| `PACK_RUNTIME_IMAGE_FLAVOR` | `default` | Remote setup runtime image flavor; use `quant` on CUDA hosts for optional quant adapter container evidence, including `hf_bnb`, `hf_awq`, `hf_gptq`, `hf_torchao`, `hf_hqq`, `hf_quanto`, and `hf_ct` |
 | `RESUME_MODE` | `true` | Skip completed steps when outputs exist |
 
 ### Hardware selection

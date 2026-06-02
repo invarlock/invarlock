@@ -97,7 +97,7 @@ app = typer.Typer(
         "  0=success\n"
         "  1=generic failure\n"
         "  2=schema invalid\n"
-        "  3=hard abort ([INVARLOCK:EXXX])."
+        "  3=hard abort with structured error code."
     ),
     no_args_is_help=True,
     cls=OrderedGroup,

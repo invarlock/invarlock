@@ -41,6 +41,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added public contract stability documentation for report schemas,
   evidence-pack formats, verifier outputs, CLI stability classes, adapter
   support tiers, and the pre-1.0 package stability posture.
+- Added optional `hf_torchao` adapter discovery for torchao int8 runtime
+  quantization, including module maps for guard targeting and public adapter
+  capability metadata, plus a runnable TorchAO integration example that proves
+  the `hf_torchao` subject adapter path.
+- Added optional `hf_hqq` adapter discovery for HQQ runtime quantization,
+  including capability metadata, guard targeting, backend inventory, and a
+  runnable HQQ integration example with host/off and CUDA/container strict
+  lanes.
+- Added optional `hf_quanto` adapter discovery for Quanto runtime
+  quantization, including capability metadata, backend inventory, a narrow
+  example-only CUDA runtime image, and a runnable Quanto integration example
+  with host/off and CUDA/container strict lanes.
+- Added optional `hf_ct` adapter discovery for compressed-tensors
+  pre-quantized checkpoints, including capability metadata, backend inventory,
+  and a narrow example-only CUDA runtime image smoke path.
 
 ### Changed
 
@@ -56,9 +71,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dataset identifiers, stale pack-staging report ignores, and Qwen14 sentinel
   cleanup guidance.
 - Updated quantized adapter documentation and runtime image guidance around
-  GPTQModel-backed GPTQ/AWQ loaders and platform-dependent BNB loading.
+  GPTQModel-backed GPTQ/AWQ loaders, platform-dependent BNB loading, and
+  torchao runtime quantization.
 - Updated quant runtime image builds to use portable build dependencies, a CUDA
   devel base, and a retained JIT toolchain for quantized adapter evidence paths.
+- Expanded CUDA quant runtime-image smoke coverage across BNB, GPTQModel-backed
+  GPTQ/AWQ, TorchAO, HQQ, Quanto, and compressed-tensors adapter families.
 - Re-scoped grouped evidence evaluation to the simpler ungrouped path after
   remote timing showed no useful default speedup.
 - Consolidated run-orchestrator execution helpers and reporting render/context
@@ -1134,7 +1152,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Prevents re-quantization when loading saved BNB checkpoints
 - **Quantization-aware auto-adapter routing**
   - `_detect_quantization_from_path()` and `_detect_quantization_from_model()` in `auto.py`
-  - Auto-routes to `hf_bnb`, `hf_awq`, or `hf_gptq` based on checkpoint metadata
+  - Auto-routes to quantized HF adapters based on checkpoint metadata
 - **Comprehensive adapter test coverage** (46 new tests)
   - `test_capabilities.py` - QuantizationMethod, QuantizationConfig, ModelCapabilities
   - `test_safe_device.py` - Safe device movement and capability detection

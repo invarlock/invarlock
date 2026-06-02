@@ -230,8 +230,10 @@ pip install invarlock
 pip install "invarlock[hf]"
 ```
 
-Optional extras: `invarlock[probes]`, `invarlock[gpu]`, `invarlock[awq,gptq]`.
-The `awq` and `gptq` extras use GPTQModel-backed subject loading. Full setup:
+Optional extras: `invarlock[probes]`, `invarlock[gpu]`,
+`invarlock[awq,gptq]`, `invarlock[torchao]`, `invarlock[hqq]`,
+`invarlock[quanto]`, and `invarlock[compressed-tensors]`. The `awq` and
+`gptq` extras use GPTQModel-backed subject loading. Full setup:
 <https://invarlock.github.io/invarlock/0.9.0/user-guide/getting-started/>.
 
 The minimal install covers the core verification and reporting flows. Add
