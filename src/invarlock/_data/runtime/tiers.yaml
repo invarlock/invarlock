@@ -1,8 +1,8 @@
 # Tier policy defaults (metrics gates + guard knobs) used at runtime.
 #
 # Balanced and Conservative values are calibrated/validated against pilot/null
-# runs (Nov/Dec 2025) where applicable; Aggressive is research-oriented (not in
-# the safety case).
+# runs (Nov/Dec 2025) where applicable; Aggressive is research-oriented and
+# outside the current assurance case.
 #
 # Rationale by key: docs/reference/tier-policy-catalog.md
 # Calibration method: docs/assurance/09-tier-v1-calibration.md

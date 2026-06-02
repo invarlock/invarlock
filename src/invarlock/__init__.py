@@ -1,13 +1,13 @@
 """
-InvarLock: auditable release gates for edited model checkpoints
-===============================================================
+InvarLock: auditable strict verification for edited model checkpoints
+=====================================================================
 
 Core runtime package — torch-independent utilities, configuration, and interfaces.
 
 This package provides the foundation for the InvarLock GuardChain without heavy dependencies.
 For torch-dependent functionality, see subpackages under `invarlock.*`:
 - `invarlock.adapters`: Model adapters (HF causal/MLM/seq2seq + auto)
-- `invarlock.guards`: Safety mechanisms (invariants, spectral, RMT, variance)
+- `invarlock.guards`: Guard mechanisms (invariants, spectral, RMT, variance)
 - `invarlock.edits`: Built-in quantization and edit interfaces
 - `invarlock.eval`: Metrics, guard-overhead checks, and evaluation reporting
 """
