@@ -8,7 +8,7 @@
   </picture>
 </p>
 
-<p align="center"><em>Auditable release gates for edited model checkpoints</em></p>
+<p align="center"><em>Auditable strict verification for edited model checkpoints</em></p>
 
 <p align="center">
   <a href="https://github.com/invarlock/invarlock/actions/workflows/ci.yml">
@@ -49,7 +49,7 @@ fixtures for dense magnitude pruning and LoRA-merge style subjects under
 tiny GPT-2 quantization smoke.
 
 The `public_evidence/` tree separates verifier fixtures from real runs. Fixtures
-prove report, runtime-manifest, failure-policy, and evidence-pack contracts;
+validate report, runtime-manifest, failure-policy, and evidence-pack contracts;
 `public_evidence/real_runs/` contains concrete GPT-2-family `invarlock evaluate`
 runs with signed, fingerprint-pinned evidence packs.
 
@@ -264,7 +264,7 @@ If you use InvarLock in scientific work, please cite it (canonical metadata is i
 
 ```bibtex
 @software{invarlock,
-  title  = {InvarLock: Auditable release gates for edited model checkpoints},
+  title  = {InvarLock: Auditable strict verification for edited model checkpoints},
   author = {{InvarLock}},
   url    = {https://github.com/invarlock/invarlock},
 }
@@ -272,9 +272,9 @@ If you use InvarLock in scientific work, please cite it (canonical metadata is i
 
 ## Limitations
 
-- InvarLock evaluates an edited model relative to a baseline under a specific configuration; results are not “global” guarantees.
-- Not a content-safety/alignment tool.
-- Native Windows is not supported (use WSL2 or Linux).
+- Results are baseline-relative to a specific configuration and evidence profile.
+- The project scope is edited-checkpoint regression evidence; content-safety and alignment assessment are outside that scope.
+- Linux is the primary support target; Windows users should use WSL2 or Linux.
 
 ## Support matrix
 
