@@ -121,7 +121,47 @@ def test_runtime_image_quant_cuda_requirements_are_hash_locked() -> None:
     assert "--hash=sha256:" in text
     assert "bitsandbytes==" in text
     assert "gptqmodel==" in text
+    assert "hqq==" in text
+    assert "optimum-quanto==" in text
+    assert "compressed-tensors==" in text
+    assert "torchao==" in text
     assert "autoawq==" not in text
+
+
+def test_cuda_quant_runtime_smoke_covers_supported_quant_adapters() -> None:
+    root = Path.cwd()
+    makefile_text = (root / "Makefile").read_text(encoding="utf-8")
+    smoke_text = (
+        root
+        / "examples"
+        / "integrations"
+        / "_runtime_images"
+        / "quant_runtime_image_smoke.py"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "examples/integrations/_runtime_images/quant_runtime_image_smoke.py"
+        in makefile_text
+    )
+    for adapter in (
+        "hf_bnb",
+        "hf_awq",
+        "hf_gptq",
+        "hf_torchao",
+        "hf_hqq",
+        "hf_quanto",
+        "hf_ct",
+    ):
+        assert adapter in smoke_text
+    for backend in (
+        "bitsandbytes",
+        "gptqmodel",
+        "torchao",
+        "hqq",
+        "optimum.quanto",
+        "compressed_tensors",
+    ):
+        assert backend in smoke_text
 
 
 def test_current_quant_dependency_surfaces_do_not_pin_autoawq() -> None:

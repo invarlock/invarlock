@@ -1,0 +1,2 @@
+-r ../../../../requirements/workflows/runtime-image.in
+bitsandbytes>=0.41
