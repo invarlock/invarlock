@@ -2,12 +2,38 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+INTEGRATIONS_DIR = REPO_ROOT / "examples" / "integrations"
 PEFT_DIR = REPO_ROOT / "examples" / "integrations" / "peft_lora"
 TORCHAO_DIR = REPO_ROOT / "examples" / "integrations" / "torchao_int8_runtime"
+
+EXAMPLE_RUNNERS = [
+    INTEGRATIONS_DIR / "awq" / "run_tiny_awq.sh",
+    INTEGRATIONS_DIR / "compressed_tensors" / "run_tiny_hf_ct.sh",
+    INTEGRATIONS_DIR / "gptqmodel" / "run_tiny_gptqmodel.sh",
+    INTEGRATIONS_DIR / "hf_bnb" / "run_tiny_hf_bnb_8bit.sh",
+    INTEGRATIONS_DIR / "hqq" / "run_tiny_hf_hqq.sh",
+    INTEGRATIONS_DIR / "lm_eval_harness" / "run_tiny_lm_eval_sidecar.sh",
+    INTEGRATIONS_DIR / "peft_lora" / "run_tiny_peft_lora.sh",
+    INTEGRATIONS_DIR / "quanto" / "run_tiny_hf_quanto.sh",
+    INTEGRATIONS_DIR / "torchao_int8_runtime" / "run_tiny_hf_torchao_int8.sh",
+]
+
+README_EXAMPLES = [
+    "awq",
+    "compressed_tensors",
+    "gptqmodel",
+    "hf_bnb",
+    "hqq",
+    "lm_eval_harness",
+    "peft_lora",
+    "quanto",
+    "torchao_int8_runtime",
+]
 
 
 def _load_module(path: Path, module_name: str):
@@ -112,13 +138,120 @@ def test_integration_example_readmes_document_run_lanes() -> None:
     assert "verifier status, runtime provenance status" in lm_eval_text
 
 
+def test_integration_runners_default_reports_are_lane_scoped() -> None:
+    for runner in EXAMPLE_RUNNERS:
+        subprocess.run(["bash", "-n", str(runner)], check=True)
+
+        text = runner.read_text(encoding="utf-8")
+        assert "<artifact-lane>" in text, f"{runner} missing help contract"
+        assert "report_out_was_default=1" in text, f"{runner} missing default flag"
+        assert "report_out_was_default=0" in text, f"{runner} missing override flag"
+        assert "integration_lane_report_out" in text, f"{runner} missing lane output"
+
+
+def test_integration_readmes_use_run_lane_subsections() -> None:
+    for example in README_EXAMPLES:
+        readme = INTEGRATIONS_DIR / example / "README.md"
+        text = readme.read_text(encoding="utf-8")
+
+        assert "## Run\n\n## Lane Support" not in text
+        assert "## Run\n\n### Lane Support" in text
+
+
+def test_integration_readme_report_paths_are_lane_scoped() -> None:
+    for example in README_EXAMPLES:
+        readme = INTEGRATIONS_DIR / example / "README.md"
+        text = readme.read_text(encoding="utf-8")
+        report_paths = re.findall(r"`(reports/tiny-[^`]+)`", text)
+
+        assert report_paths, f"{example} README has no report artifact paths"
+        for report_path in report_paths:
+            assert "/<artifact-lane>/" in report_path, (
+                f"{example} report path is not lane-scoped: {report_path}"
+            )
+
+
+def test_strict_evidence_claim_readmes_have_artifact_source_matrix() -> None:
+    expected_sources = {
+        "awq": "build_example_runtime_image.sh cuda-gptqmodel",
+        "gptqmodel": "build_example_runtime_image.sh cuda-gptqmodel",
+        "hf_bnb": "build_example_runtime_image.sh cuda-bnb",
+        "peft_lora": "make runtime-image-cuda",
+        "torchao_int8_runtime": "build_example_runtime_image.sh cuda-torchao",
+    }
+
+    claimed_readmes = {}
+    for readme in INTEGRATIONS_DIR.rglob("README.md"):
+        text = readme.read_text(encoding="utf-8")
+        if "strict container evidence is verified" in text:
+            claimed_readmes[readme.parent.name] = text
+
+    assert set(claimed_readmes) == set(expected_sources)
+
+    for example, source_command in expected_sources.items():
+        text = claimed_readmes[example]
+
+        assert source_command in text
+        assert "INVARLOCK_RUNTIME_IMAGE=" in text
+        assert "`cuda-container-strict`" in text
+        assert "`runtime.manifest.json`" in text
+        assert "/<artifact-lane>/" in text
+        assert "evaluation.report.json" in text
+        assert "verify.json" in text
+        assert "lane_artifact.json" in text
+        assert "run_command.txt" in text
+        assert "run_summary.txt" in text
+
+
+def test_materialized_subject_readmes_define_evidence_boundary() -> None:
+    expectations = {
+        "awq": ["`hf_awq`", "`external_edit_summary.json`"],
+        "compressed_tensors": ["`hf_ct`", "`adapter_runtime_summary.json`"],
+        "gptqmodel": ["`hf_gptq`", "`external_edit_summary.json`"],
+        "peft_lora": ["`hf_causal`", "`external_edit_summary.json`"],
+    }
+
+    for example, phrases in expectations.items():
+        text = (INTEGRATIONS_DIR / example / "README.md").read_text(encoding="utf-8")
+
+        assert "## Evidence Boundary" in text, f"{example} lacks evidence boundary"
+        assert "The subject checkpoint is materialized before" in text
+        assert "verifier result for that\nproduced subject" in text
+        for phrase in phrases:
+            assert phrase in text
+
+
+def test_torchao_readme_documents_backend_inventory_sidecar() -> None:
+    text = (TORCHAO_DIR / "README.md").read_text(encoding="utf-8")
+
+    assert (
+        "`reports/tiny-hf-torchao-int8/<artifact-lane>/backend_inventory.json`" in text
+    )
+    assert "`backend_inventory.json` is emitted by InvarLock report persistence" in text
+    assert "adapter provenance is available" in text
+
+
+def test_shared_example_docs_scope_source_archives_and_image_digests() -> None:
+    shared_readme = (
+        REPO_ROOT / "examples" / "integrations" / "_shared" / "README.md"
+    ).read_text(encoding="utf-8")
+    image_readme = (
+        REPO_ROOT / "examples" / "integrations" / "_runtime_images" / "README.md"
+    ).read_text(encoding="utf-8")
+
+    assert "Use `--committed` when sharing an archive" in shared_readme
+    assert "Use `--include-worktree` only" in shared_readme
+    assert "deliberately including local changes" in shared_readme
+    assert "may produce a different image digest" in image_readme
+    assert "digest recorded in `runtime.manifest.json`" in image_readme
+
+
 def test_peft_readme_scopes_strict_evidence_to_tiny_runtime() -> None:
     text = (PEFT_DIR / "README.md").read_text(encoding="utf-8")
 
     assert "strict container evidence is verified on CUDA for this tiny" in text
-    assert "not a blanket claim" in text
-    assert "Rerun the strict lane" in text
-    assert "for the target runtime" in text
+    assert "scoped to the configured tiny merged dense checkpoint" in text
+    assert "shared integration evidence" in text
 
 
 def test_integration_example_docs_use_canonical_lane_wording() -> None:
@@ -180,6 +313,10 @@ def test_shared_compare_wrapper_checks_report_materialization() -> None:
     assert "integration_log_kv" in text
     assert "integration_default_host_device" in text
     assert "integration_lane_artifact_label" in text
+    assert "integration_lane_report_out" in text
+    assert "report_out_was_default=1" in text
+    assert "report_out_was_default=0" in text
+    assert "<artifact-lane>" in text
 
 
 def test_shared_source_archive_helper_avoids_macos_xattrs() -> None:
@@ -215,6 +352,7 @@ def test_shared_preflight_helper_defines_host_lane_contract() -> None:
     assert "integration_preflight_host_cuda_device" in text
     assert "integration_preflight_gptqmodel_host_runtime" in text
     assert "integration_lane_artifact_label" in text
+    assert "integration_lane_report_out" in text
     assert "integration_effective_assurance" in text
     assert "integration_log_header" in text
     assert "integration_log_step" in text
@@ -257,9 +395,8 @@ def test_torchao_readme_frames_hf_torchao_as_primary_path() -> None:
     assert "strict container evidence is verified" in text
     assert "this tiny\n`hf_torchao` runtime-load example" in text
     assert "runnable evidence path is the `hf_torchao` subject" in text
-    assert "does not claim blanket strict support" in text
-    assert "rerun the strict lane" in text
-    assert "for the target runtime" in text
+    assert "scoped to the configured tiny HF checkpoint" in text
+    assert "shared integration evidence" in text
     assert "run_tiny_hf_torchao_int8.sh" in text
 
 

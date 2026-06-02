@@ -29,11 +29,11 @@ uv run --extra quanto python -c "import optimum.quanto"
 
 ## Run
 
-## Lane Support
+### Lane Support
 
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
-| `cuda-container-strict` | `--lane cuda` | Primary review path with the example-only Quanto image. |
+| `cuda-container-strict` | `--lane cuda` | Primary evidence path with the example-specific Quanto image. |
 | `cuda-host-off` | `--lane host --device cuda` | Secondary local CUDA comparison path without strict container evidence. |
 | `cpu-host-off` | `--lane host --device cpu` | Secondary local non-CUDA bring-up when the installed Quanto backend supports CPU. |
 
@@ -43,7 +43,7 @@ the backend run.
 
 ### cuda-container-strict lane
 
-Build and smoke the example-only Quanto image, then run this lane on a CUDA host
+Build and check the example-specific Quanto image, then run this lane on a CUDA host
 with that image configured:
 
 ```bash
@@ -59,11 +59,10 @@ uv run --extra quanto \
 ```
 
 Use the digest-pinned image reference recorded in `runtime.manifest.json` when
-the strict container artifact will be shared for review.
-This proves the configured tiny `hf_quanto` runtime-load subject and image; it
-is not a blanket claim for every Quanto version, kernel path, model shape, or
-runtime image. Rerun the strict lane for the target runtime before using the
-artifact as review evidence.
+the strict container artifact will be shared externally.
+This strict lane is scoped to the configured tiny `hf_quanto` runtime-load
+subject and image. Rerun the strict lane for the target runtime before using the
+artifact as shared integration evidence.
 
 ### cpu-host-off lane
 
@@ -78,14 +77,14 @@ uv run --extra quanto \
   --device cpu
 ```
 
-Use this lane for local dependency bring-up and non-CUDA smoke runs when the
+Use this lane for local dependency setup and non-CUDA compatibility runs when the
 installed Quanto backend supports the selected host.
 
 For `cuda-host-off` evaluation, use the same command with `--device cuda`.
 
 ## Outputs
 
-The runner writes generated outputs under ignored local directories:
+The runner writes generated outputs under local output directories:
 
 | Path | Role |
 | --- | --- |
@@ -93,20 +92,20 @@ The runner writes generated outputs under ignored local directories:
 | `artifacts/tiny-hf-quanto/tiny_causal_text.jsonl` | Deterministic local text fixture for evaluation. |
 | `artifacts/tiny-hf-quanto/preset.yaml` | Generated preset pointing at the local fixture. |
 | `artifacts/tiny-hf-quanto/fixture_summary.json` | Fixture parameters and file hashes. |
-| `reports/tiny-hf-quanto/evaluation.report.json` | Canonical verifier input. |
-| `reports/tiny-hf-quanto/verify.json` | Machine-readable verifier result. |
-| `reports/tiny-hf-quanto/evaluation.html` | Human-readable report. |
-| `reports/tiny-hf-quanto/backend_inventory.json` | Quanto backend version and quantized module inventory when exposed. |
-| `reports/tiny-hf-quanto/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
-| `reports/tiny-hf-quanto/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
-| `reports/tiny-hf-quanto/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
-| `reports/tiny-hf-quanto/checkpoint_refs.json` | Baseline and subject checkpoint references. |
-| `reports/tiny-hf-quanto/adapter_runtime_summary.json` | `hf_quanto` runtime adapter metadata, quantization settings, and file hashes. |
+| `reports/tiny-hf-quanto/<artifact-lane>/evaluation.report.json` | Canonical verifier input. |
+| `reports/tiny-hf-quanto/<artifact-lane>/verify.json` | Machine-readable verifier result. |
+| `reports/tiny-hf-quanto/<artifact-lane>/evaluation.html` | Human-readable report. |
+| `reports/tiny-hf-quanto/<artifact-lane>/backend_inventory.json` | Quanto backend version and quantized module inventory when exposed. |
+| `reports/tiny-hf-quanto/<artifact-lane>/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
+| `reports/tiny-hf-quanto/<artifact-lane>/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
+| `reports/tiny-hf-quanto/<artifact-lane>/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
+| `reports/tiny-hf-quanto/<artifact-lane>/checkpoint_refs.json` | Baseline and subject checkpoint references. |
+| `reports/tiny-hf-quanto/<artifact-lane>/adapter_runtime_summary.json` | `hf_quanto` runtime adapter metadata, quantization settings, and file hashes. |
 
 A successful run ends with the shared completion block documented in
 `examples/integrations/_shared/README.md#expected-run-output`. If a run fails,
 check the prerequisite message first, then inspect
-`reports/tiny-hf-quanto/run_command.txt`.
+`reports/tiny-hf-quanto/<artifact-lane>/run_command.txt`.
 
 The example uses Quanto runtime quantization through the HF load path, so the
 subject remains an HF-loadable checkpoint plus adapter runtime configuration

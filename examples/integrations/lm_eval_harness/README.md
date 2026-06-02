@@ -33,13 +33,13 @@ fine:
 
 ## Run
 
-## Lane Support
+### Lane Support
 
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
 | `cuda-container-strict` | Paired InvarLock comparison with `--lane cuda` | Primary verifier-evidence path; not produced by the sidecar itself. |
 | `cuda-host-off` | `--device cuda` | Secondary CUDA sidecar task-score run with host dependencies. |
-| `cpu-host-off` | `--device cpu` | Portable sidecar smoke run. |
+| `cpu-host-off` | `--device cpu` | Portable sidecar quick check. |
 | `mps-host-off` | `--device mps` | Apple Silicon sidecar task-score run when the harness environment supports MPS. |
 
 Treat the paired InvarLock `cuda-container-strict` run as the primary evidence
@@ -64,11 +64,12 @@ examples/integrations/_shared/run_invarlock_compare.sh \
   --allow-network
 ```
 
-Use the InvarLock verifier result for the release-gate claim, and use
-`lm_eval_sidecar_summary.json` for task-score context. For local debug, use the
-same comparison with `--lane host`. Do not use an identical baseline and subject
-as a placeholder for this paired run; the verifier can correctly fail that as a
-non-edit comparison instead of producing useful regression evidence.
+Use the InvarLock verifier result as the strict regression evidence, and use
+`lm_eval_sidecar_summary.json` for task-score context. For a host-side
+comparison, use the same command with `--lane host`. Do not use an identical
+baseline and subject as a placeholder for this paired run; the verifier can
+correctly fail that as a non-edit comparison instead of producing useful
+regression evidence.
 
 ### cpu-host-off lane
 
@@ -92,7 +93,7 @@ examples/integrations/lm_eval_harness/run_tiny_lm_eval_sidecar.sh \
   --force
 ```
 
-The default is `--device cpu` for portable smoke runs.
+The default is `--device cpu` for portable quick checks.
 
 ### cuda-host-off lane
 
@@ -112,20 +113,20 @@ examples/integrations/lm_eval_harness/run_tiny_lm_eval_sidecar.sh \
 Use `--device mps` on Apple Silicon when the local harness environment supports
 it. That writes an `mps-host-off` sidecar summary. This sidecar does not produce
 InvarLock runtime provenance; pair it with a `cuda-container-strict` InvarLock
-run for the release-gate evidence claim.
+run for the strict evidence record.
 
 ## Outputs
 
-The runner writes generated outputs under ignored local directories:
+The runner writes generated outputs under local output directories:
 
 | Path | Role |
 | --- | --- |
-| `reports/tiny-lm-eval-sidecar/baseline/` | Raw LM Eval output directory for the baseline. |
-| `reports/tiny-lm-eval-sidecar/subject/` | Raw LM Eval output directory for the optional subject. |
-| `reports/tiny-lm-eval-sidecar/lm_eval_sidecar_summary.json` | Compact sidecar summary with task metrics, lane label, and optional baseline-vs-subject deltas. |
-| `reports/tiny-lm-eval-sidecar/run_command.txt` | Runner invocation and LM Eval commands. |
-| `reports/tiny-lm-eval-sidecar/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
+| `reports/tiny-lm-eval-sidecar/<artifact-lane>/baseline/` | Raw LM Eval output directory for the baseline. |
+| `reports/tiny-lm-eval-sidecar/<artifact-lane>/subject/` | Raw LM Eval output directory for the optional subject. |
+| `reports/tiny-lm-eval-sidecar/<artifact-lane>/lm_eval_sidecar_summary.json` | Compact sidecar summary with task metrics, lane label, and optional baseline-vs-subject deltas. |
+| `reports/tiny-lm-eval-sidecar/<artifact-lane>/run_command.txt` | Runner invocation and LM Eval commands. |
+| `reports/tiny-lm-eval-sidecar/<artifact-lane>/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
 
-The default `--limit 1` setting is intentionally a smoke-test setting. Remove or
-raise the limit only when you want meaningful task metrics and have recorded the
+The default `--limit 1` setting is intentionally minimal. Remove or raise the
+limit only when you want meaningful task metrics and have recorded the
 corresponding InvarLock regression artifacts separately.
