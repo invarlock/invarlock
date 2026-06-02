@@ -50,6 +50,9 @@ non-ignored files from the worktree. The worktree path sets
 `COPYFILE_DISABLE=1` and uses `--no-xattrs` when the local `tar` supports it,
 so macOS extended-attribute headers are not written into the tarball.
 
+Use `--committed` for external outreach archives. Use `--include-worktree` only
+for local pre-PR validation or when intentionally sharing uncommitted changes.
+
 ## Shared Compare Wrapper
 
 The shared script expects an already loadable baseline and subject:

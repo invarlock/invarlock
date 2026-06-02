@@ -11,7 +11,7 @@ Required:
 
 Options:
   --report-out DIR             Output directory for evaluation artifacts.
-                               Default: reports/integration
+                               Default: reports/integration/<artifact-lane>
   --baseline-adapter NAME      Baseline adapter. Default: auto
   --subject-adapter NAME       Subject adapter. Default: auto
   --profile NAME               InvarLock profile. Default: ci
@@ -38,6 +38,7 @@ USAGE
 baseline=""
 subject=""
 report_out="reports/integration"
+report_out_was_default=1
 baseline_adapter="auto"
 subject_adapter="auto"
 profile="ci"
@@ -70,6 +71,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --report-out)
       report_out="${2:-}"
+      report_out_was_default=0
       shift 2
       ;;
     --baseline-adapter)
@@ -175,6 +177,9 @@ fi
 device="$(integration_default_host_device "$execution_mode" "$device")"
 lane_artifact_label="$(
   integration_lane_artifact_label "$execution_mode" "$assurance" "$device"
+)"
+report_out="$(
+  integration_lane_report_out "$report_out" "$report_out_was_default" "$lane_artifact_label"
 )"
 integration_log_header "InvarLock integration compare"
 integration_log_kv "lane" "$lane_artifact_label"

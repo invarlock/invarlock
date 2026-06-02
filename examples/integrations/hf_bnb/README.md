@@ -33,7 +33,7 @@ uv run --extra hf --extra gpu python -c "import bitsandbytes"
 
 ## Run
 
-## Lane Support
+### Lane Support
 
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
@@ -100,18 +100,18 @@ The runner writes generated outputs under ignored local directories:
 | `artifacts/tiny-hf-bnb-8bit/tiny_causal_text.jsonl` | Deterministic local text fixture for the CI-sized comparison. |
 | `artifacts/tiny-hf-bnb-8bit/preset.yaml` | Generated preset pointing at the local fixture. |
 | `artifacts/tiny-hf-bnb-8bit/fixture_summary.json` | Fixture parameters and file hashes. |
-| `reports/tiny-hf-bnb-8bit/evaluation.report.json` | Canonical verifier input. |
-| `reports/tiny-hf-bnb-8bit/verify.json` | Machine-readable verifier result. |
-| `reports/tiny-hf-bnb-8bit/evaluation.html` | Human-readable report. |
-| `reports/tiny-hf-bnb-8bit/backend_inventory.json` | bitsandbytes backend version, quantized module types, and smoke results. |
-| `reports/tiny-hf-bnb-8bit/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
-| `reports/tiny-hf-bnb-8bit/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
-| `reports/tiny-hf-bnb-8bit/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
+| `reports/tiny-hf-bnb-8bit/<artifact-lane>/evaluation.report.json` | Canonical verifier input. |
+| `reports/tiny-hf-bnb-8bit/<artifact-lane>/verify.json` | Machine-readable verifier result. |
+| `reports/tiny-hf-bnb-8bit/<artifact-lane>/evaluation.html` | Human-readable report. |
+| `reports/tiny-hf-bnb-8bit/<artifact-lane>/backend_inventory.json` | bitsandbytes backend version, quantized module types, and smoke results. |
+| `reports/tiny-hf-bnb-8bit/<artifact-lane>/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
+| `reports/tiny-hf-bnb-8bit/<artifact-lane>/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
+| `reports/tiny-hf-bnb-8bit/<artifact-lane>/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
 
 A successful run ends with the shared completion block documented in
 `examples/integrations/_shared/README.md#expected-run-output`. If a run fails,
 check the prerequisite message first, then inspect
-`reports/tiny-hf-bnb-8bit/run_command.txt`.
+`reports/tiny-hf-bnb-8bit/<artifact-lane>/run_command.txt`.
 
 The generated preset uses local JSONL data so the evaluation data path is
 offline after fixture creation. `--allow-network` is only needed for the HF

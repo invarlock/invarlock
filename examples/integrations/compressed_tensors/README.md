@@ -32,7 +32,7 @@ uv run --extra compressed-tensors python -c "import compressed_tensors"
 
 ## Run
 
-## Lane Support
+### Lane Support
 
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
@@ -86,6 +86,14 @@ compressed-tensors backend supports the selected host.
 
 For `cuda-host-off` evaluation, use the same command with `--device cuda`.
 
+## Evidence Boundary
+
+The subject checkpoint is materialized before the InvarLock comparison. The
+strict lane covers the configured baseline-vs-subject evaluation, `hf_ct`
+adapter load, guard evidence, runtime manifest, and verifier result for that
+produced subject. The compressed-tensors materialization step is represented by
+`adapter_runtime_summary.json` and checkpoint hashes.
+
 ## Outputs
 
 The runner writes generated outputs under ignored local directories:
@@ -97,20 +105,20 @@ The runner writes generated outputs under ignored local directories:
 | `artifacts/tiny-hf-ct/tiny_causal_text.jsonl` | Deterministic local text fixture for evaluation. |
 | `artifacts/tiny-hf-ct/preset.yaml` | Generated preset pointing at the local fixture. |
 | `artifacts/tiny-hf-ct/fixture_summary.json` | Fixture parameters and file hashes. |
-| `reports/tiny-hf-ct/evaluation.report.json` | Canonical verifier input. |
-| `reports/tiny-hf-ct/verify.json` | Machine-readable verifier result. |
-| `reports/tiny-hf-ct/evaluation.html` | Human-readable report. |
-| `reports/tiny-hf-ct/backend_inventory.json` | compressed-tensors backend version and module inventory when exposed. |
-| `reports/tiny-hf-ct/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
-| `reports/tiny-hf-ct/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
-| `reports/tiny-hf-ct/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
-| `reports/tiny-hf-ct/checkpoint_refs.json` | Baseline and subject checkpoint references. |
-| `reports/tiny-hf-ct/adapter_runtime_summary.json` | `hf_ct` adapter metadata, packed tensor inventory, quantization settings, and file hashes. |
+| `reports/tiny-hf-ct/<artifact-lane>/evaluation.report.json` | Canonical verifier input. |
+| `reports/tiny-hf-ct/<artifact-lane>/verify.json` | Machine-readable verifier result. |
+| `reports/tiny-hf-ct/<artifact-lane>/evaluation.html` | Human-readable report. |
+| `reports/tiny-hf-ct/<artifact-lane>/backend_inventory.json` | compressed-tensors backend version and module inventory when exposed. |
+| `reports/tiny-hf-ct/<artifact-lane>/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
+| `reports/tiny-hf-ct/<artifact-lane>/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
+| `reports/tiny-hf-ct/<artifact-lane>/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
+| `reports/tiny-hf-ct/<artifact-lane>/checkpoint_refs.json` | Baseline and subject checkpoint references. |
+| `reports/tiny-hf-ct/<artifact-lane>/adapter_runtime_summary.json` | `hf_ct` adapter metadata, packed tensor inventory, quantization settings, and file hashes. |
 
 A successful run ends with the shared completion block documented in
 `examples/integrations/_shared/README.md#expected-run-output`. If a run fails,
 check the prerequisite message first, then inspect
-`reports/tiny-hf-ct/run_command.txt`.
+`reports/tiny-hf-ct/<artifact-lane>/run_command.txt`.
 
 The subject checkpoint is produced with `compressed_tensors.compressors.ModelCompressor`
 and contains packed weight tensors plus the HF `quantization_config` metadata.

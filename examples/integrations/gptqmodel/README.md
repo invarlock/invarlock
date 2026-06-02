@@ -27,7 +27,7 @@ uv run --extra gptq python -c "import gptqmodel"
 
 ## Run
 
-## Lane Support
+### Lane Support
 
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
@@ -87,6 +87,14 @@ renderer.
 
 For `cuda-host-off` evaluation, use the same command with `--device cuda`.
 
+## Evidence Boundary
+
+The subject checkpoint is materialized before the InvarLock comparison. The
+strict lane covers the configured baseline-vs-subject evaluation, `hf_gptq`
+adapter load, guard evidence, runtime manifest, and verifier result for that
+produced subject. The GPTQModel materialization step is represented by
+`external_edit_summary.json` and checkpoint hashes.
+
 ## Outputs
 
 The runner writes generated outputs under ignored local directories:
@@ -98,20 +106,20 @@ The runner writes generated outputs under ignored local directories:
 | `artifacts/tiny-gptqmodel-fixture/tiny_causal_text.jsonl` | Deterministic local text fixture for evaluation and calibration. |
 | `artifacts/tiny-gptqmodel-fixture/preset.yaml` | Generated preset pointing at the local fixture. |
 | `artifacts/tiny-gptqmodel-fixture/fixture_summary.json` | Fixture parameters and file hashes. |
-| `reports/tiny-gptqmodel/evaluation.report.json` | Canonical verifier input. |
-| `reports/tiny-gptqmodel/verify.json` | Machine-readable verifier result. |
-| `reports/tiny-gptqmodel/evaluation.html` | Human-readable report. |
-| `reports/tiny-gptqmodel/backend_inventory.json` | GPTQModel backend version and quantized module inventory when exposed. |
-| `reports/tiny-gptqmodel/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
-| `reports/tiny-gptqmodel/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
-| `reports/tiny-gptqmodel/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
-| `reports/tiny-gptqmodel/checkpoint_refs.json` | Baseline and subject checkpoint references. |
-| `reports/tiny-gptqmodel/external_edit_summary.json` | GPTQModel quantization metadata and checkpoint file hashes. |
+| `reports/tiny-gptqmodel/<artifact-lane>/evaluation.report.json` | Canonical verifier input. |
+| `reports/tiny-gptqmodel/<artifact-lane>/verify.json` | Machine-readable verifier result. |
+| `reports/tiny-gptqmodel/<artifact-lane>/evaluation.html` | Human-readable report. |
+| `reports/tiny-gptqmodel/<artifact-lane>/backend_inventory.json` | GPTQModel backend version and quantized module inventory when exposed. |
+| `reports/tiny-gptqmodel/<artifact-lane>/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
+| `reports/tiny-gptqmodel/<artifact-lane>/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
+| `reports/tiny-gptqmodel/<artifact-lane>/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
+| `reports/tiny-gptqmodel/<artifact-lane>/checkpoint_refs.json` | Baseline and subject checkpoint references. |
+| `reports/tiny-gptqmodel/<artifact-lane>/external_edit_summary.json` | GPTQModel quantization metadata and checkpoint file hashes. |
 
 A successful run ends with the shared completion block documented in
 `examples/integrations/_shared/README.md#expected-run-output`. If a run fails,
 check the prerequisite message first, then inspect
-`reports/tiny-gptqmodel/run_command.txt`.
+`reports/tiny-gptqmodel/<artifact-lane>/run_command.txt`.
 
 The helper fails if GPTQModel does not produce a quantized checkpoint
 configuration or if the subject cannot be loaded back through GPTQModel.

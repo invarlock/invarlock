@@ -34,7 +34,7 @@ fine:
 
 ## Run
 
-## Lane Support
+### Lane Support
 
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
@@ -98,22 +98,25 @@ The runner writes generated outputs under ignored local directories:
 | `artifacts/tiny-hf-torchao-int8/tiny_causal_text.jsonl` | Deterministic local text fixture for evaluation. |
 | `artifacts/tiny-hf-torchao-int8/preset.yaml` | Generated preset pointing at the local fixture. |
 | `artifacts/tiny-hf-torchao-int8/fixture_summary.json` | Fixture parameters and file hashes. |
-| `reports/tiny-hf-torchao-int8/evaluation.report.json` | Canonical verifier input. |
-| `reports/tiny-hf-torchao-int8/verify.json` | Machine-readable verifier result. |
-| `reports/tiny-hf-torchao-int8/evaluation.html` | Human-readable report. |
-| `reports/tiny-hf-torchao-int8/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
-| `reports/tiny-hf-torchao-int8/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
-| `reports/tiny-hf-torchao-int8/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
-| `reports/tiny-hf-torchao-int8/checkpoint_refs.json` | Baseline and subject checkpoint references. |
-| `reports/tiny-hf-torchao-int8/adapter_runtime_summary.json` | `hf_torchao` runtime adapter metadata, quantization probe, and file hashes. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/evaluation.report.json` | Canonical verifier input. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/verify.json` | Machine-readable verifier result. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/evaluation.html` | Human-readable report. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/backend_inventory.json` | torchao backend version and quantized module inventory when adapter provenance is available. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/checkpoint_refs.json` | Baseline and subject checkpoint references. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/adapter_runtime_summary.json` | `hf_torchao` runtime adapter metadata, quantization probe, and file hashes. |
 
 A successful run ends with the shared completion block documented in
 `examples/integrations/_shared/README.md#expected-run-output`. If a run fails,
 check the prerequisite message first, then inspect
-`reports/tiny-hf-torchao-int8/run_command.txt`.
+`reports/tiny-hf-torchao-int8/<artifact-lane>/run_command.txt`.
 
 The preparer fails if `torchao` does not produce quantized tensor-backed weights
 or if runtime quantization has no measurable weight delta.
+`backend_inventory.json` is emitted by InvarLock report persistence when adapter
+provenance is available; the shell runner does not write that sidecar directly.
 
 ## Public Evidence Anchor
 

@@ -28,7 +28,7 @@ uv run --extra hqq python -c "import hqq"
 
 ## Run
 
-## Lane Support
+### Lane Support
 
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
@@ -92,20 +92,20 @@ The runner writes generated outputs under ignored local directories:
 | `artifacts/tiny-hf-hqq/tiny_causal_text.jsonl` | Deterministic local text fixture for evaluation. |
 | `artifacts/tiny-hf-hqq/preset.yaml` | Generated preset pointing at the local fixture. |
 | `artifacts/tiny-hf-hqq/fixture_summary.json` | Fixture parameters and file hashes. |
-| `reports/tiny-hf-hqq/evaluation.report.json` | Canonical verifier input. |
-| `reports/tiny-hf-hqq/verify.json` | Machine-readable verifier result. |
-| `reports/tiny-hf-hqq/evaluation.html` | Human-readable report. |
-| `reports/tiny-hf-hqq/backend_inventory.json` | HQQ backend version and quantized module inventory when exposed. |
-| `reports/tiny-hf-hqq/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
-| `reports/tiny-hf-hqq/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
-| `reports/tiny-hf-hqq/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
-| `reports/tiny-hf-hqq/checkpoint_refs.json` | Baseline and subject checkpoint references. |
-| `reports/tiny-hf-hqq/adapter_runtime_summary.json` | `hf_hqq` runtime adapter metadata, quantization settings, and file hashes. |
+| `reports/tiny-hf-hqq/<artifact-lane>/evaluation.report.json` | Canonical verifier input. |
+| `reports/tiny-hf-hqq/<artifact-lane>/verify.json` | Machine-readable verifier result. |
+| `reports/tiny-hf-hqq/<artifact-lane>/evaluation.html` | Human-readable report. |
+| `reports/tiny-hf-hqq/<artifact-lane>/backend_inventory.json` | HQQ backend version and quantized module inventory when exposed. |
+| `reports/tiny-hf-hqq/<artifact-lane>/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
+| `reports/tiny-hf-hqq/<artifact-lane>/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
+| `reports/tiny-hf-hqq/<artifact-lane>/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
+| `reports/tiny-hf-hqq/<artifact-lane>/checkpoint_refs.json` | Baseline and subject checkpoint references. |
+| `reports/tiny-hf-hqq/<artifact-lane>/adapter_runtime_summary.json` | `hf_hqq` runtime adapter metadata, quantization settings, and file hashes. |
 
 A successful run ends with the shared completion block documented in
 `examples/integrations/_shared/README.md#expected-run-output`. If a run fails,
 check the prerequisite message first, then inspect
-`reports/tiny-hf-hqq/run_command.txt`.
+`reports/tiny-hf-hqq/<artifact-lane>/run_command.txt`.
 
 The example uses native HQQ runtime quantization after loading the HF checkpoint,
 so the subject remains an HF-loadable checkpoint plus adapter runtime

@@ -33,7 +33,7 @@ uv run --extra awq python -c "import gptqmodel"
 
 ## Run
 
-## Lane Support
+### Lane Support
 
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
@@ -85,6 +85,14 @@ The host path uses `--execution-mode host --assurance off` because the AWQ
 runtime depends on the selected CUDA host and installed GPTQModel wheel. To
 exercise a different AWQ backend, pass `--awq-backend VALUE`.
 
+## Evidence Boundary
+
+The subject checkpoint is materialized before the InvarLock comparison. The
+strict lane covers the configured baseline-vs-subject evaluation, `hf_awq`
+adapter load, guard evidence, runtime manifest, and verifier result for that
+produced subject. The AWQ materialization step is represented by
+`external_edit_summary.json` and checkpoint hashes.
+
 ## Generated Artifacts
 
 The default run writes ignored local artifacts under this directory:
@@ -96,19 +104,20 @@ The default run writes ignored local artifacts under this directory:
 | `artifacts/tiny-awq-fixture/tiny_causal_text.jsonl` | Deterministic local text fixture for evaluation and calibration. |
 | `artifacts/tiny-awq-fixture/preset.yaml` | Generated preset pointing at the local fixture. |
 | `artifacts/tiny-awq-fixture/fixture_summary.json` | Fixture parameters and file hashes. |
-| `reports/tiny-awq/evaluation.report.json` | Canonical verifier input. |
-| `reports/tiny-awq/verify.json` | Machine-readable verifier result. |
-| `reports/tiny-awq/evaluation.html` | Human-readable report. |
-| `reports/tiny-awq/backend_inventory.json` | GPTQModel backend version and AWQ module inventory when exposed. |
-| `reports/tiny-awq/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
-| `reports/tiny-awq/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
-| `reports/tiny-awq/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
-| `reports/tiny-awq/checkpoint_refs.json` | Baseline and subject checkpoint references. |
-| `reports/tiny-awq/external_edit_summary.json` | AWQ quantization metadata and checkpoint file hashes. |
+| `reports/tiny-awq/<artifact-lane>/evaluation.report.json` | Canonical verifier input. |
+| `reports/tiny-awq/<artifact-lane>/verify.json` | Machine-readable verifier result. |
+| `reports/tiny-awq/<artifact-lane>/evaluation.html` | Human-readable report. |
+| `reports/tiny-awq/<artifact-lane>/backend_inventory.json` | GPTQModel backend version and AWQ module inventory when exposed. |
+| `reports/tiny-awq/<artifact-lane>/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
+| `reports/tiny-awq/<artifact-lane>/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
+| `reports/tiny-awq/<artifact-lane>/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
+| `reports/tiny-awq/<artifact-lane>/checkpoint_refs.json` | Baseline and subject checkpoint references. |
+| `reports/tiny-awq/<artifact-lane>/external_edit_summary.json` | AWQ quantization metadata and checkpoint file hashes. |
 
 A successful run ends with the shared completion block documented in
 `examples/integrations/_shared/README.md#expected-run-output`. If a run fails,
-check the prerequisite message first, then inspect `reports/tiny-awq/run_command.txt`.
+check the prerequisite message first, then inspect
+`reports/tiny-awq/<artifact-lane>/run_command.txt`.
 
 The helper fails if CUDA is unavailable, if GPTQModel does not expose a
 quantized checkpoint configuration, or if the subject cannot be loaded back

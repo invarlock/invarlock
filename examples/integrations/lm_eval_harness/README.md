@@ -33,7 +33,7 @@ fine:
 
 ## Run
 
-## Lane Support
+### Lane Support
 
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
@@ -120,11 +120,11 @@ The runner writes generated outputs under ignored local directories:
 
 | Path | Role |
 | --- | --- |
-| `reports/tiny-lm-eval-sidecar/baseline/` | Raw LM Eval output directory for the baseline. |
-| `reports/tiny-lm-eval-sidecar/subject/` | Raw LM Eval output directory for the optional subject. |
-| `reports/tiny-lm-eval-sidecar/lm_eval_sidecar_summary.json` | Compact sidecar summary with task metrics, lane label, and optional baseline-vs-subject deltas. |
-| `reports/tiny-lm-eval-sidecar/run_command.txt` | Runner invocation and LM Eval commands. |
-| `reports/tiny-lm-eval-sidecar/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
+| `reports/tiny-lm-eval-sidecar/<artifact-lane>/baseline/` | Raw LM Eval output directory for the baseline. |
+| `reports/tiny-lm-eval-sidecar/<artifact-lane>/subject/` | Raw LM Eval output directory for the optional subject. |
+| `reports/tiny-lm-eval-sidecar/<artifact-lane>/lm_eval_sidecar_summary.json` | Compact sidecar summary with task metrics, lane label, and optional baseline-vs-subject deltas. |
+| `reports/tiny-lm-eval-sidecar/<artifact-lane>/run_command.txt` | Runner invocation and LM Eval commands. |
+| `reports/tiny-lm-eval-sidecar/<artifact-lane>/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
 
 The default `--limit 1` setting is intentionally a smoke-test setting. Remove or
 raise the limit only when you want meaningful task metrics and have recorded the

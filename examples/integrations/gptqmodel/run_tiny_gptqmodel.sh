@@ -16,7 +16,7 @@ Options:
   --fixture-dir DIR            Generated local JSONL/preset directory.
                                Default: examples/integrations/gptqmodel/artifacts/tiny-gptqmodel-fixture
   --report-out DIR             Output directory for InvarLock artifacts.
-                               Default: examples/integrations/gptqmodel/reports/tiny-gptqmodel
+                               Default: examples/integrations/gptqmodel/reports/tiny-gptqmodel/<artifact-lane>
   --tokenizer-source VALUE     Tokenizer ID or local path. Default: sshleifer/tiny-gpt2
   --profile NAME               InvarLock profile. Default: ci
   --tier NAME                  InvarLock tier. Default: balanced
@@ -45,6 +45,7 @@ baseline_dir="$SCRIPT_DIR/models/tiny-llama-baseline"
 subject_dir="$SCRIPT_DIR/models/tiny-llama-gptq-4bit"
 fixture_dir="$SCRIPT_DIR/artifacts/tiny-gptqmodel-fixture"
 report_out="$SCRIPT_DIR/reports/tiny-gptqmodel"
+report_out_was_default=1
 tokenizer_source="sshleifer/tiny-gpt2"
 profile="ci"
 tier="balanced"
@@ -74,6 +75,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --report-out)
       report_out="${2:-}"
+      report_out_was_default=0
       shift 2
       ;;
     --tokenizer-source)
@@ -158,6 +160,7 @@ effective_assurance="$(integration_effective_assurance "$lane" "$assurance")"
 device="$(integration_default_host_device "$effective_execution_mode" "$device")"
 effective_device="$(integration_effective_device "$lane" "$device")"
 lane_artifact_label="$(integration_lane_artifact_label "$effective_execution_mode" "$effective_assurance" "$effective_device")"
+report_out="$(integration_lane_report_out "$report_out" "$report_out_was_default" "$lane_artifact_label")"
 
 integration_log_header "GPTQModel integration example"
 integration_log_kv "lane" "$lane_artifact_label"

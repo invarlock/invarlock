@@ -47,3 +47,5 @@ examples/integrations/hqq/run_tiny_hf_hqq.sh --allow-network --force --lane cuda
 
 Strict shared artifacts should include the digest-pinned image reference recorded
 in `runtime.manifest.json`.
+Rebuilding an example image may produce a different image digest; shared strict
+artifacts should rely on the digest recorded in `runtime.manifest.json`.
