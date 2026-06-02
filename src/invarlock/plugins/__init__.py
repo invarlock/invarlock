@@ -520,16 +520,14 @@ class HF_HQQ_Adapter(_QuantizedCausalIntrospectionMixin, HFAdapterMixin, ModelAd
         self,
         quantization_config: Any,
     ) -> ModelCapabilities:
-        bits = 4
-        group_size: int | None = 64
         if isinstance(quantization_config, dict):
-            bits = int(quantization_config.get("nbits", 4) or 4)
+            raw_bits = quantization_config.get("nbits", 4)
             raw_group_size = quantization_config.get("group_size", 64)
-            group_size = int(raw_group_size) if raw_group_size is not None else None
         else:
-            bits = int(getattr(quantization_config, "nbits", 4) or 4)
+            raw_bits = getattr(quantization_config, "nbits", 4)
             raw_group_size = getattr(quantization_config, "group_size", 64)
-            group_size = int(raw_group_size) if raw_group_size is not None else None
+        bits = int(raw_bits or 4)
+        group_size = int(raw_group_size) if raw_group_size is not None else None
         return ModelCapabilities.for_hqq(bits=bits, group_size=group_size)
 
     def get_capabilities(self, model: Any) -> ModelCapabilities:
