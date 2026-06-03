@@ -154,9 +154,7 @@ def test_integration_example_readmes_document_run_lanes() -> None:
     assert "run_summary.txt" in lm_eval_text
     assert "verifier status, runtime provenance status" in lm_eval_text
 
-    peft_text = (integrations / "peft_lora" / "README.md").read_text(
-        encoding="utf-8"
-    )
+    peft_text = (integrations / "peft_lora" / "README.md").read_text(encoding="utf-8")
     assert "uv run --extra hf --with peft" in peft_text
 
 
