@@ -25,6 +25,8 @@ prerequisites, commands, and generated artifact list.
   labeling helpers.
 - `_shared/run_invarlock_compare.sh` is a reusable baseline-vs-subject wrapper
   for HF-loadable checkpoints and adapter-backed subject paths.
+- `_shared/validate_source_matrix_artifacts.py` checks generated strict-lane
+  artifact directories against `source_matrix.json`.
 - `_runtime_images/` contains example-only CUDA image definitions for optional
   quant backends. These images are not the regular InvarLock runtime images.
 
@@ -44,7 +46,15 @@ prerequisites, commands, and generated artifact list.
    the standard InvarLock CUDA runtime.
 4. Run `invarlock evaluate` against the baseline and subject.
 5. Run `invarlock verify --json` and render `evaluation.html`.
-6. Record the output paths and any backend limitations in the example README.
+6. Validate generated strict-lane artifacts against `source_matrix.json` when
+   using verified strict-evidence README claims:
+
+   ```bash
+   python examples/integrations/_shared/validate_source_matrix_artifacts.py \
+     --targets hqq quanto compressed_tensors
+   ```
+
+7. Record the output paths and any backend limitations in the example README.
 
 Use these examples as public, reproducible reference flows when discussing
 integrations with upstream projects. Each README should make the runnable status

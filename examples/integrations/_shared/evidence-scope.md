@@ -54,6 +54,8 @@ run.
 - `evaluation.html` was rendered from the same report.
 - `source_matrix.json` has an entry for any README that claims verified strict
   container evidence.
+- `validate_source_matrix_artifacts.py` passes against the generated strict-lane
+  artifact directory before treating that run as current evidence.
 - `lane_artifact.json` records `cuda-container-strict`.
 - `run_command.txt` records the wrapper, evaluate, verify, and render commands.
 - `run_summary.txt` records verifier and runtime-provenance status.
