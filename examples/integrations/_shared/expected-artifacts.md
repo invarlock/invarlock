@@ -23,17 +23,18 @@ evidence update intentionally promotes a small fixture into `public_evidence/`.
 ## Verification Commands
 
 ```bash
-invarlock verify --json reports/<target>/evaluation.report.json \
-  > reports/<target>/verify.json
+invarlock verify --json reports/<target>/<artifact-lane>/evaluation.report.json \
+  > reports/<target>/<artifact-lane>/verify.json
 
 invarlock report html \
-  -i reports/<target>/evaluation.report.json \
-  -o reports/<target>/evaluation.html
+  -i reports/<target>/<artifact-lane>/evaluation.report.json \
+  -o reports/<target>/<artifact-lane>/evaluation.html
 ```
 
 For release-profile strict verification, use:
 
 ```bash
 invarlock verify --profile release --assurance strict \
-  reports/<target>/evaluation.report.json
+  --runtime-provenance container \
+  reports/<target>/cuda-container-strict/evaluation.report.json
 ```

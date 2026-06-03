@@ -1,0 +1,183 @@
+{
+  "schema": "invarlock.integration_source_matrix.v1",
+  "description": "Machine-readable contract for integration READMEs that claim verified strict container evidence. Generated run artifacts stay outside source control; each entry records the target, strict lane, runtime image source, expected verifier/provenance status, and sidecars that a current run must produce.",
+  "entries": [
+    {
+      "target": "awq",
+      "readme": "examples/integrations/awq/README.md",
+      "runner": "examples/integrations/awq/run_tiny_awq.sh",
+      "status_label": "runnable",
+      "strict_claim_phrase": "strict container evidence is verified",
+      "subject_form": "materialized-checkpoint",
+      "subject_adapter": "hf_awq",
+      "lane": "cuda-container-strict",
+      "command_shape": "--lane cuda",
+      "report_path": "reports/tiny-awq/<artifact-lane>",
+      "runtime_image": {
+        "family": "cuda-gptqmodel",
+        "source_command": "examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-gptqmodel",
+        "digest_source": "runtime.manifest.json"
+      },
+      "expected": {
+        "lane_artifact_label": "cuda-container-strict",
+        "verify_status": "ok",
+        "runtime_provenance_declared": "container",
+        "runtime_provenance_verified": true
+      },
+      "required_artifacts": [
+        "evaluation.report.json",
+        "verify.json",
+        "runtime.manifest.json",
+        "evaluation.html",
+        "backend_inventory.json",
+        "lane_artifact.json",
+        "run_command.txt",
+        "run_summary.txt"
+      ],
+      "runner_enforcement": {
+        "backend_inventory": "--require-backend-inventory"
+      }
+    },
+    {
+      "target": "gptqmodel",
+      "readme": "examples/integrations/gptqmodel/README.md",
+      "runner": "examples/integrations/gptqmodel/run_tiny_gptqmodel.sh",
+      "status_label": "runnable",
+      "strict_claim_phrase": "strict container evidence is verified",
+      "subject_form": "materialized-checkpoint",
+      "subject_adapter": "hf_gptq",
+      "lane": "cuda-container-strict",
+      "command_shape": "--lane cuda",
+      "report_path": "reports/tiny-gptqmodel/<artifact-lane>",
+      "runtime_image": {
+        "family": "cuda-gptqmodel",
+        "source_command": "examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-gptqmodel",
+        "digest_source": "runtime.manifest.json"
+      },
+      "expected": {
+        "lane_artifact_label": "cuda-container-strict",
+        "verify_status": "ok",
+        "runtime_provenance_declared": "container",
+        "runtime_provenance_verified": true
+      },
+      "required_artifacts": [
+        "evaluation.report.json",
+        "verify.json",
+        "runtime.manifest.json",
+        "evaluation.html",
+        "backend_inventory.json",
+        "lane_artifact.json",
+        "run_command.txt",
+        "run_summary.txt"
+      ],
+      "runner_enforcement": {
+        "backend_inventory": "--require-backend-inventory"
+      }
+    },
+    {
+      "target": "hf_bnb",
+      "readme": "examples/integrations/hf_bnb/README.md",
+      "runner": "examples/integrations/hf_bnb/run_tiny_hf_bnb_8bit.sh",
+      "status_label": "runnable",
+      "strict_claim_phrase": "strict container evidence is verified",
+      "subject_form": "runtime-adapter",
+      "subject_adapter": "hf_bnb",
+      "lane": "cuda-container-strict",
+      "command_shape": "--lane cuda",
+      "report_path": "reports/tiny-hf-bnb-8bit/<artifact-lane>",
+      "runtime_image": {
+        "family": "cuda-bnb",
+        "source_command": "examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-bnb",
+        "digest_source": "runtime.manifest.json"
+      },
+      "expected": {
+        "lane_artifact_label": "cuda-container-strict",
+        "verify_status": "ok",
+        "runtime_provenance_declared": "container",
+        "runtime_provenance_verified": true
+      },
+      "required_artifacts": [
+        "evaluation.report.json",
+        "verify.json",
+        "runtime.manifest.json",
+        "evaluation.html",
+        "backend_inventory.json",
+        "lane_artifact.json",
+        "run_command.txt",
+        "run_summary.txt"
+      ],
+      "runner_enforcement": {
+        "backend_inventory": "--require-backend-inventory"
+      }
+    },
+    {
+      "target": "peft_lora",
+      "readme": "examples/integrations/peft_lora/README.md",
+      "runner": "examples/integrations/peft_lora/run_tiny_peft_lora.sh",
+      "status_label": "runnable",
+      "strict_claim_phrase": "strict container evidence is verified",
+      "subject_form": "materialized-checkpoint",
+      "subject_adapter": "hf_causal",
+      "lane": "cuda-container-strict",
+      "command_shape": "--lane cuda",
+      "report_path": "reports/tiny-peft-lora/<artifact-lane>",
+      "runtime_image": {
+        "family": "standard-cuda",
+        "source_command": "make runtime-image-cuda",
+        "digest_source": "runtime.manifest.json"
+      },
+      "expected": {
+        "lane_artifact_label": "cuda-container-strict",
+        "verify_status": "ok",
+        "runtime_provenance_declared": "container",
+        "runtime_provenance_verified": true
+      },
+      "required_artifacts": [
+        "evaluation.report.json",
+        "verify.json",
+        "runtime.manifest.json",
+        "evaluation.html",
+        "lane_artifact.json",
+        "run_command.txt",
+        "run_summary.txt"
+      ],
+      "runner_enforcement": {}
+    },
+    {
+      "target": "torchao_int8_runtime",
+      "readme": "examples/integrations/torchao_int8_runtime/README.md",
+      "runner": "examples/integrations/torchao_int8_runtime/run_tiny_hf_torchao_int8.sh",
+      "status_label": "runnable",
+      "strict_claim_phrase": "strict container evidence is verified",
+      "subject_form": "runtime-adapter",
+      "subject_adapter": "hf_torchao",
+      "lane": "cuda-container-strict",
+      "command_shape": "--lane cuda",
+      "report_path": "reports/tiny-hf-torchao-int8/<artifact-lane>",
+      "runtime_image": {
+        "family": "cuda-torchao",
+        "source_command": "examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-torchao",
+        "digest_source": "runtime.manifest.json"
+      },
+      "expected": {
+        "lane_artifact_label": "cuda-container-strict",
+        "verify_status": "ok",
+        "runtime_provenance_declared": "container",
+        "runtime_provenance_verified": true
+      },
+      "required_artifacts": [
+        "evaluation.report.json",
+        "verify.json",
+        "runtime.manifest.json",
+        "evaluation.html",
+        "backend_inventory.json",
+        "lane_artifact.json",
+        "run_command.txt",
+        "run_summary.txt"
+      ],
+      "runner_enforcement": {
+        "backend_inventory": "--require-backend-inventory"
+      }
+    }
+  ]
+}
