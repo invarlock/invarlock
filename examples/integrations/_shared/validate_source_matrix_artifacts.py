@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-
 DEFAULT_MATRIX = Path("examples/integrations/source_matrix.json")
 
 
