@@ -28,6 +28,13 @@ fine:
 .venv/bin/python -m pip install peft
 ```
 
+If the checkout environment was created by `uv sync`, install PEFT into that
+environment with:
+
+```bash
+uv pip install --python .venv/bin/python peft
+```
+
 ## Run
 
 ### Lane Support
