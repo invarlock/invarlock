@@ -9,7 +9,7 @@ materialized subjects; deployable quantized checkpoint production is outside
 this public evidence floor.
 
 `public_evidence/README.md` defines the evidence taxonomy. In short, fixture
-artifacts prove verifier contracts, while real-run artifacts are produced by
+artifacts validate verifier contracts, while real-run artifacts are produced by
 `invarlock evaluate` against materialized baseline and subject checkpoints.
 Every public evidence artifact carries `evidence.meta.json` so reviewers can see
 whether they are looking at a fixture or a real run.
@@ -123,7 +123,7 @@ uv run invarlock advanced evidence-pack verify \
   --expected-fingerprint sha256:e01c40a94c89b22306a2670b032f623aa5428351d06e18f9b3e9e6a39b42c41b
 ```
 
-That artifact is the concrete real-run proof for BYOE/custom subjects: the
+That artifact is the concrete real-run evidence for BYOE/custom subjects: the
 checkpoint weights are not vendored, `checkpoint_refs.json` records the external
 edit type and file hashes, and the report records `edit_name = custom`.
 

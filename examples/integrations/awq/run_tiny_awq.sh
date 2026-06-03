@@ -36,9 +36,9 @@ Options:
   -h, --help                   Show this help.
 
 The default path is host-mode on a CUDA host so it can validate the local
-GPTQModel AWQ runtime. Use --lane host for cuda-host-off and --lane cuda for
-cuda-container-strict evidence. AWQ materialization and evaluation use CUDA in
-this example.
+GPTQModel AWQ runtime. Use --lane host --device cuda for cuda-host-off and
+--lane cuda for cuda-container-strict evidence. AWQ materialization and
+evaluation use CUDA in this example.
 USAGE
 }
 
@@ -289,6 +289,9 @@ if [[ -n "$runtime_provenance" ]]; then
 fi
 if [[ -n "$device" ]]; then
   compare_cmd+=(--device "$device")
+fi
+if [[ "$lane_artifact_label" == "cuda-container-strict" ]]; then
+  compare_cmd+=(--require-backend-inventory)
 fi
 if [[ "$allow_network" -eq 1 ]]; then
   compare_cmd+=(--allow-network)

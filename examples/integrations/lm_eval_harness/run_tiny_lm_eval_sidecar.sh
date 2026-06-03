@@ -124,6 +124,7 @@ Missing example dependency: lm_eval
 
 Install LM Evaluation Harness in the environment used for this example:
   python -m pip install "lm_eval[hf]"
+  uv pip install --python .venv/bin/python "lm_eval[hf]"
 
 The core InvarLock install intentionally does not require LM Evaluation Harness.
 MSG
