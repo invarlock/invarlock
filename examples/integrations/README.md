@@ -50,7 +50,7 @@ prerequisites, commands, and generated artifact list.
    using verified strict-evidence README claims:
 
    ```bash
-   python examples/integrations/_shared/validate_source_matrix_artifacts.py \
+   python3 examples/integrations/_shared/validate_source_matrix_artifacts.py \
      --targets hqq quanto compressed_tensors
    ```
 
