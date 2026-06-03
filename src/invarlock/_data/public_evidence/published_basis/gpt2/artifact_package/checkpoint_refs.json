@@ -20,7 +20,7 @@
     "materialization": "external_reference",
     "edit_workflow": "BYOE validation fixture",
     "actual_quantization_backend": false,
-    "purpose": "No-op subject checkpoint reference used to prove strict verifier wiring"
+    "purpose": "No-op subject checkpoint reference used to validate strict verifier wiring"
   },
   "rebuild_recipe": "../evidence_pack_recipe.json",
   "report": "../evaluation.report.json",

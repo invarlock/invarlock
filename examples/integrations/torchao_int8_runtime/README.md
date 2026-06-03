@@ -13,8 +13,8 @@ The checkpoint save-boundary probe in `adapter_runtime_summary.json` is
 supporting metadata. The runnable evidence path is the `hf_torchao` subject
 adapter path recorded in `run_command.txt` and `evaluation.report.json`.
 
-The example is source-tree only. It does not add `torchao` to the core InvarLock
-install.
+The example keeps `torchao` in the example environment rather than the core
+InvarLock install.
 
 ## Prerequisites
 
@@ -34,11 +34,11 @@ fine:
 
 ## Run
 
-## Lane Support
+### Lane Support
 
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
-| `cuda-container-strict` | `--lane cuda` | Primary review path with the example-only TorchAO image. |
+| `cuda-container-strict` | `--lane cuda` | Primary evidence path with the example-specific TorchAO image. |
 | `cuda-host-off` | `--lane host --device cuda` | Secondary local CUDA comparison path without strict container evidence. |
 | `cpu-host-off` | `--lane host --device cpu` | Secondary local non-CUDA bring-up for `hf_torchao`. |
 
@@ -48,7 +48,7 @@ the backend run.
 
 ### cuda-container-strict lane
 
-Build and smoke the example-only TorchAO image, then run this lane on a CUDA
+Build and check the example-specific TorchAO image, then run this lane on a CUDA
 host with that image configured:
 
 ```bash
@@ -65,12 +65,11 @@ examples/integrations/torchao_int8_runtime/run_tiny_hf_torchao_int8.sh \
 The runner defaults to the `release` profile so the strict verification path has
 enough evaluation tokens for a stable primary-metric verdict.
 Use the digest-pinned image reference recorded in `runtime.manifest.json` when
-the strict container artifact will be shared for review.
+the strict container artifact will be shared externally.
 
-This strict lane proves the configured tiny HF checkpoint loaded through the
-`hf_torchao` adapter. It does not claim blanket strict support for every
-external torchao tensor-subclass wrapper or model shape; rerun the strict lane
-for the target runtime before using the result as outreach evidence.
+This strict lane is scoped to the configured tiny HF checkpoint loaded through
+the `hf_torchao` adapter. Rerun the strict lane for the target runtime before
+using the result as shared integration evidence.
 
 ### cpu-host-off lane
 
@@ -84,13 +83,13 @@ examples/integrations/torchao_int8_runtime/run_tiny_hf_torchao_int8.sh \
   --device cpu
 ```
 
-Use this lane for local dependency bring-up and non-CUDA smoke runs.
+Use this lane for local dependency setup and non-CUDA compatibility runs.
 
 For `cuda-host-off` evaluation, use the same command with `--device cuda`.
 
 ## Outputs
 
-The runner writes generated outputs under ignored local directories:
+The runner writes generated outputs under local output directories:
 
 | Path | Role |
 | --- | --- |
@@ -98,22 +97,25 @@ The runner writes generated outputs under ignored local directories:
 | `artifacts/tiny-hf-torchao-int8/tiny_causal_text.jsonl` | Deterministic local text fixture for evaluation. |
 | `artifacts/tiny-hf-torchao-int8/preset.yaml` | Generated preset pointing at the local fixture. |
 | `artifacts/tiny-hf-torchao-int8/fixture_summary.json` | Fixture parameters and file hashes. |
-| `reports/tiny-hf-torchao-int8/evaluation.report.json` | Canonical verifier input. |
-| `reports/tiny-hf-torchao-int8/verify.json` | Machine-readable verifier result. |
-| `reports/tiny-hf-torchao-int8/evaluation.html` | Human-readable report. |
-| `reports/tiny-hf-torchao-int8/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
-| `reports/tiny-hf-torchao-int8/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
-| `reports/tiny-hf-torchao-int8/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
-| `reports/tiny-hf-torchao-int8/checkpoint_refs.json` | Baseline and subject checkpoint references. |
-| `reports/tiny-hf-torchao-int8/adapter_runtime_summary.json` | `hf_torchao` runtime adapter metadata, quantization probe, and file hashes. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/evaluation.report.json` | Canonical verifier input. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/verify.json` | Machine-readable verifier result. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/evaluation.html` | Human-readable report. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/backend_inventory.json` | torchao backend version and quantized module inventory when adapter provenance is available. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/checkpoint_refs.json` | Baseline and subject checkpoint references. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/adapter_runtime_summary.json` | `hf_torchao` runtime adapter metadata, quantization probe, and file hashes. |
 
 A successful run ends with the shared completion block documented in
 `examples/integrations/_shared/README.md#expected-run-output`. If a run fails,
 check the prerequisite message first, then inspect
-`reports/tiny-hf-torchao-int8/run_command.txt`.
+`reports/tiny-hf-torchao-int8/<artifact-lane>/run_command.txt`.
 
 The preparer fails if `torchao` does not produce quantized tensor-backed weights
 or if runtime quantization has no measurable weight delta.
+The shell runner relies on InvarLock report persistence to emit
+`backend_inventory.json` when adapter provenance is available.
 
 ## Public Evidence Anchor
 
@@ -125,4 +127,5 @@ invarlock verify --profile release --assurance strict \
 ```
 
 Use that fixture as the stable public reference when the local example
-environment does not have `torchao` installed.
+environment does not have `torchao` installed. It is a generic strict InvarLock
+quantization fixture, not TorchAO-specific integration evidence.

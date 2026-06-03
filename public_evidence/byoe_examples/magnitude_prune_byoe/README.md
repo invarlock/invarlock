@@ -1,8 +1,10 @@
 # Dense magnitude-pruned BYOE subject
 
-This directory is a small public BYOE fixture for InvarLock's release-gate claim.
-It records a baseline-vs-subject report where the subject is an external checkpoint
-reference, not a model produced by a built-in InvarLock edit plugin.
+This directory is a small public BYOE fixture for InvarLock's strict-evidence
+workflow.
+It records a baseline-vs-subject report where the subject is an external
+checkpoint reference; built-in InvarLock edit plugins are outside this fixture's
+scope.
 
 - External edit type: `magnitude_prune`
 - Artifact class: `validation_subject_checkpoint`
@@ -16,5 +18,7 @@ invarlock verify --profile release --assurance strict \
   public_evidence/byoe_examples/magnitude_prune_byoe/evaluation.report.json
 ```
 
-The fixture proves report/verifier wiring for an external BYOE subject. It does
-not claim runtime compression, packed storage, or a production edit backend.
+The fixture validates report/verifier wiring for an external BYOE subject. Its
+scope is artifact verification for the edited checkpoint reference; runtime
+compression, packed storage, and production edit-backend behavior are outside
+this fixture.

@@ -11,7 +11,7 @@ Required:
 
 Options:
   --report-out DIR             Output directory for evaluation artifacts.
-                               Default: reports/integration
+                               Default: reports/integration/<artifact-lane>
   --baseline-adapter NAME      Baseline adapter. Default: auto
   --subject-adapter NAME       Subject adapter. Default: auto
   --profile NAME               InvarLock profile. Default: ci
@@ -27,6 +27,7 @@ Options:
   --preset PATH                Optional InvarLock preset path.
   --edit-label VALUE           Optional edit label for BYOE subjects.
   --allow-network              Allow model/dataset downloads for evaluate.
+  --require-backend-inventory  Fail if backend_inventory.json is missing.
   --no-html                    Skip HTML rendering.
   -h, --help                   Show this help.
 
@@ -38,6 +39,7 @@ USAGE
 baseline=""
 subject=""
 report_out="reports/integration"
+report_out_was_default=1
 baseline_adapter="auto"
 subject_adapter="auto"
 profile="ci"
@@ -51,6 +53,7 @@ preset=""
 edit_label=""
 allow_network=0
 render_html=1
+require_backend_inventory=0
 original_args=("$@")
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../../.." && pwd)"
@@ -70,6 +73,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --report-out)
       report_out="${2:-}"
+      report_out_was_default=0
       shift 2
       ;;
     --baseline-adapter)
@@ -118,6 +122,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --allow-network)
       allow_network=1
+      shift
+      ;;
+    --require-backend-inventory)
+      require_backend_inventory=1
       shift
       ;;
     --no-html)
@@ -176,6 +184,9 @@ device="$(integration_default_host_device "$execution_mode" "$device")"
 lane_artifact_label="$(
   integration_lane_artifact_label "$execution_mode" "$assurance" "$device"
 )"
+report_out="$(
+  integration_lane_report_out "$report_out" "$report_out_was_default" "$lane_artifact_label"
+)"
 integration_log_header "InvarLock integration compare"
 integration_log_kv "lane" "$lane_artifact_label"
 integration_log_kv "execution_mode" "$execution_mode"
@@ -199,10 +210,11 @@ mkdir -p "$report_out"
 report_json="$report_out/evaluation.report.json"
 verify_json="$report_out/verify.json"
 html_out="$report_out/evaluation.html"
+backend_inventory_json="$report_out/backend_inventory.json"
 lane_artifact_json="$report_out/lane_artifact.json"
 run_command_txt="$report_out/run_command.txt"
 run_summary_txt="$report_out/run_summary.txt"
-rm -f "$report_json" "$verify_json"
+rm -f "$report_json" "$verify_json" "$backend_inventory_json"
 rm -f "$lane_artifact_json" "$run_summary_txt"
 if [[ "$render_html" -eq 1 ]]; then
   rm -f "$html_out"
@@ -425,6 +437,18 @@ Evaluate completed but did not write the expected report:
 
 Check --report-out path mapping and the evaluate command recorded in:
   $run_command_txt
+MSG
+  exit 1
+fi
+
+if [[ "$require_backend_inventory" -eq 1 && ! -s "$backend_inventory_json" ]]; then
+  cat >&2 <<MSG
+Evaluate completed but did not write the required backend inventory:
+  $backend_inventory_json
+
+This run requested --require-backend-inventory because the example documents
+adapter provenance sidecars for this strict quantized lane. Check the selected
+subject adapter and report persistence output.
 MSG
   exit 1
 fi

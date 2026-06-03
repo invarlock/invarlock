@@ -39,16 +39,15 @@ execution forfeits strict assurance and should be verified explicitly with
 - Host execution and unverified provenance force the report out of strict
   assurance.
 
-## What The Manifest Proves
+## What The Manifest Records
 
 The runtime manifest records the execution mode, runtime tool, image
 reference, image digest or local-image allowance, command context, and policy
 allowances used for the evaluation.
 
-It does not prove kernel-level isolation, cloud tenancy, GPU firmware
-integrity, or that the baseline model itself is trustworthy. See
-[Threat Model](threat-model.md) for the wider set of assumptions and
-out-of-scope concerns.
+Kernel-level isolation, cloud tenancy, GPU firmware integrity, and baseline
+model trust are outside the manifest boundary. See [Threat Model](threat-model.md)
+for the wider set of assumptions and out-of-scope concerns.
 
 ## Recommended Review
 

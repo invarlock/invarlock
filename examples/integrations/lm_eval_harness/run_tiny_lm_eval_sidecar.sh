@@ -19,7 +19,7 @@ Options:
   --batch-size VALUE           LM Eval batch size. Default: 1
   --dtype VALUE                Hugging Face model dtype. Default: float32
   --report-out DIR             Output directory for sidecar artifacts.
-                               Default: examples/integrations/lm_eval_harness/reports/tiny-lm-eval-sidecar
+                               Default: examples/integrations/lm_eval_harness/reports/tiny-lm-eval-sidecar/<artifact-lane>
   --allow-network              Allow model and dataset downloads.
   --force                      Replace an existing report directory.
   -h, --help                   Show this help.
@@ -40,6 +40,7 @@ device="cpu"
 batch_size="1"
 dtype="float32"
 report_out="$SCRIPT_DIR/reports/tiny-lm-eval-sidecar"
+report_out_was_default=1
 allow_network=0
 force=0
 original_args=("$@")
@@ -76,6 +77,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --report-out)
       report_out="${2:-}"
+      report_out_was_default=0
       shift 2
       ;;
     --allow-network)
@@ -122,6 +124,7 @@ Missing example dependency: lm_eval
 
 Install LM Evaluation Harness in the environment used for this example:
   python -m pip install "lm_eval[hf]"
+  uv pip install --python .venv/bin/python "lm_eval[hf]"
 
 The core InvarLock install intentionally does not require LM Evaluation Harness.
 MSG
@@ -130,6 +133,7 @@ fi
 
 integration_preflight_host_cuda_device "$PYTHON_BIN" "host" "$device" "LM Evaluation Harness sidecar" || exit $?
 lane_artifact_label="$(integration_lane_artifact_label "host" "off" "$device")"
+report_out="$(integration_lane_report_out "$report_out" "$report_out_was_default" "$lane_artifact_label")"
 
 integration_log_header "LM Eval sidecar example"
 integration_log_kv "lane" "$lane_artifact_label"

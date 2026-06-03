@@ -16,7 +16,7 @@ Options:
   --fixture-dir DIR            Generated local JSONL/preset directory.
                                Default: examples/integrations/awq/artifacts/tiny-awq-fixture
   --report-out DIR             Output directory for InvarLock artifacts.
-                               Default: examples/integrations/awq/reports/tiny-awq
+                               Default: examples/integrations/awq/reports/tiny-awq/<artifact-lane>
   --tokenizer-source VALUE     Tokenizer ID or local path. Default: sshleifer/tiny-gpt2
   --quantize-device VALUE      CUDA device for AWQ materialization. Default: cuda:0
   --awq-backend VALUE          GPTQModel/Transformers AWQ backend. Default: torch_awq
@@ -36,9 +36,9 @@ Options:
   -h, --help                   Show this help.
 
 The default path is host-mode on a CUDA host so it can validate the local
-GPTQModel AWQ runtime. Use --lane host for cuda-host-off and --lane cuda for
-cuda-container-strict evidence. AWQ materialization and evaluation use CUDA in
-this example.
+GPTQModel AWQ runtime. Use --lane host --device cuda for cuda-host-off and
+--lane cuda for cuda-container-strict evidence. AWQ materialization and
+evaluation use CUDA in this example.
 USAGE
 }
 
@@ -49,6 +49,7 @@ baseline_dir="$SCRIPT_DIR/models/tiny-llama-baseline"
 subject_dir="$SCRIPT_DIR/models/tiny-llama-awq-4bit"
 fixture_dir="$SCRIPT_DIR/artifacts/tiny-awq-fixture"
 report_out="$SCRIPT_DIR/reports/tiny-awq"
+report_out_was_default=1
 tokenizer_source="sshleifer/tiny-gpt2"
 quantize_device="cuda:0"
 awq_backend="torch_awq"
@@ -80,6 +81,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --report-out)
       report_out="${2:-}"
+      report_out_was_default=0
       shift 2
       ;;
     --tokenizer-source)
@@ -176,6 +178,7 @@ effective_assurance="$(integration_effective_assurance "$lane" "$assurance")"
 device="$(integration_default_host_device "$effective_execution_mode" "$device")"
 effective_device="$(integration_effective_device "$lane" "$device")"
 lane_artifact_label="$(integration_lane_artifact_label "$effective_execution_mode" "$effective_assurance" "$effective_device")"
+report_out="$(integration_lane_report_out "$report_out" "$report_out_was_default" "$lane_artifact_label")"
 
 integration_log_header "AWQ integration example"
 integration_log_kv "lane" "$lane_artifact_label"
@@ -286,6 +289,9 @@ if [[ -n "$runtime_provenance" ]]; then
 fi
 if [[ -n "$device" ]]; then
   compare_cmd+=(--device "$device")
+fi
+if [[ "$lane_artifact_label" == "cuda-container-strict" ]]; then
+  compare_cmd+=(--require-backend-inventory)
 fi
 if [[ "$allow_network" -eq 1 ]]; then
   compare_cmd+=(--allow-network)

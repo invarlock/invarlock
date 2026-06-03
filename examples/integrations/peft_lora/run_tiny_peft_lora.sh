@@ -16,7 +16,7 @@ Options:
   --fixture-dir DIR            Generated local JSONL/preset directory.
                                Default: examples/integrations/peft_lora/artifacts/tiny-peft-lora-fixture
   --report-out DIR             Output directory for InvarLock artifacts.
-                               Default: examples/integrations/peft_lora/reports/tiny-peft-lora
+                               Default: examples/integrations/peft_lora/reports/tiny-peft-lora/<artifact-lane>
   --profile NAME               InvarLock profile. Default: release
   --tier NAME                  InvarLock tier. Default: balanced
   --lane MODE                  Standard lane shortcut: host or cuda.
@@ -44,6 +44,7 @@ baseline="sshleifer/tiny-gpt2"
 subject_dir="$SCRIPT_DIR/models/tiny-gpt2-peft-lora-merged"
 fixture_dir="$SCRIPT_DIR/artifacts/tiny-peft-lora-fixture"
 report_out="$SCRIPT_DIR/reports/tiny-peft-lora"
+report_out_was_default=1
 profile="release"
 tier="balanced"
 lane=""
@@ -72,6 +73,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --report-out)
       report_out="${2:-}"
+      report_out_was_default=0
       shift 2
       ;;
     --profile)
@@ -152,6 +154,7 @@ effective_assurance="$(integration_effective_assurance "$lane" "$assurance")"
 device="$(integration_default_host_device "$effective_execution_mode" "$device")"
 effective_device="$(integration_effective_device "$lane" "$device")"
 lane_artifact_label="$(integration_lane_artifact_label "$effective_execution_mode" "$effective_assurance" "$effective_device")"
+report_out="$(integration_lane_report_out "$report_out" "$report_out_was_default" "$lane_artifact_label")"
 
 integration_log_header "PEFT LoRA integration example"
 integration_log_kv "lane" "$lane_artifact_label"
@@ -165,6 +168,7 @@ Missing example dependency: peft
 
 Install PEFT in the environment used for this example, for example:
   python -m pip install peft
+  uv pip install --python .venv/bin/python peft
 
 The core InvarLock install intentionally does not require PEFT.
 MSG

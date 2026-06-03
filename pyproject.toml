@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "invarlock"
 version = "0.9.0"
-description = "Auditable release gates for edited model checkpoints (InvarLock framework)"
+description = "Auditable strict verification for edited model checkpoints (InvarLock framework)"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
 license = "Apache-2.0"

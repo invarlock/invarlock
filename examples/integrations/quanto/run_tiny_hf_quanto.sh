@@ -14,7 +14,7 @@ Options:
   --fixture-dir DIR            Generated local JSONL/preset directory.
                                Default: examples/integrations/quanto/artifacts/tiny-hf-quanto
   --report-out DIR             Output directory for InvarLock artifacts.
-                               Default: examples/integrations/quanto/reports/tiny-hf-quanto
+                               Default: examples/integrations/quanto/reports/tiny-hf-quanto/<artifact-lane>
   --tokenizer-source VALUE     Tokenizer ID or local path. Default: sshleifer/tiny-gpt2
   --profile NAME               InvarLock profile. Default: release
   --tier NAME                  InvarLock tier. Default: balanced
@@ -42,6 +42,7 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/../../.." && pwd)"
 model_dir="$SCRIPT_DIR/models/tiny-llama-hf-quanto-baseline"
 fixture_dir="$SCRIPT_DIR/artifacts/tiny-hf-quanto"
 report_out="$SCRIPT_DIR/reports/tiny-hf-quanto"
+report_out_was_default=1
 tokenizer_source="sshleifer/tiny-gpt2"
 profile="release"
 tier="balanced"
@@ -67,6 +68,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --report-out)
       report_out="${2:-}"
+      report_out_was_default=0
       shift 2
       ;;
     --tokenizer-source)
@@ -151,6 +153,7 @@ effective_assurance="$(integration_effective_assurance "$lane" "$assurance")"
 device="$(integration_default_host_device "$effective_execution_mode" "$device")"
 effective_device="$(integration_effective_device "$lane" "$device")"
 lane_artifact_label="$(integration_lane_artifact_label "$effective_execution_mode" "$effective_assurance" "$effective_device")"
+report_out="$(integration_lane_report_out "$report_out" "$report_out_was_default" "$lane_artifact_label")"
 
 integration_log_header "Quanto integration example"
 integration_log_kv "lane" "$lane_artifact_label"
@@ -226,6 +229,9 @@ if [[ -n "$runtime_provenance" ]]; then
 fi
 if [[ -n "$device" ]]; then
   compare_cmd+=(--device "$device")
+fi
+if [[ "$lane_artifact_label" == "cuda-container-strict" ]]; then
+  compare_cmd+=(--require-backend-inventory)
 fi
 if [[ "$allow_network" -eq 1 ]]; then
   compare_cmd+=(--allow-network)

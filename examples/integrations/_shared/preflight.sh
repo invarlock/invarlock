@@ -107,6 +107,19 @@ integration_lane_artifact_label() {
   printf '%s-%s-%s\n' "${device:-auto}" "$execution_mode" "$assurance"
 }
 
+integration_lane_report_out() {
+  local report_out="$1"
+  local report_out_was_default="$2"
+  local lane_artifact_label="$3"
+
+  if [[ "$report_out_was_default" == "1" ]]; then
+    printf '%s/%s\n' "$report_out" "$lane_artifact_label"
+    return 0
+  fi
+
+  printf '%s\n' "$report_out"
+}
+
 integration_preflight_host_cuda_device() {
   local python_bin="$1"
   local execution_mode="$2"

@@ -2,12 +2,41 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import re
 import subprocess
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+INTEGRATIONS_DIR = REPO_ROOT / "examples" / "integrations"
+SOURCE_MATRIX = INTEGRATIONS_DIR / "source_matrix.json"
 PEFT_DIR = REPO_ROOT / "examples" / "integrations" / "peft_lora"
 TORCHAO_DIR = REPO_ROOT / "examples" / "integrations" / "torchao_int8_runtime"
+
+EXAMPLE_RUNNERS = [
+    INTEGRATIONS_DIR / "awq" / "run_tiny_awq.sh",
+    INTEGRATIONS_DIR / "compressed_tensors" / "run_tiny_hf_ct.sh",
+    INTEGRATIONS_DIR / "gptqmodel" / "run_tiny_gptqmodel.sh",
+    INTEGRATIONS_DIR / "hf_bnb" / "run_tiny_hf_bnb_8bit.sh",
+    INTEGRATIONS_DIR / "hqq" / "run_tiny_hf_hqq.sh",
+    INTEGRATIONS_DIR / "lm_eval_harness" / "run_tiny_lm_eval_sidecar.sh",
+    INTEGRATIONS_DIR / "peft_lora" / "run_tiny_peft_lora.sh",
+    INTEGRATIONS_DIR / "quanto" / "run_tiny_hf_quanto.sh",
+    INTEGRATIONS_DIR / "torchao_int8_runtime" / "run_tiny_hf_torchao_int8.sh",
+]
+
+README_EXAMPLES = [
+    "awq",
+    "compressed_tensors",
+    "gptqmodel",
+    "hf_bnb",
+    "hqq",
+    "lm_eval_harness",
+    "peft_lora",
+    "quanto",
+    "torchao_int8_runtime",
+]
 
 
 def _load_module(path: Path, module_name: str):
@@ -17,6 +46,14 @@ def _load_module(path: Path, module_name: str):
     assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
+
+
+def _load_source_matrix() -> dict[str, dict[str, object]]:
+    payload = json.loads(SOURCE_MATRIX.read_text(encoding="utf-8"))
+    assert payload["schema"] == "invarlock.integration_source_matrix.v1"
+    entries = payload["entries"]
+    assert isinstance(entries, list)
+    return {entry["target"]: entry for entry in entries}
 
 
 def test_peft_lora_runner_wires_local_fixture() -> None:
@@ -93,6 +130,7 @@ def test_integration_example_readmes_document_run_lanes() -> None:
     assert "`cuda-host-off`" in awq_text
     assert "`cuda-container-strict`" in awq_text
     assert "--lane host" in awq_text
+    assert "--lane host --device cuda" in awq_text
     assert "--lane cuda" in awq_text
     assert "--device cpu" not in awq_text
     assert awq_text.index("`cuda-container-strict`") < awq_text.index("`cuda-host-off`")
@@ -112,13 +150,202 @@ def test_integration_example_readmes_document_run_lanes() -> None:
     assert "verifier status, runtime provenance status" in lm_eval_text
 
 
+def test_integration_runners_default_reports_are_lane_scoped() -> None:
+    for runner in EXAMPLE_RUNNERS:
+        subprocess.run(["bash", "-n", str(runner)], check=True)
+
+        text = runner.read_text(encoding="utf-8")
+        assert "<artifact-lane>" in text, f"{runner} missing help contract"
+        assert "report_out_was_default=1" in text, f"{runner} missing default flag"
+        assert "report_out_was_default=0" in text, f"{runner} missing override flag"
+        assert "integration_lane_report_out" in text, f"{runner} missing lane output"
+
+
+def test_integration_readmes_use_run_lane_subsections() -> None:
+    for example in README_EXAMPLES:
+        readme = INTEGRATIONS_DIR / example / "README.md"
+        text = readme.read_text(encoding="utf-8")
+
+        assert "## Run\n\n## Lane Support" not in text
+        assert "## Run\n\n### Lane Support" in text
+
+
+def test_integration_readme_report_paths_are_lane_scoped() -> None:
+    for example in README_EXAMPLES:
+        readme = INTEGRATIONS_DIR / example / "README.md"
+        text = readme.read_text(encoding="utf-8")
+        report_paths = re.findall(r"`(reports/tiny-[^`]+)`", text)
+
+        assert report_paths, f"{example} README has no report artifact paths"
+        for report_path in report_paths:
+            assert "/<artifact-lane>/" in report_path, (
+                f"{example} report path is not lane-scoped: {report_path}"
+            )
+
+
+def test_strict_evidence_claim_readmes_have_artifact_source_matrix() -> None:
+    matrix_entries = _load_source_matrix()
+    common_artifacts = {
+        "evaluation.report.json",
+        "verify.json",
+        "runtime.manifest.json",
+        "evaluation.html",
+        "lane_artifact.json",
+        "run_command.txt",
+        "run_summary.txt",
+    }
+    quantized_strict_targets = {
+        "awq",
+        "compressed_tensors",
+        "gptqmodel",
+        "hf_bnb",
+        "hqq",
+        "quanto",
+        "torchao_int8_runtime",
+    }
+    target_provenance_artifacts = {
+        "awq": {
+            "checkpoint_refs.json",
+            "external_edit_summary.json",
+            "fixture_summary.json",
+        },
+        "compressed_tensors": {
+            "checkpoint_refs.json",
+            "adapter_runtime_summary.json",
+            "fixture_summary.json",
+        },
+        "gptqmodel": {
+            "checkpoint_refs.json",
+            "external_edit_summary.json",
+            "fixture_summary.json",
+        },
+        "hf_bnb": {"fixture_summary.json"},
+        "hqq": {
+            "checkpoint_refs.json",
+            "adapter_runtime_summary.json",
+            "fixture_summary.json",
+        },
+        "peft_lora": {
+            "checkpoint_refs.json",
+            "external_edit_summary.json",
+            "fixture_summary.json",
+        },
+        "quanto": {
+            "checkpoint_refs.json",
+            "adapter_runtime_summary.json",
+            "fixture_summary.json",
+        },
+        "torchao_int8_runtime": {
+            "checkpoint_refs.json",
+            "adapter_runtime_summary.json",
+            "fixture_summary.json",
+        },
+    }
+
+    claimed_readmes = {}
+    for readme in INTEGRATIONS_DIR.rglob("README.md"):
+        text = readme.read_text(encoding="utf-8")
+        if "strict container evidence is verified" in text:
+            claimed_readmes[readme.parent.name] = text
+
+    assert set(claimed_readmes) == set(matrix_entries)
+
+    for example, text in claimed_readmes.items():
+        entry = matrix_entries[example]
+        readme = INTEGRATIONS_DIR / example / "README.md"
+        runner = Path(entry["runner"])
+        runtime_image = entry["runtime_image"]
+        expected = entry["expected"]
+        required_artifacts = set(entry["required_artifacts"])
+        provenance_artifacts = set(entry["provenance_artifacts"])
+
+        assert Path(entry["readme"]) == readme.relative_to(REPO_ROOT)
+        assert (REPO_ROOT / runner).is_file()
+        assert entry["strict_claim_phrase"] in text
+        assert entry["lane"] == "cuda-container-strict"
+        assert entry["command_shape"] == "--lane cuda"
+        assert "`cuda-container-strict`" in text
+        assert str(entry["report_path"]) in text
+        assert runtime_image["source_command"] in text
+        assert runtime_image["digest_source"] == "runtime.manifest.json"
+        assert expected["lane_artifact_label"] == "cuda-container-strict"
+        assert expected["verify_status"] == "ok"
+        assert expected["runtime_provenance_declared"] == "container"
+        assert expected["runtime_provenance_verified"] is True
+        assert common_artifacts <= required_artifacts
+        assert provenance_artifacts == target_provenance_artifacts[example]
+        assert provenance_artifacts <= required_artifacts
+
+        for artifact in required_artifacts:
+            assert artifact in text
+
+        runner_text = (REPO_ROOT / runner).read_text(encoding="utf-8")
+        for artifact in provenance_artifacts:
+            assert artifact in runner_text
+
+        if example in quantized_strict_targets:
+            assert "backend_inventory.json" in required_artifacts
+            assert (
+                entry["runner_enforcement"]["backend_inventory"]
+                == "--require-backend-inventory"
+            )
+            assert "--require-backend-inventory" in runner_text
+            assert 'lane_artifact_label" == "cuda-container-strict"' in runner_text
+        else:
+            assert "backend_inventory.json" not in required_artifacts
+            assert entry["runner_enforcement"] == {}
+
+
+def test_materialized_subject_readmes_define_evidence_boundary() -> None:
+    expectations = {
+        "awq": ["`hf_awq`", "`external_edit_summary.json`"],
+        "compressed_tensors": ["`hf_ct`", "`adapter_runtime_summary.json`"],
+        "gptqmodel": ["`hf_gptq`", "`external_edit_summary.json`"],
+        "peft_lora": ["`hf_causal`", "`external_edit_summary.json`"],
+    }
+
+    for example, phrases in expectations.items():
+        text = (INTEGRATIONS_DIR / example / "README.md").read_text(encoding="utf-8")
+
+        assert "## Evidence Boundary" in text, f"{example} lacks evidence boundary"
+        assert "The subject checkpoint is materialized before" in text
+        assert "verifier result for that\nproduced subject" in text
+        for phrase in phrases:
+            assert phrase in text
+
+
+def test_torchao_readme_documents_backend_inventory_sidecar() -> None:
+    text = (TORCHAO_DIR / "README.md").read_text(encoding="utf-8")
+
+    assert (
+        "`reports/tiny-hf-torchao-int8/<artifact-lane>/backend_inventory.json`" in text
+    )
+    assert "The shell runner relies on InvarLock report persistence to emit" in text
+    assert "`backend_inventory.json` when adapter provenance is available" in text
+    assert "adapter provenance is available" in text
+
+
+def test_shared_example_docs_scope_source_archives_and_image_digests() -> None:
+    shared_readme = (
+        REPO_ROOT / "examples" / "integrations" / "_shared" / "README.md"
+    ).read_text(encoding="utf-8")
+    image_readme = (
+        REPO_ROOT / "examples" / "integrations" / "_runtime_images" / "README.md"
+    ).read_text(encoding="utf-8")
+
+    assert "Use `--committed` when sharing an archive" in shared_readme
+    assert "Use `--include-worktree` only" in shared_readme
+    assert "deliberately including local changes" in shared_readme
+    assert "may produce a different image digest" in image_readme
+    assert "digest recorded in `runtime.manifest.json`" in image_readme
+
+
 def test_peft_readme_scopes_strict_evidence_to_tiny_runtime() -> None:
     text = (PEFT_DIR / "README.md").read_text(encoding="utf-8")
 
     assert "strict container evidence is verified on CUDA for this tiny" in text
-    assert "not a blanket claim" in text
-    assert "Rerun the strict lane" in text
-    assert "for the target runtime" in text
+    assert "scoped to the configured tiny merged dense checkpoint" in text
+    assert "shared integration evidence" in text
 
 
 def test_integration_example_docs_use_canonical_lane_wording() -> None:
@@ -157,8 +384,14 @@ def test_shared_compare_wrapper_checks_report_materialization() -> None:
 
     text = wrapper.read_text(encoding="utf-8")
     assert "Evaluate completed but did not write the expected report" in text
+    assert "Evaluate completed but did not write the required backend inventory" in text
     assert '[[ ! -s "$report_json" ]]' in text
+    assert (
+        '[[ "$require_backend_inventory" -eq 1 && ! -s "$backend_inventory_json" ]]'
+        in text
+    )
     assert 'rm -f "$report_json" "$verify_json"' in text
+    assert 'rm -f "$report_json" "$verify_json" "$backend_inventory_json"' in text
     assert 'CLI=("$PYTHON_BIN" -m invarlock)' in text
     assert '"${CLI[@]}" evaluate' in text
     assert '"${CLI[@]}" verify' in text
@@ -169,6 +402,7 @@ def test_shared_compare_wrapper_checks_report_materialization() -> None:
     assert "lane_artifact.json" in text
     assert "lane_artifact_label" in text
     assert "run_summary.txt" in text
+    assert "--require-backend-inventory" in text
     assert "InvarLock integration run complete" in text
     assert "InvarLock integration run failed" in text
     assert 'write_run_summary "success"' in text
@@ -180,6 +414,123 @@ def test_shared_compare_wrapper_checks_report_materialization() -> None:
     assert "integration_log_kv" in text
     assert "integration_default_host_device" in text
     assert "integration_lane_artifact_label" in text
+    assert "integration_lane_report_out" in text
+    assert "report_out_was_default=1" in text
+    assert "report_out_was_default=0" in text
+    assert "<artifact-lane>" in text
+
+
+def test_shared_compare_wrapper_enforces_backend_inventory_sidecar(
+    tmp_path: Path,
+) -> None:
+    wrapper = (
+        REPO_ROOT / "examples" / "integrations" / "_shared" / "run_invarlock_compare.sh"
+    )
+    fake_python = tmp_path / "fake_python"
+    fake_python.write_text(
+        f"""#!{sys.executable}
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+REAL_PYTHON = {sys.executable!r}
+
+if sys.argv[1:3] != ["-m", "invarlock"]:
+    raise SystemExit(subprocess.run([REAL_PYTHON, *sys.argv[1:]]).returncode)
+
+args = sys.argv[3:]
+command = args[0]
+if command == "evaluate":
+    report_out = Path(args[args.index("--report-out") + 1])
+    report_out.mkdir(parents=True, exist_ok=True)
+    (report_out / "evaluation.report.json").write_text(
+        json.dumps({{"schema": "fake", "results": []}}) + "\\n",
+        encoding="utf-8",
+    )
+    if os.environ.get("FAKE_INVARLOCK_WRITE_BACKEND_INVENTORY") == "1":
+        (report_out / "backend_inventory.json").write_text(
+            json.dumps({{"adapter": "fake"}}) + "\\n",
+            encoding="utf-8",
+        )
+    raise SystemExit(0)
+if command == "verify":
+    payload = {{
+        "summary": {{"ok": True, "reason": "ok"}},
+        "results": [
+            {{
+                "verification": {{
+                    "runtime_provenance": {{
+                        "declared_mode": "container",
+                        "status": "verified",
+                        "verified": True,
+                    }}
+                }}
+            }}
+        ],
+    }}
+    print(json.dumps(payload))
+    raise SystemExit(0)
+if command == "report" and args[1] == "html":
+    output = Path(args[args.index("-o") + 1])
+    output.write_text("<html></html>\\n", encoding="utf-8")
+    raise SystemExit(0)
+raise SystemExit(f"unexpected fake invarlock command: {{args!r}}")
+""",
+        encoding="utf-8",
+    )
+    fake_python.chmod(0o755)
+
+    base_cmd = [
+        str(wrapper),
+        "--baseline",
+        "dense",
+        "--subject",
+        "quant",
+        "--report-out",
+        str(tmp_path / "reports"),
+        "--lane",
+        "cuda",
+        "--require-backend-inventory",
+        "--no-html",
+    ]
+    env = os.environ.copy()
+    env["PYTHON_BIN"] = str(fake_python)
+
+    missing = subprocess.run(
+        base_cmd,
+        cwd=REPO_ROOT,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert missing.returncode == 1
+    assert "required backend inventory" in missing.stderr
+    assert (tmp_path / "reports" / "evaluation.report.json").is_file()
+    assert not (tmp_path / "reports" / "backend_inventory.json").exists()
+
+    env["FAKE_INVARLOCK_WRITE_BACKEND_INVENTORY"] = "1"
+    ok = subprocess.run(
+        base_cmd,
+        cwd=REPO_ROOT,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert ok.returncode == 0
+    assert "InvarLock integration run complete" in ok.stdout
+    assert (tmp_path / "reports" / "backend_inventory.json").is_file()
+    assert (tmp_path / "reports" / "verify.json").is_file()
+    assert "status: success" in (tmp_path / "reports" / "run_summary.txt").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_shared_source_archive_helper_avoids_macos_xattrs() -> None:
@@ -202,8 +553,26 @@ def test_shared_expected_artifacts_documents_backend_inventory() -> None:
     ).read_text(encoding="utf-8")
 
     assert "`backend_inventory.json`" in text
+    assert "`external_edit_summary.json`" in text
+    assert "`adapter_runtime_summary.json`" in text
+    assert "`fixture_summary.json`" in text
     assert "InvarLock report persistence" in text
     assert "adapter provenance is available" in text
+    assert "reports/<target>/<artifact-lane>/evaluation.report.json" in text
+    assert "--runtime-provenance container" in text
+    assert "For the primary CUDA/container strict lane" in text
+
+
+def test_shared_evidence_scope_documents_source_matrix_contract() -> None:
+    text = (
+        REPO_ROOT / "examples" / "integrations" / "_shared" / "evidence-scope.md"
+    ).read_text(encoding="utf-8")
+
+    assert "`source_matrix.json` is the source-controlled contract" in text
+    assert "strict container evidence is verified" in text
+    assert "`source_matrix.json` has an entry" in text
+    assert "`checkpoint_refs.json`, `external_edit_summary.json`" in text
+    assert "`adapter_runtime_summary.json`, and `fixture_summary.json`" in text
 
 
 def test_shared_preflight_helper_defines_host_lane_contract() -> None:
@@ -215,6 +584,7 @@ def test_shared_preflight_helper_defines_host_lane_contract() -> None:
     assert "integration_preflight_host_cuda_device" in text
     assert "integration_preflight_gptqmodel_host_runtime" in text
     assert "integration_lane_artifact_label" in text
+    assert "integration_lane_report_out" in text
     assert "integration_effective_assurance" in text
     assert "integration_log_header" in text
     assert "integration_log_step" in text
@@ -257,9 +627,8 @@ def test_torchao_readme_frames_hf_torchao_as_primary_path() -> None:
     assert "strict container evidence is verified" in text
     assert "this tiny\n`hf_torchao` runtime-load example" in text
     assert "runnable evidence path is the `hf_torchao` subject" in text
-    assert "does not claim blanket strict support" in text
-    assert "rerun the strict lane" in text
-    assert "for the target runtime" in text
+    assert "scoped to the configured tiny HF checkpoint" in text
+    assert "shared integration evidence" in text
     assert "run_tiny_hf_torchao_int8.sh" in text
 
 

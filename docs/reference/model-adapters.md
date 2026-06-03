@@ -134,9 +134,9 @@ Machine-readable adapter capability metadata is published at
 | `hf_bnb` | Bitsandbytes quantized LMs | `invarlock[gpu]` | Platform-dependent | Uses `device_map="auto"`; no `.to()`. Latest bitsandbytes wheels can work outside Linux/CUDA when the runtime imports cleanly. |
 | `hf_awq` | AWQ quantized LMs | `invarlock[awq]` | GPTQModel-supported platforms | Uses the Transformers AWQ loader backed by GPTQModel; GPU recommended for quantized inference. |
 | `hf_gptq` | GPTQ quantized LMs | `invarlock[gptq]` | GPTQModel-supported platforms | Uses GPTQModel for GPTQ subject loading; GPU recommended for quantized inference. |
-| `hf_torchao` | HF causal LMs quantized at runtime with torchao | `invarlock[torchao]` | Platform-dependent | Applies torchao int8 weight-only quantization after HF load; strict container evidence should be proven for the selected runtime before outreach claims. |
-| `hf_hqq` | HF causal LMs quantized at runtime with HQQ | `invarlock[hqq]` | Platform-dependent | Applies native HQQ runtime quantization after HF load; strict container evidence should be proven for the selected runtime before outreach claims. |
-| `hf_quanto` | HF causal LMs quantized at runtime with Quanto | `invarlock[quanto]` | Platform-dependent | Loads through Transformers with a Quanto quantization config; strict container evidence should be proven for the selected runtime before outreach claims. |
+| `hf_torchao` | HF causal LMs quantized at runtime with torchao | `invarlock[torchao]` | Platform-dependent | Applies torchao int8 weight-only quantization after HF load; strict container evidence should be proven for the selected runtime before externally sharing strict-evidence results. |
+| `hf_hqq` | HF causal LMs quantized at runtime with HQQ | `invarlock[hqq]` | Platform-dependent | Applies native HQQ runtime quantization after HF load; strict container evidence should be proven for the selected runtime before externally sharing strict-evidence results. |
+| `hf_quanto` | HF causal LMs quantized at runtime with Quanto | `invarlock[quanto]` | Platform-dependent | Loads through Transformers with a Quanto quantization config; strict container evidence should be proven for the selected runtime before externally sharing strict-evidence results. |
 | `hf_ct` | HF causal LMs from compressed-tensors pre-quantized checkpoints | `invarlock[compressed-tensors]` | Platform-dependent | Loads pre-quantized compressed-tensors checkpoints; use llmcompressor or other tooling to create them outside the adapter. |
 
 ### Adapter capabilities

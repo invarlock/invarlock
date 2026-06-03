@@ -2,15 +2,14 @@
 
 This tree contains two different kinds of public evidence:
 
-- **Verifier fixtures**: small, intentionally fixture-sized artifacts that prove
+- **Verifier fixtures**: small, intentionally fixture-sized artifacts that validate
   report schemas, runtime-manifest binding, signed-pack verification, and
-  release-gate failure behavior.
+  strict verification failure behavior.
 - **Real model runs**: artifacts produced by `invarlock evaluate` against
   materialized baseline and subject checkpoints, then verified and packaged.
 
-Fixtures are useful for offline contract validation, but they are not empirical
-proof of model quality or deployable compression. Real model runs demonstrate the
-end-to-end evidence workflow on a concrete checkpoint comparison.
+Fixtures are useful for offline contract validation. Real model runs demonstrate
+the end-to-end evidence workflow on a concrete checkpoint comparison.
 
 The real-run set includes both a built-in edit smoke run and an external BYOE
 run where the subject checkpoint is materialized outside InvarLock and consumed
@@ -20,7 +19,7 @@ with `--edit-label custom`.
 
 | Class | Meaning |
 | --- | --- |
-| `contract_fixture` | Schema or packaging fixture that proves a contract surface. |
+| `contract_fixture` | Schema or packaging fixture that validates a contract surface. |
 | `strict_pass_fixture` | Fixture report expected to pass `invarlock verify` under strict policy. |
 | `caught_regression_fixture` | Fixture report expected to fail because a guard catches a regression. |
 | `policy_failure_fixture` | Fixture report expected to fail because a release policy predicate blocks. |
@@ -30,8 +29,8 @@ with `--edit-label custom`.
 
 Every artifact directory that carries public evidence must include an
 `evidence.meta.json` file. The metadata declares the evidence class, lists the
-verifier commands, and records non-goals so fixtures cannot be mistaken for
-real-run evidence.
+verifier commands, and records scope boundaries so fixtures cannot be mistaken
+for real-run evidence.
 
 Run the audit with:
 

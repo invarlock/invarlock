@@ -21,7 +21,7 @@ Options:
   --fixture-dir DIR            Generated local JSONL/preset directory.
                                Default: examples/integrations/hf_bnb/artifacts/tiny-hf-bnb-8bit
   --report-out DIR             Output directory for InvarLock artifacts.
-                               Default: examples/integrations/hf_bnb/reports/tiny-hf-bnb-8bit
+                               Default: examples/integrations/hf_bnb/reports/tiny-hf-bnb-8bit/<artifact-lane>
   --profile NAME               InvarLock profile. Default: ci
   --tier NAME                  InvarLock tier. Default: balanced
   --lane MODE                  Standard lane shortcut: host or cuda.
@@ -50,6 +50,7 @@ model_dir="$SCRIPT_DIR/models/tiny-llama-bnb-baseline"
 tokenizer_source="sshleifer/tiny-gpt2"
 fixture_dir="$SCRIPT_DIR/artifacts/tiny-hf-bnb-8bit"
 report_out="$SCRIPT_DIR/reports/tiny-hf-bnb-8bit"
+report_out_was_default=1
 profile="ci"
 tier="balanced"
 lane=""
@@ -85,6 +86,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --report-out)
       report_out="${2:-}"
+      report_out_was_default=0
       shift 2
       ;;
     --profile)
@@ -170,6 +172,7 @@ effective_assurance="$(integration_effective_assurance "$lane" "$assurance")"
 device="$(integration_default_host_device "$effective_execution_mode" "$device")"
 effective_device="$(integration_effective_device "$lane" "$device")"
 lane_artifact_label="$(integration_lane_artifact_label "$effective_execution_mode" "$effective_assurance" "$effective_device")"
+report_out="$(integration_lane_report_out "$report_out" "$report_out_was_default" "$lane_artifact_label")"
 
 integration_log_header "bitsandbytes integration example"
 integration_log_kv "lane" "$lane_artifact_label"
@@ -244,6 +247,9 @@ if [[ -n "$runtime_provenance" ]]; then
 fi
 if [[ -n "$device" ]]; then
   compare_cmd+=(--device "$device")
+fi
+if [[ "$lane_artifact_label" == "cuda-container-strict" ]]; then
+  compare_cmd+=(--require-backend-inventory)
 fi
 if [[ "$allow_network" -eq 1 ]]; then
   compare_cmd+=(--allow-network)

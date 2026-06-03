@@ -1,7 +1,8 @@
 # compressed-tensors Checkpoint Integration Example
 
-Status: `runnable`; `cuda-container-strict`, `cuda-host-off`, and `cpu-host-off`
-lanes are supported.
+Status: `runnable`; strict container evidence is verified for the
+`cuda-container-strict` lane on CUDA for this tiny compressed-tensors example.
+`cuda-host-off` and `cpu-host-off` lanes are supported.
 
 This example shows how to attach InvarLock regression evidence to a Hugging Face
 causal checkpoint saved in the `compressed-tensors` packed checkpoint format. It
@@ -9,11 +10,11 @@ creates a tiny dense Llama-style HF baseline, creates a matching packed
 compressed-tensors subject checkpoint, then compares the baseline through
 `hf_causal` against the subject loaded through InvarLock's `hf_ct` adapter.
 
-The example is source-tree only. It does not add compressed-tensors to the core
-InvarLock install. It validates a pre-quantized checkpoint load path; it does not
-claim compressed-kernel speedups.
+The example keeps compressed-tensors in the example environment rather than the
+core InvarLock install. Its scope is pre-quantized checkpoint-load regression
+evidence; compressed-kernel speedup validation is outside this example.
 `llmcompressor` is covered here as tooling that can produce compatible
-compressed-tensors checkpoints, not as a separate InvarLock adapter/runtime lane.
+compressed-tensors checkpoints.
 
 ## Prerequisites
 
@@ -32,11 +33,11 @@ uv run --extra compressed-tensors python -c "import compressed_tensors"
 
 ## Run
 
-## Lane Support
+### Lane Support
 
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
-| `cuda-container-strict` | `--lane cuda` | Primary review path with the example-only compressed-tensors image. |
+| `cuda-container-strict` | `--lane cuda` | Primary evidence path with the example-specific compressed-tensors image. |
 | `cuda-host-off` | `--lane host --device cuda` | Secondary local CUDA comparison path without strict container evidence. |
 | `cpu-host-off` | `--lane host --device cpu` | Secondary local non-CUDA bring-up when the installed compressed-tensors backend supports CPU. |
 
@@ -46,7 +47,7 @@ the backend run.
 
 ### cuda-container-strict lane
 
-Build and smoke the example-only compressed-tensors image, then run this lane on
+Build and check the example-specific compressed-tensors image, then run this lane on
 a CUDA host with that image configured:
 
 ```bash
@@ -62,11 +63,10 @@ uv run --extra compressed-tensors \
 ```
 
 Use the digest-pinned image reference recorded in `runtime.manifest.json` when
-the strict container artifact will be shared for review.
-This proves the configured tiny `hf_ct` packed-checkpoint subject and image; it
-is not a blanket claim for every compressed-tensors version, packing recipe,
-model shape, or runtime image. Rerun the strict lane for the target runtime
-before using the artifact as review evidence.
+the strict container artifact will be shared externally.
+This strict lane is scoped to the configured tiny `hf_ct` packed-checkpoint
+subject and image. Rerun the strict lane for the target runtime before using the
+artifact as shared integration evidence.
 
 ### cpu-host-off lane
 
@@ -81,14 +81,22 @@ uv run --extra compressed-tensors \
   --device cpu
 ```
 
-Use this lane for local dependency bring-up and non-CUDA smoke runs when the
+Use this lane for local dependency setup and non-CUDA compatibility runs when the
 compressed-tensors backend supports the selected host.
 
 For `cuda-host-off` evaluation, use the same command with `--device cuda`.
 
+## Evidence Boundary
+
+The subject checkpoint is materialized before the InvarLock comparison. The
+strict lane covers the configured baseline-vs-subject evaluation, `hf_ct`
+adapter load, guard evidence, runtime manifest, and verifier result for that
+produced subject. The compressed-tensors materialization step is represented by
+`adapter_runtime_summary.json` and checkpoint hashes.
+
 ## Outputs
 
-The runner writes generated outputs under ignored local directories:
+The runner writes generated outputs under local output directories:
 
 | Path | Role |
 | --- | --- |
@@ -97,25 +105,24 @@ The runner writes generated outputs under ignored local directories:
 | `artifacts/tiny-hf-ct/tiny_causal_text.jsonl` | Deterministic local text fixture for evaluation. |
 | `artifacts/tiny-hf-ct/preset.yaml` | Generated preset pointing at the local fixture. |
 | `artifacts/tiny-hf-ct/fixture_summary.json` | Fixture parameters and file hashes. |
-| `reports/tiny-hf-ct/evaluation.report.json` | Canonical verifier input. |
-| `reports/tiny-hf-ct/verify.json` | Machine-readable verifier result. |
-| `reports/tiny-hf-ct/evaluation.html` | Human-readable report. |
-| `reports/tiny-hf-ct/backend_inventory.json` | compressed-tensors backend version and module inventory when exposed. |
-| `reports/tiny-hf-ct/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
-| `reports/tiny-hf-ct/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
-| `reports/tiny-hf-ct/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
-| `reports/tiny-hf-ct/checkpoint_refs.json` | Baseline and subject checkpoint references. |
-| `reports/tiny-hf-ct/adapter_runtime_summary.json` | `hf_ct` adapter metadata, packed tensor inventory, quantization settings, and file hashes. |
+| `reports/tiny-hf-ct/<artifact-lane>/evaluation.report.json` | Canonical verifier input. |
+| `reports/tiny-hf-ct/<artifact-lane>/verify.json` | Machine-readable verifier result. |
+| `reports/tiny-hf-ct/<artifact-lane>/evaluation.html` | Human-readable report. |
+| `reports/tiny-hf-ct/<artifact-lane>/backend_inventory.json` | compressed-tensors backend version and module inventory when exposed. |
+| `reports/tiny-hf-ct/<artifact-lane>/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
+| `reports/tiny-hf-ct/<artifact-lane>/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
+| `reports/tiny-hf-ct/<artifact-lane>/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
+| `reports/tiny-hf-ct/<artifact-lane>/checkpoint_refs.json` | Baseline and subject checkpoint references. |
+| `reports/tiny-hf-ct/<artifact-lane>/adapter_runtime_summary.json` | `hf_ct` adapter metadata, packed tensor inventory, quantization settings, and file hashes. |
 
 A successful run ends with the shared completion block documented in
 `examples/integrations/_shared/README.md#expected-run-output`. If a run fails,
 check the prerequisite message first, then inspect
-`reports/tiny-hf-ct/run_command.txt`.
+`reports/tiny-hf-ct/<artifact-lane>/run_command.txt`.
 
 The subject checkpoint is produced with `compressed_tensors.compressors.ModelCompressor`
 and contains packed weight tensors plus the HF `quantization_config` metadata.
-Transformers may decompress those tensors for inference on the selected stack;
-the stable example claim is checkpoint-load regression evidence, not deployment
-throughput.
-`backend_inventory.json` is emitted by InvarLock report persistence when adapter
-provenance is available; the shell runner does not write it directly.
+Transformers may decompress those tensors for inference on the selected stack,
+so the stable example claim is checkpoint-load regression evidence.
+The shell runner relies on InvarLock report persistence to emit
+`backend_inventory.json` when adapter provenance is available.
