@@ -103,7 +103,7 @@ Top-level structure (simplified):
 invarlock/
 ├── src/invarlock/           # Library + CLI implementation
 │   ├── core/            # Runner, registry, contracts, auto-tuning, events, types
-│   ├── guards/          # Safety mechanisms (invariants, spectral, rmt, variance, policies)
+│   ├── guards/          # Guard mechanisms (invariants, spectral, rmt, variance, policies)
 │   ├── eval/            # Evaluation metrics and helpers
 │   ├── reporting/       # Evaluation report + reporting surface
 │   ├── cli/             # Typer-based CLI app and commands

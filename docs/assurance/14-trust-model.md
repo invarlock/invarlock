@@ -25,7 +25,7 @@ container-backed evidence. See [Runtime Provenance Guide](../security/runtime-pr
 for the manifest contract.
 
 Evidence-pack verification is separate from report verification. A signed
-evidence pack proves manifest integrity; signer authenticity requires pinning
+evidence pack validates manifest integrity; signer authenticity requires pinning
 with `--expected-fingerprint` or a local trust store.
 
 ## What A Strict Pass Means

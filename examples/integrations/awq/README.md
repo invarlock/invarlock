@@ -9,8 +9,8 @@ Llama-style Hugging Face baseline with AWQ-compatible layer widths, quantizes
 that checkpoint as AWQ, and compares the quantized subject through InvarLock's
 `hf_awq` adapter.
 
-The example is source-tree only. It does not add GPTQModel or CUDA libraries to
-the core InvarLock install.
+The example keeps GPTQModel and CUDA libraries in the example environment rather
+than the core InvarLock install.
 
 ## Prerequisites
 
@@ -38,7 +38,7 @@ uv run --extra awq python -c "import gptqmodel"
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
 | `cuda-container-strict` | `--lane cuda` | Primary evidence path with the example-specific GPTQModel/AWQ image. |
-| `cuda-host-off` | `--lane host` | Secondary local CUDA dependency bring-up without strict container evidence. |
+| `cuda-host-off` | `--lane host --device cuda` | Secondary local CUDA dependency bring-up without strict container evidence. |
 
 Host lanes run prerequisite preflight before model materialization and
 evaluation. This AWQ example is CUDA-only because AWQ materialization requires
@@ -77,7 +77,8 @@ uv run --extra awq \
   examples/integrations/awq/run_tiny_awq.sh \
   --allow-network \
   --force \
-  --lane host
+  --lane host \
+  --device cuda
 ```
 
 The host path uses `--execution-mode host --assurance off` because the AWQ
@@ -122,5 +123,5 @@ The helper fails if CUDA is unavailable, if GPTQModel does not expose a
 quantized checkpoint configuration, or if the subject cannot be loaded back
 through the Transformers AWQ loader with the selected backend.
 
-`backend_inventory.json` is emitted by InvarLock report persistence when adapter
-provenance is available; the shell runner does not write that sidecar directly.
+The shell runner relies on InvarLock report persistence to emit
+`backend_inventory.json` when adapter provenance is available.

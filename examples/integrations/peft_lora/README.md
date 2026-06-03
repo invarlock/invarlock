@@ -9,8 +9,8 @@ LoRA adapter for `sshleifer/tiny-gpt2`, merges it into a HF-loadable subject
 directory, and then compares that subject against the baseline with the shared
 integration wrapper.
 
-The example is source-tree only. It does not add PEFT to the core InvarLock
-install.
+The example keeps PEFT in the example environment rather than the core
+InvarLock install.
 
 ## Prerequisites
 
@@ -26,6 +26,13 @@ fine:
 
 ```bash
 .venv/bin/python -m pip install peft
+```
+
+If the checkout environment was created by `uv sync`, install PEFT into that
+environment with:
+
+```bash
+uv pip install --python .venv/bin/python peft
 ```
 
 ## Run

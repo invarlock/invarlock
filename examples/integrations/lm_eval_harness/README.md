@@ -7,13 +7,12 @@ InvarLock regression evidence for the same checkpoint-edit workflow. It runs a
 tiny `wikitext` task against a baseline model, and optionally a subject model,
 then normalizes the harness JSON into a compact sidecar summary.
 
-The sidecar summary is not an InvarLock verifier input. Keep
-`evaluation.report.json`, `verify.json`, and `evaluation.html` from an InvarLock
-comparison as the evidence artifacts for regression claims; use the LM Eval
-outputs as broader task-score context.
+Use `evaluation.report.json`, `verify.json`, and `evaluation.html` from an
+InvarLock comparison as the evidence artifacts for regression claims. The LM
+Eval sidecar provides broader task-score context beside those artifacts.
 
-The example is source-tree only. It does not add LM Evaluation Harness to the
-core InvarLock install.
+The example keeps LM Evaluation Harness in the example environment rather than
+the core InvarLock install.
 
 ## Prerequisites
 
@@ -29,6 +28,13 @@ fine:
 
 ```bash
 .venv/bin/python -m pip install "lm_eval[hf]"
+```
+
+If the checkout environment was created by `uv sync`, install the optional
+sidecar dependency into that environment with:
+
+```bash
+uv pip install --python .venv/bin/python "lm_eval[hf]"
 ```
 
 ## Run
@@ -49,18 +55,32 @@ prerequisite preflight before LM Evaluation Harness is invoked. The
 
 ### cuda-container-strict InvarLock evidence
 
-Run an InvarLock comparison for the same baseline and subject when the edit
-artifact is HF-loadable:
+Run the PEFT example first when you want the sidecar to use that generated
+subject and fixture:
 
 ```bash
 make runtime-image-cuda
 
+INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-local \
+examples/integrations/peft_lora/run_tiny_peft_lora.sh \
+  --allow-network \
+  --force \
+  --lane cuda
+```
+
+Then run an InvarLock comparison for the same baseline, subject, and PEFT
+fixture when you want a paired report under the LM Eval example directory:
+
+```bash
 INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-local \
 examples/integrations/_shared/run_invarlock_compare.sh \
   --baseline sshleifer/tiny-gpt2 \
   --subject ./examples/integrations/peft_lora/models/tiny-gpt2-peft-lora-merged \
   --report-out ./examples/integrations/lm_eval_harness/reports/tiny-invarlock-pair \
   --lane cuda \
+  --profile release \
+  --preset ./examples/integrations/peft_lora/artifacts/tiny-peft-lora-fixture/preset.yaml \
+  --edit-label peft_lora_merge \
   --allow-network
 ```
 
@@ -69,7 +89,9 @@ Use the InvarLock verifier result as the strict regression evidence, and use
 comparison, use the same command with `--lane host`. Do not use an identical
 baseline and subject as a placeholder for this paired run; the verifier can
 correctly fail that as a non-edit comparison instead of producing useful
-regression evidence.
+regression evidence. For very small edits, a default `ci` profile comparison on
+an unrelated dataset can also fail policy because the measured delta is too close
+to the baseline.
 
 ### cpu-host-off lane
 
@@ -111,9 +133,8 @@ examples/integrations/lm_eval_harness/run_tiny_lm_eval_sidecar.sh \
 ### mps-host-off lane
 
 Use `--device mps` on Apple Silicon when the local harness environment supports
-it. That writes an `mps-host-off` sidecar summary. This sidecar does not produce
-InvarLock runtime provenance; pair it with a `cuda-container-strict` InvarLock
-run for the strict evidence record.
+it. That writes an `mps-host-off` sidecar summary for task-score context. Pair
+it with a `cuda-container-strict` InvarLock run for the strict evidence record.
 
 ## Outputs
 

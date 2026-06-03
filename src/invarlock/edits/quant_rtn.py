@@ -111,7 +111,7 @@ class RTNQuantEdit(ModelEdit):
             clamp_ratio: Outlier clipping ratio (0.0 = no clipping)
             scope: Target scope ("ffn", "attn", "all")
             seed: Random seed for deterministic behavior
-            guard_chain: Optional GuardChain for safety checks
+            guard_chain: Optional GuardChain for guard checks
         """
         per_channel = self._normalize_per_channel_option(per_channel, default=True)
         self._validate_options(

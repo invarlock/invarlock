@@ -1,6 +1,6 @@
 """
-InvarLock – Safety: Data-Driven Variance Equalization (DD-VE)
-=========================================================
+InvarLock: Data-Driven Variance Equalization (DD-VE)
+====================================================
 
 Branch-level variance equalizer for transformer blocks to maintain
 stable residual stream dynamics after edits.

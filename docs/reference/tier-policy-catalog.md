@@ -38,7 +38,7 @@ invarlock report explain \
 ## Concepts
 
 - **Calibrated vs policy keys**: calibrated values come from pilot runs; policy
-  keys define safety margins and floors.
+  keys define conservative margins and floors.
 - **Resolved policies** are recorded in reports under `resolved_policy.*`.
 
 **Policy resolution order (highest → lowest)**
@@ -242,7 +242,7 @@ rule.
 - `deadband` *(policy)* — additional tolerance used by the RMT outlier
   diagnostics/correction path (separate from ε-band acceptance), aligning the
   “ignore small changes” behavior with other guards.
-- `margin` *(policy)* — safety multiplier for the same outlier
+- `margin` *(policy)* — tolerance multiplier for the same outlier
   diagnostics/correction path; higher margins tolerate more deviation before
   flagging.
 

@@ -43,6 +43,7 @@ def test_awq_runner_has_expected_adapter_contract() -> None:
     assert "integration_log_header" in text
     assert "integration_log_step" in text
     assert "lane_artifact_label" in text
+    assert "--require-backend-inventory" in text
     assert "AWQ lanes in this example are CUDA-only" in text
     assert '[[ "$effective_device" != cuda* ]]' in text
     assert '[[ "$quantize_device" != cuda* ]]' in text
@@ -83,7 +84,9 @@ def test_awq_readme_scopes_strict_evidence_to_tiny_runtime() -> None:
     assert "for this tiny AWQ example" in text
     assert "scoped to the configured tiny AWQ checkpoint" in text
     assert "shared integration evidence" in text
-    assert "`backend_inventory.json` is emitted by InvarLock report persistence" in text
+    assert "`cuda-host-off` | `--lane host --device cuda`" in text
+    assert "The shell runner relies on InvarLock report persistence to emit" in text
+    assert "`backend_inventory.json` when adapter provenance is available" in text
 
 
 def test_awq_helper_defaults_are_awq_compatible() -> None:

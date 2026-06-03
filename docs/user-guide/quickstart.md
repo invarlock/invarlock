@@ -32,7 +32,7 @@ pip install "invarlock[hf]"
 invarlock doctor
 ```
 
-Wheel-only review path:
+Wheel-only verification path:
 `invarlock verify /path/to/evaluation.report.json`,
 `invarlock report html -i /path/to/evaluation.report.json -o /path/to/evaluation.html`,
 and `invarlock report explain --evaluation-report /path/to/evaluation.report.json`.

@@ -168,6 +168,7 @@ Missing example dependency: peft
 
 Install PEFT in the environment used for this example, for example:
   python -m pip install peft
+  uv pip install --python .venv/bin/python peft
 
 The core InvarLock install intentionally does not require PEFT.
 MSG

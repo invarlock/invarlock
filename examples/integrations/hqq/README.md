@@ -1,7 +1,8 @@
 # HQQ Runtime Integration Example
 
-Status: `runnable`; `cuda-container-strict`, `cuda-host-off`, and `cpu-host-off`
-lanes are supported.
+Status: `runnable`; strict container evidence is verified for the
+`cuda-container-strict` lane on CUDA for this tiny HQQ example. `cuda-host-off`
+and `cpu-host-off` lanes are supported.
 
 This example shows how to attach InvarLock regression evidence to a Hugging
 Face causal checkpoint loaded through InvarLock's `hf_hqq` adapter. It creates a
@@ -9,8 +10,8 @@ tiny local Llama-style HF checkpoint, uses that checkpoint as the baseline, then
 uses the same checkpoint as the subject loaded through `hf_hqq`, where HQQ
 quantization is applied at adapter load time.
 
-The example is source-tree only. It does not add HQQ to the core InvarLock
-install.
+The example keeps HQQ in the example environment rather than the core
+InvarLock install.
 
 ## Prerequisites
 
@@ -109,5 +110,5 @@ check the prerequisite message first, then inspect
 The example uses native HQQ runtime quantization after loading the HF checkpoint,
 so the subject remains an HF-loadable checkpoint plus adapter runtime
 configuration rather than an HQQ-lib-only checkpoint format.
-`backend_inventory.json` is emitted by InvarLock report persistence when adapter
-provenance is available; the shell runner does not write it directly.
+The shell runner relies on InvarLock report persistence to emit
+`backend_inventory.json` when adapter provenance is available.

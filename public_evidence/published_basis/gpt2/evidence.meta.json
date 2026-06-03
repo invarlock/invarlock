@@ -10,8 +10,8 @@
   "expected_fingerprint": "sha256:eff9de615ddb03ecd5f90e2ba3fa7cf13a0dddeb651df7a4f587b7ca348f9059",
   "generated_by": "public fixture assembly",
   "non_goals": [
-    "Does not vendor model weights.",
-    "Does not prove deployable quantization or runtime compression."
+    "Model weights are external references.",
+    "Deployable quantization and runtime compression are outside this evidence package."
   ],
   "schema": "invarlock.public_evidence.meta.v1",
   "summary": "Strict-pass verifier fixture for the GPT-2-style published-basis lane.",

@@ -109,7 +109,8 @@ def _require_dependencies() -> tuple[Any, Any, Any, Any, Any]:
     except (ImportError, ModuleNotFoundError) as exc:
         raise SystemExit(
             "Missing example dependency. Install PEFT in your example "
-            "environment, for example: python -m pip install peft"
+            "environment, for example: python -m pip install peft "
+            "or uv pip install --python .venv/bin/python peft"
         ) from exc
     return (
         torch,

@@ -29,5 +29,6 @@ uv run invarlock advanced evidence-pack verify \
   --expected-fingerprint sha256:cc17b2af6579f5de01e74d91e93528b04670ff89f907ec3ba786a69065435605
 ```
 
-Non-goals: this does not vendor model weights, and `quant_rtn` is a deterministic
-dequantized weight perturbation rather than a deployable quantization backend.
+Scope: this run records evidence for a deterministic dequantized RTN-style
+weight perturbation. Model-weight vendoring and deployable quantization-backend
+behavior are outside this artifact.

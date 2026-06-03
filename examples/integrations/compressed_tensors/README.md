@@ -1,7 +1,8 @@
 # compressed-tensors Checkpoint Integration Example
 
-Status: `runnable`; `cuda-container-strict`, `cuda-host-off`, and `cpu-host-off`
-lanes are supported.
+Status: `runnable`; strict container evidence is verified for the
+`cuda-container-strict` lane on CUDA for this tiny compressed-tensors example.
+`cuda-host-off` and `cpu-host-off` lanes are supported.
 
 This example shows how to attach InvarLock regression evidence to a Hugging Face
 causal checkpoint saved in the `compressed-tensors` packed checkpoint format. It
@@ -9,11 +10,11 @@ creates a tiny dense Llama-style HF baseline, creates a matching packed
 compressed-tensors subject checkpoint, then compares the baseline through
 `hf_causal` against the subject loaded through InvarLock's `hf_ct` adapter.
 
-The example is source-tree only. It does not add compressed-tensors to the core
-InvarLock install. It validates a pre-quantized checkpoint load path; it does not
-claim compressed-kernel speedups.
+The example keeps compressed-tensors in the example environment rather than the
+core InvarLock install. Its scope is pre-quantized checkpoint-load regression
+evidence; compressed-kernel speedup validation is outside this example.
 `llmcompressor` is covered here as tooling that can produce compatible
-compressed-tensors checkpoints, not as a separate InvarLock adapter/runtime lane.
+compressed-tensors checkpoints.
 
 ## Prerequisites
 
@@ -121,8 +122,7 @@ check the prerequisite message first, then inspect
 
 The subject checkpoint is produced with `compressed_tensors.compressors.ModelCompressor`
 and contains packed weight tensors plus the HF `quantization_config` metadata.
-Transformers may decompress those tensors for inference on the selected stack;
-the stable example claim is checkpoint-load regression evidence, not deployment
-throughput.
-`backend_inventory.json` is emitted by InvarLock report persistence when adapter
-provenance is available; the shell runner does not write it directly.
+Transformers may decompress those tensors for inference on the selected stack,
+so the stable example claim is checkpoint-load regression evidence.
+The shell runner relies on InvarLock report persistence to emit
+`backend_inventory.json` when adapter provenance is available.

@@ -117,7 +117,7 @@ keep `seq_len=stride` for deterministic non-overlapping windows.
 - Low maintenance: you can update your edit tools without waiting for InvarLock updates.
 - Auditable: public BYOE fixtures under `public_evidence/byoe_examples/` show
   dense magnitude pruning and LoRA-merge style subjects verifying through the
-  same release gate.
+  same strict verification path.
 
 ## When to use built-in edits
 

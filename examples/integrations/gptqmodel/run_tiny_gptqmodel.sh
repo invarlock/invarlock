@@ -242,6 +242,9 @@ fi
 if [[ -n "$device" ]]; then
   compare_cmd+=(--device "$device")
 fi
+if [[ "$lane_artifact_label" == "cuda-container-strict" ]]; then
+  compare_cmd+=(--require-backend-inventory)
+fi
 if [[ "$allow_network" -eq 1 ]]; then
   compare_cmd+=(--allow-network)
 fi

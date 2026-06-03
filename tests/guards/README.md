@@ -1,7 +1,7 @@
 # Guards Tests
 
 This directory contains tests for InvarLock's guard mechanisms: invariants,
-spectral, RMT, and variance. Guards are a critical release-gate surface, so the
+spectral, RMT, and variance. Guards are a critical strict-verification surface, so the
 suite favors behavior-local files and ratcheted coverage over a minimal file
 count.
 

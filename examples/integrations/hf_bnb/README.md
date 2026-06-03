@@ -9,11 +9,12 @@ local Llama-style checkpoint, compares that checkpoint as a normal `hf_causal`
 baseline against the same checkpoint loaded with bitsandbytes 8-bit runtime
 quantization, and records backend inventory alongside the evaluation report.
 
-The subject is a runtime-loaded model, not a saved HF export. Use this example
-when the integration point is "load this checkpoint through bitsandbytes and
-compare the resulting subject" rather than "publish a new checkpoint directory."
+Use this example when the integration point is "load this checkpoint through
+bitsandbytes and compare the resulting subject" rather than "publish a new
+checkpoint directory." The subject is a runtime-loaded model for that comparison
+path.
 
-The example is source-tree only. It does not add bitsandbytes to the core
+The example keeps bitsandbytes in the example environment rather than the core
 InvarLock install.
 
 ## Prerequisites
@@ -116,5 +117,5 @@ The generated preset uses local JSONL data so the evaluation data path is
 offline after fixture creation. `--allow-network` is only needed for the HF
 model files when they are not already cached.
 
-`backend_inventory.json` is emitted by InvarLock report persistence when adapter
-provenance is available; the shell runner does not write that sidecar directly.
+The shell runner relies on InvarLock report persistence to emit
+`backend_inventory.json` when adapter provenance is available.

@@ -4,7 +4,7 @@
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Auditable release-gate framework for ML model weight modifications. |
+| **Purpose** | Auditable strict-verification framework for ML model weight modifications. |
 | **Audience** | Developers extending InvarLock, operators debugging pipelines, security reviewers. |
 | **Core components** | CLI shells, Core/runtime policy layer, Guard chain, Reporting/artifact subsystem. |
 | **Design goals** | Torch-independent core, edit-stack-neutral guards, deterministic evaluation, explicit artifact contracts, full provenance. |

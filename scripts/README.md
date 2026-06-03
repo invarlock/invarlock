@@ -62,4 +62,4 @@ inventory checker itself.
 `make architecture-fragmentation-check` also includes tracked `scripts/` metrics
 for large shell files, small-file churn, evidence-pack script concentration, and
 ignored generated cruft. Use those metrics when deciding whether to consolidate
-helpers before public outreach.
+helpers before sharing generated evidence or examples externally.

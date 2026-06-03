@@ -29,7 +29,7 @@ uv run invarlock advanced evidence-pack verify \
   --expected-fingerprint sha256:e01c40a94c89b22306a2670b032f623aa5428351d06e18f9b3e9e6a39b42c41b
 ```
 
-Non-goals: this does not vendor model weights, does not claim sparse runtime
-speedup, and does not claim magnitude pruning is a production compression
-backend. It demonstrates the real BYOE path: a pre-edited external subject
-checkpoint is verified against a baseline.
+Scope: this run records evidence for the real BYOE path, where a pre-edited
+external subject checkpoint is verified against a baseline. Model-weight
+vendoring, sparse runtime speedups, and production compression-backend behavior
+are outside this artifact.

@@ -13,8 +13,8 @@ The checkpoint save-boundary probe in `adapter_runtime_summary.json` is
 supporting metadata. The runnable evidence path is the `hf_torchao` subject
 adapter path recorded in `run_command.txt` and `evaluation.report.json`.
 
-The example is source-tree only. It does not add `torchao` to the core InvarLock
-install.
+The example keeps `torchao` in the example environment rather than the core
+InvarLock install.
 
 ## Prerequisites
 
@@ -114,8 +114,8 @@ check the prerequisite message first, then inspect
 
 The preparer fails if `torchao` does not produce quantized tensor-backed weights
 or if runtime quantization has no measurable weight delta.
-`backend_inventory.json` is emitted by InvarLock report persistence when adapter
-provenance is available; the shell runner does not write that sidecar directly.
+The shell runner relies on InvarLock report persistence to emit
+`backend_inventory.json` when adapter provenance is available.
 
 ## Public Evidence Anchor
 
@@ -127,4 +127,5 @@ invarlock verify --profile release --assurance strict \
 ```
 
 Use that fixture as the stable public reference when the local example
-environment does not have `torchao` installed.
+environment does not have `torchao` installed. It is a generic strict InvarLock
+quantization fixture, not TorchAO-specific integration evidence.

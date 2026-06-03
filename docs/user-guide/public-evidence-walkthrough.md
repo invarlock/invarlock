@@ -4,11 +4,12 @@
 
 This walkthrough shows the shipped public evidence floor that reviewers can
 verify without downloading model weights. It is deliberately BYOE-oriented:
-InvarLock validates a baseline/subject comparison artifact; it does not produce
-deployable quantized checkpoints.
+InvarLock validates baseline/subject comparison artifacts for externally
+materialized subjects; deployable quantized checkpoint production is outside
+this public evidence floor.
 
 `public_evidence/README.md` defines the evidence taxonomy. In short, fixture
-artifacts prove verifier contracts, while real-run artifacts are produced by
+artifacts validate verifier contracts, while real-run artifacts are produced by
 `invarlock evaluate` against materialized baseline and subject checkpoints.
 Every public evidence artifact carries `evidence.meta.json` so reviewers can see
 whether they are looking at a fixture or a real run.
@@ -71,7 +72,7 @@ invarlock advanced evidence-pack verify \
 ```
 
 The expected pack result is `ok=true` with `authenticity=pinned`. Without
-`--expected-fingerprint`, the signature still proves integrity but not signer
+`--expected-fingerprint`, the signature still confirms integrity but not signer
 authenticity.
 
 ## Real model runs
@@ -122,7 +123,7 @@ uv run invarlock advanced evidence-pack verify \
   --expected-fingerprint sha256:e01c40a94c89b22306a2670b032f623aa5428351d06e18f9b3e9e6a39b42c41b
 ```
 
-That artifact is the concrete real-run proof for BYOE/custom subjects: the
+That artifact is the concrete real-run evidence for BYOE/custom subjects: the
 checkpoint weights are not vendored, `checkpoint_refs.json` records the external
 edit type and file hashes, and the report records `edit_name = custom`.
 
@@ -145,14 +146,14 @@ invarlock verify --profile release --assurance strict \
 Each example includes `checkpoint_refs.json` beside the report. The pruning
 fixture is a dense magnitude-pruned subject reference, and the LoRA fixture is a
 merged-adapter/fine-tune style subject reference. Both are validation-subject
-fixtures only: they do not claim sparse runtime speedups, packed quantized
-storage, or a deployable optimized backend.
+fixtures only; sparse runtime speedups, packed quantized storage, and deployable
+optimized backend behavior are outside their scope.
 
 ## Caught regressions
 
 The caught-regression fixtures keep the naive primary metric acceptable
 (`ratio_vs_baseline = 1.0`) while one guard fails. They cover the three
-non-primary guard families exposed in the release gate:
+non-primary guard families exposed in strict verification:
 
 ```bash
 invarlock verify --profile release --assurance strict \
@@ -173,7 +174,7 @@ Release verification requires validation.spectral_stable == true
 spectral did not pass
 ```
 
-That is the intended release-gate behavior: guard stability is required even
+That is the intended strict-verification behavior: guard stability is required even
 when the summary metric is clean.
 
 ## Policy failures
@@ -214,4 +215,5 @@ invarlock verify --profile release --assurance strict \
 
 Keep `evaluation.report.json` and `runtime.manifest.json` together. Use
 `invarlock advanced runtime-verify` only when you specifically want to inspect
-the manifest/report binding; use `invarlock verify` for the full release gate.
+the manifest/report binding; use `invarlock verify` for the full strict
+verification result.

@@ -3,7 +3,7 @@
     "kind": "huggingface_model_ref",
     "materialization": "external_reference",
     "model_id": "sshleifer/tiny-gpt2",
-    "purpose": "Baseline GPT-2-style causal LM reference for BYOE release-gate fixture.",
+    "purpose": "Baseline GPT-2-style causal LM reference for BYOE strict-evidence fixture.",
     "revision": "fixture-public-basis",
     "role": "baseline"
   },
@@ -20,7 +20,7 @@
     "kind": "byoe_checkpoint_ref",
     "materialization": "external_reference",
     "model_id": "sshleifer/tiny-gpt2",
-    "purpose": "External LoRA-merged checkpoint reference used to prove fine-tune/adapter-merge BYOE verifier wiring.",
+    "purpose": "External LoRA-merged checkpoint reference used to validate fine-tune/adapter-merge BYOE verifier wiring.",
     "revision": "fixture-byoe-lora-merge",
     "role": "subject"
   },
