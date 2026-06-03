@@ -227,7 +227,8 @@ def test_torchao_readme_documents_backend_inventory_sidecar() -> None:
     assert (
         "`reports/tiny-hf-torchao-int8/<artifact-lane>/backend_inventory.json`" in text
     )
-    assert "`backend_inventory.json` is emitted by InvarLock report persistence" in text
+    assert "The shell runner relies on InvarLock report persistence to emit" in text
+    assert "`backend_inventory.json` when adapter provenance is available" in text
     assert "adapter provenance is available" in text
 
 

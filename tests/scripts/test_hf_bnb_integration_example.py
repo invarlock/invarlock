@@ -48,7 +48,8 @@ def test_hf_bnb_readme_scopes_strict_evidence_to_tiny_runtime() -> None:
     assert "this tiny\nbitsandbytes runtime-load example" in text
     assert "scoped to the configured tiny runtime-loaded bitsandbytes" in text
     assert "shared integration evidence" in text
-    assert "`backend_inventory.json` is emitted by InvarLock report persistence" in text
+    assert "The shell runner relies on InvarLock report persistence to emit" in text
+    assert "`backend_inventory.json` when adapter provenance is available" in text
 
 
 def test_prepare_tiny_hf_bnb_fixture_writes_local_jsonl_and_preset(
