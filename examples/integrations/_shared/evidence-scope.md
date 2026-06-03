@@ -46,4 +46,10 @@ the adapter, the dataset/window plan, and the verifier result.
 - `invarlock verify --assurance strict` passed for `evaluation.report.json`.
 - `verify.json` was generated from the same report with `--json`.
 - `evaluation.html` was rendered from the same report.
+- `lane_artifact.json` records `cuda-container-strict`.
+- `run_command.txt` records the wrapper, evaluate, verify, and render commands.
+- `run_summary.txt` records verifier and runtime-provenance status.
+- Quantized-adapter lanes include `backend_inventory.json` when adapter
+  provenance is available.
+- Shared strict evidence records or references the runtime image digest.
 - The target README records optional dependencies and any backend limitations.

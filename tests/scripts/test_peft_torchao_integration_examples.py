@@ -8,6 +8,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INTEGRATIONS_DIR = REPO_ROOT / "examples" / "integrations"
+SOURCE_MATRIX = INTEGRATIONS_DIR / "source_matrix.json"
 PEFT_DIR = REPO_ROOT / "examples" / "integrations" / "peft_lora"
 TORCHAO_DIR = REPO_ROOT / "examples" / "integrations" / "torchao_int8_runtime"
 
@@ -43,6 +44,14 @@ def _load_module(path: Path, module_name: str):
     assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
+
+
+def _load_source_matrix() -> dict[str, dict[str, object]]:
+    payload = json.loads(SOURCE_MATRIX.read_text(encoding="utf-8"))
+    assert payload["schema"] == "invarlock.integration_source_matrix.v1"
+    entries = payload["entries"]
+    assert isinstance(entries, list)
+    return {entry["target"]: entry for entry in entries}
 
 
 def test_peft_lora_runner_wires_local_fixture() -> None:
@@ -119,6 +128,7 @@ def test_integration_example_readmes_document_run_lanes() -> None:
     assert "`cuda-host-off`" in awq_text
     assert "`cuda-container-strict`" in awq_text
     assert "--lane host" in awq_text
+    assert "--lane host --device cuda" in awq_text
     assert "--lane cuda" in awq_text
     assert "--device cpu" not in awq_text
     assert awq_text.index("`cuda-container-strict`") < awq_text.index("`cuda-host-off`")
@@ -172,12 +182,21 @@ def test_integration_readme_report_paths_are_lane_scoped() -> None:
 
 
 def test_strict_evidence_claim_readmes_have_artifact_source_matrix() -> None:
-    expected_sources = {
-        "awq": "build_example_runtime_image.sh cuda-gptqmodel",
-        "gptqmodel": "build_example_runtime_image.sh cuda-gptqmodel",
-        "hf_bnb": "build_example_runtime_image.sh cuda-bnb",
-        "peft_lora": "make runtime-image-cuda",
-        "torchao_int8_runtime": "build_example_runtime_image.sh cuda-torchao",
+    matrix_entries = _load_source_matrix()
+    common_artifacts = {
+        "evaluation.report.json",
+        "verify.json",
+        "runtime.manifest.json",
+        "evaluation.html",
+        "lane_artifact.json",
+        "run_command.txt",
+        "run_summary.txt",
+    }
+    quantized_strict_targets = {
+        "awq",
+        "gptqmodel",
+        "hf_bnb",
+        "torchao_int8_runtime",
     }
 
     claimed_readmes = {}
@@ -186,21 +205,46 @@ def test_strict_evidence_claim_readmes_have_artifact_source_matrix() -> None:
         if "strict container evidence is verified" in text:
             claimed_readmes[readme.parent.name] = text
 
-    assert set(claimed_readmes) == set(expected_sources)
+    assert set(claimed_readmes) == set(matrix_entries)
 
-    for example, source_command in expected_sources.items():
-        text = claimed_readmes[example]
+    for example, text in claimed_readmes.items():
+        entry = matrix_entries[example]
+        readme = INTEGRATIONS_DIR / example / "README.md"
+        runner = Path(entry["runner"])
+        runtime_image = entry["runtime_image"]
+        expected = entry["expected"]
+        required_artifacts = set(entry["required_artifacts"])
 
-        assert source_command in text
-        assert "INVARLOCK_RUNTIME_IMAGE=" in text
+        assert Path(entry["readme"]) == readme.relative_to(REPO_ROOT)
+        assert (REPO_ROOT / runner).is_file()
+        assert entry["strict_claim_phrase"] in text
+        assert entry["lane"] == "cuda-container-strict"
+        assert entry["command_shape"] == "--lane cuda"
         assert "`cuda-container-strict`" in text
-        assert "`runtime.manifest.json`" in text
-        assert "/<artifact-lane>/" in text
-        assert "evaluation.report.json" in text
-        assert "verify.json" in text
-        assert "lane_artifact.json" in text
-        assert "run_command.txt" in text
-        assert "run_summary.txt" in text
+        assert str(entry["report_path"]) in text
+        assert runtime_image["source_command"] in text
+        assert runtime_image["digest_source"] == "runtime.manifest.json"
+        assert expected["lane_artifact_label"] == "cuda-container-strict"
+        assert expected["verify_status"] == "ok"
+        assert expected["runtime_provenance_declared"] == "container"
+        assert expected["runtime_provenance_verified"] is True
+        assert common_artifacts <= required_artifacts
+
+        for artifact in required_artifacts:
+            assert artifact in text
+
+        runner_text = (REPO_ROOT / runner).read_text(encoding="utf-8")
+        if example in quantized_strict_targets:
+            assert "backend_inventory.json" in required_artifacts
+            assert (
+                entry["runner_enforcement"]["backend_inventory"]
+                == "--require-backend-inventory"
+            )
+            assert "--require-backend-inventory" in runner_text
+            assert 'lane_artifact_label" == "cuda-container-strict"' in runner_text
+        else:
+            assert "backend_inventory.json" not in required_artifacts
+            assert entry["runner_enforcement"] == {}
 
 
 def test_materialized_subject_readmes_define_evidence_boundary() -> None:
@@ -291,8 +335,14 @@ def test_shared_compare_wrapper_checks_report_materialization() -> None:
 
     text = wrapper.read_text(encoding="utf-8")
     assert "Evaluate completed but did not write the expected report" in text
+    assert "Evaluate completed but did not write the required backend inventory" in text
     assert '[[ ! -s "$report_json" ]]' in text
+    assert (
+        '[[ "$require_backend_inventory" -eq 1 && ! -s "$backend_inventory_json" ]]'
+        in text
+    )
     assert 'rm -f "$report_json" "$verify_json"' in text
+    assert 'rm -f "$report_json" "$verify_json" "$backend_inventory_json"' in text
     assert 'CLI=("$PYTHON_BIN" -m invarlock)' in text
     assert '"${CLI[@]}" evaluate' in text
     assert '"${CLI[@]}" verify' in text
@@ -303,6 +353,7 @@ def test_shared_compare_wrapper_checks_report_materialization() -> None:
     assert "lane_artifact.json" in text
     assert "lane_artifact_label" in text
     assert "run_summary.txt" in text
+    assert "--require-backend-inventory" in text
     assert "InvarLock integration run complete" in text
     assert "InvarLock integration run failed" in text
     assert 'write_run_summary "success"' in text
@@ -342,6 +393,8 @@ def test_shared_expected_artifacts_documents_backend_inventory() -> None:
     assert "`backend_inventory.json`" in text
     assert "InvarLock report persistence" in text
     assert "adapter provenance is available" in text
+    assert "reports/<target>/<artifact-lane>/evaluation.report.json" in text
+    assert "--runtime-provenance container" in text
 
 
 def test_shared_preflight_helper_defines_host_lane_contract() -> None:
