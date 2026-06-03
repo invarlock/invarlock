@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -369,6 +371,119 @@ def test_shared_compare_wrapper_checks_report_materialization() -> None:
     assert "report_out_was_default=1" in text
     assert "report_out_was_default=0" in text
     assert "<artifact-lane>" in text
+
+
+def test_shared_compare_wrapper_enforces_backend_inventory_sidecar(
+    tmp_path: Path,
+) -> None:
+    wrapper = (
+        REPO_ROOT / "examples" / "integrations" / "_shared" / "run_invarlock_compare.sh"
+    )
+    fake_python = tmp_path / "fake_python"
+    fake_python.write_text(
+        f"""#!{sys.executable}
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+REAL_PYTHON = {sys.executable!r}
+
+if sys.argv[1:3] != ["-m", "invarlock"]:
+    raise SystemExit(subprocess.run([REAL_PYTHON, *sys.argv[1:]]).returncode)
+
+args = sys.argv[3:]
+command = args[0]
+if command == "evaluate":
+    report_out = Path(args[args.index("--report-out") + 1])
+    report_out.mkdir(parents=True, exist_ok=True)
+    (report_out / "evaluation.report.json").write_text(
+        json.dumps({{"schema": "fake", "results": []}}) + "\\n",
+        encoding="utf-8",
+    )
+    if os.environ.get("FAKE_INVARLOCK_WRITE_BACKEND_INVENTORY") == "1":
+        (report_out / "backend_inventory.json").write_text(
+            json.dumps({{"adapter": "fake"}}) + "\\n",
+            encoding="utf-8",
+        )
+    raise SystemExit(0)
+if command == "verify":
+    payload = {{
+        "summary": {{"ok": True, "reason": "ok"}},
+        "results": [
+            {{
+                "verification": {{
+                    "runtime_provenance": {{
+                        "declared_mode": "container",
+                        "status": "verified",
+                        "verified": True,
+                    }}
+                }}
+            }}
+        ],
+    }}
+    print(json.dumps(payload))
+    raise SystemExit(0)
+if command == "report" and args[1] == "html":
+    output = Path(args[args.index("-o") + 1])
+    output.write_text("<html></html>\\n", encoding="utf-8")
+    raise SystemExit(0)
+raise SystemExit(f"unexpected fake invarlock command: {{args!r}}")
+""",
+        encoding="utf-8",
+    )
+    fake_python.chmod(0o755)
+
+    base_cmd = [
+        str(wrapper),
+        "--baseline",
+        "dense",
+        "--subject",
+        "quant",
+        "--report-out",
+        str(tmp_path / "reports"),
+        "--lane",
+        "cuda",
+        "--require-backend-inventory",
+        "--no-html",
+    ]
+    env = os.environ.copy()
+    env["PYTHON_BIN"] = str(fake_python)
+
+    missing = subprocess.run(
+        base_cmd,
+        cwd=REPO_ROOT,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert missing.returncode == 1
+    assert "required backend inventory" in missing.stderr
+    assert (tmp_path / "reports" / "evaluation.report.json").is_file()
+    assert not (tmp_path / "reports" / "backend_inventory.json").exists()
+
+    env["FAKE_INVARLOCK_WRITE_BACKEND_INVENTORY"] = "1"
+    ok = subprocess.run(
+        base_cmd,
+        cwd=REPO_ROOT,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert ok.returncode == 0
+    assert "InvarLock integration run complete" in ok.stdout
+    assert (tmp_path / "reports" / "backend_inventory.json").is_file()
+    assert (tmp_path / "reports" / "verify.json").is_file()
+    assert "status: success" in (tmp_path / "reports" / "run_summary.txt").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_shared_source_archive_helper_avoids_macos_xattrs() -> None:
