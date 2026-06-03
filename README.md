@@ -71,38 +71,19 @@ runs with signed, fingerprint-pinned evidence packs.
 
 ## How it works
 
-```text
-Baseline checkpoint         Subject checkpoint
-        |                          |
-        +------------+-------------+
-                     |
-                     v
-             evaluate command
-       container by default; host opt-in
-                     |
-     deterministic paired windows
-     invariants -> spectral -> RMT -> variance -> invariants
-                     |
-        +------------+-------------+
-        |                          |
-        v                          v
-runs/.../report.json        reports/<name>/
-baseline/subject traces       evaluation.report.json
-        |                     runtime.manifest.json
-        v                             |
-report generate / explain             v
-                             verify command
-                  schema + pairing + gates + provenance
-                                      |
-                         +------------+------------+
-                         |                         |
-                         v                         v
-                    PASS: promote            FAIL: block
-                         |
-                         v
-                 report html command
-                 optional evidence pack
-```
+<p align="center">
+  <img
+    src="docs/assets/evaluation-verification-flow.svg"
+    alt="InvarLock evaluation and verification flow"
+    width="100%"
+  />
+</p>
+
+Flow summary: baseline and subject checkpoints enter `invarlock evaluate`,
+which produces paired run traces plus `evaluation.report.json` and
+`runtime.manifest.json`. `invarlock verify` checks schema, pairing, gates, and
+runtime provenance; passing reports can then be rendered with
+`invarlock report html` or packaged as evidence.
 
 ## Quick Start
 
