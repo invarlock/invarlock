@@ -12,7 +12,7 @@ For torch-dependent functionality, see subpackages under `invarlock.*`:
 - `invarlock.eval`: Metrics, guard-overhead checks, and evaluation reporting
 """
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 
 from dataclasses import dataclass
 
