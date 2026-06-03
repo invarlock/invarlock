@@ -1,0 +1,3368 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Official documentation for the InvarLock toolkit">
+      
+      
+      
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/reference/tier-policy-catalog/">
+      
+      
+        <link rel="prev" href="../config-schema/">
+      
+      
+        <link rel="next" href="../datasets/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Tier Policy Catalog - InvarLock Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#tier-policy-catalog-runtime-tiersyaml" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            InvarLock Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Tier Policy Catalog
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/getting-started/" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../cli/" class="md-tabs__link">
+          
+  
+  
+  CLI Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../assurance/00-assurance-case/" class="md-tabs__link">
+          
+  
+  
+  Assurance
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../security/best-practices/" class="md-tabs__link">
+          
+  
+  
+  Security
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    InvarLock Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/primary-metric-smoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Primary Metric Smoke
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/compare-and-evaluate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/live-examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/bring-your-own-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bring Your Own Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/plugins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/config-gallery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Gallery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/example-reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/failure-examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Failure Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/reading-report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading a Report
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/evidence-packs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence Packs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/evidence-packs-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence Pack Internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    CLI Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../one-run-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    One Run Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../programmatic-quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Programmatic Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model-adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model-family-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Family Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tier Policy Catalog
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tier Policy Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Comparison
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concepts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Concepts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-override-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key override matrix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#location" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Location
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tier-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier scope
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#catalog-what-why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Catalog (what + why)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Catalog (what + why)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#primary-metric-gates-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primary-metric gates (metrics.*)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Primary-metric gates (metrics.*)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#metricspm_ratio-ppl-like-kinds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        metrics.pm_ratio.* (ppl-like kinds)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metricspm_tail-primary-metric-tail-gate-ppl-like-kinds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        metrics.pm_tail.* (Primary Metric Tail gate; ppl-like kinds)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metricsaccuracy-accuracy-kinds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        metrics.accuracy.* (accuracy kinds)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spectral-guard-spectral_guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spectral guard (spectral_guard.*)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rmt-guard-rmt_guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RMT guard (rmt_guard.*)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#variance-guard-variance_guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Variance guard (variance_guard.*)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#observability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related Documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifact Layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../calibration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../alternatives-comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternatives Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Assurance
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/00-assurance-case/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance Case
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/14-trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/15-strict-assurance-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strict Assurance Checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/01-eval-math-derivation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Math Derivation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/02-coverage-and-pairing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coverage & Pairing Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/03-bca-bootstrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BCa Bootstrap (Paired Δlog)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/04-guard-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Contracts & Primer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/05-spectral-fpr-derivation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral False-Positive Control
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/06-rmt-epsilon-rule/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RMT ε-Rule
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/07-ve-gate-power/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VE Predictive Gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/08-determinism-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Determinism Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/09-tier-v1-calibration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tier Policy v1 Calibration (Pilot)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/10-guard-overhead-method/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Overhead Method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/11-policy-provenance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy Provenance & Digest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/12-device-drift-bands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Device Drift Bands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/13-gpu-mps-first-guards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GPU/MPS-First Guard Measurement Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/16-guard-validation-smoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Validation Smoke
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/17-empirical-guard-evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Empirical Guard Evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best Practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/release-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threat Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/runtime-provenance-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Provenance Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/pip-audit-allowlist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pip Audit Allowlist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Comparison
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concepts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Concepts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-override-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key override matrix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#location" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Location
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tier-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier scope
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#catalog-what-why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Catalog (what + why)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Catalog (what + why)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#primary-metric-gates-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primary-metric gates (metrics.*)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Primary-metric gates (metrics.*)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#metricspm_ratio-ppl-like-kinds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        metrics.pm_ratio.* (ppl-like kinds)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metricspm_tail-primary-metric-tail-gate-ppl-like-kinds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        metrics.pm_tail.* (Primary Metric Tail gate; ppl-like kinds)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metricsaccuracy-accuracy-kinds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        metrics.accuracy.* (accuracy kinds)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spectral-guard-spectral_guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spectral guard (spectral_guard.*)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rmt-guard-rmt_guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RMT guard (rmt_guard.*)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#variance-guard-variance_guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Variance guard (variance_guard.*)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#observability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related Documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="tier-policy-catalog-runtime-tiersyaml">Tier Policy Catalog (runtime <code>tiers.yaml</code>)<a class="headerlink" href="#tier-policy-catalog-runtime-tiersyaml" title="Permanent link">&para;</a></h1>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Purpose</strong></td>
+<td>Explain each policy key in <code>tiers.yaml</code> and its rationale.</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>Operators auditing tier defaults and guard thresholds.</td>
+</tr>
+<tr>
+<td><strong>Supported tiers</strong></td>
+<td><code>balanced</code>, <code>conservative</code> (aggressive is research-only).</td>
+</tr>
+<tr>
+<td><strong>Source of truth</strong></td>
+<td>Packaged <code>runtime/tiers.yaml</code> (override via <code>INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml</code>).</td>
+</tr>
+</tbody>
+</table>
+<h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Inspect resolved tier policies in a report</span>
+invarlock<span class="w"> </span>report<span class="w"> </span>explain<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--subject-report<span class="w"> </span>runs/subject/report.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--baseline-report<span class="w"> </span>runs/baseline/report.json
+</code></pre></div>
+
+<h2 id="quick-comparison">Quick Comparison<a class="headerlink" href="#quick-comparison" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Balanced</th>
+<th>Conservative</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>PM Ratio Limit</strong></td>
+<td>≤ 1.10</td>
+<td>≤ 1.05</td>
+</tr>
+<tr>
+<td><strong>Spectral σ Quantile</strong></td>
+<td>0.95</td>
+<td>0.90</td>
+</tr>
+<tr>
+<td><strong>Spectral Deadband</strong></td>
+<td>0.10</td>
+<td>0.05</td>
+</tr>
+<tr>
+<td><strong>Spectral Max Caps</strong></td>
+<td>5</td>
+<td>3</td>
+</tr>
+<tr>
+<td><strong>RMT ε (all families)</strong></td>
+<td>0.01</td>
+<td>0.01</td>
+</tr>
+<tr>
+<td><strong>VE Predictive Gate</strong></td>
+<td>One-sided CI</td>
+<td>Two-sided CI</td>
+</tr>
+<tr>
+<td><strong>VE min_effect_lognll</strong></td>
+<td>0.0</td>
+<td>0.016</td>
+</tr>
+<tr>
+<td><strong>Bootstrap Replicates</strong></td>
+<td>≥ 1200</td>
+<td>≥ 1500</td>
+</tr>
+<tr>
+<td><strong>Min Windows</strong></td>
+<td>180/180</td>
+<td>220/220</td>
+</tr>
+<tr>
+<td><strong>Use Case</strong></td>
+<td>Standard edits, dev/CI</td>
+<td>High-stakes releases</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Values are from the packaged <code>tiers.yaml</code>; inspect with <code>invarlock report explain</code>.</p>
+</blockquote>
+<h2 id="concepts">Concepts<a class="headerlink" href="#concepts" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Calibrated vs policy keys</strong>: calibrated values come from pilot runs; policy
+  keys define conservative margins and floors.</li>
+<li><strong>Resolved policies</strong> are recorded in reports under <code>resolved_policy.*</code>.</li>
+</ul>
+<p><strong>Policy resolution order (highest → lowest)</strong></p>
+<ol>
+<li>Explicit guard overrides in config (<code>guards.*</code> in YAML, deep‑merged).</li>
+<li>Edit adjustments (<code>EDIT_ADJUSTMENTS</code>, e.g. <code>quant_rtn</code> tweaks <code>rmt.deadband</code>).</li>
+<li>Profile guard overrides (<code>runtime/profiles/&lt;profile&gt;.yaml</code> → <code>guards.*</code>).</li>
+<li>Runtime <code>tiers.yaml</code> (via <code>INVARLOCK_CONFIG_ROOT</code> or packaged data).</li>
+<li>Built‑in defaults (<code>TIER_POLICIES</code>).</li>
+</ol>
+<h3 id="key-override-matrix">Key override matrix<a class="headerlink" href="#key-override-matrix" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Tier default</th>
+<th>Profile override</th>
+<th>Edit adjustment</th>
+<th>Config override</th>
+<th>Winner rule</th>
+<th>Confirm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>spectral.sigma_quantile</code></td>
+<td>✅</td>
+<td>✅</td>
+<td>—</td>
+<td>✅</td>
+<td>Config &gt; profile &gt; tier.</td>
+<td><code>resolved_policy.spectral.sigma_quantile</code>.</td>
+</tr>
+<tr>
+<td><code>rmt.deadband</code></td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>Config &gt; edit &gt; profile &gt; tier.</td>
+<td><code>resolved_policy.rmt.deadband</code>.</td>
+</tr>
+<tr>
+<td><code>variance.max_calib</code></td>
+<td>✅</td>
+<td>✅</td>
+<td>—</td>
+<td>✅</td>
+<td>Config &gt; profile &gt; tier.</td>
+<td><code>resolved_policy.variance.max_calib</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Metric gates (<code>metrics.pm_ratio</code>, <code>metrics.pm_tail</code>, <code>metrics.accuracy</code>) are
+resolved from tier policies (tiers.yaml + defaults) and surfaced under
+<code>resolved_policy.metrics.*</code>.</p>
+<h2 id="reference">Reference<a class="headerlink" href="#reference" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>Plain language:</strong> The packaged <code>runtime/tiers.yaml</code> is
+the source of truth for tier defaults. Some values are <strong>calibrated</strong> from pilot/null runs (e.g.,
+Spectral κ, RMT ε, VE min‑effect). The rest are <strong>policies</strong> (explicit design
+choices like sample-size floors, dead bands, and caps). This page is the “why
+map”: for every key in <code>tiers.yaml</code>, it explains what it controls and where to
+point for the rationale.</p>
+</blockquote>
+<h3 id="location">Location<a class="headerlink" href="#location" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Packaged default: <code>runtime/tiers.yaml</code></li>
+<li>Override: set <code>INVARLOCK_CONFIG_ROOT</code> and provide <code>runtime/tiers.yaml</code> under it
+  (see <code>docs/reference/env-vars.md</code>).</li>
+</ul>
+<h3 id="tier-scope">Tier scope<a class="headerlink" href="#tier-scope" title="Permanent link">&para;</a></h3>
+<p>Balanced and Conservative are the supported published assurance tiers; Aggressive is
+research‑oriented and explicitly outside the assurance case (see
+<code>docs/assurance/00-assurance-case.md</code>).</p>
+<h3 id="catalog-what-why">Catalog (what + why)<a class="headerlink" href="#catalog-what-why" title="Permanent link">&para;</a></h3>
+<p>This page documents the tier keys grouped by section. Each section follows the
+same structure:</p>
+<ul>
+<li><strong>What it controls</strong> (runtime behavior)</li>
+<li><strong>Where documented</strong> (assurance notes / method write-ups)</li>
+<li><strong>Keys</strong> (key-by-key meaning)</li>
+<li><strong>Observability</strong> (where it appears in reports/evaluation artifacts)</li>
+</ul>
+<h4 id="primary-metric-gates-metrics">Primary-metric gates (<code>metrics.*</code>)<a class="headerlink" href="#primary-metric-gates-metrics" title="Permanent link">&para;</a></h4>
+<p><strong>What it controls.</strong> Run-level acceptance gates applied when generating/verifying
+a report (see “Quality Gates” in <code>docs/assurance/04-guard-contracts.md</code>).</p>
+<p><strong>Where documented.</strong></p>
+<ul>
+<li><code>docs/assurance/04-guard-contracts.md</code> (gate definitions + flags)</li>
+</ul>
+<p><strong>Observability.</strong></p>
+<ul>
+<li>Resolved thresholds: <code>resolved_policy.metrics.*</code></li>
+<li>Gate flags: <code>validation.primary_metric_acceptable</code>, <code>validation.primary_metric_tail_acceptable</code></li>
+<li>CLI: <code>invarlock report explain</code> prints the resolved thresholds, floors, and outcomes.</li>
+</ul>
+<h5 id="metricspm_ratio-ppl-like-kinds"><code>metrics.pm_ratio.*</code> (ppl-like kinds)<a class="headerlink" href="#metricspm_ratio-ppl-like-kinds" title="Permanent link">&para;</a></h5>
+<p><strong>Keys.</strong></p>
+<ul>
+<li><code>ratio_limit_base</code> <em>(policy)</em> — the baseline-relative gate for ppl-like
+  primary metrics (<code>ratio_vs_baseline ≤ ratio_limit_base</code>, and when a CI exists,
+  <code>ratio_ci.upper ≤ ratio_limit_base</code>). Rationale and tier intent are described
+  in <code>docs/assurance/04-guard-contracts.md</code> (“Primary metric … ppl-like kinds”).</li>
+<li><code>min_tokens</code> <em>(policy)</em> — minimum total tokens (preview + final) required
+  before enforcing the ppl ratio gate. Rationale: prevents noisy PASS/FAIL on
+  tiny samples; keeps CI smokes meaningful while allowing small local
+  demos.</li>
+<li><code>min_token_fraction</code> <em>(policy)</em> — dataset-scale-aware floor: when the runner
+  knows available tokens, the effective floor becomes
+  <code>max(min_tokens, ceil(tokens_available * min_token_fraction))</code>. Rationale:
+  avoids “passing” large datasets using an unrepresentative tiny subset.</li>
+<li><code>hysteresis_ratio</code> <em>(policy)</em> — small additive slack on the ratio gate
+  (<code>ratio_limit_base + hysteresis_ratio</code>). Rationale: avoids PASS/FAIL flapping
+  when results hover near the boundary; reports mark when hysteresis was
+  needed (<code>validation.hysteresis_applied</code>).</li>
+</ul>
+<p><strong>Observability.</strong></p>
+<ul>
+<li>Resolved policy: <code>resolved_policy.metrics.pm_ratio</code></li>
+<li>Evidence: <code>primary_metric.{ratio_vs_baseline,display_ci}</code></li>
+<li>Gate flag: <code>validation.primary_metric_acceptable</code></li>
+</ul>
+<h5 id="metricspm_tail-primary-metric-tail-gate-ppl-like-kinds"><code>metrics.pm_tail.*</code> (Primary Metric Tail gate; ppl-like kinds)<a class="headerlink" href="#metricspm_tail-primary-metric-tail-gate-ppl-like-kinds" title="Permanent link">&para;</a></h5>
+<p><strong>What it controls.</strong> A <strong>tail-regression backstop</strong> computed on paired
+<strong>per-window</strong> ΔlogNLL samples vs the baseline (window-by-window
+<code>logloss_subject - logloss_baseline</code>, matched by <code>window_id</code> on the <strong>final</strong>
+schedule). It is additive to the mean/CI primary-metric gate.</p>
+<p><strong>Keys.</strong></p>
+<ul>
+<li><code>mode</code> <em>(policy)</em> — <code>off|warn|fail</code>.</li>
+<li><code>warn</code> (default): violations are recorded in the report but do <strong>not</strong>
+    fail validation (<code>validation.primary_metric_tail_acceptable</code> stays true).</li>
+<li><code>fail</code>: violations fail validation and can trigger rollback in internal
+    run pipelines (<code>rollback_reason = primary_metric_tail_failed</code>).</li>
+<li><code>min_windows</code> <em>(policy)</em> — minimum paired windows required before evaluating
+  thresholds. Underpowered runs set <code>primary_metric_tail.evaluated = false</code> and
+  do not warn/fail.</li>
+<li><code>quantile</code> <em>(policy)</em> — which percentile to monitor (default 0.95 → P95).
+  Quantiles are computed <strong>unweighted</strong> with deterministic linear interpolation
+  on sorted ΔlogNLL values.</li>
+<li><code>quantile_max</code> <em>(policy/calibration target)</em> — maximum allowed ΔlogNLL at the
+  selected quantile (e.g., <code>P95 ≤ 0.20</code>).</li>
+<li><code>epsilon</code> <em>(policy)</em> — deadband for “tail mass”: <code>tail_mass = Pr[ΔlogNLL &gt; ε]</code>.</li>
+<li><code>mass_max</code> <em>(policy/calibration target)</em> — maximum allowed tail mass. Defaults
+  to 1.0 (non-binding) until calibrated.</li>
+</ul>
+<p><strong>Observability.</strong></p>
+<ul>
+<li>report evidence: <code>primary_metric_tail.{stats,policy,violations}</code>.</li>
+<li>Validation flag: <code>validation.primary_metric_tail_acceptable</code> (false only in <code>fail</code> mode).</li>
+<li>CLI: <code>invarlock report explain</code> prints “Gate: Primary Metric Tail (ΔlogNLL)”.</li>
+</ul>
+<h5 id="metricsaccuracy-accuracy-kinds"><code>metrics.accuracy.*</code> (accuracy kinds)<a class="headerlink" href="#metricsaccuracy-accuracy-kinds" title="Permanent link">&para;</a></h5>
+<p><strong>Keys.</strong></p>
+<ul>
+<li><code>delta_min_pp</code> <em>(policy)</em> — minimum allowed delta accuracy vs baseline (percentage
+  points). Defaults per tier are stated in <code>docs/assurance/04-guard-contracts.md</code>
+  (“accuracy kinds … defaults”).</li>
+<li><code>min_examples</code> <em>(policy)</em> — minimum <code>n_final</code> required before enforcing the
+  delta accuracy gate. Rationale: avoids gating on too few examples.</li>
+<li><code>min_examples_fraction</code> <em>(policy)</em> — dataset-scale-aware floor: when available
+  examples are known, the effective floor becomes
+  <code>max(min_examples, ceil(examples_available * min_examples_fraction))</code>.</li>
+<li><code>hysteresis_delta_pp</code> <em>(policy)</em> — small slack on the delta accuracy gate
+  (<code>delta_min_pp - hysteresis_delta_pp</code>). Rationale: avoids flapping near the
+  boundary; marked in reports via <code>validation.hysteresis_applied</code>.</li>
+</ul>
+<p><strong>Observability.</strong></p>
+<ul>
+<li>Resolved policy: <code>resolved_policy.metrics.accuracy</code></li>
+<li>Evidence: <code>primary_metric.{ratio_vs_baseline,display_ci}</code></li>
+<li>Gate flag: <code>validation.primary_metric_acceptable</code></li>
+</ul>
+<h4 id="spectral-guard-spectral_guard">Spectral guard (<code>spectral_guard.*</code>)<a class="headerlink" href="#spectral-guard-spectral_guard" title="Permanent link">&para;</a></h4>
+<p><strong>What it controls.</strong> Weight-based stability thresholds for per-family spectral
+monitoring.</p>
+<p><strong>Where documented.</strong></p>
+<ul>
+<li><code>docs/assurance/05-spectral-fpr-derivation.md</code> (policy + FPR control)</li>
+<li><code>docs/assurance/09-tier-v1-calibration.md</code> (pilot numbers + recalibration)</li>
+</ul>
+<p><strong>Keys.</strong></p>
+<ul>
+<li><code>sigma_quantile</code> <em>(calibrated)</em> — which baseline percentile defines the
+  reference sigma target used for z-scoring.</li>
+<li><code>deadband</code> <em>(policy)</em> — z-score deadband δ to suppress flicker (see
+  <code>docs/assurance/05-spectral-fpr-derivation.md</code>).</li>
+<li><code>scope</code> <em>(policy)</em> — which families are actively budgeted/monitored (e.g.,
+  <code>all</code> vs <code>ffn</code>), described in <code>docs/assurance/05-spectral-fpr-derivation.md</code>.</li>
+<li><code>max_caps</code> <em>(policy)</em> — per-run WARN/cap budget; exceeding this aborts in
+  CI/Release (see <code>docs/assurance/05-spectral-fpr-derivation.md</code>).</li>
+<li><code>max_spectral_norm</code> <em>(policy)</em> — optional absolute clamp. <code>null</code> means “no
+  absolute clamp”; rely on relative z-caps and the WARN budget (see
+  <code>docs/assurance/09-tier-v1-calibration.md</code> “Keep these fixed … no clamp”).</li>
+<li><code>family_caps</code> <em>(calibrated)</em> — per-family κ caps (stored as raw floats in
+  <code>tiers.yaml</code>; normalized to <code>{family: {kappa: ...}}</code> at runtime).</li>
+<li><code>multiple_testing</code> <em>(policy)</em> — the correction procedure used to interpret
+  κ across families (<code>bh</code>/<code>bonferroni</code>, α, m); see
+  <code>docs/assurance/05-spectral-fpr-derivation.md</code>.</li>
+</ul>
+<p><strong>Observability.</strong></p>
+<ul>
+<li>Evidence: <code>spectral.{summary,families,family_caps,multiple_testing}</code></li>
+<li>Resolved policy: <code>resolved_policy.spectral</code></li>
+<li>Gate flag: <code>validation.spectral_stable</code></li>
+</ul>
+<h4 id="rmt-guard-rmt_guard">RMT guard (<code>rmt_guard.*</code>)<a class="headerlink" href="#rmt-guard-rmt_guard" title="Permanent link">&para;</a></h4>
+<p><strong>What it controls.</strong> Activation edge-risk stability via the ε-band acceptance
+rule.</p>
+<p><strong>Where documented.</strong></p>
+<ul>
+<li><code>docs/assurance/06-rmt-epsilon-rule.md</code> (acceptance rule + calibration)</li>
+<li><code>docs/assurance/09-tier-v1-calibration.md</code> (recalibration recipe)</li>
+</ul>
+<p><strong>Keys.</strong></p>
+<ul>
+<li><code>epsilon_by_family</code> <em>(calibrated)</em> — ε(f) per family for the acceptance band:
+  <code>edge_cur(f) ≤ (1 + ε(f)) · edge_base(f)</code>.</li>
+<li><code>epsilon_default</code> <em>(calibrated)</em> — fallback ε used when a family-specific
+  value is missing.</li>
+<li><code>deadband</code> <em>(policy)</em> — additional tolerance used by the RMT outlier
+  diagnostics/correction path (separate from ε-band acceptance), aligning the
+  “ignore small changes” behavior with other guards.</li>
+<li><code>margin</code> <em>(policy)</em> — tolerance multiplier for the same outlier
+  diagnostics/correction path; higher margins tolerate more deviation before
+  flagging.</li>
+</ul>
+<p><strong>Observability.</strong></p>
+<ul>
+<li>Evidence: <code>rmt.{status,stable,families,epsilon_by_family,epsilon_violations}</code></li>
+<li>Resolved policy: <code>resolved_policy.rmt</code></li>
+<li>Gate flag: <code>validation.rmt_stable</code></li>
+</ul>
+<h4 id="variance-guard-variance_guard">Variance guard (<code>variance_guard.*</code>)<a class="headerlink" href="#variance-guard-variance_guard" title="Permanent link">&para;</a></h4>
+<p><strong>What it controls.</strong> VE enablement/correction knobs including the predictive
+gate and min-effect semantics.</p>
+<p><strong>Where documented.</strong></p>
+<ul>
+<li><code>docs/assurance/07-ve-gate-power.md</code> (power + sidedness + tier knobs)</li>
+<li><code>docs/assurance/09-tier-v1-calibration.md</code> (min-effect recalibration)</li>
+</ul>
+<p><strong>Keys.</strong></p>
+<ul>
+<li><code>predictive_gate</code> <em>(policy)</em> — when true, VE only enables if the predictive
+  A/B gate passes (report records <code>variance.predictive_gate.*</code>).</li>
+<li><code>predictive_one_sided</code> <em>(calibrated policy)</em> — one-sided improvement gate
+  semantics (Balanced) vs two-sided CI (Conservative); see
+  <code>docs/assurance/07-ve-gate-power.md</code>.</li>
+<li><code>min_effect_lognll</code> <em>(calibrated)</em> — minimum absolute improvement required for
+  VE enablement; derived from <span class="arithmatex">\(z\,\hat{\sigma}/\sqrt{n}\)</span> per tier, see
+  <code>docs/assurance/07-ve-gate-power.md</code>.</li>
+<li><code>deadband</code> <em>(policy)</em> — ignores small proposed adjustments (prevents
+  “flicker”/tiny rescaling).</li>
+<li><code>min_abs_adjust</code> <em>(policy)</em> — absolute floor on per-module |scale − 1| before a
+  proposed scale is considered.</li>
+<li><code>max_scale_step</code> <em>(policy)</em> — per-module maximum |scale − 1| applied in a
+  single run (caps correction aggressiveness).</li>
+<li><code>topk_backstop</code> <em>(policy)</em> — backstop that allows selecting the top candidate
+  scale when filtering would otherwise produce no usable scales.</li>
+<li><code>max_adjusted_modules</code> <em>(policy)</em> — optional cap on how many modules receive a
+  scale in one run (0 means “no cap”).</li>
+<li><code>tap</code> <em>(policy)</em> — module-name pattern(s) that define where VE is allowed to
+  attach. Rationale: the tap must match the edited sublayer for provenance and
+  reproducibility; see “Provenance &amp; tap” in <code>docs/assurance/07-ve-gate-power.md</code>.</li>
+</ul>
+<p><strong>Observability.</strong></p>
+<ul>
+<li>Evidence: <code>variance.{enabled,predictive_gate,ab_test,scope,proposed_scales}</code></li>
+<li>Resolved policy: <code>resolved_policy.variance</code></li>
+</ul>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Overrides not taking effect</strong>: ensure <code>INVARLOCK_CONFIG_ROOT</code> points to a
+  directory containing <code>runtime/tiers.yaml</code>.</li>
+<li><strong>Aggressive tier usage</strong>: this tier is research-only and outside the safety
+  case; prefer <code>balanced</code> or <code>conservative</code>.</li>
+</ul>
+<h2 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Resolved policies appear under <code>resolved_policy.*</code> in reports.</li>
+<li>The CLI <code>invarlock report explain</code> prints gate decisions and policy digests.</li>
+</ul>
+<h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../guards/">Guards</a></li>
+<li><a href="../config-schema/">Configuration Schema</a></li>
+<li><a href="../env-vars/">Environment Variables</a></li>
+<li><a href="../../assurance/04-guard-contracts/">Guard Contracts &amp; Primer</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.expand", "navigation.tabs"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
