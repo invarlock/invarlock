@@ -12,6 +12,7 @@ They are intentionally independent of optional third-party backends.
 | `preflight.sh` | Host-lane device checks, host default resolution, and artifact-lane labels. |
 | `run_invarlock_compare.sh` | Shared compare/verify/render wrapper for HF-loadable baseline and subject paths. |
 | `create_source_archive.sh` | Source-only archive helper for sharing reproducible example inputs. |
+| `validate_source_matrix_artifacts.py` | Validates generated strict-lane artifact directories against `source_matrix.json`. |
 
 ## Preflight Checklist
 
