@@ -6,7 +6,7 @@ usage() {
 Usage:
   examples/integrations/_shared/create_source_archive.sh [--output PATH] [--committed|--include-worktree]
 
-Create a source-only tarball for outreach-style integration validation.
+Create a source-only tarball for external integration validation.
 
 Modes:
   --committed          Archive HEAD with git archive. This matches GitHub source
@@ -16,7 +16,7 @@ Modes:
 
 Default:
   If the checkout is clean, use --committed. If it is dirty, use
-  --include-worktree so local pre-PR validation can include pending changes.
+  --include-worktree so local validation can include pending changes.
 USAGE
 }
 

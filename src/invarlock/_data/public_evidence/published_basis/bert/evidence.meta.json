@@ -7,8 +7,8 @@
   "evidence_class": "strict_pass_fixture",
   "generated_by": "public fixture assembly",
   "non_goals": [
-    "Does not vendor model weights.",
-    "Does not prove deployable compression or runtime acceleration."
+    "Model weights are external references.",
+    "Deployable compression and runtime acceleration are outside this evidence package."
   ],
   "schema": "invarlock.public_evidence.meta.v1",
   "summary": "Strict-pass verifier fixture for the BERT-style published-basis lane.",

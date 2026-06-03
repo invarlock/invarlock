@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: "InvarLock: Auditable release gates for edited model checkpoints"
+title: "InvarLock: Auditable strict verification for edited model checkpoints"
 message: "If you use InvarLock in scientific work, please cite it using the metadata below."
 type: software
 abstract: >
@@ -29,7 +29,7 @@ contact:
     name: "Security Response"
 preferred-citation:
   type: software
-  title: "InvarLock: Auditable release gates for edited model checkpoints"
+  title: "InvarLock: Auditable strict verification for edited model checkpoints"
   authors:
     - name: "InvarLock"
   repository-code: https://github.com/invarlock/invarlock

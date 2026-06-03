@@ -29,7 +29,7 @@ Target examples should declare one of these labels in their README:
 | Label | Meaning |
 | --- | --- |
 | `runnable` | Commands are expected to generate `evaluation.report.json`, `verify.json`, and `evaluation.html` in the documented environment. |
-| `exploratory-host` | Commands run with `--execution-mode host --assurance off` for backend bring-up or local debugging. |
+| `exploratory-host` | Commands run with `--execution-mode host --assurance off` for local dependency setup and backend investigation. |
 | `compatibility-investigation` | The external artifact cannot yet be loaded or verified through the documented InvarLock path; the README records the blocker. |
 
 ## Preflight

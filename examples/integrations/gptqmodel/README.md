@@ -8,7 +8,7 @@ quantized by GPTQModel. It creates a deterministic tiny Llama-style Hugging Face
 baseline, quantizes that checkpoint with GPTQModel, and compares the quantized
 subject through InvarLock's `hf_gptq` adapter.
 
-The example is source-tree only. It does not add GPTQModel to the core
+The example keeps GPTQModel in the example environment rather than the core
 InvarLock install.
 
 ## Prerequisites
@@ -123,5 +123,5 @@ check the prerequisite message first, then inspect
 The helper fails if GPTQModel does not produce a quantized checkpoint
 configuration or if the subject cannot be loaded back through GPTQModel.
 
-`backend_inventory.json` is emitted by InvarLock report persistence when adapter
-provenance is available; the shell runner does not write that sidecar directly.
+The shell runner relies on InvarLock report persistence to emit
+`backend_inventory.json` when adapter provenance is available.

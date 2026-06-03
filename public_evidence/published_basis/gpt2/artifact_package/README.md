@@ -5,9 +5,9 @@ basis. It binds the baseline checkpoint reference, subject checkpoint reference,
 strict-pass report, runtime manifest, signed evidence pack, and verifier
 commands in one place.
 
-The package does not vendor model weights. Checkpoint materialization is external
-by design: reviewers can verify the shipped evidence without downloading
-weights, and maintainers can rebuild the checkpoints from
+The package is weight-free by design. Checkpoint materialization is external:
+reviewers can verify the shipped evidence without downloading weights, and
+maintainers can rebuild the checkpoints from
 `../evidence_pack_recipe.json` when producing a fresh evidence drop.
 
 ## Contents
@@ -16,7 +16,7 @@ weights, and maintainers can rebuild the checkpoints from
 | --- | --- |
 | `artifact_package.json` | Machine-readable package manifest and verifier commands. |
 | `checkpoint_refs.json` | Baseline and subject checkpoint references for the BYOE lane. |
-| `../evaluation.report.json` | Canonical release-gate report. |
+| `../evaluation.report.json` | Canonical strict verification report. |
 | `../runtime.manifest.json` | Container runtime provenance bound to the report. |
 | `../evidence_pack/` | Signed, checksum-bound evidence pack. |
 

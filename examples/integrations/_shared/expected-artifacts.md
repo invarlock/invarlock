@@ -1,7 +1,7 @@
 # Expected Artifacts
 
 Runnable integration examples should generate a small, reviewable artifact set
-under an ignored local output directory such as
+under a local output directory outside version-controlled source files, such as
 `reports/<target>/<artifact-lane>/` when multiple lanes are being compared.
 
 | Artifact | Required | Role |
@@ -31,7 +31,7 @@ invarlock report html \
   -o reports/<target>/evaluation.html
 ```
 
-For release-grade strict review, use:
+For release-profile strict verification, use:
 
 ```bash
 invarlock verify --profile release --assurance strict \

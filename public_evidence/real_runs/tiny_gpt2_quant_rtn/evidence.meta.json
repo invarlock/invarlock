@@ -11,8 +11,8 @@
   "generated_by": "invarlock evaluate",
   "model_family": "gpt2",
   "non_goals": [
-    "Does not vendor model weights.",
-    "Does not claim quant_rtn is a deployable quantization backend."
+    "Model weights are external references.",
+    "Deployable quantization-backend behavior is outside this artifact."
   ],
   "profile": "release",
   "report_sha256": "01ed52d0c592f0ed69623b05a347b57a49f9f576ca6080af0d2c6782fcca9994",

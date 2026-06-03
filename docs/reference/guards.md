@@ -4,7 +4,7 @@
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Safety checks that validate edits against baseline-derived contracts. |
+| **Purpose** | Guard checks that validate edits against baseline-derived contracts. |
 | **Audience** | Users tuning guard behavior and reviewing report evidence. |
 | **Supported guards** | `invariants`, `spectral`, `rmt`, `variance` (plus optional plugin guards). |
 | **Requires** | `invarlock[guards]` for torch/numpy guard math. |

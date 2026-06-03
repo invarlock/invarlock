@@ -1,6 +1,6 @@
 # Guard Validation Smoke
 
-> **Plain language:** The smoke command proves the synthetic guard-validation
+> **Plain language:** The smoke command checks the synthetic guard-validation
 > harness still runs and records deterministic guard behavior. Real model-family
 > evidence remains a separate release-evidence surface.
 

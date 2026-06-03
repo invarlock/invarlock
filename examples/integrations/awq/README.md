@@ -9,8 +9,8 @@ Llama-style Hugging Face baseline with AWQ-compatible layer widths, quantizes
 that checkpoint as AWQ, and compares the quantized subject through InvarLock's
 `hf_awq` adapter.
 
-The example is source-tree only. It does not add GPTQModel or CUDA libraries to
-the core InvarLock install.
+The example keeps GPTQModel and CUDA libraries in the example environment rather
+than the core InvarLock install.
 
 ## Prerequisites
 
@@ -122,5 +122,5 @@ The helper fails if CUDA is unavailable, if GPTQModel does not expose a
 quantized checkpoint configuration, or if the subject cannot be loaded back
 through the Transformers AWQ loader with the selected backend.
 
-`backend_inventory.json` is emitted by InvarLock report persistence when adapter
-provenance is available; the shell runner does not write that sidecar directly.
+The shell runner relies on InvarLock report persistence to emit
+`backend_inventory.json` when adapter provenance is available.

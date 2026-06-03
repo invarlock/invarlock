@@ -16,9 +16,9 @@ weights.
 ## When To Use InvarLock
 
 - You produced an edited checkpoint (quantization, pruning, fine-tune) and
-  need a machine-verifiable artifact that proves it did not regress beyond
+  need a machine-verifiable artifact showing it stayed within
   configured bounds.
-- A release gate needs a fail-closed `evaluate -> verify` contract with
+- A strict verification workflow needs a fail-closed `evaluate -> verify` contract with
   pairing, guard evidence, and runtime provenance.
 - Reviewers expect a self-contained report bundle they can re-verify offline.
 
@@ -46,7 +46,7 @@ weights.
 1. Use compression or edit tooling to produce the subject checkpoint.
 2. Use lm-eval / LightEval for broad downstream benchmark confidence.
 3. Use an MLOps platform for tracking, monitoring, and dashboards.
-4. Use InvarLock at the release gate to produce a machine-verifiable report
+4. Use InvarLock in the strict verification workflow to produce a machine-verifiable report
    that says a specific edited checkpoint stayed within configured regression
    and guard thresholds relative to a fixed baseline.
 
