@@ -52,5 +52,5 @@ the adapter, the dataset/window plan, and the verifier result.
 - Quantized-adapter lanes include `backend_inventory.json` when adapter
   provenance is available.
 - Shared strict evidence records or references the runtime image digest.
-- The target README records required or optional dependencies and backend
-  limitations when they apply.
+- Each integration example README records required or optional dependencies and
+  backend limitations when they apply.
