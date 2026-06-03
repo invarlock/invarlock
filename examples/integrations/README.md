@@ -19,7 +19,8 @@ prerequisites, commands, and generated artifact list.
 - `_shared/expected-artifacts.md` lists the artifacts each runnable example
   should produce.
 - `source_matrix.json` binds explicit strict-evidence README claims to the
-  target runner, runtime image source, lane label, and required sidecars.
+  target runner, runtime image source, lane label, verifier expectation, and
+  required core and target-specific sidecars.
 - `_shared/preflight.sh` contains shared host-lane preflight and artifact-lane
   labeling helpers.
 - `_shared/run_invarlock_compare.sh` is a reusable baseline-vs-subject wrapper

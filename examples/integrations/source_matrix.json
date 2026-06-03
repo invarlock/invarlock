@@ -32,7 +32,15 @@
         "backend_inventory.json",
         "lane_artifact.json",
         "run_command.txt",
-        "run_summary.txt"
+        "run_summary.txt",
+        "checkpoint_refs.json",
+        "external_edit_summary.json",
+        "fixture_summary.json"
+      ],
+      "provenance_artifacts": [
+        "checkpoint_refs.json",
+        "external_edit_summary.json",
+        "fixture_summary.json"
       ],
       "runner_enforcement": {
         "backend_inventory": "--require-backend-inventory"
@@ -68,7 +76,15 @@
         "backend_inventory.json",
         "lane_artifact.json",
         "run_command.txt",
-        "run_summary.txt"
+        "run_summary.txt",
+        "checkpoint_refs.json",
+        "external_edit_summary.json",
+        "fixture_summary.json"
+      ],
+      "provenance_artifacts": [
+        "checkpoint_refs.json",
+        "external_edit_summary.json",
+        "fixture_summary.json"
       ],
       "runner_enforcement": {
         "backend_inventory": "--require-backend-inventory"
@@ -104,7 +120,11 @@
         "backend_inventory.json",
         "lane_artifact.json",
         "run_command.txt",
-        "run_summary.txt"
+        "run_summary.txt",
+        "fixture_summary.json"
+      ],
+      "provenance_artifacts": [
+        "fixture_summary.json"
       ],
       "runner_enforcement": {
         "backend_inventory": "--require-backend-inventory"
@@ -139,7 +159,15 @@
         "evaluation.html",
         "lane_artifact.json",
         "run_command.txt",
-        "run_summary.txt"
+        "run_summary.txt",
+        "checkpoint_refs.json",
+        "external_edit_summary.json",
+        "fixture_summary.json"
+      ],
+      "provenance_artifacts": [
+        "checkpoint_refs.json",
+        "external_edit_summary.json",
+        "fixture_summary.json"
       ],
       "runner_enforcement": {}
     },
@@ -173,7 +201,147 @@
         "backend_inventory.json",
         "lane_artifact.json",
         "run_command.txt",
-        "run_summary.txt"
+        "run_summary.txt",
+        "checkpoint_refs.json",
+        "adapter_runtime_summary.json",
+        "fixture_summary.json"
+      ],
+      "provenance_artifacts": [
+        "checkpoint_refs.json",
+        "adapter_runtime_summary.json",
+        "fixture_summary.json"
+      ],
+      "runner_enforcement": {
+        "backend_inventory": "--require-backend-inventory"
+      }
+    },
+    {
+      "target": "compressed_tensors",
+      "readme": "examples/integrations/compressed_tensors/README.md",
+      "runner": "examples/integrations/compressed_tensors/run_tiny_hf_ct.sh",
+      "status_label": "runnable",
+      "strict_claim_phrase": "strict container evidence is verified",
+      "subject_form": "materialized-checkpoint",
+      "subject_adapter": "hf_ct",
+      "lane": "cuda-container-strict",
+      "command_shape": "--lane cuda",
+      "report_path": "reports/tiny-hf-ct/<artifact-lane>",
+      "runtime_image": {
+        "family": "cuda-compressed-tensors",
+        "source_command": "examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-compressed-tensors",
+        "digest_source": "runtime.manifest.json"
+      },
+      "expected": {
+        "lane_artifact_label": "cuda-container-strict",
+        "verify_status": "ok",
+        "runtime_provenance_declared": "container",
+        "runtime_provenance_verified": true
+      },
+      "required_artifacts": [
+        "evaluation.report.json",
+        "verify.json",
+        "runtime.manifest.json",
+        "evaluation.html",
+        "backend_inventory.json",
+        "lane_artifact.json",
+        "run_command.txt",
+        "run_summary.txt",
+        "checkpoint_refs.json",
+        "adapter_runtime_summary.json",
+        "fixture_summary.json"
+      ],
+      "provenance_artifacts": [
+        "checkpoint_refs.json",
+        "adapter_runtime_summary.json",
+        "fixture_summary.json"
+      ],
+      "runner_enforcement": {
+        "backend_inventory": "--require-backend-inventory"
+      }
+    },
+    {
+      "target": "hqq",
+      "readme": "examples/integrations/hqq/README.md",
+      "runner": "examples/integrations/hqq/run_tiny_hf_hqq.sh",
+      "status_label": "runnable",
+      "strict_claim_phrase": "strict container evidence is verified",
+      "subject_form": "runtime-adapter",
+      "subject_adapter": "hf_hqq",
+      "lane": "cuda-container-strict",
+      "command_shape": "--lane cuda",
+      "report_path": "reports/tiny-hf-hqq/<artifact-lane>",
+      "runtime_image": {
+        "family": "cuda-hqq",
+        "source_command": "examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-hqq",
+        "digest_source": "runtime.manifest.json"
+      },
+      "expected": {
+        "lane_artifact_label": "cuda-container-strict",
+        "verify_status": "ok",
+        "runtime_provenance_declared": "container",
+        "runtime_provenance_verified": true
+      },
+      "required_artifacts": [
+        "evaluation.report.json",
+        "verify.json",
+        "runtime.manifest.json",
+        "evaluation.html",
+        "backend_inventory.json",
+        "lane_artifact.json",
+        "run_command.txt",
+        "run_summary.txt",
+        "checkpoint_refs.json",
+        "adapter_runtime_summary.json",
+        "fixture_summary.json"
+      ],
+      "provenance_artifacts": [
+        "checkpoint_refs.json",
+        "adapter_runtime_summary.json",
+        "fixture_summary.json"
+      ],
+      "runner_enforcement": {
+        "backend_inventory": "--require-backend-inventory"
+      }
+    },
+    {
+      "target": "quanto",
+      "readme": "examples/integrations/quanto/README.md",
+      "runner": "examples/integrations/quanto/run_tiny_hf_quanto.sh",
+      "status_label": "runnable",
+      "strict_claim_phrase": "strict container evidence is verified",
+      "subject_form": "runtime-adapter",
+      "subject_adapter": "hf_quanto",
+      "lane": "cuda-container-strict",
+      "command_shape": "--lane cuda",
+      "report_path": "reports/tiny-hf-quanto/<artifact-lane>",
+      "runtime_image": {
+        "family": "cuda-quanto",
+        "source_command": "examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-quanto",
+        "digest_source": "runtime.manifest.json"
+      },
+      "expected": {
+        "lane_artifact_label": "cuda-container-strict",
+        "verify_status": "ok",
+        "runtime_provenance_declared": "container",
+        "runtime_provenance_verified": true
+      },
+      "required_artifacts": [
+        "evaluation.report.json",
+        "verify.json",
+        "runtime.manifest.json",
+        "evaluation.html",
+        "backend_inventory.json",
+        "lane_artifact.json",
+        "run_command.txt",
+        "run_summary.txt",
+        "checkpoint_refs.json",
+        "adapter_runtime_summary.json",
+        "fixture_summary.json"
+      ],
+      "provenance_artifacts": [
+        "checkpoint_refs.json",
+        "adapter_runtime_summary.json",
+        "fixture_summary.json"
       ],
       "runner_enforcement": {
         "backend_inventory": "--require-backend-inventory"

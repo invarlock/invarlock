@@ -1,7 +1,8 @@
 # HQQ Runtime Integration Example
 
-Status: `runnable`; `cuda-container-strict`, `cuda-host-off`, and `cpu-host-off`
-lanes are supported.
+Status: `runnable`; `cuda-container-strict` strict container evidence is verified
+on CUDA for this tiny HQQ example. `cuda-host-off` and `cpu-host-off` lanes are
+supported.
 
 This example shows how to attach InvarLock regression evidence to a Hugging
 Face causal checkpoint loaded through InvarLock's `hf_hqq` adapter. It creates a

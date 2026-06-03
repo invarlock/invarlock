@@ -196,9 +196,50 @@ def test_strict_evidence_claim_readmes_have_artifact_source_matrix() -> None:
     }
     quantized_strict_targets = {
         "awq",
+        "compressed_tensors",
         "gptqmodel",
         "hf_bnb",
+        "hqq",
+        "quanto",
         "torchao_int8_runtime",
+    }
+    target_provenance_artifacts = {
+        "awq": {
+            "checkpoint_refs.json",
+            "external_edit_summary.json",
+            "fixture_summary.json",
+        },
+        "compressed_tensors": {
+            "checkpoint_refs.json",
+            "adapter_runtime_summary.json",
+            "fixture_summary.json",
+        },
+        "gptqmodel": {
+            "checkpoint_refs.json",
+            "external_edit_summary.json",
+            "fixture_summary.json",
+        },
+        "hf_bnb": {"fixture_summary.json"},
+        "hqq": {
+            "checkpoint_refs.json",
+            "adapter_runtime_summary.json",
+            "fixture_summary.json",
+        },
+        "peft_lora": {
+            "checkpoint_refs.json",
+            "external_edit_summary.json",
+            "fixture_summary.json",
+        },
+        "quanto": {
+            "checkpoint_refs.json",
+            "adapter_runtime_summary.json",
+            "fixture_summary.json",
+        },
+        "torchao_int8_runtime": {
+            "checkpoint_refs.json",
+            "adapter_runtime_summary.json",
+            "fixture_summary.json",
+        },
     }
 
     claimed_readmes = {}
@@ -216,6 +257,7 @@ def test_strict_evidence_claim_readmes_have_artifact_source_matrix() -> None:
         runtime_image = entry["runtime_image"]
         expected = entry["expected"]
         required_artifacts = set(entry["required_artifacts"])
+        provenance_artifacts = set(entry["provenance_artifacts"])
 
         assert Path(entry["readme"]) == readme.relative_to(REPO_ROOT)
         assert (REPO_ROOT / runner).is_file()
@@ -231,11 +273,16 @@ def test_strict_evidence_claim_readmes_have_artifact_source_matrix() -> None:
         assert expected["runtime_provenance_declared"] == "container"
         assert expected["runtime_provenance_verified"] is True
         assert common_artifacts <= required_artifacts
+        assert provenance_artifacts == target_provenance_artifacts[example]
+        assert provenance_artifacts <= required_artifacts
 
         for artifact in required_artifacts:
             assert artifact in text
 
         runner_text = (REPO_ROOT / runner).read_text(encoding="utf-8")
+        for artifact in provenance_artifacts:
+            assert artifact in runner_text
+
         if example in quantized_strict_targets:
             assert "backend_inventory.json" in required_artifacts
             assert (
@@ -506,10 +553,26 @@ def test_shared_expected_artifacts_documents_backend_inventory() -> None:
     ).read_text(encoding="utf-8")
 
     assert "`backend_inventory.json`" in text
+    assert "`external_edit_summary.json`" in text
+    assert "`adapter_runtime_summary.json`" in text
+    assert "`fixture_summary.json`" in text
     assert "InvarLock report persistence" in text
     assert "adapter provenance is available" in text
     assert "reports/<target>/<artifact-lane>/evaluation.report.json" in text
     assert "--runtime-provenance container" in text
+    assert "For the primary CUDA/container strict lane" in text
+
+
+def test_shared_evidence_scope_documents_source_matrix_contract() -> None:
+    text = (
+        REPO_ROOT / "examples" / "integrations" / "_shared" / "evidence-scope.md"
+    ).read_text(encoding="utf-8")
+
+    assert "`source_matrix.json` is the source-controlled contract" in text
+    assert "strict container evidence is verified" in text
+    assert "`source_matrix.json` has an entry" in text
+    assert "`checkpoint_refs.json`, `external_edit_summary.json`" in text
+    assert "`adapter_runtime_summary.json`, and `fixture_summary.json`" in text
 
 
 def test_shared_preflight_helper_defines_host_lane_contract() -> None:
