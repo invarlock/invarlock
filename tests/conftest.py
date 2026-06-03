@@ -2,13 +2,10 @@ from __future__ import annotations
 
 import os
 import sys
-import types
 from importlib import import_module
 from pathlib import Path
 
 import pytest
-
-from invarlock.reporting.report_types import AutoConfig
 
 _VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
 _PATCH_TARGET_MODULES = (
@@ -21,59 +18,21 @@ _PATCH_TARGET_MODULES = (
     "invarlock.core.registry",
     "invarlock.core.run_orchestrator_execute",
     "invarlock.core.runner",
-    "invarlock.core.runtime_manifest_verify",
+    "invarlock.runtime_verify",
     "invarlock.eval.bench_runner",
     "invarlock.eval.data",
     "invarlock.eval.metrics_activation",
     "invarlock.eval.metrics_support",
     "invarlock.eval.primary_metric",
-    "invarlock.eval.providers.seq2seq",
-    "invarlock.model_utils",
     "invarlock.model_profile",
     "invarlock.observability.core",
     "invarlock.observability.health",
     "invarlock.plugins.bitsandbytes",
     "invarlock.evidence_pack",
-    "invarlock.reporting.report_console",
+    "invarlock.reporting.report_summary",
     "invarlock.reporting.report_make",
-    "invarlock.reporting.report_telemetry",
+    "invarlock.reporting.report_builder_support",
 )
-
-
-def install_transformers_tokenizer_stub() -> None:
-    """Install a tiny transformers tokenizer stub for import-only CLI tests."""
-    try:
-        import_module("transformers")
-        return
-    except (ImportError, ModuleNotFoundError):
-        pass
-
-    if "transformers" not in sys.modules:
-        tr = types.ModuleType("transformers")
-
-        class _Tok:
-            pad_token = "<pad>"
-            eos_token = "<eos>"
-
-            def get_vocab(self) -> dict[str, int]:
-                return {"<pad>": 0, "<eos>": 1}
-
-        class _Auto:
-            @staticmethod
-            def from_pretrained(*_args: object, **_kwargs: object) -> _Tok:
-                return _Tok()
-
-        class _GPT2(_Auto):
-            pass
-
-        tr.AutoTokenizer = _Auto
-        tr.GPT2Tokenizer = _GPT2
-        sys.modules["transformers"] = tr
-
-    if "transformers.tokenization_utils_base" not in sys.modules:
-        sub = types.ModuleType("transformers.tokenization_utils_base")
-        sub.PreTrainedTokenizerBase = object
-        sys.modules["transformers.tokenization_utils_base"] = sub
 
 
 def _reattach_parent_package_attrs(module_name: str) -> None:
@@ -88,22 +47,6 @@ def _reattach_parent_package_attrs(module_name: str) -> None:
             continue
         if not hasattr(parent_module, child_name):
             setattr(parent_module, child_name, child_module)
-
-
-def make_test_auto_config(
-    *,
-    enabled: bool = False,
-    tier: str = "balanced",
-    probes_used: int = 0,
-    target_pm_ratio: float | None = None,
-) -> AutoConfig:
-    """Return a fully typed AutoConfig for report fixture builders."""
-    return AutoConfig(
-        enabled=enabled,
-        tier=tier,
-        probes_used=probes_used,
-        target_pm_ratio=target_pm_ratio,
-    )
 
 
 @pytest.fixture(autouse=True)

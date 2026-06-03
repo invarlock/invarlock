@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from invarlock.guards_ref.spectral_ref import _finite01, spectral_decide
+from tests.guards.property.strategies import _finite01, spectral_decide
 
 
 def test_spectral_decide_invalid_alpha_falls_back_to_default() -> None:

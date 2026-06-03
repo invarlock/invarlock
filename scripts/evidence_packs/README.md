@@ -1,0 +1,59 @@
+# Evidence Pack Scripts
+
+Stable front doors:
+
+| Command | Purpose | Runtime |
+| --- | --- | --- |
+| `scripts/evidence_packs/run_pack.sh` | Build a full evidence pack from configured scenarios. | Medium to long; network/GPU optional by suite. |
+| `scripts/evidence_packs/verify_pack.sh` | Verify an existing evidence pack, including nested reports and signatures. | Fast to medium; offline. |
+| `scripts/evidence_packs/run_mini_pack_gate.sh` | Local dry-run and targeted mini-pack gate used by tests. | Fast; offline by default. |
+
+Everything under `lib/`, `python/`, `tests/`, and `fixtures/` is an
+implementation helper for those entry points. `lib/` is split by concern:
+
+- `lib/core/`: portable runtime, retry/fault-tolerance, remote setup.
+- `lib/config/`: dataset/provider and InvarLock config rendering.
+- `lib/tasks/`: model creation, task execution, and task JSON serialization.
+- `lib/queue/`: queue lifecycle, GPU scheduling, and worker loops.
+- `lib/validation/`: suite orchestration and verdict compilation.
+
+New JSON/state/path validation logic should be Python-first under
+`scripts/evidence_packs/python/`; shell wrappers should stay thin and
+orchestration-focused. Shared verification parsing now lives in
+`scripts/evidence_packs/python/verify_pack_checks.py` instead of inline shell
+heredocs.
+
+The remaining `lib/*.sh` files are acceptable where they coordinate processes:
+locking queue directories, moving task files between states, launching workers,
+handling signals, and dispatching remote commands. Structured state mutation
+belongs in Python. Queue retry/progress JSON is handled by
+`scripts/evidence_packs/python/queue_state.py`; future queue changes that parse
+or rewrite task JSON should extend that helper instead of adding more `jq`
+programs or shell heredocs.
+
+Python helper boundaries:
+
+- `python/create_edit_model.py`: one-shot validation-subject edit creation
+  (`quant-rtn`, `magnitude-prune`, `lowrank-svd`, `fp8-quant`).
+- `python/create_edits_batch.py`: batched edit creation from tuned edit specs.
+- `python/editing/`: shared edit metadata, targeting, implementation, save,
+  validation, and deployable artifact helpers used by edit entrypoints.
+- `python/runtime_tools.py`: runtime environment checks plus shared Hugging Face
+  model-loading helpers.
+- `python/task_tools.py create-error-model` + `python/error_model/`:
+  structural/error injection subject creation.
+- `python/verdict/`: verdict table and verdict-generation internals.
+
+Workflow boundaries:
+
+| Area | Owner | Notes |
+| --- | --- | --- |
+| Local smoke | `run_mini_pack_gate.sh`, shell tests | Must support `--dry-run`. |
+| Release evidence build | `run_pack.sh`, `run_suite.sh` | Use explicit suite/scenario manifests. |
+| Verification | `verify_pack.sh`, Python verification helpers | Offline-first; signing-key pinning is forwarded when supplied. |
+| Remote/GPU campaigns | scenario manifests and model evidence sweep callers | Keep campaign-specific state out of root `scripts/`. |
+
+Breaking cleanup rule: scripts under `python/` are not public package APIs. If a
+helper is unreferenced or only exists as an internal compatibility shim, remove
+or move it in the same change that updates repo-owned shell callers, docs, and
+tests.

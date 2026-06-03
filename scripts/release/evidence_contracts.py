@@ -2,42 +2,60 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import re
+import sys
 import tarfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+try:
+    from scripts.release.evidence_contracts_empirical import (
+        _MANIFEST_OBJECT_ERROR,
+        ALLOWED_EVIDENCE_KINDS,
+        EMPIRICAL_GUARD_EVIDENCE_CHECK_SCHEMA,
+        EMPIRICAL_GUARD_EVIDENCE_SCHEMA,
+        REAL_PRODUCER_MARKERS,
+        REQUIRED_GUARDS,
+        EmpiricalGuardEvidenceManifest,
+        GuardEvidenceRow,
+        ModelFamilyEvidenceRow,
+        resolve_artifact,
+    )
+except ImportError:  # pragma: no cover - direct script execution path
+    from evidence_contracts_empirical import (
+        _MANIFEST_OBJECT_ERROR,
+        ALLOWED_EVIDENCE_KINDS,
+        EMPIRICAL_GUARD_EVIDENCE_CHECK_SCHEMA,
+        EMPIRICAL_GUARD_EVIDENCE_SCHEMA,
+        REAL_PRODUCER_MARKERS,
+        REQUIRED_GUARDS,
+        EmpiricalGuardEvidenceManifest,
+        GuardEvidenceRow,
+        ModelFamilyEvidenceRow,
+        resolve_artifact,
+    )
+
 RELEASE_CHECK_SCHEMA = "invarlock/release-evidence-check-v1"
 OFFLINE_BUNDLE_SCHEMA = "invarlock/release-offline-bundle-v1"
 GUARD_VALIDATION_SMOKE_SCHEMA = "invarlock/guard-validation-smoke-v1"
-EMPIRICAL_GUARD_EVIDENCE_SCHEMA = "invarlock/empirical-guard-evidence-v1"
-EMPIRICAL_GUARD_EVIDENCE_CHECK_SCHEMA = "invarlock/empirical-guard-evidence-check-v1"
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 RUNTIME_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
-REQUIRED_GUARDS = frozenset({"spectral", "rmt", "variance"})
-ALLOWED_EVIDENCE_KINDS = frozenset(
-    {
-        "calibration_null_sweep",
-        "calibration_ve_sweep",
-        "evidence_pack",
-        "model_evidence_sweep",
-        "checkpoint_probe",
-    }
-)
-REAL_PRODUCER_MARKERS = (
-    "model-evidence-sweep",
-    "model_evidence_sweep.py",
-    "calibrate null-sweep",
-    "calibrate ve-sweep",
-    "run_pack.sh",
-    "run_suite.sh",
-    "run_model_evidence_remote.py",
-    "run_qwen14_sentinels.sh",
-)
+
+__all__ = [
+    "ALLOWED_EVIDENCE_KINDS",
+    "EMPIRICAL_GUARD_EVIDENCE_CHECK_SCHEMA",
+    "EMPIRICAL_GUARD_EVIDENCE_SCHEMA",
+    "EmpiricalGuardEvidenceManifest",
+    "GuardEvidenceRow",
+    "ModelFamilyEvidenceRow",
+    "REAL_PRODUCER_MARKERS",
+    "REQUIRED_GUARDS",
+]
 
 
 def existing_globs(root: Path, patterns: tuple[str, ...]) -> list[Path]:
@@ -440,198 +458,304 @@ class ReleaseEvidenceManifest:
         }
 
 
-def resolve_artifact(
+def _existing_globs(root: Path, patterns: tuple[str, ...]) -> list[Path]:
+    return existing_globs(root, patterns)
+
+
+def _require_file(path: Path, label: str, failures: list[str]) -> None:
+    require_file(path, label, failures)
+
+
+def _require_any(
+    root: Path, patterns: tuple[str, ...], label: str, failures: list[str]
+) -> None:
+    require_any(root, patterns, label, failures)
+
+
+def _dist_artifacts(dist_root: Path) -> list[Path]:
+    return existing_globs(dist_root, ("*.whl", "*.tar.gz"))
+
+
+def _sha256(path: Path) -> str:
+    return sha256(path)
+
+
+def _load_json(path: Path, label: str, failures: list[str]) -> object | None:
+    return load_json(path, label, failures)
+
+
+def _parse_hash_entries(path: Path, failures: list[str]) -> dict[str, str]:
+    return DistHashManifest.load(path, failures).entries
+
+
+def _validate_dist_hashes(
+    *, dist_root: Path, hash_path: Path, failures: list[str]
+) -> None:
+    if not _dist_artifacts(dist_root) or not hash_path.is_file():
+        return
+    manifest = DistHashManifest.load(hash_path, failures)
+    if not manifest.entries:
+        failures.append(f"wheel/sdist hashes file has no valid entries: {hash_path}")
+        return
+    manifest.validate_artifacts(dist_root=dist_root, failures=failures)
+
+
+def _validate_runtime_digest(path: Path, failures: list[str]) -> None:
+    ReleaseEvidenceManifest._validate_runtime_digest(path, failures)
+
+
+def _validate_strict_report(path: Path, failures: list[str]) -> None:
+    StrictReportEvidence.load(path, failures).validate(failures)
+
+
+def _validate_strict_verify(path: Path, report_path: Path, failures: list[str]) -> None:
+    StrictVerifyEvidence.load(path, failures).validate(
+        report_path=report_path,
+        failures=failures,
+    )
+
+
+def _validate_guard_validation(
+    *, json_path: Path, markdown_path: Path, failures: list[str]
+) -> None:
+    GuardValidationSmokeManifest.load(
+        json_path=json_path,
+        markdown_path=markdown_path,
+        failures=failures,
+    ).validate(failures)
+
+
+def _validate_sbom(path: Path, failures: list[str]) -> None:
+    payload = load_json(path, "SBOM", failures)
+    if payload is not None and not isinstance(payload, dict):
+        failures.append("SBOM must be a JSON object.")
+
+
+def _validate_offline_bundle(offline_bundle_dir: Path, failures: list[str]) -> None:
+    manifest = ReleaseEvidenceManifest(
+        release_root=Path(),
+        dist_root=Path(),
+        sbom_path=Path(),
+        guard_validation_json=Path(),
+        guard_validation_markdown=Path(),
+        offline_bundle_dir=offline_bundle_dir,
+    )
+    manifest._validate_offline_bundles(failures)
+
+
+def check_release_evidence(
+    *,
+    release_root: Path,
+    dist_root: Path,
+    sbom_path: Path,
+    guard_validation_json: Path,
+    guard_validation_markdown: Path,
+    offline_bundle_dir: Path,
+) -> list[str]:
+    manifest = ReleaseEvidenceManifest(
+        release_root=release_root,
+        dist_root=dist_root,
+        sbom_path=sbom_path,
+        guard_validation_json=guard_validation_json,
+        guard_validation_markdown=guard_validation_markdown,
+        offline_bundle_dir=offline_bundle_dir,
+    )
+    return manifest.validate()
+
+
+def _build_release_summary(
+    *,
+    release_root: Path,
+    dist_root: Path,
+    sbom_path: Path,
+    guard_validation_json: Path,
+    guard_validation_markdown: Path,
+    offline_bundle_dir: Path,
+    failures: list[str],
+) -> dict[str, object]:
+    manifest = ReleaseEvidenceManifest(
+        release_root=release_root,
+        dist_root=dist_root,
+        sbom_path=sbom_path,
+        guard_validation_json=guard_validation_json,
+        guard_validation_markdown=guard_validation_markdown,
+        offline_bundle_dir=offline_bundle_dir,
+    )
+    return manifest.summary(failures)
+
+
+def _resolve_artifact(
     root: Path, value: object, label: str, failures: list[str]
 ) -> Path | None:
-    if not isinstance(value, str) or not value.strip():
-        failures.append(f"{label} artifact must be a non-empty relative path.")
-        return None
-    raw = Path(value)
-    if raw.is_absolute():
-        failures.append(f"{label} artifact must be relative: {value}")
-        return None
-    root_resolved = root.resolve()
-    candidate = (root_resolved / raw).resolve()
-    try:
-        candidate.relative_to(root_resolved)
-    except ValueError:
-        failures.append(f"{label} artifact escapes evidence root: {value}")
-        return None
-    if not candidate.is_file():
-        failures.append(f"{label} artifact missing: {candidate}")
-        return None
-    if candidate.stat().st_size == 0:
-        failures.append(f"{label} artifact must not be empty: {candidate}")
-    return candidate
+    return resolve_artifact(root, value, label, failures)
 
 
-@dataclass(frozen=True)
-class GuardEvidenceRow:
-    index: int
-    payload: dict[str, Any]
-
-    def validate(self, *, root: Path, failures: list[str]) -> str | None:
-        label = f"guard_rows[{self.index}]"
-        guard = self.payload.get("guard")
-        if guard not in REQUIRED_GUARDS:
-            failures.append(
-                f"{label}.guard must be one of: {', '.join(sorted(REQUIRED_GUARDS))}."
-            )
-            return None
-        kind = self.payload.get("evidence_kind")
-        if kind not in ALLOWED_EVIDENCE_KINDS:
-            failures.append(
-                f"{label}.evidence_kind must be one of: "
-                + ", ".join(sorted(ALLOWED_EVIDENCE_KINDS))
-                + "."
-            )
-        status = self.payload.get("status")
-        if status != "empirical":
-            failures.append(f"{label}.status must be empirical.")
-        scope = str(self.payload.get("scope", "")).lower()
-        if self.payload.get("synthetic") is True or "synthetic" in scope:
-            failures.append(f"{label} must not be synthetic evidence.")
-        if not isinstance(
-            self.payload.get("model_family"), str
-        ) or not self.payload.get("model_family"):
-            failures.append(f"{label}.model_family must be a non-empty string.")
-        resolve_artifact(root, self.payload.get("artifact"), label, failures)
-        if (
-            guard in REQUIRED_GUARDS
-            and kind in ALLOWED_EVIDENCE_KINDS
-            and status == "empirical"
-            and self.payload.get("synthetic") is not True
-            and "synthetic" not in scope
-        ):
-            return str(guard)
-        return None
+def _validate_source_commands(payload: dict[str, object], failures: list[str]) -> None:
+    manifest = EmpiricalGuardEvidenceManifest(root=Path(), payload=payload)
+    manifest._validate_source_commands(failures)
 
 
-@dataclass(frozen=True)
-class ModelFamilyEvidenceRow:
-    index: int
-    payload: dict[str, Any]
-
-    def validate(self, *, root: Path, failures: list[str]) -> None:
-        label = f"model_family_rows[{self.index}]"
-        if not isinstance(
-            self.payload.get("model_family"), str
-        ) or not self.payload.get("model_family"):
-            failures.append(f"{label}.model_family must be a non-empty string.")
-        if self.payload.get("status") not in {"observed", "empirical"}:
-            failures.append(f"{label}.status must be observed or empirical.")
-        resolve_artifact(root, self.payload.get("artifact"), label, failures)
-
-
-@dataclass(frozen=True)
-class EmpiricalGuardEvidenceManifest:
-    root: Path
-    payload: dict[str, Any] | None
-
-    @classmethod
-    def load(cls, *, root: Path, failures: list[str]) -> EmpiricalGuardEvidenceManifest:
-        payload = load_json(
-            root / "manifest.json", "empirical guard evidence manifest", failures
+def _validate_guard_rows(
+    root: Path, payload: dict[str, object], failures: list[str]
+) -> None:
+    rows = payload.get("guard_rows")
+    if not isinstance(rows, list) or not rows:
+        failures.append("empirical evidence guard_rows must be a non-empty list.")
+        return
+    observed: set[str] = set()
+    for index, row in enumerate(rows):
+        label = f"guard_rows[{index}]"
+        if not isinstance(row, dict):
+            failures.append(f"{label} must be an object.")
+            continue
+        guard = GuardEvidenceRow(index=index, payload=row).validate(
+            root=root,
+            failures=failures,
         )
-        if payload is not None and not isinstance(payload, dict):
-            failures.append("empirical guard evidence manifest must be a JSON object.")
-            payload = None
-        return cls(root, payload)
+        if guard is not None:
+            observed.add(guard)
+    missing = sorted(REQUIRED_GUARDS - observed)
+    if missing:
+        failures.append("empirical evidence missing guard rows: " + ", ".join(missing))
 
-    def validate(self) -> list[str]:
-        failures: list[str] = []
-        if self.payload is None:
-            load_failures: list[str] = []
-            load_json(
-                self.root / "manifest.json",
-                "empirical guard evidence manifest",
-                load_failures,
-            )
-            return load_failures + [
-                "empirical guard evidence manifest must be a JSON object."
-            ]
-        if self.payload.get("schema") != EMPIRICAL_GUARD_EVIDENCE_SCHEMA:
-            failures.append(
-                f"empirical guard evidence schema must be {EMPIRICAL_GUARD_EVIDENCE_SCHEMA}."
-            )
-        self._validate_source_commands(failures)
-        self._validate_guard_rows(failures)
-        self._validate_model_family_rows(failures)
+
+def _validate_model_family_rows(
+    root: Path, payload: dict[str, object], failures: list[str]
+) -> None:
+    rows = payload.get("model_family_rows")
+    if not isinstance(rows, list) or not rows:
+        failures.append(
+            "empirical evidence model_family_rows must be a non-empty list."
+        )
+        return
+    for index, row in enumerate(rows):
+        label = f"model_family_rows[{index}]"
+        if not isinstance(row, dict):
+            failures.append(f"{label} must be an object.")
+            continue
+        ModelFamilyEvidenceRow(index=index, payload=row).validate(
+            root=root,
+            failures=failures,
+        )
+
+
+def check_empirical_guard_evidence(*, root: Path) -> list[str]:
+    failures: list[str] = []
+    manifest = EmpiricalGuardEvidenceManifest.load(root=root, failures=failures)
+    if manifest.payload is None:
+        if _MANIFEST_OBJECT_ERROR not in failures:
+            failures.append(_MANIFEST_OBJECT_ERROR)
         return failures
+    failures.extend(manifest.validate())
+    return failures
 
-    def _validate_source_commands(self, failures: list[str]) -> None:
-        if self.payload is None:
-            return
-        commands = self.payload.get("source_commands")
-        if not isinstance(commands, list) or not commands:
-            failures.append(
-                "empirical evidence source_commands must be a non-empty list."
-            )
-            return
-        valid_commands: list[str] = []
-        for index, command in enumerate(commands):
-            if not isinstance(command, str) or not command.strip():
-                failures.append(
-                    f"empirical evidence source_commands[{index}] must be a string."
-                )
-                continue
-            valid_commands.append(command)
-        if valid_commands and not any(
-            marker in command
-            for command in valid_commands
-            for marker in REAL_PRODUCER_MARKERS
-        ):
-            failures.append(
-                "empirical evidence source_commands must include a real evidence producer."
-            )
 
-    def _validate_guard_rows(self, failures: list[str]) -> None:
-        if self.payload is None:
-            return
-        rows = self.payload.get("guard_rows")
-        if not isinstance(rows, list) or not rows:
-            failures.append("empirical evidence guard_rows must be a non-empty list.")
-            return
-        observed: set[str] = set()
-        for index, row in enumerate(rows):
-            label = f"guard_rows[{index}]"
-            if not isinstance(row, dict):
-                failures.append(f"{label} must be an object.")
-                continue
-            guard = GuardEvidenceRow(index=index, payload=row).validate(
-                root=self.root, failures=failures
-            )
-            if guard is not None:
-                observed.add(guard)
-        missing = sorted(REQUIRED_GUARDS - observed)
-        if missing:
-            failures.append(
-                "empirical evidence missing guard rows: " + ", ".join(missing)
-            )
+def _build_empirical_summary(*, root: Path, failures: list[str]) -> dict[str, object]:
+    manifest = EmpiricalGuardEvidenceManifest(root=root, payload={})
+    return manifest.summary(failures)
 
-    def _validate_model_family_rows(self, failures: list[str]) -> None:
-        if self.payload is None:
-            return
-        rows = self.payload.get("model_family_rows")
-        if not isinstance(rows, list) or not rows:
-            failures.append(
-                "empirical evidence model_family_rows must be a non-empty list."
-            )
-            return
-        for index, row in enumerate(rows):
-            label = f"model_family_rows[{index}]"
-            if not isinstance(row, dict):
-                failures.append(f"{label} must be an object.")
-                continue
-            ModelFamilyEvidenceRow(index=index, payload=row).validate(
-                root=self.root,
-                failures=failures,
-            )
 
-    def summary(self, failures: list[str]) -> dict[str, object]:
-        return {
-            "schema": EMPIRICAL_GUARD_EVIDENCE_CHECK_SCHEMA,
-            "root": str(self.root),
-            "ok": not failures,
-            "failures": failures,
-        }
+def _add_release_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--root", default="artifacts/release")
+    parser.add_argument("--dist", default="dist")
+    parser.add_argument("--sbom", default="artifacts/supply-chain/sbom.json")
+    parser.add_argument(
+        "--guard-validation-json",
+        default="artifacts/guard-validation/guard-validation-smoke.json",
+    )
+    parser.add_argument(
+        "--guard-validation-md",
+        default="artifacts/guard-validation/guard-validation-smoke.md",
+    )
+    parser.add_argument(
+        "--offline-bundle-dir",
+        default="artifacts/release/offline",
+    )
+    parser.add_argument("--json", action="store_true")
+
+
+def _add_empirical_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--root",
+        default="artifacts/guard-validation/empirical",
+    )
+    parser.add_argument("--json", action="store_true")
+
+
+def _parse_args(argv: list[str] | None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Validate InvarLock release and empirical evidence artifacts."
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    release_parser = subparsers.add_parser(
+        "release",
+        help="Validate the local release-evidence bundle.",
+    )
+    _add_release_args(release_parser)
+    empirical_parser = subparsers.add_parser(
+        "empirical",
+        help="Validate non-synthetic empirical guard-evidence artifacts.",
+    )
+    _add_empirical_args(empirical_parser)
+    return parser.parse_args(argv)
+
+
+def _run_release(args: argparse.Namespace) -> int:
+    release_root = Path(args.root)
+    dist_root = Path(args.dist)
+    sbom_path = Path(args.sbom)
+    guard_validation_json = Path(args.guard_validation_json)
+    guard_validation_markdown = Path(args.guard_validation_md)
+    offline_bundle_dir = Path(args.offline_bundle_dir)
+    failures = check_release_evidence(
+        release_root=release_root,
+        dist_root=dist_root,
+        sbom_path=sbom_path,
+        guard_validation_json=guard_validation_json,
+        guard_validation_markdown=guard_validation_markdown,
+        offline_bundle_dir=offline_bundle_dir,
+    )
+    summary = _build_release_summary(
+        release_root=release_root,
+        dist_root=dist_root,
+        sbom_path=sbom_path,
+        guard_validation_json=guard_validation_json,
+        guard_validation_markdown=guard_validation_markdown,
+        offline_bundle_dir=offline_bundle_dir,
+        failures=failures,
+    )
+    if args.json:
+        print(json.dumps(summary, indent=2, sort_keys=True))
+    elif failures:
+        for failure in failures:
+            print(f"ERROR: {failure}", file=sys.stderr)
+    else:
+        print("Release evidence check passed.")
+    return 1 if failures else 0
+
+
+def _run_empirical(args: argparse.Namespace) -> int:
+    root = Path(args.root)
+    failures = check_empirical_guard_evidence(root=root)
+    summary = _build_empirical_summary(root=root, failures=failures)
+    if args.json:
+        print(json.dumps(summary, indent=2, sort_keys=True))
+    elif failures:
+        for failure in failures:
+            print(f"ERROR: {failure}", file=sys.stderr)
+    else:
+        print("Empirical guard evidence check passed.")
+    return 1 if failures else 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(argv)
+    if args.command == "release":
+        return _run_release(args)
+    if args.command == "empirical":
+        return _run_empirical(args)
+    raise AssertionError(f"Unhandled evidence command: {args.command}")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

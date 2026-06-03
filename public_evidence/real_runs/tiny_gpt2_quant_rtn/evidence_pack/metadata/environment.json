@@ -1,0 +1,42 @@
+{
+  "allow_network": true,
+  "determinism": {
+    "device": "cpu",
+    "env": {
+      "MKL_NUM_THREADS": "1",
+      "NUMEXPR_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "TOKENIZERS_PARALLELISM": "false",
+      "VECLIB_MAXIMUM_THREADS": "1"
+    },
+    "level": "tolerance",
+    "notes": [
+      "torch_thread_caps_failed"
+    ],
+    "profile": "release",
+    "requested": "strict",
+    "seed": 43,
+    "seeds": {
+      "numpy": 43,
+      "python": 43,
+      "torch": 43
+    },
+    "strict_enforcement": "unsafe",
+    "threads": 1,
+    "torch": {
+      "cuda_matmul_allow_tf32": false,
+      "cudnn_allow_tf32": false,
+      "cudnn_benchmark": false,
+      "cudnn_deterministic": true,
+      "deterministic_algorithms": true,
+      "python_random": true
+    }
+  },
+  "device": "cpu",
+  "execution_environment": "container",
+  "generated_by": "invarlock evaluate",
+  "pack_builder": "invarlock advanced evidence-pack build",
+  "runtime_image_digest": "sha256:1b00b1d839a2b4f757e72505289fe1ee00f71a7c49f4fc59a47c17df47727c54",
+  "runtime_image_ref": "ghcr.io/invarlock/invarlock-runtime:latest@sha256:1b00b1d839a2b4f757e72505289fe1ee00f71a7c49f4fc59a47c17df47727c54"
+}

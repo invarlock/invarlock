@@ -84,9 +84,16 @@ def _strict_stub_report(*, model_id: str, edit_name: str, context: dict) -> dict
         "provenance": {"provider_digest": {"ids_sha256": "strict-provider-ids"}},
         "artifacts": {},
         "guards": [
-            {"name": "invariants", "metrics": invariant_metrics},
+            {
+                "name": "invariants",
+                "passed": True,
+                "decision": "allow",
+                "metrics": invariant_metrics,
+            },
             {
                 "name": "spectral",
+                "passed": True,
+                "decision": "allow",
                 "metrics": {
                     "stable": True,
                     "caps_applied": 0,
@@ -97,6 +104,8 @@ def _strict_stub_report(*, model_id: str, edit_name: str, context: dict) -> dict
             },
             {
                 "name": "rmt",
+                "passed": True,
+                "decision": "allow",
                 "metrics": {
                     "stable": True,
                     "edge_risk_by_family_base": {"linear": 1.0},
@@ -104,8 +113,18 @@ def _strict_stub_report(*, model_id: str, edit_name: str, context: dict) -> dict
                     "measurement_contract": measurement_contract,
                 },
             },
-            {"name": "variance", "metrics": {"ve_enabled": False, "gain": 0.0}},
-            {"name": "invariants", "metrics": invariant_metrics},
+            {
+                "name": "variance",
+                "passed": True,
+                "decision": "allow",
+                "metrics": {"ve_enabled": False, "gain": 0.0},
+            },
+            {
+                "name": "invariants",
+                "passed": True,
+                "decision": "allow",
+                "metrics": invariant_metrics,
+            },
         ],
     }
 
@@ -163,7 +182,8 @@ def test_evaluate_command_smoke_for_bridge(monkeypatch, tmp_path) -> None:
     evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="auto",
+        baseline_adapter="auto",
+        subject_adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
         report_out=str(tmp_path / "reports"),
@@ -226,7 +246,8 @@ def test_evaluate_command_strict_path_generates_verifiable_pending_report(
     evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="auto",
+        baseline_adapter="auto",
+        subject_adapter="auto",
         profile="ci",
         tier="balanced",
         out=str(tmp_path / "runs"),
@@ -281,9 +302,26 @@ def test_evaluate_command_reuses_baseline_report_for_bridge(monkeypatch, tmp_pat
     baseline_report.write_text(
         json.dumps(
             {
-                "meta": {"model_id": "stub", "adapter": "hf_causal", "device": "cpu"},
-                "context": {"profile": "ci", "auto": {"tier": "balanced"}},
+                "meta": {
+                    "model_id": str(src),
+                    "adapter": "hf_causal",
+                    "device": "cpu",
+                },
+                "context": {
+                    "profile": "ci",
+                    "auto": {"tier": "balanced"},
+                    "assurance": {"mode": "off"},
+                },
                 "edit": {"name": "noop"},
+                "data": {
+                    "provider": "wikitext2",
+                    "split": "validation",
+                    "seq_len": 512,
+                    "stride": 512,
+                    "preview_n": 64,
+                    "final_n": 64,
+                    "seed": 43,
+                },
                 "evaluation_windows": {
                     "preview": {"window_ids": [1], "input_ids": [[1, 2]]},
                     "final": {"window_ids": [2], "input_ids": [[3, 4]]},
@@ -320,7 +358,8 @@ def test_evaluate_command_reuses_baseline_report_for_bridge(monkeypatch, tmp_pat
         baseline=str(src),
         subject=str(edt),
         baseline_report=str(baseline_report),
-        adapter="auto",
+        baseline_adapter="auto",
+        subject_adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
         report_out=str(tmp_path / "reports"),
@@ -368,7 +407,8 @@ def test_evaluate_command_local_mode_prefers_local_files_only(monkeypatch, tmp_p
     evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="auto",
+        baseline_adapter="auto",
+        subject_adapter="auto",
         profile="ci",
         execution_mode="host",
         out=str(tmp_path / "runs"),
@@ -417,7 +457,8 @@ def test_evaluate_command_passes_host_mode_execution_mode_to_runs(
     evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="auto",
+        baseline_adapter="auto",
+        subject_adapter="auto",
         profile="dev",
         execution_mode="host",
         out=str(tmp_path / "runs"),
@@ -479,7 +520,8 @@ def test_evaluate_command_resets_runtime_security_on_success(
     evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="auto",
+        baseline_adapter="auto",
+        subject_adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
         report_out=str(tmp_path / "reports"),
@@ -542,7 +584,8 @@ def test_evaluate_command_resets_runtime_security_on_raise(
         evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="auto",
+            baseline_adapter="auto",
+            subject_adapter="auto",
             profile="ci",
             out=str(tmp_path / "runs"),
             report_out=str(tmp_path / "reports"),
@@ -590,7 +633,8 @@ def test_evaluate_command_passes_concrete_run_defaults(monkeypatch, tmp_path) ->
     evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="auto",
+        baseline_adapter="auto",
+        subject_adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
         report_out=str(tmp_path / "reports"),

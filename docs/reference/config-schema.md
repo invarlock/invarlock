@@ -42,18 +42,25 @@ output:
   resolves guard thresholds from `tiers.yaml`.
 - **Defaults merging**: the optional top-level `defaults` mapping is merged into
   the config before execution.
+- **Evaluate adapter split**: `invarlock evaluate` accepts
+  `--baseline-adapter` and `--subject-adapter`, then materializes separate
+  baseline and subject run configs. Each generated run config still uses the
+  existing single-run `model.adapter` field.
 - **Programmatic access**: `load_config()` returns an explicit mapping-backed
   `InvarLockConfig`. Use `cfg["model"]["id"]` or
-  `cfg.require_section("model")["id"]`; attribute-style access is unsupported.
+  `cfg.require_section("model")["id"]` as the canonical form. Typed
+  attribute access is also available for known sections, for example
+  `cfg.model.id`, when callers want the typed section-object view.
 - **Unsupported keys**: `edit.kind`, `edit.parameters`, unknown
   `assurance.*` keys, and `guards.{spectral,rmt}.mode` are rejected to keep the
   config surface explicit.
 
 **Precedence (highest → lowest)**
 
-1. CLI flags (e.g. `--device`, `--tier`, `--probes`).
+1. Public CLI flags (e.g. `--device`, `--tier`); advanced/internal config
+   runners also accept runner-specific flags such as `--probes`.
 2. Profile selection (`--profile ci|release`) — window counts + determinism knobs.
-3. YAML config (`-c config.yaml`).
+3. YAML config selected through `--preset` or an internal config runner.
 4. `defaults:` block in YAML (DRY base).
 5. Packaged runtime defaults (fallback).
 
@@ -64,7 +71,7 @@ output:
 | `model.device` | `--device` | — | ✅ | ✅ | CLI wins. |
 | `dataset.preview_n/final_n` | — | ✅ | ✅ | ✅ | Profile wins. |
 | `auto.tier` | `--tier` | — | ✅ | ✅ | CLI wins. |
-| `auto.probes` | `--probes` | — | ✅ | ✅ | CLI wins. |
+| `auto.probes` | internal `--probes` | — | ✅ | ✅ | Internal runner flag wins. |
 
 Confirm in `report.meta.device`, `report.meta.auto`, and `report.data.preview_n/final_n`.
 
@@ -142,7 +149,7 @@ auto:
   enabled: true
   tier: balanced
   probes: 0
-  target_pm_ratio: 2.0
+  target_pm_ratio: 1.0
 ```
 
 ### Primary metric policy hints
@@ -213,7 +220,7 @@ output:
 eval:
   max_pm_ratio: 1.5
   metric:
-    kind: auto            # auto|ppl_causal|ppl_mlm|ppl_seq2seq|accuracy
+    kind: auto            # resolver value; report kinds include ppl_causal, ppl_mlm, ppl_seq2seq, accuracy, bleu, f1, rouge
     reps: 2000
     ci_level: 0.95
 ```
@@ -223,7 +230,7 @@ eval:
 - **Unsupported keys rejected**: remove `edit.kind`, `edit.parameters`,
   unknown `assurance.*` keys, or guard `mode` keys.
 - **Provider not found**: verify `dataset.provider` and install `invarlock[eval]`.
-- **Preset drift**: run `python scripts/check_config_schema_sync.py` after edits.
+- **Preset drift**: run `python scripts/docs/docs_check.py --config-schema-sync` after edits.
 
 ## Observability
 

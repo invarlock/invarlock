@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import torch
 
 from invarlock.eval import metrics as M
-from invarlock.eval.metrics_environment import (
+from invarlock.eval.metrics import (
     get_metrics_info,
     validate_metrics_environment,
 )

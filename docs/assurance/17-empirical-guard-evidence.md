@@ -1,13 +1,17 @@
 # Empirical Guard Evidence
 
+> **Plain language:** Empirical guard evidence is the portable manifest layer
+> that points reviewers to real model/checkpoint runs for spectral, RMT, and
+> variance behavior.
+
 ## Overview
 
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Track non-synthetic guard evidence for spectral, RMT, and variance behavior on real model/checkpoint workflows. |
 | **Audience** | Maintainers, release reviewers, and calibration owners. |
-| **Contract scope** | Portable evidence manifests that point to real-run artifacts; not a substitute for the strict verifier report contract. |
-| **Source of truth** | `scripts/release/check_empirical_guard_evidence.py`, `scripts/model_evidence_sweep.py`, calibration commands, and evidence-pack scripts. |
+| **Contract scope** | Portable evidence manifests that point to real-run artifacts; strict report acceptance remains governed by the verifier report contract. |
+| **Source of truth** | `scripts/release/evidence_contracts.py empirical`, `scripts/model_evidence/model_evidence_sweep.py`, calibration commands, and evidence-pack scripts. |
 
 ## Maintainer Command
 
@@ -29,9 +33,9 @@ different location.
 The empirical bundle is meant to reference artifacts produced by existing
 non-synthetic workflows:
 
-- `make model-evidence-sweep` or `scripts/model_evidence_sweep.py` for
+- `make model-evidence-sweep` or `scripts/model_evidence/model_evidence_sweep.py` for
   maintained shipped-model lanes.
-- `scripts/run_model_evidence_remote.py` for remote GPU execution of the same
+- `scripts/model_evidence/run_model_evidence_remote.py` for remote GPU execution of the same
   model-evidence sweep.
 - `invarlock advanced calibrate null-sweep` for empirical spectral null
   behavior.
@@ -97,9 +101,12 @@ root.
 ## Interpretation
 
 Passing the empirical checker means the release bundle contains portable
-non-synthetic evidence references with the required guard coverage. It does not
-mean every threshold is statistically final, and it does not replace
-`invarlock verify --assurance strict` for strict report acceptance.
+manifest references that self-declare non-synthetic evidence with the required
+guard coverage. The checker validates manifest shape, required guard/model rows,
+declared evidence kinds/statuses, command markers, and relative nonempty
+artifact paths. Artifact content review, producer authentication, statistical
+finality, and strict report acceptance are handled by their dedicated evidence
+and verifier gates.
 
 ## Related Documentation
 
@@ -107,6 +114,6 @@ mean every threshold is statistically final, and it does not replace
 - [Spectral False-Positive Control](05-spectral-fpr-derivation.md)
 - [RMT Epsilon Rule](06-rmt-epsilon-rule.md)
 - [VE Predictive Gate](07-ve-gate-power.md)
-- [Tier v1.0 Calibration](09-tier-v1-calibration.md)
+- [Tier Policy v1 Calibration](09-tier-v1-calibration.md)
 - [Calibration Reference](../reference/calibration.md)
 - [Evidence Packs](../user-guide/evidence-packs.md)

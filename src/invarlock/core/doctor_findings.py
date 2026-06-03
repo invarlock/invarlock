@@ -5,9 +5,28 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from . import doctor_inventory as _doctor_inventory
+from .doctor_inventory import (
+    OPTIONAL_DEPENDENCIES,
+    DoctorDatasetRow,
+    DoctorInventoryRow,
+    DoctorOptionalDependency,
+    DoctorSpecProbeResult,
+    DoctorTorchRuntimeFacts,
+    build_adapter_inventory_rows,
+    build_dataset_inventory_rows,
+    build_generic_inventory_rows,
+    collect_optional_dependency_facts,
+    collect_torch_runtime_facts,
+    find_spec_safe,
+    probe_module_spec,
+    summarize_inventory_rows,
+)
 from .report_inputs import ReportInputError, load_report_input_json
 
 DATASET_SPLIT_FALLBACK_WARNING = "Dataset split was inferred via fallback; set dataset.split explicitly to avoid drift."
+importlib_metadata = _doctor_inventory.importlib_metadata
+_package_version = _doctor_inventory._package_version
 
 
 @dataclass(frozen=True)
@@ -588,14 +607,28 @@ def _report_tiny_relax(report_data: dict[str, Any] | None) -> bool:
 __all__ = [
     "DATASET_SPLIT_FALLBACK_WARNING",
     "DoctorAccumulator",
+    "DoctorDatasetRow",
     "DoctorFinding",
+    "DoctorInventoryRow",
+    "DoctorOptionalDependency",
+    "DoctorSpecProbeResult",
+    "DoctorTorchRuntimeFacts",
+    "OPTIONAL_DEPENDENCIES",
+    "build_adapter_inventory_rows",
     "build_bootstrap_replicates_findings",
     "build_capacity_findings",
     "build_cross_check_findings",
+    "build_dataset_inventory_rows",
     "build_doctor_result",
+    "build_generic_inventory_rows",
     "build_provider_kind_findings",
     "build_provider_schema_findings",
     "build_split_fallback_findings",
     "build_tiny_relax_finding",
+    "collect_optional_dependency_facts",
+    "collect_torch_runtime_facts",
+    "find_spec_safe",
     "load_explicit_report_input",
+    "probe_module_spec",
+    "summarize_inventory_rows",
 ]

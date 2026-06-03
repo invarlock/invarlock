@@ -13,6 +13,18 @@ from rich.console import Console
 
 from invarlock.cli.commands.run import run_command
 from invarlock.eval.data import EvaluationWindow
+from tests.cli.run._support_run_config_parsing import (
+    ConfigParsingCfg as _Cfg,
+)
+from tests.cli.run._support_run_config_parsing import (
+    config_parsing_core_report as _core_report,
+)
+from tests.cli.run._support_run_config_parsing import (
+    config_parsing_detect_profile as _detect_profile,
+)
+from tests.cli.run._support_run_config_parsing import (
+    config_parsing_tokenizer as _tok,
+)
 
 
 class _DictNoItems(dict):
@@ -27,27 +39,6 @@ class _TruthyEmptyDict(dict):
         return True
 
 
-def _detect_profile(model_id: str, adapter: str) -> SimpleNamespace:
-    return SimpleNamespace(
-        default_loss="ce",
-        default_provider=None,
-        default_metric=None,
-        model_id=model_id,
-        adapter=adapter,
-        family="gpt",
-        module_selectors={},
-        invariants=[],
-        cert_lints=[],
-    )
-
-
-def _tok():
-    return (
-        SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50_000),
-        "tokhash123",
-    )
-
-
 def _pm_stub(*_a, **_k):
     return {
         "kind": "ppl_causal",
@@ -55,25 +46,6 @@ def _pm_stub(*_a, **_k):
         "final": 1.0,
         "ratio_vs_baseline": 1.0,
     }
-
-
-def _core_report(*, evaluation_windows: dict[str, object] | None) -> SimpleNamespace:
-    return SimpleNamespace(
-        edit={"plan_digest": "abcd", "deltas": {"heads_pruned": 0}},
-        metrics={
-            "ppl_preview": 10.0,
-            "ppl_final": 10.0,
-            "ppl_ratio": 1.0,
-            "window_overlap_fraction": 0.0,
-            "window_match_fraction": 1.0,
-            "paired_windows": 1,
-            "loss_type": "ce",
-        },
-        guards={},
-        context={"dataset_meta": {}},
-        evaluation_windows=evaluation_windows,
-        status="success",
-    )
 
 
 def _provider_windows(
@@ -94,94 +66,6 @@ def _provider_windows(
         indices=[1000 + i for i in range(final_n)],
     )
     return prev, fin
-
-
-class _Eval:
-    def __init__(self, *, spike_threshold: float, loss_type: str, capacity_fast: bool):
-        self.spike_threshold = float(spike_threshold)
-        self.loss = SimpleNamespace(type=loss_type)
-        self.capacity_fast = bool(capacity_fast)
-
-    def model_dump(self) -> dict[str, object]:
-        return {
-            "spike_threshold": float(self.spike_threshold),
-            "loss": {"type": str(getattr(self.loss, "type", "auto"))},
-            "capacity_fast": bool(self.capacity_fast),
-        }
-
-
-class _Cfg:
-    def __init__(
-        self,
-        *,
-        outdir: Path,
-        dataset_provider: object,
-        loss_type: str = "ce",
-        edit_plan: object | None = None,
-        output: dict[str, object] | None = None,
-    ) -> None:
-        self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
-        self.edit = SimpleNamespace(name="quant_rtn", plan=(edit_plan or {}))
-        self.auto = SimpleNamespace(
-            enabled=False, tier="balanced", probes=0, target_pm_ratio=None
-        )
-        self.guards = SimpleNamespace(order=[])
-        self.dataset = SimpleNamespace(
-            provider=dataset_provider,
-            id="synthetic",
-            split="validation",
-            seq_len=8,
-            stride=4,
-            preview_n=2,
-            final_n=2,
-            seed=42,
-        )
-        self.eval = _Eval(spike_threshold=2.0, loss_type=loss_type, capacity_fast=True)
-        out = {"dir": outdir}
-        if output:
-            out.update(output)
-        self.output = SimpleNamespace(**out)
-
-    def model_dump(self) -> dict[str, object]:
-        out = {
-            "dir": str(getattr(self.output, "dir", "")),
-            "save_model": getattr(self.output, "save_model", False),
-            "model_dir": getattr(self.output, "model_dir", None),
-            "model_subdir": getattr(self.output, "model_subdir", None),
-        }
-        return {
-            "model": {
-                "id": self.model.id,
-                "adapter": self.model.adapter,
-                "device": self.model.device,
-            },
-            "edit": {
-                "name": self.edit.name,
-                "plan": getattr(self.edit, "plan", {}),
-            },
-            "auto": {
-                "enabled": self.auto.enabled,
-                "tier": self.auto.tier,
-                "probes": self.auto.probes,
-                "target_pm_ratio": self.auto.target_pm_ratio,
-            },
-            "guards": {"order": list(self.guards.order)},
-            "dataset": {
-                "provider": self.dataset.provider,
-                "id": self.dataset.id,
-                "split": self.dataset.split,
-                "seq_len": self.dataset.seq_len,
-                "stride": self.dataset.stride,
-                "preview_n": self.dataset.preview_n,
-                "final_n": self.dataset.final_n,
-                "seed": self.dataset.seed,
-            },
-            "eval": {
-                "spike_threshold": self.eval.spike_threshold,
-                "loss": {"type": getattr(self.eval.loss, "type", None)},
-            },
-            "output": out,
-        }
 
 
 def _run_with_common_patches(
@@ -212,8 +96,10 @@ def _run_with_common_patches(
 
     patches = [
         patch("invarlock.cli.run_config.prepare_config_for_run", lambda **k: cfg),
-        patch("invarlock.cli.run_runtime.detect_model_profile", _detect_profile),
-        patch("invarlock.cli.run_runtime.resolve_tokenizer", lambda *_a, **_k: _tok()),
+        patch("invarlock.cli.run_runtime_exec.detect_model_profile", _detect_profile),
+        patch(
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer", lambda *_a, **_k: _tok()
+        ),
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch("invarlock.core.registry.get_registry", lambda: Registry()),
@@ -222,7 +108,7 @@ def _run_with_common_patches(
             lambda *_a: (False, False, None),
         ),
         patch("invarlock.cli.run_runtime_exec.execute_guarded_run", exec_stub),
-        patch("invarlock.cli.run_artifact_output.postprocess_and_summarize", post_stub),
+        patch("invarlock.cli.run_execution.postprocess_and_summarize", post_stub),
         patch(
             "invarlock.cli.run_pairing.resolve_metric_and_provider",
             lambda *_a, **_k: ("ppl_causal", None, {}),
@@ -613,9 +499,12 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
         for p in (
             patch("invarlock.cli.run_execution.console", rec_console),
             patch("invarlock.cli.run_config.prepare_config_for_run", lambda **k: cfg),
-            patch("invarlock.cli.run_runtime.detect_model_profile", _detect_profile),
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer", lambda *_a, **_k: _tok()
+                "invarlock.cli.run_runtime_exec.detect_model_profile", _detect_profile
+            ),
+            patch(
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
+                lambda *_a, **_k: _tok(),
             ),
             patch("invarlock.cli.device.resolve_device", lambda d: d),
             patch(
@@ -626,9 +515,7 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
                 lambda *_a: (False, False, None),
             ),
             patch("invarlock.cli.run_runtime_exec.execute_guarded_run", exec_stub),
-            patch(
-                "invarlock.cli.run_artifact_output.postprocess_and_summarize", post_stub
-            ),
+            patch("invarlock.cli.run_execution.postprocess_and_summarize", post_stub),
             patch(
                 "invarlock.cli.run_pairing.resolve_metric_and_provider",
                 lambda *_a, **_k: ("ppl_causal", None, {}),
@@ -640,11 +527,11 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
             patch("invarlock.core.registry.get_registry", lambda: Registry()),
             patch("invarlock.cli.run_pairing.compute_provider_digest", provider_digest),
             patch(
-                "invarlock.core.provider_parity.enforce_provider_parity",
+                "invarlock.core.run_policy.enforce_provider_parity",
                 enforce_parity,
             ),
             patch(
-                "invarlock.reporting.run_metric_utils.format_debug_metric_diffs",
+                "invarlock.reporting.run_report_metrics_contract.format_debug_metric_diffs",
                 lambda *_a, **_k: "diffs",
             ),
         ):

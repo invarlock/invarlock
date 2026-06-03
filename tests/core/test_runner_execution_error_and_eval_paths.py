@@ -4,9 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from invarlock.core.runner import CoreRunner
-from invarlock.core.runner_context import coerce_bool, env_flag
-from tests.core.test_runner_execution_metrics_and_memory import (
+from invarlock.core.runner import CoreRunner, coerce_bool, env_flag
+from tests.core._support_runner_execution import (
     BadGuard,
     DummyAdapter,
     DummyModel,

@@ -12,7 +12,7 @@ import pytest
 
 def _load_script_module() -> ModuleType:
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "verify_markdown_bash_blocks.py"
+    script_path = repo_root / "scripts" / "docs" / "verify_markdown_bash_blocks.py"
     spec = importlib.util.spec_from_file_location(
         "tests_verify_markdown_bash_blocks", script_path
     )
@@ -227,13 +227,15 @@ def test_sanitize_script_rewrites_python_script_invocations_to_selected_python()
         file="docs/reference/device-drift-bands.md",
         line=1,
         block_index=1,
-        text="python scripts/check_device_drift.py reports/a.json reports/b.json\n",
+        text="python scripts/smoke/check_device_drift.py reports/a.json reports/b.json\n",
     )
 
     rendered = module._sanitize_script(block, execution_mode="host")
 
     assert rendered.startswith(sys.executable)
-    assert "scripts/check_device_drift.py reports/a.json reports/b.json" in rendered
+    assert (
+        "scripts/smoke/check_device_drift.py reports/a.json reports/b.json" in rendered
+    )
 
 
 def test_sanitize_script_adds_force_to_report_html() -> None:
@@ -287,7 +289,10 @@ def test_sanitize_script_skip_model_loading_skips_full_multiline_command() -> No
     assert "[skip-model-loading] invarlock evaluate --allow-network \\" in rendered
     assert "--baseline gpt2" not in rendered
     assert "--subject distilgpt2" not in rendered
-    assert "-m invarlock verify reports/eval/evaluation.report.json" in rendered
+    assert (
+        "-m invarlock verify --assurance off reports/eval/evaluation.report.json"
+        in rendered
+    )
 
 
 def test_sanitize_script_skip_model_loading_skips_doctor_health_check() -> None:
@@ -519,14 +524,22 @@ def test_prepare_workspace_stages_lightweight_repo_view(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     module._prepare_workspace(workspace)
 
-    assert (workspace / ".github").is_symlink()
-    assert (workspace / "src").is_symlink()
-    assert (workspace / "scripts").is_symlink()
-    assert (workspace / "configs").is_symlink()
-    assert (workspace / "runtime").is_symlink()
-    assert (workspace / "tests").is_symlink()
-    assert (workspace / "README.md").is_symlink()
-    assert (workspace / "pyproject.toml").is_symlink()
+    assert (workspace / ".github").is_dir()
+    assert not (workspace / ".github").is_symlink()
+    assert (workspace / "src").is_dir()
+    assert not (workspace / "src").is_symlink()
+    assert (workspace / "scripts").is_dir()
+    assert not (workspace / "scripts").is_symlink()
+    assert (workspace / "configs").is_dir()
+    assert not (workspace / "configs").is_symlink()
+    assert (workspace / "runtime").is_dir()
+    assert not (workspace / "runtime").is_symlink()
+    assert (workspace / "tests").is_dir()
+    assert not (workspace / "tests").is_symlink()
+    assert (workspace / "README.md").is_file()
+    assert not (workspace / "README.md").is_symlink()
+    assert (workspace / "pyproject.toml").is_file()
+    assert not (workspace / "pyproject.toml").is_symlink()
     assert not (workspace / "tmp").exists()
     assert not (workspace / "data").exists()
     assert not (workspace / ".git").exists()

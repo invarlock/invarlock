@@ -1,4 +1,4 @@
-"""CLI examples validation moved from scripts/test_cli_examples.py.
+"""CLI examples validation moved from scripts/docs/test_cli_examples.py.
 
 This test ensures the CLI examples in the scripts stay in sync and runnable.
 """

@@ -20,23 +20,20 @@ from invarlock.core.doctor_findings import (
 from invarlock.core.doctor_findings import (
     DoctorAccumulator,
     DoctorFinding,
+    build_adapter_inventory_rows,
     build_cross_check_findings,
+    build_dataset_inventory_rows,
     build_doctor_result,
+    build_generic_inventory_rows,
     build_split_fallback_findings,
     build_tiny_relax_finding,
-    load_explicit_report_input,
-)
-from invarlock.core.doctor_inventory import (
-    build_adapter_inventory_rows,
-    build_dataset_inventory_rows,
-    build_generic_inventory_rows,
-    summarize_inventory_rows,
-)
-from invarlock.core.doctor_runtime import (
     collect_optional_dependency_facts,
     collect_torch_runtime_facts,
     find_spec_safe,
+    load_explicit_report_input,
+    summarize_inventory_rows,
 )
+from invarlock.core.plugins_inventory import bitsandbytes_runtime_available
 from invarlock.public_contracts import (
     contract_catalog,
     load_adapter_capabilities,
@@ -46,7 +43,6 @@ from invarlock.public_contracts import (
 )
 
 from .. import output as cli_output
-from ..backend_runtime import bitsandbytes_runtime_available
 from ..constants import DOCTOR_FORMAT_VERSION
 from ..security_helpers import resolve_shell_runtime_security_policy
 
@@ -629,16 +625,10 @@ def doctor_command(
                 console_obj.print(
                     f"  [yellow]⚠️  {dep.name} — {dep.description}[/yellow]"
                 )
-                if dep.name in {"auto_gptq", "autoawq"}:
-                    console_obj.print(
-                        f"     → Install: pip install 'invarlock[{dep.extra_hint}]'  # Linux + CUDA only",
-                        markup=False,
-                    )
-                else:
-                    console_obj.print(
-                        f"     → Install: pip install 'invarlock[{dep.extra_hint}]'",
-                        markup=False,
-                    )
+                console_obj.print(
+                    f"     → Install: pip install 'invarlock[{dep.extra_hint}]'",
+                    markup=False,
+                )
 
     had_error, cfg_metric_kind = _doctor_apply_preflight(
         config=config,

@@ -8,6 +8,7 @@ Torch-independent coordination with proper event logging and checkpoint manageme
 
 from __future__ import annotations
 
+import os
 import time
 from typing import Any
 
@@ -32,14 +33,11 @@ from .bootstrap import compute_paired_delta_log_ci, logspace_to_ratio_ci
 from .checkpoint import CheckpointManager
 from .events import EventLogger
 from .exceptions import InvarlockError
-from .runner_context import (
-    collect_cuda_flags as _collect_cuda_flags,
+from .runner_eval_metrics import (
+    compute_real_metrics,
+    measure_latency,
+    samples_to_dataloader,
 )
-from .runner_context import (
-    resolve_policy_flags,
-    serialize_config,
-)
-from .runner_eval_metrics import compute_real_metrics
 from .runner_eval_phase import eval_phase
 from .runner_finalize import finalize_phase, handle_error
 from .runner_guards import (
@@ -48,19 +46,7 @@ from .runner_guards import (
     prepare_guards_phase,
     resolve_guard_policies,
 )
-from .runner_latency import measure_latency, samples_to_dataloader
-from .runner_lifecycle import (
-    finalize_run_report,
-    initialize_run_report,
-    merge_execution_metrics,
-)
 from .runner_pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
-from .runner_services import (
-    capture_memory,
-    cleanup_services,
-    initialize_services,
-    record_timing,
-)
 from .types import LogLevel, RunStatus
 
 __all__ = ["CoreRunner"]
@@ -74,6 +60,235 @@ _RUNNER_EXECUTION_ERRORS = (
     TypeError,
     ValueError,
 )
+_CUDA_FLAG_ERRORS = (
+    AttributeError,
+    ImportError,
+    ModuleNotFoundError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+_BOOL_TRUE = {"1", "true", "yes", "on"}
+_BOOL_FALSE = {"0", "false", "no", "off"}
+
+
+def coerce_bool(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value)
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in _BOOL_TRUE:
+            return True
+        if lowered in _BOOL_FALSE:
+            return False
+    return None
+
+
+def env_flag(name: str) -> bool | None:
+    raw = os.environ.get(name)
+    if raw is None:
+        return None
+    return coerce_bool(raw)
+
+
+def collect_cuda_flags() -> dict[str, Any]:
+    """Capture deterministic CUDA configuration for provenance."""
+    flags: dict[str, Any] = {}
+    try:
+        import torch
+
+        flags["deterministic_algorithms"] = bool(
+            torch.are_deterministic_algorithms_enabled()
+        )
+        if hasattr(torch.backends, "cudnn"):
+            flags["cudnn_deterministic"] = bool(torch.backends.cudnn.deterministic)
+            flags["cudnn_benchmark"] = bool(torch.backends.cudnn.benchmark)
+            if hasattr(torch.backends.cudnn, "allow_tf32"):
+                flags["cudnn_allow_tf32"] = bool(torch.backends.cudnn.allow_tf32)
+        if hasattr(torch.backends, "cuda") and hasattr(torch.backends.cuda, "matmul"):
+            matmul = torch.backends.cuda.matmul
+            if hasattr(matmul, "allow_tf32"):
+                flags["cuda_matmul_allow_tf32"] = bool(matmul.allow_tf32)
+    except _CUDA_FLAG_ERRORS:  # pragma: no cover - fallback when torch missing
+        pass
+
+    workspace = os.environ.get("CUBLAS_WORKSPACE_CONFIG")
+    if workspace:
+        flags["CUBLAS_WORKSPACE_CONFIG"] = workspace
+    return flags
+
+
+def serialize_config(config: RunConfig) -> dict[str, Any]:
+    """Serialize RunConfig for storage in report."""
+    return {
+        "device": config.device,
+        "max_pm_ratio": config.max_pm_ratio,
+        "checkpoint_interval": config.checkpoint_interval,
+        "dry_run": config.dry_run,
+        "verbose": config.verbose,
+        "guards": config.context.get("guards", {}) if config.context else {},
+    }
+
+
+def _resolve_policy_flag(
+    run_ctx: dict[str, Any],
+    eval_ctx: dict[str, Any],
+    *,
+    run_key: str,
+    eval_keys: tuple[str, ...],
+    env_key: str | None,
+    default: bool,
+) -> bool:
+    val = coerce_bool(run_ctx.get(run_key))
+    if val is None:
+        for key in eval_keys:
+            val = coerce_bool(eval_ctx.get(key))
+            if val is not None:
+                break
+    if env_key:
+        env_val = env_flag(env_key)
+        if env_val is not None:
+            val = env_val
+    return default if val is None else bool(val)
+
+
+def resolve_policy_flags(config: RunConfig | None) -> dict[str, bool]:
+    run_ctx: dict[str, Any] = {}
+    eval_ctx: dict[str, Any] = {}
+    if config and isinstance(config.context, dict):
+        run_ctx = (
+            config.context.get("run", {})
+            if isinstance(config.context.get("run"), dict)
+            else {}
+        )
+        eval_ctx = (
+            config.context.get("eval", {})
+            if isinstance(config.context.get("eval"), dict)
+            else {}
+        )
+
+    return {
+        "strict_eval": _resolve_policy_flag(
+            run_ctx,
+            eval_ctx,
+            run_key="strict_eval",
+            eval_keys=("strict_errors", "strict"),
+            env_key=None,
+            default=True,
+        ),
+        "strict_guard_prepare": _resolve_policy_flag(
+            run_ctx,
+            eval_ctx,
+            run_key="strict_guard_prepare",
+            eval_keys=(),
+            env_key=None,
+            default=True,
+        ),
+        "allow_calibration_materialize": _resolve_policy_flag(
+            run_ctx,
+            eval_ctx,
+            run_key="allow_calibration_materialize",
+            eval_keys=("materialize_calibration", "allow_iterable_calibration"),
+            env_key="INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE",
+            default=False,
+        ),
+    }
+
+
+def initialize_run_report(
+    *,
+    config: RunConfig,
+    serialized_config: dict[str, Any],
+    cuda_flags: dict[str, Any],
+    auto_config: dict[str, Any] | None = None,
+    report_factory: type[RunReport] = RunReport,
+    start_time: float | None = None,
+) -> RunReport:
+    report = report_factory()
+    context = config.context
+    report.meta["cuda_flags"] = cuda_flags
+    report.meta["start_time"] = (
+        float(start_time) if start_time is not None else float(time.time())
+    )
+    report.meta["config"] = serialized_config
+
+    if context:
+        normalized_context = dict(context)
+        try:
+            report.context.update(normalized_context)
+        except (AttributeError, TypeError, ValueError, RuntimeError):
+            report.context = normalized_context
+
+    run_id = context.get("run_id") if context is not None else None
+    if run_id:
+        report.meta["run_id"] = run_id
+    plugins_meta = context.get("plugins") if context is not None else None
+    if plugins_meta:
+        report.meta["plugins"] = plugins_meta
+
+    if auto_config:
+        report.meta["auto"] = auto_config
+        existing_auto = context.get("auto") if context is not None else None
+        if isinstance(context, dict) and isinstance(existing_auto, dict):
+            merged_auto = dict(existing_auto)
+            merged_auto.update(auto_config)
+            context["auto"] = merged_auto
+            report.context["auto"] = context["auto"]
+        elif isinstance(context, dict):
+            context["auto"] = dict(auto_config)
+            report.context["auto"] = context["auto"]
+
+    return report
+
+
+def finalize_run_report(
+    report: RunReport,
+    *,
+    final_status: str,
+    end_time: float | None = None,
+) -> None:
+    end_ts = float(end_time) if end_time is not None else float(time.time())
+    report.status = final_status
+    report.meta["end_time"] = end_ts
+    start_time = report.meta.get("start_time")
+    if isinstance(start_time, int | float):
+        report.meta["duration"] = end_ts - float(start_time)
+
+
+def merge_execution_metrics(
+    report: RunReport,
+    *,
+    timings: dict[str, float],
+    guard_timings: dict[str, float],
+    memory_snapshots: list[dict[str, Any]],
+    memory_summary: dict[str, Any],
+) -> None:
+    metrics_obj: object = report.metrics
+    if isinstance(metrics_obj, dict):
+        metrics = metrics_obj
+    else:
+        report.metrics = {}
+        metrics = report.metrics
+
+    if timings:
+        metrics.setdefault("timings", {}).update(timings)
+
+    if guard_timings:
+        metrics["guard_timings"] = guard_timings
+
+    if not memory_snapshots:
+        return
+
+    metrics["memory_snapshots"] = memory_snapshots
+    summary = dict(memory_summary)
+    mem_peak = summary.get("memory_mb_peak")
+    if isinstance(mem_peak, int | float):
+        existing_peak = metrics.get("memory_mb_peak")
+        if isinstance(existing_peak, int | float):
+            summary["memory_mb_peak"] = max(float(existing_peak), float(mem_peak))
+    metrics.update(summary)
 
 
 def _profile_from_context(context: dict[str, Any] | None) -> str | None:
@@ -88,6 +303,56 @@ def _profile_from_context(context: dict[str, Any] | None) -> str | None:
         if isinstance(raw_runtime_profile, str) and raw_runtime_profile.strip():
             return raw_runtime_profile.strip().lower()
     return None
+
+
+def initialize_services(
+    runner: Any,
+    config: Any,
+    *,
+    event_logger_factory: Any = EventLogger,
+    checkpoint_factory: Any = CheckpointManager,
+) -> None:
+    """Initialize event logging and checkpoint services."""
+    if config.event_path:
+        run_id = None
+        if isinstance(config.context, dict):
+            run_id = config.context.get("run_id")
+        runner.event_logger = event_logger_factory(config.event_path, run_id=run_id)
+
+    if config.checkpoint_interval > 0:
+        runner.checkpoint_manager = checkpoint_factory()
+
+
+def cleanup_services(runner: Any) -> None:
+    """Clean up event logging and checkpoint services."""
+    if runner.event_logger:
+        runner.event_logger.close()
+        runner.event_logger = None
+
+    if runner.checkpoint_manager:
+        runner.checkpoint_manager.cleanup()
+        runner.checkpoint_manager = None
+
+
+def record_timing(
+    timings: dict[str, float],
+    key: str,
+    start: float,
+    *,
+    perf_counter: Any = time.perf_counter,
+) -> None:
+    timings[key] = max(0.0, float(perf_counter() - start))
+
+
+def capture_memory(
+    memory_snapshots: list[dict[str, Any]],
+    phase: str,
+    *,
+    capture_fn: Any = capture_memory_snapshot,
+) -> None:
+    snapshot = capture_fn(phase)
+    if snapshot:
+        memory_snapshots.append(snapshot)
 
 
 class CoreRunner:
@@ -127,7 +392,7 @@ class CoreRunner:
         report = initialize_run_report(
             config=config,
             serialized_config=self._serialize_config(config),
-            cuda_flags=_collect_cuda_flags(),
+            cuda_flags=collect_cuda_flags(),
             auto_config=auto_config,
             report_factory=RunReport,
         )

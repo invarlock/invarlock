@@ -145,8 +145,10 @@ The HTML export keeps that same body content but adds a browser shell with:
 
 ### Concepts
 
-- **Schema stability**: v1 is a PM-only contract; breaking changes require a
-  schema-version bump.
+- **Schema stability**: v1 has a stable core around primary metric,
+  dataset/window metadata, artifacts, plugins, and report identity. Optional
+  policy, guard, provenance, telemetry, and confidence blocks are additive
+  unless promoted into the required core, which requires a schema-version bump.
 - **Validation allow-list**: only specific `validation.*` flags are accepted by
   the schema validator.
 - **Baseline pairing**: reports assume paired windows; verification enforces
@@ -279,11 +281,11 @@ fields while enforcing a small, stable core:
 **Required top‑level fields:**
 
 - `schema_version` — must equal `"v1"`.
-- `run_id` — non‑empty string (minimum length 4).
+- `run_id` — non‑empty string (minimum length 1).
 - `meta` — object (model/device/seeds; validator does not fix sub‑shape).
 - `dataset` — object with at least:
   - `provider`: string
-  - `seq_len`: integer ≥ 1
+  - `seq_len`: integer ≥ 0
   - `windows.preview`: integer ≥ 0
   - `windows.final`: integer ≥ 0
   - `windows.stats`: object (paired-window stats and coverage)
@@ -291,12 +293,12 @@ fields while enforcing a small, stable core:
 - `plugins` — object listing discovered adapters/edits/guards.
 - `primary_metric` — object (canonical primary metric snapshot).
 
-**Primary metric block (required):**
+**Primary metric block (object required, only `kind` required by schema):**
 
 - `primary_metric.kind`: string (e.g., `"ppl_causal"`, `"accuracy"`).
-- `primary_metric.preview` / `primary_metric.final`: numbers.
-- `primary_metric.ratio_vs_baseline`: number.
-- `primary_metric.display_ci`: two‑element numeric array `[lo, hi]`.
+- `primary_metric.preview` / `primary_metric.final`: numbers when available.
+- `primary_metric.ratio_vs_baseline`: number when available.
+- `primary_metric.display_ci`: two‑element numeric array `[lo, hi]` when available.
 - Additional optional fields: `unit`, `direction`, `ci`, `gating_basis`,
   `aggregation_scope`, `estimated`, etc.
 
@@ -386,7 +388,7 @@ baseline and the tail-gate evaluation outcome:
 
 Telemetry values are copied from `report.json` into reports and always
 include the execution device. CPU telemetry sweeps are collected via
-`scripts/run_cpu_telemetry.sh`.
+`scripts/smoke/run_cpu_telemetry.sh`.
 
 | JSON Pointer | Meaning | Notes |
 | --- | --- | --- |
@@ -443,7 +445,7 @@ html = render_report_html(report)
 - **Schema validation fails**: check `schema_version` and required top-level
   fields (`run_id`, `meta`, `dataset`, `artifacts`, `primary_metric`).
 - **Unexpected validation keys**: ensure `validation.*` keys match the allow-list
-  in `report_schema`.
+  in `contracts/validation_keys.json`.
 
 ### Telemetry Issues
 
@@ -452,7 +454,8 @@ html = render_report_html(report)
 
 ### HTML Export Issues
 
-- **Missing report**: generate one first via `invarlock report --format report`.
+- **Missing report**: generate one first via
+  `invarlock report generate --run <subject report.json> --baseline-run-report <baseline report.json> --format report -o <output-dir>`.
 - **HTML missing styles**: omit `--no-embed-css` or apply custom CSS later in your publishing layer.
 
 ---

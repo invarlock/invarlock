@@ -1,0 +1,2 @@
+-r ../../../../requirements/workflows/runtime-image.in
+torchao>=0.17.0

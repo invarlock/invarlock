@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from invarlock.core.retry import RetryDiagnostic
-from invarlock.core.run_retry_policy import (
+from invarlock.core.retry import (
+    RetryDiagnostic,
     apply_mask_only_head_autotune,
     build_restore_failure_attempt_summary,
     build_retry_result_summary,

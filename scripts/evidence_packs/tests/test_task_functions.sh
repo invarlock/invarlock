@@ -51,10 +51,57 @@ stub_resolve_edit_params() {
     }
 }
 
+write_validation_edit_metadata() {
+    local edit_path="$1"
+    local edit_type="${2:-quant_rtn}"
+    local storage_format="float_dequantized"
+    case "${edit_type}" in
+        magnitude_prune)
+            storage_format="dense_float_with_zeros"
+            ;;
+        lowrank_svd)
+            storage_format="dense_float_lowrank_approximated"
+            ;;
+    esac
+    cat > "${edit_path}/edit_metadata.json" <<JSON
+{
+  "schema": "invarlock/evidence-pack-edit-metadata-v1",
+  "artifact_class": "validation_subject_checkpoint",
+  "edit_type": "${edit_type}",
+  "edit_semantics": "external_subject_validation_edit",
+  "deployable_as_hf_checkpoint": true,
+  "optimized_deployment_backend": false,
+  "backend": null,
+  "storage_format": "${storage_format}",
+  "actual_storage_format": "${storage_format}",
+  "packed_quantized_storage": false,
+  "runtime_memory_reduction": false,
+  "scope": "ffn",
+  "parameters": {},
+  "coverage": {
+    "edited_tensors": 1,
+    "edited_params": 1,
+    "total_params": 1,
+    "coverage_ratio": 1.0
+  }
+}
+JSON
+}
+
+write_minimal_validation_edit_artifact() {
+    local edit_path="$1"
+    local edit_type="${2:-quant_rtn}"
+    mkdir -p "${edit_path}"
+    echo "{}" > "${edit_path}/config.json"
+    echo "weights" > "${edit_path}/pytorch_model.bin"
+    echo "{}" > "${edit_path}/tokenizer_config.json"
+    write_validation_edit_metadata "${edit_path}" "${edit_type}"
+}
+
 test_default_ci_min_windows_accounts_for_padding() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     unset INVARLOCK_CERT_MIN_WINDOWS
     unset INVARLOCK_DATASET
@@ -78,7 +125,7 @@ test_default_ci_min_windows_accounts_for_padding() {
 test_effective_ci_schedule_selects_and_logs_viable_candidate() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local model_dir="${TEST_TMPDIR}/model"
     mkdir -p "${model_dir}"
@@ -113,7 +160,7 @@ EOF
 test_effective_ci_schedule_fails_fast_when_no_candidate_clears_floor() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local log_file="${TEST_TMPDIR}/plan_fail.log"
     : > "${log_file}"
@@ -132,7 +179,7 @@ test_effective_ci_schedule_fails_fast_when_no_candidate_clears_floor() {
 test_large_model_threshold_covers_14b_dense_checkpoints() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     _is_large_model "13" || t_fail "expected 13B-class model sizes to skip overhead check"
     _is_large_model "14" || t_fail "expected 14B-class model sizes to skip overhead check"
@@ -144,7 +191,7 @@ test_large_model_threshold_covers_14b_dense_checkpoints() {
 test_baseline_report_wait_budget_scales_for_heavy_7b_windows() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     run _baseline_report_wait_secs "7" "128" "128"
     assert_rc "0" "${RUN_RC}" "default wait helper succeeds"
@@ -164,13 +211,18 @@ test_baseline_report_wait_budget_scales_for_heavy_7b_windows() {
     assert_rc "0" "${RUN_RC}" "large-model wait helper succeeds"
     assert_eq "1200" "${RUN_OUT}" "large-model override still takes precedence"
 
-    unset PACK_BASELINE_REPORT_WAIT_SECS_HEAVY_WINDOWS PACK_BASELINE_REPORT_WAIT_SECS_LARGE
+    export PACK_BASELINE_REPORT_WAIT_HEAVY_WINDOW_TOTAL_MIN="bad"
+    run _baseline_report_wait_secs "7" "400" "400"
+    assert_rc "0" "${RUN_RC}" "invalid heavy-window floor is sanitized"
+    assert_eq "900" "${RUN_OUT}" "invalid heavy-window floor still honors heavy-window wait override"
+
+    unset PACK_BASELINE_REPORT_WAIT_SECS_HEAVY_WINDOWS PACK_BASELINE_REPORT_WAIT_SECS_LARGE PACK_BASELINE_REPORT_WAIT_HEAVY_WINDOW_TOTAL_MIN
 }
 
 test_model_size_and_eval_batch_selection() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     mock_python3_stub_enable
 
@@ -225,7 +277,7 @@ test_model_size_and_eval_batch_selection() {
 test_ensure_evaluate_baseline_report_falls_back_to_hf_causal_adapter_when_resolver_empty() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     _resolve_invarlock_adapter() { echo ""; }
     _validate_evaluate_baseline_report() {
@@ -264,7 +316,7 @@ test_ensure_evaluate_baseline_report_falls_back_to_hf_causal_adapter_when_resolv
 test_task_calibration_run_and_generate_preset_cover_overrides_large_model_and_report_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     mock_python3_stub_enable
     fixture_write "python3.rc" "0"
@@ -320,12 +372,12 @@ test_task_calibration_run_and_generate_preset_cover_overrides_large_model_and_re
 test_task_create_edit_and_batch_edits_cover_success_failure_and_missing_function_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
     stub_resolve_edit_params
 
     mock_python3_stub_enable
     fixture_write "python3.rc" "0"
-    mock_python3_stub_allow_real_script "validate_edit_artifact.py"
+    mock_python3_stub_allow_real_script "validate_artifact.py"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -343,10 +395,7 @@ test_task_create_edit_and_batch_edits_cover_success_failure_and_missing_function
     fi
 
     _write_complete_edit_artifact() {
-        mkdir -p "$1"
-        echo "{}" > "$1/config.json"
-        echo "weights" > "$1/pytorch_model.bin"
-        echo "{}" > "$1/tokenizer_config.json"
+        write_minimal_validation_edit_artifact "$1"
     }
 
     # Create function stubs that materialize complete edit artifacts for verification.
@@ -430,7 +479,7 @@ test_task_create_edit_and_batch_edits_cover_success_failure_and_missing_function
 test_task_evaluate_edit_and_error_cover_preset_discovery_overrides_and_report_copy_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
     stub_resolve_edit_params
 
     local out="${TEST_TMPDIR}/out"
@@ -455,7 +504,7 @@ test_task_evaluate_edit_and_error_cover_preset_discovery_overrides_and_report_co
     if task_evaluate_edit "${model_name}" 0 "lowrank_svd:8:attn" clean 1 "${out}" "${log_file}"; then :; fi
 
     # Full evaluate flow for quant_rtn with overrides and report copy.
-    mkdir -p "${model_output_dir}/models/quant_4bit_clean"
+    write_minimal_validation_edit_artifact "${model_output_dir}/models/quant_4bit_clean" "quant_rtn"
     local cert_dir="${model_output_dir}/reports/quant_4bit_clean/run_1"
     mkdir -p "${cert_dir}/nested"
     echo "{}" > "${cert_dir}/nested/evaluation.report.json"
@@ -463,6 +512,7 @@ test_task_evaluate_edit_and_error_cover_preset_discovery_overrides_and_report_co
     export TASK_PARAMS='{"seq_len":100,"stride":200}'
     export INVARLOCK_BOOTSTRAP_N="1234"
     export INVARLOCK_CERT_MIN_WINDOWS="256"
+    export PACK_DEFER_REPORT_RENDERING="1"
     _estimate_model_size() { echo "13"; }
 
     mkdir -p "${out}/presets"
@@ -491,6 +541,7 @@ YAML
     local calls
     calls="$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")"
     assert_match "calibrated_preset_${model_name}__quant_rtn\\.yaml" "${calls}" "uses edit-type preset"
+    assert_match "--defer-report-rendering" "${calls}" "deferred optional report rendering flag forwarded"
     if [[ "${calls}" =~ oom_override_preset\.yaml ]]; then
         t_fail "expected evaluate to avoid override preset file"
     fi
@@ -513,12 +564,13 @@ YAML
     mkdir -p "${cert_dir}/nested"
     echo "{}" > "${cert_dir}/nested/evaluation.report.json"
     task_evaluate_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
+    unset PACK_DEFER_REPORT_RENDERING
 }
 
 test_task_evaluate_edit_exits_when_workdir_cd_fails() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
     stub_resolve_edit_params
 
     local out="${TEST_TMPDIR}/out"
@@ -527,9 +579,9 @@ test_task_evaluate_edit_exits_when_workdir_cd_fails() {
     local baseline_dir="${model_output_dir}/models/baseline"
     local edit_dir="${model_output_dir}/models/quant_4bit_clean"
     local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${baseline_dir}" "${edit_dir}" "$(dirname "${log_file}")"
+    mkdir -p "${baseline_dir}" "$(dirname "${log_file}")"
+    write_minimal_validation_edit_artifact "${edit_dir}" "quant_rtn"
     echo "{}" > "${baseline_dir}/config.json"
-    echo "{}" > "${edit_dir}/config.json"
     echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
     : > "${log_file}"
 
@@ -548,7 +600,7 @@ test_task_evaluate_edit_exits_when_workdir_cd_fails() {
 test_task_evaluate_error_exits_when_workdir_cd_fails() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -577,7 +629,7 @@ test_task_evaluate_error_exits_when_workdir_cd_fails() {
 test_task_evaluate_error_missing_baseline_missing_error_model_skip_and_preset_missing_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -618,7 +670,7 @@ test_task_evaluate_error_missing_baseline_missing_error_model_skip_and_preset_mi
 test_task_evaluate_tasks_treat_nonzero_cli_rc_as_success_when_report_written() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
     stub_resolve_edit_params
 
     fixture_write "invarlock.create_cert" ""
@@ -638,9 +690,9 @@ test_task_evaluate_tasks_treat_nonzero_cli_rc_as_success_when_report_written() {
 
     # evaluate_EDIT: rc!=0 but report exists -> treat as success
     local edit_dir="${model_output_dir}/models/quant_4bit_clean"
-    mkdir -p "${baseline_dir}" "${edit_dir}"
+    mkdir -p "${baseline_dir}"
+    write_minimal_validation_edit_artifact "${edit_dir}" "quant_rtn"
     echo "{}" > "${baseline_dir}/config.json"
-    echo "{}" > "${edit_dir}/config.json"
     echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
 
     run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
@@ -660,7 +712,7 @@ test_task_evaluate_tasks_treat_nonzero_cli_rc_as_success_when_report_written() {
 test_task_evaluate_tasks_generate_evaluation_report_when_only_report_json_written() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
     stub_resolve_edit_params
 
     fixture_write "invarlock.create_report_for_evaluate" ""
@@ -681,7 +733,7 @@ test_task_evaluate_tasks_generate_evaluation_report_when_only_report_json_writte
     _cmd_python() {
         local script="$1"
         shift || true
-        if [[ "${script}" == *"evaluation_report_from_report.py" ]]; then
+        if [[ "${script}" == *"task_tools.py" && "${1:-}" == "evaluation-report" ]]; then
             local out_path=""
             while [[ $# -gt 0 ]]; do
                 if [[ "${1}" == "--out" ]]; then
@@ -701,9 +753,9 @@ test_task_evaluate_tasks_generate_evaluation_report_when_only_report_json_writte
 
     # evaluate_EDIT: no evaluation.report.json produced by CLI, but report.json exists -> conversion creates cert.
     local edit_dir="${model_output_dir}/models/quant_4bit_clean"
-    mkdir -p "${baseline_dir}" "${edit_dir}"
+    mkdir -p "${baseline_dir}"
+    write_minimal_validation_edit_artifact "${edit_dir}" "quant_rtn"
     echo "{}" > "${baseline_dir}/config.json"
-    echo "{}" > "${edit_dir}/config.json"
     echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
 
     run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
@@ -720,10 +772,56 @@ test_task_evaluate_tasks_generate_evaluation_report_when_only_report_json_writte
     assert_file_exists "${model_output_dir}/reports/errors/cuda_assert/evaluation.report.json" "converted error report exists"
 }
 
+test_task_evaluate_tasks_return_conversion_failure_when_report_generation_fails() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
+    stub_resolve_edit_params
+
+    fixture_write "invarlock.create_report_for_evaluate" ""
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "$(dirname "${log_file}")"
+    : > "${log_file}"
+
+    _estimate_model_size() { echo "7"; }
+    _ensure_evaluate_baseline_report() { echo "${TEST_TMPDIR}/baseline_report.json"; }
+    echo "{}" > "${TEST_TMPDIR}/baseline_report.json"
+    _cmd_python() {
+        local script="$1"
+        shift || true
+        if [[ "${script}" == *"task_tools.py" && "${1:-}" == "evaluation-report" ]]; then
+            return 9
+        fi
+        return 0
+    }
+
+    local edit_dir="${model_output_dir}/models/quant_4bit_clean"
+    mkdir -p "${baseline_dir}"
+    write_minimal_validation_edit_artifact "${edit_dir}" "quant_rtn"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+
+    run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
+    assert_rc "9" "${RUN_RC}" "evaluate_EDIT returns report conversion failure"
+    assert_match "failed to generate evaluation\\.report\\.json" "$(cat "${log_file}")" "edit conversion failure is logged"
+
+    local error_dir="${model_output_dir}/models/error_cuda_assert"
+    mkdir -p "${error_dir}"
+    echo "{}" > "${error_dir}/config.json"
+
+    run task_evaluate_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
+    assert_rc "9" "${RUN_RC}" "evaluate_ERROR returns report conversion failure"
+}
+
 test_task_create_error_branches_cover_skip_missing_function_and_verify_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -771,7 +869,7 @@ test_task_create_error_branches_cover_skip_missing_function_and_verify_paths() {
 test_task_create_error_recreates_incomplete_models_and_propagates_failures() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -815,7 +913,7 @@ test_task_create_error_recreates_incomplete_models_and_propagates_failures() {
 test_task_cleanup_edit_and_error_cover_guard_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -917,7 +1015,7 @@ test_task_evaluate_error_probe_warning_branches() {
     mock_reset
     push_active_python_bin
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -1012,7 +1110,7 @@ EOF
 test_task_helpers_cover_fallback_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     assert_eq "moe" "$(_get_model_size_from_name "Mixtral-8x7B")" "moe detection"
     assert_eq "13" "$(_get_model_size_from_name "model-13b")" "13B detection"
@@ -1057,7 +1155,7 @@ test_task_helpers_cover_fallback_branches() {
 test_task_helpers_cover_bootstrap_replicates_floor_logic() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     assert_eq "1500" "$(_bootstrap_replicates_floor_for_tier conservative)" "conservative floor"
     assert_eq "1200" "$(_bootstrap_replicates_floor_for_tier balanced)" "balanced floor"
@@ -1072,7 +1170,7 @@ test_task_helpers_cover_bootstrap_replicates_floor_logic() {
 test_task_baseline_report_helpers_wait_sanitizes_interval_and_large_timeout() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local baseline_root="${TEST_TMPDIR}/baseline_root_sanitize_wait"
     mkdir -p "${baseline_root}"
@@ -1103,7 +1201,7 @@ test_task_baseline_report_helpers_wait_sanitizes_interval_and_large_timeout() {
 test_task_baseline_report_helpers_wait_iters_floor_to_one() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local baseline_root="${TEST_TMPDIR}/baseline_root_wait_iters"
     mkdir -p "${baseline_root}"
@@ -1139,7 +1237,7 @@ test_task_baseline_report_helpers_wait_iters_floor_to_one() {
 test_task_evaluate_error_repairs_missing_tensors_config_when_available() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     fixture_write "invarlock.create_cert" ""
 
@@ -1161,7 +1259,7 @@ test_task_evaluate_error_repairs_missing_tensors_config_when_available() {
 test_task_evaluate_error_emits_rmt_cross_model_probe_for_rmt_norm_noise() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     fixture_write "invarlock.create_cert" ""
 
@@ -1220,7 +1318,7 @@ YAML
 test_task_create_model_variant_dispatch_and_fallback_errors() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     create_model_variant() { echo "main:$*"; return 0; }
     run _task_create_model_variant "/b" "/o" "quant_rtn" "8" "128" "ffn" "0"
@@ -1249,7 +1347,7 @@ test_task_create_model_variant_dispatch_and_fallback_errors() {
 test_task_create_model_variant_fallback_success_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     unset -f create_model_variant || true
 
@@ -1275,10 +1373,33 @@ test_task_create_model_variant_fallback_success_paths() {
     assert_match "^lowrank:" "${RUN_OUT}" "lowrank_svd uses create_lowrank_model"
 }
 
+test_task_edit_artifact_probe_helpers_cover_present_and_missing_cases() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
+
+    local edit_dir="${TEST_TMPDIR}/edit_probe"
+    mkdir -p "${edit_dir}"
+
+    run _edit_artifact_has_weights "${edit_dir}"
+    assert_rc "1" "${RUN_RC}" "missing weight files are rejected"
+
+    touch "${edit_dir}/foo.safetensors"
+    run _edit_artifact_has_weights "${edit_dir}"
+    assert_rc "0" "${RUN_RC}" "safetensors shard satisfies weight probe"
+
+    run _edit_artifact_has_tokenizer "${edit_dir}"
+    assert_rc "1" "${RUN_RC}" "missing tokenizer files are rejected"
+
+    touch "${edit_dir}/tokenizer.json"
+    run _edit_artifact_has_tokenizer "${edit_dir}"
+    assert_rc "0" "${RUN_RC}" "tokenizer json satisfies tokenizer probe"
+}
+
 test_task_baseline_report_helpers_cover_reuse_lock_race_and_wait_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     run _resolve_invarlock_adapter ""
     assert_ne "0" "${RUN_RC}" "empty adapter input returns non-zero"
@@ -1336,12 +1457,12 @@ test_task_baseline_report_helpers_cover_reuse_lock_race_and_wait_paths() {
 test_task_baseline_report_helpers_execute_python_wrappers() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() {
         echo "python $*" >> "${calls}"
-        if [[ $# -eq 2 ]]; then
+        if [[ $# -eq 3 && "${2:-}" == "resolve-adapter" ]]; then
             echo "hf_auto"
         fi
         return 0
@@ -1362,7 +1483,7 @@ test_task_baseline_report_helpers_execute_python_wrappers() {
 test_task_baseline_report_helpers_cover_generate_baseline_report_path() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local baseline_root="${TEST_TMPDIR}/baseline_root_generate"
     mkdir -p "${baseline_root}"
@@ -1405,10 +1526,29 @@ EOF
     assert_match "skip_overhead_check: true" "${profile_contents}" "large-model baseline report profile carries skip_overhead policy"
 }
 
+test_task_baseline_report_helpers_return_runner_failure() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
+
+    local baseline_root="${TEST_TMPDIR}/baseline_root_runner_failure"
+    mkdir -p "${baseline_root}"
+    local log_file="${TEST_TMPDIR}/baseline_runner_failure.log"
+    : > "${log_file}"
+
+    _resolve_invarlock_adapter() { echo "hf_test"; }
+    _validate_evaluate_baseline_report() { return 1; }
+    _pack_run_from_config() { return 9; }
+
+    local rc=0
+    ( _ensure_evaluate_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${log_file}" ) || rc=$?
+    assert_rc "1" "${rc}" "baseline report helper returns failure when config runner fails"
+}
+
 test_task_baseline_report_helpers_remove_invalid_baseline_report_and_timeout_wait() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local baseline_root="${TEST_TMPDIR}/baseline_root_timeout"
     mkdir -p "${baseline_root}"
@@ -1433,7 +1573,7 @@ test_task_baseline_report_helpers_remove_invalid_baseline_report_and_timeout_wai
 test_task_baseline_report_helpers_remove_invalid_baseline_report_after_lock_acquired() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local baseline_root="${TEST_TMPDIR}/baseline_root_lock_rm"
     mkdir -p "${baseline_root}"
@@ -1466,7 +1606,7 @@ test_task_evaluate_edit_reuses_baseline_report_applies_ci_override_and_falls_bac
     mock_reset
     push_active_python_bin
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     fixture_write "invarlock.create_cert" ""
     local bin_dir="${TEST_TMPDIR}/bin"
@@ -1527,8 +1667,7 @@ EOF
         jq -n '{status:"selected", edit_type:"quant_rtn", param1:"4", param2:"32", scope:"ffn", edit_dir_name:"_clean"}'
     }
     local edit_dir="${model_output_dir}/models/_clean"
-    mkdir -p "${edit_dir}"
-    echo "{}" > "${edit_dir}/config.json"
+    write_minimal_validation_edit_artifact "${edit_dir}" "quant_rtn"
 
     mkdir -p "${out}/presets"
     echo "{}" > "${out}/presets/calibrated_preset_${model_name}.yaml"
@@ -1569,7 +1708,7 @@ test_normalize_staged_preset_for_eval_handles_sparse_yaml_and_json_inputs() {
     mock_reset
     push_active_python_bin
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local log_file="${TEST_TMPDIR}/normalize.log"
     : > "${log_file}"
@@ -1607,7 +1746,7 @@ test_task_evaluate_error_reuses_baseline_report_for_nonstructural_errors_and_app
     mock_reset
     push_active_python_bin
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     fixture_write "invarlock.create_cert" ""
 
@@ -1634,7 +1773,9 @@ test_task_evaluate_error_reuses_baseline_report_for_nonstructural_errors_and_app
     mkdir -p "${out}/presets"
     echo "{}" > "${out}/presets/calibrated_preset_${model_name}.yaml"
 
+    export PACK_DEFER_REPORT_RENDERING="1"
     task_evaluate_error "${model_name}" 0 norm_collapse "${out}" "${log_file}"
+    unset PACK_DEFER_REPORT_RENDERING
 
     assert_match "CI window override" "$(cat "${log_file}")" "CI window override applied"
     assert_match "Reusing baseline report" "$(cat "${log_file}")" "baseline report reused"
@@ -1657,7 +1798,7 @@ test_task_evaluate_error_skips_baseline_report_reuse_for_structural_errors() {
     mock_reset
     push_active_python_bin
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     fixture_write "invarlock.create_cert" ""
 
@@ -1688,7 +1829,9 @@ test_task_evaluate_error_skips_baseline_report_reuse_for_structural_errors() {
     mkdir -p "${out}/presets"
     echo "{}" > "${out}/presets/calibrated_preset_${model_name}.yaml"
 
+    export PACK_DEFER_REPORT_RENDERING="1"
     task_evaluate_error "${model_name}" 0 nan_injection "${out}" "${log_file}"
+    unset PACK_DEFER_REPORT_RENDERING
 
     local log_text
     log_text="$(cat "${log_file}")"
@@ -1706,6 +1849,7 @@ test_task_evaluate_error_skips_baseline_report_reuse_for_structural_errors() {
     assert_file_exists "${model_output_dir}/reports/errors/nan_injection/runtime_inputs/calibrated_preset_${model_name}.yaml" "staged preset exists for structural error"
     local calls
     calls="$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")"
+    assert_match "--defer-report-rendering" "${calls}" "deferred optional report rendering flag forwarded for error evaluation"
     if [[ "${calls}" =~ --baseline-report ]]; then
         t_fail "expected structural error evaluate call to omit --baseline-report"
     fi
@@ -1716,7 +1860,7 @@ test_task_evaluate_error_emits_structural_failure_report_when_structural_eval_ca
     mock_reset
     push_active_python_bin
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     fixture_write "invarlock.rc" "1"
 
@@ -1830,6 +1974,7 @@ EOF
   }
 }
 EOF
+    echo '{"run_id":"edited-run"}' > "${edited_dir}/report.json"
     : > "${edited_dir}/events.jsonl"
 
     task_evaluate_error "${model_name}" 0 inf_injection "${out}" "${log_file}"
@@ -1847,7 +1992,7 @@ EOF
 test_task_timeout_and_profile_helpers() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     TASK_TIMEOUT_DEFAULT=""
     assert_eq "" "$(_get_task_timeout "X")" "empty timeout returns blank"
@@ -1872,12 +2017,16 @@ test_task_timeout_and_profile_helpers() {
     local rc=0
     _write_model_profile "${TEST_TMPDIR}/missing" "model" || rc=$?
     assert_rc "1" "${rc}" "missing baseline dir returns non-zero"
+
+    PACK_DEFER_REPORT_RENDERING="yes"
+    _pack_defer_report_rendering_enabled || t_fail "truthy defer rendering flag should enable optional report deferral"
+    unset PACK_DEFER_REPORT_RENDERING
 }
 
 test_execute_task_dispatches_all_task_types() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}"
@@ -1897,6 +2046,7 @@ test_execute_task_dispatches_all_task_types() {
     task_evaluate_error() { :; }
     task_cleanup_error() { :; }
     task_generate_preset() { :; }
+    task_setup_evaluate_baseline_report() { :; }
 
     make_task() {
         local task_id="$1"
@@ -1910,7 +2060,7 @@ test_execute_task_dispatches_all_task_types() {
             > "${TEST_TMPDIR}/${task_id}.task"
     }
 
-    local types=(SETUP_BASELINE CALIBRATION_RUN CREATE_EDIT CREATE_EDITS_BATCH evaluate_EDIT CLEANUP_EDIT CREATE_ERROR evaluate_ERROR CLEANUP_ERROR GENERATE_PRESET)
+    local types=(SETUP_BASELINE CALIBRATION_RUN SETUP_EVALUATE_BASELINE_REPORT CREATE_EDIT CREATE_EDITS_BATCH evaluate_EDIT CLEANUP_EDIT CREATE_ERROR evaluate_ERROR CLEANUP_ERROR GENERATE_PRESET)
     local type
     for type in "${types[@]}"; do
         make_task "task_${type}" "${type}" '{}'
@@ -1927,7 +2077,7 @@ test_execute_task_dispatches_all_task_types() {
 test_execute_task_handles_job_control_enabled() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}"
@@ -1948,7 +2098,7 @@ test_execute_task_handles_job_control_enabled() {
 test_execute_task_timeout_triggers_marker() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}"
@@ -1971,7 +2121,7 @@ test_execute_task_timeout_triggers_marker() {
 test_task_setup_baseline_revision_errors() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -2000,7 +2150,7 @@ test_task_setup_baseline_revision_errors() {
 test_task_create_edit_handles_skip_and_invalid() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -2033,7 +2183,7 @@ test_task_create_edit_handles_skip_and_invalid() {
 test_task_evaluate_edit_skip_and_invalid() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -2055,12 +2205,23 @@ test_task_evaluate_edit_skip_and_invalid() {
     }
     run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:ffn" clean 1 "${out}" "${log_file}"
     assert_rc "1" "${RUN_RC}" "invalid resolution errors"
+
+    resolve_edit_params() {
+        jq -n '{status:"selected", edit_type:"quant_rtn", param1:"4", param2:"32", scope:"ffn", edit_dir_name:"quant_4bit_clean"}'
+    }
+    mkdir -p "${model_output_dir}/models/quant_4bit_clean"
+    _cmd_python() { return 1; }
+    run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:ffn" clean 1 "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "edit metadata validation failure errors"
+    unset -f _cmd_python
+    # shellcheck source=../runtime.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/runtime.sh"
 }
 
 test_resolve_edit_params_uses_tuned_presets() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -2115,7 +2276,7 @@ JSON
 test_task_calibration_run_guard_order_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -2133,6 +2294,7 @@ test_task_calibration_run_guard_order_branches() {
     _get_invarlock_config() { echo "512:256:1:1:4"; }
 
     fixture_write "python3.create_report" ""
+    fixture_write "python3.stub" ""
     cat > "${TEST_TMPDIR}/fixtures/python3.capture_env_keys" <<'EOF'
 PYTHONPATH
 INVARLOCK_CONFIG_ROOT
@@ -2163,7 +2325,7 @@ EOF
 test_task_helper_effective_ci_and_runtime_stage_error_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local plan_json
     plan_json="$(_plan_effective_ci_schedule "${TEST_TMPDIR}/missing-model" "13" "balanced" "wikitext2" "validation" "42")"
@@ -2206,10 +2368,11 @@ test_task_helper_effective_ci_and_runtime_stage_error_branches() {
     [[ ! -v PYTHON_BIN ]] || t_fail "PYTHON_BIN should be unset after normalize failure without an explicit override"
 }
 
+
 test_task_calibration_and_preset_cover_effective_ci_failure_and_remote_code_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -2289,7 +2452,7 @@ test_task_calibration_and_preset_cover_effective_ci_failure_and_remote_code_bran
 test_task_baseline_report_helper_exports_remote_code_allowance() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local baseline_root="${TEST_TMPDIR}/baseline_root"
     local baseline_path="${TEST_TMPDIR}/baseline_model"
@@ -2327,10 +2490,62 @@ test_task_baseline_report_helper_exports_remote_code_allowance() {
     assert_eq "1" "$(cat "${env_log}")" "baseline helper exports remote code allowance when enabled"
 }
 
+test_task_setup_evaluate_baseline_report_covers_success_and_failure_paths() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local log_file="${TEST_TMPDIR}/setup_baseline_report.log"
+    mkdir -p "${baseline_dir}" "$(dirname "${log_file}")"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    echo "Qwen/Qwen2.5-14B" > "${model_output_dir}/.model_id"
+    : > "${log_file}"
+
+    local baseline_report="${TEST_TMPDIR}/baseline_report.json"
+    _estimate_model_size() { echo "7"; }
+    _get_model_size_from_name() { echo "14"; }
+    _get_invarlock_config() { echo "256:128:1:1:2"; }
+    _default_ci_min_windows() { echo "3"; }
+    _plan_effective_ci_schedule() { echo '{"status":"selected"}'; }
+    _apply_effective_ci_schedule() { echo "128:128:4:5"; }
+    _resolve_bootstrap_replicates() { echo "7"; }
+    _ensure_evaluate_baseline_report() {
+        printf '{"report":"ok"}\n' > "${baseline_report}"
+        echo "${baseline_report}"
+    }
+
+    run task_setup_evaluate_baseline_report "${model_name}" 0 "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "baseline report setup succeeds"
+    assert_match "preparing shared evaluate baseline report" "$(cat "${log_file}")" "setup logs start"
+    assert_match "Prepared reusable baseline report" "$(cat "${log_file}")" "setup logs success"
+
+    run task_setup_evaluate_baseline_report "missing" 0 "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "missing baseline path fails"
+
+    _plan_effective_ci_schedule() { return 1; }
+    run task_setup_evaluate_baseline_report "${model_name}" 0 "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "baseline report setup fails when effective ci planning fails"
+
+    _plan_effective_ci_schedule() { echo '{"status":"selected"}'; }
+    _apply_effective_ci_schedule() { return 1; }
+    run task_setup_evaluate_baseline_report "${model_name}" 0 "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "baseline report setup fails when effective ci schedule application fails"
+
+    _apply_effective_ci_schedule() { echo "128:128:4:5"; }
+    _ensure_evaluate_baseline_report() { return 1; }
+    run task_setup_evaluate_baseline_report "${model_name}" 0 "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "baseline report setup fails when reusable report generation fails"
+}
+
 test_task_calibration_run_exports_remote_code_allowance() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -2350,6 +2565,7 @@ test_task_calibration_run_exports_remote_code_allowance() {
     _plan_effective_ci_schedule() { echo '{"status":"selected"}'; }
     _apply_effective_ci_schedule() { echo "128:128:1:1"; }
     pack_remote_code_allowed() { return 0; }
+    fixture_write "python3.stub" ""
     _pack_run_from_config() {
         printf '%s\n' "${INVARLOCK_ALLOW_REMOTE_CODE-}" > "${env_log}"
         local out_dir=""
@@ -2374,10 +2590,82 @@ test_task_calibration_run_exports_remote_code_allowance() {
     assert_eq "1" "$(cat "${env_log}")" "calibration run exports remote code allowance when enabled"
 }
 
+test_task_calibration_run_returns_config_runner_failure() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "${baseline_dir}" "$(dirname "${log_file}")"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    echo "mistralai/Mistral-7B-v0.1" > "${model_output_dir}/.model_id"
+    : > "${log_file}"
+
+    _estimate_model_size() { echo "7"; }
+    _get_model_size_from_name() { echo "7"; }
+    _get_invarlock_config() { echo "128:128:1:1:1"; }
+    _plan_effective_ci_schedule() { echo '{"status":"selected"}'; }
+    _apply_effective_ci_schedule() { echo "128:128:1:1"; }
+    _pack_run_from_config() { return 8; }
+
+    run task_calibration_run "${model_name}" 0 "1" "42" "${out}" "${log_file}"
+    assert_rc "8" "${RUN_RC}" "calibration run returns config-runner failure"
+}
+
+test_task_calibration_run_returns_report_conversion_failure() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "${baseline_dir}" "$(dirname "${log_file}")"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    echo "mistralai/Mistral-7B-v0.1" > "${model_output_dir}/.model_id"
+    : > "${log_file}"
+
+    _estimate_model_size() { echo "7"; }
+    _get_model_size_from_name() { echo "7"; }
+    _get_invarlock_config() { echo "128:128:1:1:1"; }
+    _plan_effective_ci_schedule() { echo '{"status":"selected"}'; }
+    _apply_effective_ci_schedule() { echo "128:128:1:1"; }
+    _pack_run_from_config() {
+        local out_dir=""
+        while [[ $# -gt 0 ]]; do
+            case "${1}" in
+                --out)
+                    out_dir="${2:-}"
+                    shift 2
+                    ;;
+                *)
+                    shift
+                    ;;
+            esac
+        done
+        mkdir -p "${out_dir}"
+        printf '{"report":"ok"}\n' > "${out_dir}/report.json"
+        return 0
+    }
+    _cmd_python() { return 10; }
+
+    run task_calibration_run "${model_name}" 0 "1" "42" "${out}" "${log_file}"
+    assert_rc "10" "${RUN_RC}" "calibration run returns report conversion failure"
+    assert_match "failed to generate evaluation\\.report\\.json" "$(cat "${log_file}")" "calibration conversion failure is logged"
+}
+
 test_task_evaluate_edit_covers_effective_ci_and_staging_failure_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -2412,9 +2700,9 @@ EOF
     local baseline_dir="${model_output_dir}/models/baseline"
     local edit_dir="${model_output_dir}/models/_clean"
     local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${baseline_dir}" "${edit_dir}" "${out}/presets" "$(dirname "${log_file}")"
+    mkdir -p "${baseline_dir}" "${out}/presets" "$(dirname "${log_file}")"
+    write_minimal_validation_edit_artifact "${edit_dir}" "quant_rtn"
     echo "{}" > "${baseline_dir}/config.json"
-    echo "{}" > "${edit_dir}/config.json"
     echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
     echo "Qwen/Qwen2.5-32B" > "${model_output_dir}/.model_id"
     printf 'dataset:\n  seq_len: 128\n' > "${out}/presets/calibrated_preset_${model_name}.yaml"
@@ -2468,7 +2756,7 @@ EOF
 test_task_evaluate_error_covers_effective_ci_staging_and_probe_remote_code_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"

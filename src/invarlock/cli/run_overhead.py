@@ -11,6 +11,66 @@ RELEASE_BUFFER_FRACTION = 0.12
 RELEASE_MIN_WINDOWS_PER_ARM = 200
 RELEASE_CALIBRATION_MIN = 16
 RELEASE_CALIBRATION_MAX = 24
+_OVERHEAD_EXTRACTION_ERRORS = (
+    AttributeError,
+    KeyError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
+
+def _valid_primary_metric_snapshot(pm: Any) -> dict[str, Any] | None:
+    if not isinstance(pm, dict):
+        return None
+    fin = pm.get("final")
+    if isinstance(fin, int | float) and math.isfinite(float(fin)):
+        return pm
+    return None
+
+
+def _compute_snapshot_from_report(
+    report: dict[str, Any], *, kind: str
+) -> dict[str, Any] | None:
+    from invarlock.eval.primary_metric import compute_primary_metric_from_report
+
+    computed = compute_primary_metric_from_report(report, kind=kind)
+    return _valid_primary_metric_snapshot(computed)
+
+
+def _extract_pm_snapshot_for_overhead(
+    src: object, *, kind: str
+) -> dict[str, Any] | None:
+    """Extract or compute a primary-metric snapshot from diverse report shapes."""
+    try:
+        metrics = getattr(src, "metrics", None)
+        if isinstance(metrics, dict):
+            snapshot = _valid_primary_metric_snapshot(metrics.get("primary_metric"))
+            if snapshot is not None:
+                return snapshot
+    except _OVERHEAD_EXTRACTION_ERRORS:
+        pass
+
+    try:
+        if isinstance(src, dict):
+            snapshot = _compute_snapshot_from_report(src, kind=kind)
+            if snapshot is not None:
+                return snapshot
+    except _OVERHEAD_EXTRACTION_ERRORS:
+        pass
+
+    try:
+        ew = getattr(src, "evaluation_windows", None)
+        if isinstance(ew, dict) and ew:
+            snapshot = _compute_snapshot_from_report(
+                {"evaluation_windows": ew}, kind=kind
+            )
+            if snapshot is not None:
+                return snapshot
+    except _OVERHEAD_EXTRACTION_ERRORS:
+        pass
+
+    return None
 
 
 def plan_release_windows(

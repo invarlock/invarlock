@@ -116,7 +116,6 @@ def _build_wheel(tmp_path: Path, python_exe: Path) -> Path:
             "-m",
             "build",
             "--wheel",
-            "--no-isolation",
             "--outdir",
             str(tmp_path),
         ],

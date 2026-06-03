@@ -36,6 +36,20 @@ def _build_diagnostics(
     return tuple(diagnostics)
 
 
+def _diagnostics_to_dicts(
+    diagnostics: tuple[GuardDiagnostic, ...],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "kind": diagnostic.kind,
+            "severity": diagnostic.severity,
+            "message": diagnostic.message,
+            "details": dict(diagnostic.details),
+        }
+        for diagnostic in diagnostics
+    ]
+
+
 def before_edit_guard(guard: Any, model: nn.Module) -> None:
     """Execute before edit (no action needed beyond readiness logging)."""
     _ = model
@@ -87,11 +101,19 @@ def validate_guard(
         }
         for message in errors
     )
-    reason = (
-        "no_variance_targets"
-        if any("no target modules found" in str(message).lower() for message in errors)
-        else None
+    reason = None
+    prepare_failure = details.get("prepare_failure")
+    prepare_reason = (
+        prepare_failure.get("reason") if isinstance(prepare_failure, dict) else None
     )
+    if any("packed quantized" in str(message).lower() for message in errors):
+        reason = "packed_quantized_weight_mutation_unsupported"
+    elif prepare_reason == "no_variance_targets" or any(
+        "no target modules found" in str(message).lower() for message in errors
+    ):
+        reason = "no_variance_targets"
+    elif prepare_reason == "packed_quantized_weight_mutation_unsupported":
+        reason = "packed_quantized_weight_mutation_unsupported"
     extras = (
         {
             "supported": False,
@@ -119,6 +141,37 @@ def finalize_guard(guard: Any, model: nn.Module) -> dict[str, Any]:
     start_time = time.time()
 
     if not guard._prepared:
+        prepare_failure = getattr(guard, "_prepare_failure", None)
+        if isinstance(prepare_failure, dict) and prepare_failure.get("message"):
+            error_message = str(prepare_failure["message"])
+            details = {
+                "guard_type": "variance",
+                "prepare_failure": dict(prepare_failure),
+                "stats": dict(getattr(guard, "_stats", {}) or {}),
+                "policy": dict(getattr(guard, "_policy", {}) or {}),
+            }
+            if prepare_failure.get("reason") == "no_variance_targets":
+                error_message = "Preparation failed or no target modules found"
+            guard._log_event(
+                "finalize_failed",
+                level="ERROR",
+                message=error_message,
+                reason=str(prepare_failure.get("reason", "prepare_error")),
+            )
+            return {
+                "passed": False,
+                "metrics": {},
+                "warnings": ["Variance guard not properly prepared"],
+                "errors": [error_message],
+                "finalize_time": time.time() - start_time,
+                "diagnostics": _diagnostics_to_dicts(
+                    _build_diagnostics(
+                        warnings=["Variance guard not properly prepared"],
+                        errors=[error_message],
+                    )
+                ),
+                "details": details,
+            }
         guard._log_event(
             "finalize_failed",
             level="ERROR",
@@ -130,7 +183,7 @@ def finalize_guard(guard: Any, model: nn.Module) -> dict[str, Any]:
             "warnings": ["Variance guard not properly prepared"],
             "errors": ["Preparation failed or no target modules found"],
             "finalize_time": time.time() - start_time,
-            "diagnostics": list(
+            "diagnostics": _diagnostics_to_dicts(
                 _build_diagnostics(
                     warnings=["Variance guard not properly prepared"],
                     errors=["Preparation failed or no target modules found"],
@@ -188,6 +241,18 @@ def finalize_guard(guard: Any, model: nn.Module) -> dict[str, Any]:
     warnings = list(finalize_state["warnings"])
     errors = list(finalize_state["errors"])
 
+    quantized_mutation_unsupported = list(
+        guard._stats.get("quantized_mutation_unsupported", [])
+        if isinstance(guard._stats, dict)
+        else []
+    )
+    if guard._scales and quantized_mutation_unsupported:
+        errors.append(
+            "Packed quantized variance targets are not safely mutable; "
+            "strict variance enablement is unsupported for these targets"
+        )
+        passed = False
+
     finalize_time = time.time() - start_time
     final_metrics = build_finalize_metrics(
         scales=guard._scales,
@@ -236,15 +301,9 @@ def finalize_guard(guard: Any, model: nn.Module) -> dict[str, Any]:
         if passed and not warnings
         else ("monitor" if passed or guard._monitor_only else "block")
     )
-    result["diagnostics"] = [
-        {
-            "kind": diagnostic.kind,
-            "severity": diagnostic.severity,
-            "message": diagnostic.message,
-            "details": dict(diagnostic.details),
-        }
-        for diagnostic in _build_diagnostics(warnings=warnings, errors=errors)
-    ]
+    result["diagnostics"] = _diagnostics_to_dicts(
+        _build_diagnostics(warnings=warnings, errors=errors)
+    )
 
     return result
 

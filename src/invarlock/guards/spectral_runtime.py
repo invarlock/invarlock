@@ -9,8 +9,8 @@ import torch
 
 from invarlock.core.types import GuardDiagnostic, GuardValidationResult
 
-from ._contracts import guard_assert
 from ._estimators import frobenius_norm_sq, row_col_norm_extrema
+from .policies import guard_assert
 from .spectral_control import apply_spectral_control
 from .spectral_detection import (
     classify_model_families,
@@ -70,9 +70,10 @@ def prepare_guard(
     percentile_fn: Any = np.percentile,
 ) -> dict[str, Any]:
     """Prepare spectral guard by capturing baseline spectral properties."""
-    _ = adapter
     _ = calib
     start_time = time.time()
+    guard._adapter_ref = adapter
+    guard._scoped_modules_model_id = None
 
     if policy:
         apply_policy_overrides_fn(guard, policy)
@@ -338,7 +339,10 @@ def validate_guard(
     guard_assert(0.0 < alpha <= 1.0, "spectral.multiple_testing.alpha out of range")
     guard_assert(guard.max_caps >= 0, "spectral.max_caps must be >= 0")
 
-    diagnostics = build_spectral_diagnostics(selected_violations)
+    diagnostics = [
+        *getattr(guard, "_measurement_diagnostics", []),
+        *build_spectral_diagnostics(selected_violations),
+    ]
     return GuardValidationResult(
         passed=passed,
         decision=decision,
@@ -436,7 +440,10 @@ def finalize_guard(guard: Any, model: Any) -> dict[str, Any]:
         "warnings": warnings,
         "errors": errors,
         "violations": selected_final_violations,
-        "diagnostics": build_spectral_diagnostics(selected_final_violations),
+        "diagnostics": [
+            *getattr(guard, "_measurement_diagnostics", []),
+            *build_spectral_diagnostics(selected_final_violations),
+        ],
         "baseline_metrics": guard.baseline_metrics,
         "final_metrics": final_metrics,
         "final_z_scores": guard.latest_z_scores,

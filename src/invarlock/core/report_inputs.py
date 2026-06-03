@@ -38,6 +38,16 @@ class ReportInputError(ValueError):
                 f"({RUN_REPORT_FILENAME}); pass an explicit run report path."
             )
         if self.reason == "missing_evaluation_canonical":
+            run_report_path = self.path / RUN_REPORT_FILENAME
+            if run_report_path.is_file():
+                return (
+                    f"Directory {self.path} contains {RUN_REPORT_FILENAME}, which is "
+                    "a raw run report. Verification expects the canonical "
+                    f"{EVALUATION_REPORT_FILENAME}; generate one with "
+                    "`invarlock report generate --run <subject report.json> "
+                    "--baseline-run-report <baseline report.json> --format report "
+                    "-o <output-dir>` or pass an explicit evaluation report path."
+                )
             return (
                 f"Directory {self.path} does not contain a canonical evaluation report file "
                 f"({EVALUATION_REPORT_FILENAME}); pass an explicit evaluation report path."

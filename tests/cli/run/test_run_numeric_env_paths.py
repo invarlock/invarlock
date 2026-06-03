@@ -10,138 +10,33 @@ import click
 import pytest
 
 from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_common import (
+    common_ce_detect_ce_patches,
+    offline_registry_patch,
+    write_base_run_config,
+)
+from tests.cli.run._support_run_common import (
+    synthetic_provider_min as _provider_min,
+)
 
 
 def _base_cfg(tmp_path: Path, preview=1, final=1) -> Path:
-    p = tmp_path / "config.yaml"
-    p.write_text(
-        f"""
-model:
-  adapter: hf_causal
-  id: gpt2
-  device: cpu
-edit:
-  name: quant_rtn
-  plan: {{}}
-
-dataset:
-  provider: synthetic
-  id: synthetic
-  split: validation
-  seq_len: 8
-  stride: 4
-  preview_n: {preview}
-  final_n: {final}
-
-guards:
-  order: []
-
-eval:
-  spike_threshold: 2.0
-  loss:
-    type: auto
-
-output:
-  dir: runs
-        """
-    )
-    return p
-
-
-def _provider_min():
-    return SimpleNamespace(
-        windows=lambda **kw: (
-            SimpleNamespace(input_ids=[[1, 2, 3]], attention_masks=[[1, 1, 1]]),
-            SimpleNamespace(input_ids=[[4, 5, 6]], attention_masks=[[1, 1, 1]]),
-        )
+    return write_base_run_config(
+        tmp_path,
+        preview,
+        final,
+        eval_fields="  spike_threshold: 2.0\n",
     )
 
 
 @pytest.fixture(autouse=True)
 def _offline_registry_stub():
-    class _Registry:
-        def get_adapter(self, name):
-            return SimpleNamespace(
-                name=name,
-                load_model=lambda model_id, device=None: SimpleNamespace(
-                    named_parameters=lambda: [], named_buffers=lambda: []
-                ),
-            )
-
-        def get_edit(self, name):
-            return SimpleNamespace(name=name)
-
-        def get_guard(self, name):
-            return SimpleNamespace(name=name)
-
-        def get_plugin_metadata(self, name, kind):
-            return {"name": name, "module": f"{kind}.{name}", "version": "test"}
-
-    with patch("invarlock.core.registry.get_registry", lambda: _Registry()):
+    with offline_registry_patch():
         yield
 
 
 def _common_ce_detect_ce():
-    class _Registry:
-        def get_adapter(self, name):
-            return SimpleNamespace(
-                name=name,
-                load_model=lambda model_id, device=None: SimpleNamespace(
-                    named_parameters=lambda: [], named_buffers=lambda: []
-                ),
-            )
-
-        def get_edit(self, name):
-            return SimpleNamespace(name=name)
-
-        def get_guard(self, name):
-            return SimpleNamespace(name=name)
-
-        def get_plugin_metadata(self, name, kind):
-            return {"name": name, "module": f"{kind}.{name}", "version": "test"}
-
-    return (
-        patch("invarlock.cli.device.resolve_device", lambda d: d),
-        patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
-        patch("invarlock.core.registry.get_registry", lambda: _Registry()),
-        patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
-            lambda model_id, adapter: SimpleNamespace(
-                default_loss="ce",
-                model_id=model_id,
-                adapter=adapter,
-                module_selectors={},
-                invariants=set(),
-                cert_lints=[],
-                family="gpt",
-            ),
-        ),
-        patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
-            lambda profile: (
-                SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
-                "tokhash123",
-            ),
-        ),
-        patch(
-            "invarlock.reporting.report_files.save_report",
-            lambda report, run_dir, formats, filename_prefix: {
-                "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
-            },
-        ),
-    )
-
-
-def _runner_success():
-    return SimpleNamespace(
-        execute=lambda **k: SimpleNamespace(
-            edit={},
-            metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
-            guards={},
-            context={"dataset_meta": {}},
-            status="success",
-        )
-    )
+    return common_ce_detect_ce_patches()
 
 
 def test_baseline_mlm_no_masked_tokens_exit(tmp_path: Path):
@@ -206,11 +101,11 @@ def test_baseline_mlm_no_masked_tokens_exit(tmp_path: Path):
             patch("invarlock.core.config_loader.load_config", lambda p: Cfg())
         )
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.detect_model_profile", detect_mlm)
+            patch("invarlock.cli.run_runtime_exec.detect_model_profile", detect_mlm)
         )
         for target in (
-            "invarlock.cli.run_runtime.resolve_tokenizer",
-            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
         ):
             stack.enter_context(
                 patch(
@@ -338,7 +233,7 @@ def test_guard_order_permutations(tmp_path: Path, order):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda *_a, **_k: (
                     SimpleNamespace(
                         eos_token="</s>",

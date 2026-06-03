@@ -62,7 +62,7 @@ or datasets, opt in per command with `--allow-network`:
 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject distilgpt2 \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile ci
 ```
 
@@ -79,7 +79,7 @@ container and emits `runtime.manifest.json` beside the evaluation report.
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject distilgpt2 \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile ci \
   --report-out reports/eval
 ```
@@ -120,6 +120,7 @@ Artifact model:
 | **Python developer** | Getting Started → [Primary Metric Smoke](primary-metric-smoke.md) → [API Guide](../reference/api-guide.md) |
 | **Custom data user** | Getting Started → [Bring Your Own Data](bring-your-own-data.md) → [Config Gallery](config-gallery.md) |
 | **Validation engineer** | Getting Started → [Evidence Packs](evidence-packs.md) → [Evidence Packs Internals](evidence-packs-internals.md) |
+| **Integration author** | Getting Started → [Integration Examples](integrations.md) → [Compare & evaluate (BYOE)](compare-and-evaluate.md) |
 | **Security auditor** | Getting Started → [Threat Model](../security/threat-model.md) → [Best Practices](../security/best-practices.md) |
 
 ## Advanced Workflows
@@ -136,14 +137,13 @@ Installed packages also include the evidence-pack verifier, so bundles can be
 inspected without cloning the repository:
 
 ```bash
-invarlock advanced evidence-pack verify <pack> --strict
+invarlock advanced evidence-pack verify <pack> --strict --report-assurance strict
 ```
 
 Optional adapter and backend installs use Python extras such as
 `pip install "invarlock[awq,gptq]"`; they are not managed through CLI
-install or uninstall commands. On Python 3.13+ stacks, `gptq` may still
-require a vendor wheel or a supported older interpreter because upstream
-`auto-gptq` packaging remains narrower than the core InvarLock support matrix.
+install or uninstall commands. The `awq` and `gptq` extras use
+GPTQModel-backed subject loading.
 
 ## Device Support
 
@@ -162,6 +162,7 @@ for local smoke and portability runs.
 | I want to... | Start here |
 | --- | --- |
 | evaluate my own edited checkpoint workflow | [Compare & evaluate (BYOE)](compare-and-evaluate.md) |
+| attach evidence to an external edit toolchain | [Integration Examples](integrations.md) |
 | understand the CLI commands | [Quickstart](quickstart.md) |
 | bring my own evaluation dataset | [Bring Your Own Data](bring-your-own-data.md) |
 | see example outputs | [Example Reports](example-reports.md) |

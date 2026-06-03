@@ -12,19 +12,17 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
-from invarlock import evidence_pack_manifest as evidence_pack_manifest_mod
-
-_json_load_error_types = evidence_pack_manifest_mod._json_load_error_types
-_load_json = evidence_pack_manifest_mod._load_json
-_manual_validate_manifest = evidence_pack_manifest_mod._manual_validate_manifest
-_normalize_pack_path = evidence_pack_manifest_mod._normalize_pack_path
-_path_within_dir = evidence_pack_manifest_mod._path_within_dir
-_sha256_bytes = evidence_pack_manifest_mod._sha256_bytes
-load_evidence_pack_manifest_schema = (
-    evidence_pack_manifest_mod.load_evidence_pack_manifest_schema
+from invarlock.public_contracts import (
+    EVIDENCE_PACK_FORMAT_VERSION,
+    load_evidence_pack_manifest_schema,
 )
-jsonschema = evidence_pack_manifest_mod.jsonschema
 
+try:  # pragma: no cover - exercised through tests/integration
+    import jsonschema
+except ImportError:  # pragma: no cover
+    jsonschema = None
+
+EVIDENCE_PACK_FORMAT = EVIDENCE_PACK_FORMAT_VERSION
 MANIFEST_SIGNATURE_FILENAME = "manifest.signature.json"
 EVIDENCE_PACK_SIGNATURE_FORMAT = "evidence-pack-signature-v1"
 CONTROL_FILES = {
@@ -36,9 +34,24 @@ CONTROL_FILES = {
     f"metadata/{MANIFEST_SIGNATURE_FILENAME}",
 }
 CHECKSUM_LINE_RE = re.compile(r"^([A-Fa-f0-9]{64}) [ *](.+)$")
+_MATERIAL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_SHA256_HEX_RE = re.compile(r"^[a-f0-9]{64}$")
+_SHA256_REF_RE = re.compile(r"^sha256:[a-f0-9]{64}$")
+SIGNING_KEY_FINGERPRINT_RE = re.compile(r"sha256:[a-f0-9]{64}")
+DEFAULT_TRUST_STORE_PATH = (
+    Path.home() / ".config" / "invarlock" / "trusted-signers.json"
+)
 
 
-def jsonschema_validation_error_types() -> tuple[type[BaseException], ...]:
+def _load_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _json_load_error_types() -> tuple[type[BaseException], ...]:
+    return (OSError, UnicodeDecodeError, json.JSONDecodeError)
+
+
+def _jsonschema_validation_error_types() -> tuple[type[BaseException], ...]:
     if jsonschema is None:
         return ()
     exceptions_mod = getattr(jsonschema, "exceptions", None)
@@ -54,6 +67,127 @@ def jsonschema_validation_error_types() -> tuple[type[BaseException], ...]:
     return tuple(error_types)
 
 
+def jsonschema_validation_error_types() -> tuple[type[BaseException], ...]:
+    return _jsonschema_validation_error_types()
+
+
+def _sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _sha256_file(path: Path) -> str:
+    return f"sha256:{_sha256_bytes(path.read_bytes())}"
+
+
+def _normalize_pack_path(pack_dir: Path, rel_path: str) -> Path | None:
+    candidate = (pack_dir / rel_path).resolve()
+    try:
+        candidate.relative_to(pack_dir.resolve())
+    except ValueError:
+        return None
+    return candidate
+
+
+def _path_within_dir(dir_path: Path, candidate_path: Path) -> bool:
+    try:
+        candidate_path.resolve().relative_to(dir_path.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def _manual_validate_manifest(payload: Any) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(payload, dict):
+        return ["manifest must decode to a JSON object"]
+    required = ["format", "checksums_sha256", "checksums_sha256_digest"]
+    for field in required:
+        if field not in payload:
+            errors.append(f"manifest missing required field: {field}")
+    if payload.get("format") != EVIDENCE_PACK_FORMAT:
+        errors.append(
+            f"manifest format must be {EVIDENCE_PACK_FORMAT!r} (found {payload.get('format')!r})"
+        )
+    if payload.get("checksums_sha256") != "checksums.sha256":
+        errors.append("manifest checksums_sha256 must point to 'checksums.sha256'")
+    digest = payload.get("checksums_sha256_digest")
+    if not isinstance(digest, str) or _SHA256_HEX_RE.fullmatch(digest) is None:
+        errors.append("manifest checksums_sha256_digest must be a 64-char sha256 hex")
+    network_mode = payload.get("network_mode")
+    if network_mode is not None and network_mode not in {"offline", "online"}:
+        errors.append("manifest network_mode must be 'offline' or 'online'")
+    evidence_level = payload.get("evidence_level")
+    if evidence_level is not None and evidence_level not in {"low", "medium", "high"}:
+        errors.append("manifest evidence_level must be 'low', 'medium', or 'high'")
+    artifacts = payload.get("artifacts")
+    if artifacts is not None and not isinstance(artifacts, list):
+        errors.append("manifest artifacts must be a list")
+
+    builder = payload.get("builder")
+    if builder is not None:
+        if not isinstance(builder, dict):
+            errors.append("manifest builder must be an object")
+        else:
+            if not isinstance(builder.get("id"), str) or not builder.get("id"):
+                errors.append("manifest builder.id must be a non-empty string")
+            if not isinstance(builder.get("name"), str) or not builder.get("name"):
+                errors.append("manifest builder.name must be a non-empty string")
+
+    def _validate_digest_ref(label: str, value: Any) -> None:
+        if value is None:
+            return
+        if not isinstance(value, dict):
+            errors.append(f"manifest {label} must be an object")
+            return
+        path = value.get("path")
+        digest_value = value.get("digest")
+        if path is None and digest_value is None:
+            return
+        if not isinstance(path, str) or not path:
+            errors.append(f"manifest {label}.path must be a non-empty string")
+        if (
+            not isinstance(digest_value, str)
+            or _SHA256_REF_RE.fullmatch(digest_value) is None
+        ):
+            errors.append(f"manifest {label}.digest must be a sha256:... string")
+
+    _validate_digest_ref("subject", payload.get("subject"))
+
+    invocation = payload.get("invocation")
+    if invocation is not None:
+        if not isinstance(invocation, dict):
+            errors.append("manifest invocation must be an object")
+        else:
+            config_source = invocation.get("config_source")
+            if config_source is not None and not isinstance(config_source, dict):
+                errors.append("manifest invocation.config_source must be an object")
+            _validate_digest_ref("invocation.config_source", config_source)
+            parameters = invocation.get("parameters")
+            if parameters is not None and not isinstance(parameters, dict):
+                errors.append("manifest invocation.parameters must be an object")
+
+    _validate_digest_ref("environment", payload.get("environment"))
+
+    materials = payload.get("materials")
+    if materials is not None:
+        if not isinstance(materials, list):
+            errors.append("manifest materials must be a list")
+        else:
+            for index, material in enumerate(materials):
+                _validate_digest_ref(f"materials[{index}]", material)
+                if isinstance(material, dict):
+                    name = material.get("name")
+                    if not isinstance(name, str) or not name:
+                        errors.append(
+                            f"manifest materials[{index}].name must be a non-empty string"
+                        )
+                    elif _validate_material_name(name) is not None:
+                        errors.append(
+                            f"manifest materials[{index}].name has invalid characters"
+                        )
+    return errors
+
+
 def validate_manifest(path: Path) -> list[str]:
     try:
         payload = _load_json(path)
@@ -62,7 +196,7 @@ def validate_manifest(path: Path) -> list[str]:
 
     schema = load_evidence_pack_manifest_schema()
     if schema and jsonschema is not None:
-        validation_error_types = jsonschema_validation_error_types()
+        validation_error_types = _jsonschema_validation_error_types()
         if validation_error_types:
             try:
                 jsonschema.validate(instance=payload, schema=schema)
@@ -71,6 +205,104 @@ def validate_manifest(path: Path) -> list[str]:
         else:
             jsonschema.validate(instance=payload, schema=schema)
     return _manual_validate_manifest(payload)
+
+
+def _load_json_object(
+    path: Path, *, label: str
+) -> tuple[dict[str, Any] | None, list[str]]:
+    if not path.is_file():
+        return None, [f"{label} file not found: {path}"]
+    try:
+        payload = _load_json(path)
+    except _json_load_error_types() as exc:
+        return None, [f"{label} is not valid JSON: {exc}"]
+    if not isinstance(payload, dict):
+        return None, [f"{label} must decode to a JSON object: {path}"]
+    return payload, []
+
+
+def _material_spec(name_and_path: str) -> tuple[str, Path] | None:
+    name, sep, raw_path = name_and_path.partition("=")
+    if not sep:
+        return None
+    material_name = name.strip()
+    material_path = Path(raw_path.strip())
+    if not material_name or not raw_path.strip():
+        return None
+    return material_name, material_path
+
+
+def _validate_material_name(name: str) -> str | None:
+    if _MATERIAL_NAME_RE.fullmatch(name):
+        return None
+    return (
+        "material names must match "
+        "[A-Za-z0-9][A-Za-z0-9._-]* and must not contain path separators"
+    )
+
+
+def _validate_reference(*, pack_dir: Path, label: str, payload: Any) -> list[str]:
+    if not isinstance(payload, dict):
+        return []
+    rel_path = payload.get("path")
+    digest = payload.get("digest")
+    if rel_path is None and digest is None:
+        return []
+    if not isinstance(rel_path, str) or not rel_path:
+        return [
+            f"{label} must include a non-empty path when digest verification is enabled"
+        ]
+    if not isinstance(digest, str) or _SHA256_REF_RE.fullmatch(digest) is None:
+        return [f"{label} digest must be a sha256:... string"]
+    resolved = _normalize_pack_path(pack_dir, rel_path)
+    if resolved is None:
+        return [f"{label} path escapes the pack root: {rel_path}"]
+    if not resolved.is_file():
+        return [f"{label} path is missing: {rel_path}"]
+    actual = _sha256_file(resolved)
+    if actual != digest:
+        return [
+            f"{label} digest mismatch for {rel_path} (expected {digest}, got {actual})"
+        ]
+    return []
+
+
+def verify_manifest_provenance(pack_dir: Path) -> list[str]:
+    payload = _load_json(pack_dir / "manifest.json")
+    if not isinstance(payload, dict):
+        return ["manifest must decode to a JSON object"]
+
+    errors: list[str] = []
+    errors.extend(
+        _validate_reference(
+            pack_dir=pack_dir, label="subject", payload=payload.get("subject")
+        )
+    )
+    invocation = payload.get("invocation")
+    if isinstance(invocation, dict):
+        errors.extend(
+            _validate_reference(
+                pack_dir=pack_dir,
+                label="invocation.config_source",
+                payload=invocation.get("config_source"),
+            )
+        )
+    errors.extend(
+        _validate_reference(
+            pack_dir=pack_dir, label="environment", payload=payload.get("environment")
+        )
+    )
+    materials = payload.get("materials")
+    if isinstance(materials, list):
+        for index, material in enumerate(materials):
+            errors.extend(
+                _validate_reference(
+                    pack_dir=pack_dir,
+                    label=f"materials[{index}]",
+                    payload=material,
+                )
+            )
+    return errors
 
 
 def relative_file_paths(pack_dir: Path) -> list[str]:
@@ -122,6 +354,16 @@ def public_key_fingerprint(public_key: ed25519.Ed25519PublicKey) -> str:
         format=serialization.PublicFormat.Raw,
     )
     return f"sha256:{hashlib.sha256(key_bytes).hexdigest()}"
+
+
+def normalize_expected_fingerprint(value: str | None) -> str | None:
+    """Normalize a caller-pinned signing key fingerprint."""
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    if not SIGNING_KEY_FINGERPRINT_RE.fullmatch(normalized):
+        return None
+    return normalized
 
 
 def sign_manifest(
@@ -313,8 +555,8 @@ def _load_signature_bundle(path: Path) -> tuple[dict[str, Any] | None, list[str]
                 f"{MANIFEST_SIGNATURE_FILENAME} signature.value must be a non-empty base64 string."
             )
     fingerprint = payload.get("signing_key_fingerprint")
-    if not isinstance(fingerprint, str) or not re.fullmatch(
-        r"sha256:[a-f0-9]{64}", fingerprint
+    if not isinstance(fingerprint, str) or not SIGNING_KEY_FINGERPRINT_RE.fullmatch(
+        fingerprint
     ):
         errors.append(
             f"{MANIFEST_SIGNATURE_FILENAME} signing_key_fingerprint must be a sha256:... string."
@@ -327,6 +569,7 @@ def verify_signature(
     *,
     strict: bool,
     load_json_fn: Any = _load_json,
+    expected_fingerprints: set[str] | frozenset[str] | None = None,
 ) -> tuple[list[str], list[str], str | None]:
     signature_path = pack_dir / MANIFEST_SIGNATURE_FILENAME
     if not signature_path.is_file():
@@ -386,6 +629,19 @@ def verify_signature(
             [],
             derived_fingerprint,
         )
+    if (
+        expected_fingerprints is not None
+        and derived_fingerprint not in expected_fingerprints
+    ):
+        expected = ", ".join(sorted(expected_fingerprints))
+        return (
+            [
+                "manifest signature signer mismatch: "
+                f"expected one of [{expected}], got {derived_fingerprint}."
+            ],
+            [],
+            derived_fingerprint,
+        )
     return [], [], derived_fingerprint
 
 
@@ -403,11 +659,25 @@ def signature_warnings_to_errors(warnings: list[str]) -> list[str]:
 
 __all__ = [
     "CONTROL_FILES",
+    "EVIDENCE_PACK_FORMAT",
     "MANIFEST_SIGNATURE_FILENAME",
     "EVIDENCE_PACK_SIGNATURE_FORMAT",
+    "DEFAULT_TRUST_STORE_PATH",
+    "SIGNING_KEY_FINGERPRINT_RE",
+    "_json_load_error_types",
+    "_load_json",
+    "_load_json_object",
+    "_manual_validate_manifest",
+    "_material_spec",
+    "_normalize_pack_path",
     "_path_within_dir",
+    "_sha256_bytes",
+    "_sha256_file",
+    "_validate_material_name",
+    "_validate_reference",
     "copy_file",
     "generate_signing_keypair",
+    "jsonschema_validation_error_types",
     "load_private_signing_key",
     "parse_checksums",
     "public_key_fingerprint",
@@ -419,6 +689,8 @@ __all__ = [
     "verify_checksums",
     "verify_signature",
     "verify_manifest_binds_checksums",
+    "verify_manifest_provenance",
     "verify_no_extra_files",
     "write_checksums_file",
+    "normalize_expected_fingerprint",
 ]

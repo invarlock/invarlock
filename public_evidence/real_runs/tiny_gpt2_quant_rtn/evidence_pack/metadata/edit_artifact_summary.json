@@ -1,0 +1,14 @@
+{
+  "actual_quantization_backend": false,
+  "baseline_checkpoint": "sshleifer/tiny-gpt2@runtime-resolved",
+  "edit_workflow": "built-in quant_rtn RTN dequantized weight-edit simulation",
+  "note": "This real run was produced by invarlock evaluate in container mode. The edit is a deterministic dequantized RTN simulation, not a deployable quantization backend.",
+  "plan_digest": "sha256:82bd5fc2b5ccb26ed710545009b8ae52006bd8813e5d8932593e8b32520ddc50",
+  "selected_modules": [
+    "transformer.h.0.attn.c_attn",
+    "transformer.h.0.attn.c_proj",
+    "transformer.h.1.attn.c_attn",
+    "transformer.h.1.attn.c_proj"
+  ],
+  "subject_checkpoint": "sshleifer/tiny-gpt2@runtime-resolved+quant_rtn_attn"
+}

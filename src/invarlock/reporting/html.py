@@ -12,7 +12,7 @@ from html import escape
 from importlib import import_module
 from typing import Any
 
-from .render import render_report_markdown
+from .render_markdown import render_report_markdown
 from .report_schema import validate_report
 
 markdown_module: Any | None = None

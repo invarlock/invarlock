@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import re
+import tomllib
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -25,20 +27,6 @@ def test_markdownlintignore_curated_docs_use_current_existing_paths() -> None:
         "docs/user-guide/compare-and-evaluate.md",
         "docs/user-guide/reading-report.md",
     ]
-    removed_paths = [
-        "docs/assurance/01-logspace-rationale.md",
-        "docs/assurance/02-eval-math-proof.md",
-        "docs/assurance/03-coverage-and-pairing.md",
-        "docs/assurance/04-bca-bootstrap.md",
-        "docs/assurance/05-guard-contracts.md",
-        "docs/assurance/06-spectral-fpr-derivation.md",
-        "docs/assurance/07-rmt-epsilon-rule.md",
-        "docs/assurance/08-ve-gate-power.md",
-        "docs/assurance/09-determinism-contracts.md",
-        "docs/reference/exporting-certificates-html.md",
-        "docs/user-guide/compare-and-certify.md",
-        "docs/user-guide/reading-certificate.md",
-    ]
 
     for rel_path in expected_curated_paths:
         assert f"!{rel_path}" in text, f"missing markdownlint curated path {rel_path}"
@@ -46,13 +34,8 @@ def test_markdownlintignore_curated_docs_use_current_existing_paths() -> None:
             f"curated markdownlint path missing: {rel_path}"
         )
 
-    for rel_path in removed_paths:
-        assert rel_path not in text, (
-            f"removed markdownlint path still present: {rel_path}"
-        )
 
-
-def test_gitignore_keeps_current_output_paths_and_drops_stale_legacy_scratch() -> None:
+def test_gitignore_keeps_current_output_paths() -> None:
     text = _read(".gitignore")
     required_patterns = [
         "/reports/",
@@ -64,30 +47,9 @@ def test_gitignore_keeps_current_output_paths_and_drops_stale_legacy_scratch() -
         "/tmp_*/",
         "._*",
     ]
-    removed_patterns = [
-        "/reports_report/",
-        "/.certify_tmp/",
-        "/certificates/",
-        "*_certificate/",
-        "cert-*.json",
-        "*.cert",
-        "fullLisk.txt",
-        "*.clinerules",
-        ".clinerules",
-        "/demo_*/",
-        "/mock_run/",
-        "test_comprehensive_results*.json",
-        "mps_full_stats/",
-        "test_mps_stats/",
-        "optuna_results/",
-        "invarlock_comparison_results/",
-    ]
 
     for pattern in required_patterns:
         assert pattern in text, f"required gitignore pattern missing: {pattern}"
-
-    for pattern in removed_patterns:
-        assert pattern not in text, f"stale gitignore pattern still present: {pattern}"
 
 
 def test_public_docs_use_repo_and_package_native_wording_for_pack_verification() -> (
@@ -113,6 +75,13 @@ def test_public_docs_use_repo_and_package_native_wording_for_pack_verification()
 
 def test_docs_node_toolchain_contract_is_explicit_and_ci_aligned() -> None:
     package_json = json.loads(_read("package.json"))
+    package_lock = json.loads(_read("package-lock.json"))
+    assert package_json.get("name") == package_lock.get("name")
+    assert package_json.get("name") == package_lock.get("packages", {}).get("", {}).get(
+        "name"
+    )
+    assert package_json.get("private") is True
+
     engines = package_json.get("engines", {})
     assert engines.get("node") == ">=22.18.0"
 
@@ -126,3 +95,39 @@ def test_docs_node_toolchain_contract_is_explicit_and_ci_aligned() -> None:
     workflows_doc = _read(".github/WORKFLOWS.md")
     assert "Node.js 22.18+" in workflows_doc
     assert "Node.js 18" not in workflows_doc
+
+
+def _notice_table_components(section: str) -> set[str]:
+    text = _read("THIRD_PARTY_NOTICES.md")
+    marker = f"## {section}"
+    start = text.index(marker)
+    next_start = text.find("\n## ", start + len(marker))
+    body = text[start:] if next_start == -1 else text[start:next_start]
+    components: set[str] = set()
+    for line in body.splitlines():
+        if not line.startswith("| "):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if not cells or cells[0] in {"Component", "-----------"}:
+            continue
+        components.add(cells[0])
+    return components
+
+
+def test_third_party_direct_dependency_notices_match_pyproject() -> None:
+    pyproject = tomllib.loads(_read("pyproject.toml"))
+    direct_dependencies = pyproject["project"]["dependencies"]
+    expected = {
+        re.split(r"[<>=!~;\\[]", dependency, maxsplit=1)[0]
+        .strip()
+        .lower()
+        .replace("_", "-")
+        for dependency in direct_dependencies
+    }
+
+    actual = {
+        component.lower().replace("_", "-")
+        for component in _notice_table_components("Direct Python Dependencies")
+    }
+
+    assert actual == expected

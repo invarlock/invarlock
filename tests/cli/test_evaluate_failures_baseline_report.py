@@ -8,7 +8,6 @@ import pytest
 
 from tests.cli._support_evaluate_failures import (
     _assert_baseline_report_validation_exit,
-    _fake_run_command_with_paths,
     _prepare_evaluate_paths,
     _valid_baseline_report_payload,
     _write_json,
@@ -41,7 +40,8 @@ def test_evaluate_rejects_baseline_report_directory_even_with_report_json(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             baseline_report=str(baseline_dir),
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -77,7 +77,8 @@ def test_evaluate_rejects_baseline_report_directory_without_report_json(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             baseline_report=str(baseline_dir),
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -195,7 +196,8 @@ def test_evaluate_baseline_report_rejects_non_regular_file(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             baseline_report=str(baseline_fifo),
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -254,7 +256,8 @@ def test_evaluate_supplied_baseline_report_path_must_exist(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             baseline_report="missing.json",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -278,7 +281,8 @@ def test_evaluate_supplied_baseline_report_directory_requires_a_report_file(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             baseline_report=str(baseline_dir),
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -289,43 +293,63 @@ def test_evaluate_supplied_baseline_report_directory_requires_a_report_file(
     assert exc.value.exit_code == 2
 
 
-def test_evaluate_baseline_report_accepts_non_mapping_meta_and_context(
+def test_evaluate_baseline_report_rejects_non_mapping_meta_and_context(
     monkeypatch, tmp_path: Path
 ) -> None:
-    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
     baseline_payload = {
         **_valid_baseline_report_payload(),
         "meta": "bad-meta",
         "context": "bad-context",
     }
-    baseline_report = _write_json(tmp_path / "baseline.json", baseline_payload)
-    edited_report = _write_json(tmp_path / "edited.json", {})
-    run_calls: list[dict[str, object]] = []
-
-    monkeypatch.setattr(
-        run_mod,
-        "run_command",
-        _fake_run_command_with_paths(
-            {"source": edited_report, "edited": edited_report},
-            run_calls=run_calls,
-        ),
-        raising=False,
-    )
-    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
-
-    mod.evaluate_command(
-        baseline=str(src),
-        subject=str(edt),
-        adapter="hf_causal",
-        baseline_report=str(baseline_report),
-        out=str(Path("runs")),
-        report_out=str(Path("reports")),
-        profile="dev",
-        assurance="off",
+    exc = _assert_baseline_report_validation_exit(
+        monkeypatch,
+        tmp_path,
+        payload=baseline_payload,
     )
 
-    assert len(run_calls) == 1
-    assert run_calls[0]["baseline"] == str(baseline_report.resolve())
+    assert exc.exit_code == 2
+
+
+def test_evaluate_baseline_report_rejects_model_mismatch(
+    monkeypatch, tmp_path: Path
+) -> None:
+    exc = _assert_baseline_report_validation_exit(
+        monkeypatch,
+        tmp_path,
+        payload=_valid_baseline_report_payload(model_id="wrong-model"),
+    )
+
+    assert exc.exit_code == 2
+
+
+def test_evaluate_baseline_report_rejects_assurance_mismatch(
+    monkeypatch, tmp_path: Path
+) -> None:
+    exc = _assert_baseline_report_validation_exit(
+        monkeypatch,
+        tmp_path,
+        payload=_valid_baseline_report_payload(assurance_mode="strict"),
+    )
+
+    assert exc.exit_code == 2
+
+
+def test_evaluate_baseline_report_rejects_dataset_mismatch(
+    monkeypatch, tmp_path: Path
+) -> None:
+    payload = _valid_baseline_report_payload()
+    data = payload["data"]
+    assert isinstance(data, dict)
+    data = dict(data)
+    data["seed"] = 999
+    payload["data"] = data
+    exc = _assert_baseline_report_validation_exit(
+        monkeypatch,
+        tmp_path,
+        payload=payload,
+    )
+
+    assert exc.exit_code == 2
 
 
 def test_evaluate_baseline_report_requires_nonempty_preview_window_ids(

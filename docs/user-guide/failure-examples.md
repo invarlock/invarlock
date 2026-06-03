@@ -50,7 +50,7 @@ non-assurance.
 verify failed: runtime_manifest_missing
 ```
 
-**Meaning:** the verifier cannot prove the runtime provenance required by strict
+**Meaning:** the verifier cannot verify the runtime provenance required by strict
 assurance.
 
 **Action:** rerun in container mode and keep `runtime.manifest.json` with the
@@ -75,6 +75,30 @@ family under the strict claim.
 tests, or treat the run as exploratory. See
 [Model Family Catalog](../reference/model-family-catalog.md) for the current
 support inventory.
+
+## Guard Catches Clean Primary Metric
+
+**Reproduce:**
+
+```bash
+invarlock verify --profile release --assurance strict \
+  public_evidence/caught_regressions/spectral_guard_failure/evaluation.report.json
+```
+
+**Symptom:**
+
+```text
+Release verification requires validation.spectral_stable == true
+spectral did not pass
+```
+
+**Meaning:** the primary metric can still look acceptable while a guard blocks
+release. In the shipped fixture, `primary_metric.ratio_vs_baseline` is `1.0`,
+but the spectral guard records a release-blocking weight-geometry violation.
+
+**Action:** inspect the guard diagnostics, regenerate the edited checkpoint, or
+route the run to exploratory/non-assurance review. See
+[Public Evidence Walkthrough](public-evidence-walkthrough.md).
 
 ## Development Fallback
 

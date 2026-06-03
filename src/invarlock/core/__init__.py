@@ -8,7 +8,7 @@ This module provides the foundational abstractions and orchestration
 for the InvarLock framework without requiring heavy dependencies.
 """
 
-from .abi import INVARLOCK_CORE_ABI
+from . import error_utils as error_encoding
 from .api import Guard, ModelAdapter, ModelEdit, RunConfig, RunReport
 from .checkpoint import CheckpointManager
 from .events import EventLogger
@@ -23,6 +23,10 @@ from .types import (
     RunStatus,
 )
 
+# Plugin ABI for the core interfaces used by adapters/edits/guards.
+# Increment when the plugin-facing contracts change.
+INVARLOCK_CORE_ABI = "0.1"
+
 __all__ = [
     # Core interfaces
     "ModelAdapter",
@@ -34,6 +38,7 @@ __all__ = [
     "RunReport",
     # Exceptions
     "InvarlockError",
+    "error_encoding",
     # Types and enums
     "EditType",
     "GuardType",

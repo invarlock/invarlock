@@ -3,7 +3,7 @@
 test_classify_error_precedence() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     local log="${TEST_TMPDIR}/task.log"
 
@@ -24,7 +24,7 @@ test_classify_error_precedence() {
 test_classify_error_marks_adapter_structure_invalid_permanent() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     local log="${TEST_TMPDIR}/task.log"
 
@@ -36,7 +36,7 @@ test_classify_error_marks_adapter_structure_invalid_permanent() {
 test_calculate_backoff_uses_jitter_hook_and_caps() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     RETRY_BACKOFF_BASE=10
     RETRY_BACKOFF_MAX=100
@@ -53,7 +53,7 @@ test_calculate_backoff_uses_jitter_hook_and_caps() {
 test_calculate_backoff_sanitizes_non_numeric_retry_count_and_jitter() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     RETRY_BACKOFF_BASE=10
     RETRY_BACKOFF_MAX=100
@@ -65,7 +65,7 @@ test_calculate_backoff_sanitizes_non_numeric_retry_count_and_jitter() {
 test_calculate_backoff_defaults_invalid_config() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     RETRY_BACKOFF_BASE="bad"
     RETRY_BACKOFF_MAX="bad"
@@ -77,7 +77,7 @@ test_calculate_backoff_defaults_invalid_config() {
 test_should_retry_task_branches() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     local task="${TEST_TMPDIR}/t.task"
     jq -n '{task_id:"t", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:2, max_retries:4, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
@@ -102,7 +102,7 @@ test_should_retry_task_branches() {
 test_should_retry_task_sanitizes_missing_retry_fields() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     MAX_RETRIES=3
 
@@ -117,7 +117,7 @@ test_should_retry_task_sanitizes_missing_retry_fields() {
 test_should_retry_task_sanitizes_invalid_max_retries_env() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     MAX_RETRIES="nope"
 
@@ -133,7 +133,7 @@ test_should_retry_task_sanitizes_invalid_max_retries_env() {
 test_maybe_retry_task_sets_retry_after_and_moves_task() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     _now_iso_plus_seconds() { echo "2025-01-01T00:00:10Z"; }
     _rand_jitter_ms() { echo "0"; }
@@ -161,7 +161,7 @@ test_maybe_retry_task_sets_retry_after_and_moves_task() {
 test_maybe_retry_task_sanitizes_non_numeric_retries_and_returns_error_when_update_task_params_fails() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     _now_iso_plus_seconds() { echo "2025-01-01T00:00:10Z"; }
     _rand_jitter_ms() { echo "0"; }
@@ -188,7 +188,7 @@ test_maybe_retry_task_sanitizes_non_numeric_retries_and_returns_error_when_updat
 test_is_retry_ready_gates_on_retry_after() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     _now_epoch() { echo "0"; }
     local task="${TEST_TMPDIR}/t.task"
@@ -204,7 +204,7 @@ test_is_retry_ready_gates_on_retry_after() {
 test_detect_helpers_return_false_on_missing_log_file() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     ! detect_oom "${TEST_TMPDIR}/nope.log"
     ! detect_transient_error "${TEST_TMPDIR}/nope.log"
@@ -214,7 +214,7 @@ test_detect_helpers_return_false_on_missing_log_file() {
 test_maybe_retry_task_missing_task_and_non_retryable_paths() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/logs/tasks"
@@ -239,7 +239,7 @@ test_maybe_retry_task_missing_task_and_non_retryable_paths() {
 test_is_retry_ready_defaults_ready_when_retry_after_missing() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     local task="${TEST_TMPDIR}/t.task"
     jq -n '{task_id:"t", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
@@ -250,7 +250,7 @@ test_is_retry_ready_defaults_ready_when_retry_after_missing() {
 test_handle_oom_task_clamps_batch_and_seq_len_minimums() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     mock_python3_stub_enable
     fixture_write "python3.rc" "0"
@@ -269,7 +269,7 @@ test_handle_oom_task_clamps_batch_and_seq_len_minimums() {
 test_handle_oom_task_sanitizes_non_numeric_batch_and_seq() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     mock_python3_stub_enable
     fixture_write "python3.rc" "0"
@@ -288,7 +288,7 @@ test_handle_oom_task_sanitizes_non_numeric_batch_and_seq() {
 test_record_error_and_get_error_stats_cover_create_and_append_paths() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/state"
@@ -305,7 +305,7 @@ test_record_error_and_get_error_stats_cover_create_and_append_paths() {
 test_record_error_returns_nonzero_and_preserves_existing_invalid_log() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/state"
@@ -319,7 +319,7 @@ test_record_error_returns_nonzero_and_preserves_existing_invalid_log() {
 test_record_error_returns_nonzero_when_errors_log_move_fails() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/state"
@@ -343,7 +343,7 @@ test_record_error_returns_nonzero_when_errors_log_move_fails() {
 test_health_check_error_branches_for_gpu_mem_disk_and_python() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     # nvidia-smi failure.
     _cmd_nvidia_smi() { return 1; }
@@ -376,7 +376,7 @@ test_health_check_error_branches_for_gpu_mem_disk_and_python() {
 test_health_check_handles_non_numeric_disk_output() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     _cmd_nvidia_smi() { return 0; }
     get_gpu_available_memory() { echo "10"; }
@@ -392,7 +392,7 @@ test_health_check_handles_non_numeric_disk_output() {
 test_cleanup_failed_task_branches_cover_not_found_and_incomplete_artifacts() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     local out="${TEST_TMPDIR}/out"
     export QUEUE_DIR="${out}/queue"
@@ -421,7 +421,7 @@ test_cleanup_failed_task_branches_cover_not_found_and_incomplete_artifacts() {
 test_get_error_stats_print_error_summary_and_cleanup_all_failed_cover_success_paths() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/state"
@@ -451,7 +451,7 @@ test_get_error_stats_print_error_summary_and_cleanup_all_failed_cover_success_pa
 test_health_check_returns_zero_when_all_checks_pass() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/fault_tolerance.sh"
 
     _cmd_nvidia_smi() { return 0; }
     get_gpu_available_memory() { echo "100"; }

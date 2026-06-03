@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any, ClassVar
@@ -171,7 +171,7 @@ def build_request_container_launch_plan(
     command_name: str | Iterable[str],
     request: ConfigExecutionRequest,
 ):
-    from invarlock.cli.runtime_launch_plan import (
+    from invarlock.runtime_security import (
         build_request_container_launch_plan as _build_request_container_launch_plan,
     )
 
@@ -259,7 +259,7 @@ def run_request(
         if delegate and not running_inside_container() and not host_execution_allowed():
             try:
                 exit_code = delegate_python_module_to_container(
-                    "invarlock.cli.internal_config_run",
+                    "invarlock.cli.config_execution",
                     build_request_container_launch_plan(command_name, request),
                 )
             except RuntimeError as exc:
@@ -291,3 +291,32 @@ def run_request(
             )
 
         return report
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m invarlock.cli.config_execution",
+        description="Package-internal delegated config runner.",
+    )
+    parser.add_argument(
+        "--invoked-command",
+        default="run",
+        help="Logical command name recorded in runtime manifests.",
+    )
+    ConfigExecutionRequest.add_argparse_arguments(parser)
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = _build_parser()
+    args = parser.parse_args(list(argv) if argv is not None else None)
+    run_request(
+        ConfigExecutionRequest.from_argparse(args),
+        command_name=str(args.invoked_command),
+        delegate=False,
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

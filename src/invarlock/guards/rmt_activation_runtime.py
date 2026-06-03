@@ -248,9 +248,9 @@ def activation_edge_risk(
         return None
 
     try:
-        from . import rmt_math
+        from . import rmt_analysis
 
-        mp_edge_val = rmt_math.mp_bulk_edge(
+        mp_edge_val = rmt_analysis.mp_bulk_edge(
             int(mat.shape[0]), int(mat.shape[1]), whitened=False
         )
     except (AttributeError, RuntimeError, TypeError, ValueError):
@@ -326,6 +326,7 @@ def activation_svd_outliers(
     try:
         mat = activations.detach().float().cpu()
     except (AttributeError, RuntimeError, TypeError, ValueError):
+        # guard-fallback-ok: activation outlier helper has no report context; caller treats zero samples as not evaluated.
         return 0, 0.0, 0.0
 
     if not torch.isfinite(mat).all():
@@ -338,14 +339,15 @@ def activation_svd_outliers(
 
     mat = mat / std
     m, n = mat.shape
-    from . import rmt_math
+    from . import rmt_analysis
 
-    mp_edge_val = rmt_math.mp_bulk_edge(m, n, whitened=False)
+    mp_edge_val = rmt_analysis.mp_bulk_edge(m, n, whitened=False)
     threshold = mp_edge_val * (1.0 + deadband) * margin
 
     try:
         s_vals = torch.linalg.svdvals(mat)
     except (RuntimeError, torch.linalg.LinAlgError):
+        # guard-fallback-ok: SVD failure makes this activation slice non-measurable for the caller.
         return 0, 0.0, 0.0
 
     if s_vals.numel() == 0:

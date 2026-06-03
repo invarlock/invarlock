@@ -10,6 +10,7 @@ import contextlib
 import json
 import time
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -45,6 +46,8 @@ class AdapterType(Enum):
 
     TRANSFORMER = "transformer"
     GENERIC = "generic"
+    HUGGINGFACE = "huggingface"
+    OPENAI = "openai"
 
 
 class DeviceType(Enum):
@@ -61,43 +64,94 @@ class AdapterState(Enum):
     INITIALIZED = "initialized"
     LOADED = "loaded"
     ERROR = "error"
+    READY = "ready"
 
 
+@dataclass
 class PerformanceMetrics:
     """Performance metrics container."""
 
-    def __init__(self):
-        self.metrics = {}
+    operation_count: int = 0
+    total_duration: float = 0.0
+    average_duration: float = 0.0
+    memory_usage_mb: float = 0.0
+    metrics: dict[str, Any] = field(default_factory=dict, repr=False)
 
-    def __getitem__(self, key):
-        return self.metrics.get(key, {})
+    def __getitem__(self, key: str) -> Any:
+        if key in self.metrics:
+            return self.metrics[key]
+        return getattr(self, key, {})
 
-    def __contains__(self, key):
-        return key in self.metrics
+    def __contains__(self, key: str) -> bool:
+        return key in self.metrics or hasattr(self, key)
 
 
+@dataclass
 class CacheConfig:
     """Cache configuration."""
 
-    def __init__(
-        self, enabled=True, max_size_mb=1024, ttl_seconds=3600, cache_dir=None
-    ):
-        self.enabled = enabled
-        self.max_size_mb = max_size_mb
-        self.ttl_seconds = ttl_seconds
-        self.cache_dir = cache_dir
+    enabled: bool = True
+    max_size_mb: int = 1024
+    ttl_seconds: int = 3600
+    cache_dir: str | None = None
 
 
+@dataclass
 class MonitorConfig:
     """Monitor configuration."""
 
-    def __init__(
-        self, enabled=True, track_performance=True, track_memory=True, log_level="INFO"
+    enabled: bool = True
+    track_performance: bool = True
+    track_memory: bool = True
+    log_level: str = "INFO"
+
+
+def _resolve_snapshot_member_path(
+    snapshot_dir: Path,
+    filename: str,
+    *,
+    entry_kind: str,
+    entry_name: str,
+) -> Path:
+    owner = f"{entry_kind}: {entry_name}"
+    if not isinstance(filename, str) or not filename:
+        raise TypeError(f"Invalid snapshot manifest filename for {owner}")
+    if (
+        Path(filename).is_absolute()
+        or "/" in filename
+        or "\\" in filename
+        or filename in {".", ".."}
     ):
-        self.enabled = enabled
-        self.track_performance = track_performance
-        self.track_memory = track_memory
-        self.log_level = log_level
+        raise ValueError(f"Invalid snapshot manifest filename for {owner}")
+
+    file_path = snapshot_dir / filename
+    try:
+        snapshot_root = snapshot_dir.resolve(strict=True)
+        resolved_file = file_path.resolve(strict=True)
+    except FileNotFoundError:
+        return file_path
+    if not resolved_file.is_relative_to(snapshot_root):
+        raise ValueError(
+            f"Snapshot manifest filename escapes snapshot directory for {owner}"
+        )
+    return file_path
+
+
+def _record_snapshot_member_filename(
+    seen_filenames: dict[str, str],
+    filename: str,
+    *,
+    entry_kind: str,
+    entry_name: str,
+) -> None:
+    owner = f"{entry_kind}:{entry_name}"
+    previous_owner = seen_filenames.get(filename)
+    if previous_owner is not None:
+        raise ValueError(
+            f"Duplicate snapshot manifest filename {filename!r} for {owner}; "
+            f"already used by {previous_owner}"
+        )
+    seen_filenames[filename] = owner
 
 
 class AdapterInterface(ABC):
@@ -340,6 +394,10 @@ class PerformanceTracker:
     @contextlib.contextmanager
     def time_operation(self, operation_name: str):
         """Time an operation."""
+        if not self.enabled or not self.track_performance:
+            yield
+            return
+
         start_time = time.time()
         try:
             yield
@@ -369,6 +427,8 @@ class PerformanceTracker:
 
     def record_memory_usage(self, label: str):
         """Record memory usage."""
+        if not self.enabled or not self.track_memory:
+            return
         if "memory_usage" not in self._metrics:
             self._metrics["memory_usage"] = {}
         self._metrics["memory_usage"][label] = _collect_memory_usage()
@@ -379,7 +439,7 @@ class PerformanceTracker:
 
     def export_metrics(self, path: Path):
         """Export metrics to file."""
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(self._metrics, f, indent=2)
 
 
@@ -443,6 +503,21 @@ class AdapterUtils:
     """Adapter utility functions."""
 
     @staticmethod
+    def _parse_version_tuple(value: str) -> tuple[int, ...]:
+        parts: list[int] = []
+        for raw_part in str(value).split("."):
+            digits = ""
+            for char in raw_part:
+                if char.isdigit():
+                    digits += char
+                else:
+                    break
+            if digits == "":
+                break
+            parts.append(int(digits))
+        return tuple(parts)
+
+    @staticmethod
     def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         """Validate adapter configuration."""
         valid = True
@@ -499,8 +574,10 @@ class AdapterUtils:
         for requirement, _version in requirements.items():
             if requirement in system_info:
                 system_version = system_info[requirement]
-                # Simplified check - just compare strings
-                if "python" in requirement and system_version < "3.8":
+                # Parse components so 3.10 is not treated as older than 3.8.
+                if "python" in requirement and AdapterUtils._parse_version_tuple(
+                    system_version
+                ) < (3, 8):
                     compatible = False
                     issues.append(f"Python version {system_version} < 3.8")
 

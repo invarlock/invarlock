@@ -1,90 +1,17 @@
-import sys
 import types
-from typing import Any
 
 import pytest
 
 import invarlock.core.registry as reg
 from invarlock.core.builtin_plugin_catalog import builtin_plugin_specs
-
-
-class _EP:
-    """Simple stand-in for importlib.metadata.EntryPoint."""
-
-    def __init__(
-        self, name: str, value: str, dist: Any | None = None, loader: Any | None = None
-    ):
-        self.name = name
-        self.value = value
-        self.dist = dist
-        self._loader = loader
-
-    def load(self):  # pragma: no cover - exercised via get_* calls
-        if self._loader is not None:
-            return self._loader
-        mod, _, attr = self.value.partition(":")
-        m = __import__(mod, fromlist=[attr])
-        return getattr(m, attr)
-
-
-class _Dist:
-    def __init__(self, name: str, version: str):
-        self.name = name
-        self.version = version
-        self.metadata = {"Name": name}
-
-
-def _install_plugin_module(
-    monkeypatch: pytest.MonkeyPatch,
-    module_name: str,
-    *,
-    abi: str,
-) -> tuple[type[reg.ModelAdapter], type[reg.ModelEdit], type[reg.Guard]]:
-    module = types.ModuleType(module_name)
-    module.INVARLOCK_CORE_ABI = abi
-
-    class DummyAdapter(reg.ModelAdapter):
-        name = "dummy_adapter"
-
-        def can_handle(self, model: Any) -> bool:
-            return True
-
-        def describe(self, model: Any) -> dict[str, Any]:
-            return {"n_layer": 1}
-
-        def snapshot(self, model: Any) -> bytes:
-            return b"snapshot"
-
-        def restore(self, model: Any, blob: bytes) -> None:
-            return None
-
-    class DummyEdit(reg.ModelEdit):
-        name = "dummy_edit"
-
-        def can_edit(self, model_desc: dict[str, Any]) -> bool:
-            return True
-
-        def apply(
-            self, model: Any, adapter: reg.ModelAdapter, **kwargs: Any
-        ) -> dict[str, Any]:
-            return {"ok": True}
-
-    class DummyGuard(reg.Guard):
-        name = "dummy_guard"
-
-        def validate(
-            self, model: Any, adapter: reg.ModelAdapter, context: dict[str, Any]
-        ) -> dict[str, Any]:
-            return {"passed": True}
-
-    DummyAdapter.__module__ = module_name
-    DummyEdit.__module__ = module_name
-    DummyGuard.__module__ = module_name
-    module.DummyAdapter = DummyAdapter
-    module.DummyEdit = DummyEdit
-    module.DummyGuard = DummyGuard
-    monkeypatch.setitem(sys.modules, module_name, module)
-    return DummyAdapter, DummyEdit, DummyGuard
+from tests.core._support_registry import (
+    DistStub,
+    EntryPointStub,
+    MappingEntryPoints,
+    SelectEntryPoints,
+    install_plain_module,
+    install_plugin_module,
+)
 
 
 def test_registry_fails_closed_on_entry_points_error(monkeypatch) -> None:
@@ -136,34 +63,27 @@ def test_registry_entry_points_select_and_get_paths(monkeypatch):
     # Build stubs that exercise both eps.select(...) and eps.get(...)
 
     # One entry point that resolves to a valid guard via .load()
-    from invarlock.plugins.hello_guard import HelloGuard
+    from invarlock.plugins import HelloGuard
 
-    ep_ok = _EP(
+    ep_ok = EntryPointStub(
         name="ep_hello_guard",
-        value="invarlock.plugins.hello_guard:HelloGuard",
-        dist=_Dist("invarlock-plugins", "0.0"),
+        value="invarlock.plugins:HelloGuard",
+        dist=DistStub("invarlock-plugins", "0.0"),
         loader=HelloGuard,
     )
 
     # One entry point with a non-importable module to mark available=False
-    ep_bad = _EP(
+    ep_bad = EntryPointStub(
         name="ep_missing_mod",
         value="totally_missing.module:Thing",
-        dist=_Dist("missing", "0.0"),
+        dist=DistStub("missing", "0.0"),
         loader=None,
     )
 
-    class _EPContainerSelect:
-        def select(self, *, group: str):  # pragma: no cover - covered below
-            if group == "invarlock.guards":
-                return [ep_ok, ep_bad]
-            return []
-
-    class _EPContainerGet(dict):
-        pass
-
     # First, exercise select() code path
-    monkeypatch.setattr(reg, "entry_points", lambda: _EPContainerSelect())
+    monkeypatch.setattr(
+        reg, "entry_points", lambda: SelectEntryPoints(guards=[ep_ok, ep_bad])
+    )
     r1 = reg.CoreRegistry()
     names = r1.list_guards()
     assert "ep_hello_guard" in names and "ep_missing_mod" in names
@@ -177,7 +97,7 @@ def test_registry_entry_points_select_and_get_paths(monkeypatch):
         r1.get_guard("ep_missing_mod")
 
     # Now, exercise get() mapping code path
-    eps = _EPContainerGet()
+    eps = MappingEntryPoints()
     eps["invarlock.guards"] = [ep_ok]
     eps["invarlock.adapters"] = []
     eps["invarlock.edits"] = []
@@ -190,9 +110,9 @@ def test_registry_entry_points_select_and_get_paths(monkeypatch):
 def test_get_plugin_metadata_adds_name_and_type_for_known_plugin() -> None:
     registry = reg.CoreRegistry()
 
-    metadata = registry.get_plugin_metadata("hello_guard", "guards")
+    metadata = registry.get_plugin_metadata("demo_hello_guard", "guards")
 
-    assert metadata["name"] == "hello_guard"
+    assert metadata["name"] == "demo_hello_guard"
     assert metadata["type"] == "guards"
     assert metadata["available"] is True
     assert metadata["module"] != "unknown"
@@ -203,22 +123,16 @@ def test_get_plugin_info_reports_entry_point_group_for_entry_point_plugins(
 ) -> None:
     monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "1")
 
-    from invarlock.plugins.hello_guard import HelloGuard
+    from invarlock.plugins import HelloGuard
 
-    ep = _EP(
+    ep = EntryPointStub(
         name="ep_hello_guard",
-        value="invarlock.plugins.hello_guard:HelloGuard",
-        dist=_Dist("invarlock-plugins", "0.0"),
+        value="invarlock.plugins:HelloGuard",
+        dist=DistStub("invarlock-plugins", "0.0"),
         loader=HelloGuard,
     )
 
-    class _EPContainerSelect:
-        def select(self, *, group: str):
-            if group == "invarlock.guards":
-                return [ep]
-            return []
-
-    monkeypatch.setattr(reg, "entry_points", lambda: _EPContainerSelect())
+    monkeypatch.setattr(reg, "entry_points", lambda: SelectEntryPoints(guards=[ep]))
     registry = reg.CoreRegistry()
 
     info = registry.get_plugin_info("ep_hello_guard", "guards")
@@ -229,42 +143,40 @@ def test_get_plugin_info_reports_entry_point_group_for_entry_point_plugins(
 
 def test_registry_rejects_entry_point_name_collisions(monkeypatch) -> None:
     monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "1")
-    adapter_cls, edit_cls, guard_cls = _install_plugin_module(
+    adapter_cls, edit_cls, guard_cls = install_plugin_module(
         monkeypatch,
         "invarlock_test_registry_entry_points",
         abi=reg.INVARLOCK_CORE_ABI,
     )
 
-    adapter_ep = _EP(
+    adapter_ep = EntryPointStub(
         name="hf_causal",
         value="invarlock_test_registry_entry_points:DummyAdapter",
-        dist=_Dist("third-party-adapter", "1.2.3"),
+        dist=DistStub("third-party-adapter", "1.2.3"),
         loader=adapter_cls,
     )
-    edit_ep = _EP(
+    edit_ep = EntryPointStub(
         name="quant_rtn",
         value="invarlock_test_registry_entry_points:DummyEdit",
-        dist=_Dist("third-party-edit", "2.3.4"),
+        dist=DistStub("third-party-edit", "2.3.4"),
         loader=edit_cls,
     )
-    guard_ep = _EP(
+    guard_ep = EntryPointStub(
         name="hello_guard",
         value="invarlock_test_registry_entry_points:DummyGuard",
-        dist=_Dist("third-party-guard", "3.4.5"),
+        dist=DistStub("third-party-guard", "3.4.5"),
         loader=guard_cls,
     )
 
-    class _EPContainerSelect:
-        def select(self, *, group: str):
-            if group == "invarlock.adapters":
-                return [adapter_ep]
-            if group == "invarlock.edits":
-                return [edit_ep]
-            if group == "invarlock.guards":
-                return [guard_ep]
-            return []
-
-    monkeypatch.setattr(reg, "entry_points", lambda: _EPContainerSelect())
+    monkeypatch.setattr(
+        reg,
+        "entry_points",
+        lambda: SelectEntryPoints(
+            adapters=[adapter_ep],
+            edits=[edit_ep],
+            guards=[guard_ep],
+        ),
+    )
     registry = reg.CoreRegistry()
 
     with pytest.raises(RuntimeError, match="Duplicate adapter plugin name: hf_causal"):
@@ -275,42 +187,40 @@ def test_registry_entry_points_with_distinct_names_support_typed_getters(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "1")
-    adapter_cls, edit_cls, guard_cls = _install_plugin_module(
+    adapter_cls, edit_cls, guard_cls = install_plugin_module(
         monkeypatch,
         "invarlock_test_registry_distinct_entry_points",
         abi=reg.INVARLOCK_CORE_ABI,
     )
 
-    adapter_ep = _EP(
+    adapter_ep = EntryPointStub(
         name="custom_adapter",
         value="invarlock_test_registry_distinct_entry_points:DummyAdapter",
-        dist=_Dist("third-party-adapter", "1.2.3"),
+        dist=DistStub("third-party-adapter", "1.2.3"),
         loader=adapter_cls,
     )
-    edit_ep = _EP(
+    edit_ep = EntryPointStub(
         name="custom_edit",
         value="invarlock_test_registry_distinct_entry_points:DummyEdit",
-        dist=_Dist("third-party-edit", "2.3.4"),
+        dist=DistStub("third-party-edit", "2.3.4"),
         loader=edit_cls,
     )
-    guard_ep = _EP(
+    guard_ep = EntryPointStub(
         name="custom_guard",
         value="invarlock_test_registry_distinct_entry_points:DummyGuard",
-        dist=_Dist("third-party-guard", "3.4.5"),
+        dist=DistStub("third-party-guard", "3.4.5"),
         loader=guard_cls,
     )
 
-    class _EPContainerSelect:
-        def select(self, *, group: str):
-            if group == "invarlock.adapters":
-                return [adapter_ep]
-            if group == "invarlock.edits":
-                return [edit_ep]
-            if group == "invarlock.guards":
-                return [guard_ep]
-            return []
-
-    monkeypatch.setattr(reg, "entry_points", lambda: _EPContainerSelect())
+    monkeypatch.setattr(
+        reg,
+        "entry_points",
+        lambda: SelectEntryPoints(
+            adapters=[adapter_ep],
+            edits=[edit_ep],
+            guards=[guard_ep],
+        ),
+    )
     registry = reg.CoreRegistry()
 
     assert registry.get_plugin_info("custom_adapter", "adapters")["package"] == (
@@ -335,12 +245,18 @@ def test_registry_optional_plugin_metadata_tracks_missing_dependencies(
     monkeypatch,
 ) -> None:
     def _fake_missing(self, deps: list[str]) -> list[str]:
-        if deps == ["auto_gptq"]:
-            return ["auto_gptq"]
-        if deps == ["awq"]:
-            return []
+        if deps == ["gptqmodel"]:
+            return ["gptqmodel"]
         if deps == ["bitsandbytes"]:
             return ["bitsandbytes"]
+        if deps == ["torchao"]:
+            return ["torchao"]
+        if deps == ["hqq"]:
+            return ["hqq"]
+        if deps == ["optimum.quanto"]:
+            return ["optimum.quanto"]
+        if deps == ["compressed_tensors"]:
+            return ["compressed_tensors"]
         return []
 
     monkeypatch.setattr(reg.CoreRegistry, "_check_runtime_dependencies", _fake_missing)
@@ -349,13 +265,60 @@ def test_registry_optional_plugin_metadata_tracks_missing_dependencies(
     gptq_info = registry.get_plugin_info("hf_gptq", "adapters")
     awq_info = registry.get_plugin_info("hf_awq", "adapters")
     bnb_info = registry.get_plugin_info("hf_bnb", "adapters")
+    torchao_info = registry.get_plugin_info("hf_torchao", "adapters")
+    hqq_info = registry.get_plugin_info("hf_hqq", "adapters")
+    quanto_info = registry.get_plugin_info("hf_quanto", "adapters")
+    ct_info = registry.get_plugin_info("hf_ct", "adapters")
 
     assert gptq_info["available"] is False
-    assert gptq_info["status"] == "Needs extra: auto_gptq"
-    assert awq_info["available"] is True
-    assert awq_info["status"] == "Built-in"
+    assert gptq_info["status"] == "Needs extra: gptqmodel"
+    assert awq_info["available"] is False
+    assert awq_info["status"] == "Needs extra: gptqmodel"
     assert bnb_info["available"] is False
     assert bnb_info["status"] == "Needs extra: bitsandbytes"
+    assert torchao_info["available"] is False
+    assert torchao_info["status"] == "Needs extra: torchao"
+    assert hqq_info["available"] is False
+    assert hqq_info["status"] == "Needs extra: hqq"
+    assert quanto_info["available"] is False
+    assert quanto_info["status"] == "Needs extra: optimum.quanto"
+    assert ct_info["available"] is False
+    assert ct_info["status"] == "Needs extra: compressed_tensors"
+
+
+def test_registry_optional_plugin_metadata_tracks_available_dependencies(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        reg.CoreRegistry,
+        "_check_runtime_dependencies",
+        lambda self, deps: [],
+    )
+
+    registry = reg.CoreRegistry()
+
+    gptq_info = registry.get_plugin_info("hf_gptq", "adapters")
+    awq_info = registry.get_plugin_info("hf_awq", "adapters")
+    bnb_info = registry.get_plugin_info("hf_bnb", "adapters")
+    torchao_info = registry.get_plugin_info("hf_torchao", "adapters")
+    hqq_info = registry.get_plugin_info("hf_hqq", "adapters")
+    quanto_info = registry.get_plugin_info("hf_quanto", "adapters")
+    ct_info = registry.get_plugin_info("hf_ct", "adapters")
+
+    assert gptq_info["available"] is True
+    assert gptq_info["status"] == "Built-in"
+    assert awq_info["available"] is True
+    assert awq_info["status"] == "Built-in"
+    assert bnb_info["available"] is True
+    assert bnb_info["status"] == "Built-in"
+    assert torchao_info["available"] is True
+    assert torchao_info["status"] == "Built-in"
+    assert hqq_info["available"] is True
+    assert hqq_info["status"] == "Built-in"
+    assert quanto_info["available"] is True
+    assert quanto_info["status"] == "Built-in"
+    assert ct_info["available"] is True
+    assert ct_info["status"] == "Built-in"
 
 
 def test_registry_additional_paths(monkeypatch):
@@ -377,14 +340,11 @@ def test_registry_additional_paths(monkeypatch):
     # Use a synthetic module so importlib.import_module can resolve it even though
     # tests/ is not a package.
     module_name = "invarlock_test_registry_type_mismatch"
-    dummy_mod = types.ModuleType(module_name)
 
     class NotGuard:
         pass
 
-    NotGuard.__module__ = module_name
-    dummy_mod.NotGuard = NotGuard
-    monkeypatch.setitem(sys.modules, module_name, dummy_mod)
+    install_plain_module(monkeypatch, module_name, NotGuard=NotGuard)
 
     r._guards["not_guard"] = reg.PluginInfo(
         name="not_guard",
@@ -401,7 +361,7 @@ def test_registry_additional_paths(monkeypatch):
         r.get_guard("not_guard")
 
     # Validate configuration success path
-    ok, msg = r.validate_configuration("hf_causal", "quant_rtn", ["hello_guard"])
+    ok, msg = r.validate_configuration("hf_causal", "quant_rtn", ["demo_hello_guard"])
     assert ok and msg.endswith("valid")
 
     # Validate configuration unavailable paths
@@ -422,7 +382,7 @@ def test_registry_additional_paths(monkeypatch):
     )
     r._guards["hello_guard"] = reg.PluginInfo(
         name="hello_guard",
-        module="invarlock.plugins.hello_guard",
+        module="invarlock.plugins",
         class_name="HelloGuard",
         available=False,
         status="disabled",
@@ -484,7 +444,7 @@ def test_get_registry_returns_global_singleton() -> None:
 def test_create_plugin_info_parse_and_metadata_paths(monkeypatch):
     r = reg.CoreRegistry()
 
-    bad_ep = _EP(name="bad", value="malformed-without-colon")
+    bad_ep = EntryPointStub(name="bad", value="malformed-without-colon")
     with pytest.raises(ValueError, match="malformed entry point value"):
         r._create_plugin_info(bad_ep, "guards")
 
@@ -495,7 +455,7 @@ def test_create_plugin_info_parse_and_metadata_paths(monkeypatch):
         "metadata_version",
         lambda pkg: (_ for _ in ()).throw(reg.PackageNotFoundError(pkg)),
     )
-    ok_ep = _EP(name="ok", value="invarlock.plugins.hello_guard:HelloGuard", dist=None)
+    ok_ep = EntryPointStub(name="ok", value="invarlock.plugins:HelloGuard", dist=None)
     info_ok = r._create_plugin_info(ok_ep, "guards")
     assert info_ok.available is True
     assert info_ok.status == "Deferred load"
@@ -505,9 +465,9 @@ def test_create_plugin_info_parse_and_metadata_paths(monkeypatch):
 
 def test_create_plugin_info_uses_dist_name_when_metadata_name_is_missing() -> None:
     r = reg.CoreRegistry()
-    ep = _EP(
+    ep = EntryPointStub(
         name="ok",
-        value="invarlock.plugins.hello_guard:HelloGuard",
+        value="invarlock.plugins:HelloGuard",
         dist=types.SimpleNamespace(name="fallback-dist", version="1.2.3", metadata={}),
     )
 
@@ -521,14 +481,14 @@ def test_create_plugin_info_rejects_non_string_values_and_uses_metadata_version(
     monkeypatch,
 ) -> None:
     r = reg.CoreRegistry()
-    bad_ep = _EP(name="bad", value="ignored")
+    bad_ep = EntryPointStub(name="bad", value="ignored")
     bad_ep.value = 123
 
     with pytest.raises(TypeError, match="entry point value must be a string"):
         r._create_plugin_info(bad_ep, "guards")
 
     monkeypatch.setattr(reg, "metadata_version", lambda pkg: f"{pkg}-version")
-    ep = _EP(
+    ep = EntryPointStub(
         name="ok",
         value="thirdparty.guard:Guard",
         dist=types.SimpleNamespace(name=None, version=None, metadata="not-a-dict"),
@@ -568,7 +528,6 @@ def test_registry_get_paths_cover_unavailable_and_type_mismatch_paths(monkeypatc
         r.get_adapter("unavailable_adapter")
 
     module_name = "invarlock_test_registry_type_mismatch_more"
-    dummy_mod = types.ModuleType(module_name)
 
     class NotAdapter:
         pass
@@ -576,11 +535,12 @@ def test_registry_get_paths_cover_unavailable_and_type_mismatch_paths(monkeypatc
     class NotEdit:
         pass
 
-    NotAdapter.__module__ = module_name
-    NotEdit.__module__ = module_name
-    dummy_mod.NotAdapter = NotAdapter
-    dummy_mod.NotEdit = NotEdit
-    monkeypatch.setitem(sys.modules, module_name, dummy_mod)
+    install_plain_module(
+        monkeypatch,
+        module_name,
+        NotAdapter=NotAdapter,
+        NotEdit=NotEdit,
+    )
 
     r._adapters["bad_adapter"] = reg.PluginInfo(
         name="bad_adapter",
@@ -606,7 +566,7 @@ def test_registry_get_paths_cover_unavailable_and_type_mismatch_paths(monkeypatc
 
 
 def test_registry_unavailable_and_abi_mismatch_paths(monkeypatch):
-    bad_adapter_cls, bad_edit_cls, bad_guard_cls = _install_plugin_module(
+    bad_adapter_cls, bad_edit_cls, bad_guard_cls = install_plugin_module(
         monkeypatch,
         "invarlock_test_registry_bad_abi",
         abi="9999",
@@ -616,7 +576,7 @@ def test_registry_unavailable_and_abi_mismatch_paths(monkeypatch):
 
     registry._edits["unavailable_edit"] = reg.PluginInfo(
         name="unavailable_edit",
-        module="invarlock.edits.noop",
+        module="invarlock.edits",
         class_name="NoopEdit",
         available=False,
         status="disabled",
@@ -624,7 +584,7 @@ def test_registry_unavailable_and_abi_mismatch_paths(monkeypatch):
     )
     registry._guards["unavailable_guard"] = reg.PluginInfo(
         name="unavailable_guard",
-        module="invarlock.plugins.hello_guard",
+        module="invarlock.plugins",
         class_name="HelloGuard",
         available=False,
         status="disabled",
@@ -642,7 +602,7 @@ def test_registry_unavailable_and_abi_mismatch_paths(monkeypatch):
         class_name="DummyAdapter",
         available=True,
         status="Available",
-        entry_point=_EP(
+        entry_point=EntryPointStub(
             "bad_abi_adapter",
             "invarlock_test_registry_bad_abi:DummyAdapter",
             loader=bad_adapter_cls,
@@ -654,7 +614,7 @@ def test_registry_unavailable_and_abi_mismatch_paths(monkeypatch):
         class_name="DummyEdit",
         available=True,
         status="Available",
-        entry_point=_EP(
+        entry_point=EntryPointStub(
             "bad_abi_edit",
             "invarlock_test_registry_bad_abi:DummyEdit",
             loader=bad_edit_cls,
@@ -666,7 +626,7 @@ def test_registry_unavailable_and_abi_mismatch_paths(monkeypatch):
         class_name="DummyGuard",
         available=True,
         status="Available",
-        entry_point=_EP(
+        entry_point=EntryPointStub(
             "bad_abi_guard",
             "invarlock_test_registry_bad_abi:DummyGuard",
             loader=bad_guard_cls,
@@ -716,11 +676,12 @@ def test_registry_plugin_info_and_validation_error_paths(monkeypatch) -> None:
         pass
 
     module_name = "invarlock_test_registry_not_adapter"
-    dummy_mod = types.ModuleType(module_name)
-    dummy_mod.INVARLOCK_CORE_ABI = reg.INVARLOCK_CORE_ABI
-    _NotAdapter.__module__ = module_name
-    dummy_mod.NotAdapter = _NotAdapter
-    monkeypatch.setitem(sys.modules, module_name, dummy_mod)
+    install_plain_module(
+        monkeypatch,
+        module_name,
+        INVARLOCK_CORE_ABI=reg.INVARLOCK_CORE_ABI,
+        NotAdapter=_NotAdapter,
+    )
 
     registry._adapters["bad_adapter"] = reg.PluginInfo(
         name="bad_adapter",

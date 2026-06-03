@@ -11,13 +11,16 @@ from unittest.mock import patch
 
 import pytest
 
-from invarlock.eval.bench import (
+import invarlock.reporting.report_builder_support as telemetry_mod
+from invarlock.eval.bench_policy import (
     BenchmarkConfig,
     BenchmarkSummary,
     RunResult,
     ScenarioConfig,
     ScenarioResult,
-    _generate_step14_markdown,
+    generate_step14_markdown,
+)
+from invarlock.eval.bench_runner import (
     execute_scenario,
     run_guard_effect_benchmark,
 )
@@ -126,8 +129,9 @@ class TestExecuteScenario:
                     "invarlock.reporting.report_make.make_report",
                     return_value=create_empty_report(),
                 ),
-                patch(
-                    "invarlock.reporting.report_telemetry.telemetry_output_enabled",
+                patch.object(
+                    telemetry_mod,
+                    "telemetry_output_enabled",
                     return_value=False,
                 ),
             ):
@@ -198,8 +202,9 @@ class TestExecuteScenario:
                     "invarlock.reporting.report_make.make_report",
                     side_effect=RuntimeError("report boom"),
                 ),
-                patch(
-                    "invarlock.reporting.report_telemetry.telemetry_output_enabled",
+                patch.object(
+                    telemetry_mod,
+                    "telemetry_output_enabled",
                     return_value=False,
                 ),
                 pytest.raises(
@@ -338,7 +343,7 @@ class TestMarkdownGeneration:
             execution_time_seconds=10.0,
         )
 
-        markdown = _generate_step14_markdown(summary)
+        markdown = generate_step14_markdown(summary)
 
         assert "❌ FAIL" in markdown
         assert "🔴 +20.0%" in markdown  # High time overhead

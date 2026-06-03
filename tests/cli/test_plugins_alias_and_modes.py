@@ -18,6 +18,8 @@ def test_plugins_guards_and_edits_text_and_json():
     # Compact text table
     r = CliRunner().invoke(app, ["advanced", "plugins", "guards"])
     assert r.exit_code == 0 and "Guard Plugins" in r.stdout
+    r_edits = CliRunner().invoke(app, ["advanced", "plugins", "edits"])
+    assert r_edits.exit_code == 0 and "Edit Plugins" in r_edits.stdout
     # Verbose table
     rv = CliRunner().invoke(app, ["advanced", "plugins", "edits", "--verbose"])
     assert rv.exit_code == 0 and "Edit Plugins" in rv.stdout
@@ -26,6 +28,12 @@ def test_plugins_guards_and_edits_text_and_json():
     assert rj.exit_code == 0
     pj = json.loads(rj.stdout.strip().splitlines()[-1])
     assert pj.get("format_version") == "plugins-v1" and pj.get("category") == "guards"
+
+
+def test_plugins_datasets_text_table():
+    result = CliRunner().invoke(app, ["advanced", "plugins", "list", "datasets"])
+    assert result.exit_code == 0
+    assert "Dataset Providers" in result.stdout
 
 
 def test_plugins_edits_explain_unknown():

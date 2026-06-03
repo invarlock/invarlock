@@ -6,95 +6,27 @@ import types
 
 import pytest
 
-
-class _OneShotEvent:
-    def __init__(self) -> None:
-        self._set = False
-
-    def is_set(self) -> bool:
-        return self._set
-
-    def wait(self, timeout: float) -> bool:
-        self._set = True
-        return True
-
-    def set(self) -> None:
-        self._set = True
-
-
-class _MemoryInfo:
-    def __init__(self, percent: float, available: int, used: int, total: int) -> None:
-        self.percent = percent
-        self.available = available
-        self.used = used
-        self.total = total
-
-
-class _DiskInfo:
-    def __init__(self, used: int, total: int, free: int | None = None) -> None:
-        self.used = used
-        self.total = total
-        self.free = total - used if free is None else free
-
-
-class _Response:
-    def __init__(self, status_code: int = 200, text: str = "ok") -> None:
-        self.status_code = status_code
-        self.text = text
-        self.raise_calls = 0
-
-    def raise_for_status(self) -> None:
-        self.raise_calls += 1
-        if self.status_code >= 400:
-            raise OSError(self.text)
-
-
-class _SMTPRecorder:
-    started_tls = False
-    logged_in: tuple[str, str] | None = None
-    sent_subjects: list[str] = []
-
-    def __init__(self, host: str, port: int) -> None:
-        self.host = host
-        self.port = port
-
-    def __enter__(self) -> _SMTPRecorder:
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        return None
-
-    def starttls(self) -> None:
-        type(self).started_tls = True
-
-    def login(self, username: str, password: str) -> None:
-        type(self).logged_in = (username, password)
-
-    def send_message(self, message) -> None:
-        type(self).sent_subjects.append(message["Subject"])
-
-
-def _make_alert(alerting_module, *, severity=None):
-    severity = severity or alerting_module.AlertSeverity.WARNING
-    return alerting_module.Alert(
-        id="alert-1",
-        name="Edge Alert",
-        severity=severity,
-        message="edge-case",
-        details={"outer": {"inner": "value"}, "plain": 1},
-        timestamp=1_700_000_000.0,
-    )
-
-
-def _fake_import_without(missing_name: str):
-    real_import = builtins.__import__
-
-    def _import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name == missing_name:
-            raise ImportError(missing_name)
-        return real_import(name, globals, locals, fromlist, level)
-
-    return _import
+from tests.observability._support_coverage import (
+    DiskInfo as _DiskInfo,
+)
+from tests.observability._support_coverage import (
+    MemoryInfo as _MemoryInfo,
+)
+from tests.observability._support_coverage import (
+    OneShotEvent as _OneShotEvent,
+)
+from tests.observability._support_coverage import (
+    Response as _Response,
+)
+from tests.observability._support_coverage import (
+    SMTPRecorder as _SMTPRecorder,
+)
+from tests.observability._support_coverage import (
+    fake_import_without as _fake_import_without,
+)
+from tests.observability._support_coverage import (
+    make_alert as _make_alert,
+)
 
 
 @pytest.mark.unit
@@ -276,6 +208,8 @@ def test_core_monitoring_loops_export_and_gpu_thresholds(monkeypatch, caplog):
         )
         == 2.0
     )
+    perf.operation_times["empty"] = []
+    perf.update_metrics()
 
     resource = core.ResourceMonitor(
         registry,
@@ -580,3 +514,30 @@ def test_exporter_noop_and_existing_socket_branches(monkeypatch):
     )
     manager._export_loop()
     assert export_calls == []
+
+
+@pytest.mark.unit
+def test_prometheus_name_fallback_and_influx_missing_requests(monkeypatch, caplog):
+    import invarlock.observability.exporters as exporters
+
+    assert exporters._prometheus_name(" !!! ", fallback="fallback_metric") == "___"
+    assert exporters._prometheus_name("", fallback="fallback_metric") == (
+        "fallback_metric"
+    )
+
+    real_import = builtins.__import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "requests":
+            raise ImportError("requests missing")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    influx = exporters.InfluxDBExporter(
+        url="https://influx.example.test",
+        database="metrics",
+    )
+
+    with caplog.at_level("ERROR"):
+        assert influx.export([]) is False
+    assert "requests library required" in caplog.text

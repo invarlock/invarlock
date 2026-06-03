@@ -50,8 +50,8 @@ def test_output_helpers_fallback_print_and_no_color(monkeypatch) -> None:
     assert "\x1b[" not in buf.getvalue()
 
 
-def test_doctor_helpers_get_adapter_rows(monkeypatch) -> None:
-    from invarlock.cli import doctor_helpers
+def test_plugins_inventory_get_adapter_rows(monkeypatch) -> None:
+    from invarlock.core import plugins_inventory
 
     class DummyRegistry:
         def list_adapters(self):  # noqa: ANN001
@@ -70,16 +70,18 @@ def test_doctor_helpers_get_adapter_rows(monkeypatch) -> None:
             return {"module": f"invarlock.adapters.{name}"}
 
     monkeypatch.setattr("invarlock.core.registry.get_registry", lambda: DummyRegistry())
-    monkeypatch.setattr(doctor_helpers._platform, "system", lambda: "Darwin")
     monkeypatch.setattr(
-        doctor_helpers, "bitsandbytes_runtime_available", lambda: False, raising=False
+        plugins_inventory,
+        "bitsandbytes_runtime_available",
+        lambda: False,
+        raising=False,
     )
 
-    rows = doctor_helpers.get_adapter_rows()
+    rows = plugins_inventory.get_adapter_rows()
     by_name = {row["name"]: row for row in rows}
 
-    assert by_name["hf_gptq"]["status"] == "unsupported"
-    assert by_name["hf_gptq"]["enable"] == "Linux-only"
-    assert by_name["hf_awq"]["status"] == "unsupported"
+    assert by_name["hf_gptq"]["status"] == "ready"
+    assert by_name["hf_awq"]["status"] == "ready"
+    assert by_name["hf_awq"]["backend"] == "gptqmodel"
     assert by_name["hf_auto"]["mode"] == "auto-matcher"
     assert by_name["plugin_adapter"]["origin"] == "plugin"

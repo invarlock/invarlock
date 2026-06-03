@@ -401,8 +401,8 @@ def test_verify_family_mismatch_warning_includes_backends(tmp_path: Path):
                 "adapter": {
                     "provenance": {
                         "family": "gptq",
-                        "library": "auto-gptq",
-                        "version": "0.7.0",
+                        "library": "gptqmodel",
+                        "version": "5.8.0",
                     }
                 }
             }
@@ -415,7 +415,7 @@ def test_verify_family_mismatch_warning_includes_backends(tmp_path: Path):
     cert = _build_sample_evaluation_report()
     cert.setdefault("plugins", {}).setdefault("adapter", {}).setdefault(
         "provenance", {}
-    ).update({"family": "awq", "library": "autoawq", "version": "0.2.0"})
+    ).update({"family": "awq", "library": "gptqmodel", "version": "5.8.0"})
     cert["provenance"] = {"baseline": {"report_path": str(baseline_path)}}
 
     cert_path = tmp_path / "cert_family_mismatch.json"
@@ -428,8 +428,8 @@ def test_verify_family_mismatch_warning_includes_backends(tmp_path: Path):
     assert result.exit_code == 0
     out = result.stdout
     assert "Adapter family differs" in out
-    assert "baseline: family=gptq, backend=auto-gptq ==0.7.0" in out
-    assert "edited  : family=awq, backend=autoawq ==0.2.0" in out
+    assert "baseline: family=gptq, backend=gptqmodel ==5.8.0" in out
+    assert "edited  : family=awq, backend=gptqmodel ==5.8.0" in out
 
 
 def test_verify_resolves_canonical_directories(monkeypatch, tmp_path: Path):
@@ -470,6 +470,21 @@ def test_verify_rejects_noncanonical_report_directory(tmp_path: Path):
     result = runner.invoke(app, ["verify", str(report_dir)])
 
     assert result.exit_code == 2
+
+
+def test_verify_explains_run_report_directory_when_evaluation_missing(
+    tmp_path: Path,
+) -> None:
+    report_dir = tmp_path / "run-dir"
+    report_dir.mkdir()
+    (report_dir / "report.json").write_text("{}", encoding="utf-8")
+
+    result = runner.invoke(app, ["verify", str(report_dir)])
+
+    assert result.exit_code == 2
+    output = " ".join(result.output.split())
+    assert "contains report.json, which is a raw run report" in output
+    assert "invarlock report generate --run <subject report.json>" in output
 
 
 def test_verify_rejects_noncanonical_baseline_directory(tmp_path: Path):

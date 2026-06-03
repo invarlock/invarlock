@@ -6,16 +6,22 @@ Invariant checking for model edits to ensure structural integrity.
 """
 
 import hashlib
+from collections import Counter
 from typing import Any
 
 import torch
 import torch.nn as nn
 
-from invarlock.core.abi import INVARLOCK_CORE_ABI as CORE_ABI
+from invarlock.core import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import Guard
 from invarlock.core.types import GuardDiagnostic, GuardOutcome, GuardValidationResult
+from invarlock.guards import invariants_standard as _invariants_standard
 
 INVARLOCK_CORE_ABI = CORE_ABI
+
+check_adapter_aware_invariants = _invariants_standard.check_adapter_aware_invariants
+_check_standard_invariants = _invariants_standard.check_standard_invariants
+_detect_adapter_type = _invariants_standard.detect_adapter_type
 
 _INVARIANT_CAPTURE_ERRORS = (
     AttributeError,
@@ -24,6 +30,47 @@ _INVARIANT_CAPTURE_ERRORS = (
     TypeError,
     ValueError,
 )
+
+
+def _coerce_vocab_counts(vocab_sizes: Any) -> Counter[int]:
+    counts: Counter[int] = Counter()
+    if not isinstance(vocab_sizes, dict):
+        return counts
+    for value in vocab_sizes.values():
+        try:
+            counts[int(value)] += 1
+        except _INVARIANT_CAPTURE_ERRORS:
+            continue
+    return counts
+
+
+def _embedding_vocab_size_matches(
+    baseline_vocab_sizes: Any,
+    current_vocab_sizes: Any,
+    module_name: str,
+    baseline_size: Any,
+) -> tuple[bool, int | None]:
+    try:
+        expected = int(baseline_size)
+    except _INVARIANT_CAPTURE_ERRORS:
+        # guard-fallback-ok: caller reports the embedding mismatch with unavailable size details.
+        return False, None
+    current_size = None
+    if isinstance(current_vocab_sizes, dict):
+        current_size = current_vocab_sizes.get(module_name)
+    if current_size is not None:
+        try:
+            current_int = int(current_size)
+        except _INVARIANT_CAPTURE_ERRORS:
+            # guard-fallback-ok: caller reports the embedding mismatch with unavailable size details.
+            return False, None
+        return current_int == expected, current_int
+
+    baseline_counts = _coerce_vocab_counts(baseline_vocab_sizes)
+    current_counts = _coerce_vocab_counts(current_vocab_sizes)
+    if baseline_counts and current_counts.get(expected, 0) >= baseline_counts[expected]:
+        return True, expected
+    return False, None
 
 
 class InvariantsGuard(Guard):
@@ -194,14 +241,17 @@ class InvariantsGuard(Guard):
         current_vocab_sizes = current_checks.get("embedding_vocab_sizes")
         if isinstance(baseline_vocab_sizes, dict):
             for module_name, baseline_size in baseline_vocab_sizes.items():
-                current_size = None
-                if isinstance(current_vocab_sizes, dict):
-                    current_size = current_vocab_sizes.get(module_name)
-                if current_size is None or int(current_size) != int(baseline_size):
+                size_matches, current_size = _embedding_vocab_size_matches(
+                    baseline_vocab_sizes,
+                    current_vocab_sizes,
+                    str(module_name),
+                    baseline_size,
+                )
+                if not size_matches:
                     mismatch = {
                         "module": module_name,
                         "baseline": int(baseline_size),
-                        "current": None if current_size is None else int(current_size),
+                        "current": current_size,
                     }
                     tokenizer_mismatches.append(mismatch)
                     violations.append(
@@ -409,6 +459,7 @@ class InvariantsGuard(Guard):
             try:
                 return left.data_ptr() == right.data_ptr()
             except _INVARIANT_CAPTURE_ERRORS:
+                # guard-fallback-ok: inaccessible tensor pointers are treated as not tied.
                 return False
 
         # GPT-2 style (transformer.wte <-> lm_head)
@@ -558,81 +609,6 @@ class InvariantsGuard(Guard):
             )
 
         return True
-
-
-def check_adapter_aware_invariants(
-    model: Any, verbose: bool = False
-) -> tuple[bool, dict[str, Any]]:
-    """
-    Check model invariants with adapter awareness.
-
-    Args:
-        model: Model to check
-        verbose: Whether to print detailed information
-
-    Returns:
-        (all_passed, results) tuple
-    """
-    results: dict[str, Any] = {"adapter_type": "none", "checks": {}, "violations": []}
-    all_passed = True
-    # Standard model checks only
-    standard_checks: dict[str, dict[str, Any]] = _check_standard_invariants(model)
-    results["checks"].update(standard_checks)
-    for check_name, check_result in standard_checks.items():
-        if not check_result.get("passed", True):
-            all_passed = False
-            results["violations"].append(
-                {
-                    "type": "standard_violation",
-                    "check": check_name,
-                    "message": check_result.get("message", "Check failed"),
-                }
-            )
-    return all_passed, results
-
-
-def _detect_adapter_type(model: Any) -> str:
-    """Detect adapter type (disabled). Always returns 'none'."""
-    return "none"
-
-
-def _check_standard_invariants(model: Any) -> dict[str, dict[str, Any]]:
-    """Check standard model invariants."""
-    checks: dict[str, dict[str, Any]] = {}
-
-    # Check parameter count is reasonable
-    try:
-        param_count = sum(p.numel() for p in model.parameters())
-        checks["parameter_count"] = {
-            "passed": param_count > 0,
-            "count": param_count,
-            "message": f"Parameter count: {param_count}",
-        }
-    except _INVARIANT_CAPTURE_ERRORS as e:
-        checks["parameter_count"] = {
-            "passed": False,
-            "message": f"Could not count parameters: {e}",
-        }
-
-    # Check for NaN parameters
-    try:
-        has_nan = False
-        for param in model.parameters():
-            if hasattr(param, "isnan") and param.isnan().any():
-                has_nan = True
-                break
-
-        checks["no_nan_parameters"] = {
-            "passed": not has_nan,
-            "message": "NaN parameters detected" if has_nan else "No NaN parameters",
-        }
-    except _INVARIANT_CAPTURE_ERRORS as e:
-        checks["no_nan_parameters"] = {
-            "passed": False,
-            "message": f"Could not check for NaN: {e}",
-        }
-
-    return checks
 
 
 def check_all_invariants(model: Any, threshold: float = 1e-6) -> GuardOutcome:

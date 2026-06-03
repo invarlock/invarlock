@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import copy
 import gc
-import json
 import os
 import sys
 from pathlib import Path
@@ -12,18 +11,44 @@ from typing import Any
 import torch
 
 try:
-    from edit_targeting import matches_edit_scope
-    from runtime_tools import require_remote_code_opt_in
+    from .editing.implementations import (
+        apply_dense_lowrank_approximation,
+        apply_dense_magnitude_prune,
+        apply_fp8_dequantized_simulation,
+        apply_rtn_dequantized_simulation,
+        build_validation_edit_metadata,
+        parse_edit_specs_json,
+        resolve_batch_entry,
+    )
+    from .editing.validate_artifact import (
+        save_edited_subject_artifact,
+        validate_edit_artifact,
+    )
+    from .runtime_tools import require_remote_code_opt_in
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from edit_targeting import matches_edit_scope
+    from editing.implementations import (
+        apply_dense_lowrank_approximation,
+        apply_dense_magnitude_prune,
+        apply_fp8_dequantized_simulation,
+        apply_rtn_dequantized_simulation,
+        build_validation_edit_metadata,
+        parse_edit_specs_json,
+        resolve_batch_entry,
+    )
+    from editing.validate_artifact import (
+        save_edited_subject_artifact,
+        validate_edit_artifact,
+    )
     from runtime_tools import require_remote_code_opt_in
 from transformers import AutoModelForCausalLM, AutoTokenizer
+
+_BATCH_EDIT_STRATEGIES = {"reload", "deepcopy"}
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Create many evidence-pack edits with a single baseline model load."
+        description="Create many evidence-pack edits from one baseline checkpoint."
     )
     parser.add_argument("--baseline", required=True)
     parser.add_argument("--model-output-dir", required=True)
@@ -35,57 +60,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _load_tuned_params(
-    model_output_dir: Path,
-) -> tuple[dict[str, object], dict[str, object], str, str]:
-    tuned_path = (os.environ.get("PACK_TUNED_EDIT_PARAMS_FILE") or "").strip()
-    model_id = ""
-    model_id_path = model_output_dir / ".model_id"
-    if model_id_path.exists():
-        try:
-            model_id = model_id_path.read_text().strip()
-        except OSError:
-            model_id = ""
-    model_key = model_id or model_output_dir.name
-
-    tuned_params_by_type: dict[str, object] = {}
-    tuned_defaults: dict[str, object] = {}
-
-    if tuned_path and Path(tuned_path).exists():
-        try:
-            data = json.loads(Path(tuned_path).read_text())
-        except (OSError, json.JSONDecodeError):
-            data = {}
-        if isinstance(data, dict):
-            model_map: dict[str, object] = {}
-            models = data.get("models")
-            if isinstance(models, dict):
-                model_map = (
-                    models.get(model_key)
-                    or models.get(model_id)
-                    or models.get(model_output_dir.name)
-                    or {}
-                )
-            if not model_map and isinstance(data.get("quant_rtn"), dict):
-                model_map = data
-            if isinstance(model_map, dict):
-                tuned_params_by_type = model_map
-            defaults = data.get("defaults")
-            if isinstance(defaults, dict):
-                tuned_defaults = defaults
-
-    return tuned_params_by_type, tuned_defaults, model_key, model_id
-
-
 def _parse_edit_specs_json(raw_payload: str) -> list[object]:
-    try:
-        edit_specs = json.loads(raw_payload)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"Invalid edit_specs JSON: {exc}") from exc
-
-    if not isinstance(edit_specs, list):
-        raise ValueError("edit_specs_json must be a JSON list")
-    return edit_specs
+    return parse_edit_specs_json(raw_payload)
 
 
 def _configure_determinism() -> None:
@@ -99,113 +75,33 @@ def _configure_determinism() -> None:
     torch.set_grad_enabled(False)
 
 
-def _load_baseline_artifacts(baseline_path: Path) -> tuple[Any, Any]:
+def _load_tokenizer(baseline_path: Path) -> Any:
     trust_remote_code = require_remote_code_opt_in("create_edits_batch.py")
-    tokenizer = AutoTokenizer.from_pretrained(
+    return AutoTokenizer.from_pretrained(
         baseline_path,
         trust_remote_code=trust_remote_code,
     )
-    model = AutoModelForCausalLM.from_pretrained(
+
+
+def _load_baseline_model(baseline_path: Path) -> Any:
+    trust_remote_code = require_remote_code_opt_in("create_edits_batch.py")
+    return AutoModelForCausalLM.from_pretrained(
         baseline_path,
         dtype=torch.bfloat16,
         trust_remote_code=trust_remote_code,
         device_map="auto",
         low_cpu_mem_usage=True,
     )
-    return tokenizer, model
 
 
-def _clean_tuned_entry(
-    edit_type: str,
-    tuned_params_by_type: dict[str, object],
-    tuned_defaults: dict[str, object],
-) -> tuple[dict[str, object], str]:
-    entry = tuned_params_by_type.get(edit_type) or tuned_defaults.get(edit_type) or {}
-    if not isinstance(entry, dict):
-        entry = {}
-    status = str(entry.get("status") or "missing")
-    return entry, status
-
-
-def _parse_clean_edit_spec(
-    edit_type: str,
-    parts: list[str],
-    tuned_params_by_type: dict[str, object],
-    tuned_defaults: dict[str, object],
-) -> dict[str, object]:
-    entry, status = _clean_tuned_entry(edit_type, tuned_params_by_type, tuned_defaults)
-    if status == "skipped":
-        return {"type": edit_type, "skip": True, "reason": status}
-    if status != "selected":
-        return {"type": edit_type, "error": status}
-
-    scope = entry.get("scope", parts[2] if len(parts) > 2 else "ffn")
-    if edit_type == "quant_rtn":
-        return {
-            "type": "quant_rtn",
-            "bits": int(entry.get("bits", 8)),
-            "group_size": int(entry.get("group_size", 128)),
-            "scope": scope,
-            "edit_dir_name": entry.get("edit_dir_name"),
-        }
-    if edit_type == "fp8_quant":
-        return {
-            "type": "fp8_quant",
-            "format": entry.get("format", "e4m3fn"),
-            "scope": scope,
-            "edit_dir_name": entry.get("edit_dir_name"),
-        }
-    if edit_type == "magnitude_prune":
-        return {
-            "type": "magnitude_prune",
-            "ratio": float(entry.get("sparsity", 0.0)),
-            "scope": scope,
-            "edit_dir_name": entry.get("edit_dir_name"),
-        }
-    if edit_type == "lowrank_svd":
-        return {
-            "type": "lowrank_svd",
-            "rank": int(entry.get("rank", 0)),
-            "scope": scope,
-            "edit_dir_name": entry.get("edit_dir_name"),
-        }
-    return {"type": edit_type, "params": parts[1:]}
-
-
-def _parse_edit_spec(
-    spec_str: str,
-    tuned_params_by_type: dict[str, object],
-    tuned_defaults: dict[str, object],
-) -> dict[str, object]:
-    parts = spec_str.split(":")
-    edit_type = parts[0] if parts else ""
-
-    if len(parts) > 1 and parts[1] == "clean":
-        return _parse_clean_edit_spec(
-            edit_type,
-            parts,
-            tuned_params_by_type,
-            tuned_defaults,
+def _batch_edit_strategy() -> str:
+    raw = os.environ.get("PACK_BATCH_EDIT_STRATEGY", "reload").strip().lower()
+    if raw not in _BATCH_EDIT_STRATEGIES:
+        raise ValueError(
+            "PACK_BATCH_EDIT_STRATEGY must be one of: "
+            + ", ".join(sorted(_BATCH_EDIT_STRATEGIES))
         )
-
-    if edit_type == "quant_rtn":
-        return {
-            "type": "quant_rtn",
-            "bits": int(parts[1]),
-            "group_size": int(parts[2]),
-            "scope": parts[3],
-        }
-    if edit_type == "fp8_quant":
-        return {"type": "fp8_quant", "format": parts[1], "scope": parts[2]}
-    if edit_type == "magnitude_prune":
-        return {
-            "type": "magnitude_prune",
-            "ratio": float(parts[1]),
-            "scope": parts[2],
-        }
-    if edit_type == "lowrank_svd":
-        return {"type": "lowrank_svd", "rank": int(parts[1]), "scope": parts[2]}
-    return {"type": edit_type, "params": parts[1:]}
+    return raw
 
 
 def _get_edit_dir_name(parsed_spec: dict[str, object], version: str) -> str:
@@ -225,131 +121,94 @@ def _get_edit_dir_name(parsed_spec: dict[str, object], version: str) -> str:
     return f"{edit_type}_{version}"
 
 
-def _matches_scope(name: str, scope: str) -> bool:
-    return matches_edit_scope(name, scope)
-
-
-def _apply_quantization(model: Any, bits: int, group_size: int, scope: str) -> Any:
-    edited = copy.deepcopy(model)
-
-    qmin = -(2 ** (bits - 1))
-    qmax = max((2 ** (bits - 1)) - 1, 1)
-    for name, param in edited.named_parameters():
-        if not _matches_scope(name, scope):
-            continue
-        if param.dim() < 2:
-            continue
-        orig_shape = param.shape
-        flat = param.reshape(orig_shape[0], -1)
-        in_features = flat.shape[1]
-        eff_group_size = group_size if group_size > 0 else in_features
-        if eff_group_size >= in_features:
-            eff_group_size = in_features
-        num_groups = (in_features + eff_group_size - 1) // eff_group_size
-        pad = (num_groups * eff_group_size) - in_features
-        if pad > 0:
-            flat = torch.nn.functional.pad(flat, (0, pad))
-        grouped = flat.reshape(orig_shape[0], num_groups, eff_group_size)
-        max_abs = grouped.abs().amax(dim=-1, keepdim=True)
-        scale = torch.clamp(max_abs / qmax, min=1e-10)
-        quantized = torch.round(grouped / scale).clamp(qmin, qmax) * scale
-        quantized = quantized.reshape(orig_shape[0], num_groups * eff_group_size)
-        if pad > 0:
-            quantized = quantized[:, :in_features]
-        param.data = quantized.reshape(orig_shape).to(param.dtype)
-    return edited
-
-
-def _apply_pruning(model: Any, ratio: float, scope: str) -> Any:
-    edited = copy.deepcopy(model)
-
-    for name, param in edited.named_parameters():
-        if not _matches_scope(name, scope):
-            continue
-        if param.dim() < 2:
-            continue
-        param_abs = param.detach().float().abs()
-        flat = param_abs.view(-1)
-        if flat.numel() > 10_000_000:
-            sample_size = min(1_000_000, flat.numel())
-            idx = torch.randint(0, flat.numel(), (sample_size,), device=flat.device)
-            flat_for_quantile = flat[idx]
-        else:
-            flat_for_quantile = flat
-        threshold = torch.quantile(flat_for_quantile, ratio)
-        mask = param_abs > threshold
-        param.data = (param * mask).to(param.dtype)
-    return edited
-
-
-def _apply_lowrank(model: Any, rank: int, scope: str) -> Any:
-    edited = copy.deepcopy(model)
-
-    for name, param in edited.named_parameters():
-        if not _matches_scope(name, scope):
-            continue
-        if param.dim() != 2:
-            continue
-        if min(param.shape) <= rank:
-            continue
-        weights = param.data.float()
-        k = min(rank, min(weights.shape))
-        left, singular, right = torch.svd_lowrank(weights, q=k, niter=2)
-        param.data = ((left * singular) @ right.T).to(param.dtype)
-    return edited
-
-
-def _fp8_dtype(format_type: str) -> torch.dtype | None:
-    if format_type in {"e4m3", "e4m3fn", "e4m3fnuz"}:
-        return getattr(torch, "float8_e4m3fn", None)
-    if format_type in {"e5m2", "e5m2fn", "e5m2fnuz"}:
-        return getattr(torch, "float8_e5m2", None)
-    return None
-
-
-def _apply_fp8(model: Any, format_type: str, scope: str) -> Any:
-    edited = copy.deepcopy(model)
-    dtype = _fp8_dtype(format_type)
-
-    for name, param in edited.named_parameters():
-        if not _matches_scope(name, scope):
-            continue
-        if param.dim() < 2:
-            continue
-        if dtype is None:
-            param.data = param.data.to(torch.float16).to(param.dtype)
-        else:
-            param.data = param.data.to(dtype).to(param.dtype)
-    return edited
-
-
-def _build_edited_model(model: Any, parsed_spec: dict[str, object]) -> Any:
+def _build_edited_model_and_metadata(
+    model: Any,
+    parsed_spec: dict[str, object],
+    *,
+    clone_model: bool = True,
+) -> tuple[Any, dict[str, object]]:
+    edited = copy.deepcopy(model) if clone_model else model
     edit_type = str(parsed_spec["type"])
     if edit_type == "quant_rtn":
-        return _apply_quantization(
-            model,
-            int(parsed_spec["bits"]),
-            int(parsed_spec["group_size"]),
-            str(parsed_spec["scope"]),
+        bits = int(parsed_spec["bits"])
+        group_size = int(parsed_spec["group_size"])
+        scope = str(parsed_spec["scope"])
+        stats = apply_rtn_dequantized_simulation(
+            edited,
+            bits=bits,
+            group_size=group_size,
+            scope=scope,
         )
+        metadata = build_validation_edit_metadata(
+            edit_type="quant_rtn",
+            scope=scope,
+            parameters={"bits": bits, "group_size": group_size},
+            coverage=stats.coverage_payload(),
+            extra={
+                "quantization_mode": "rtn_dequantized_external_subject_simulation",
+                "quantized_params": stats.edited_tensors,
+            },
+        )
+        return edited, metadata
     if edit_type == "magnitude_prune":
-        return _apply_pruning(
-            model,
-            float(parsed_spec["ratio"]),
-            str(parsed_spec["scope"]),
+        ratio = float(parsed_spec["ratio"])
+        scope = str(parsed_spec["scope"])
+        stats = apply_dense_magnitude_prune(edited, sparsity=ratio, scope=scope)
+        metadata = build_validation_edit_metadata(
+            edit_type="magnitude_prune",
+            scope=scope,
+            parameters={"target_sparsity": ratio},
+            coverage=stats.coverage_payload(),
+            extra={
+                "target_sparsity": ratio,
+                "actual_sparsity": stats.details.get("actual_sparsity"),
+                "pruned_params": stats.edited_tensors,
+            },
         )
+        return edited, metadata
     if edit_type == "lowrank_svd":
-        return _apply_lowrank(
-            model,
-            int(parsed_spec["rank"]),
-            str(parsed_spec["scope"]),
+        rank = int(parsed_spec["rank"])
+        scope = str(parsed_spec["scope"])
+        stats = apply_dense_lowrank_approximation(edited, rank=rank, scope=scope)
+        metadata = build_validation_edit_metadata(
+            edit_type="lowrank_svd",
+            scope=scope,
+            parameters={"rank": rank},
+            coverage=stats.coverage_payload(),
+            extra={
+                "rank": rank,
+                "modified_matrices": stats.edited_tensors,
+                "avg_energy_retained": stats.details.get("avg_energy_retained"),
+                "base_scope": stats.details.get("base_scope"),
+                "layer_limit": stats.details.get("layer_limit"),
+                "layer": stats.details.get("layer"),
+            },
         )
+        return edited, metadata
     if edit_type == "fp8_quant":
-        return _apply_fp8(
-            model,
-            str(parsed_spec["format"]),
-            str(parsed_spec["scope"]),
+        format_type = str(parsed_spec["format"])
+        scope = str(parsed_spec["scope"])
+        stats = apply_fp8_dequantized_simulation(
+            edited,
+            format_type=format_type,
+            scope=scope,
         )
+        metadata = build_validation_edit_metadata(
+            edit_type="fp8_quant",
+            scope=scope,
+            parameters={"format": format_type},
+            coverage=stats.coverage_payload(),
+            extra={
+                "quantization_mode": "fp8_dequantized_external_subject_simulation",
+                "format": format_type,
+                "quantized_tensors": stats.edited_tensors,
+                "avg_relative_error": stats.details.get("avg_relative_error"),
+                "torch_fp8_dtype_available": stats.details.get(
+                    "torch_fp8_dtype_available"
+                ),
+            },
+        )
+        return edited, metadata
     raise ValueError(f"Unknown edit type: {edit_type}")
 
 
@@ -358,39 +217,8 @@ def _clear_memory() -> None:
     torch.cuda.empty_cache()
 
 
-def _artifact_has_weights(edit_path: Path) -> bool:
-    if any(edit_path.glob("*.safetensors")):
-        return True
-    return any(
-        (edit_path / name).is_file()
-        for name in (
-            "model.safetensors",
-            "model.safetensors.index.json",
-            "pytorch_model.bin",
-            "pytorch_model.bin.index.json",
-        )
-    )
-
-
-def _artifact_has_tokenizer(edit_path: Path) -> bool:
-    return any(
-        (edit_path / name).is_file()
-        for name in (
-            "tokenizer.json",
-            "tokenizer_config.json",
-            "tokenizer.model",
-            "special_tokens_map.json",
-        )
-    )
-
-
 def _edit_artifact_complete(edit_path: Path) -> bool:
-    return (
-        edit_path.is_dir()
-        and (edit_path / "config.json").is_file()
-        and _artifact_has_weights(edit_path)
-        and _artifact_has_tokenizer(edit_path)
-    )
+    return bool(validate_edit_artifact(edit_path, require_metadata=True))
 
 
 def _create_edit_artifact(
@@ -399,11 +227,19 @@ def _create_edit_artifact(
     tokenizer: Any,
     parsed_spec: dict[str, object],
     edit_path: Path,
+    clone_model: bool = True,
 ) -> None:
-    edit_path.mkdir(parents=True, exist_ok=True)
-    edited_model = _build_edited_model(model, parsed_spec)
-    edited_model.save_pretrained(edit_path, safe_serialization=True)
-    tokenizer.save_pretrained(edit_path)
+    edited_model, metadata = _build_edited_model_and_metadata(
+        model,
+        parsed_spec,
+        clone_model=clone_model,
+    )
+    save_edited_subject_artifact(
+        model=edited_model,
+        tokenizer=tokenizer,
+        output_path=edit_path,
+        metadata=metadata,
+    )
     del edited_model
     _clear_memory()
 
@@ -414,35 +250,23 @@ def _process_spec_entry(
     model_output_dir: Path,
     model: Any,
     tokenizer: Any,
-    tuned_params_by_type: dict[str, object],
-    tuned_defaults: dict[str, object],
+    clone_model: bool = True,
 ) -> tuple[int, int]:
-    if not isinstance(spec_entry, dict):
-        return 0, 0
+    pending, created, failed = _resolve_pending_spec_entry(
+        spec_entry=spec_entry,
+        model_output_dir=model_output_dir,
+    )
+    if pending is None:
+        return created, failed
 
-    spec_str = str(spec_entry.get("spec", ""))
-    version = str(spec_entry.get("version", "clean"))
-    parsed = _parse_edit_spec(spec_str, tuned_params_by_type, tuned_defaults)
-
-    if parsed.get("skip"):
-        print(f"  Skip (tuned edit preset skipped): {spec_str}")
-        return 0, 0
-    if parsed.get("error"):
-        raise ValueError(f"Tuned edit preset missing for {spec_str}: {parsed['error']}")
-
-    edit_dir_name = _get_edit_dir_name(parsed, version)
-    edit_path = model_output_dir / "models" / edit_dir_name
-    if _edit_artifact_complete(edit_path):
-        print(f"  Skip (exists): {edit_dir_name}")
-        return 1, 0
-
-    print(f"  Creating: {edit_dir_name}...")
+    parsed, edit_path = pending
     try:
         _create_edit_artifact(
             model=model,
             tokenizer=tokenizer,
             parsed_spec=parsed,
             edit_path=edit_path,
+            clone_model=clone_model,
         )
     except (KeyError, OSError, RuntimeError, TypeError, ValueError) as exc:
         print(f"    ERROR: {exc}", file=sys.stderr)
@@ -452,14 +276,49 @@ def _process_spec_entry(
     return 1, 0
 
 
+def _resolve_pending_spec_entry(
+    *,
+    spec_entry: object,
+    model_output_dir: Path,
+) -> tuple[tuple[dict[str, object], Path] | None, int, int]:
+    if not isinstance(spec_entry, dict):
+        return None, 0, 0
+
+    spec_str = str(spec_entry.get("spec", ""))
+    version = str(spec_entry.get("version", "clean"))
+    parsed_resolved = resolve_batch_entry(
+        spec_entry=spec_entry,
+        model_output_dir=model_output_dir,
+    )
+    if parsed_resolved is None:
+        return None, 0, 0
+    parsed = parsed_resolved.to_batch_payload()
+
+    if parsed_resolved.skip:
+        print(f"  Skip (tuned edit preset skipped): {spec_str}")
+        return None, 0, 0
+    if not parsed_resolved.selected:
+        raise ValueError(
+            f"Tuned edit preset missing for {spec_str}: {parsed_resolved.status}"
+        )
+
+    edit_dir_name = _get_edit_dir_name(parsed, version)
+    edit_path = model_output_dir / "models" / edit_dir_name
+    if _edit_artifact_complete(edit_path):
+        print(f"  Skip (exists): {edit_dir_name}")
+        return None, 1, 0
+
+    print(f"  Creating: {edit_dir_name}...")
+    return (parsed, edit_path), 0, 0
+
+
 def _process_edit_specs(
     *,
     edit_specs: list[object],
     model_output_dir: Path,
     model: Any,
     tokenizer: Any,
-    tuned_params_by_type: dict[str, object],
-    tuned_defaults: dict[str, object],
+    clone_model: bool = True,
 ) -> tuple[int, int]:
     created_count = 0
     failed_count = 0
@@ -469,11 +328,51 @@ def _process_edit_specs(
             model_output_dir=model_output_dir,
             model=model,
             tokenizer=tokenizer,
-            tuned_params_by_type=tuned_params_by_type,
-            tuned_defaults=tuned_defaults,
+            clone_model=clone_model,
         )
         created_count += created
         failed_count += failed
+    return created_count, failed_count
+
+
+def _process_edit_specs_reloading_model(
+    *,
+    edit_specs: list[object],
+    baseline_path: Path,
+    model_output_dir: Path,
+    tokenizer: Any,
+) -> tuple[int, int]:
+    created_count = 0
+    failed_count = 0
+    for spec_entry in edit_specs:
+        model: Any | None = None
+        try:
+            pending, created, failed = _resolve_pending_spec_entry(
+                spec_entry=spec_entry,
+                model_output_dir=model_output_dir,
+            )
+            if pending is None:
+                created_count += created
+                failed_count += failed
+                continue
+            parsed, edit_path = pending
+            model = _load_baseline_model(baseline_path)
+            _create_edit_artifact(
+                model=model,
+                tokenizer=tokenizer,
+                parsed_spec=parsed,
+                edit_path=edit_path,
+                clone_model=False,
+            )
+            print(f"    Saved: {edit_path}")
+            created_count += 1
+        except (KeyError, OSError, RuntimeError, TypeError, ValueError) as exc:
+            print(f"    ERROR: {exc}", file=sys.stderr)
+            failed_count += 1
+        finally:
+            if model is not None:
+                del model
+            _clear_memory()
     return created_count, failed_count
 
 
@@ -488,23 +387,38 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    tuned_params_by_type, tuned_defaults, _, _ = _load_tuned_params(model_output_dir)
-    print(f"Loading baseline model once for {len(edit_specs)} edits...")
-
     _configure_determinism()
+    try:
+        strategy = _batch_edit_strategy()
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"Creating {len(edit_specs)} edits with strategy={strategy}...")
 
     model: Any | None = None
     try:
-        tokenizer, model = _load_baseline_artifacts(baseline_path)
-        print(f"Baseline loaded. Creating {len(edit_specs)} edits...")
-        created_count, failed_count = _process_edit_specs(
-            edit_specs=edit_specs,
-            model_output_dir=model_output_dir,
-            model=model,
-            tokenizer=tokenizer,
-            tuned_params_by_type=tuned_params_by_type,
-            tuned_defaults=tuned_defaults,
-        )
+        tokenizer = _load_tokenizer(baseline_path)
+        if strategy == "deepcopy":
+            model = _load_baseline_model(baseline_path)
+            print("Baseline loaded once. Creating edits via model deepcopy...")
+            created_count, failed_count = _process_edit_specs(
+                edit_specs=edit_specs,
+                model_output_dir=model_output_dir,
+                model=model,
+                tokenizer=tokenizer,
+                clone_model=True,
+            )
+        else:
+            print(
+                "Reloading baseline per edit to avoid model deepcopy memory spikes..."
+            )
+            created_count, failed_count = _process_edit_specs_reloading_model(
+                edit_specs=edit_specs,
+                baseline_path=baseline_path,
+                model_output_dir=model_output_dir,
+                tokenizer=tokenizer,
+            )
     finally:
         if model is not None:
             del model

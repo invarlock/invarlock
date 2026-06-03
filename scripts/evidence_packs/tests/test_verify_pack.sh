@@ -3,7 +3,7 @@
 pack_test_sign_manifest() {
     local pack_dir="$1"
     local repo_root="${TEST_ROOT:-$(pwd)}"
-    python3 "${repo_root}/scripts/evidence_packs/python/sign_manifest.py" \
+    python3 "${repo_root}/scripts/evidence_packs/python/manifest_writer.py" sign \
         --manifest "${pack_dir}/manifest.json" \
         --generate-ephemeral \
         >/dev/null
@@ -48,6 +48,34 @@ EOF
     assert_file_exists "${verify_out}" "verify output written"
 }
 
+test_verify_pack_report_assurance_off_still_invokes_report_verify() {
+    mock_reset
+
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/reports"
+    echo "{}" > "${pack_dir}/reports/evaluation.report.json"
+
+    local sha_cmd
+    sha_cmd="$(pack_sha256_cmd)"
+    (
+        cd "${pack_dir}"
+        ${sha_cmd} reports/evaluation.report.json > checksums.sha256
+    )
+
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"evidence-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
+
+    local verify_out="${TEST_TMPDIR}/verify-off.json"
+    run pack_verify_pack --pack "${pack_dir}" --report-assurance off --json-out "${verify_out}"
+
+    assert_rc "0" "${RUN_RC}" "report-assurance off still verifies report files"
+    assert_file_exists "${verify_out}" "verify output path is still used"
+    assert_match "--assurance off" "$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")" "nested verify uses assurance off"
+}
+
 test_verify_pack_errors_on_missing_args() {
     mock_reset
 
@@ -62,8 +90,33 @@ test_verify_pack_errors_on_missing_args() {
     run pack_verify_pack --pack "${TEST_TMPDIR}/pack" --json-out
     assert_rc "2" "${RUN_RC}" "missing json-out value"
 
+    run pack_verify_pack --pack "${TEST_TMPDIR}/pack" --expected-fingerprint
+    assert_rc "2" "${RUN_RC}" "missing expected-fingerprint value"
+
     run pack_verify_pack --nope
     assert_rc "2" "${RUN_RC}" "unknown arg returns 2"
+
+    run pack_verify_pack --pack "${TEST_TMPDIR}/pack" --report-assurance
+    assert_rc "2" "${RUN_RC}" "missing report-assurance value is rejected"
+
+    run pack_verify_pack --pack "${TEST_TMPDIR}/pack" --report-assurance weak
+    assert_rc "2" "${RUN_RC}" "invalid report-assurance value is rejected"
+}
+
+test_verify_pack_source_selects_python_from_path_without_test_real_python() {
+    mock_reset
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/python" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "${bin_dir}/python"
+
+    run bash -x -c 'unset PYTHON_BIN TEST_REAL_PYTHON3; PATH="$1:/usr/bin:/bin"; source ./scripts/evidence_packs/verify_pack.sh; printf "%s\n" "${PYTHON_BIN}"' _ "${bin_dir}"
+    assert_rc "0" "${RUN_RC}" "verify_pack source selects python from PATH"
+    assert_eq "${bin_dir}/python" "${RUN_OUT}" "python path exported from PATH"
 }
 
 
@@ -234,12 +287,48 @@ test_verify_pack_sha256_cmd_fallback_and_no_reports() {
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
-    local repo_root
-    repo_root="$(pwd)"
-    cat > "${bin_dir}/shasum" <<EOF
+    cat > "${bin_dir}/shasum" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-exec python3 "${repo_root}/scripts/evidence_packs/python/shasum_mock.py" "\$@"
+python3 - "$@" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import pathlib
+import sys
+
+args = sys.argv[1:]
+check_file = None
+files: list[str] = []
+i = 0
+while i < len(args):
+    if args[i] == "-a":
+        i += 2
+    elif args[i] == "-c":
+        check_file = args[i + 1] if i + 1 < len(args) else ""
+        i += 2
+    else:
+        files.append(args[i])
+        i += 1
+
+
+def sha256(path: str) -> str:
+    return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+
+
+if check_file:
+    ok = True
+    for line in pathlib.Path(check_file).read_text().splitlines():
+        if not line.strip():
+            continue
+        parts = line.split()
+        if sha256(parts[-1]) != parts[0]:
+            ok = False
+    raise SystemExit(0 if ok else 1)
+
+for filename in files:
+    print(f"{sha256(filename)}  {filename}")
+PY
 EOF
     chmod +x "${bin_dir}/shasum"
 
@@ -319,6 +408,60 @@ test_verify_pack_signed_manifest_verifies_signature() {
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
     assert_rc "0" "${RUN_RC}" "verify succeeds with package-native signature present"
+}
+
+test_verify_pack_signed_manifest_accepts_expected_fingerprint() {
+    mock_reset
+
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}"
+    echo "payload" > "${pack_dir}/payload.txt"
+
+    local sha_cmd
+    sha_cmd="$(pack_sha256_cmd)"
+    (
+        cd "${pack_dir}"
+        ${sha_cmd} payload.txt > checksums.sha256
+    )
+
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"evidence-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
+    pack_test_sign_manifest "${pack_dir}"
+
+    local expected_fingerprint
+    expected_fingerprint="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["signing_key_fingerprint"])' "${pack_dir}/manifest.json")"
+
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify --expected-fingerprint "${expected_fingerprint}"
+    assert_rc "0" "${RUN_RC}" "verify succeeds with pinned package-native signature"
+}
+
+test_verify_pack_signed_manifest_rejects_unexpected_fingerprint() {
+    mock_reset
+
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}"
+    echo "payload" > "${pack_dir}/payload.txt"
+
+    local sha_cmd
+    sha_cmd="$(pack_sha256_cmd)"
+    (
+        cd "${pack_dir}"
+        ${sha_cmd} payload.txt > checksums.sha256
+    )
+
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"evidence-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
+    pack_test_sign_manifest "${pack_dir}"
+
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify --expected-fingerprint "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    assert_rc "5" "${RUN_RC}" "verify rejects an unexpected signature signer"
+    assert_match "signer mismatch" "${RUN_ERR}" "mismatch error names signer mismatch"
 }
 
 
@@ -730,6 +873,95 @@ EOF
     PATH="${original_path}"
 }
 
+test_verify_pack_verify_reports_accepts_scenario_expected_failures() {
+    mock_reset
+
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/metadata"
+    mkdir -p "${pack_dir}/reports/modelA/quant_4bit_clean/run_1"
+    mkdir -p "${pack_dir}/reports/modelA/prune_50pct_stress/run_1"
+    cat > "${pack_dir}/metadata/scenarios.json" <<'JSON'
+{
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "quant_4bit_clean", "strictness": "must_pass"},
+    {"id": "prune_50pct_stress", "strictness": "must_fail"}
+  ]
+}
+JSON
+    echo "{}" > "${pack_dir}/reports/modelA/quant_4bit_clean/run_1/evaluation.report.json"
+    echo "{}" > "${pack_dir}/reports/modelA/prune_50pct_stress/run_1/evaluation.report.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "$*" >> "${TEST_TMPDIR}/invarlock.calls"
+for arg in "$@"; do
+    if [[ "${arg}" == */prune_50pct_stress/*/evaluation.report.json ]]; then
+        exit 1
+    fi
+done
+exit 0
+EOF
+    chmod +x "${bin_dir}/invarlock"
+
+    local original_path="${PATH}"
+    PATH="${bin_dir}:${PATH}"
+
+    run pack_verify_reports "${pack_dir}" ""
+    assert_rc "0" "${RUN_RC}" "verify succeeds when scenario-declared must_fail reports fail"
+    assert_match "quant_4bit_clean/run_1/evaluation\\.report\\.json" "$(cat "${TEST_TMPDIR}/invarlock.calls")" "verifies expected-pass report"
+    assert_match "prune_50pct_stress/run_1/evaluation\\.report\\.json" "$(cat "${TEST_TMPDIR}/invarlock.calls")" "attempts scenario expected-failure report"
+
+    PATH="${original_path}"
+}
+
+test_verify_pack_verify_reports_rejects_scenario_expected_failure_that_passes() {
+    mock_reset
+
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/metadata"
+    mkdir -p "${pack_dir}/reports/modelA/quant_4bit_clean/run_1"
+    mkdir -p "${pack_dir}/reports/modelA/prune_50pct_stress/run_1"
+    cat > "${pack_dir}/metadata/scenarios.json" <<'JSON'
+{
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "quant_4bit_clean", "strictness": "must_pass"},
+    {"id": "prune_50pct_stress", "strictness": "must_fail"}
+  ]
+}
+JSON
+    echo "{}" > "${pack_dir}/reports/modelA/quant_4bit_clean/run_1/evaluation.report.json"
+    echo "{}" > "${pack_dir}/reports/modelA/prune_50pct_stress/run_1/evaluation.report.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+exit 0
+EOF
+    chmod +x "${bin_dir}/invarlock"
+
+    local original_path="${PATH}"
+    PATH="${bin_dir}:${PATH}"
+
+    run pack_verify_reports "${pack_dir}" ""
+    assert_rc "1" "${RUN_RC}" "verify fails when scenario-declared must_fail report verifies clean"
+    assert_match "Expected verify failure passed" "${RUN_ERR}" "unexpected expected-failure pass is explicit"
+
+    PATH="${original_path}"
+}
+
 test_verify_pack_verify_reports_errors_when_only_error_injection_reports_present() {
     mock_reset
 
@@ -741,7 +973,7 @@ test_verify_pack_verify_reports_errors_when_only_error_injection_reports_present
 
     run pack_verify_reports "${pack_dir}" ""
     assert_rc "1" "${RUN_RC}" "only error-injection reports must fail"
-    assert_match "No clean reports found" "${RUN_ERR}" "clean report requirement surfaced"
+    assert_match "No reports expected to pass" "${RUN_ERR}" "expected-pass report requirement surfaced"
 }
 
 test_verify_pack_rejects_tampered_payload_when_checksums_bound() {

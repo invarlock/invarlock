@@ -14,7 +14,8 @@ task graph, scheduling, and artifact generation. It complements
 | Aspect | Details |
 | --- | --- |
 | Purpose | Hardware-agnostic Phase 0 validation harness for edit detection |
-| Version | `evidence-packs-v1` |
+| Harness version | `evidence-packs-v1` |
+| Manifest format | `evidence-pack-v1` |
 | Hardware | NVIDIA GPUs where models fit VRAM; multi-GPU recommended for `full` |
 | Models | `subset` (1 model), `showcase`/`workshop3` (3 models), or `full` (6 models); all ungated public |
 | Edits | Scenario-driven; default suites use 4 clean + 4 stress edit scenarios per model, and filtered manifests may select any subset |
@@ -26,15 +27,23 @@ task graph, scheduling, and artifact generation. It complements
 
 ## Quick Start (Context)
 
+The suite wrappers fail closed unless remote model code has been explicitly
+approved. The examples below assume `INVARLOCK_ALLOW_REMOTE_CODE=1` is exported
+for the shell that launches `run_suite.sh` or `run_pack.sh`.
+
 ```bash
 # Run the subset suite (offline by default)
+export INVARLOCK_ALLOW_REMOTE_CODE=1
 ./scripts/evidence_packs/run_suite.sh --suite subset
 
 # Run the full suite and build an evidence pack
-./scripts/evidence_packs/run_pack.sh --suite full --net 1
+./scripts/evidence_packs/run_pack.sh --suite full --net 1 --release-review
 
 # Verify an existing evidence pack
-invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000000/evidence_pack --strict
+invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000000/evidence_pack --strict --report-assurance strict
+
+# Verify and pin the expected package-native signer
+invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000000/evidence_pack --strict --report-assurance strict --expected-fingerprint sha256:<64-hex-chars>
 ```
 
 ## Hardware Target
@@ -57,22 +66,35 @@ invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000
 - `scripts/evidence_packs/verify_pack.sh` validates an evidence pack in repo workflows.
 - `invarlock advanced evidence-pack verify` provides the package-native verifier path for
   installed wheels.
-- `scripts/evidence_packs/suites.sh` defines the model suites and allows
+- `scripts/evidence_packs/run_suite.sh` defines the model suites and allows
   `MODEL_1`–`MODEL_8` overrides.
-- `scripts/evidence_packs/lib/validation_suite.sh` orchestrates the run: preflight,
+- `scripts/evidence_packs/lib/validation/validation_suite.sh` orchestrates the run: preflight,
   queue creation, worker launch, and monitoring.
 
 ### Library modules
 
 - `lib/task_serialization.sh`: task schema, JSON helpers, GPU planning.
-- `lib/queue_manager.sh`: queue states, dependency resolution, task generation.
-- `lib/scheduler.sh`: dynamic priority, memory gating, reservations.
+- `lib/queue/queue_manager.sh`: compatibility facade for queue state, dependency, and task-generation modules.
+- `lib/queue/queue_core.sh`: queue setup, locking, summaries, and terminal-state helpers.
+- `lib/queue/queue_lifecycle.sh`: task state transitions and orphan reclamation.
+- `lib/queue/queue_dependencies.sh`: dependency resolution and dependent promotion.
+- `lib/queue/queue_memory_plan.sh`: profile-based memory refresh and memory-plan export.
+- `lib/queue/queue_generation.sh`: progress state, task search, and task graph generation.
+- `lib/queue/scheduler.sh`: compatibility facade for scheduler modules.
+- `lib/queue/scheduler_core.sh`: GPU ID/cache helpers, scheduler lock, and GPU-count policy.
+- `lib/queue/scheduler_gpu_runtime.sh`: OOM checks, memory probes, utilization, and purge helpers.
+- `lib/queue/scheduler_reservations.sh`: GPU reservation and availability helpers.
+- `lib/queue/scheduler_selection.sh`: task priority, selection, work stealing, and scheduling metrics.
 - `lib/gpu_worker.sh`: worker loop, heartbeats, task execution glue.
-- `lib/task_functions.sh`: implementations for each task type.
-- `lib/model_creation.sh`: edit and error-model creation helpers (`create_model_variant` dispatcher).
-- `lib/config_generator.sh`: InvarLock config generation and wrapper helpers.
-- `lib/result_compiler.sh`: analysis and verdict compilation.
-- `lib/fault_tolerance.sh`: error classification and retry/backoff logic.
+- `lib/tasks/task_functions.sh`: compatibility facade and `execute_task` dispatcher.
+- `lib/tasks/task_common.sh`: shared scheduling, model, preset, and reusable baseline-report helpers.
+- `lib/tasks/task_baseline.sh`: baseline setup, calibration, preset generation, and shared baseline report preparation.
+- `lib/tasks/task_edit_lifecycle.sh`: edit creation, batch edit creation, evaluation, and cleanup.
+- `lib/tasks/task_error_lifecycle.sh`: error-model creation, evaluation probes, structural-failure reports, and cleanup.
+- `lib/tasks/model_creation.sh`: edit and error-model creation helpers (`create_model_variant` dispatcher).
+- `lib/config/config_generator.sh`: InvarLock config generation and wrapper helpers.
+- `lib/validation/validation_suite.sh`: validation orchestration, analysis setup, and verdict compilation.
+- `lib/core/fault_tolerance.sh`: error classification and retry/backoff logic.
 - `scripts/evidence_packs/python/manifest_writer.py`: evidence pack `manifest.json` writer.
 - `scripts/evidence_packs/python/preset_generator.py`: preset derivation + edit-type variants.
 
@@ -95,15 +117,16 @@ invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000
 │                   ┌───────────────┴───────────────┐                   │
 │                   ▼                               ▼                   │
 │ TASK EXECUTION                                  CORE SERVICES         │
-│   lib/gpu_worker.sh                               queue_manager       │
-│   task claim -> precheck -> execute -> cleanup    scheduler           │
+│   lib/gpu_worker.sh                               queue_* modules     │
+│   task claim -> precheck -> execute -> cleanup    scheduler_* modules │
 │                                                  task_serialization   │
 │                                                  fault_tolerance      │
 │                   │                                                   │
 │                   ▼                                                   │
 │ TASK FUNCTIONS                                                        │
-│   SETUP_BASELINE, CALIBRATION_RUN, GENERATE_PRESET                    │
-│   CREATE_EDITS(_BATCH), CREATE_ERROR, evaluate_*                      │
+│   task_functions facade + task_common shared helpers                  │
+│   task_baseline | task_edit_lifecycle | task_error_lifecycle          │
+│   SETUP_BASELINE, CALIBRATION_RUN, GENERATE_PRESET, evaluate_*        │
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -134,7 +157,7 @@ Evidence pack issues?
 
 ## Model Suite
 
-Model suites are defined in `scripts/evidence_packs/suites.sh` and applied by
+Model suites are defined and applied by
 `run_suite.sh`.
 
 | Suite | Models | Notes |
@@ -159,12 +182,13 @@ Notes:
 
 - Override models via `MODEL_1`–`MODEL_8`; set an empty string to disable a slot.
 - `validation_suite.sh` includes a fallback list of large causal models if it is
-  run directly without `suites.sh`.
+  run directly without separate suite plumbing.
 
 ## Edit Types
 
-Each model runs 8 edit experiments (4 types × 2 versions) plus optional error
-injection tests.
+Each model runs 8 validation-subject edit experiments (4 types × 2 versions)
+plus optional error-injection tests. `scripts/evidence_packs/scenarios.json`
+is the source of truth for each scenario's `artifact_class`.
 
 Evidence-pack `quant_rtn` scenarios are generated as external subject
 artifacts: the helper applies RTN quantize/dequantize simulation and saves
@@ -173,18 +197,23 @@ floating-point dequantized weights. Those scenarios may use `bits` and
 `edit.name: quant_rtn` plugin plan and they do not produce packed runtime
 quantization.
 
+The same distinction applies to the other current edits: FP8 round-trips tensors
+through FP8 or float16 and saves ordinary floating-point weights; magnitude
+pruning writes zeros into dense tensors; low-rank SVD writes dense approximated
+tensors instead of factorized low-rank modules.
+
 ### Clean edits (tuned)
 
 Clean edits use tuned parameters supplied via `PACK_TUNED_EDIT_PARAMS_FILE`.
 The suite uses `:clean:` as a sentinel in the edit spec and resolves concrete
 parameters at runtime.
 
-| Edit Type | Parameters | Scope |
-| --- | --- | --- |
-| RTN dequantized external-subject simulation | tuned (`bits`, `group_size`) from tuned params file | FFN only |
-| FP8 Quantization | tuned (`format`) from tuned params file | FFN only |
-| Magnitude Pruning | tuned (`prune_level`) from tuned params file | FFN only |
-| Low-Rank SVD | tuned (`rank`) from tuned params file | FFN only |
+| Edit Type | Artifact class | Parameters | Scope |
+| --- | --- | --- | --- |
+| RTN dequantized external-subject simulation | validation subject checkpoint | tuned (`bits`, `group_size`) from tuned params file | FFN only |
+| FP8 dequantized external-subject simulation | validation subject checkpoint | tuned (`format`) from tuned params file | FFN only |
+| Dense magnitude-pruned checkpoint | validation subject checkpoint | tuned (`prune_level`) from tuned params file | FFN only |
+| Dense low-rank-SVD approximated checkpoint | validation subject checkpoint | tuned (`rank`) from tuned params file | FFN only |
 
 ### Stress edits
 
@@ -198,12 +227,22 @@ example, Spectral can remain `validation.spectral_stable=true` while applying ca
 and remediation events (caps applied) as a “signal” so the suite measures guard activity
 without manufacturing clean false positives.
 
-| Edit Type | Parameters | Scope |
-| --- | --- | --- |
-| RTN dequantized external-subject simulation | `quant_rtn:8:all` (8-bit) | All layers |
-| FP8 Quantization | `fp8_quant:e5m2:all` | All layers |
-| Magnitude Pruning | `magnitude_prune:0.5:all` (50% sparsity) | All layers |
-| Low-Rank SVD | `lowrank_svd:32:all` (rank 32) | All layers |
+| Edit Type | Artifact class | Parameters | Scope |
+| --- | --- | --- | --- |
+| RTN dequantized external-subject simulation | validation subject checkpoint | `quant_rtn:8:all` (8-bit) | All layers |
+| FP8 dequantized external-subject simulation | validation subject checkpoint | `fp8_quant:e5m2:all` | All layers |
+| Dense magnitude-pruned checkpoint | validation subject checkpoint | `magnitude_prune:0.5:all` (50% sparsity) | All layers |
+| Dense low-rank-SVD approximated checkpoint | validation subject checkpoint | `lowrank_svd:32:all` (rank 32) | All layers |
+
+### Deployable edits
+
+Deployable scenarios use `artifact_class: deployable_optimized_subject` and are
+not part of the default validation lanes. A deployable scenario must carry a
+backend contract (`packed_quantized_storage`, reload smoke, inference smoke,
+and memory/storage evidence) and package the corresponding sidecars into the
+evidence pack. The OSS suite currently has no runnable deployable scenario; add
+one only when the backend can produce or load an artifact and provide all
+required sidecars on the target GPU stack.
 
 ### Error injection tests
 
@@ -362,12 +401,27 @@ START gpu_worker
 
 Small/medium models default to batch edit creation:
 
-- **Batch edit creation**: `CREATE_EDITS_BATCH` loads a model once and creates
-  all 8 edits (cuts repeated model loads).
+- **Batch edit creation**: `CREATE_EDITS_BATCH` parses and schedules all edit
+  specs together, but reloads the baseline per edit by default to avoid
+  deep-copying large loaded models. Set `PACK_BATCH_EDIT_STRATEGY=deepcopy`
+  only for small models where single-load throughput is more important than
+  peak memory.
+- **Deferred optional report rendering**: `PACK_DEFER_REPORT_RENDERING=1`
+  keeps `evaluation.report.json`, `runtime.manifest.json`, and JSON evidence
+  sidecars in the hot path while skipping markdown/reviewer bundle rendering.
+  Pack verification does not require those optional rendered files. Release
+  review mode enables this default so evaluation workers spend less time on
+  report-heavy filesystem writes; pack-level HTML export still runs unless
+  `PACK_SKIP_HTML=1` is set.
+- **Evaluation-loop telemetry**: each `evaluate_timing.json` records top-level
+  evaluate timings plus nested baseline/subject run timings when reports expose
+  them. The pack-level `evaluation_optimization_summary.json` aggregates those
+  timings so reviewers can separate process startup savings from model load,
+  dataset preparation, guard/eval, and report-generation costs.
 
-Large or MoE models disable batch edits automatically (or via
+Large or MoE models can still disable batch edit tasks automatically (or via
 `PACK_USE_BATCH_EDITS=false`) and fall back to per-edit tasks
-(`CREATE_EDIT → evaluate_EDIT`).
+(`CREATE_EDIT -> evaluate_EDIT`).
 
 ### Task dependency graphs
 
@@ -384,6 +438,9 @@ Notes:
 
 - Error injection tasks (`CREATE_ERROR` → `evaluate_ERROR`) branch off
   `SETUP_BASELINE` and require the preset for evaluation.
+- Grouped edit evaluation is opt-in because it trades some multi-GPU task
+  parallelism for lower per-scenario process startup overhead. It is most useful
+  for many short edit evaluations on one model.
 
 Per-edit path (large/MoE or `PACK_USE_BATCH_EDITS=false`):
 
@@ -397,27 +454,25 @@ SETUP_BASELINE
 ## Task breakdown per model (defaults)
 
 Defaults: `DRIFT_CALIBRATION_RUNS=5`, `CLEAN_EDIT_RUNS=3`,
-`STRESS_EDIT_RUNS=2`, `RUN_ERROR_INJECTION=true`.
+`STRESS_EDIT_RUNS=2`, `RUN_ERROR_INJECTION=true`, and
+`PACK_USE_BATCH_EDITS=auto`.
 
-Batch path (default for small/medium):
-
-- Setup baseline: 1 task
-- Preset-derivation runs + preset generation: 6 tasks
-- Batch edits: 1 task
-- evaluate edits: 20 tasks
-- Error injection: 10 tasks
-
-Total: ~38 tasks/model (varies with overrides).
-
-Per-edit path (large/MoE or `PACK_USE_BATCH_EDITS=false`):
+The task graph is manifest-driven and may add eager baseline, reusable-baseline,
+and cleanup tasks. Use the generated queue summary as the authoritative count.
+At a high level, each model includes:
 
 - Setup baseline: 1 task
 - Preset-derivation runs + preset generation: 6 tasks
-- Create edits: 8 tasks
-- evaluate edits: 20 tasks
-- Error injection: 10 tasks
+- Edit creation: one batch task when grouped edit creation is explicitly
+  enabled, otherwise one creation task per edit
+- Edit evaluation: edit count × clean/stress run counts
+- Error injection: suite manifest scenarios (12 for `subset`, 15 for
+  `showcase`, `workshop3`, and `full` by default)
+- Cleanup tasks when cleanup mode is enabled
 
-Total: ~45 tasks/model (varies with overrides).
+`PACK_USE_BATCH_EDITS=auto` currently favors the per-edit path for
+cleanup-safe default runs. Set `PACK_USE_BATCH_EDITS=true` only when the reduced
+startup overhead is worth the lower task-level parallelism for that campaign.
 
 ## Execution phases
 
@@ -430,6 +485,7 @@ PHASE 2: GPU worker launch
   - Spawn one worker per GPU, dynamic scheduling in loop
 PHASE 3: Reports + verdict
   - Compile reports into final verdict reports
+  - Write results/analysis/evaluation_optimization_summary.json
 ```
 
 ## Run directory layout
@@ -499,6 +555,7 @@ these sidecars into the packaged evidence pack under `reports/**/`.
 
 ```bash
 # Throughput (default)
+export INVARLOCK_ALLOW_REMOTE_CODE=1
 PACK_DETERMINISM=throughput ./scripts/evidence_packs/run_suite.sh --suite subset
 
 # Strict
@@ -585,7 +642,9 @@ run_pack.sh
 - Verifies digest-backed manifest references (`subject`, `invocation.config_source`,
   `environment`, and `materials`) against on-pack files.
 - Verifies `checksums.sha256` (and thus all hashed artifacts).
-- Verifies the package-native Ed25519 signature bundle when present; `--strict` requires it.
+- Verifies the package-native Ed25519 signature bundle; a missing
+  `manifest.signature.json` is a signature failure by default.
+- Enforces signer authenticity when `--expected-fingerprint` or `--trust-store` is supplied.
 - Enforces “no extra files” semantics in `--strict` mode.
 - Runs `invarlock verify` across all bundled reports (JSON output optional) with
   runtime-manifest enforcement on; each packaged `evaluation.report.json`
@@ -606,13 +665,19 @@ Maintainer evidence-pack packaging also treats source provenance as fail-closed:
 
 - `run_pack.sh` writes `metadata/source_repo.json` from the active Git checkout.
 - If `git` is unavailable or the repository metadata cannot be collected, pack
-  creation stops instead of silently emitting partial provenance.
+  creation stops instead of silently emitting partial provenance unless an
+  explicit snapshot marker is present.
+- Detached artifact-tree runs may provide `GPU_RUN_SOURCE.txt` in the repository
+  root, or point `INVARLOCK_SOURCE_REPO_MARKER` at an equivalent key-value file.
+  The marker must include `source_commit=<40-hex-commit>` and may include
+  `source_branch`, `source_describe`, `source_uri`, and `source_dirty`.
 - If you need to package from a detached artifact tree, write a complete
-  `metadata/source_repo.json` first rather than relying on fallback inference.
+  `metadata/source_repo.json` first or provide that explicit snapshot marker
+  rather than relying on fallback inference.
 
 ## Remote setup helper
 
-`scripts/evidence_packs/lib/setup_remote.sh` is an optional bootstrap script for
+`scripts/evidence_packs/lib/core/setup_remote.sh` is an optional bootstrap script for
 fresh GPU hosts. It clones the repo, creates a venv, installs PyTorch and
 InvarLock, and leaves the host ready to run `run_pack.sh`.
 
@@ -634,9 +699,13 @@ Operational guidance for remote evidence-pack work:
   set `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1` on the remote host before the
   evidence-pack entrypoint; the default runtime-container launcher rejects that config
   graph before container start when the override is missing.
-- After Qwen2.5-14B campaigns, run
+- After Qwen2.5-14B campaigns run with `PACK_CLEANUP_MODELS=0`, run
   `scripts/evidence_packs/run_qwen14_sentinels.sh` from the same fresh work tree to
-  validate saved-model direct evaluate and the public quant smoke.
+  validate saved-model direct evaluate and the public quant smoke. The sentinel
+  helper reloads retained edit subject directories, so default cleanup mode is
+  not sufficient for this follow-up check. The helper defaults to
+  `--profile dev --assurance off` and requires evaluate/verify subprocesses to
+  exit zero.
 
 Recommended remote validation checklist after security-default changes:
 
@@ -644,7 +713,7 @@ Recommended remote validation checklist after security-default changes:
    `INVARLOCK_CONFIG_ROOT` overrides.
 2. Run one delegated `invarlock evaluate` with external `--edit-config`,
    `TMPDIR`, and `INVARLOCK_EXPORT_DIR` roots.
-3. Run one `scripts/model_evidence_sweep.py --execution-mode container` lane
+3. Run one `scripts/model_evidence/model_evidence_sweep.py --execution-mode container` lane
    with an external output root and confirm the published report path is
    populated.
 
@@ -660,7 +729,7 @@ Common knobs for the setup script:
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `PACK_SUITE` | `subset` | Suite name (`subset` or `full`) |
+| `PACK_SUITE` | `subset` | Suite name (`subset`, `showcase`, `workshop3`, or `full`) |
 | `PACK_NET` | `0` | Enable network preflight/downloads |
 | `PACK_OUTPUT_DIR` | unset | Sets `OUTPUT_DIR` when provided |
 | `OUTPUT_DIR` | auto | `./evidence_pack_runs/<suite>_<timestamp>` via entrypoint |
@@ -670,6 +739,8 @@ Common knobs for the setup script:
 | `PACK_REPEATS` | `0` | Determinism repeat metadata |
 | `PACK_MODEL_REVISIONS_FILE` | `OUTPUT_DIR/state/model_revisions.json` | Revisions path |
 | `PACK_USE_BATCH_EDITS` | `auto` | Force/disable batch edit creation |
+| `PACK_DEFER_REPORT_RENDERING` | `0` (`1` under `--release-review`) | Skip optional markdown/reviewer bundle rendering during evaluation |
+| `PACK_RUNTIME_IMAGE_FLAVOR` | `default` | Remote setup runtime image flavor; use `quant` on CUDA hosts for optional quant adapter container evidence, including `hf_bnb`, `hf_awq`, `hf_gptq`, `hf_torchao`, `hf_hqq`, `hf_quanto`, and `hf_ct` |
 | `RESUME_MODE` | `true` | Skip completed steps when outputs exist |
 
 ### Hardware selection
@@ -748,7 +819,7 @@ Primary metric acceptance/drift gates should be configured via profile/config
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `PACK_BASELINE_STORAGE_MODE` | `snapshot_symlink` | Baseline storage mode (`snapshot_symlink`, `snapshot_copy`, or `save_pretrained`) |
+| `PACK_BASELINE_STORAGE_MODE` | `snapshot_copy` | Baseline storage mode for `run_suite.sh` and `run_pack.sh` (`snapshot_symlink`, `snapshot_copy`, or `save_pretrained`) |
 | `MIN_FREE_DISK_GB` | `200` | Disk pressure threshold |
 | `PACK_SKIP_DISK_PREFLIGHT` | `0` | Skip storage preflight |
 | `CUDA_MEMORY_FRACTION` | `0.92` | Target GPU memory fraction |
@@ -778,6 +849,10 @@ Primary metric acceptance/drift gates should be configured via profile/config
 | `PACK_SIGNING_KEY` | unset | Optional Ed25519 private key PEM for deterministic signer identity |
 | `PACK_SKIP_HTML` | `0` | Skip HTML rendering |
 | `PACK_VERIFY_PROFILE` | `dev` | Profile for `invarlock verify` |
+| `PACK_REPORT_ASSURANCE` | `report` | Nested report assurance mode passed to report verification (`report`, `strict`, or `off`) |
+| `PACK_REQUIRE_PASS` | `0` | Fail pack generation unless `final_verdict.json` is `PASS` |
+| `PACK_REQUIRE_RUNTIME_MANIFESTS` | `0` | Require report-adjacent runtime manifests during hardened pack generation |
+| `PACK_RELEASE_REVIEW` | `0` | Set by `run_pack.sh --release-review`; requires PASS verdicts, signed manifests, runtime manifests, CI profile, and strict report assurance |
 
 ## Troubleshooting
 
@@ -786,6 +861,7 @@ Primary metric acceptance/drift gates should be configured via profile/config
 If offline runs fail with “requires model revisions”, run a preflight:
 
 ```bash
+export INVARLOCK_ALLOW_REMOTE_CODE=1
 ./scripts/evidence_packs/run_suite.sh --suite subset --net 1
 ```
 
@@ -809,6 +885,7 @@ risk of partial artifacts.
 Increase the default or per-task timeout:
 
 ```bash
+export INVARLOCK_ALLOW_REMOTE_CODE=1
 TASK_TIMEOUT_DEFAULT=28800 ./scripts/evidence_packs/run_suite.sh --suite subset
 TASK_TIMEOUT_CREATE_EDIT=28800 ./scripts/evidence_packs/run_suite.sh --suite subset
 ```

@@ -1,8 +1,37 @@
 from __future__ import annotations
 
+import random
 from types import SimpleNamespace
 
-from invarlock.core import run_orchestrator_execute_seed as seed_mod
+import numpy as np
+
+from invarlock.core import determinism_policy
+from invarlock.core import run_orchestrator_execute_environment as environment_mod
+
+
+def test_set_seed_reseeds_python_and_numpy() -> None:
+    determinism_policy.set_seed(123)
+    first = (random.random(), float(np.random.rand()))
+
+    determinism_policy.set_seed(123)
+    second = (random.random(), float(np.random.rand()))
+
+    assert first == second
+
+
+def test_set_seed_tolerates_missing_torch(monkeypatch) -> None:
+    monkeypatch.setattr(determinism_policy, "torch", None)
+    determinism_policy.set_seed(321)
+    first = (random.random(), float(np.random.rand()))
+
+    determinism_policy.set_seed(321)
+    second = (random.random(), float(np.random.rand()))
+
+    assert first == second
+
+
+def test_determinism_policy_exports_seed_helper() -> None:
+    assert callable(determinism_policy.set_seed)
 
 
 def test_apply_determinism_preset_handles_partial_or_missing_seed_payloads(
@@ -15,7 +44,7 @@ def test_apply_determinism_preset_handles_partial_or_missing_seed_payloads(
         lambda **_kwargs: {"seeds": {"numpy": 17}},
     )
 
-    preset = seed_mod._apply_determinism_preset(
+    preset = environment_mod._apply_determinism_preset(
         profile_label="ci",
         resolved_device="cpu",
         seed_bundle=seed_bundle,
@@ -30,7 +59,7 @@ def test_apply_determinism_preset_handles_partial_or_missing_seed_payloads(
         lambda **_kwargs: {"mode": "throughput"},
     )
 
-    preset = seed_mod._apply_determinism_preset(
+    preset = environment_mod._apply_determinism_preset(
         profile_label="ci",
         resolved_device="cpu",
         seed_bundle=seed_bundle,
@@ -76,7 +105,7 @@ def test_resolve_loss_seed_and_determinism_state_prefers_warn_only_and_seed_fall
     torch_mod = _Torch()
     emitted: list[object] = []
 
-    state = seed_mod._resolve_loss_seed_and_determinism_state(
+    state = environment_mod._resolve_loss_seed_and_determinism_state(
         SimpleNamespace(dataset=_Dataset(), eval={"loss": {"type": "auto"}}),
         model_profile=SimpleNamespace(default_loss="mlm"),
         profile_normalized="ci",
@@ -117,7 +146,7 @@ def test_resolve_loss_seed_and_determinism_state_without_cudnn_backend() -> None
             return 7
 
     torch_mod = _TorchNoCudnn()
-    state = seed_mod._resolve_loss_seed_and_determinism_state(
+    state = environment_mod._resolve_loss_seed_and_determinism_state(
         SimpleNamespace(dataset=SimpleNamespace(seed=5), eval={"loss": {"type": "ce"}}),
         model_profile=SimpleNamespace(default_loss="mlm"),
         profile_normalized="release",

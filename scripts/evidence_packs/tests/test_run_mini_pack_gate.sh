@@ -145,3 +145,91 @@ test_run_mini_pack_entrypoint_requires_models() {
     run pack_mini_pack_entrypoint --manifest "${TEST_TMPDIR}/missing.json"
     assert_rc "2" "${RUN_RC}" "models are required"
 }
+
+test_run_mini_pack_entrypoint_argument_error_branches() {
+    mock_reset
+    source_run_mini_pack_with_remote_code
+
+    run pack_mini_pack_entrypoint --models ""
+    assert_rc "2" "${RUN_RC}" "empty models value is rejected"
+    run pack_mini_pack_entrypoint --models "m" --gate ""
+    assert_rc "2" "${RUN_RC}" "empty gate value is rejected"
+    run pack_mini_pack_entrypoint --models "m" --scenario-ids ""
+    assert_rc "2" "${RUN_RC}" "empty scenario ids value is rejected"
+    run pack_mini_pack_entrypoint --models "m" --failed-verdict ""
+    assert_rc "2" "${RUN_RC}" "empty failed verdict value is rejected"
+    run pack_mini_pack_entrypoint --models "m" --manifest ""
+    assert_rc "2" "${RUN_RC}" "empty manifest value is rejected"
+    run pack_mini_pack_entrypoint --models "m" --net ""
+    assert_rc "2" "${RUN_RC}" "empty net value is rejected"
+    run pack_mini_pack_entrypoint --models "m" --out ""
+    assert_rc "2" "${RUN_RC}" "empty out value is rejected"
+    run pack_mini_pack_entrypoint --models "m" --determinism ""
+    assert_rc "2" "${RUN_RC}" "empty determinism value is rejected"
+    run pack_mini_pack_entrypoint --models "m" --repeats nope
+    assert_rc "2" "${RUN_RC}" "non-integer repeats value is rejected"
+    run pack_mini_pack_entrypoint --models "m" --unknown
+    assert_rc "2" "${RUN_RC}" "unknown mini-pack option is rejected"
+}
+
+test_run_mini_pack_entrypoint_accepts_all_value_options() {
+    mock_reset
+    source_run_mini_pack_with_remote_code
+
+    local manifest="${TEST_TMPDIR}/manifest.json"
+    local verdict="${TEST_TMPDIR}/verdict.json"
+    cat > "${manifest}" <<'JSON'
+{
+  "scenarios": [
+    {"id": "clean_a", "category": "clean"}
+  ]
+}
+JSON
+    cat > "${verdict}" <<'JSON'
+{
+  "failed_requirements": [
+    {"scenario": "failed_a"}
+  ]
+}
+JSON
+
+    run pack_mini_pack_entrypoint \
+        --models "org/modelA" \
+        --gate closure \
+        --scenario-ids manual_a \
+        --failed-verdict "${verdict}" \
+        --manifest "${manifest}" \
+        --net 1 \
+        --out "${TEST_TMPDIR}/valid-out" \
+        --determinism strict \
+        --repeats 2 \
+        --dry-run
+    assert_rc "0" "${RUN_RC}" "all value options are accepted"
+    assert_match "scenario_ids=clean_a,failed_a,manual_a" "${RUN_OUT}" "dry-run reports merged scenarios"
+}
+
+test_run_mini_pack_entrypoint_default_out_dry_run_and_empty_scenarios() {
+    mock_reset
+    source_run_mini_pack_with_remote_code
+
+    local manifest="${TEST_TMPDIR}/manifest.json"
+    cat > "${manifest}" <<'JSON'
+{
+  "scenarios": [
+    {"id": "clean_a", "category": "clean"}
+  ]
+}
+JSON
+
+    unset OUTPUT_DIR
+    unset PACK_OUTPUT_DIR
+    run pack_mini_pack_entrypoint --models "org/modelA" --manifest "${manifest}" --dry-run
+    assert_rc "0" "${RUN_RC}" "dry-run succeeds with default output dir"
+    assert_match "scenario_ids=clean_a" "${RUN_OUT}" "dry-run prints selected scenarios"
+
+    cat > "${manifest}" <<'JSON'
+{"scenarios":[]}
+JSON
+    run pack_mini_pack_entrypoint --models "org/modelA" --manifest "${manifest}" --out "${TEST_TMPDIR}/out"
+    assert_rc "2" "${RUN_RC}" "empty scenario selection is rejected"
+}

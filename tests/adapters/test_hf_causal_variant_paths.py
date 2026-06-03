@@ -382,6 +382,40 @@ class _GlmForCausalLM(nn.Module):
         self.lm_head.weight = self.model.embed_tokens.weight
 
 
+class _NestedModelForCausalLM(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.model = nn.Module()
+        self.model.model = _GlmModel()
+        self.config = SimpleNamespace(
+            model_type="nested_dense",
+            num_hidden_layers=2,
+            num_attention_heads=2,
+            hidden_size=4,
+            intermediate_size=8,
+            vocab_size=16,
+        )
+        self.lm_head = nn.Linear(4, 16, bias=False)
+        self.lm_head.weight = self.model.model.embed_tokens.weight
+
+
+class _NestedFallbackModelForCausalLM(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.model = _GlmModel()
+        self.model.model = nn.Module()
+        self.config = SimpleNamespace(
+            model_type="nested_fallback_dense",
+            num_hidden_layers=2,
+            num_attention_heads=2,
+            hidden_size=4,
+            intermediate_size=8,
+            vocab_size=16,
+        )
+        self.lm_head = nn.Linear(4, 16, bias=False)
+        self.lm_head.weight = self.model.embed_tokens.weight
+
+
 def test_hf_causal_adapter_handles_olmo2_decoder_layout() -> None:
     adapter = HF_Causal_Adapter()
 
@@ -566,3 +600,27 @@ def test_hf_causal_adapter_describes_glm_decoder_layout() -> None:
     assert description["hf_model_type"] == "glm"
     assert description["spec"] == "glm_decoder"
     assert description["mlp_dims"] == [8, 8]
+
+
+def test_hf_causal_adapter_handles_nested_model_model_layout() -> None:
+    adapter = HF_Causal_Adapter()
+    model = _NestedModelForCausalLM()
+
+    assert adapter.can_handle(model) is True
+
+    description = adapter.describe(model)
+    modules = adapter.get_layer_modules(model, 0)
+
+    assert description["spec"] == "glm_decoder"
+    assert modules["mlp.down_proj"] is model.model.model.layers[0].mlp.down_proj
+
+
+def test_hf_causal_adapter_falls_back_when_nested_model_has_no_layers() -> None:
+    adapter = HF_Causal_Adapter()
+    model = _NestedFallbackModelForCausalLM()
+
+    description = adapter.describe(model)
+    modules = adapter.get_layer_modules(model, 0)
+
+    assert description["spec"] == "glm_decoder"
+    assert modules["mlp.down_proj"] is model.model.layers[0].mlp.down_proj

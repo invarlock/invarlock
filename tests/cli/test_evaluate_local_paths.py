@@ -160,7 +160,8 @@ def test_evaluate_local_paths_pm_and_digests(monkeypatch, tmp_path: Path):
     evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="auto",
+        baseline_adapter="auto",
+        subject_adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
         report_out=str(report_dir),
@@ -291,7 +292,8 @@ def test_evaluate_local_paths_quantized_subject_overheads(monkeypatch, tmp_path:
     evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="auto",
+        baseline_adapter="auto",
+        subject_adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
         report_out=str(report_dir),

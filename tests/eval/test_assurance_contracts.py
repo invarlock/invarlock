@@ -14,9 +14,8 @@ from invarlock.core.auto_tuning import get_tier_policies
 from invarlock.core.runner_pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
 from invarlock.guards.spectral import SpectralGuard
 from invarlock.guards.variance import VarianceGuard
-from invarlock.reporting.guards_rmt import _extract_rmt_analysis
 from invarlock.reporting.guards_spectral import _extract_spectral_analysis
-from invarlock.reporting.report_make import make_report
+from invarlock.reporting.report_make import _extract_rmt_analysis, make_report
 from invarlock.reporting.report_types import create_empty_report
 
 

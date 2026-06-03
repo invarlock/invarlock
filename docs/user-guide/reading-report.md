@@ -79,5 +79,5 @@ adjacent `runtime.manifest.json`.
 ## Related Documentation
 
 - [reports](../reference/reports.md) — Full v1 schema reference, telemetry, and HTML export
-- [Assurance Case](../assurance/00-assurance-case.md) — What the report does and does not guarantee
+- [Assurance Case](../assurance/00-assurance-case.md) — Report claim scope
 - [CLI Reference](../reference/cli.md) — `invarlock verify` command details

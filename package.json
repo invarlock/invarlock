@@ -1,12 +1,14 @@
 {
+  "name": "invarlock-public",
+  "private": true,
   "engines": {
     "node": ">=22.18.0"
   },
   "devDependencies": {
-    "cspell": "^10.0.0",
-    "markdownlint-cli2": "^0.21.0"
+    "cspell": "^10.0.1",
+    "markdownlint-cli2": "^0.22.1"
   },
   "dependencies": {
-    "katex": "^0.16.45"
+    "katex": "^0.17.0"
   }
 }

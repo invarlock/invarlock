@@ -14,13 +14,17 @@ def _repo_root() -> Path:
 
 
 def _release_checker_module(repo_root: Path):
-    module_path = repo_root / "scripts" / "release" / "check_release_evidence.py"
+    module_path = repo_root / "scripts" / "release" / "evidence_contracts.py"
+    script_dir = str(module_path.parent)
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
     spec = importlib.util.spec_from_file_location(
-        "release_evidence_check_under_test", module_path
+        "release_evidence_contracts_under_test", module_path
     )
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -150,7 +154,8 @@ def _release_check_command(
 ) -> list[str]:
     command = [
         sys.executable,
-        str(repo_root / "scripts" / "release" / "check_release_evidence.py"),
+        str(repo_root / "scripts" / "release" / "evidence_contracts.py"),
+        "release",
         "--root",
         str(release),
         "--dist",
@@ -169,31 +174,10 @@ def _release_check_command(
     return command
 
 
-def test_release_checklist_exists_outside_published_docs_tree() -> None:
+def test_release_checklist_is_not_part_of_public_repo_surface() -> None:
     repo_root = _repo_root()
-    checklist = repo_root / ".github" / "release-checklist.md"
-    assert checklist.is_file()
+    assert not (repo_root / ".github" / "release-checklist.md").exists()
     assert not (repo_root / "docs" / "release").exists()
-    text = checklist.read_text(encoding="utf-8")
-    for required in (
-        "make verify",
-        "make coverage-enforce",
-        "make dist-check",
-        "make security",
-        "make container-front-door-smoke",
-        "make guard-validation-smoke",
-        "make release-evidence-check",
-        "make empirical-guard-evidence-check",
-        "wheel-sdist-hashes.txt",
-        "runtime-image-digest.txt",
-        "strict/evaluation.report.json",
-        "strict/verify.json",
-        "guard-validation-smoke.json",
-        "guard-validation-smoke.md",
-        "artifacts/release/offline",
-        "artifacts/guard-validation/empirical/manifest.json",
-    ):
-        assert required in text
 
 
 def test_release_evidence_check_passes_with_required_artifacts(tmp_path: Path) -> None:
@@ -420,7 +404,7 @@ def test_release_evidence_check_rejects_malformed_hash_and_json_edges(
     assert any("has no valid entries" in item for item in failures)
 
 
-def test_release_evidence_legacy_wrapper_paths(tmp_path: Path) -> None:
+def test_release_evidence_contract_owner_paths(tmp_path: Path) -> None:
     module = _release_checker_module(_repo_root())
     failures: list[str] = []
     root = tmp_path / "root"

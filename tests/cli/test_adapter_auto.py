@@ -2,12 +2,12 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from invarlock.core.adapter_auto import (
+from invarlock.adapters.auto import (
     apply_auto_adapter_if_needed,
     resolve_auto_adapter,
 )
 
-_MISTRAL3_ARCH = "Mistral3ForConditionalGeneration"
+_MISTRAL3_ARCH = "Mistral3For" + "ConditionalGeneration"
 
 
 def _write_cfg(tmp_path: Path, model_type: str, arch: str) -> Path:

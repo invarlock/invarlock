@@ -1,0 +1,303 @@
+{
+  "artifacts": {
+    "policy_failure_example": "runtime_provenance_failure"
+  },
+  "assurance": {
+    "blocking_reasons": [],
+    "canonical_guard_chain": [
+      "invariants",
+      "spectral",
+      "rmt",
+      "variance",
+      "invariants"
+    ],
+    "canonical_guard_chain_enforced": true,
+    "claim_set": "invarlock-weight-edit-regression-v1",
+    "fallback_fields_used": false,
+    "guard_chain_observed": [
+      "invariants",
+      "spectral",
+      "rmt",
+      "variance",
+      "invariants"
+    ],
+    "mode": "strict",
+    "profile": "release",
+    "report_local_verdict": "pass",
+    "runtime_provenance_declared": "container",
+    "runtime_provenance_verification_status": "pending",
+    "runtime_provenance_verified": false,
+    "tier": "balanced",
+    "verdict": "pending_verifier",
+    "verified_assurance_verdict": "pending"
+  },
+  "auto": {
+    "tier": "balanced"
+  },
+  "baseline_ref": {
+    "primary_metric": {
+      "final": 29.1,
+      "kind": "ppl_causal"
+    },
+    "tokenizer_hash": "gpt2-tokenizer-sha256-fixture"
+  },
+  "context": {
+    "profile": "release",
+    "runtime": {
+      "execution_mode": "container"
+    }
+  },
+  "dataset": {
+    "provider": "wikitext2",
+    "seq_len": 128,
+    "windows": {
+      "final": 8,
+      "preview": 8,
+      "stats": {
+        "coverage": {
+          "final": {
+            "used": 8
+          },
+          "preview": {
+            "used": 8
+          }
+        },
+        "paired_windows": 8,
+        "window_match_fraction": 1.0,
+        "window_overlap_fraction": 0.0,
+        "window_pairing_reason": null
+      }
+    }
+  },
+  "evaluation_windows": {
+    "final": {
+      "logloss": [
+        3.370738174177447,
+        3.370738174177447,
+        3.370738174177447,
+        3.370738174177447,
+        3.370738174177447,
+        3.370738174177447,
+        3.370738174177447,
+        3.370738174177447
+      ],
+      "token_counts": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "window_ids": [
+        "gpt2-window-00",
+        "gpt2-window-01",
+        "gpt2-window-02",
+        "gpt2-window-03",
+        "gpt2-window-04",
+        "gpt2-window-05",
+        "gpt2-window-06",
+        "gpt2-window-07"
+      ]
+    }
+  },
+  "guard_overhead": {
+    "evaluated": true,
+    "overhead_ratio": 0.001,
+    "overhead_threshold": 0.01,
+    "passed": true
+  },
+  "guards": [
+    {
+      "name": "invariants"
+    },
+    {
+      "name": "spectral"
+    },
+    {
+      "name": "rmt"
+    },
+    {
+      "name": "variance"
+    },
+    {
+      "name": "invariants"
+    }
+  ],
+  "invariants": {
+    "decision": "allow",
+    "diagnostics": [],
+    "metrics": {},
+    "passed": true,
+    "status": "pass",
+    "supported": true,
+    "violations": []
+  },
+  "meta": {
+    "adapter": "hf_causal",
+    "execution_mode": "container",
+    "model_id": "sshleifer/tiny-gpt2",
+    "profile": "release"
+  },
+  "plugins": {
+    "adapters": [
+      {
+        "name": "hf_causal"
+      }
+    ],
+    "edits": [],
+    "guards": [
+      "invariants",
+      "spectral",
+      "rmt",
+      "variance",
+      "invariants"
+    ]
+  },
+  "policy_digest": {
+    "changed": false,
+    "policy_version": "policy-v1",
+    "thresholds_hash": "3f1ee6570fcf3a12",
+    "tier_policy_name": "balanced"
+  },
+  "primary_metric": {
+    "ci": [
+      -0.01005033585350145,
+      0.009950330853168092
+    ],
+    "display_ci": [
+      0.99,
+      1.01
+    ],
+    "drift_band": {
+      "max": 1.05,
+      "min": 0.95
+    },
+    "final": 29.1,
+    "gating_basis": "ratio",
+    "kind": "ppl_causal",
+    "preview": 29.1,
+    "ratio_vs_baseline": 1.0
+  },
+  "provenance": {
+    "execution_mode": "container",
+    "provider_digest": {
+      "ids_sha256": "gpt2-window-ids-sha256-fixture",
+      "masking_sha256": "none",
+      "tokenizer_sha256": "gpt2-tokenizer-sha256-fixture"
+    }
+  },
+  "resolved_policy": {
+    "metrics": {
+      "pm_ratio": {
+        "hysteresis_ratio": 0.0,
+        "min_token_fraction": 0.0,
+        "min_tokens": 128,
+        "ratio_limit_base": 1.1
+      }
+    },
+    "rmt": {
+      "measurement_contract": {
+        "activation_sampling": {
+          "windows": {
+            "count": 8,
+            "indices_policy": "paired_final"
+          }
+        },
+        "bulk_edge": "marchenko_pastur",
+        "estimator": {
+          "init": "deterministic_ones",
+          "iters": 8,
+          "type": "power_iter"
+        }
+      }
+    },
+    "spectral": {
+      "measurement_contract": {
+        "estimator": {
+          "init": "deterministic_ones",
+          "iters": 8,
+          "type": "power_iter"
+        },
+        "scope": {
+          "families": [
+            "attn",
+            "mlp"
+          ]
+        }
+      }
+    }
+  },
+  "rmt": {
+    "decision": "allow",
+    "diagnostics": [],
+    "measurement_contract": {
+      "activation_sampling": {
+        "windows": {
+          "count": 8,
+          "indices_policy": "paired_final"
+        }
+      },
+      "bulk_edge": "marchenko_pastur",
+      "estimator": {
+        "init": "deterministic_ones",
+        "iters": 8,
+        "type": "power_iter"
+      }
+    },
+    "measurement_contract_hash": "074d72405a1c519b",
+    "measurement_contract_match": true,
+    "metrics": {},
+    "passed": true,
+    "stable": true,
+    "status": "pass",
+    "supported": true,
+    "violations": []
+  },
+  "run_id": "gpt2-runtime-provenance-policy-failure-20260529",
+  "schema_version": "v1",
+  "spectral": {
+    "decision": "allow",
+    "diagnostics": [],
+    "measurement_contract": {
+      "estimator": {
+        "init": "deterministic_ones",
+        "iters": 8,
+        "type": "power_iter"
+      },
+      "scope": {
+        "families": [
+          "attn",
+          "mlp"
+        ]
+      }
+    },
+    "measurement_contract_hash": "efcfc5d7407a1f66",
+    "measurement_contract_match": true,
+    "metrics": {},
+    "passed": true,
+    "status": "pass",
+    "supported": true,
+    "violations": []
+  },
+  "validation": {
+    "guard_overhead_acceptable": true,
+    "invariants_pass": true,
+    "preview_final_drift_acceptable": true,
+    "primary_metric_acceptable": true,
+    "rmt_stable": true,
+    "spectral_stable": true
+  },
+  "variance": {
+    "decision": "allow",
+    "diagnostics": [],
+    "enabled": false,
+    "metrics": {},
+    "passed": true,
+    "status": "pass",
+    "supported": true,
+    "violations": []
+  }
+}

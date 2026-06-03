@@ -19,6 +19,7 @@ def test_scenarios_include_intent_and_primary_guard_metadata() -> None:
         "catastrophic_failure",
         "subtle_detectable",
         "fault_detection",
+        "production_artifact_assurance",
     }
     allowed_guards = {"invariants", "primary_metric", "spectral", "rmt", "variance"}
 
@@ -37,6 +38,44 @@ def test_scenarios_include_intent_and_primary_guard_metadata() -> None:
         assert primary_guard in allowed_guards, (
             f"{scenario_id}: unknown primary_guard={primary_guard!r}"
         )
+
+
+def test_scenarios_declare_artifact_taxonomy() -> None:
+    scenarios = _load_scenarios()
+    allowed_classes = {
+        "validation_subject_checkpoint",
+        "deployable_optimized_subject",
+        "fault_injection_fixture",
+        "evidence_only_pack",
+    }
+
+    assert scenarios, "scenario manifest must not be empty"
+    for scenario in scenarios:
+        scenario_id = str(scenario.get("id"))
+        artifact_class = scenario.get("artifact_class")
+        generation = scenario.get("generation")
+        assert artifact_class in allowed_classes, (
+            f"{scenario_id}: invalid artifact_class={artifact_class!r}"
+        )
+        assert isinstance(generation, dict), f"{scenario_id}: generation must be dict"
+        if generation.get("kind") == "edit":
+            assert artifact_class == "validation_subject_checkpoint"
+            assert scenario.get("optimized_deployment_backend") is False
+        if generation.get("kind") == "error":
+            assert artifact_class == "fault_injection_fixture"
+        if generation.get("kind") == "deployable_edit":
+            assert artifact_class == "deployable_optimized_subject"
+            assert scenario.get("optimized_deployment_backend") is True
+
+
+def test_scenarios_do_not_ship_unverified_quantization_lanes() -> None:
+    scenarios = _load_scenarios()
+
+    assert not any(
+        isinstance(scenario.get("generation"), dict)
+        and scenario["generation"].get("kind") == "deployable_edit"
+        for scenario in scenarios
+    )
 
 
 def test_scenarios_target_expected_guards_for_injection_probes() -> None:

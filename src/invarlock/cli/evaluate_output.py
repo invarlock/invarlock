@@ -171,7 +171,7 @@ def _print_quiet_summary(
         console.print(f"Output: {report_path}", soft_wrap=True)
         return
     try:
-        from invarlock.reporting.report_console import (
+        from invarlock.reporting.report_summary import (
             compute_console_validation_block as _console_block,
         )
 

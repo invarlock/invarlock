@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from collections import namedtuple
 from contextlib import ExitStack
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,116 +10,25 @@ import click
 import pytest
 
 from invarlock.cli.commands.run import run_command
-
-
-def _cfg(tmp_path: Path, preview=2, final=2) -> Path:
-    p = tmp_path / "config.yaml"
-    p.write_text(
-        f"""
-model:
-  adapter: hf_causal
-  id: gpt2
-  device: cpu
-edit:
-  name: quant_rtn
-  plan: {{ heads: {{ mask_only: true, mask_auto: true, materialize: true }} }}
-
-dataset:
-  provider: synthetic
-  id: synthetic
-  split: validation
-  seq_len: 8
-  stride: 4
-  preview_n: {preview}
-  final_n: {final}
-
-guards:
-  order: []
-
-eval:
-  spike_threshold: 2.0
-  loss:
-    type: auto
-
-output:
-  dir: runs
-        """
-    )
-    return p
-
-
-def _common_ce():
-    return (
-        patch("invarlock.cli.device.resolve_device", lambda d: d),
-        patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
-        patch(
-            "invarlock.reporting.report_files.save_report",
-            lambda report, run_dir, formats, filename_prefix: {
-                "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
-            },
-        ),
-        patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
-            lambda profile: (
-                SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
-                "tokhash123",
-            ),
-        ),
-    )
-
-
-def _runner_success():
-    return SimpleNamespace(
-        execute=lambda **k: SimpleNamespace(
-            edit={},
-            metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
-            guards={},
-            context={"dataset_meta": {}},
-            status="success",
-        )
-    )
-
-
-class FakeTensor:
-    def __init__(self, bytes_count: int):
-        self._bytes = bytes_count
-
-    def element_size(self):
-        return 1
-
-    def nelement(self):
-        return self._bytes
-
-
-class LargeModel:
-    def named_parameters(self):
-        return [("p", FakeTensor(500_000_000))]  # ~500MB
-
-    def named_buffers(self):
-        return [("b", FakeTensor(100_000_000))]  # ~100MB
-
-
-class SmallModel:
-    def named_parameters(self):
-        return [("p", FakeTensor(1_000_000))]  # ~1MB
-
-    def named_buffers(self):
-        return []
-
-
-def _psutil_vm(available_mb: float):
-    return SimpleNamespace(available=int(available_mb * 1024 * 1024))
-
-
-def _disk_usage(free_mb: float):
-    DU = namedtuple("DU", ["total", "used", "free"])
-    return DU(total=10 * 1024 * 1024 * 1024, used=0, free=int(free_mb * 1024 * 1024))
+from tests.cli.run._support_run_common import (
+    runner_success,
+)
+from tests.cli.run._support_run_snapshot import (
+    LargeModel,
+    SmallModel,
+    disk_usage,
+    provider_windows_patch,
+    psutil_vm,
+    registry_with_adapter_patch,
+    snapshot_cfg,
+    snapshot_common_ce,
+)
 
 
 def test_snapshot_auto_chunked_selected_when_large_and_disk_ok(
     tmp_path: Path, monkeypatch
 ):
-    cfg = _cfg(tmp_path, 1, 1)
+    cfg = snapshot_cfg(tmp_path, 1, 1)
 
     class Adapter:
         name = "hf_causal"
@@ -142,51 +50,23 @@ def test_snapshot_auto_chunked_selected_when_large_and_disk_ok(
     adapter = Adapter()
 
     with ExitStack() as stack:
-        for ctx in _common_ce():
+        for ctx in snapshot_common_ce():
             stack.enter_context(ctx)
+        stack.enter_context(registry_with_adapter_patch(adapter))
+        stack.enter_context(provider_windows_patch([[1, 2, 3, 4]], [[5, 6, 7, 8]]))
         stack.enter_context(
             patch(
-                "invarlock.core.registry.get_registry",
-                lambda: SimpleNamespace(
-                    get_adapter=lambda n: adapter,
-                    get_edit=lambda n: SimpleNamespace(name=n),
-                    get_guard=lambda n: SimpleNamespace(name=n),
-                    get_plugin_metadata=lambda n, t: {
-                        "name": n,
-                        "module": f"{t}.{n}",
-                        "version": "test",
-                    },
-                ),
-            )
-        )
-        stack.enter_context(
-            patch(
-                "invarlock.eval.data.get_provider",
-                lambda *a, **k: SimpleNamespace(
-                    windows=lambda **kw: (
-                        SimpleNamespace(
-                            input_ids=[[1, 2, 3, 4]], attention_masks=[[1, 1, 1, 1]]
-                        ),
-                        SimpleNamespace(
-                            input_ids=[[5, 6, 7, 8]], attention_masks=[[1, 1, 1, 1]]
-                        ),
-                    )
-                ),
-            )
-        )
-        stack.enter_context(
-            patch(
-                "invarlock.cli.run_runtime.psutil.virtual_memory",
-                lambda: _psutil_vm(available_mb=512),
+                "invarlock.cli.run_runtime_exec.psutil.virtual_memory",
+                lambda: psutil_vm(available_mb=512),
             )
         )
         stack.enter_context(
             patch(
                 "invarlock.cli.run_runtime_exec.shutil.disk_usage",
-                lambda path: _disk_usage(free_mb=2048),
+                lambda path: disk_usage(free_mb=2048),
             )
         )
-        stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_success))
+        stack.enter_context(patch("invarlock.core.runner.CoreRunner", runner_success))
         monkeypatch.delenv("INVARLOCK_SNAPSHOT_MODE", raising=False)
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
@@ -196,7 +76,7 @@ def test_snapshot_auto_chunked_selected_when_large_and_disk_ok(
 
 
 def test_snapshot_cfg_mode_overrides_env(tmp_path: Path, monkeypatch):
-    cfg = _cfg(tmp_path, 1, 1)
+    cfg = snapshot_cfg(tmp_path, 1, 1)
 
     class Adapter:
         name = "hf_causal"
@@ -246,37 +126,13 @@ def test_snapshot_cfg_mode_overrides_env(tmp_path: Path, monkeypatch):
         return Cfg()
 
     with ExitStack() as stack:
-        for ctx in _common_ce():
+        for ctx in snapshot_common_ce():
             stack.enter_context(ctx)
         monkeypatch.setenv("INVARLOCK_SNAPSHOT_MODE", "chunked")  # env says chunked
         stack.enter_context(patch("invarlock.core.config_loader.load_config", load_cfg))
-        stack.enter_context(
-            patch(
-                "invarlock.core.registry.get_registry",
-                lambda: SimpleNamespace(
-                    get_adapter=lambda n: adapter,
-                    get_edit=lambda n: SimpleNamespace(name=n),
-                    get_guard=lambda n: SimpleNamespace(name=n),
-                    get_plugin_metadata=lambda n, t: {
-                        "name": n,
-                        "module": f"{t}.{n}",
-                        "version": "test",
-                    },
-                ),
-            )
-        )
-        stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_success))
-        stack.enter_context(
-            patch(
-                "invarlock.eval.data.get_provider",
-                lambda *a, **k: SimpleNamespace(
-                    windows=lambda **kw: (
-                        SimpleNamespace(input_ids=[[1, 2]], attention_masks=[[1, 1]]),
-                        SimpleNamespace(input_ids=[[3, 4]], attention_masks=[[1, 1]]),
-                    )
-                ),
-            )
-        )
+        stack.enter_context(registry_with_adapter_patch(adapter))
+        stack.enter_context(patch("invarlock.core.runner.CoreRunner", runner_success))
+        stack.enter_context(provider_windows_patch([[1, 2]], [[3, 4]]))
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
@@ -287,7 +143,7 @@ def test_snapshot_cfg_mode_overrides_env(tmp_path: Path, monkeypatch):
 def test_until_pass_materialize_sets_flags_and_retries_once(
     tmp_path: Path, monkeypatch
 ):
-    cfg = _cfg(tmp_path, 1, 1)
+    cfg = snapshot_cfg(tmp_path, 1, 1)
     baseline = tmp_path / "baseline.json"
     baseline.write_text(
         json.dumps(
@@ -387,10 +243,10 @@ def test_until_pass_materialize_sets_flags_and_retries_once(
         )
 
     with ExitStack() as stack:
-        for ctx in _common_ce():
+        for ctx in snapshot_common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.detect_model_profile", detect_profile)
+            patch("invarlock.cli.run_runtime_exec.detect_model_profile", detect_profile)
         )
         stack.enter_context(patch("invarlock.core.retry.RetryController", RC))
         stack.enter_context(
@@ -398,8 +254,8 @@ def test_until_pass_materialize_sets_flags_and_retries_once(
         )
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.run_runtime.validate_guard_overhead",
-            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
         ):
             stack.enter_context(
                 patch(
@@ -414,32 +270,8 @@ def test_until_pass_materialize_sets_flags_and_retries_once(
                     ),
                 )
             )
-        stack.enter_context(
-            patch(
-                "invarlock.core.registry.get_registry",
-                lambda: SimpleNamespace(
-                    get_adapter=lambda n: Adapter(),
-                    get_edit=lambda n: SimpleNamespace(name=n),
-                    get_guard=lambda n: SimpleNamespace(name=n),
-                    get_plugin_metadata=lambda n, t: {
-                        "name": n,
-                        "module": f"{t}.{n}",
-                        "version": "test",
-                    },
-                ),
-            )
-        )
-        stack.enter_context(
-            patch(
-                "invarlock.eval.data.get_provider",
-                lambda *a, **k: SimpleNamespace(
-                    windows=lambda **kw: (
-                        SimpleNamespace(input_ids=[[1, 2]], attention_masks=[[1, 1]]),
-                        SimpleNamespace(input_ids=[[3, 4]], attention_masks=[[1, 1]]),
-                    )
-                ),
-            )
-        )
+        stack.enter_context(registry_with_adapter_patch(Adapter()))
+        stack.enter_context(provider_windows_patch([[1, 2]], [[3, 4]]))
         stack.enter_context(
             patch(
                 "invarlock.core.runner.CoreRunner",
@@ -462,23 +294,13 @@ def test_until_pass_materialize_sets_flags_and_retries_once(
 
 
 def test_release_baseline_no_eval_windows_exit(tmp_path: Path):
-    cfg = _cfg(tmp_path, 1, 1)
+    cfg = snapshot_cfg(tmp_path, 1, 1)
     baseline = tmp_path / "baseline.json"
     baseline.write_text(json.dumps({"meta": {"tokenizer_hash": "tokhash123"}}))
-    with ExitStack() as stack:
-        for ctx in _common_ce():
+    with ExitStack() as stack, pytest.raises(click.exceptions.Exit):
+        for ctx in snapshot_common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(
-            patch(
-                "invarlock.eval.data.get_provider",
-                lambda *a, **k: SimpleNamespace(
-                    windows=lambda **kw: (
-                        SimpleNamespace(input_ids=[[1]], attention_masks=[[1]]),
-                        SimpleNamespace(input_ids=[[2]], attention_masks=[[1]]),
-                    )
-                ),
-            )
-        )
+        stack.enter_context(provider_windows_patch([[1]], [[2]]))
         stack.enter_context(
             patch(
                 "invarlock.core.runner.CoreRunner",
@@ -497,7 +319,6 @@ def test_release_baseline_no_eval_windows_exit(tmp_path: Path):
                 ),
             )
         )
-    with pytest.raises(click.exceptions.Exit):
         run_command(
             config=str(cfg),
             device="cpu",
@@ -509,7 +330,7 @@ def test_release_baseline_no_eval_windows_exit(tmp_path: Path):
 
 
 def test_snapshot_auto_bytes_when_small_model(tmp_path: Path, monkeypatch):
-    cfg = _cfg(tmp_path, 1, 1)
+    cfg = snapshot_cfg(tmp_path, 1, 1)
 
     class Adapter:
         name = "hf_causal"
@@ -529,51 +350,23 @@ def test_snapshot_auto_bytes_when_small_model(tmp_path: Path, monkeypatch):
     adapter = Adapter()
 
     with ExitStack() as stack:
-        for ctx in _common_ce():
+        for ctx in snapshot_common_ce():
             stack.enter_context(ctx)
+        stack.enter_context(registry_with_adapter_patch(adapter))
+        stack.enter_context(provider_windows_patch([[1, 2, 3, 4]], [[5, 6, 7, 8]]))
         stack.enter_context(
             patch(
-                "invarlock.core.registry.get_registry",
-                lambda: SimpleNamespace(
-                    get_adapter=lambda n: adapter,
-                    get_edit=lambda n: SimpleNamespace(name=n),
-                    get_guard=lambda n: SimpleNamespace(name=n),
-                    get_plugin_metadata=lambda n, t: {
-                        "name": n,
-                        "module": f"{t}.{n}",
-                        "version": "test",
-                    },
-                ),
-            )
-        )
-        stack.enter_context(
-            patch(
-                "invarlock.eval.data.get_provider",
-                lambda *a, **k: SimpleNamespace(
-                    windows=lambda **kw: (
-                        SimpleNamespace(
-                            input_ids=[[1, 2, 3, 4]], attention_masks=[[1, 1, 1, 1]]
-                        ),
-                        SimpleNamespace(
-                            input_ids=[[5, 6, 7, 8]], attention_masks=[[1, 1, 1, 1]]
-                        ),
-                    )
-                ),
-            )
-        )
-        stack.enter_context(
-            patch(
-                "invarlock.cli.run_runtime.psutil.virtual_memory",
-                lambda: _psutil_vm(available_mb=8192),
+                "invarlock.cli.run_runtime_exec.psutil.virtual_memory",
+                lambda: psutil_vm(available_mb=8192),
             )
         )
         stack.enter_context(
             patch(
                 "invarlock.cli.run_runtime_exec.shutil.disk_usage",
-                lambda path: _disk_usage(free_mb=0),
+                lambda path: disk_usage(free_mb=0),
             )
         )
-        stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_success))
+        stack.enter_context(patch("invarlock.core.runner.CoreRunner", runner_success))
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
@@ -582,7 +375,7 @@ def test_snapshot_auto_bytes_when_small_model(tmp_path: Path, monkeypatch):
 
 
 def test_snapshot_no_support_uses_reload(tmp_path: Path, monkeypatch):
-    cfg = _cfg(tmp_path, 1, 1)
+    cfg = snapshot_cfg(tmp_path, 1, 1)
 
     class Adapter:
         name = "hf_causal"
@@ -597,51 +390,23 @@ def test_snapshot_no_support_uses_reload(tmp_path: Path, monkeypatch):
     adapter = Adapter()
 
     with ExitStack() as stack:
-        for ctx in _common_ce():
+        for ctx in snapshot_common_ce():
             stack.enter_context(ctx)
+        stack.enter_context(registry_with_adapter_patch(adapter))
+        stack.enter_context(provider_windows_patch([[1, 2, 3, 4]], [[5, 6, 7, 8]]))
         stack.enter_context(
             patch(
-                "invarlock.core.registry.get_registry",
-                lambda: SimpleNamespace(
-                    get_adapter=lambda n: adapter,
-                    get_edit=lambda n: SimpleNamespace(name=n),
-                    get_guard=lambda n: SimpleNamespace(name=n),
-                    get_plugin_metadata=lambda n, t: {
-                        "name": n,
-                        "module": f"{t}.{n}",
-                        "version": "test",
-                    },
-                ),
-            )
-        )
-        stack.enter_context(
-            patch(
-                "invarlock.eval.data.get_provider",
-                lambda *a, **k: SimpleNamespace(
-                    windows=lambda **kw: (
-                        SimpleNamespace(
-                            input_ids=[[1, 2, 3, 4]], attention_masks=[[1, 1, 1, 1]]
-                        ),
-                        SimpleNamespace(
-                            input_ids=[[5, 6, 7, 8]], attention_masks=[[1, 1, 1, 1]]
-                        ),
-                    )
-                ),
-            )
-        )
-        stack.enter_context(
-            patch(
-                "invarlock.cli.run_runtime.psutil.virtual_memory",
-                lambda: _psutil_vm(available_mb=0),
+                "invarlock.cli.run_runtime_exec.psutil.virtual_memory",
+                lambda: psutil_vm(available_mb=0),
             )
         )
         stack.enter_context(
             patch(
                 "invarlock.cli.run_runtime_exec.shutil.disk_usage",
-                lambda path: _disk_usage(free_mb=0),
+                lambda path: disk_usage(free_mb=0),
             )
         )
-        stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_success))
+        stack.enter_context(patch("invarlock.core.runner.CoreRunner", runner_success))
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
@@ -651,7 +416,7 @@ def test_snapshot_no_support_uses_reload(tmp_path: Path, monkeypatch):
 
 
 def test_snapshot_env_mode_overrides(tmp_path: Path, monkeypatch):
-    cfg = _cfg(tmp_path, 1, 1)
+    cfg = snapshot_cfg(tmp_path, 1, 1)
 
     class Adapter:
         name = "hf_causal"
@@ -678,35 +443,11 @@ def test_snapshot_env_mode_overrides(tmp_path: Path, monkeypatch):
     adapter = Adapter()
 
     with ExitStack() as stack:
-        for ctx in _common_ce():
+        for ctx in snapshot_common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(
-            patch(
-                "invarlock.core.registry.get_registry",
-                lambda: SimpleNamespace(
-                    get_adapter=lambda n: adapter,
-                    get_edit=lambda n: SimpleNamespace(name=n),
-                    get_guard=lambda n: SimpleNamespace(name=n),
-                    get_plugin_metadata=lambda n, t: {
-                        "name": n,
-                        "module": f"{t}.{n}",
-                        "version": "test",
-                    },
-                ),
-            )
-        )
-        stack.enter_context(
-            patch(
-                "invarlock.eval.data.get_provider",
-                lambda *a, **k: SimpleNamespace(
-                    windows=lambda **kw: (
-                        SimpleNamespace(input_ids=[[1, 2]], attention_masks=[[1, 1]]),
-                        SimpleNamespace(input_ids=[[3, 4]], attention_masks=[[1, 1]]),
-                    )
-                ),
-            )
-        )
-        stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_success))
+        stack.enter_context(registry_with_adapter_patch(adapter))
+        stack.enter_context(provider_windows_patch([[1, 2]], [[3, 4]]))
+        stack.enter_context(patch("invarlock.core.runner.CoreRunner", runner_success))
         # Force env override to bytes
         monkeypatch.setenv("INVARLOCK_SNAPSHOT_MODE", "bytes")
         run_command(

@@ -9,89 +9,12 @@ import click
 import pytest
 
 from invarlock.cli.commands.run import run_command
-
-
-def _cfg(tmp_path: Path, preview=4, final=4) -> Path:
-    p = tmp_path / "config.yaml"
-    p.write_text(
-        f"""
-model:
-  adapter: hf_causal
-  id: gpt2
-  device: cpu
-edit:
-  name: structured
-  plan: {{}}
-
-dataset:
-  provider: synthetic
-  id: synthetic
-  split: validation
-  seq_len: 8
-  stride: 4
-  preview_n: {preview}
-  final_n: {final}
-
-guards:
-  order: []
-
-eval:
-  spike_threshold: 2.0
-  loss:
-    type: auto
-
-output:
-  dir: runs
-        """
-    )
-    return p
-
-
-def _common_ce():
-    return (
-        patch("invarlock.cli.device.resolve_device", lambda d: d),
-        patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
-        patch(
-            "invarlock.core.registry.get_registry",
-            lambda: SimpleNamespace(
-                get_adapter=lambda name: SimpleNamespace(
-                    name=name, load_model=lambda model_id, device=None: object()
-                ),
-                get_edit=lambda name: SimpleNamespace(name=name),
-                get_guard=lambda name: SimpleNamespace(name=name),
-                get_plugin_metadata=lambda n, t: {
-                    "name": n,
-                    "module": f"{t}.{n}",
-                    "version": "test",
-                },
-            ),
-        ),
-        patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
-            lambda model_id, adapter: SimpleNamespace(
-                default_loss="ce",
-                model_id=model_id,
-                adapter=adapter,
-                module_selectors={},
-                invariants=set(),
-                cert_lints=[],
-                family="gpt",
-            ),
-        ),
-        patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
-            lambda profile: (
-                SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=1000),
-                "tokhash123",
-            ),
-        ),
-        patch(
-            "invarlock.reporting.report_files.save_report",
-            lambda report, run_dir, formats, filename_prefix: {
-                "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
-            },
-        ),
-    )
+from tests.cli.run._support_run_plugins import (
+    plugin_provenance_cfg as _cfg,
+)
+from tests.cli.run._support_run_plugins import (
+    plugin_provenance_common_ce as _common_ce,
+)
 
 
 def _provider_simple():
@@ -541,8 +464,8 @@ def test_overhead_bare_warning_present(tmp_path: Path):
         # Validator passes but we expect bare warning to be captured
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.run_runtime.validate_guard_overhead",
-            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
         ):
             stack.enter_context(
                 patch(

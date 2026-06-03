@@ -9,83 +9,29 @@ import click
 import pytest
 
 from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_common import (
+    common_ce_patches,
+    write_base_run_config,
+)
+from tests.cli.run._support_run_common import (
+    runner_success as _runner_success,
+)
+from tests.cli.run._support_run_common import (
+    synthetic_provider_min as _provider_simple,
+)
 
 
 def _base_cfg(tmp_path: Path, preview=1, final=1) -> Path:
-    p = tmp_path / "config.yaml"
-    p.write_text(
-        f"""
-model:
-  adapter: hf_causal
-  id: gpt2
-  device: cpu
-edit:
-  name: quant_rtn
-  plan: {{}}
-
-dataset:
-  provider: synthetic
-  id: synthetic
-  split: validation
-  seq_len: 8
-  stride: 4
-  preview_n: {preview}
-  final_n: {final}
-
-guards:
-  order: []
-
-eval:
-  spike_threshold: 2.0
-  loss:
-    type: auto
-
-output:
-  dir: runs
-        """
+    return write_base_run_config(
+        tmp_path,
+        preview,
+        final,
+        eval_fields="  spike_threshold: 2.0\n",
     )
-    return p
 
 
 def _common_ce():
-    return (
-        patch("invarlock.cli.device.resolve_device", lambda d: d),
-        patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
-        patch(
-            "invarlock.reporting.report_files.save_report",
-            lambda report, run_dir, formats, filename_prefix: {
-                "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
-            },
-        ),
-        patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
-            lambda profile: (
-                SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
-                "tokhash123",
-            ),
-        ),
-    )
-
-
-def _provider_simple():
-    return SimpleNamespace(
-        windows=lambda **kw: (
-            SimpleNamespace(input_ids=[[1, 2, 3]], attention_masks=[[1, 1, 1]]),
-            SimpleNamespace(input_ids=[[4, 5, 6]], attention_masks=[[1, 1, 1]]),
-        )
-    )
-
-
-def _runner_success():
-    return SimpleNamespace(
-        execute=lambda **k: SimpleNamespace(
-            edit={},
-            metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
-            guards={},
-            context={"dataset_meta": {}},
-            status="success",
-        )
-    )
+    return common_ce_patches(include_profile=False, include_save_report=True)
 
 
 def _is_bare_control(kwargs: dict[str, object]) -> bool:
@@ -139,7 +85,7 @@ def test_overhead_threshold_bad_type_uses_default(tmp_path: Path):
             stack.enter_context(ctx)
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
         ):
             stack.enter_context(patch(target, vg))
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
@@ -290,7 +236,7 @@ def test_psutil_virtual_memory_failure(tmp_path: Path):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.psutil.virtual_memory",
+                "invarlock.cli.run_runtime_exec.psutil.virtual_memory",
                 lambda: (_ for _ in ()).throw(RuntimeError("fail")),
             )
         )

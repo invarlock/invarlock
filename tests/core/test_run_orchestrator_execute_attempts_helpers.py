@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from invarlock.core.exceptions import InvarlockError
+from invarlock.core.run_orchestrator import RunAttemptStartedEvent
 from invarlock.core.run_orchestrator_execute_attempts import (
     _emit_attempt_start,
     _emit_primary_metric_summary_from_report,
@@ -18,7 +19,6 @@ from invarlock.core.run_orchestrator_execute_helpers import (
     _AttemptExecutionState,
     _RunExecutionState,
 )
-from invarlock.core.run_orchestrator_types import RunAttemptStartedEvent
 
 
 class _TimedStep:
@@ -300,6 +300,7 @@ def test_process_attempt_result_maps_halt_invarlock_errors() -> None:
                 edit_config={},
                 guard_overhead_payload=None,
                 core_report=SimpleNamespace(status="success"),
+                model=None,
                 should_continue=False,
             ),
             timings={},

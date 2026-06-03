@@ -10,7 +10,7 @@ from typing import Any, cast
 
 from invarlock.core.exceptions import DataError as _DataErr
 
-from .data_windows import EvaluationWindow
+from .data_support import EvaluationWindow
 
 _TOKENIZATION_ERRORS = (
     AttributeError,

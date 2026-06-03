@@ -1,0 +1,28 @@
+{
+  "baseline_checkpoint": {
+    "kind": "huggingface_model_ref",
+    "materialization": "external_reference",
+    "model_id": "sshleifer/tiny-gpt2",
+    "purpose": "Baseline GPT-2-style causal LM reference for BYOE strict-evidence fixture.",
+    "revision": "fixture-public-basis",
+    "role": "baseline"
+  },
+  "checkpoint_materialization": "external_reference",
+  "generated_at": "2026-05-30T00:00:00Z",
+  "lane_id": "gpt2-magnitude_prune_byoe",
+  "report": "evaluation.report.json",
+  "runtime_manifest": "runtime.manifest.json",
+  "schema": "invarlock.public_evidence.checkpoint_refs.v1",
+  "subject_checkpoint": {
+    "built_in_edit_plugin": false,
+    "edit_workflow": "BYOE external subject checkpoint",
+    "external_edit_type": "magnitude_prune",
+    "kind": "byoe_checkpoint_ref",
+    "materialization": "external_reference",
+    "model_id": "sshleifer/tiny-gpt2",
+    "purpose": "External dense magnitude-pruned checkpoint reference used to validate BYOE verifier wiring.",
+    "revision": "fixture-byoe-magnitude-prune-ffn",
+    "role": "subject"
+  },
+  "weights_vendored": false
+}

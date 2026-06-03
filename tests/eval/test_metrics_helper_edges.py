@@ -7,11 +7,14 @@ from invarlock.eval.metrics import (
     InputValidator,
     MetricsConfig,
     ResourceManager,
+    _finalize_results,
     bootstrap_confidence_interval,
+    get_metrics_info,
 )
-from invarlock.eval.metrics_activation import _locate_transformer_blocks_enhanced
-from invarlock.eval.metrics_environment import get_metrics_info
-from invarlock.eval.metrics_lens import _finalize_results
+from invarlock.eval.metrics_activation import (
+    _gini_vectorized,
+    _locate_transformer_blocks_enhanced,
+)
 
 
 def test_bootstrap_confidence_interval_errors_and_success():
@@ -120,3 +123,9 @@ def test_finalize_results_invalid_types_sanitized_and_cached(tmp_path):
     res = {"sigma_max": float("inf"), "head_energy": "bad", "mi_gini": 0.1}
     out = _finalize_results(res, ["sigma_max"], DummyCache(), "k", 0.0)
     assert all(k in out for k in ("sigma_max", "head_energy", "mi_gini"))
+
+
+def test_gini_vectorized_all_zeros_returns_nan():
+    v = torch.zeros(3, 4)
+    g = _gini_vectorized(v)
+    assert isinstance(g, float) and (g != g)  # NaN

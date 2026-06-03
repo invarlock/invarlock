@@ -4,7 +4,7 @@ import math
 
 import pytest
 
-from invarlock.eval.bootstrap import paired_delta_mean_ci
+from invarlock.core.bootstrap import paired_delta_mean_ci
 from invarlock.eval.metrics import ValidationError as MValidationError
 
 

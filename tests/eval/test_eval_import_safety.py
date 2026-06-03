@@ -22,9 +22,9 @@ def test_mi_probe_import_and_call_are_lazy_for_sklearn(monkeypatch):
     for mod in list(sys.modules):
         if mod == "sklearn" or mod.startswith("sklearn."):
             sys.modules.pop(mod, None)
-    sys.modules.pop("invarlock.eval.probes.mi", None)
+    sys.modules.pop("invarlock.eval.probes.importance", None)
 
-    mod = importlib.import_module("invarlock.eval.probes.mi")
+    mod = importlib.import_module("invarlock.eval.probes.importance")
 
     assert callable(mod.mutual_info_regression)
 
@@ -47,9 +47,7 @@ def test_eval_probes_package_root_is_light_and_has_no_heavy_reexports(
 
     for mod in [
         "invarlock.eval.probes",
-        "invarlock.eval.probes.fft",
-        "invarlock.eval.probes.mi",
-        "invarlock.eval.probes.post_attention",
+        "invarlock.eval.probes.importance",
     ]:
         sys.modules.pop(mod, None)
 
@@ -62,6 +60,4 @@ def test_eval_probes_package_root_is_light_and_has_no_heavy_reexports(
     assert not hasattr(mod, "compute_neuron_mi_scores")
     assert not hasattr(mod, "mi_neuron_scores")
     assert not hasattr(mod, "compute_post_attention_head_scores")
-    assert "invarlock.eval.probes.mi" not in sys.modules
-    assert "invarlock.eval.probes.fft" not in sys.modules
-    assert "invarlock.eval.probes.post_attention" not in sys.modules
+    assert "invarlock.eval.probes.importance" not in sys.modules

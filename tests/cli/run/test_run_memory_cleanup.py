@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from invarlock.cli import run_runtime
+from invarlock.cli import run_runtime_exec as run_runtime
 
 
 def test_optional_module_helpers_preserve_explicit_bindings(monkeypatch):

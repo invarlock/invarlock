@@ -8,7 +8,7 @@ import os
 import platform
 from typing import Any
 
-from invarlock.utils.digest import hash_json
+from invarlock.utils import hash_json
 
 POLICY_VERSION = "policy-v1"
 _NON_FATAL_EXCEPTIONS = (
@@ -36,7 +36,7 @@ def compute_edit_digest(report: dict[str, Any]) -> dict[str, Any]:
     except _NON_FATAL_EXCEPTIONS:
         edits = {}
 
-    family = "cert_only"
+    family = "report_only"
     impl_hash = hash_json({"family": family})
     try:
         if str(edits.get("name", "")) == "quant_rtn":

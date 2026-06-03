@@ -53,11 +53,23 @@ def _run_baseline_evaluation_phase(
             emoji="♻️",
         )
         try:
+            model_cfg = baseline_cfg.get("model")
+            baseline_model_id = (
+                model_cfg.get("id") if isinstance(model_cfg, dict) else ""
+            )
+            assurance_cfg = baseline_cfg.get("assurance")
+            assurance_mode = (
+                assurance_cfg.get("mode") if isinstance(assurance_cfg, dict) else None
+            )
+            dataset_cfg = baseline_cfg.get("dataset")
             baseline_report_path, _ = load_validated_baseline_report(
                 Path(baseline_report),
+                expected_model_id=str(baseline_model_id or ""),
                 expected_profile=profile_name,
                 expected_tier=tier_name,
                 expected_adapter=str(eff_adapter),
+                expected_assurance_mode=str(assurance_mode or "off"),
+                expected_dataset=dataset_cfg if isinstance(dataset_cfg, dict) else None,
             )
         except typer.BadParameter as exc:
             fail_fn(str(getattr(exc, "message", exc)), exit_code=2)

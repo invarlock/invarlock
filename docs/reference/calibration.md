@@ -1,7 +1,8 @@
 # Tier Policy Tuning CLI (Calibration)
 
 > Scope note: this page covers **Tier Policy Tuning** via `invarlock advanced calibrate ...`.
-> It outputs `tiers_patch_*.yaml` recommendations for `runtime/tiers.yaml`.
+> It outputs `tiers_patch_*.yaml` recommendations for a reviewed tier-policy
+> override or the packaged source tier file (`runtime/tiers.yaml`).
 > For evidence-pack run-scoped preset derivation (`CALIBRATION_RUN -> GENERATE_PRESET`),
 > see [Evidence Pack Internals](../user-guide/evidence-packs-internals.md).
 
@@ -14,7 +15,7 @@
 | **Primary commands** | `invarlock advanced calibrate null-sweep`, `invarlock advanced calibrate ve-sweep`. |
 | **Requires** | `invarlock[hf]` for HF workflows; base config YAML for each sweep type. |
 | **Network** | Offline by default; use `--allow-network` on calibration commands when a sweep needs model or dataset downloads. |
-| **Source of truth** | `src/invarlock/cli/commands/calibrate.py`, `src/invarlock/calibration/`. |
+| **Source of truth** | `src/invarlock/cli/commands/calibrate.py`, `src/invarlock/calibration.py`. |
 
 Smoke-sized configs are also shipped for maintainers who want to exercise the
 calibration command surface without a full policy-tuning campaign:
@@ -175,7 +176,8 @@ Runs VE predictive-gate sweeps and recommends `min_effect_lognll` per tier.
 
 ### Applying recommendations
 
-After a sweep, merge the `tiers_patch_*.yaml` into your `runtime/tiers.yaml`:
+After a sweep, merge the `tiers_patch_*.yaml` into a reviewed
+`runtime/tiers.yaml` override or the source tier policy:
 
 ```bash
 # Review recommendations

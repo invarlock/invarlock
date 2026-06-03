@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = REPO_ROOT / "scripts" / "check_repo_cruft.py"
+SCRIPT = REPO_ROOT / "scripts" / "checks" / "check_repo_cruft.py"
 
 
 def _run(root: Path) -> subprocess.CompletedProcess[str]:
@@ -32,12 +32,14 @@ def test_check_repo_cruft_rejects_appledouble_and_macos_archive_dir(
 ) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "._module.py").write_text("junk\n", encoding="utf-8")
+    (tmp_path / "src" / ".DS_Store").write_text("junk\n", encoding="utf-8")
     (tmp_path / "__MACOSX").mkdir()
 
     result = _run(tmp_path)
 
     assert result.returncode == 1
     assert "src/._module.py" in result.stderr
+    assert "src/.DS_Store" in result.stderr
     assert "__MACOSX" in result.stderr
 
 
@@ -46,6 +48,18 @@ def test_check_repo_cruft_ignores_tmp_and_virtualenv_paths(tmp_path: Path) -> No
     (tmp_path / ".venv" / "._pip").write_text("junk\n", encoding="utf-8")
     (tmp_path / "tmp").mkdir()
     (tmp_path / "tmp" / ".DS_Store").write_text("junk\n", encoding="utf-8")
+
+    result = _run(tmp_path)
+
+    assert result.returncode == 0
+
+
+def test_check_repo_cruft_allows_untracked_gitignored_ds_store(
+    tmp_path: Path,
+) -> None:
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    (tmp_path / ".gitignore").write_text(".DS_Store\n", encoding="utf-8")
+    (tmp_path / ".DS_Store").write_text("local finder state\n", encoding="utf-8")
 
     result = _run(tmp_path)
 

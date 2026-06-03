@@ -5,6 +5,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 
 def _repo_root() -> Path:
@@ -12,15 +13,17 @@ def _repo_root() -> Path:
 
 
 def _checker_module():
-    module_path = (
-        _repo_root() / "scripts" / "release" / "check_empirical_guard_evidence.py"
-    )
+    module_path = _repo_root() / "scripts" / "release" / "evidence_contracts.py"
+    script_dir = str(module_path.parent)
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
     spec = importlib.util.spec_from_file_location(
-        "empirical_guard_evidence_check_under_test", module_path
+        "empirical_guard_evidence_contracts_under_test", module_path
     )
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -84,7 +87,8 @@ def _write_valid_bundle(root: Path) -> None:
 def _checker_command(root: Path, *, json_output: bool = False) -> list[str]:
     command = [
         sys.executable,
-        str(_repo_root() / "scripts" / "release" / "check_empirical_guard_evidence.py"),
+        str(_repo_root() / "scripts" / "release" / "evidence_contracts.py"),
+        "empirical",
         "--root",
         str(root),
     ]
@@ -101,8 +105,8 @@ def test_empirical_guard_evidence_check_accepts_valid_bundle(
     module = _checker_module()
 
     assert module.check_empirical_guard_evidence(root=root) == []
-    assert module.main(["--root", str(root)]) == 0
-    assert module.main(["--root", str(root), "--json"]) == 0
+    assert module.main(["empirical", "--root", str(root)]) == 0
+    assert module.main(["empirical", "--root", str(root), "--json"]) == 0
 
     proc = subprocess.run(
         _checker_command(root, json_output=True),
@@ -206,7 +210,9 @@ def test_empirical_guard_evidence_check_rejects_artifact_path_edges(
         json.dumps(
             {
                 "schema": "invarlock/empirical-guard-evidence-v1",
-                "source_commands": ["scripts/model_evidence_sweep.py --dry-run"],
+                "source_commands": [
+                    "scripts/model_evidence/model_evidence_sweep.py --dry-run"
+                ],
                 "guard_rows": rows,
                 "model_family_rows": [
                     {
@@ -332,7 +338,11 @@ def test_empirical_guard_evidence_check_rejects_required_field_edges(
 
     failures.clear()
     module._validate_source_commands(
-        {"source_commands": ["scripts/model_evidence_sweep.py --dry-run"]},
+        {
+            "source_commands": [
+                "scripts/model_evidence/model_evidence_sweep.py --dry-run"
+            ]
+        },
         failures,
     )
     assert failures == []
@@ -344,7 +354,7 @@ def test_empirical_guard_evidence_check_rejects_required_field_edges(
     )
 
 
-def test_empirical_guard_evidence_legacy_wrapper_paths(tmp_path: Path) -> None:
+def test_empirical_guard_evidence_contract_owner_paths(tmp_path: Path) -> None:
     root = tmp_path / "empirical"
     root.mkdir()
     artifact = root / "artifact.json"
@@ -434,6 +444,88 @@ def test_empirical_guard_evidence_legacy_wrapper_paths(tmp_path: Path) -> None:
     assert none_failures == []
 
 
+def test_empirical_guard_evidence_wrapper_counts_invalid_dict_rows(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "empirical"
+    root.mkdir()
+    artifact = root / "artifact.json"
+    artifact.write_text('{"ok": true}', encoding="utf-8")
+    module = _checker_module()
+    failures: list[str] = []
+
+    module._validate_guard_rows(
+        root,
+        {
+            "guard_rows": [
+                {
+                    "guard": "spectral",
+                    "evidence_kind": "calibration_null_sweep",
+                    "status": "fallback",
+                    "model_family": "gpt2",
+                    "artifact": "artifact.json",
+                }
+            ]
+        },
+        failures,
+    )
+
+    assert any("guard_rows[0].status must be empirical" in item for item in failures)
+    assert any("missing guard rows" in item for item in failures)
+
+
+def test_empirical_guard_evidence_contract_empty_guard_rows(tmp_path: Path) -> None:
+    from evidence_contracts import EmpiricalGuardEvidenceManifest
+
+    manifest = EmpiricalGuardEvidenceManifest(
+        root=tmp_path,
+        payload={
+            "schema": "invarlock/empirical-guard-evidence-v1",
+            "source_commands": ["scripts/model_evidence/model_evidence_sweep.py"],
+            "guard_rows": [],
+            "model_family_rows": [{"model_family": "gpt2", "status": "observed"}],
+        },
+    )
+
+    failures = manifest.validate()
+
+    assert "empirical evidence guard_rows must be a non-empty list." in failures
+
+
+def test_offline_bundle_manifest_handles_unreadable_member(monkeypatch, tmp_path: Path):
+    import evidence_contracts
+    from evidence_contracts import OfflineBundleManifest
+
+    class FakeTar:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_exc):
+            return False
+
+        def getmembers(self):
+            return [
+                SimpleNamespace(
+                    name="release_manifest.json",
+                    isfile=lambda: True,
+                )
+            ]
+
+        def extractfile(self, _member):
+            return None
+
+    monkeypatch.setattr(evidence_contracts.tarfile, "open", lambda *_a, **_k: FakeTar())
+    failures: list[str] = []
+
+    manifest = OfflineBundleManifest.load_from_tarball(
+        tmp_path / "offline.tar.gz",
+        failures,
+    )
+
+    assert manifest.payload is None
+    assert any("manifest unreadable" in failure for failure in failures)
+
+
 def test_empirical_guard_evidence_contract_non_object_manifest(
     tmp_path: Path,
 ) -> None:
@@ -465,7 +557,7 @@ def test_empirical_guard_evidence_check_rejects_malformed_manifest(
     manifest.write_text("{", encoding="utf-8")
     module = _checker_module()
 
-    assert module.main(["--root", str(root)]) == 1
+    assert module.main(["empirical", "--root", str(root)]) == 1
     proc = subprocess.run(
         _checker_command(root),
         text=True,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -101,4 +102,65 @@ def test_no_test_file_exceeds_size_guideline() -> None:
         for path in _tracked_test_files()
         if len(path.read_text(encoding="utf-8").splitlines()) > 800
     ]
+    assert offenders == []
+
+
+def _is_test_module_ref(module_name: str) -> bool:
+    return ".test_" in module_name or module_name.rsplit(".", 1)[-1].startswith("test_")
+
+
+def _call_name(node: ast.AST) -> str:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        parent = _call_name(node.value)
+        if parent:
+            return f"{parent}.{node.attr}"
+        return node.attr
+    return ""
+
+
+def test_test_modules_do_not_import_other_test_modules() -> None:
+    offenders: list[str] = []
+    for path in _tracked_test_files():
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                if node.module and _is_test_module_ref(node.module):
+                    offenders.append(f"{path.as_posix()}:{node.lineno}:{node.module}")
+                for alias in node.names:
+                    if _is_test_module_ref(alias.name):
+                        offenders.append(
+                            f"{path.as_posix()}:{node.lineno}:{alias.name}"
+                        )
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    if _is_test_module_ref(alias.name):
+                        offenders.append(
+                            f"{path.as_posix()}:{node.lineno}:{alias.name}"
+                        )
+            elif isinstance(node, ast.Call):
+                call_name = _call_name(node.func)
+                if call_name not in {
+                    "__import__",
+                    "importlib.import_module",
+                    "importlib.util.spec_from_file_location",
+                }:
+                    continue
+                if not node.args or not isinstance(node.args[0], ast.Constant):
+                    continue
+                imported_module = node.args[0].value
+                if isinstance(imported_module, str) and _is_test_module_ref(
+                    imported_module
+                ):
+                    offenders.append(
+                        f"{path.as_posix()}:{node.lineno}:{imported_module}"
+                    )
+                if len(node.args) < 2 or not isinstance(node.args[1], ast.Constant):
+                    continue
+                imported_path = node.args[1].value
+                if isinstance(imported_path, str) and _is_test_module_ref(
+                    Path(imported_path).stem
+                ):
+                    offenders.append(f"{path.as_posix()}:{node.lineno}:{imported_path}")
     assert offenders == []

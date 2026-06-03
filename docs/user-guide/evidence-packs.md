@@ -86,7 +86,7 @@ invarlock advanced evidence-pack build ./tmp/evidence_pack \
   --signing-key ./tmp/evidence_pack_signing_key.pem
 
 # Verify an existing evidence pack
-invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000000/evidence_pack --strict
+invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000000/evidence_pack --strict --report-assurance strict
 ```
 
 Each `--report` must be an explicit `evaluation.report.json` file path. The
@@ -99,7 +99,7 @@ Note: clean edits require tuned preset parameters. Either set
 
 The evidence-pack shell wrappers do not expose the public core
 `--execution-mode` / `--runtime-provenance` flags directly. For host-side
-host execution in these repo-only wrappers, set `INVARLOCK_ALLOW_HOST_EXECUTION=1`
+execution in these repo-only wrappers, set `INVARLOCK_ALLOW_HOST_EXECUTION=1`
 in the environment before calling `run_pack.sh` or `run_suite.sh`.
 Installed-wheel/public workflows should use
 `invarlock evaluate --execution-mode host` instead. Otherwise, the
@@ -137,22 +137,23 @@ scheduler flow, and artifacts, see [Evidence Pack Internals](evidence-packs-inte
 
 ## Suites
 
-Model suites live in `scripts/evidence_packs/suites.sh`. You can also override individual
+Model suites live in `scripts/evidence_packs/run_suite.sh`. You can also override individual
 models via `MODEL_1`–`MODEL_8`.
 
 | Suite | Models | Notes |
 | --- | --- | --- |
 | `subset` | `mistralai/Mistral-7B-v0.1` | Single-GPU friendly |
-| `showcase` | 7B–14B ungated models | Multi-GPU recommended; adds guard-focused scenarios |
-| `workshop3` | 7B–32B ungated models | Workshop-friendly 3-model suite (architecture diversity) |
-| `full` | 7B–72B ungated models | Multi-GPU recommended |
+| `showcase` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B` | Multi-GPU recommended; adds guard-focused scenarios |
+| `workshop3` | `mistralai/Mistral-7B-v0.1`, `mistralai/Mixtral-8x7B-v0.1`, `01-ai/Yi-34B` | Workshop-friendly 3-model suite (architecture diversity) |
+| `full` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B`, `01-ai/Yi-34B`, `mistralai/Mixtral-8x7B-v0.1`, `Qwen/Qwen1.5-72B` | Multi-GPU recommended |
 
-Storage note: a default `subset` run on Mistral-7B typically needs about 42 GB
-of model-weight space on the output filesystem with the default
-`PACK_BASELINE_STORAGE_MODE=snapshot_symlink` when the Hugging Face cache lives
-on the same filesystem as `OUTPUT_DIR`, or about 28 GB if the cache is on a
-separate volume. `snapshot_copy` is heavier at about 56 GB. The suite's disk
-preflight also enforces `MIN_FREE_DISK_GB` headroom (200 GB by default).
+Storage note: a default `subset` run on Mistral-7B typically needs about 56 GB
+of model-weight space on the output filesystem with the wrapper default
+`PACK_BASELINE_STORAGE_MODE=snapshot_copy`. If you explicitly opt into
+`snapshot_symlink`, the same run typically needs about 42 GB when the Hugging
+Face cache lives on the same filesystem as `OUTPUT_DIR`, or about 28 GB if the
+cache is on a separate volume. The suite's disk preflight also enforces
+`MIN_FREE_DISK_GB` headroom (200 GB by default).
 
 Scenario selection is driven by `scripts/evidence_packs/scenarios.json`. Scenarios can
 optionally declare `suites: ["subset", "showcase", "full", ...]`; during execution the
@@ -163,6 +164,24 @@ honors one-sided selections exactly: clean-only, stress-only, or single-scenario
 smokes do not expand back to the default 8 edit scenarios. Disk estimation uses
 the same filtered state manifest, so storage preflight reflects the selected
 scenario set rather than the suite defaults.
+
+## Evidence Pack Artifact Taxonomy
+
+Evidence packs do not package model weights by default. The run directory may
+contain edited subject checkpoints under each model's `models/` directory, while
+the evidence pack contains reports and digest-backed sidecars about those
+subjects. Scenarios declare one artifact class:
+
+| Artifact class | Meaning |
+| --- | --- |
+| `validation_subject_checkpoint` | A Hugging Face checkpoint-shaped validation subject, not an optimized runtime backend |
+| `deployable_optimized_subject` | A backend-specific deployable subject with packed storage and smoke evidence |
+| `fault_injection_fixture` | An intentionally invalid or degraded fixture used to test detection |
+| `evidence_only_pack` | Evidence without a corresponding edited subject artifact |
+
+Current RTN, FP8, pruning, and low-rank evidence-pack edits are validation
+subjects. They validate InvarLock behavior on external subject checkpoints; they
+do not claim runtime memory reduction or packed deployment storage.
 
 ## Network & Model Revisions
 
@@ -177,10 +196,13 @@ Evidence packs require pinned model revisions for reproducibility:
 
 ## Promotion Sentinels
 
-For Qwen2.5-14B promotion work, use the maintained sentinel helper from a fresh
-repo work tree:
+For Qwen2.5-14B promotion work, run the evidence-pack campaign with
+`PACK_CLEANUP_MODELS=0`, then use the maintained sentinel helper from a fresh
+repo work tree. The sentinel helper reloads the saved validation subjects, so
+the default cleanup mode removes the directories it needs.
 
 ```bash
+PACK_CLEANUP_MODELS=0 \
 INVARLOCK_ALLOW_REMOTE_CODE=1 \
 INVARLOCK_ALLOW_NETWORK=1 \
   ./scripts/evidence_packs/run_qwen14_sentinels.sh \
@@ -198,7 +220,9 @@ Acceptance for these sentinels is load-path completion, not scientific PASS:
 
 - `evaluation.report.json` must be emitted for each sentinel
 - the public quant smoke must also produce `verify.json`
-- a primary-metric `FAIL` is acceptable for this infrastructure/load-path gate
+- evaluate and verify commands must exit zero
+- the helper defaults to `--profile dev --assurance off`; a primary-metric `FAIL`
+  inside the emitted report is acceptable for this infrastructure/load-path gate
 
 Use a fresh work tree on remote hosts. If you intentionally run from a checkout
 that is not the editable install used by `.venv`, either reinstall the checkout
@@ -214,6 +238,7 @@ A suite run writes artifacts under `OUTPUT_DIR` (default: `./evidence_pack_runs/
 - `reports/guard_intervention_summary.json` (non-failing remediation signals, e.g. spectral caps + VE probe)
 - `reports/scenario_signal_summary.json`
 - `analysis/determinism_repeats.json` (when `--repeats` is used)
+- `analysis/evaluation_optimization_summary.json`
 - `*/reports/**/evaluation.report.json`
 
 `run_pack.sh` copies curated artifacts into a pack directory (default
@@ -222,9 +247,13 @@ A suite run writes artifacts under `OUTPUT_DIR` (default: `./evidence_pack_runs/
 - `results/final_verdict.txt` + `results/final_verdict.json`
 - `results/**/category_summary.json`, `results/**/guard_signal_summary.json`, `results/**/guard_intervention_summary.json`, `results/**/scenario_signal_summary.json`
 - `results/**/determinism_repeats.json` (if present)
+- `results/**/edit_artifact_summary.json`
+- `results/analysis/evaluation_optimization_summary.json`
 - `reports/<model>/<edit>/<run>/evaluation.report.json`
+- `reports/<model>/<edit>/<run>/edit_metadata.json`
 - `reports/**/rmt_probe.json` (optional sidecar; emitted by some scenarios, e.g. `rmt_norm_noise`)
 - `reports/**/ve_probe.json` (optional sidecar; emitted by VE demo scenarios, e.g. `ve_mlp_scale_skew`)
+- `reports/**/deployable_artifact_validation.json`, `backend_inventory.json`, `memory_report.json`, `load_smoke.json`, and `inference_smoke.json` for deployable scenarios
 - `reports/**/evaluation.html` + `reports/**/verify.json`
 - `README.md` (reviewer summary), `manifest.json`, `checksums.sha256`
 - `manifest.signature.json` when the pack is signed
@@ -235,6 +264,24 @@ a hidden sibling temporary directory and only renames it into the final
 `evidence_pack/` path after manifest generation, checksum sealing, optional HTML
 export, and optional signing succeed. Failed pack builds do not leave a partial
 pack behind at the final destination.
+
+## Evaluation Loop Controls
+
+The default suite keeps one evaluation task per scenario so scheduler behavior
+and GPU placement remain easy to inspect. Batch edit creation still reduces edit
+generation overhead by loading the baseline once for multiple validation edits,
+but each evaluated subject checkpoint is loaded by its own `evaluate_EDIT` task.
+
+`PACK_DEFER_REPORT_RENDERING=1` keeps `evaluation.report.json` and required
+sidecars, but skips optional markdown/reviewer rendering in the hot path.
+`run_pack.sh --release-review` enables this by default; pack-level HTML export
+and verification still run unless explicitly disabled.
+
+Every run writes `results/analysis/evaluation_optimization_summary.json`. It
+records timing files discovered under the run directory, deferred-render counts,
+baseline-report reuse counts, and nested run timing totals from
+`evaluate_timing.json`. Use it as scheduling and regression telemetry, not as a
+standalone throughput claim.
 
 ## Edit Provenance Labels
 
@@ -248,11 +295,43 @@ reports record the edit algorithm used:
 
 For BYOE workflows, use `--edit-label custom` or let InvarLock infer from the model path.
 
+Evidence-pack edit artifacts also write `edit_metadata.json`. The metadata uses
+`schema: invarlock/evidence-pack-edit-metadata-v1` and records the scenario
+artifact class, edit type, storage format, deployment flags, parameters, and
+coverage. Evidence-pack task execution validates this metadata before evaluating
+an edited subject, and pack verification checks that metadata agrees with
+`metadata/scenarios.json`.
+
+| Edit Type | Artifact class | Deployable optimization? |
+| --- | --- | --- |
+| RTN dequantized external-subject simulation | validation subject checkpoint | No |
+| FP8 dequantized external-subject simulation | validation subject checkpoint | No |
+| Dense magnitude-pruned checkpoint | validation subject checkpoint | No sparse runtime |
+| Dense low-rank-SVD approximated checkpoint | validation subject checkpoint | No factorized runtime |
+
+## Deployable Edit Lane
+
+Deployable edit scenarios are separate from the default validation suite. They
+are opt-in because backends such as bitsandbytes, GPTQ, and AWQ depend
+on specific PyTorch, CUDA, kernel, architecture, and package versions.
+
+There is no default deployable scenario in the OSS evidence-pack suite. A
+deployable lane should be added only after its backend has a generator or
+BYOE-loading path that passes reload, inference, inventory, and memory/storage
+checks on a supported GPU stack.
+
+A deployable scenario must produce backend metadata, backend inventory,
+reload-smoke evidence, inference-smoke evidence, storage or memory evidence, an
+InvarLock evaluation report, and verification output. The evidence pack still
+does not include model weights unless explicitly configured; it includes
+digest-backed evidence about the deployable artifact that was validated.
+
 ## Determinism
 
 Use `--determinism strict` to disable TF32 and cuDNN benchmarks and align with
 strict InvarLock presets. `--repeats N` reruns a single edit N times and records
-a drift summary in `results/determinism_repeats.json`.
+a drift summary in `analysis/determinism_repeats.json` in the run output; packed
+bundles copy it to `results/analysis/determinism_repeats.json`.
 
 ## Signing & Verification (Evidence vs Strict Signed Verification)
 
@@ -266,9 +345,35 @@ Package-native signed packs store the detached Ed25519 signature bundle in
 `manifest.signature.json` and record `signing_key_fingerprint` in the manifest
 for audit trails.
 
+Signature verification confirms that `manifest.json` has not changed since the
+holder of the matching private key signed it. To also establish signer authenticity,
+pin the expected signer fingerprint or use a local trust store. Without pinning,
+the verifier reports the signer fingerprint for review, but a different key can
+sign a different pack.
+
+```bash
+invarlock advanced evidence-pack verify <dir> \
+  --strict \
+  --expected-fingerprint sha256:<64-hex-chars> \
+  --report-assurance strict
+```
+
+The package-native verifier also accepts `--trust-store <json>`. If the flag is
+omitted and `~/.config/invarlock/trusted-signers.json` exists, that file is used.
+The trust store may be either a JSON list of fingerprints or an object with a
+`trusted_signers` or `fingerprints` list; list entries may be strings or objects
+with a `fingerprint` field.
+
 The manifest contract is published at `contracts/evidence_pack_manifest.schema.json`.
 `invarlock advanced evidence-pack verify` validates this schema before checksum and signature verification so
 malformed evidence packs fail deterministically.
+
+The current manifest format is `evidence-pack-v1`. The schema-required core is
+`format`, `checksums_sha256`, and `checksums_sha256_digest`; builder, subject,
+invocation, environment, material, signing, and nested report-verification
+fields are additive provenance fields. Strong distributable evidence should
+include those provenance fields even when a minimal schema-valid pack omits
+them.
 
 Installed wheels ship the public contracts and support package-native
 inspection, key generation, assembly, and verification via `invarlock advanced evidence-pack inspect`,
@@ -293,9 +398,11 @@ Use the package-native subcommands:
 - Default: `invarlock advanced evidence-pack verify <dir>`
   - Verifies `checksums_sha256_digest`, validates digest-backed manifest references, validates `checksums.sha256`, requires a signed `manifest.signature.json`, and runs `invarlock verify`.
   - Fails closed if the pack is unsigned or if signature verification cannot run.
-- Strict (recommended for distributable evidence): `invarlock advanced evidence-pack verify <dir> --strict`
+- Strict (recommended for distributable evidence): `invarlock advanced evidence-pack verify <dir> --strict --report-assurance strict`
   - Adds fail-closed checks for extra files outside `checksums.sha256` on top of the default signed-manifest requirement.
-  - Repo-harness alternative: `PACK_STRICT_MODE=1 scripts/evidence_packs/verify_pack.sh --pack <dir>`.
+  - `--strict` is pack-integrity strictness; `--report-assurance strict` requires every bundled clean report to satisfy strict report assurance.
+  - Add `--expected-fingerprint sha256:<64-hex-chars>` or `--trust-store <json>` when accepting evidence from a specific signer.
+  - Repo-harness alternative: `PACK_STRICT_MODE=1 scripts/evidence_packs/verify_pack.sh --pack <dir> --report-assurance strict --expected-fingerprint sha256:<64-hex-chars>`.
 
 `invarlock advanced evidence-pack verify` returns structured exit codes:
 
@@ -310,7 +417,9 @@ Use the package-native subcommands:
 
 Reviewer checklist:
 
-- [ ] `invarlock advanced evidence-pack verify <dir> --strict` returns `0`
+- [ ] `invarlock advanced evidence-pack verify <dir> --strict --report-assurance strict` returns `0`
+- [ ] Verification is signer-pinned with `--expected-fingerprint` or a trust
+  store when authenticity matters outside the producing workspace
 - [ ] `jq -e . <dir>/manifest.json` succeeds
 - [ ] `sha256sum -c <dir>/checksums.sha256` succeeds
 - [ ] `jq -e . <dir>/manifest.signature.json` succeeds when the pack is
@@ -360,6 +469,6 @@ verification, and PASS final verdict.
 - [CLI Reference](../reference/cli.md) — `invarlock advanced evidence-pack` subcommands
 - [Public Contracts](../reference/contracts.md) — manifest schema and JSON output envelopes
 - [Runtime Provenance Guide](../security/runtime-provenance-guide.md) — manifest requirements for strict bundles
-- [Trust Model](../assurance/14-trust-model.md) — what strict assurance does and does not mean
+- [Trust Model](../assurance/14-trust-model.md) — strict assurance scope
 - [Tier Policy Tuning CLI](../reference/calibration.md) — global tier policy calibration
 - [Threat Model](../security/threat-model.md) — security assumptions for distributable evidence

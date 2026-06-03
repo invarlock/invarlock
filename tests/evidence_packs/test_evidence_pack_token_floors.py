@@ -5,7 +5,7 @@ from pathlib import Path
 
 def test_evidence_pack_default_cert_min_windows_is_high_enough() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    text = (repo_root / "scripts/evidence_packs/lib/task_functions.sh").read_text(
+    text = (repo_root / "scripts/evidence_packs/lib/tasks/task_common.sh").read_text(
         encoding="utf-8"
     )
 
@@ -20,10 +20,14 @@ def test_evidence_pack_default_cert_min_windows_is_high_enough() -> None:
 
 def test_evidence_pack_7b_uses_short_seq_len_for_throughput() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    text = (repo_root / "scripts/evidence_packs/lib/validation_suite.sh").read_text(
-        encoding="utf-8"
-    )
+    suite_text = (
+        repo_root / "scripts/evidence_packs/lib/validation/validation_suite.sh"
+    ).read_text(encoding="utf-8")
+    runtime_text = (
+        repo_root / "scripts/evidence_packs/lib/validation/validation_runtime.sh"
+    ).read_text(encoding="utf-8")
 
     # The suite's 7B config should avoid long padded sequences on short-text
     # datasets (WT-2), which wastes compute and slows tuning/runs.
-    assert 'echo "512:512:' in text
+    assert "validation_runtime.sh" in suite_text
+    assert 'echo "512:512:' in runtime_text

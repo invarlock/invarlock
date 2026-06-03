@@ -137,8 +137,11 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
     resolved_public_evidence = json.loads(installed_public_evidence.stdout.strip())
     assert resolved_public_evidence
     for evidence in resolved_public_evidence.values():
-        for path in evidence.values():
-            assert Path(path).is_file(), path
+        for key, path in evidence.items():
+            if key in {"artifact_package", "evidence_pack_fixture"}:
+                assert Path(path).is_dir(), path
+            else:
+                assert Path(path).is_file(), path
 
     published_report = Path(
         resolved_public_evidence["gpt2-causal-hf"]["evaluation_report_fixture"]

@@ -6,12 +6,18 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from tests.cli.run.test_run_config_parsing_provider_and_export import (
-    _Cfg,
-    _core_report,
-    _detect_profile,
-    _tok,
-    run_command,
+from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_config_parsing import (
+    ConfigParsingCfg as _Cfg,
+)
+from tests.cli.run._support_run_config_parsing import (
+    config_parsing_core_report as _core_report,
+)
+from tests.cli.run._support_run_config_parsing import (
+    config_parsing_detect_profile as _detect_profile,
+)
+from tests.cli.run._support_run_config_parsing import (
+    config_parsing_tokenizer as _tok,
 )
 
 
@@ -121,10 +127,11 @@ def test_run_command_until_pass_auto_tune_head_budget_paths(tmp_path: Path) -> N
                     lambda **k: cfg,
                 ),
                 patch(
-                    "invarlock.cli.run_runtime.detect_model_profile", _detect_profile
+                    "invarlock.cli.run_runtime_exec.detect_model_profile",
+                    _detect_profile,
                 ),
                 patch(
-                    "invarlock.cli.run_runtime.resolve_tokenizer",
+                    "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                     lambda *_a, **_k: _tok(),
                 ),
                 patch("invarlock.cli.device.resolve_device", lambda d: d),
@@ -139,7 +146,7 @@ def test_run_command_until_pass_auto_tune_head_budget_paths(tmp_path: Path) -> N
                 ),
                 patch("invarlock.cli.run_runtime_exec.execute_guarded_run", exec_stub),
                 patch(
-                    "invarlock.cli.run_artifact_output.postprocess_and_summarize",
+                    "invarlock.cli.run_execution.postprocess_and_summarize",
                     post_stub,
                 ),
                 patch("invarlock.core.retry.RetryController", RC),

@@ -41,7 +41,11 @@
         "support_tiers": {
           "type": "array",
           "items": {
-            "type": "string"
+            "enum": [
+              "published_basis",
+              "supported_experimental",
+              "community_experimental"
+            ]
           }
         },
         "adapter_families": {

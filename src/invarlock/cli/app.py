@@ -12,6 +12,7 @@ minimal environments.
 from __future__ import annotations
 
 import os
+from enum import StrEnum
 from importlib.metadata import PackageNotFoundError
 
 import click
@@ -19,7 +20,6 @@ import typer
 from rich.console import Console
 from typer.core import TyperGroup
 
-from invarlock.cli.runtime_modes import ExecutionMode, RuntimeProvenanceMode
 from invarlock.core.report_inputs import (
     ReportInputError,
     resolve_report_input_path,
@@ -38,6 +38,16 @@ LIGHT_IMPORT = os.getenv("INVARLOCK_LIGHT_IMPORT", "").strip().lower() in {
     "true",
     "yes",
 }
+
+
+class ExecutionMode(StrEnum):
+    CONTAINER = "container"
+    HOST = "host"
+
+
+class RuntimeProvenanceMode(StrEnum):
+    CONTAINER = "container"
+    HOST = "host"
 
 
 # Deterministic help ordering
@@ -61,6 +71,19 @@ class OrderedGroup(TyperGroup):
         return None
 
 
+class AdvancedGroup(TyperGroup):
+    def list_commands(self, ctx: click.Context) -> list[str]:
+        return ["evidence-pack", "policy", "plugins", "calibrate", "runtime-verify"]
+
+    def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
+        command = super().get_command(ctx, cmd_name)
+        if command is not None:
+            return command
+        if _load_advanced_subapp(self, cmd_name):
+            return super().get_command(ctx, cmd_name)
+        return None
+
+
 # Initialize CLI app
 app = typer.Typer(
     name="invarlock",
@@ -74,13 +97,21 @@ app = typer.Typer(
         "  0=success\n"
         "  1=generic failure\n"
         "  2=schema invalid\n"
-        "  3=hard abort ([INVARLOCK:EXXX])."
+        "  3=hard abort with structured error code."
     ),
     no_args_is_help=True,
     cls=OrderedGroup,
 )
 
 console = Console()
+advanced_app = typer.Typer(
+    help=(
+        "Advanced and maintenance workflows. "
+        "These commands are intentionally outside the core evaluate/verify/report path."
+    ),
+    no_args_is_help=True,
+    cls=AdvancedGroup,
+)
 _VERSION_IMPORT_ERRORS = (
     AttributeError,
     ImportError,
@@ -190,8 +221,15 @@ def _evaluate_lazy(
             "Must include stored evaluation windows (e.g., set INVARLOCK_STORE_EVAL_WINDOWS=1)."
         ),
     ),
-    adapter: str = typer.Option(
-        "auto", "--adapter", help="Adapter name or 'auto' to resolve"
+    baseline_adapter: str = typer.Option(
+        "auto",
+        "--baseline-adapter",
+        help="Adapter for the baseline side, or 'auto' to resolve from baseline.",
+    ),
+    subject_adapter: str = typer.Option(
+        "auto",
+        "--subject-adapter",
+        help="Adapter for the subject side, or 'auto' to resolve from subject.",
     ),
     device: str | None = typer.Option(
         None, "--device", help="Device override for runs (auto|cuda|mps|cpu)"
@@ -203,7 +241,7 @@ def _evaluate_lazy(
         "--preset",
         help=(
             "Universal preset path to use (defaults to causal or masked preset "
-            "based on adapter)"
+            "based on the subject adapter)"
         ),
     ),
     out: str = typer.Option("runs", "--out", help="Base output directory"),
@@ -232,6 +270,19 @@ def _evaluate_lazy(
     ),
     style: str = typer.Option("audit", "--style", help="Output style (audit|friendly)"),
     timing: bool = typer.Option(False, "--timing", help="Show timing summary"),
+    timing_json: str | None = typer.Option(
+        None,
+        "--timing-json",
+        help="Write machine-readable evaluate timing data to this JSON path.",
+    ),
+    defer_report_rendering: bool = typer.Option(
+        False,
+        "--defer-report-rendering",
+        help=(
+            "Write JSON evidence sidecars only; skip markdown/reviewer bundle "
+            "rendering in the hot path."
+        ),
+    ),
     progress: bool = typer.Option(
         True, "--progress/--no-progress", help="Show progress done messages"
     ),
@@ -261,7 +312,8 @@ def _evaluate_lazy(
         baseline=baseline,
         subject=subject,
         baseline_report=baseline_report,
-        adapter=adapter,
+        baseline_adapter=baseline_adapter,
+        subject_adapter=subject_adapter,
         device=device,
         profile=profile,
         tier=tier,
@@ -275,6 +327,8 @@ def _evaluate_lazy(
         banner=banner,
         style=style,
         timing=timing,
+        timing_json=timing_json,
+        defer_report_rendering=defer_report_rendering,
         progress=progress,
         execution_mode=execution_mode.value,
         assurance=assurance,
@@ -289,6 +343,61 @@ def _register_subapps() -> None:
     pass
 
 
+@advanced_app.callback(invoke_without_command=True)
+def _advanced_root() -> None:
+    """Advanced command namespace."""
+
+
+def _missing_dependency_subapp(name: str, missing: str) -> typer.Typer:
+    subapp = typer.Typer(help=f"{name} requires optional dependency {missing!r}.")
+
+    @subapp.callback(invoke_without_command=True)
+    def _missing() -> None:
+        raise click.UsageError(
+            f"`invarlock advanced {name}` requires optional dependency {missing!r}."
+        )
+
+    return subapp
+
+
+def _load_advanced_subapp(group: TyperGroup, name: str) -> bool:
+    def _register(sub_name: str, subapp: typer.Typer) -> bool:
+        command = typer.main.get_command(subapp)
+        command.name = sub_name
+        group.add_command(command, name=sub_name)
+        return True
+
+    def _register_command(sub_name: str, command: click.Command) -> bool:
+        command.name = sub_name
+        group.add_command(command, name=sub_name)
+        return True
+
+    if name == "evidence-pack":
+        from .commands.evidence_pack import evidence_pack_app
+
+        return _register(name, evidence_pack_app)
+    if name == "policy":
+        from .commands.policy import policy_app
+
+        return _register(name, policy_app)
+    if name == "plugins":
+        from .commands.plugins import plugins_app
+
+        return _register(name, plugins_app)
+    if name == "calibrate":
+        try:
+            from .commands.calibrate import calibrate_app
+        except ModuleNotFoundError as exc:  # pragma: no cover - exercised in venvs
+            missing = getattr(exc, "name", "") or "optional runtime"
+            return _register(name, _missing_dependency_subapp(name, missing))
+        return _register(name, calibrate_app)
+    if name == "runtime-verify":
+        from invarlock.cli.commands.verify import runtime_verify_app
+
+        return _register_command(name, runtime_verify_app)
+    return False
+
+
 def _load_lazy_subapp(group: TyperGroup, name: str) -> bool:
     def _register_lazy(name: str, subapp: typer.Typer) -> bool:
         command = typer.main.get_command(subapp)
@@ -301,9 +410,7 @@ def _load_lazy_subapp(group: TyperGroup, name: str) -> bool:
 
         return _register_lazy(name, _report_app)
     if name == "advanced":
-        from .commands.advanced import advanced_app as _advanced_app
-
-        return _register_lazy(name, _advanced_app)
+        return _register_lazy(name, advanced_app)
     return False
 
 

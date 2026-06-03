@@ -8,6 +8,10 @@ test_run_qwen14_sentinels_helper_functions_cover_resolution_and_error_paths() {
     run require_dir "${TEST_TMPDIR}/missing-dir" "run directory"
     assert_rc "1" "${RUN_RC}" "missing directories fail directly"
 
+    run require_saved_subject_dir "${TEST_TMPDIR}/missing-subject" "quant_4bit_clean subject"
+    assert_rc "1" "${RUN_RC}" "missing saved subject fails directly"
+    assert_match "PACK_CLEANUP_MODELS=0" "${RUN_ERR}" "missing saved subject explains cleanup requirement"
+
     run require_file "${TEST_TMPDIR}/missing-file" "preset"
     assert_rc "1" "${RUN_RC}" "missing files fail directly"
 
@@ -47,10 +51,11 @@ EOF
     /bin/rm -f "${bin_dir}/python"
     assert_eq "python3" "$(resolve_python_bin)" "python3 is used when python is absent"
 
-    PATH=""
+    local empty_bin="${TEST_TMPDIR}/empty-bin"
+    /bin/mkdir -p "${empty_bin}"
+    PATH="${empty_bin}"
     local rc=0
-    local err_file="${TEST_TMPDIR}/resolve_python_bin.err"
-    if resolve_python_bin > /dev/null 2> "${err_file}"; then
+    if resolve_python_bin > /dev/null; then
         rc=0
     else
         rc=$?
@@ -78,6 +83,10 @@ EOF
     rm -f "${run_dir}/presets/calibrated_preset_${model_name}__quant_rtn.json"
     printf 'preset: base\n' > "${run_dir}/presets/calibrated_preset_${model_name}.json"
     assert_eq "${run_dir}/presets/calibrated_preset_${model_name}.json" "$(resolve_preset_path "${run_dir}" "${model_name}" "quant_rtn")" "base json preset is accepted as final fallback"
+
+    rm -f "${run_dir}/presets/calibrated_preset_${model_name}.json"
+    run resolve_preset_path "${run_dir}" "${model_name}" "quant_rtn"
+    assert_rc "1" "${RUN_RC}" "missing preset returns non-zero"
 }
 
 test_run_qwen14_sentinels_main_is_sourceable_and_covers_mode_dispatch() {
@@ -95,7 +104,7 @@ test_run_qwen14_sentinels_main_is_sourceable_and_covers_mode_dispatch() {
     resolve_baseline_report() { printf '%s\n' "${TEST_TMPDIR}/baseline_report.json"; }
     resolve_preset_path() { printf '%s\n' "${TEST_TMPDIR}/preset_${3}.yaml"; }
     run_evaluate_sentinel() {
-        printf 'evaluate\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "$8" >> "${calls_file}"
+        printf 'evaluate\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "$9" >> "${calls_file}"
         return 0
     }
     run_public_quant_verify() {
@@ -121,7 +130,7 @@ test_run_qwen14_sentinels_main_is_sourceable_and_covers_mode_dispatch() {
     assert_rc "2" "${RUN_RC}" "invalid mode is rejected"
 
     : > "${calls_file}"
-    run main --run-dir "${run_dir}" --model-name "${model_name}" --mode public-quant --device cpu --profile smoke --adapter test
+    run main --run-dir "${run_dir}" --model-name "${model_name}" --mode public-quant --device cpu --profile smoke --baseline-adapter test_base --subject-adapter test_subject
     assert_rc "0" "${RUN_RC}" "public-quant mode succeeds"
     assert_match "evaluate.*quant_4bit_clean.*preset_quant_rtn\\.yaml.*${run_dir}/sentinels/qwen14/quant_4bit_clean.*cpu" "$(cat "${calls_file}")" "public-quant mode evaluates the quant subject and uses default out dir"
     assert_match "verify.*quant_4bit_clean/evaluation\\.report\\.json.*${run_dir}/sentinels/qwen14/quant_4bit_clean" "$(cat "${calls_file}")" "public-quant mode verifies the quant report"
@@ -185,9 +194,6 @@ case "${cmd}" in
         cp "${baseline_report}" "${report_out}/observed_baseline_report.json"
         printf '{"ok":true}\n' > "${report_out}/evaluation.report.json"
         printf '{"report":"ok"}\n' > "${out}"
-        if [[ "${subject}" == *"quant_4bit_clean" ]]; then
-            exit 13
-        fi
         exit 0
         ;;
     verify)
@@ -202,6 +208,9 @@ case "${cmd}" in
                     profile="$2"
                     shift 2
                     ;;
+                --assurance)
+                    shift 2
+                    ;;
                 *)
                     report="$1"
                     shift
@@ -210,7 +219,7 @@ case "${cmd}" in
         done
         printf 'verify\t%s\t%s\n' "${profile}" "${report}" >> "${calls_file}"
         printf '{"ok":true}\n'
-        exit 17
+        exit 0
         ;;
     *)
         printf 'unexpected\t%s\n' "${cmd}" >> "${calls_file}"
@@ -226,7 +235,7 @@ EOF
         --run-dir "${run_dir}" \
         --model-name "${model_name}" \
         --out "${TEST_TMPDIR}/sentinels"
-    assert_rc "0" "${RUN_RC}" "sentinel script succeeds when reports are written"
+    assert_rc "0" "${RUN_RC}" "sentinel script succeeds when subprocesses pass and reports are written"
     assert_file_exists "${TEST_TMPDIR}/sentinels/quant_4bit_clean/evaluation.report.json" "quant report produced"
     assert_file_exists "${TEST_TMPDIR}/sentinels/quant_4bit_clean/verify.json" "quant verify output captured"
     assert_file_exists "${TEST_TMPDIR}/sentinels/prune_clean/evaluation.report.json" "prune report produced"
@@ -236,7 +245,7 @@ EOF
     assert_match "quant_4bit_clean.*runtime_inputs/calibrated_preset_${model_name}__quant_rtn\\.yaml" "${calls}" "quant sentinel stages the quant-specific preset"
     assert_match "prune_clean.*runtime_inputs/calibrated_preset_${model_name}\\.yaml" "${calls}" "prune sentinel stages the base preset"
     assert_match "runtime_inputs/baseline_report\\.json" "${calls}" "sentinel stages the baseline report"
-    assert_match "verify.*quant_4bit_clean/evaluation\\.report\\.json" "${calls}" "public quant verify runs"
+    assert_match "verify.*dev.*quant_4bit_clean/evaluation\\.report\\.json" "${calls}" "public quant verify runs with dev profile"
 
     local quant_preset
     quant_preset="$(cat "${TEST_TMPDIR}/sentinels/quant_4bit_clean/observed_preset.yaml")"
@@ -259,7 +268,7 @@ test_run_qwen14_sentinels_requires_inputs_and_rejects_bad_mode() {
     assert_rc "2" "${RUN_RC}" "invalid mode returns usage error"
 }
 
-test_run_qwen14_sentinels_evaluate_and_verify_warning_paths() {
+test_run_qwen14_sentinels_evaluate_and_verify_fail_on_nonzero_subprocesses() {
     mock_reset
 
     source ./scripts/evidence_packs/run_qwen14_sentinels.sh
@@ -308,13 +317,13 @@ EOF
     normalize_staged_preset_for_baseline_report() { :; }
 
     local out_dir="${TEST_TMPDIR}/sentinel"
-    run run_evaluate_sentinel "${baseline_dir}" "${baseline_report}" "${subject_dir}" "${preset}" "${out_dir}" "auto" "ci" "cpu"
-    assert_rc "0" "${RUN_RC}" "evaluate sentinel treats non-zero exit with written report as success"
-    assert_match "treating sentinel as load-path success" "${RUN_ERR}" "evaluate warning is surfaced"
+    run run_evaluate_sentinel "${baseline_dir}" "${baseline_report}" "${subject_dir}" "${preset}" "${out_dir}" "auto" "auto" "ci" "cpu"
+    assert_rc "13" "${RUN_RC}" "evaluate sentinel returns non-zero evaluate exit even when a report was written"
+    assert_file_exists "${out_dir}/evaluation.report.json" "evaluate report remains available for debugging"
 
     run run_public_quant_verify "${out_dir}/evaluation.report.json" "${out_dir}" "ci"
-    assert_rc "0" "${RUN_RC}" "verify sentinel treats non-zero exit with written summary as success"
-    assert_match "treating sentinel as load-path success" "${RUN_ERR}" "verify warning is surfaced"
+    assert_rc "17" "${RUN_RC}" "verify sentinel returns non-zero verify exit even when a summary was written"
+    assert_file_exists "${out_dir}/verify.json" "verify summary remains available for debugging"
 }
 
 test_run_qwen14_sentinels_verify_success_path_writes_summary_without_warning() {
@@ -340,7 +349,7 @@ EOF
     run run_public_quant_verify "${out_dir}/evaluation.report.json" "${out_dir}" "ci"
     assert_rc "0" "${RUN_RC}" "verify success path returns zero"
     assert_file_exists "${out_dir}/verify.json" "verify summary is written"
-    if [[ "${RUN_ERR}" == *"treating sentinel as load-path success"* ]]; then
+    if [[ "${RUN_ERR}" == *"load-path success"* ]]; then
         fail_test "verify success path should not emit a warning"
     fi
 }

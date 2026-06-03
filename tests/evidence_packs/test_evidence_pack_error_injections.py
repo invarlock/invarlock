@@ -21,9 +21,13 @@ def test_error_injection_set_includes_weight_tying_break() -> None:
 
     # Ensure the harness is wired to the manifest (avoid drift between task graph and verdict).
     queue_manager = (
-        repo_root / "scripts/evidence_packs/lib/queue_manager.sh"
+        repo_root / "scripts/evidence_packs/lib/queue/queue_manager.sh"
     ).read_text(encoding="utf-8")
-    assert "scenarios.json" in queue_manager
+    queue_generation = (
+        repo_root / "scripts/evidence_packs/lib/queue/queue_generation.sh"
+    ).read_text(encoding="utf-8")
+    assert "queue_generation.sh" in queue_manager
+    assert "scenarios.json" in queue_generation
 
 
 class _FakeTextLayer(nn.Module):
@@ -54,15 +58,14 @@ class _FakeConditionalGeneration(nn.Module):
 def test_missing_tensors_injects_nested_language_model_layers(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     script_path = (
-        repo_root
-        / "scripts/evidence_packs/python/create_error_model_basic_injections.py"
+        repo_root / "scripts/evidence_packs/python/error_model/basic_injections.py"
     )
     spec = importlib.util.spec_from_file_location(
-        "create_error_model_basic_injections", script_path
+        "scripts.evidence_packs.python.error_model.basic_injections", script_path
     )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    sys.path.insert(0, str(script_path.parent))
+    sys.path.insert(0, str(script_path.parents[1]))
     try:
         spec.loader.exec_module(module)
     finally:

@@ -3,8 +3,9 @@ from collections.abc import Iterable
 
 import pytest
 
+import invarlock.cli.run_overhead as run_overhead_mod
 import invarlock.eval.primary_metric as primary_metric_mod
-from invarlock.cli.overhead_utils import _extract_pm_snapshot_for_overhead as extract
+from invarlock.cli.run_overhead import _extract_pm_snapshot_for_overhead as extract
 from invarlock.reporting.validate import validate_guard_overhead
 
 
@@ -64,6 +65,17 @@ def test_extract_pm_snapshot_uses_dict_report_when_available() -> None:
     assert isinstance(pm, dict)
     assert isinstance(pm.get("final"), int | float)
     assert math.isfinite(float(pm["final"]))
+
+
+def test_extract_pm_snapshot_continues_after_dict_compute_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _boom(*args, **kwargs):  # noqa: ANN001, ARG001
+        raise RuntimeError("cannot compute")
+
+    monkeypatch.setattr(run_overhead_mod, "_compute_snapshot_from_report", _boom)
+
+    assert extract({"evaluation_windows": {}}, kind="ppl_causal") is None
 
 
 def test_extract_pm_snapshot_returns_none_when_unusable(

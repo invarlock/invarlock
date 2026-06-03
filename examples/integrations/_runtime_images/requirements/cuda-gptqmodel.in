@@ -1,0 +1,4 @@
+-r ../../../../requirements/workflows/runtime-image.in
+torchvision>=0.23.0
+gptqmodel>=7.0.0
+triton>=2.3.0

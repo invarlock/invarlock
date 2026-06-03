@@ -66,3 +66,66 @@ def test_restore_chunked_missing_parameter_key_raises_and_is_atomic(
         adapter.restore_chunked(target, str(snapshot_dir))
 
     _assert_state_equal(_clone_state(target), modified)
+
+
+def test_restore_chunked_rejects_manifest_path_traversal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TMPDIR", str(tmp_path))
+    adapter = HFAdapterMixin()
+    model = torch.nn.Linear(4, 3)
+    snapshot_dir = Path(adapter.snapshot_chunked(model, prefix="test-snap-"))
+    manifest_path = snapshot_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    first_param = next(iter(manifest["params"]))
+    manifest["params"][first_param] = "../outside.safetensors"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    modified = _clone_state(model)
+
+    with pytest.raises(ValueError, match="Invalid snapshot manifest filename"):
+        adapter.restore_chunked(model, str(snapshot_dir))
+
+    _assert_state_equal(_clone_state(model), modified)
+
+
+def test_restore_chunked_rejects_absolute_manifest_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TMPDIR", str(tmp_path))
+    adapter = HFAdapterMixin()
+    model = torch.nn.Linear(4, 3)
+    snapshot_dir = Path(adapter.snapshot_chunked(model, prefix="test-snap-"))
+    manifest_path = snapshot_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    first_param = next(iter(manifest["params"]))
+    manifest["params"][first_param] = str(tmp_path / "outside.safetensors")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    modified = _clone_state(model)
+
+    with pytest.raises(ValueError, match="Invalid snapshot manifest filename"):
+        adapter.restore_chunked(model, str(snapshot_dir))
+
+    _assert_state_equal(_clone_state(model), modified)
+
+
+def test_restore_chunked_rejects_duplicate_manifest_filename(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TMPDIR", str(tmp_path))
+    adapter = HFAdapterMixin()
+    model = torch.nn.Sequential(torch.nn.Linear(4, 3), torch.nn.Linear(3, 2))
+    snapshot_dir = Path(adapter.snapshot_chunked(model, prefix="test-snap-"))
+    manifest_path = snapshot_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    params = list(manifest["params"])
+    manifest["params"][params[1]] = manifest["params"][params[0]]
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    modified = _clone_state(model)
+
+    with pytest.raises(ValueError, match="Duplicate snapshot manifest filename"):
+        adapter.restore_chunked(model, str(snapshot_dir))
+
+    _assert_state_equal(_clone_state(model), modified)

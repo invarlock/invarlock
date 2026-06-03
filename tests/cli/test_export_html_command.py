@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.cli.commands.export_html import export_html_command
+from invarlock.cli.commands.report import export_html_command
 from invarlock.reporting.report_make import make_report
 
 

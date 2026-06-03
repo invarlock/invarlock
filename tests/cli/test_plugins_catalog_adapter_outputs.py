@@ -103,7 +103,7 @@ def test_plugins_adapters_json_with_explicit_filters(monkeypatch, capsys):
 
     # Patch at the provenance module level so the import inside the function gets it
     monkeypatch.setattr(
-        "invarlock.core.adapter_provenance.extract_adapter_provenance",
+        "invarlock.core.backend_inventory.extract_adapter_provenance",
         fake_extract,
         raising=False,
     )
@@ -147,7 +147,7 @@ def test_plugins_adapters_json_statuses(monkeypatch, capsys):
         return SimpleNamespace(library="transformers", version="1.0")
 
     monkeypatch.setattr(
-        "invarlock.core.adapter_provenance.extract_adapter_provenance",
+        "invarlock.core.backend_inventory.extract_adapter_provenance",
         fake_extract,
         raising=False,
     )
@@ -190,7 +190,7 @@ def test_plugins_adapters_json_bnb_ready_without_cuda_when_runtime_is_available(
         plugins_mod, "bitsandbytes_runtime_available", lambda: True, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.core.adapter_provenance.extract_adapter_provenance",
+        "invarlock.core.backend_inventory.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="bitsandbytes", version="0.49.2"),
         raising=False,
     )
@@ -215,11 +215,10 @@ def test_plugins_adapters_json_marks_missing_backends_not_present(monkeypatch, c
     monkeypatch.setattr(plugins_mod.platform, "system", lambda: "Linux", raising=False)
 
     def fake_extract(name):
-        lib = "autoawq" if name == "hf_awq" else "auto-gptq"
-        return SimpleNamespace(library=lib, version=None)
+        return SimpleNamespace(library="gptqmodel", version=None)
 
     monkeypatch.setattr(
-        "invarlock.core.adapter_provenance.extract_adapter_provenance",
+        "invarlock.core.backend_inventory.extract_adapter_provenance",
         fake_extract,
         raising=False,
     )
@@ -227,8 +226,8 @@ def test_plugins_adapters_json_marks_missing_backends_not_present(monkeypatch, c
     plugins_command(category="adapters", json_out=True, hide_unsupported=False)
     payload = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     by_name = {item["name"]: item for item in payload["items"]}
-    assert by_name["hf_awq"]["backend"] == {"name": "autoawq", "present": False}
-    assert by_name["hf_gptq"]["backend"] == {"name": "auto-gptq", "present": False}
+    assert by_name["hf_awq"]["backend"] == {"name": "gptqmodel", "present": False}
+    assert by_name["hf_gptq"]["backend"] == {"name": "gptqmodel", "present": False}
 
 
 def test_plugins_adapters_minimal_only_ready(monkeypatch, capsys):
@@ -239,7 +238,7 @@ def test_plugins_adapters_minimal_only_ready(monkeypatch, capsys):
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setenv("INVARLOCK_MINIMAL", "1")
     monkeypatch.setattr(
-        "invarlock.core.adapter_provenance.extract_adapter_provenance",
+        "invarlock.core.backend_inventory.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="transformers", version="1.0"),
         raising=False,
     )
@@ -288,7 +287,7 @@ def test_plugins_datasets_json_does_not_instantiate_parameterized_providers(
     _patch_registry(monkeypatch, {})
 
     class _NeedsArgsProvider:
-        __module__ = "invarlock.eval.providers.seq2seq"
+        __module__ = "invarlock.eval.data"
 
         def __init__(self, dataset_name: str):
             self.dataset_name = dataset_name
@@ -313,7 +312,7 @@ def test_plugins_datasets_json_does_not_instantiate_parameterized_providers(
     assert payload["items"] == [
         {
             "name": "hf_seq2seq",
-            "module": "invarlock.eval.providers.seq2seq",
+            "module": "invarlock.eval.data",
             "status": "available",
         }
     ]
@@ -342,13 +341,13 @@ def test_plugins_adapters_handle_torch_and_extra_errors(monkeypatch, capsys):
         if name == "hf_bnb":
             return SimpleNamespace(library="bitsandbytes", version="0.42")
         if name == "hf_gptq":
-            return SimpleNamespace(library="auto-gptq", version="1.0")
+            return SimpleNamespace(library="gptqmodel", version="1.0")
         if name == "hf_hint":
             return SimpleNamespace(library="transformers", version="1.2")
         raise RuntimeError("no provenance")
 
     monkeypatch.setattr(
-        "invarlock.core.adapter_provenance.extract_adapter_provenance",
+        "invarlock.core.backend_inventory.extract_adapter_provenance",
         fake_extract,
         raising=False,
     )
@@ -378,7 +377,7 @@ def test_plugins_adapters_handle_torch_and_extra_errors(monkeypatch, capsys):
     payload = json.loads(capsys.readouterr().out.strip())
     statuses = {item["name"]: item["status"] for item in payload["items"]}
     assert statuses["hf_bnb"] == "unsupported"
-    assert statuses["hf_gptq"] == "unsupported"
+    assert statuses["hf_gptq"] == "ready"
     assert statuses["hf_hint"] == "needs_extra"
     assert "hf_err" in statuses  # row produced even when provenance extras fail
 
@@ -399,12 +398,8 @@ def test_plugins_datasets_verbose(monkeypatch):
         data_mod,
         "_PROVIDERS",
         {
-            "wikitext2": SimpleNamespace(
-                __module__="invarlock.eval.providers.wikitext2"
-            ),
-            "synthetic": SimpleNamespace(
-                __module__="invarlock.eval.providers.synthetic"
-            ),
+            "wikitext2": SimpleNamespace(__module__="invarlock.eval.data"),
+            "synthetic": SimpleNamespace(__module__="invarlock.eval.data"),
         },
         raising=False,
     )
@@ -448,7 +443,7 @@ def test_plugins_explain_unknown_adapter(monkeypatch):
     }
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setattr(
-        "invarlock.core.adapter_provenance.extract_adapter_provenance",
+        "invarlock.core.backend_inventory.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="bitsandbytes", version=None),
         raising=False,
     )
@@ -472,6 +467,14 @@ def test_check_plugin_extras_missing(monkeypatch):
     monkeypatch.setattr("builtins.__import__", fake_import)
     result = plugins_mod._check_plugin_extras("hf_gptq", "adapters")
     assert "invarlock[gptq]" in result
+    result = plugins_mod._check_plugin_extras("hf_torchao", "adapters")
+    assert "invarlock[torchao]" in result
+    result = plugins_mod._check_plugin_extras("hf_hqq", "adapters")
+    assert "invarlock[hqq]" in result
+    result = plugins_mod._check_plugin_extras("hf_quanto", "adapters")
+    assert "invarlock[quanto]" in result
+    result = plugins_mod._check_plugin_extras("hf_ct", "adapters")
+    assert "invarlock[compressed-tensors]" in result
 
 
 def test_plugins_adapters_verbose_console(monkeypatch):
@@ -482,7 +485,7 @@ def test_plugins_adapters_verbose_console(monkeypatch):
     }
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setattr(
-        "invarlock.core.adapter_provenance.extract_adapter_provenance",
+        "invarlock.core.backend_inventory.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="transformers", version="1.0"),
         raising=False,
     )
@@ -537,7 +540,7 @@ def test_plugins_adapters_only_unknown_keeps_all(monkeypatch, capsys):
     }
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setattr(
-        "invarlock.core.adapter_provenance.extract_adapter_provenance",
+        "invarlock.core.backend_inventory.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="transformers", version="1.0"),
         raising=False,
     )
@@ -553,7 +556,7 @@ def test_plugins_adapters_only_core_and_optional(monkeypatch, capsys):
     }
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setattr(
-        "invarlock.core.adapter_provenance.extract_adapter_provenance",
+        "invarlock.core.backend_inventory.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="transformers", version="1.0"),
         raising=False,
     )
@@ -575,8 +578,8 @@ def test_plugins_adapters_show_unsupported_backend_present(monkeypatch, capsys):
     adapters = {"hf_gptq": {"module": "invarlock.plugins.gptq", "entry_point": "gptq"}}
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setattr(
-        "invarlock.core.adapter_provenance.extract_adapter_provenance",
-        lambda name: SimpleNamespace(library="auto-gptq", version=None),
+        "invarlock.core.backend_inventory.extract_adapter_provenance",
+        lambda name: SimpleNamespace(library="gptqmodel", version=None),
         raising=False,
     )
     monkeypatch.setattr(
@@ -591,8 +594,8 @@ def test_plugins_adapters_show_unsupported_backend_present(monkeypatch, capsys):
         hide_unsupported=False,
     )
     payload = json.loads(capsys.readouterr().out)
-    assert payload["items"][0]["status"] == "unsupported"
-    assert payload["items"][0]["backend"] == {"name": "auto-gptq", "present": False}
+    assert payload["items"][0]["status"] == "needs_extra"
+    assert payload["items"][0]["backend"] == {"name": "gptqmodel", "present": False}
 
 
 def test_plugins_adapters_explain_enable_hint(monkeypatch):
@@ -601,7 +604,7 @@ def test_plugins_adapters_explain_enable_hint(monkeypatch):
     }
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setattr(
-        "invarlock.core.adapter_provenance.extract_adapter_provenance",
+        "invarlock.core.backend_inventory.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="transformers", version="1.0"),
         raising=False,
     )
@@ -623,10 +626,17 @@ def test_plugins_adapters_explain_special_notes(monkeypatch):
     adapters = {
         "hf_gptq": {"module": "invarlock.plugins.gptq", "entry_point": "gptq"},
         "hf_awq": {"module": "invarlock.plugins.awq", "entry_point": "awq"},
+        "hf_torchao": {
+            "module": "invarlock.plugins.torchao",
+            "entry_point": "torchao",
+        },
+        "hf_hqq": {"module": "invarlock.plugins.hqq", "entry_point": "hqq"},
+        "hf_quanto": {"module": "invarlock.plugins.quanto", "entry_point": "quanto"},
+        "hf_ct": {"module": "invarlock.plugins.ct", "entry_point": "ct"},
     }
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setattr(
-        "invarlock.core.adapter_provenance.extract_adapter_provenance",
+        "invarlock.core.backend_inventory.extract_adapter_provenance",
         lambda name: SimpleNamespace(
             library=name.replace("hf_", "").replace("_", "-"), version="1.0"
         ),
@@ -640,11 +650,30 @@ def test_plugins_adapters_explain_special_notes(monkeypatch):
     dummy_console = DummyConsole()
     monkeypatch.setattr(plugins_mod, "console", dummy_console, raising=False)
     plugins_command(category="adapters", explain="hf_gptq")
-    assert any("AutoGPTQ-quantized" in line for line in dummy_console.lines)
-    assert any("pinned or vendor wheel" in line for line in dummy_console.lines)
+    assert any("GPTQModel-compatible" in line for line in dummy_console.lines)
+    assert any("Uses GPTQModel" in line for line in dummy_console.lines)
     dummy_console.lines.clear()
     plugins_command(category="adapters", explain="hf_awq")
     assert any("AWQ-quantized" in line for line in dummy_console.lines)
+    assert any(
+        "Transformers AWQ through GPTQModel" in line for line in dummy_console.lines
+    )
+    dummy_console.lines.clear()
+    plugins_command(category="adapters", explain="hf_torchao")
+    assert any("torchao" in line for line in dummy_console.lines)
+    assert any("int8 weight-only" in line for line in dummy_console.lines)
+    dummy_console.lines.clear()
+    plugins_command(category="adapters", explain="hf_hqq")
+    assert any("HQQ" in line or "hqq" in line for line in dummy_console.lines)
+    assert any("Runtime applies HQQ" in line for line in dummy_console.lines)
+    dummy_console.lines.clear()
+    plugins_command(category="adapters", explain="hf_quanto")
+    assert any("Quanto" in line or "quanto" in line for line in dummy_console.lines)
+    assert any("Runtime applies Quanto" in line for line in dummy_console.lines)
+    dummy_console.lines.clear()
+    plugins_command(category="adapters", explain="hf_ct")
+    assert any("compressed-tensors" in line for line in dummy_console.lines)
+    assert any("pre-quantized" in line for line in dummy_console.lines)
 
 
 def test_plugins_adapters_provenance_failure_graceful(monkeypatch, capsys):
@@ -653,7 +682,7 @@ def test_plugins_adapters_provenance_failure_graceful(monkeypatch, capsys):
     }
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setattr(
-        "invarlock.core.adapter_provenance.extract_adapter_provenance",
+        "invarlock.core.backend_inventory.extract_adapter_provenance",
         lambda name: (_ for _ in ()).throw(RuntimeError("boom")),
         raising=False,
     )

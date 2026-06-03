@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 def _load_linter_module():
-    path = Path("scripts/lint_assurance_xrefs.py")
+    path = Path("scripts/docs/lint_assurance_xrefs.py")
     spec = importlib.util.spec_from_file_location("lint_assurance_xrefs", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -19,7 +19,7 @@ def _load_linter_module():
 
 def test_assurance_cross_reference_linter_script_passes() -> None:
     result = subprocess.run(
-        [sys.executable, "scripts/lint_assurance_xrefs.py"],
+        [sys.executable, "scripts/docs/lint_assurance_xrefs.py"],
         capture_output=True,
         text=True,
     )

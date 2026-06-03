@@ -4,7 +4,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 HELPERS_SH="${SCRIPT_DIR}/helpers.sh"
-MOCK_BIN_DIR="${SCRIPT_DIR}/mocks/bin"
 
 FILTER_REGEX=""
 DO_BRANCH_COVERAGE="false"
@@ -49,25 +48,43 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-REAL_PYTHON3="$(command -v python3 2>/dev/null || true)"
+if [[ -x "${ROOT_DIR}/.venv/bin/python" ]]; then
+    REAL_PYTHON3="${ROOT_DIR}/.venv/bin/python"
+else
+    REAL_PYTHON3="$(command -v python3 2>/dev/null || true)"
+fi
 
 coverage_owner_hint() {
     local rel="$1"
     case "${rel}" in
-        scripts/evidence_packs/lib/config_generator.sh) echo "scripts/evidence_packs/tests/test_config_generator.sh" ;;
-        scripts/evidence_packs/lib/dataset_provider_config.sh) echo "scripts/evidence_packs/tests/test_dataset_provider_config.sh" ;;
-        scripts/evidence_packs/lib/task_serialization.sh) echo "scripts/evidence_packs/tests/test_task_serialization.sh" ;;
-        scripts/evidence_packs/lib/queue_manager.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;
-        scripts/evidence_packs/lib/scheduler.sh) echo "scripts/evidence_packs/tests/test_scheduler.sh" ;;
-        scripts/evidence_packs/lib/gpu_worker.sh) echo "scripts/evidence_packs/tests/test_gpu_worker.sh" ;;
-        scripts/evidence_packs/lib/fault_tolerance.sh) echo "scripts/evidence_packs/tests/test_fault_tolerance.sh" ;;
-        scripts/evidence_packs/lib/task_functions.sh) echo "scripts/evidence_packs/tests/test_task_functions.sh" ;;
-        scripts/evidence_packs/lib/result_compiler.sh) echo "scripts/evidence_packs/tests/test_result_compiler.sh" ;;
-        scripts/evidence_packs/lib/model_creation.sh) echo "scripts/evidence_packs/tests/test_model_creation.sh" ;;
-        scripts/evidence_packs/lib/runtime.sh) echo "scripts/evidence_packs/tests/test_runtime.sh" ;;
-        scripts/evidence_packs/lib/validation_suite.sh) echo "scripts/evidence_packs/tests/test_validation_suite.sh" ;;
-        scripts/evidence_packs/lib/setup_remote.sh) echo "scripts/evidence_packs/tests/test_setup_remote.sh" ;;
-        scripts/evidence_packs/suites.sh) echo "scripts/evidence_packs/tests/test_suites.sh" ;;
+        scripts/evidence_packs/lib/config/config_generator.sh) echo "scripts/evidence_packs/tests/test_config_generator.sh" ;;
+        scripts/evidence_packs/lib/config/dataset_provider_config.sh) echo "scripts/evidence_packs/tests/test_dataset_provider_config.sh" ;;
+        scripts/evidence_packs/lib/tasks/task_serialization.sh) echo "scripts/evidence_packs/tests/test_task_serialization.sh" ;;
+        scripts/evidence_packs/lib/queue/queue_manager.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;
+        scripts/evidence_packs/lib/queue/queue_core.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;
+        scripts/evidence_packs/lib/queue/queue_lifecycle.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;
+        scripts/evidence_packs/lib/queue/queue_dependencies.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;
+        scripts/evidence_packs/lib/queue/queue_memory_plan.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;
+        scripts/evidence_packs/lib/queue/queue_generation.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;
+        scripts/evidence_packs/lib/queue/scheduler.sh) echo "scripts/evidence_packs/tests/test_scheduler.sh" ;;
+        scripts/evidence_packs/lib/queue/scheduler_core.sh) echo "scripts/evidence_packs/tests/test_scheduler.sh" ;;
+        scripts/evidence_packs/lib/queue/scheduler_gpu_runtime.sh) echo "scripts/evidence_packs/tests/test_scheduler.sh" ;;
+        scripts/evidence_packs/lib/queue/scheduler_reservations.sh) echo "scripts/evidence_packs/tests/test_scheduler.sh" ;;
+        scripts/evidence_packs/lib/queue/scheduler_selection.sh) echo "scripts/evidence_packs/tests/test_scheduler.sh" ;;
+        scripts/evidence_packs/lib/queue/gpu_worker.sh) echo "scripts/evidence_packs/tests/test_gpu_worker.sh" ;;
+        scripts/evidence_packs/lib/core/fault_tolerance.sh) echo "scripts/evidence_packs/tests/test_fault_tolerance.sh" ;;
+        scripts/evidence_packs/lib/tasks/task_functions.sh) echo "scripts/evidence_packs/tests/test_task_functions.sh" ;;
+        scripts/evidence_packs/lib/tasks/task_common.sh) echo "scripts/evidence_packs/tests/test_task_functions.sh" ;;
+        scripts/evidence_packs/lib/tasks/task_baseline.sh) echo "scripts/evidence_packs/tests/test_task_functions.sh" ;;
+        scripts/evidence_packs/lib/tasks/task_edit_lifecycle.sh) echo "scripts/evidence_packs/tests/test_task_functions.sh" ;;
+        scripts/evidence_packs/lib/tasks/task_error_lifecycle.sh) echo "scripts/evidence_packs/tests/test_task_functions.sh" ;;
+        scripts/evidence_packs/lib/tasks/model_creation.sh) echo "scripts/evidence_packs/tests/test_model_creation.sh" ;;
+        scripts/evidence_packs/lib/core/runtime.sh) echo "scripts/evidence_packs/tests/test_runtime.sh" ;;
+        scripts/evidence_packs/lib/validation/validation_suite.sh) echo "scripts/evidence_packs/tests/test_validation_suite.sh" ;;
+        scripts/evidence_packs/lib/validation/validation_preflight.sh) echo "scripts/evidence_packs/tests/test_validation_suite.sh" ;;
+        scripts/evidence_packs/lib/validation/validation_runtime.sh) echo "scripts/evidence_packs/tests/test_validation_suite.sh" ;;
+        scripts/evidence_packs/lib/validation/validation_dynamic.sh) echo "scripts/evidence_packs/tests/test_validation_suite.sh" ;;
+        scripts/evidence_packs/lib/core/setup_remote.sh) echo "scripts/evidence_packs/tests/test_setup_remote.sh" ;;
         scripts/evidence_packs/run_qwen14_sentinels.sh) echo "scripts/evidence_packs/tests/test_run_qwen14_sentinels.sh" ;;
         scripts/evidence_packs/run_suite.sh) echo "scripts/evidence_packs/tests/test_run_suite.sh" ;;
         scripts/evidence_packs/run_mini_pack_gate.sh) echo "scripts/evidence_packs/tests/test_run_mini_pack_gate.sh" ;;
@@ -81,7 +98,7 @@ coverage_target_files() {
     (
         cd "${ROOT_DIR}"
         find scripts/evidence_packs -maxdepth 1 -type f -name '*.sh' -print
-        find scripts/evidence_packs/lib -maxdepth 1 -type f -name '*.sh' -print
+        find scripts/evidence_packs/lib -type f -name '*.sh' -print
     ) | sort
 }
 
@@ -920,16 +937,16 @@ run_one_test() {
 export TEST_ROOT="."
 export TEST_TMPDIR="$2"
 export TEST_REAL_PYTHON3="$3"
-export PATH="$4:$PATH"
+source "$4"
+export PATH="$(mock_install_bin_dir):$PATH"
 source "$5"
-source "$6"
 # Keep xtrace prefixes short to avoid bash 3.2 truncation on long absolute paths.
 # Note: bash 3.2 truncates long PS4 expansions; we rely on shorter prod script paths
 # and ignore malformed trace lines from very long absolute paths (e.g., temp dirs).
 export PS4="__XTRACE__:\${BASH_SOURCE[0]:-}:\${LINENO}: "
 	set -x
-	"$7"
-	        ' -- "${ROOT_DIR}" "${tmp_dir}" "${REAL_PYTHON3}" "${MOCK_BIN_DIR}" "${HELPERS_SH}" "${file}" "${fn}" >"${out_file}" 2>"${err_file}" </dev/null
+	"$6"
+	        ' -- "${ROOT_DIR}" "${tmp_dir}" "${REAL_PYTHON3}" "${HELPERS_SH}" "${file}" "${fn}" >"${out_file}" 2>"${err_file}" </dev/null
 	    rc=$?
 	    if [[ ${rc} -eq 0 ]]; then
             local safe_id trace_copy
@@ -949,11 +966,11 @@ export PS4="__XTRACE__:\${BASH_SOURCE[0]:-}:\${LINENO}: "
 export TEST_ROOT="."
 export TEST_TMPDIR="$2"
 export TEST_REAL_PYTHON3="$3"
-export PATH="$4:$PATH"
+	source "$4"
+export PATH="$(mock_install_bin_dir):$PATH"
 	source "$5"
-	source "$6"
-	"$7"
-	        ' -- "${ROOT_DIR}" "${tmp_dir}" "${REAL_PYTHON3}" "${MOCK_BIN_DIR}" "${HELPERS_SH}" "${file}" "${fn}" >"${out_file}" 2>"${err_file}" </dev/null
+	"$6"
+	        ' -- "${ROOT_DIR}" "${tmp_dir}" "${REAL_PYTHON3}" "${HELPERS_SH}" "${file}" "${fn}" >"${out_file}" 2>"${err_file}" </dev/null
 	    rc=$?
 	    if [[ ${rc} -eq 0 ]]; then
             rm -rf "${tmp_dir}"

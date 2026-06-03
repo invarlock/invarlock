@@ -20,7 +20,13 @@ import numpy as np
 
 from invarlock.core.bootstrap import compute_paired_delta_log_ci
 from invarlock.core.exceptions import ValidationError
-from invarlock.utils.bootstrap import (
+from invarlock.eval.primary_metric_accuracy import (
+    compute_accuracy_counts as compute_accuracy_counts,
+)
+from invarlock.eval.primary_metric_accuracy import (
+    infer_binary_label_from_ids as infer_binary_label_from_ids,
+)
+from invarlock.utils import (
     bootstrap_mean_statistics,
     percentile_interval_from_statistics,
 )
@@ -400,8 +406,10 @@ class _Accuracy:
         ):
             c = windows.get(c_key)
             t = windows.get(t_key)
-            if _is_non_bool_number(c) and _is_non_bool_number(t) and t > 0:
-                total = float(t)
+            c_value = _coerce_float(c)
+            t_value = _coerce_float(t)
+            if c_value is not None and t_value is not None and t_value > 0:
+                total = t_value
                 # Optional abstain/tie handling with documented policy
                 policy = (
                     windows.get("policy", {})
@@ -416,18 +424,20 @@ class _Accuracy:
                     policy.get("ties_count_as_incorrect", False)
                 )
                 # Apply abstain exclusion from denominator if requested
-                if exclude_abstain and _is_non_bool_number(abstain) and abstain > 0:
-                    total = max(1.0, total - float(abstain))
+                abstain_value = _coerce_float(abstain)
+                if exclude_abstain and abstain_value is not None and abstain_value > 0:
+                    total = max(1.0, total - abstain_value)
                 # Apply tie policy
-                if _is_non_bool_number(ties) and ties > 0:
+                ties_value = _coerce_float(ties)
+                if ties_value is not None and ties_value > 0:
                     if count_ties_as_correct:
-                        c = float(c) + float(ties)
+                        c_value += ties_value
                     elif count_ties_as_incorrect:
                         pass
                     else:
                         if exclude_abstain:
-                            total = max(1.0, total - float(ties))
-                return float(c) / float(total)
+                            total = max(1.0, total - ties_value)
+                return c_value / total
         return float("nan")
 
     def accumulate(self, contrib: MetricContribution) -> None:
@@ -582,11 +592,13 @@ def compute_primary_metric_from_report(
             final_win = fin
             # Attach counts into a small context to help gating
             n_prev = _coerce_int(prev.get("total"))
-            if n_prev is None and isinstance(prev.get("example_correct"), list):
-                n_prev = len(prev.get("example_correct"))
+            prev_examples = prev.get("example_correct")
+            if n_prev is None and isinstance(prev_examples, list):
+                n_prev = len(prev_examples)
             n_fin = _coerce_int(fin.get("total"))
-            if n_fin is None and isinstance(fin.get("example_correct"), list):
-                n_fin = len(fin.get("example_correct"))
+            fin_examples = fin.get("example_correct")
+            if n_fin is None and isinstance(fin_examples, list):
+                n_fin = len(fin_examples)
             # Propagate counts source tagging when present
             counts_source = clf.get("counts_source")
             if isinstance(counts_source, str) and counts_source:
@@ -623,10 +635,11 @@ def compute_primary_metric_from_report(
     if kind == "accuracy":
 
         def _ensure_counts(win: dict[str, Any]) -> dict[str, Any]:
+            total = _coerce_float(win.get("total"))
             has_counts = (
                 isinstance(win.get("correct_total"), int | float)
-                and isinstance(win.get("total"), int | float)
-                and win.get("total") > 0
+                and total is not None
+                and total > 0
             )
             if has_counts:
                 return win
@@ -673,12 +686,13 @@ def compute_primary_metric_from_report(
         )
         if isinstance(pm_base, dict) and (base_kind == kind_l or same_family):
             base_ref = pm_base.get("final")
-            if _is_non_bool_number(base_ref):
+            base_value = _coerce_float(base_ref)
+            if base_value is not None:
                 is_ppl_like = str(kind).lower().startswith("ppl")
-                if is_ppl_like and base_ref > 0:
-                    ratio_vs_baseline = float(final_point) / float(base_ref)
-                elif str(kind).lower() == "accuracy" and 0 <= base_ref <= 1:
-                    ratio_vs_baseline = float(final_point) - float(base_ref)
+                if is_ppl_like and base_value > 0:
+                    ratio_vs_baseline = float(final_point) / base_value
+                elif str(kind).lower() == "accuracy" and 0 <= base_value <= 1:
+                    ratio_vs_baseline = float(final_point) - base_value
 
     invalid = True
     invalid = not (_is_finite(preview_point) and _is_finite(final_point))
@@ -750,45 +764,3 @@ def validate_primary_metric_block(block: dict[str, Any]) -> dict[str, Any]:
             code="E402", message="METRICS-VALIDATION-FAILED", details=details
         )
     return block
-
-
-# --- Classification helpers (deterministic smoke path) ----------------------
-
-
-def infer_binary_label_from_ids(input_ids: list[int]) -> int:
-    """Deterministic binary label from token ids (parity), for smoke usage.
-
-    This is a placeholder for provider-driven labels; it enables a stable,
-    model-agnostic accuracy path for tests and demos without dataset labels.
-    """
-    total = 0
-    for token in input_ids:
-        coerced = _coerce_int(token)
-        if coerced is None:
-            return 0
-        total += coerced
-    return int(total % 2)
-
-
-def compute_accuracy_counts(records: list[dict[str, Any]]) -> tuple[int, int]:
-    """Compute accuracy counts from records with measured correctness or input_ids.
-
-    Prefer explicit per-example correctness when present. Otherwise predict the
-    same as the inferred label for a perfect-accuracy smoke path.
-    Returns (correct_total, total).
-    """
-    correct = 0
-    total = 0
-    for rec in records:
-        explicit_correct = rec.get("correct") if isinstance(rec, dict) else None
-        if isinstance(explicit_correct, bool):
-            correct += int(explicit_correct)
-            total += 1
-            continue
-        seq = rec.get("input_ids") if isinstance(rec, dict) else None
-        if not isinstance(seq, list) or not seq:
-            continue
-        infer_binary_label_from_ids(seq)
-        correct += 1  # perfect prediction in smoke path
-        total += 1
-    return correct, total

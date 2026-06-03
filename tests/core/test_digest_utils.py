@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from invarlock.utils.digest import hash_int_array, hash_json
+from invarlock.utils import hash_int_array, hash_json
 
 
 def test_hash_json_stability_and_sensitivity():

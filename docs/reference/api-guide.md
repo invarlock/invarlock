@@ -11,7 +11,7 @@
 | **Network** | Offline by default; CLI runs use `evaluate --allow-network`, while Python callers set `INVARLOCK_ALLOW_NETWORK=1` to download models or datasets. |
 | **Inputs** | Model instance, adapter, edit, guard list, `RunConfig`, optional calibration data. |
 | **Outputs / Artifacts** | `RunReport` object; optional event logs/checkpoints; evaluation bundles via `invarlock.reporting.make_report(...)` and `report_bundle.save_evaluation_bundle(...)`. |
-| **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/core/api.py`, `src/invarlock/cli/config_execution.py`, `src/invarlock/reporting/report_make.py`, `src/invarlock/reporting/report_make_inputs.py`, `src/invarlock/reporting/report_make_assembly.py`, `src/invarlock/reporting/report_make_output.py`, `src/invarlock/reporting/report_bundle.py`, `src/invarlock/reporting/report_console.py`, `src/invarlock/reporting/report_files.py`, `src/invarlock/reporting/report_schema.py`. |
+| **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/core/api.py`, `src/invarlock/cli/config_execution.py`, `src/invarlock/reporting/report_make.py`, `src/invarlock/reporting/report_make_assembly.py`, `src/invarlock/reporting/report_bundle.py`, `src/invarlock/reporting/report_summary.py`, `src/invarlock/reporting/report_schema.py`. |
 
 ## Quick Start
 
@@ -126,7 +126,7 @@ report = CoreRunner().execute(
 | `enabled` | Whether auto mode is enabled. |
 | `tier` | Tier label (`balanced`, `conservative`, `aggressive`). |
 | `probes` | Micro-probe count (0–10). |
-| `target_pm_ratio` | Target ratio for auto tuning (CLI default: 2.0). |
+| `target_pm_ratio` | Target ratio for auto tuning (default: 1.0 when unset). |
 
 ### RunReport fields
 
@@ -234,13 +234,13 @@ calibration = [
 ### reports (canonical helpers)
 
 ```python
-from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.render_markdown import render_report_markdown
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_schema import validate_report
 
-report = make_report(report, baseline_report)
-validate_report(report)
-print(render_report_markdown(report))
+evaluation_report = make_report(report, baseline_report)
+validate_report(evaluation_report)
+print(render_report_markdown(evaluation_report))
 ```
 
 ### Exceptions
@@ -278,5 +278,5 @@ Core exceptions live in `invarlock.core.exceptions`:
 - [Dataset Providers](datasets.md)
 - [Guards](guards.md)
 - [reports](reports.md) — Schema, telemetry, and HTML export
-- [Determinism Contracts](../assurance/08-determinism-contracts.md) — Reproducibility guarantees
+- [Determinism Contracts](../assurance/08-determinism-contracts.md) — Reproducibility contract
 - [Observability](observability.md) — Monitoring and telemetry

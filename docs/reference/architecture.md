@@ -4,10 +4,10 @@
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Edit-agnostic safety evaluation framework for ML model weight modifications. |
+| **Purpose** | Auditable strict-verification framework for ML model weight modifications. |
 | **Audience** | Developers extending InvarLock, operators debugging pipelines, security reviewers. |
 | **Core components** | CLI shells, Core/runtime policy layer, Guard chain, Reporting/artifact subsystem. |
-| **Design goals** | Torch-independent core, edit-agnostic guards, deterministic evaluation, explicit artifact contracts, full provenance. |
+| **Design goals** | Torch-independent core, edit-stack-neutral guards, deterministic evaluation, explicit artifact contracts, full provenance. |
 | **Source of truth** | `src/invarlock/core/*.py`, `src/invarlock/reporting/*.py`, `src/invarlock/runtime_provenance.py`, `src/invarlock/runtime_verify.py`, `src/invarlock/cli/commands/*.py`, `src/invarlock/cli/run_*.py`, `src/invarlock/guards/*.py`. |
 
 See the [Glossary](../assurance/glossary.md) for definitions of terms such as
@@ -70,8 +70,8 @@ InvarLock follows a layered architecture with clear separation of concerns:
 │                     CORE POLICY / CONTRACT LAYER                            │
 │  ┌─────────────────────────────────────────────────────────────────┐        │
 │  │ evaluate_plan · report_inputs · doctor_findings                │        │
-│  │ verify_contract · run_retry_policy · run_snapshot_contract     │        │
-│  │ run_guard_overhead_policy · run_provenance_contract            │        │
+│  │ verify_contract · retry · run_snapshot_contract                │        │
+│  │ run_report_contract · runtime_verify                          │        │
 │  └─────────────────────────────────────────────────────────────────┘        │
 │                                                                             │
 ├─────────────────────────────────────────────────────────────────────────────┤
@@ -94,7 +94,7 @@ InvarLock follows a layered architecture with clear separation of concerns:
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                          REPORTING / FILES LAYER                            │
 │  ┌──────────────┐ ┌──────────────┐ ┌────────────┐ ┌────────────┐            │
-│  │ report_make  │ │ report_files │ │   render   │ │  manifest  │            │
+│  │ report_make  │ │report_bundle │ │   render   │ │  schema    │            │
 │  │ + console    │ │ + evidence   │ │  (MD/HTML) │ │   (JSON)   │            │
 │  └──────────────┘ └──────────────┘ └────────────┘ └────────────┘            │
 │                                                                             │
@@ -110,10 +110,10 @@ modules should stay thin: parse arguments, call core/reporting owners, render
 output, and map failures to exit codes.
 
 Shell support modules such as `cli/config_execution.py`, `cli/run_execution.py`,
-`cli/run_config.py`, `cli/run_pairing.py`, `cli/run_overhead.py`, and
-`cli/run_artifacts.py` belong to this boundary layer as well. They can perform
-CLI-facing adaptation and console/event rendering, but they must not become
-policy owners.
+`cli/run_config.py`, `cli/run_pairing.py`, and `cli/run_overhead.py` belong to
+this boundary layer as well. They can perform CLI-facing adaptation and
+console/event rendering; policy ownership stays in the core and reporting
+owners.
 
 | Command | Purpose | Primary Output |
 | --- | --- | --- |
@@ -136,22 +136,20 @@ by the CLI and non-CLI entrypoints.
 | `report_inputs.py` | Canonical report path resolution and JSON-object validation |
 | `doctor_findings.py` | Structured doctor findings and optional report cross-check analysis |
 | `verify_contract.py` | Structured report-verification service used by `verify` and evidence-pack flows |
-| `runtime_manifest_verify.py` + `runtime_provenance.py` | Authoritative runtime-manifest verification and runtime-provenance ownership for report verification |
+| `runtime_verify.py` + `runtime_provenance.py` | Authoritative runtime-manifest verification and runtime-provenance ownership for report verification |
 | `run_policy.py` | Shared run policy helpers such as split choice, PM thresholds, and overhead policy |
-| `run_retry_policy.py` | Retry-attempt summaries and retry state transitions |
-| `run_snapshot_contract.py` + `run_snapshot_policy.py` | Snapshot planning, restore behavior, and retry transitions |
-| `run_guard_overhead_policy.py` | Guard-overhead normalization, summary building, and report shaping |
-| `run_provenance_contract.py` + `run_report_contract.py` | Run provenance and run-report assembly contracts |
-| `run_report_payload_policy.py` | Deterministic payload shaping for context, metrics, guards, and flags |
+| `retry.py` | Retry controller, edit-parameter adjustment, attempt summaries, and retry state transitions |
+| `run_snapshot_contract.py` | Snapshot planning, restore behavior, and retry transitions |
+| `run_report_contract.py` | Run provenance finalization, payload shaping, and run-report assembly contracts |
 
 ### Runtime Provenance Verification Ownership
 
 Runtime provenance uses a single verifier implementation:
 
-- `core/runtime_manifest_verify.py` is the authoritative verifier for
+- `runtime_verify.py` is the authoritative programmatic verifier for
   `runtime.manifest.json` plus report-digest binding checks.
-- `runtime_verify.py` and `cli/runtime_verify.py` are the programmatic and CLI
-  entrypoints for that verifier.
+- `cli/commands/verify.py` owns the CLI entrypoints for both report verification
+  and advanced runtime-manifest verification.
 - `runtime_provenance.py` calls the same verifier when `invarlock verify`
   enforces runtime provenance on container-backed reports.
 - Product behavior does not depend on finding an external verifier binary on
@@ -189,19 +187,16 @@ Report generation, validation, persistence, and rendering.
 | --- | --- |
 | `report_schema.py` | Evaluation report schema and structural validation |
 | `report_validation.py` | Canonical validation-flag computation |
-| `report_make.py` | Public evaluation-report entrypoint that coordinates the split report-making owners |
-| `report_make_inputs.py` | Input normalization, baseline reference building, and build-section extraction |
+| `report_make.py` | Evaluation-report input normalization, build-section extraction, output shaping, and public report assembly |
 | `report_make_assembly.py` | Policy/provenance/guard assembly and report build-context composition |
-| `report_make_output.py` | Final evaluation-report shaping and output payload construction |
 | `report_bundle.py` | Evaluation-bundle persistence, manifest writing, and evidence attachment |
 | `report_contract.py` | Input loading and report-generation planning |
-| `report_console.py` | Console/report validation summary helpers used by CLI/reporting surfaces |
-| `report_summary.py` | Shared executive-summary/view-model derivation for reporting surfaces |
-| `render.py` | Markdown rendering for evaluation reports |
+| `report_overhead.py` | Guard-overhead normalization, summary building, and report shaping |
+| `report_summary.py` | Console validation blocks and shared executive-summary/view-model derivation for reporting surfaces |
+| `render_markdown.py` | Markdown rendering for evaluation reports |
 | `html.py` | HTML export with styling |
-| `report_files.py` | Raw run-report JSON/Markdown/HTML persistence |
-| `evidence.py` | Evidence file normalization and attachment helpers |
-| `telemetry.py` | Performance metrics collection |
+| `core/guard_evidence.py` | Canonical guard-evidence normalization before reporting assembly |
+| `report_builder_support.py` | Report build context, telemetry extraction, telemetry payloads, artifacts, and baseline references |
 
 ## Pipeline Flow
 
@@ -340,10 +335,10 @@ tests. The intended invariants are:
   `guards/__init__.py`. Package roots should expose only explicit canonical
   exports.
 - No `rmt_legacy` references in production source. RMT ownership lives in
-  `rmt.py`, `rmt_analysis.py`, `rmt_detection.py`, and `rmt_math.py`.
-- No dependency-map orchestration in command shells. Public command owners must
-  stay thin and must not rebuild giant `deps` dictionaries or inject callables
-  to recreate removed indirection.
+  `rmt.py`, `rmt_analysis.py`, and `rmt_detection.py`.
+- No dependency-map orchestration in command shells. Public command owners stay
+  thin and avoid giant `deps` dictionaries or injected callables that recreate
+  removed indirection.
 - No compatibility-only command signatures once a canonical owner contract
   exists. Example: lens-metric calculation takes a required `MetricsConfig`
   instead of deprecated per-call overrides.
@@ -360,13 +355,19 @@ verification and programmatic execution.
 | Decision | Rationale | Implementation |
 | --- | --- | --- |
 | **Torch-independent core** | `runner.py` coordinates without importing torch; adapters encapsulate torch-specific logic. | Adapter protocol in `core/api.py` |
-| **Edit-agnostic guards** | Guards work with any weight modification (quantization, pruning, LoRA merge). | Guard protocol validates model state, not edit type |
+| **Edit-stack-neutral guards** | Guards work with subject checkpoints from quantization, pruning, LoRA merge, fine-tuning, or other weight-edit workflows. | Guard protocol validates model state, not edit toolchain |
 | **Tier-based policies** | Calibrated thresholds in `tiers.yaml` for balanced/conservative/aggressive safety profiles. | Policy resolution in `guards/policies.py` |
 | **Deterministic evaluation** | Seed bundle + window pairing schedules ensure reproducible metrics. | `meta.seeds`, `dataset.windows.stats` tracking |
 | **Functional-core / imperative-shell split** | Keep policy, artifact contracts, and verdict computation reusable outside the CLI while CLI modules stay thin. | `core/*.py` + `reporting/*.py` owners called from `cli/commands/*.py` |
-| **Single verifier ownership** | Runtime-manifest verification should not vary with host tooling, so it must use one product implementation. | `core/runtime_manifest_verify.py`, `runtime_verify.py`, `runtime_provenance.py` |
+| **Single verifier ownership** | Runtime-manifest verification should not vary with host tooling, so it must use one product implementation. | `runtime_verify.py`, `runtime_provenance.py` |
 | **Plugin architecture** | Entry points for guards, adapters, edits enable extension without core changes. | `importlib.metadata` discovery in `core/registry.py` |
 | **Log-space primary metrics** | Paired ΔlogNLL with BCa bootstrap avoids ratio math bias. | `core/bootstrap.py` implementation |
+
+Edit-stack neutral means the stable production boundary is BYOE: an external
+quantization tool, pruner, adapter merge, or fine-tuning pipeline produces the
+subject checkpoint, and InvarLock validates the resulting
+baseline-vs-subject evidence.
+Built-in edit generation is limited to demo/smoke support.
 
 ## Module Dependencies
 
@@ -384,7 +385,7 @@ verification and programmatic execution.
 │                   ┌──────────────────────────────┐                           │
 │                   │ cli shell support modules    │                           │
 │                   │ run_config/run_pairing/      │                           │
-│                   │ run_overhead/run_artifacts   │                           │
+│                   │ run_execution/run_overhead   │                           │
 │                   └─────────────┬────────────────┘                           │
 │                                 │                                            │
 │                                 ▼                                            │
@@ -429,9 +430,9 @@ InvarLock supports extension via entry points without modifying core code.
 
 | Extension Type | Entry Point Group | Example |
 | --- | --- | --- |
-| Adapters | `invarlock.adapters` | `hf_causal`, `hf_mlm`, `hf_causal` |
+| Adapters | `invarlock.adapters` | `hf_causal`, `hf_mlm`, `hf_seq2seq`, `hf_multimodal`, `hf_auto`, `hf_bnb`, `hf_awq`, `hf_gptq`, `hf_torchao`, `hf_hqq`, `hf_quanto`, `hf_ct` |
 | Guards | `invarlock.guards` | `invariants`, `spectral`, `rmt`, `variance` |
-| Edits | `invarlock.edits` | `quant_rtn`, `noop` |
+| Edits | `invarlock.edits` | `quant_rtn` (`noop` is built in for internal/catalog use, not a pyproject entry-point example) |
 
 ### Custom Adapter Example
 

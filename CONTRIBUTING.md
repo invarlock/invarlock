@@ -21,9 +21,9 @@ the runtime container by default; host-side development outside that
 container should use `--execution-mode host` on the public `evaluate` path:
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --execution-mode host --baseline gpt2 --subject distilgpt2 --adapter auto
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --execution-mode host --baseline gpt2 --subject distilgpt2 --baseline-adapter auto --subject-adapter auto
 # repo preset example:
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --execution-mode host --baseline gpt2 --subject gpt2 --adapter auto --preset configs/presets/causal_lm/wikitext2_512.yaml --profile ci
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --execution-mode host --baseline gpt2 --subject gpt2 --baseline-adapter auto --subject-adapter auto --preset configs/presets/causal_lm/wikitext2_512.yaml --profile ci
 ```
 
 ### 1.2 Quick setup (recommended)
@@ -74,22 +74,22 @@ invarlock doctor --json
 For maintainer-facing CLI smoke coverage, use the lane scripts directly:
 
 ```bash
-bash scripts/cli_smoke_fast.sh
-bash scripts/cli_smoke_negative.sh
-bash scripts/cli_smoke_realistic.sh
+bash scripts/smoke/cli_smoke_fast.sh
+bash scripts/smoke/cli_smoke_negative.sh
+INVARLOCK_SMOKE_LANES=realistic bash scripts/smoke/cli_smoke_matrix.sh
 
 # or dispatch the full matrix
-bash scripts/cli_exhaustive_smoke.sh
+bash scripts/smoke/cli_smoke_matrix.sh
 ```
 
 Lane intent:
 
 - `cli_smoke_fast.sh` covers broad command-surface and positive-path tiny-model flows
 - `cli_smoke_negative.sh` covers malformed, policy-fail, and fail-closed categories
-- `cli_smoke_realistic.sh` wraps the GPT-2-sized smoke campaign
+- `INVARLOCK_SMOKE_LANES=realistic cli_smoke_matrix.sh` wraps the GPT-2-sized smoke campaign
 
 Delegated config execution and calibration internals re-enter through the
-package-internal `python -m invarlock.cli.internal_config_run` module, not a
+package-internal `python -m invarlock.cli.config_execution` module, not a
 public CLI command. Public docs and user examples should continue to use
 `evaluate`, `verify`, `report`, `doctor`, and `advanced ...`.
 
@@ -103,7 +103,7 @@ Top-level structure (simplified):
 invarlock/
 ├── src/invarlock/           # Library + CLI implementation
 │   ├── core/            # Runner, registry, contracts, auto-tuning, events, types
-│   ├── guards/          # Safety mechanisms (invariants, spectral, rmt, variance, policies)
+│   ├── guards/          # Guard mechanisms (invariants, spectral, rmt, variance, policies)
 │   ├── eval/            # Evaluation metrics and helpers
 │   ├── reporting/       # Evaluation report + reporting surface
 │   ├── cli/             # Typer-based CLI app and commands
@@ -193,9 +193,9 @@ For more curated examples (including the CI subset), see `tests/README.md`.
 
 Coverage configuration lives in `pyproject.toml` under `[tool.coverage.*]`.
 The canonical threshold/source-of-truth lives in
-`scripts/coverage_policy.py`; both `scripts/check_coverage_thresholds.py` and
-the Makefile coverage targets consume that shared policy. Per-file branch
-coverage thresholds are enforced by `make coverage-enforce`.
+`scripts/coverage/check_coverage_thresholds.py`, which is also consumed by
+the Makefile coverage targets. Per-file branch coverage thresholds are
+enforced by `make coverage-enforce`.
 
 Key points:
 
@@ -218,11 +218,11 @@ Key points:
 
   ```bash
   make coverage-enforce
-  # internally: python scripts/check_coverage_thresholds.py --coverage reports/cov.xml --json reports/thresholds.json
+  # internally: python scripts/coverage/check_coverage_thresholds.py --coverage reports/cov.xml --json reports/thresholds.json
   ```
 
 - **Critical surface** includes (see `THRESHOLDS`, `CORE_PREFIXES`, and
-  `CORE_FILES` in `scripts/coverage_policy.py`):
+  `CORE_FILES` in `scripts/coverage/check_coverage_thresholds.py`):
   - Core runtime: everything under `src/invarlock/core/`
     (runner, registry, contracts, auto_tuning, events, types, checkpoint, api, retry)
   - Guards: everything under `src/invarlock/guards/`
@@ -287,7 +287,7 @@ Key points:
 When you modify a file covered by thresholds, please:
 
 - Add or extend tests to keep its measured coverage at or above its enforced floor
-- Update/add entries in `scripts/coverage_policy.py` if you
+- Update/add entries in `scripts/coverage/check_coverage_thresholds.py` if you
   expand the critical surface or add new core modules
 
 If the checker reports **“no coverage data present”**, ensure the module is
@@ -308,7 +308,7 @@ make docs           # mkdocs build --strict
 make docs-serve     # mkdocs serve -a 127.0.0.1:8000
 make docs-check     # consolidated docs validation plus curated live examples
 make docs-live-fast # curated deterministic live docs/notebook subset
-make docs-lint      # markdown + spell lint (via scripts/docs_lint.py)
+make docs-lint      # markdown + spell lint (via scripts/docs/docs_lint.py)
 ```
 
 Granular helpers:
@@ -322,7 +322,7 @@ make docs-lint-spell      # cspell only
 
 ### 4.2 Docs linting (markdownlint + cspell)
 
-`python scripts/docs_lint.py` wraps common linters:
+`python scripts/docs/docs_lint.py` wraps common linters:
 
 - Requires Node 22.18+.
 - Uses `markdownlint`, `markdownlint-cli2`, or `npx markdownlint-cli*`
@@ -332,8 +332,8 @@ This script runs over `README.md`, `CONTRIBUTING.md`, and all `docs/**/*.md`.
 To keep docs CI‑clean, please run at least:
 
 ```bash
-python scripts/docs_lint.py --markdown   # style
-python scripts/docs_lint.py --spell      # spelling
+python scripts/docs/docs_lint.py --markdown   # style
+python scripts/docs/docs_lint.py --spell      # spelling
 ```
 
 If you only have Node installed, the script will look for `node_modules/.bin` first.
@@ -349,7 +349,7 @@ otherwise it skips with a warning.
   - Relevant pages under `docs/reference/` and `docs/user-guide/`
 - When adding new CLI switches or config fields, update:
   - `docs/reference/cli.md`
-  - `docs/reference/config-schema.md` (and run `scripts/check_config_schema_sync.py`)
+  - `docs/reference/config-schema.md` (and run `scripts/docs/docs_check.py --config-schema-sync`)
 
 ---
 
@@ -389,25 +389,88 @@ When touching core runtime or guards, bias toward deterministic tests
 
 ### 5.3 Code quality checks
 
-Before opening a PR, please run at least:
+Before opening a PR, run the focused checks for the files you changed. For
+small code changes this usually starts with:
 
 ```bash
 make test
 make lint
 make format
 make docs
-python scripts/docs_lint.py --markdown
+python scripts/docs/docs_lint.py --markdown
 ```
 
-For a more complete sweep, use:
+For maintainer PRs targeting protected branches, the expected bar is stronger:
+run the practical local equivalent of the GitHub checks before pushing, then
+use GitHub as confirmation rather than discovery. Start with:
+
+```bash
+git diff --check origin/staging/next...HEAD
+make lock-sync
+pre-commit run --all-files --show-diff-on-failure
+make workflow-lint
+make docs-check
+make mypy-typed-surface
+make coverage-enforce
+make packaging-smoke-minimal
+make security
+```
+
+For broader functional validation, use:
 
 ```bash
 make verify
 ```
 
-This runs tests, a smoke regression (`scripts/run_smoke_regression.sh`),
+This runs tests, a smoke regression (`scripts/smoke/run_smoke_regression.sh`),
 CLI command-surface smokes, ruff lint, ruff format (check mode), packaged
-contract sync checks, and markdown lint over docs.
+contract sync checks, repository maintenance checks, public evidence audit, and
+strict docs linting.
+
+### 5.4 Supply-chain and artifact checks
+
+For security-sensitive, public-evidence, release, or artifact-heavy PRs, also
+run a PR-range secret scan before pushing. Install the same scanner version used
+by the GitHub workflow if needed:
+
+```bash
+go install github.com/zricethezav/gitleaks/v8@v8.30.0
+gitleaks git . \
+  --redact \
+  --no-banner \
+  --log-opts origin/staging/next..HEAD \
+  --report-format json \
+  --report-path artifacts/supply-chain/gitleaks-pr.json
+```
+
+Keep large generated outputs out of the PR. GitHub rejects files over 10 MB in
+the PR diff and generated directories such as `site/`, `dist/`, `build/`,
+`runs/`, and report-output directories. If you must add review artifacts, prefer
+compact canonical JSON and verifier-ready metadata over opaque archives.
+
+### 5.5 Public evidence changes
+
+Public evidence is part of the trust surface. When changing `public_evidence/`
+or packaged evidence under `src/invarlock/_data/public_evidence/`, run:
+
+```bash
+make public-evidence-audit
+uv run invarlock verify <evidence-dir>/evaluation.report.json --profile release --assurance strict
+uv run invarlock advanced evidence-pack verify <evidence-dir>/evidence_pack \
+  --strict \
+  --profile release \
+  --report-assurance strict \
+  --expected-fingerprint sha256:<fingerprint>
+```
+
+Verifier examples must preserve the provenance link to the matching
+`runtime.manifest.json`; reviewers need that manifest to confirm execution
+context, profile, and artifact integrity.
+
+Evidence metadata should be scanner-friendly and reviewer-friendly. Store file
+hashes as records such as `{"path": "...", "sha256": "..."}` instead of using
+file names as JSON keys when those names can look like secret/token fields to
+generic scanners.
 
 ---
 
@@ -440,7 +503,12 @@ PRs should:
 2. Link to any relevant issues
 3. Include tests for new or changed behavior
 4. Update docs when CLI/config/schema or user‑visible behavior changes
-5. Pass CI (tests, lint, docs) before requesting review
+5. Target `staging/next` unless a maintainer explicitly asks otherwise
+6. Pass the relevant local gates before pushing
+7. Pass GitHub checks and required review before merge
+
+Force-pushing a PR can invalidate an earlier approval. After a force-push,
+confirm the review decision and check status again before merging.
 
 A simple checklist to include in the PR description:
 
@@ -448,16 +516,19 @@ A simple checklist to include in the PR description:
 ## Testing
 - [ ] Unit tests added/updated
 - [ ] Integration/regression tests added/updated (if applicable)
+- [ ] Focused tests for changed files
 
 ## Docs
 - [ ] User docs updated (if user-facing behavior changed)
 - [ ] Reference docs updated (if CLI/config/API changed)
 
 ## Quality
-- [ ] make test
-- [ ] make lint
-- [ ] make format
-- [ ] make docs
+- [ ] pre-commit run --all-files --show-diff-on-failure
+- [ ] make docs-check (docs/user-facing changes)
+- [ ] make mypy-typed-surface (typed-surface changes)
+- [ ] make coverage-enforce (core/guards/reporting/CLI changes)
+- [ ] make security or PR-range gitleaks scan (security/evidence/artifact changes)
+- [ ] make public-evidence-audit (public evidence changes)
 ```
 
 ### 6.3 Release flow (maintainers)

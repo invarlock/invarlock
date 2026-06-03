@@ -8,21 +8,19 @@ their dedicated owner modules.
 from __future__ import annotations
 
 import math
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 import torch
 import torch.nn as nn
 
-from invarlock.core.abi import INVARLOCK_CORE_ABI as CORE_ABI
+from invarlock.core import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import Guard
-from invarlock.core.types import GuardValidationResult
+from invarlock.core.types import GuardOutcome, GuardValidationResult
 
 from . import (
     rmt_activation_runtime,
     rmt_analysis,
-    rmt_detection,
-    rmt_math,
 )
 from .rmt_activation_runtime import (
     activation_svd_outliers as _activation_svd_outliers_impl,
@@ -71,20 +69,9 @@ __all__ = [
     "create_custom_rmt_policy",
 ]
 
-# Preserve module-level monkeypatch targets used by existing tests and callers.
-_COMPAT_MODULE_EXPORTS = (rmt_detection, rmt_math)
-
 # === Guard Implementation ===
 
-# Import GuardOutcome types if available
-try:
-    from invarlock.core.types import GuardOutcome
-
-    HAS_GUARD_OUTCOME = True
-except ImportError:
-    # Fallback for standalone usage or when types not available
-    HAS_GUARD_OUTCOME = False
-    GuardOutcome = dict
+HAS_GUARD_OUTCOME = True
 
 
 class RMTGuard(Guard):
@@ -193,7 +180,7 @@ class RMTGuard(Guard):
         }.get(level_code, level_code.lower())
         self._event_records.append(
             {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "component": "rmt_guard",
                 "kind": operation,
                 "severity": severity,

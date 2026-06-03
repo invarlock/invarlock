@@ -4,6 +4,15 @@
 > can grow beyond its baseline, ensuring structural shifts trigger a failure
 > while expected noise passes.
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Define the RMT edge-risk acceptance band and the report fields needed to audit it. |
+| **Audience** | RMT guard maintainers, calibration reviewers, and release reviewers checking activation evidence. |
+| **Contract scope** | Baseline-relative activation edge-risk growth, per-family epsilon bands, and report-verifier behavior. |
+| **Source of truth** | `src/invarlock/guards/rmt*.py`, `runtime/tiers.yaml`, and RMT assurance tests. |
+
 ## Claim
 
 The Random Matrix Theory (RMT) guard accepts an edit when the activation **edge
@@ -22,10 +31,10 @@ $r_f^{\text{cur}}/r_f^{\text{base}} - 1$).
 
 ### What is the edge risk score?
 
-For a (token×hidden) activation matrix $A$, the guard forms a whitened matrix
-$A'$ (centered and standardised), estimates its top singular value
-$\hat{\sigma}_{\max}(A')$ via a deterministic matvec estimator, and normalizes by
-the Marchenko–Pastur edge $\sigma_{\mathrm{MP}}(m,n)$ for the same shape:
+For a (token×hidden) activation matrix, the guard forms a whitened centered and
+standardized matrix, estimates its top singular value via a deterministic
+matvec estimator, and normalizes by the Marchenko–Pastur edge for the same
+shape:
 
 $$
 r = \frac{\hat{\sigma}_{\max}(A')}{\sigma_{\mathrm{MP}}(m,n)}
@@ -50,7 +59,8 @@ inside `src/invarlock/guards/rmt.py`.
 
 - Null calibration must cover each family `{ffn, attn, embed, other}`; default ε values are exposed whenever data is sparse.
 - Baseline and current scores use identical activation sampling and **token‑weighted aggregation**.
-- Evidence requires activation-based scoring; if activation batches are missing, the RMT guard fails closed.
+- CI/release and activation-required evidence require activation-based scoring;
+  if activation batches are missing in those paths, the RMT guard fails closed.
 
 ## Calibration (pilot-derived)
 
@@ -65,20 +75,20 @@ inside `src/invarlock/guards/rmt.py`.
 *Example:* with `r_base = 1.20` and ε = 0.01, the guard allows
 `r_cur ≤ (1+0.01) × 1.20 = 1.212`.
 
-## Calibration
+## Recalibration
 
 Calibration values are derived from null-sweep runs and stored in the packaged
-`tiers.yaml`. See the full calibration methodology in
+`runtime/tiers.yaml`. See the full calibration methodology in
 [09-tier-v1-calibration.md](09-tier-v1-calibration.md).
 
 To recalibrate, run null baselines (no edit) and compute per-family deltas
-Δ(f) = r_cur(f)/r_base(f) − 1 (skip cases with missing baseline). Set ε(f) to the
-q95–q99 quantile of Δ(f). For small families or tiny sample sizes, use a slightly
-larger ε to avoid spurious failures.
+Δ(f) = r_cur(f)/r_base(f) − 1 (skip cases with missing or zero baseline). Set
+ε(f) to the q95–q99 quantile of Δ(f). For small families or tiny sample sizes,
+use a slightly larger ε to avoid spurious failures.
 
 ## Runtime Contract (report)
 
-- report reports `rmt.{mode,edge_risk_by_family_base,edge_risk_by_family,epsilon_default,epsilon_by_family,epsilon_violations,stable,status}`.
+- report records `rmt.{mode,edge_risk_by_family_base,edge_risk_by_family,epsilon_default,epsilon_by_family,epsilon_violations,stable,status}`.
 - Per-family details for rendering live under `rmt.families.*.{edge_base,edge_cur,epsilon,allowed,ratio,delta}`.
 - `rmt.measurement_contract.kind = "activation_edge_risk"` records which RMT
   measurement path produced the evidence.
@@ -89,7 +99,7 @@ larger ε to avoid spurious failures.
 - `rmt.edge_risk_by_family_base.*` and `rmt.edge_risk_by_family.*`.
 - `rmt.epsilon_default` and `rmt.epsilon_by_family.*`.
 - `rmt.status` / `rmt.stable` and `rmt.epsilon_violations` for pass/fail context.
-- `resolved_policy.rmt.{margin,deadband,epsilon_by_family}` — resolved thresholds archived with the container-backed report bundle.
+- `resolved_policy.rmt.{margin,deadband,epsilon_by_family}` — resolved thresholds archived with the report bundle.
 
 ## Edge cases
 
@@ -97,5 +107,10 @@ larger ε to avoid spurious failures.
 
 ## Background reading
 
+- Marchenko, V. A., & Pastur, L. A. (1967). “Distribution of eigenvalues for
+  some sets of random matrices.” *Mathematics of the USSR-Sbornik*, 1(4),
+  457–483.
+- Bai, Z. D., & Silverstein, J. W. (2010). *Spectral Analysis of Large
+  Dimensional Random Matrices* (2nd ed.). Springer.
 - Pennington, J., & Worah, P. (2017). “Nonlinear Random Matrix Theory for Deep Learning.” *Advances in Neural Information Processing Systems (NeurIPS)*. <https://papers.nips.cc/paper/6857-nonlinear-random-matrix-theory-for-deep-learning>
 - Martin, C. H., & Mahoney, M. W. (2021). “Implicit Self-Regularization in Deep Neural Networks: Evidence from Random Matrix Theory and Implications for Learning.” *Journal of Machine Learning Research*, 22(165), 1–73. Preprint: <https://arxiv.org/abs/1810.01075>

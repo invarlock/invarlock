@@ -2,26 +2,137 @@
 
 from __future__ import annotations
 
+import builtins
 import copy
+import gc
 import inspect
+import json
 import math
 import os
 import shutil
+from ctypes import CDLL, c_int, c_size_t
+from pathlib import Path
+from types import ModuleType
 from typing import Any
 
-from invarlock.cli.run_runtime import free_model_memory, get_psutil
-from invarlock.cli.run_warning_filters import suppress_noisy_warnings
+from invarlock.cli.run_runtime_warnings import (
+    FilteredWarningStream,
+    _apply_warning_filters,
+    _resolve_warning_suppression,
+    suppress_noisy_warnings,
+)
+from invarlock.core.backend_inventory import (
+    BACKEND_INVENTORY_FILENAME,
+    build_backend_inventory_for_adapter,
+)
 from invarlock.core.exceptions import InvarlockError
 from invarlock.core.run_policy import GUARD_OVERHEAD_THRESHOLD
 from invarlock.core.run_snapshot_contract import (
     build_snapshot_execution_plan as _build_snapshot_execution_plan_impl,
 )
-from invarlock.core.run_snapshot_policy import (
+from invarlock.core.run_snapshot_contract import (
     choose_snapshot_mode as _choose_snapshot_mode_impl,
 )
-from invarlock.core.run_snapshot_policy import (
+from invarlock.core.run_snapshot_contract import (
     estimate_model_bytes as _estimate_model_bytes_impl,
 )
+
+
+def _import_optional_module(name: str) -> Any:
+    try:
+        return builtins.__import__(name)
+    except ImportError:
+        return None
+
+
+def get_psutil() -> Any:
+    global psutil
+    if psutil is None or isinstance(psutil, ModuleType):
+        psutil = _import_optional_module("psutil")
+    return psutil
+
+
+def get_torch() -> Any:
+    global torch
+    if torch is None or isinstance(torch, ModuleType):
+        torch = _import_optional_module("torch")
+    return torch
+
+
+psutil: Any = _import_optional_module("psutil")
+torch: Any = _import_optional_module("torch")
+
+
+def reset_optional_runtime_caches() -> None:
+    global psutil, torch
+    if psutil is None:
+        psutil = _import_optional_module("psutil")
+    if torch is None:
+        torch = _import_optional_module("torch")
+
+
+def _malloc_trim() -> bool:
+    try:
+        libc = CDLL(None)
+        trim = getattr(libc, "malloc_trim", None)
+        if trim is None:
+            return False
+        trim.argtypes = [c_size_t]
+        trim.restype = c_int
+        return bool(trim(0))
+    except (AttributeError, OSError, TypeError, ValueError):
+        return False
+
+
+def release_process_memory() -> None:
+    """Best-effort process-wide memory trim after heavyweight model work."""
+    try:
+        gc.collect()
+    except (RuntimeError, TypeError, ValueError):
+        pass
+    try:
+        torch_mod = get_torch()
+        if torch_mod is not None and torch_mod.cuda.is_available():
+            torch_mod.cuda.empty_cache()
+            torch_mod.cuda.synchronize()
+    except (RuntimeError, TypeError, ValueError, AttributeError):
+        pass
+    try:
+        _malloc_trim()
+    except (RuntimeError, TypeError, ValueError, AttributeError, OSError):
+        pass
+
+
+def detect_model_profile(model_id: str, adapter: str | None = None) -> Any:
+    from invarlock.model_profile import detect_model_profile as _detect_model_profile
+
+    return _detect_model_profile(model_id=model_id, adapter=adapter)
+
+
+def resolve_tokenizer(profile: Any) -> tuple[Any, str]:
+    from invarlock.model_profile import resolve_tokenizer as _resolve_tokenizer
+
+    return _resolve_tokenizer(profile)
+
+
+def validate_guard_overhead(*args: Any, **kwargs: Any) -> Any:
+    from invarlock.reporting.validate import (
+        validate_guard_overhead as _validate_guard_overhead,
+    )
+
+    return _validate_guard_overhead(*args, **kwargs)
+
+
+def free_model_memory(model: object | None) -> None:
+    """Best-effort cleanup to release GPU memory for a model object."""
+    if model is None:
+        return
+    try:
+        del model
+        release_process_memory()
+    except (ImportError, RuntimeError, TypeError, ValueError, AttributeError):
+        # Cleanup should never raise; fallback is to proceed without cache purge.
+        return
 
 
 class SnapshotRestoreFailed(RuntimeError):
@@ -43,6 +154,52 @@ def _require_snapshot_reuse_model(*, model: Any, phase: str) -> Any:
             f"Snapshot reuse requested for {phase} without a live model instance."
         )
     return model
+
+
+def _capture_backend_inventory(
+    *,
+    adapter: Any,
+    cfg: Any,
+    model: Any,
+    run_config: Any,
+) -> None:
+    try:
+        from invarlock.cli.run_config import extract_model_load_kwargs
+
+        load_kwargs = extract_model_load_kwargs(
+            cfg,
+            invarlock_error_cls=InvarlockError,
+        )
+    except (AttributeError, KeyError, TypeError, ValueError, InvarlockError):
+        load_kwargs = {}
+    quantization_config = load_kwargs.get("quantization_config")
+    adapter_name = str(getattr(adapter, "name", "") or "")
+    inventory = build_backend_inventory_for_adapter(
+        adapter=adapter_name,
+        quantization_config=(
+            quantization_config if isinstance(quantization_config, dict) else {}
+        ),
+        model=model,
+        load_smoke=True,
+        inference_smoke=False,
+    )
+    if inventory is None:
+        return
+    context = getattr(run_config, "context", None)
+    if isinstance(context, dict):
+        context["_backend_inventory"] = inventory
+    event_path = getattr(run_config, "event_path", None)
+    if event_path is None:
+        return
+    try:
+        output_dir = Path(event_path).parent
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / BACKEND_INVENTORY_FILENAME).write_text(
+            json.dumps(inventory, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+    except (OSError, TypeError, ValueError):
+        return
 
 
 def build_snapshot_execution_plan(
@@ -173,10 +330,10 @@ def run_bare_control(
     prefer_local_files_only: bool = False,
 ) -> dict[str, Any] | None:
     """Execute the bare-control run for overhead estimation and return payload."""
-    from invarlock.cli.overhead_utils import _extract_pm_snapshot_for_overhead
+    from invarlock.cli.run_overhead import _extract_pm_snapshot_for_overhead
     from invarlock.core.api import EditRuntime
+    from invarlock.core.determinism_policy import set_seed
     from invarlock.core.runner import CoreRunner
-    from invarlock.model_utils import set_seed
 
     python_seed = seed_bundle.get("python")
     if isinstance(python_seed, int):
@@ -191,6 +348,12 @@ def run_bare_control(
     edit_runtime = EditRuntime(
         profile=profile_normalized,
         verbose=bool(getattr(run_config, "verbose", False)),
+    )
+    _capture_backend_inventory(
+        adapter=adapter,
+        cfg=cfg,
+        model=model,
+        run_config=run_config,
     )
 
     private_model_loaded = False
@@ -371,6 +534,12 @@ def execute_guarded_run(
         profile=profile_normalized,
         verbose=bool(getattr(run_config, "verbose", False)),
     )
+    _capture_backend_inventory(
+        adapter=adapter,
+        cfg=cfg,
+        model=model,
+        run_config=run_config,
+    )
 
     with suppress_noisy_warnings(
         profile_normalized,
@@ -394,12 +563,23 @@ def execute_guarded_run(
 
 
 __all__ = [
+    "FilteredWarningStream",
     "GUARD_OVERHEAD_THRESHOLD",
     "SnapshotRestoreFailed",
+    "_apply_warning_filters",
+    "_resolve_warning_suppression",
     "build_snapshot_execution_plan",
+    "detect_model_profile",
     "execute_guarded_run",
+    "free_model_memory",
+    "get_psutil",
+    "get_torch",
     "init_retry_controller",
     "load_model_with_cfg",
+    "release_process_memory",
+    "reset_optional_runtime_caches",
+    "resolve_tokenizer",
     "run_bare_control",
     "suppress_noisy_warnings",
+    "validate_guard_overhead",
 ]

@@ -13,9 +13,15 @@ Usage: scripts/evidence_packs/run_pack.sh [options]
 Builds an evidence pack from a completed suite run.
 For strong distributable evidence, require a signed manifest, strict verification,
 and a PASS final verdict.
+Deployable edit scenarios are opt-in; set PACK_INCLUDE_DEPLOYABLE_EDITS=1,
+PACK_DEPLOY_BACKENDS=bitsandbytes,gptq,awq, and select explicit deployable
+scenario IDs only in backend-ready environments.
+For containerized quant adapter evidence on a CUDA remote, set
+PACK_RUNTIME_IMAGE_FLAVOR=quant during remote setup or explicitly set
+INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-quant with a provenance digest.
 
 Verify a completed pack with:
-  invarlock advanced evidence-pack verify <pack-dir> --strict
+  invarlock advanced evidence-pack verify <pack-dir> --strict --report-assurance strict
 
 Options:
   --suite NAME         Suite name (subset|showcase|workshop3|full)
@@ -27,6 +33,8 @@ Options:
   --determinism MODE   Determinism mode (strict|throughput)
   --repeats N          Determinism repeat count metadata (default: 0)
   --scenario-ids IDS   Comma-separated scenario IDs to include (filters scenarios.json before queue generation)
+  --release-review     Hardened release-review mode: require PASS, signed pack,
+                       runtime manifests, ci profile, and strict report assurance
   --calibrate-only     Only run calibration tasks (implies PACK_SUITE_MODE=calibrate-only)
   --errors-only        Only run error injection scenarios (still performs calibration unless presets are provided)
   --run-only           Run edits/reports only (implies resume)
@@ -106,6 +114,12 @@ pack_copy_report_sidecars() {
     pack_copy_optional "${report_dir}/runtime.manifest.json" "${dest_dir}/runtime.manifest.json"
     pack_copy_optional "${report_dir}/evaluation_report.md" "${dest_dir}/evaluation_report.md"
     pack_copy_optional "${report_dir}/reviewer_summary.txt" "${dest_dir}/reviewer_summary.txt"
+    pack_copy_optional "${report_dir}/edit_metadata.json" "${dest_dir}/edit_metadata.json"
+    pack_copy_optional "${report_dir}/deployable_artifact_validation.json" "${dest_dir}/deployable_artifact_validation.json"
+    pack_copy_optional "${report_dir}/backend_inventory.json" "${dest_dir}/backend_inventory.json"
+    pack_copy_optional "${report_dir}/memory_report.json" "${dest_dir}/memory_report.json"
+    pack_copy_optional "${report_dir}/load_smoke.json" "${dest_dir}/load_smoke.json"
+    pack_copy_optional "${report_dir}/inference_smoke.json" "${dest_dir}/inference_smoke.json"
     pack_copy_optional_dir "${report_dir}/runtime_inputs" "${dest_dir}/runtime_inputs"
     pack_copy_optional_dir "${report_dir}/source" "${dest_dir}/source"
     pack_copy_optional_dir "${report_dir}/edited" "${dest_dir}/edited"
@@ -113,7 +127,9 @@ pack_copy_report_sidecars() {
 
 pack_collect_reports() {
     local run_dir="$1"
-    find "${run_dir}" -type f -name "evaluation.report.json" -path "*/reports/*" | sort
+    find "${run_dir}" \
+        -type d -name ".*.tmp.*" -prune \
+        -o -type f -name "evaluation.report.json" -path "*/reports/*" -print | sort
 }
 
 pack_report_rel_path() {
@@ -141,69 +157,56 @@ pack_generate_html() {
     done < <(find "${pack_dir}/reports" -type f -name "evaluation.report.json" | sort)
 }
 
+pack_report_scenario_id() {
+    local pack_dir="$1"
+    local report="$2"
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/verify_pack_checks.py" report-scenario-id "${pack_dir}" "${report}"
+}
+
+pack_scenario_strictness() {
+    local pack_dir="$1"
+    local scenario_id="$2"
+    local scenarios_path="${pack_dir}/metadata/scenarios.json"
+    if [[ ! -f "${scenarios_path}" ]]; then
+        return 1
+    fi
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/verify_pack_checks.py" scenario-strictness "${scenarios_path}" "${scenario_id}"
+}
+
+pack_report_expects_verify_failure() {
+    local pack_dir="$1"
+    local report="$2"
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/verify_pack_checks.py" report-expects-verify-failure "${pack_dir}" "${report}"
+}
+
 pack_verify_reports() {
     local pack_dir="$1"
     local profile="${PACK_VERIFY_PROFILE:-dev}"
-    local count_clean=0
-    local count_error=0
-    local count_failed=0
-    local report
-    while IFS= read -r report; do
-        [[ -n "${report}" ]] || continue
-        local report_dir
-        report_dir="$(dirname "${report}")"
-        if [[ "${report}" == */errors/*/evaluation.report.json ]]; then
-            # Error injection reports are expected to fail verify (unsafe edits by design).
-            invarlock verify --json --profile "${profile}" "${report}" > "${report_dir}/verify.json" || true
-            count_error=$((count_error + 1))
-            continue
-        fi
-
-        if invarlock verify --json --profile "${profile}" "${report}" > "${report_dir}/verify.json"; then
-            count_clean=$((count_clean + 1))
-        else
-            echo "ERROR: Unexpected verify failure: ${report}" >&2
-            count_failed=$((count_failed + 1))
-        fi
-    done < <(find "${pack_dir}/reports" -type f -name "evaluation.report.json" | sort)
-
-    local total=$((count_clean + count_error + count_failed))
-    if [[ ${total} -eq 0 ]]; then
-        echo "ERROR: No reports found to verify." >&2
-        return 1
-    fi
-
-    PACK_VERIFY_COUNT_CLEAN="${count_clean}"
-    PACK_VERIFY_COUNT_ERROR="${count_error}"
-    PACK_VERIFY_COUNT_FAILED="${count_failed}"
+    local report_assurance="${PACK_REPORT_ASSURANCE:-report}"
     PACK_VERIFY_PROFILE_USED="${profile}"
-    export PACK_VERIFY_COUNT_CLEAN PACK_VERIFY_COUNT_ERROR PACK_VERIFY_COUNT_FAILED PACK_VERIFY_PROFILE_USED
+    PACK_REPORT_ASSURANCE_USED="${report_assurance}"
+    export PACK_VERIFY_PROFILE_USED PACK_REPORT_ASSURANCE_USED
 
     local results_dir="${pack_dir}/results"
     mkdir -p "${results_dir}"
-    python3 "${RUN_PACK_SCRIPT_DIR}/python/write_verification_summary.py" \
-        "${results_dir}/verification_summary.json" \
-        "${count_clean}" \
-        "${count_error}" \
-        "${count_failed}" \
-        "${profile}"
-
-    echo "Verified: ${count_clean} clean, ${count_error} error-injection (expected fail), ${count_failed} unexpected failures"
-
-    if [[ ${count_failed} -gt 0 ]]; then
-        return 1
-    fi
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/verify_pack_checks.py" \
+        verify-reports \
+        "${pack_dir}" \
+        --profile "${profile}" \
+        --report-assurance "${report_assurance}" \
+        --write-sidecars \
+        --summary-out "${results_dir}/verification_summary.json"
 }
 
 pack_write_source_repo_metadata() {
     local dest="$1"
-    python3 "${RUN_PACK_SCRIPT_DIR}/python/write_source_repo_metadata.py" --out "${dest}"
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/manifest_writer.py" source-repo --out "${dest}"
 }
 
 pack_write_environment_metadata() {
     local run_dir="$1"
     local dest="$2"
-    python3 "${RUN_PACK_SCRIPT_DIR}/python/write_environment_metadata.py" \
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/manifest_writer.py" environment \
         --run-dir "${run_dir}" \
         --out "${dest}"
 }
@@ -225,16 +228,30 @@ pack_write_manifest() {
         --repeats "${repeats}"
 }
 
+pack_write_edit_artifact_summary() {
+    local pack_dir="$1"
+    local scenarios_path="${pack_dir}/metadata/scenarios.json"
+    local summary_path="${pack_dir}/results/analysis/edit_artifact_summary.json"
+    if [[ ! -f "${scenarios_path}" ]]; then
+        return 0
+    fi
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/task_tools.py" \
+        edit-artifact-summary \
+        --pack-dir "${pack_dir}" \
+        --scenarios "${scenarios_path}" \
+        --out "${summary_path}"
+}
+
 pack_sign_manifest_helper() {
     local manifest_path="$1"
     local signing_key_path="${2:-}"
-    local helper="${RUN_PACK_SCRIPT_DIR}/python/sign_manifest.py"
+    local helper="${RUN_PACK_SCRIPT_DIR}/python/manifest_writer.py"
 
     if [[ -n "${signing_key_path}" ]]; then
-        _cmd_python "${helper}" --manifest "${manifest_path}" --signing-key "${signing_key_path}"
+        _cmd_python "${helper}" sign --manifest "${manifest_path}" --signing-key "${signing_key_path}"
         return
     fi
-    _cmd_python "${helper}" --manifest "${manifest_path}" --generate-ephemeral
+    _cmd_python "${helper}" sign --manifest "${manifest_path}" --generate-ephemeral
 }
 
 pack_require_passing_run_verdict() {
@@ -273,7 +290,70 @@ PY
         return 1
     fi
     if [[ "${verdict_status}" != "PASS" ]]; then
+        if [[ "${PACK_REQUIRE_PASS:-0}" == "1" ]]; then
+            echo "ERROR: Run final verdict status is ${verdict_status}; release-review mode requires PASS." >&2
+            return 1
+        fi
         echo "WARNING: Run final verdict status is ${verdict_status}; proceeding with pack build." >&2
+    fi
+}
+
+pack_require_runtime_manifests() {
+    local run_dir="$1"
+    local missing=0
+    local report
+    while IFS= read -r report; do
+        [[ -n "${report}" ]] || continue
+        if [[ ! -f "$(dirname "${report}")/runtime.manifest.json" ]]; then
+            echo "ERROR: Missing runtime.manifest.json for ${report}" >&2
+            missing=$((missing + 1))
+        fi
+    done < <(pack_collect_reports "${run_dir}")
+    if [[ "${missing}" -gt 0 ]]; then
+        return 1
+    fi
+}
+
+pack_apply_release_review_defaults() {
+    PACK_REQUIRE_PASS="${PACK_REQUIRE_PASS:-1}"
+    PACK_VERIFY_PROFILE="${PACK_VERIFY_PROFILE:-ci}"
+    PACK_REPORT_ASSURANCE="${PACK_REPORT_ASSURANCE:-strict}"
+    PACK_SIGN_MANIFEST="${PACK_SIGN_MANIFEST:-1}"
+    PACK_REQUIRE_RUNTIME_MANIFESTS="${PACK_REQUIRE_RUNTIME_MANIFESTS:-1}"
+    PACK_DEFER_REPORT_RENDERING="${PACK_DEFER_REPORT_RENDERING:-1}"
+    PACK_RELEASE_REVIEW=1
+    export PACK_REQUIRE_PASS PACK_VERIFY_PROFILE PACK_REPORT_ASSURANCE
+    export PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+    export PACK_DEFER_REPORT_RENDERING PACK_RELEASE_REVIEW
+}
+
+pack_validate_release_review_settings() {
+    if [[ "${PACK_RELEASE_REVIEW:-0}" != "1" ]]; then
+        return 0
+    fi
+    if [[ "${PACK_REQUIRE_PASS:-0}" != "1" ]]; then
+        echo "ERROR: release-review mode requires PACK_REQUIRE_PASS=1." >&2
+        return 1
+    fi
+    if [[ "${PACK_SIGN_MANIFEST:-1}" == "0" ]]; then
+        echo "ERROR: release-review mode requires PACK_SIGN_MANIFEST=1." >&2
+        return 1
+    fi
+    if [[ "${PACK_REQUIRE_RUNTIME_MANIFESTS:-0}" != "1" ]]; then
+        echo "ERROR: release-review mode requires PACK_REQUIRE_RUNTIME_MANIFESTS=1." >&2
+        return 1
+    fi
+    if [[ -z "${PACK_VERIFY_PROFILE:-}" ]]; then
+        echo "ERROR: release-review mode requires explicit PACK_VERIFY_PROFILE." >&2
+        return 1
+    fi
+    if [[ "${PACK_VERIFY_PROFILE}" == "dev" ]]; then
+        echo "ERROR: release-review mode rejects PACK_VERIFY_PROFILE=dev." >&2
+        return 1
+    fi
+    if [[ "${PACK_REPORT_ASSURANCE:-}" != "strict" ]]; then
+        echo "ERROR: release-review mode requires PACK_REPORT_ASSURANCE=strict." >&2
+        return 1
     fi
 }
 
@@ -338,7 +418,7 @@ pack_write_checksums() {
 pack_write_readme() {
     local pack_dir="$1"
     echo "[run_pack.sh] Writing README.md to ${pack_dir}" >&2
-    python3 "${RUN_PACK_SCRIPT_DIR}/python/write_pack_readme.py" "${pack_dir}"
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/manifest_writer.py" readme "${pack_dir}"
 }
 
 pack_prepare_staging_dir() {
@@ -408,6 +488,7 @@ pack_populate_pack_dir() {
     pack_copy_optional "${run_dir}/reports/guard_signal_summary.json" "${analysis_dir}/guard_signal_summary.json"
     pack_copy_optional "${run_dir}/reports/guard_intervention_summary.json" "${analysis_dir}/guard_intervention_summary.json"
     pack_copy_optional "${run_dir}/reports/scenario_signal_summary.json" "${analysis_dir}/scenario_signal_summary.json"
+    pack_copy_optional "${run_dir}/results/analysis/evaluation_optimization_summary.json" "${analysis_dir}/evaluation_optimization_summary.json"
 
     pack_copy_optional "${run_dir}/state/model_revisions.json" "${revisions_dest}"
     pack_copy_optional "${run_dir}/state/scenarios.json" "${scenarios_dest}"
@@ -440,6 +521,7 @@ pack_populate_pack_dir() {
         pack_generate_html "${pack_dir}"
     fi
 
+    pack_write_edit_artifact_summary "${pack_dir}" || return $?
     pack_write_readme "${pack_dir}" || return $?
     pack_write_checksums "${pack_dir}" || return $?
     pack_write_manifest "${pack_dir}" "${run_dir}" "${PACK_SUITE:-}" "${PACK_NET:-0}" "${PACK_DETERMINISM:-}" "${PACK_REPEATS:-0}" || return $?
@@ -477,6 +559,10 @@ pack_build_pack() {
     fi
 
     pack_require_passing_run_verdict "${run_dir}" || return 1
+    pack_validate_release_review_settings || return 1
+    if [[ "${PACK_REQUIRE_RUNTIME_MANIFESTS:-0}" == "1" ]]; then
+        pack_require_runtime_manifests "${run_dir}" || return 1
+    fi
     pack_require_cmd invarlock
 
     if [[ -d "${pack_dir}" && -n "$(ls -A "${pack_dir}" 2>/dev/null)" ]]; then
@@ -520,6 +606,10 @@ pack_run_pack() {
     local pack_dir="${PACK_DIR:-}"
     local layout="${PACK_PACK_LAYOUT:-v2}"
     local scenario_ids="${PACK_SCENARIO_IDS:-}"
+
+    if [[ "${PACK_RELEASE_REVIEW:-0}" == "1" ]]; then
+        pack_apply_release_review_defaults
+    fi
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -590,6 +680,10 @@ pack_run_pack() {
                     return 2
                 fi
                 shift 2
+                ;;
+            --release-review)
+                pack_apply_release_review_defaults
+                shift
                 ;;
             --repeats)
                 repeats="${2:-}"
@@ -663,6 +757,8 @@ pack_run_pack() {
     if [[ -n "${scenario_ids}" ]]; then
         run_args+=("--scenario-ids" "${scenario_ids}")
     fi
+
+    pack_validate_release_review_settings || return 1
 
     pack_entrypoint "${run_args[@]}"
     layout="$(pack_normalize_layout "${layout}")" || return $?

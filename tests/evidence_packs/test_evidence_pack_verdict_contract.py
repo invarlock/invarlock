@@ -5,6 +5,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from scripts.evidence_packs.python.verdict.generator_helpers import _evaluate_report
+
 
 def _write_cert(
     path: Path,
@@ -78,6 +80,46 @@ def _run_verdict(repo_root: Path, output_dir: Path) -> dict[str, Any]:
     )
     verdict_path = output_dir / "reports" / "final_verdict.json"
     return json.loads(verdict_path.read_text(encoding="utf-8"))
+
+
+def test_verdict_report_fails_closed_on_missing_drift_flag() -> None:
+    outcome = _evaluate_report(
+        {
+            "validation": {
+                "invariants_pass": True,
+                "primary_metric_acceptable": True,
+                "spectral_stable": True,
+                "rmt_stable": True,
+                "guard_overhead_acceptable": True,
+            },
+            "primary_metric": {"degraded": False, "invalid": False},
+            "guard_overhead": {"evaluated": False},
+            "invariants": {"status": "pass"},
+        }
+    )
+
+    assert outcome.passed is False
+    assert "drift_fail" in outcome.reasons
+
+
+def test_verdict_report_fails_closed_on_missing_evaluated_overhead_flag() -> None:
+    outcome = _evaluate_report(
+        {
+            "validation": {
+                "invariants_pass": True,
+                "primary_metric_acceptable": True,
+                "spectral_stable": True,
+                "rmt_stable": True,
+                "preview_final_drift_acceptable": True,
+            },
+            "primary_metric": {"degraded": False, "invalid": False},
+            "guard_overhead": {"evaluated": True},
+            "invariants": {"status": "pass"},
+        }
+    )
+
+    assert outcome.passed is False
+    assert "overhead_fail" in outcome.reasons
 
 
 def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(

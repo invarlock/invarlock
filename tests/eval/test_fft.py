@@ -1,5 +1,5 @@
 """
-Comprehensive test coverage for invarlock.eval.probes.fft module.
+Comprehensive test coverage for invarlock.eval.probes.importance module.
 
 Tests for FFT-based head energy scoring functions.
 """
@@ -10,7 +10,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from invarlock.eval.probes.fft import compute_head_energy_scores, fft_head_energy
+from invarlock.eval.probes.importance import compute_head_energy_scores, fft_head_energy
 
 
 class MockAttentionModule(nn.Module):
@@ -520,15 +520,23 @@ class TestModuleExports:
 
     def test_all_exports(self):
         """Test that __all__ contains expected functions."""
-        from invarlock.eval.probes.fft import __all__
+        from invarlock.eval.probes.importance import __all__
 
-        expected_exports = ["compute_head_energy_scores", "fft_head_energy"]
+        expected_exports = [
+            "blend_neuron_scores",
+            "compute_head_energy_scores",
+            "compute_neuron_mi_scores",
+            "compute_post_attention_head_scores",
+            "compute_wanda_neuron_scores",
+            "fft_head_energy",
+            "mi_neuron_scores",
+        ]
 
         assert set(__all__) == set(expected_exports)
 
     def test_function_imports(self):
         """Test that functions can be imported."""
-        from invarlock.eval.probes.fft import (
+        from invarlock.eval.probes.importance import (
             compute_head_energy_scores,
             fft_head_energy,
         )

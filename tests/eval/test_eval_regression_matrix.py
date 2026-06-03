@@ -10,13 +10,13 @@ import torch
 import torch.nn as nn
 
 import invarlock.eval.bench_policy as bench_policy
+import invarlock.eval.metrics as metrics_mod
 import invarlock.eval.metrics_activation as metrics_activation_mod
-import invarlock.eval.metrics_aggregation as metrics_aggregation
 import invarlock.eval.metrics_runtime as metrics_runtime_mod
-import invarlock.eval.probes.mi as mi_mod
-import invarlock.eval.probes.post_attention as post_attention
+import invarlock.eval.probes.importance as mi_mod
+import invarlock.eval.probes.importance as post_attention
+from invarlock.eval.data import VisionTextProvider, _resolve_image_path
 from invarlock.eval.metrics_support import MetricsConfig
-from invarlock.eval.providers.vision_text import VisionTextProvider, _resolve_image_path
 
 
 class _ExplodingGetDict(dict):
@@ -96,13 +96,13 @@ class _MismatchModel(nn.Module):
         )  # type: ignore[index]
 
 
-def test_metrics_aggregation_covers_non_matching_layer_names_and_missing_after_norms(
+def test_metrics_mod_covers_non_matching_layer_names_and_missing_after_norms(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     before = _MismatchModel(0.0)
     after = _MismatchModel(1.0)
 
-    deltas = metrics_aggregation.compute_parameter_deltas(before, after)
+    deltas = metrics_mod.compute_parameter_deltas(before, after)
     assert deltas["params_changed"] == 4
     assert deltas["layers_modified"] == 0
 
@@ -116,7 +116,7 @@ def test_metrics_aggregation_covers_non_matching_layer_names_and_missing_after_n
         spectral_module,
     )
 
-    changes = metrics_aggregation.analyze_spectral_changes(before, after)
+    changes = metrics_mod.analyze_spectral_changes(before, after)
     assert changes["layers_analyzed"] == 1
     assert "layer_b" not in changes["layer_changes"]
     assert changes["layer_changes"]["layer_a"]["ratio"] == 1.5

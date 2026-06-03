@@ -9,63 +9,20 @@ import click
 import pytest
 
 from invarlock.cli.commands.run import run_command
-
-
-def _cfg(tmp_path: Path, preview=2, final=2) -> Path:
-    p = tmp_path / "config.yaml"
-    p.write_text(
-        f"""
-model:
-  adapter: hf_causal
-  id: gpt2
-  device: cpu
-edit:
-  name: quant_rtn
-  plan: {{}}
-
-dataset:
-  provider: synthetic
-  id: synthetic
-  split: validation
-  seq_len: 8
-  stride: 4
-  preview_n: {preview}
-  final_n: {final}
-
-guards:
-  order: []
-
-eval:
-  loss:
-    type: auto
-
-output:
-  dir: runs
-        """,
-        encoding="utf-8",
-    )
-    return p
+from tests.cli.run._support_run_common import (
+    common_ce_patches,
+    synthetic_provider_min,
+)
+from tests.cli.run._support_run_common import (
+    write_base_run_config as _cfg,
+)
 
 
 def _common_ce():
-    return (
-        patch("invarlock.cli.device.resolve_device", lambda d: d),
-        patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
+    return common_ce_patches(include_profile=False) + (
         patch(
             "invarlock.eval.data.get_provider",
-            lambda *a, **k: SimpleNamespace(
-                windows=lambda **kw: (
-                    SimpleNamespace(input_ids=[[1, 2, 3]], attention_masks=[[1, 1, 1]]),
-                    SimpleNamespace(input_ids=[[4, 5, 6]], attention_masks=[[1, 1, 1]]),
-                )
-            ),
-        ),
-        patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
-            lambda prof: (
-                SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
-                "tokhash123",
-            ),
+            lambda *a, **k: synthetic_provider_min(),
         ),
     )
 
@@ -104,7 +61,7 @@ def test_overhead_percent_display_release_profile(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.validate_guard_overhead",
+                "invarlock.cli.run_runtime_exec.validate_guard_overhead",
                 lambda *a, **k: Overhead(),
             )
         )
@@ -149,7 +106,7 @@ def test_counts_mismatch_exit_after_stratification(tmp_path: Path):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda prof: (
                     SimpleNamespace(
                         eos_token="</s>", pad_token="</s>", vocab_size=50000
@@ -281,7 +238,7 @@ def test_snapshot_auto_bytes_and_chunked_paths(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.psutil.virtual_memory",
+                "invarlock.cli.run_runtime_exec.psutil.virtual_memory",
                 lambda: SimpleNamespace(available=50 * 1024 * 1024),
             )
         )  # 50MB
@@ -483,7 +440,7 @@ def test_tokenizer_digest_nonstring_keys_fallback(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.resolve_tokenizer", resolver)
+            patch("invarlock.cli.run_runtime_exec.resolve_tokenizer", resolver)
         )
         stack.enter_context(
             patch(

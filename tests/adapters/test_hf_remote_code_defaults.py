@@ -27,7 +27,7 @@ def test_hf_bnb_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
     transformers.BitsAndBytesConfig = _BitsAndBytesConfig
     monkeypatch.setitem(sys.modules, "transformers", transformers)
 
-    from invarlock.plugins.hf_bnb_adapter import HF_BNB_Adapter
+    from invarlock.plugins import HF_BNB_Adapter
 
     calls: dict[str, object] = {}
     adapter = HF_BNB_Adapter()
@@ -49,17 +49,19 @@ def test_hf_bnb_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
 
 @pytest.mark.unit
 def test_hf_awq_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
-    autoawq = types.ModuleType("autoawq")
+    transformers = types.ModuleType("transformers")
+    gptqmodel = types.ModuleType("gptqmodel")
 
-    class _AutoAWQForCausalLM:
+    class _AutoModelForCausalLM:
         @staticmethod
-        def from_quantized(model_id: str, **kwargs: object) -> dict[str, object]:
+        def from_pretrained(model_id: str, **kwargs: object) -> dict[str, object]:
             return {"model_id": model_id, "kwargs": dict(kwargs)}
 
-    autoawq.AutoAWQForCausalLM = _AutoAWQForCausalLM
-    monkeypatch.setitem(sys.modules, "autoawq", autoawq)
+    transformers.AutoModelForCausalLM = _AutoModelForCausalLM
+    monkeypatch.setitem(sys.modules, "transformers", transformers)
+    monkeypatch.setitem(sys.modules, "gptqmodel", gptqmodel)
 
-    from invarlock.plugins.hf_awq_adapter import HF_AWQ_Adapter
+    from invarlock.plugins import HF_AWQ_Adapter
 
     adapter = HF_AWQ_Adapter()
     monkeypatch.setattr(
@@ -71,6 +73,7 @@ def test_hf_awq_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
     _clear_remote_code_env(monkeypatch)
     loaded = adapter.load_model("demo/model")
     assert loaded["kwargs"]["trust_remote_code"] is False
+    assert loaded["kwargs"]["device_map"] == "auto"
 
     with runtime_allowances_scope(allow_remote_code=True):
         loaded = adapter.load_model("demo/model", trust_remote_code=True)
@@ -79,17 +82,17 @@ def test_hf_awq_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
 
 @pytest.mark.unit
 def test_hf_gptq_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
-    auto_gptq = types.ModuleType("auto_gptq")
+    gptqmodel = types.ModuleType("gptqmodel")
 
-    class _AutoGPTQForCausalLM:
+    class _GPTQModel:
         @staticmethod
-        def from_quantized(model_id: str, **kwargs: object) -> dict[str, object]:
+        def load(model_id: str, **kwargs: object) -> dict[str, object]:
             return {"model_id": model_id, "kwargs": dict(kwargs)}
 
-    auto_gptq.AutoGPTQForCausalLM = _AutoGPTQForCausalLM
-    monkeypatch.setitem(sys.modules, "auto_gptq", auto_gptq)
+    gptqmodel.GPTQModel = _GPTQModel
+    monkeypatch.setitem(sys.modules, "gptqmodel", gptqmodel)
 
-    from invarlock.plugins.hf_gptq_adapter import HF_GPTQ_Adapter
+    from invarlock.plugins import HF_GPTQ_Adapter
 
     adapter = HF_GPTQ_Adapter()
     monkeypatch.setattr(

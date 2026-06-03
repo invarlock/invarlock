@@ -21,8 +21,9 @@ Options:
   --out DIR           Sentinel output root (default: <run-dir>/sentinels/qwen14)
   --mode NAME         all|saved-model|public-quant (default: all)
   --device NAME       Device for evaluate (default: cuda)
-  --profile NAME      Evaluate/verify profile (default: ci)
-  --adapter NAME      Adapter selection (default: auto)
+  --profile NAME      Evaluate/verify profile (default: dev)
+  --baseline-adapter NAME  Baseline adapter selection (default: auto)
+  --subject-adapter NAME   Subject adapter selection (default: auto)
   --help              Show this help
 EOF
 }
@@ -32,6 +33,16 @@ require_dir() {
     local label="$2"
     [[ -d "${path}" ]] || {
         echo "ERROR: ${label} not found: ${path}" >&2
+        return 1
+    }
+}
+
+require_saved_subject_dir() {
+    local path="$1"
+    local label="$2"
+    [[ -d "${path}" ]] || {
+        echo "ERROR: ${label} not found: ${path}" >&2
+        echo "Hint: Qwen14 sentinels require retained edit subject directories; rerun the evidence-pack campaign with PACK_CLEANUP_MODELS=0." >&2
         return 1
     }
 }
@@ -79,7 +90,7 @@ normalize_staged_preset_for_baseline_report() {
     local staged_baseline_report="$2"
     local python_bin=""
     python_bin="$(resolve_python_bin)"
-    "${python_bin}" "${SCRIPT_DIR}/python/normalize_staged_preset.py" \
+    "${python_bin}" "${SCRIPT_DIR}/python/task_tools.py" normalize-staged-preset \
         --preset "${staged_preset}" \
         --baseline-report "${staged_baseline_report}" \
         --skip-overhead-check
@@ -137,9 +148,10 @@ run_evaluate_sentinel() {
     local subject_path="$3"
     local preset_path="$4"
     local out_dir="$5"
-    local adapter="$6"
-    local profile="$7"
-    local device="$8"
+    local baseline_adapter="$6"
+    local subject_adapter="$7"
+    local profile="$8"
+    local device="$9"
 
     mkdir -p "${out_dir}"
     local runtime_inputs_dir="${out_dir}/runtime_inputs"
@@ -153,8 +165,10 @@ run_evaluate_sentinel() {
     if invarlock evaluate \
         --baseline "${baseline_path}" \
         --subject "${subject_path}" \
-        --adapter "${adapter}" \
+        --baseline-adapter "${baseline_adapter}" \
+        --subject-adapter "${subject_adapter}" \
         --profile "${profile}" \
+        --assurance off \
         --preset "${staged_preset}" \
         --baseline-report "${staged_baseline_report}" \
         --device "${device}" \
@@ -163,11 +177,6 @@ run_evaluate_sentinel() {
         :
     else
         rc=$?
-    fi
-
-    if [[ ${rc} -ne 0 && -f "${out_dir}/evaluation.report.json" ]]; then
-        echo "WARNING: evaluate exited ${rc} but wrote ${out_dir}/evaluation.report.json; treating sentinel as load-path success" >&2
-        rc=0
     fi
 
     require_file "${out_dir}/evaluation.report.json" "evaluation report"
@@ -180,15 +189,13 @@ run_public_quant_verify() {
     local profile="$3"
 
     local rc=0
-    if invarlock verify --json --profile "${profile}" "${report_path}" > "${out_dir}/verify.json"; then
+    if invarlock verify --json --profile "${profile}" --assurance off "${report_path}" > "${out_dir}/verify.json"; then
         :
     else
         rc=$?
     fi
     require_file "${out_dir}/verify.json" "verify summary"
-    if [[ ${rc} -ne 0 ]]; then
-        echo "WARNING: verify exited ${rc} but wrote ${out_dir}/verify.json; treating sentinel as load-path success" >&2
-    fi
+    return "${rc}"
 }
 
 main() {
@@ -197,8 +204,9 @@ main() {
     local out_dir=""
     local mode="all"
     local device="cuda"
-    local profile="ci"
-    local adapter="auto"
+    local profile="dev"
+    local baseline_adapter="auto"
+    local subject_adapter="auto"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -226,8 +234,12 @@ main() {
                 profile="${2:-}"
                 shift 2
                 ;;
-            --adapter)
-                adapter="${2:-}"
+            --baseline-adapter)
+                baseline_adapter="${2:-}"
+                shift 2
+                ;;
+            --subject-adapter)
+                subject_adapter="${2:-}"
                 shift 2
                 ;;
             --help|-h)
@@ -285,14 +297,15 @@ main() {
         local quant_subject="${model_root}/models/quant_4bit_clean"
         local quant_preset=""
         quant_preset="$(resolve_preset_path "${run_dir}" "${model_name}" "quant_rtn")"
-        require_dir "${quant_subject}" "quant_4bit_clean subject"
+        require_saved_subject_dir "${quant_subject}" "quant_4bit_clean subject"
         run_evaluate_sentinel \
             "${baseline_path}" \
             "${baseline_report}" \
             "${quant_subject}" \
             "${quant_preset}" \
             "${out_dir}/quant_4bit_clean" \
-            "${adapter}" \
+            "${baseline_adapter}" \
+            "${subject_adapter}" \
             "${profile}" \
             "${device}"
         run_public_quant_verify \
@@ -305,14 +318,15 @@ main() {
         local prune_subject="${model_root}/models/prune_clean"
         local prune_preset=""
         prune_preset="$(resolve_preset_path "${run_dir}" "${model_name}" "magnitude_prune")"
-        require_dir "${prune_subject}" "prune_clean subject"
+        require_saved_subject_dir "${prune_subject}" "prune_clean subject"
         run_evaluate_sentinel \
             "${baseline_path}" \
             "${baseline_report}" \
             "${prune_subject}" \
             "${prune_preset}" \
             "${out_dir}/prune_clean" \
-            "${adapter}" \
+            "${baseline_adapter}" \
+            "${subject_adapter}" \
             "${profile}" \
             "${device}"
     fi

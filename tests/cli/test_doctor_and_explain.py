@@ -6,10 +6,10 @@ from pathlib import Path
 import pytest
 
 from invarlock.cli.commands.explain_gates import explain_gates_command
-from invarlock.cli.doctor_helpers import get_adapter_rows
+from invarlock.core.plugins_inventory import get_adapter_rows
 
 
-def test_doctor_helpers_rows(monkeypatch):
+def test_plugins_inventory_rows(monkeypatch):
     # Avoid ModuleNotFoundError from importlib.util.find_spec on nested packages
     import importlib.util as iu
 

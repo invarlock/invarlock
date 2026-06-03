@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import importlib
+import io
+import warnings
 from collections.abc import Callable, Mapping
+from contextlib import redirect_stderr, redirect_stdout
 from typing import Any, Literal
+
+from invarlock.core.builtin_plugin_catalog import builtin_plugin_support_metadata
 
 PluginCategory = Literal["adapters", "guards", "edits"]
 InventoryRow = dict[str, Any]
@@ -13,6 +19,7 @@ _INVENTORY_PROBE_ERRORS = (
     TypeError,
     ValueError,
 )
+_SAFE_IMPORT_ERRORS = (ImportError, AttributeError, RuntimeError, OSError)
 
 
 def is_minimal_plugins_view(env_value: str | None) -> bool:
@@ -26,6 +33,89 @@ def detect_cuda_available(torch_module: Any) -> bool:
         return bool(cuda and cuda.is_available())
     except _INVENTORY_PROBE_ERRORS:
         return False
+
+
+def _safe_import(module_name: str, attr: str | None = None) -> bool:
+    """Return True when a backend module (and optional symbol) imports cleanly."""
+
+    try:
+        with (
+            warnings.catch_warnings(),
+            redirect_stdout(io.StringIO()),
+            redirect_stderr(io.StringIO()),
+        ):
+            warnings.simplefilter("ignore")
+            module = importlib.import_module(module_name)
+        if attr is None:
+            return True
+        return getattr(module, attr, None) is not None
+    except _SAFE_IMPORT_ERRORS:
+        return False
+
+
+def bitsandbytes_runtime_available() -> bool:
+    """Return True when bitsandbytes is importable on this host."""
+
+    return _safe_import("bitsandbytes")
+
+
+def get_adapter_rows() -> list[dict[str, Any]]:
+    """Build compact adapter rows without importing heavy optional backends."""
+    from invarlock.core.registry import get_registry
+
+    registry = get_registry()
+    rows: list[dict[str, Any]] = []
+    for name in registry.list_adapters():
+        info = registry.get_plugin_info(name, "adapters")
+        module = str(info.get("module") or "")
+        support = (
+            "auto"
+            if module.startswith("invarlock.adapters") and name in {"hf_auto"}
+            else ("core" if module.startswith("invarlock.adapters") else "optional")
+        )
+        backend, status, enable = None, "ready", ""
+
+        if name in {
+            "hf_causal",
+            "hf_mlm",
+            "hf_multimodal",
+            "hf_seq2seq",
+            "hf_auto",
+        }:
+            backend = "transformers"
+        elif name == "hf_gptq":
+            backend = "gptqmodel"
+        elif name == "hf_awq":
+            backend = "gptqmodel"
+        elif name == "hf_bnb":
+            backend = "bitsandbytes"
+            if not bitsandbytes_runtime_available():
+                status, enable = (
+                    "unsupported",
+                    "Requires CUDA or a compatible bitsandbytes runtime",
+                )
+        elif name == "hf_torchao":
+            backend = "torchao"
+        elif name == "hf_hqq":
+            backend = "hqq"
+        elif name == "hf_quanto":
+            backend = "optimum.quanto"
+        elif name == "hf_ct":
+            backend = "compressed_tensors"
+
+        rows.append(
+            {
+                "name": name,
+                "origin": "core" if support in {"core", "auto"} else "plugin",
+                "mode": "auto-matcher" if support == "auto" else "adapter",
+                "backend": backend,
+                "version": None,
+                "status": status,
+                "enable": enable,
+            }
+        )
+
+    return rows
 
 
 def _module_origin(module: str) -> str:
@@ -46,6 +136,24 @@ def _adapter_backend_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
     return backend_obj
 
 
+def _support_metadata(
+    *,
+    plugin_type: PluginCategory,
+    name: str,
+    info: Mapping[str, Any],
+) -> dict[str, Any]:
+    metadata = builtin_plugin_support_metadata(plugin_type, name)
+    for key in (
+        "support_tier",
+        "strict_assurance_allowed",
+        "published_basis",
+        "deployment_claim",
+    ):
+        if key in info:
+            metadata[key] = info[key]
+    return metadata
+
+
 def gather_adapter_inventory_rows(
     *,
     registry: Any,
@@ -56,6 +164,7 @@ def gather_adapter_inventory_rows(
     provenance_extractor: Callable[[str], Any],
     bitsandbytes_runtime_available: Callable[[], bool],
 ) -> list[InventoryRow]:
+    _ = is_linux
     names = list(registry.list_adapters())
     if minimal:
         names = [
@@ -96,10 +205,6 @@ def gather_adapter_inventory_rows(
         if support == "optional" and not present:
             status = "needs_extra"
 
-        if backend_name in {"auto-gptq", "autoawq"} and not is_linux:
-            status = "unsupported"
-            enable = "Linux-only"
-
         try:
             extras_status = extras_checker(name, "adapters")
         except _INVENTORY_PROBE_ERRORS:
@@ -127,6 +232,10 @@ def gather_adapter_inventory_rows(
             "hf_gptq": "invarlock[gptq]",
             "hf_awq": "invarlock[awq]",
             "hf_bnb": "invarlock[gpu]",
+            "hf_torchao": "invarlock[torchao]",
+            "hf_hqq": "invarlock[hqq]",
+            "hf_quanto": "invarlock[quanto]",
+            "hf_ct": "invarlock[compressed-tensors]",
         }.get(name)
         if status == "needs_extra" and extra_hint:
             enable = f"pip install '{extra_hint}'"
@@ -144,6 +253,7 @@ def gather_adapter_inventory_rows(
                 "enable": enable,
                 "module": module,
                 "entry_point": entry,
+                **_support_metadata(plugin_type="adapters", name=name, info=info),
             }
         )
 
@@ -194,6 +304,7 @@ def gather_generic_inventory_rows(
                 "enable": enable,
                 "module": module,
                 "entry_point": entry,
+                **_support_metadata(plugin_type=plugin_type, name=name, info=info),
             }
         )
 
@@ -222,6 +333,16 @@ def filter_inventory_rows(
         return [row for row in rows if row["support"] == "core"]
     if mode == "optional":
         return [row for row in rows if row["support"] == "optional"]
+    support_tiers = {
+        "core_supported",
+        "optional_backend_loader",
+        "validation_simulation",
+        "demo_only",
+        "internal_baseline_edit",
+        "third_party",
+    }
+    if mode in support_tiers:
+        return [row for row in rows if row.get("support_tier") == mode]
     return rows
 
 
@@ -234,6 +355,10 @@ def adapter_inventory_json_items(rows: list[InventoryRow]) -> list[dict[str, Any
             "entry_point": row.get("entry_point"),
             "origin": _module_origin(str(row.get("module") or "")),
             "status": row.get("status"),
+            "support_tier": row.get("support_tier"),
+            "strict_assurance_allowed": row.get("strict_assurance_allowed"),
+            "published_basis": row.get("published_basis"),
+            "deployment_claim": row.get("deployment_claim"),
             "backend": _adapter_backend_payload(row),
             "capability": row.get("capability"),
         }
@@ -254,6 +379,10 @@ def generic_inventory_json_items(
             "module": row.get("module"),
             "entry_point": row.get("entry_point"),
             "origin": _module_origin(str(row.get("module") or "")),
+            "support_tier": row.get("support_tier"),
+            "strict_assurance_allowed": row.get("strict_assurance_allowed"),
+            "published_basis": row.get("published_basis"),
+            "deployment_claim": row.get("deployment_claim"),
         }
         for row in rows
     ]
@@ -273,6 +402,10 @@ def combined_plugins_json_items(
                 "module": row.get("module"),
                 "entry_point": row.get("entry_point"),
                 "origin": _module_origin(str(row.get("module") or "")),
+                "support_tier": row.get("support_tier"),
+                "strict_assurance_allowed": row.get("strict_assurance_allowed"),
+                "published_basis": row.get("published_basis"),
+                "deployment_claim": row.get("deployment_claim"),
                 "backend": _adapter_backend_payload(row),
             }
             for row in adapter_rows

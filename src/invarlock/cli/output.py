@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import json
 import os
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
-from typing import TextIO
+from dataclasses import asdict, dataclass, is_dataclass
+from datetime import UTC, datetime
+from typing import Any, TextIO
 
+import typer
 from rich.console import Console
 
 _STYLE_AUDIT = "audit"
@@ -29,6 +32,24 @@ def env_no_color() -> bool:
 
 def perf_counter() -> float:
     return time.perf_counter()
+
+
+def _ts() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def emit(payload: Any, exit_code: int) -> None:
+    """Emit a JSON payload with a stable envelope and exit."""
+    payload_obj: Any = (
+        asdict(payload)
+        if is_dataclass(payload) and not isinstance(payload, type)
+        else payload
+    )
+    if isinstance(payload_obj, dict):
+        payload_obj.setdefault("ts", _ts())
+        payload_obj.setdefault("component", "cli")
+    typer.echo(json.dumps(payload_obj, sort_keys=True))
+    raise typer.Exit(exit_code)
 
 
 @dataclass(frozen=True, slots=True)

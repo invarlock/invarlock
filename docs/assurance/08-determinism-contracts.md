@@ -1,15 +1,26 @@
 # Determinism Contracts
 
 > **Plain language:** If we fix the seed bundle, record dataset/tokenizer
-> hashes, and keep the paired window schedule stable, every evaluation run is
-> reproducible within float tolerance—and we surface those checks in the
+> hashes, and keep the paired window schedule stable, evaluation runs should be
+> reproducible within float tolerance under the stated backend/version
+> preconditions—and we surface those checks in the
 > report.
+
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | State the determinism preconditions and report evidence required for reproducible paired evaluation. |
+| **Audience** | Evaluation maintainers, CI/release reviewers, and operators comparing run evidence. |
+| **Contract scope** | Seed bundle, dataset/tokenizer hashes, paired schedules, backend flags, and drift boundaries. |
+| **Source of truth** | `src/invarlock/core/determinism_policy.py`, run/report provenance code, and determinism contract tests. |
 
 ## Claim
 
-With fixed seeds, dataset/tokenizer hashes, and a paired, non‑overlapping
-schedule, evaluation is reproducible (within float tolerance) and reports
-are stable.
+With fixed seeds, dataset/tokenizer hashes, a paired non-overlapping schedule,
+and a pinned backend stack, evaluation should be reproducible within float
+tolerance on the same backend. Cross-backend and cross-version results are
+empirical drift checks, not strict reproducibility claims.
 
 ## Derivation (sketch)
 
@@ -35,8 +46,10 @@ ties the runtime contract back to reproducible maths:
 
 ## Runtime Contract
 
-- Runs **abort** for CI/Release if pairing < 1.0, overlap > 0.0, or counts differ.
-- report contains seeds/hashes, pairing metrics, and policy tier/digest.
+- CI/Release runs hard-fail if a baseline pairing context exists and pairing is
+  incomplete, windows overlap, or counts differ.
+- report contains seeds/hashes, pairing metrics, coverage floors, bootstrap
+  metadata, and policy tier/digest.
 
 ## Observability
 
@@ -51,17 +64,21 @@ ties the runtime contract back to reproducible maths:
 ## Assumptions & Scope
 
 - Applies to inference-only evaluation loops; training/edit algorithms may
-  introduce additional nondeterminism not covered here.
+  introduce additional nondeterminism governed by their own evidence surfaces.
 - Identical seeds, configs, and backend should yield identical numeric evidence,
   pairings, hashes, and policy/provenance digests after normalizing volatile
   artifact paths and timestamps. Raw report files can differ in generated-time
   metadata and timestamped run directories.
 - Determinism is best-effort on some backends; enforce `|Δ ratio| ≤ 1e-6` when
   regenerating reports on the **same backend** (see
-  `tests/reporting/test_report_paired_ci_identity.py::test_paired_ci_identity_holds`).
+  `tests/reporting/policy/test_report_paired_ci_identity.py::test_paired_ci_identity_holds`).
 - Cross-device drift must stay within the bands listed in
-  `docs/assurance/04-guard-contracts.md`; use `scripts/check_device_drift.py` in
-  CI to guard the limit.
+  [Cross-Device Drift Bands](12-device-drift-bands.md); use
+  `scripts/smoke/check_device_drift.py` in CI to guard the limit.
 - Some hardware backends (e.g., GPUs without deterministic kernels) may exceed
   float tolerances despite the flags; document deviations in the report
   metadata.
+
+## References
+
+- PyTorch. “Reproducibility.” <https://docs.pytorch.org/docs/2.12/notes/randomness.html>

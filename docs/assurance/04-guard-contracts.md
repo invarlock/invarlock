@@ -4,6 +4,15 @@
 > thresholds we enforce, and how those decisions appear in the report so
 > reviewers can trace every PASS or FAIL.
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Consolidate guard contracts, statistical assumptions, thresholds, and report evidence fields. |
+| **Audience** | Guard maintainers, release reviewers, and contributors changing guard policy or reporting. |
+| **Contract scope** | Invariants, Spectral, RMT, Variance, bootstrap sanity, calibration expectations, and report observability. |
+| **Source of truth** | Guard modules under `src/invarlock/guards/`, report guard renderers, packaged tiers, and assurance-contract tests. |
+
 **Contents:**
 
 - [1. Guard Contracts](#1-guard-contracts) — what each guard checks and how it fails
@@ -12,10 +21,10 @@
 - [4. Reproducibility Kit](#4-reproducibility-kit) — how to reproduce a report
 - [5. Device Tolerance Guidance](#5-device-tolerance-guidance) — expected drift across backends
 - [6. Threshold Rationale (Defaults)](#6-threshold-rationale-defaults) — why the defaults are what they are
-- [7. Known Limitations](#7-known-limitations) — what the assurance case does not cover
+- [7. Scope Boundaries](#7-scope-boundaries) — where the guard contract applies
 - [8. Coverage Reference](#8-coverage-reference) — tests that underpin this handbook
 
-This handbook captures the practical guarantees that underpin InvarLock's guard
+This handbook captures the evidence claims that underpin InvarLock's guard
 pipeline. It consolidates the guard contracts, statistical assumptions, and
 calibration data that accompany the InvarLock assurance notes.
 
@@ -24,13 +33,31 @@ calibration data that accompany the InvarLock assurance notes.
 | Guard | Inputs | Check & Threshold | Failure behavior | Code reference |
 |-------|--------|-------------------|-------------------|----------------|
 | **Invariants** | Model weights, adapter metadata | Fatal invariants (non-finite scan, tokenizer alignment) plus structural checks (weight tying, embedding dims, layer norms) | Fatal invariant types block before evaluation; structural drift warns in monitor mode unless strict/block policy is configured | `invarlock.guards.invariants` |
-| **Spectral** | 2‑D layer weights (FFN, attention proj, embeddings) | Compute $z = \frac{\hat{s} - \mu_f}{\sigma_f}$ where $\hat{s}$ is an **iterative estimate** of $\sigma_{\max}$ under a fixed measurement contract; require `abs(z) ≤ κ_f` under the published family caps. Gaussian-tail FPR applies to calibrated high-kappa families; low sentinel caps are operational thresholds. Optional degeneracy proxies (stable-rank drift, norm collapse) may add WARN/ABORT depending on policy. | WARN when cap applied; abort if cap would exceed `max_caps` (and for configured fatal degeneracy thresholds). | `invarlock.guards.spectral` |
-| **RMT** | Token‑weighted activations (sampled) | Compute a per‑module **edge risk score** $r = \hat{\sigma}_{\max}(A') / \sigma_{\mathrm{MP}}(m,n)$ on whitened activations $A'$ under a fixed measurement contract; accept when baseline‑relative growth stays within the calibrated ε-band per family. | report fails on ε‑band violations; catastrophic spikes in the primary metric are gated separately (`spike_threshold` = 2.0× for ppl‑like metrics). | `invarlock.guards.rmt` |
+| **Spectral** | 2‑D layer weights (FFN, attention proj, embeddings) | Compute the spectral z-score under the fixed measurement contract; pass while `abs(z) ≤ κ_f` under the published family caps. Gaussian-tail FPR applies to calibrated high-kappa families; low sentinel caps are operational thresholds. Optional degeneracy proxies (stable-rank drift, norm collapse) may add WARN/ABORT depending on policy. | WARN when `abs(z) > κ_f`; abort if the cap budget would exceed `max_caps` (and for configured fatal degeneracy thresholds). | `invarlock.guards.spectral` |
+| **RMT** | Token‑weighted activations (sampled) | Compute a per‑module edge risk score on whitened activations under a fixed measurement contract; accept when baseline-relative growth stays within the calibrated ε-band per family. | report fails on ε‑band violations; catastrophic spikes in the primary metric are gated separately (`spike_threshold` = 2.0× for ppl‑like metrics). | `invarlock.guards.rmt` |
 | **Variance (VE)** | Paired ΔlogNLL with calibration windows | Enable VE only if the predictive CI upper bound ≤ −`min_effect_lognll` **and** mean Δ ≤ −`min_effect_lognll` (Balanced uses one‑sided CI; Conservative uses two‑sided CI). A CI entirely above +`min_effect_lognll` is treated as regression and VE stays off. | VE disabled, guard records reason; edit continues | `invarlock.guards.variance` |
-| **Bootstrap sanity** | Evaluation windows, token counts | Matching window IDs, zero overlap; BCa replicates ≥ requested | Abort evaluation and surface reason | `invarlock.reporting.report_make` |
+| **Bootstrap sanity** | Evaluation windows, token counts | Matching window IDs, zero overlap; BCa replicates ≥ selected tier floor | Abort or fail verification and surface reason | `invarlock.reporting.report_make` |
 
-Each guard logs its policy digest, metrics, and **measurement contract**; reports
-mirror those fields under `resolved_policy.*` and `spectral`/`rmt`/`variance` blocks.
+Reports record a report-level policy digest plus guard metrics. Spectral and RMT
+carry explicit measurement-contract evidence, and variance may include a
+variance-policy digest; these fields are mirrored under `resolved_policy.*` and
+the `spectral`/`rmt`/`variance` blocks.
+
+For the two guard formulas that are easiest to misread in a table:
+
+$$
+z = \frac{\hat{s} - \mu_f}{\sigma_f}
+$$
+
+where $\hat{s}$ is an iterative estimate of the largest singular value under the
+spectral measurement contract.
+
+$$
+r = \frac{\hat{\sigma}_{\max}(A')}{\sigma_{\mathrm{MP}}(m,n)}
+$$
+
+where $A'$ is the centered and standardized activation matrix and
+$\sigma_{\mathrm{MP}}(m,n)$ is the Marchenko-Pastur edge for the same shape.
 
 ### Invariants: what is checked
 
@@ -42,7 +69,7 @@ mirror those fields under `resolved_policy.*` and `spectral`/`rmt`/`variance` bl
 
 ### Catastrophic limits and aborts
 
-- Spike stop: a large primary‑metric spike (for ppl‑like metrics, ≥ 2.0× ratio) triggers a hard abort/rollback independent of guard WARNs.
+- Spike stop: a large primary‑metric spike (for ppl‑like metrics, ≥ 2.0× ratio) triggers a hard abort/fail independent of guard WARNs.
 - Pairing/coverage: preview/final counts must match, pairing must be 1.0, overlap 0.0 in CI/Release; violations abort evaluation.
 
 ### Invariants coverage checklist
@@ -78,14 +105,15 @@ both the count and the limit under
 ### Quality Gates (Acceptance)
 
 - Primary metric (canonical gate in report):
-  - ppl-like kinds (ppl_causal, ppl_mlm, ppl_seq2seq): require
+  - ppl-like kinds (ppl_causal, ppl_mlm, ppl_seq2seq): require the canonical
+    report point estimate
     `ratio_vs_baseline ≤ tier_limit + hysteresis_ratio` where base tier limits
     are 1.05 (Conservative), 1.10 (Balanced), 1.20 (Aggressive). The packaged
     `tiers.yaml` currently publishes `metrics.pm_ratio.hysteresis_ratio = 0.002`
-    to avoid PASS/FAIL flapping at the boundary. When a ratio CI is present,
-    the upper bound must also be ≤ the effective limit. If the run exceeds the
-    base limit but passes only because of hysteresis, the report marks
-    `validation.hysteresis_applied`. Gate flag:
+    to avoid PASS/FAIL flapping at the boundary. The lower-level `ppl.ratio_ci`
+    analysis path also checks its upper bound when that block is populated. If
+    the run exceeds the base limit but passes only because of hysteresis, the
+    report marks `validation.hysteresis_applied`. Gate flag:
     `validation.primary_metric_acceptable`.
   - accuracy kinds (accuracy): gate on Δ accuracy vs baseline
     (percentage points) with minimum coverage. Defaults (policy‑controlled):
@@ -117,25 +145,29 @@ report fails overall, **except** that the Primary Metric Tail gate can run
 in `mode: warn` (staged rollout) where it emits a warning but keeps
 `validation.primary_metric_tail_acceptable = true`. Catastrophic spikes are
 handled during the run: the `spike_threshold` (default 2.0× PPL) triggers
-immediate rollback regardless of other gates. See also
+immediate abort/fail regardless of other gates. See also
 `src/invarlock/core/runner_finalize.py`.
 
 **Sigma quantile (qσ)** controls the target sigma used for spectral monitoring.
 Balanced uses `sigma_quantile = 0.95`, Conservative `0.90` (see
 the packaged tiers configuration at
-`runtime/tiers.yaml`). reports expose this under
-`spectral.sigma_quantile`.
+`runtime/tiers.yaml`; overrides use
+`INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml`). Reports expose this under
+`spectral.summary.sigma_quantile`.
 Per-family z-caps use $\kappa_f$; defaults are defined in the packaged tiers
 configuration and summarized in the Threshold Rationale table below.
 
 ## 2. Statistical Method Primer
 
-InvarLock evaluates edits using **paired Δlog perplexity**:
+InvarLock evaluates edits using **paired Δlog perplexity** against the baseline:
 
 > See [Quality Gates (Acceptance)](#quality-gates-acceptance) for the run-level thresholds the CLI enforces on these statistics.
 
 $$
-\Delta_i = \log(\text{PPL}_{\text{final},i}) - \log(\text{PPL}_{\text{preview},i}),\quad
+\Delta_i = \log(\text{PPL}_{\text{subject final}, i}) - \log(\text{PPL}_{\text{baseline final}, i})
+$$
+
+$$
 \overline{\Delta} = \frac{\sum_i w_i \Delta_i}{\sum_i w_i},\quad
 \text{ratio} = \exp(\overline{\Delta})
 $$
@@ -143,12 +175,23 @@ $$
 All logarithms are natural (`ln`); see ln/log for the convention used across InvarLock.
 
 Perplexity (PPL = exp(mean NLL)) uses the standard language-model
-definition—see the
-Transformers perplexity guide.
+definition; see the
+[Transformers perplexity guide](https://huggingface.co/docs/transformers/perplexity).
 
-Confidence intervals use the **BCa bootstrap** (1.2k to 3.2k replicates, α=0.05). The
-half-width approximation for planning is `half_width ≈ z · σ̂ / √n` with
-`z = 1.96` for two-sided 95% (balanced tiers use one-sided CI for VE gating; conservative uses two-sided).
+Preview→final drift is a separate guarded-run stability check; it does not
+define the primary edited-vs-baseline ratio.
+
+Primary metric confidence intervals use the **BCa bootstrap** (1.2k to 3.2k
+replicates by profile, α=0.05). The half-width approximation for planning is:
+
+$$
+\text{half-width} \approx z \cdot \frac{\hat{\sigma}}{\sqrt{n}}
+$$
+
+Use `z = 1.96` for two-sided 95% intervals. Balanced tiers use one-sided CI for
+VE gating; Conservative uses two-sided. VE predictive A/B evidence uses its own
+predictive bootstrap surface recorded under `variance.predictive_gate`; do not
+read primary-metric replicate floors as VE replicate counts.
 
 **Bootstrap defaults**
 
@@ -194,7 +237,7 @@ Explainers for each field live in [`docs/reference/reports.md`](../reference/rep
 
 ## 5. Device Tolerance Guidance
 
-The guards are calibrated on CPU/MPS. We expect:
+Device drift budgets are calibrated relative to CPU evidence. We expect:
 
 | Backend | Expected drift (vs CPU) | Notes |
 |---------|------------------------|-------|
@@ -205,7 +248,7 @@ The guards are calibrated on CPU/MPS. We expect:
 Automate the check with:
 
 ```bash
-python scripts/check_device_drift.py \
+python scripts/smoke/check_device_drift.py \
   artifacts/ci-pack-*/baseline_cpu/evaluation.report.json \
   artifacts/ci-pack-*/baseline_mps/evaluation.report.json \
   --tolerance 0.005
@@ -222,8 +265,8 @@ If drift exceeds these bands, re-tune VE thresholds or increase window counts.
 
 | Parameter | Default | Rationale |
 |-----------|---------|-----------|
-| PM ratio gate (Balanced) | PM_final ≤ 1.10 × PM_preview | Tier acceptance; exceeding the gate fails the run |
-| PM ratio gate (Conservative) | PM_final ≤ 1.05 × PM_preview | Stricter release acceptance; exceeding the gate fails the run |
+| PM ratio gate (Balanced) | subject final / baseline final ≤ 1.10 (+ published hysteresis) | Tier acceptance; exceeding the effective gate fails the run |
+| PM ratio gate (Conservative) | subject final / baseline final ≤ 1.05 (+ published hysteresis) | Stricter release acceptance; exceeding the effective gate fails the run |
 | Bootstrap α | 0.05 | 95 % CI for ΔlogNLL |
 | Spectral κ | Balanced caps `{ffn: 3.849, attn: 3.018, embed: 1.05, other: 0.0}`; Conservative `{ffn: 3.849, attn: 2.6, embed: 2.8, other: 2.8}` (from `tiers.yaml`) | Keeps WARN rate within the calibrated null budget |
 | RMT ε | `{ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01}` | q95–q97 of null ratio (+ margin) |
@@ -236,24 +279,27 @@ Detailed derivations are in the calibration appendix (`09-tier-v1-calibration.md
 - **ε-band corner case:** if `rmt.families.attn.edge_base = 1.20` and
   `rmt.families.attn.epsilon = 0.01`, the guard allows
   `rmt.families.attn.edge_cur ≤ (1+0.01) × 1.20 = 1.212`.
-- **Predictive gate:** on Balanced, if Δ̄ = −0.002 and the one-sided CI is
-  [−0.003, −0.001], VE enables (`mean_delta` and the CI upper bound both beat
-  −`min_effect_lognll`).
+- **Predictive gate:** on Balanced, if `mean_delta = -0.002` and the one-sided CI is
+  `[-0.003, -0.001]`, VE enables (`mean_delta` and the CI upper bound both beat
+  `-min_effect_lognll`).
 - **Spectral caps:** Balanced permits at most five caps (`max_caps = 5`). If the
   sixth violation fires, `spectral.summary.caps_exceeded = true` and the guard
   aborts the run.
 
-## 7. Known Limitations
+## 7. Scope Boundaries
 
-- Guarantees apply to evaluation slices only; task-level accuracy is not guaranteed.
+- Claims apply to configured evaluation slices; task-level accuracy requires
+  task-specific evidence.
 - Dataset shift or tokenizer changes invalidate pairing schedules.
-- No adversarial robustness or gradient masking guarantees.
+- Adversarial robustness and gradient masking require separate evidence.
 - CUDA kernels outside deterministic mode may exceed drift tolerances.
 - Reference mask-based flows are conservative; stronger compression requires plugins.
 - Published assurance basis covers GPT-2 and BERT profiles.
-- The repo also ships pilot calibration configs for additional families such as
-  Mistral 7B, Qwen2 7B, Qwen2.5 7B, and Qwen2.5 14B; those configs are not part of the published
-  assurance basis until supporting artifacts are attached.
+- Additional supported-experimental lanes are defined in
+  `contracts/support_matrix.json`; those lanes are not part of the published
+  assurance basis until supporting artifacts are attached. Examples include
+  Mistral 7B, Qwen2 7B, Qwen2.5 7B, and Qwen2.5 14B; the contract file remains
+  authoritative and may include additional lanes.
 - Contributions for additional model families are welcome; attach pilot reports
   and summary CSVs (typically written under `reports/calibration/` when running
   the calibration scripts) to change proposals or release artifacts.
@@ -267,12 +313,14 @@ The following tests underpin this handbook:
 - tests/edits/test_quant_rtn.py
 - tests/cli/test_verify.py: test_verify_command_passes
 
-Run them collectively with `make test` or `pytest -q -m "assurance"` where applicable.
+Run them collectively with `make test` or the narrower `make test-assurance`
+target.
 
 ## References
 
-- Evaluation math and paired ratios: `01-eval-math-derivation.md`
-- Paired BCa bootstrap details: `03-bca-bootstrap.md`
-- Spectral FPR and multiple-testing control: `05-spectral-fpr-derivation.md`
-- RMT ε‑rule and outlier bands: `06-rmt-epsilon-rule.md`
-- VE predictive gate power and thresholds: `07-ve-gate-power.md`
+- Evaluation math and paired ratios: [01-eval-math-derivation.md](01-eval-math-derivation.md)
+- Paired BCa bootstrap details: [03-bca-bootstrap.md](03-bca-bootstrap.md)
+- Spectral FPR and multiple-testing control: [05-spectral-fpr-derivation.md](05-spectral-fpr-derivation.md)
+- RMT ε‑rule and outlier bands: [06-rmt-epsilon-rule.md](06-rmt-epsilon-rule.md)
+- VE predictive gate power and thresholds: [07-ve-gate-power.md](07-ve-gate-power.md)
+- Perplexity background: [Hugging Face Transformers perplexity guide](https://huggingface.co/docs/transformers/perplexity)

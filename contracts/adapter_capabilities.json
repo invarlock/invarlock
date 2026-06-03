@@ -81,9 +81,10 @@
       "adapter": "hf_awq",
       "snapshot_restore": "best_effort",
       "guard_coverage": "full_when_modules_exposed",
-      "platform_support": "linux",
+      "platform_support": "gptqmodel-supported platforms",
       "runtime_constraints": [
-        "autoawq",
+        "gptqmodel",
+        "transformers",
         "triton"
       ],
       "required_extra": "awq",
@@ -95,12 +96,75 @@
       "adapter": "hf_gptq",
       "snapshot_restore": "best_effort",
       "guard_coverage": "full_when_modules_exposed",
-      "platform_support": "linux",
+      "platform_support": "gptqmodel-supported platforms",
       "runtime_constraints": [
-        "auto-gptq",
+        "gptqmodel",
         "triton"
       ],
       "required_extra": "gptq",
+      "degraded_modes": [
+        "metadata_only_without_runtime_stack"
+      ]
+    },
+    {
+      "adapter": "hf_torchao",
+      "snapshot_restore": "best_effort",
+      "guard_coverage": "full_when_modules_exposed",
+      "platform_support": "platform_dependent",
+      "runtime_constraints": [
+        "torchao",
+        "torch",
+        "transformers"
+      ],
+      "required_extra": "torchao",
+      "degraded_modes": [
+        "runtime_quantization_only",
+        "metadata_only_without_runtime_stack"
+      ]
+    },
+    {
+      "adapter": "hf_hqq",
+      "snapshot_restore": "best_effort",
+      "guard_coverage": "full_when_modules_exposed",
+      "platform_support": "platform_dependent",
+      "runtime_constraints": [
+        "hqq",
+        "torch",
+        "transformers"
+      ],
+      "required_extra": "hqq",
+      "degraded_modes": [
+        "runtime_quantization_only",
+        "metadata_only_without_runtime_stack"
+      ]
+    },
+    {
+      "adapter": "hf_quanto",
+      "snapshot_restore": "best_effort",
+      "guard_coverage": "full_when_modules_exposed",
+      "platform_support": "platform_dependent",
+      "runtime_constraints": [
+        "optimum-quanto",
+        "torch",
+        "transformers"
+      ],
+      "required_extra": "quanto",
+      "degraded_modes": [
+        "runtime_quantization_only",
+        "metadata_only_without_runtime_stack"
+      ]
+    },
+    {
+      "adapter": "hf_ct",
+      "snapshot_restore": "best_effort",
+      "guard_coverage": "full_when_modules_exposed",
+      "platform_support": "platform_dependent",
+      "runtime_constraints": [
+        "compressed-tensors",
+        "torch",
+        "transformers"
+      ],
+      "required_extra": "compressed-tensors",
       "degraded_modes": [
         "metadata_only_without_runtime_stack"
       ]

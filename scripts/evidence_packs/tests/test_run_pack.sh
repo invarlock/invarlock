@@ -3,10 +3,38 @@
 pack_test_sign_manifest() {
     local pack_dir="$1"
     local repo_root="${TEST_ROOT:-$(pwd)}"
-    python3 "${repo_root}/scripts/evidence_packs/python/sign_manifest.py" \
+    python3 "${repo_root}/scripts/evidence_packs/python/manifest_writer.py" sign \
         --manifest "${pack_dir}/manifest.json" \
         --generate-ephemeral \
         >/dev/null
+}
+
+test_run_pack_collect_reports_ignores_hidden_pack_staging_dirs() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}/modelA/reports/edit/run_1"
+    mkdir -p "${run_dir}/.evidence_pack.tmp.stale/reports/modelA/edit/run_1"
+    echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
+    echo "{}" > "${run_dir}/.evidence_pack.tmp.stale/reports/modelA/edit/run_1/evaluation.report.json"
+
+    local reports
+    reports="$(pack_collect_reports "${run_dir}")"
+
+    assert_eq "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json" "${reports}" "stale hidden pack staging reports are ignored"
+}
+
+test_run_pack_report_expected_failure_rejects_unparseable_report_paths() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/reports"
+    run pack_report_expects_verify_failure "${pack_dir}" "${pack_dir}/reports/evaluation.report.json"
+    assert_rc "1" "${RUN_RC}" "unparseable report path is not treated as expected failure"
 }
 
 test_run_pack_build_pack_collects_artifacts() {
@@ -27,6 +55,24 @@ test_run_pack_build_pack_collects_artifacts() {
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/manifest.json"
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/runtime.manifest.json"
+    cat > "${run_dir}/modelA/reports/edit/run_1/edit_metadata.json" <<'JSON'
+{
+  "schema": "invarlock/evidence-pack-edit-metadata-v1",
+  "artifact_class": "validation_subject_checkpoint",
+  "edit_type": "quant_rtn",
+  "optimized_deployment_backend": false,
+  "storage_format": "float_dequantized",
+  "actual_storage_format": "float_dequantized",
+  "packed_quantized_storage": false,
+  "runtime_memory_reduction": false,
+  "coverage": {
+    "edited_tensors": 1,
+    "edited_params": 1,
+    "total_params": 1,
+    "coverage_ratio": 1.0
+  }
+}
+JSON
     echo "# summary" > "${run_dir}/modelA/reports/edit/run_1/evaluation_report.md"
     echo "reviewer summary" > "${run_dir}/modelA/reports/edit/run_1/reviewer_summary.txt"
     mkdir -p "${run_dir}/modelA/reports/edit/run_1/runtime_inputs"
@@ -92,6 +138,7 @@ EOF
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/evaluation.report.json" "report copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/manifest.json" "report manifest copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/runtime.manifest.json" "runtime manifest copied"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/edit_metadata.json" "edit metadata copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/evaluation_report.md" "markdown summary copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/reviewer_summary.txt" "reviewer summary copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/runtime_inputs/baseline_report.json" "runtime inputs copied"
@@ -109,6 +156,7 @@ EOF
     assert_match "signed manifest, strict verification, and a PASS final verdict" "$(cat "${pack_dir}/README.md")" "README documents strict signed verification triad"
     assert_match "invarlock advanced evidence-pack verify" "$(cat "${pack_dir}/README.md")" "README points to advanced evidence-pack verify"
     assert_file_exists "${pack_dir}/results/analysis/guard_intervention_summary.json" "intervention summary copied"
+    assert_file_exists "${pack_dir}/results/analysis/edit_artifact_summary.json" "edit artifact summary written"
     assert_file_exists "${pack_dir}/metadata/source_repo.json" "source repo metadata written"
     assert_file_exists "${pack_dir}/metadata/environment.json" "environment metadata written"
     assert_file_exists "${pack_dir}/metadata/tuned_edit_params.json" "tuned edit params copied"
@@ -150,6 +198,189 @@ test_run_pack_build_pack_rejects_failed_final_verdict() {
     run pack_build_pack "${run_dir}" "${TEST_TMPDIR}/pack"
     assert_rc "1" "${RUN_RC}" "pack build fails when run verdict is FAIL"
     assert_match "refusing to build a distributable pack" "${RUN_ERR}" "rejects failed run verdict"
+}
+
+test_run_pack_release_review_requires_pass_and_runtime_manifests() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}/reports" "${run_dir}/modelA/reports/edit/run_1"
+    echo "review" > "${run_dir}/reports/final_verdict.txt"
+    echo '{"verdict":"WARN"}' > "${run_dir}/reports/final_verdict.json"
+    echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
+
+    PACK_RELEASE_REVIEW=1
+    PACK_REQUIRE_PASS=1
+    PACK_VERIFY_PROFILE=ci
+    PACK_REPORT_ASSURANCE=strict
+    PACK_SIGN_MANIFEST=1
+    PACK_REQUIRE_RUNTIME_MANIFESTS=1
+    export PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    export PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+
+    run pack_build_pack "${run_dir}" "${TEST_TMPDIR}/pack"
+    assert_rc "1" "${RUN_RC}" "release-review rejects non-PASS verdict"
+    assert_match "requires PASS" "${RUN_ERR}" "non-PASS rejection is explicit"
+
+    echo '{"verdict":"PASS"}' > "${run_dir}/reports/final_verdict.json"
+    run pack_build_pack "${run_dir}" "${TEST_TMPDIR}/pack2"
+    assert_rc "1" "${RUN_RC}" "release-review rejects missing runtime manifests"
+    assert_match "Missing runtime.manifest.json" "${RUN_ERR}" "runtime sidecar required"
+
+    unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+}
+
+test_run_pack_entrypoint_release_review_sets_hardened_defaults() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    pack_entrypoint() { printf '%s\n' "$@" > "${TEST_TMPDIR}/run.args"; }
+    pack_build_pack() { :; }
+
+    pack_run_pack --release-review --out "${TEST_TMPDIR}/out"
+
+    assert_eq "1" "${PACK_REQUIRE_PASS}" "release-review requires PASS"
+    assert_eq "ci" "${PACK_VERIFY_PROFILE}" "release-review uses ci profile"
+    assert_eq "strict" "${PACK_REPORT_ASSURANCE}" "release-review uses strict assurance"
+    assert_eq "1" "${PACK_SIGN_MANIFEST}" "release-review signs manifests"
+    assert_eq "1" "${PACK_REQUIRE_RUNTIME_MANIFESTS}" "release-review requires runtime manifests"
+    assert_eq "1" "${PACK_DEFER_REPORT_RENDERING}" "release-review defers optional report rendering"
+
+    unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+    unset PACK_DEFER_REPORT_RENDERING
+}
+
+test_run_pack_entrypoint_applies_preconfigured_release_review_defaults() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    pack_entrypoint() { printf '%s\n' "$@" > "${TEST_TMPDIR}/run.args"; }
+    pack_build_pack() { :; }
+
+    PACK_RELEASE_REVIEW=1
+    export PACK_RELEASE_REVIEW
+
+    pack_run_pack --out "${TEST_TMPDIR}/out"
+
+    assert_eq "1" "${PACK_REQUIRE_PASS}" "preconfigured release-review requires PASS"
+    assert_eq "ci" "${PACK_VERIFY_PROFILE}" "preconfigured release-review uses ci profile"
+    assert_eq "strict" "${PACK_REPORT_ASSURANCE}" "preconfigured release-review uses strict assurance"
+    assert_eq "1" "${PACK_SIGN_MANIFEST}" "preconfigured release-review signs manifests"
+    assert_eq "1" "${PACK_REQUIRE_RUNTIME_MANIFESTS}" "preconfigured release-review requires runtime manifests"
+    assert_eq "1" "${PACK_DEFER_REPORT_RENDERING}" "preconfigured release-review defers optional report rendering"
+
+    unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+    unset PACK_DEFER_REPORT_RENDERING
+}
+
+test_run_pack_release_review_rejects_dev_verify_profile() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    PACK_RELEASE_REVIEW=1
+    PACK_REQUIRE_PASS=1
+    PACK_VERIFY_PROFILE=dev
+    PACK_REPORT_ASSURANCE=strict
+    PACK_SIGN_MANIFEST=1
+    PACK_REQUIRE_RUNTIME_MANIFESTS=1
+    export PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    export PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+
+    run pack_validate_release_review_settings
+    assert_rc "1" "${RUN_RC}" "release-review rejects dev verify profile"
+    assert_match "PACK_VERIFY_PROFILE=dev" "${RUN_ERR}" "dev profile rejection is explicit"
+
+    unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+}
+
+test_run_pack_release_review_rejects_weak_report_assurance() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    PACK_RELEASE_REVIEW=1
+    PACK_REQUIRE_PASS=1
+    PACK_VERIFY_PROFILE=ci
+    PACK_REPORT_ASSURANCE=report
+    PACK_SIGN_MANIFEST=1
+    PACK_REQUIRE_RUNTIME_MANIFESTS=1
+    export PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    export PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+
+    run pack_validate_release_review_settings
+    assert_rc "1" "${RUN_RC}" "release-review rejects weak report assurance"
+    assert_match "PACK_REPORT_ASSURANCE=strict" "${RUN_ERR}" "strict report assurance is required"
+
+    unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+}
+
+test_run_pack_release_review_rejects_missing_hardened_settings() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    PACK_RELEASE_REVIEW=1
+    PACK_REQUIRE_PASS=0
+    PACK_VERIFY_PROFILE=ci
+    PACK_REPORT_ASSURANCE=strict
+    PACK_SIGN_MANIFEST=1
+    PACK_REQUIRE_RUNTIME_MANIFESTS=1
+    export PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    export PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+
+    run pack_validate_release_review_settings
+    assert_rc "1" "${RUN_RC}" "release-review rejects disabled PASS requirement"
+    assert_match "PACK_REQUIRE_PASS=1" "${RUN_ERR}" "PASS requirement error is explicit"
+
+    PACK_REQUIRE_PASS=1
+    PACK_SIGN_MANIFEST=0
+    run pack_validate_release_review_settings
+    assert_rc "1" "${RUN_RC}" "release-review rejects disabled signing"
+    assert_match "PACK_SIGN_MANIFEST=1" "${RUN_ERR}" "signing requirement error is explicit"
+
+    PACK_SIGN_MANIFEST=1
+    PACK_REQUIRE_RUNTIME_MANIFESTS=0
+    run pack_validate_release_review_settings
+    assert_rc "1" "${RUN_RC}" "release-review rejects disabled runtime manifests"
+    assert_match "PACK_REQUIRE_RUNTIME_MANIFESTS=1" "${RUN_ERR}" "runtime manifest requirement error is explicit"
+
+    PACK_REQUIRE_RUNTIME_MANIFESTS=1
+    PACK_VERIFY_PROFILE=""
+    run pack_validate_release_review_settings
+    assert_rc "1" "${RUN_RC}" "release-review rejects missing verify profile"
+    assert_match "explicit PACK_VERIFY_PROFILE" "${RUN_ERR}" "missing profile error is explicit"
+
+    unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+}
+
+test_run_pack_release_review_cli_preserves_and_rejects_explicit_dev_profile() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    pack_entrypoint() { t_fail "pack_entrypoint should not run after dev profile rejection"; }
+    pack_build_pack() { t_fail "pack_build_pack should not run after dev profile rejection"; }
+
+    PACK_VERIFY_PROFILE=dev
+    export PACK_VERIFY_PROFILE
+
+    run pack_run_pack --release-review --out "${TEST_TMPDIR}/out"
+    assert_rc "1" "${RUN_RC}" "release-review CLI rejects explicit dev profile"
+    assert_match "PACK_VERIFY_PROFILE=dev" "${RUN_ERR}" "dev profile rejection is explicit"
+
+    unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
 }
 
 test_run_pack_build_pack_layout_v2_nests_results_and_metadata() {
@@ -362,6 +593,155 @@ EOF
     assert_match "\"failed_reports\": 0" "$(cat "${pack_dir}/results/verification_summary.json")" "failed count recorded"
 }
 
+test_run_pack_build_pack_accepts_scenario_expected_verify_failures() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}/reports" "${run_dir}/analysis" "${run_dir}/state"
+    mkdir -p "${run_dir}/modelA/reports/quant_4bit_clean/run_1"
+    mkdir -p "${run_dir}/modelA/reports/prune_50pct_stress/run_1"
+
+    echo "verdict" > "${run_dir}/reports/final_verdict.txt"
+    echo '{"verdict":"PASS"}' > "${run_dir}/reports/final_verdict.json"
+    echo '{"model_list": ["org/model"], "models": {"org/model": {"revision": "abc"}}}' > "${run_dir}/state/model_revisions.json"
+    cat > "${run_dir}/state/scenarios.json" <<'JSON'
+{
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "quant_4bit_clean", "strictness": "must_pass"},
+    {"id": "prune_50pct_stress", "strictness": "must_fail"}
+  ]
+}
+JSON
+    echo "{}" > "${run_dir}/modelA/reports/quant_4bit_clean/run_1/evaluation.report.json"
+    echo "{}" > "${run_dir}/modelA/reports/prune_50pct_stress/run_1/evaluation.report.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+cmd="${1:-}"
+shift || true
+case "${cmd}" in
+    report)
+        sub="${1:-}"
+        if [[ "${sub}" == "html" ]]; then
+            out=""
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --output|-o)
+                        out="$2"
+                        shift 2
+                        ;;
+                    *)
+                        shift
+                        ;;
+                esac
+            done
+            mkdir -p "$(dirname "${out}")"
+            printf '<html>ok</html>\n' > "${out}"
+            exit 0
+        fi
+        ;;
+    verify)
+        report="${@: -1}"
+        echo '{"ok": false}'
+        if [[ "${report}" == */prune_50pct_stress/*/evaluation.report.json ]]; then
+            exit 1
+        fi
+        exit 0
+        ;;
+esac
+echo '{}'
+EOF
+    chmod +x "${bin_dir}/invarlock"
+    export PATH="${bin_dir}:${PATH}"
+
+    PACK_SIGN_MANIFEST=0
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    pack_build_pack "${run_dir}" "${pack_dir}"
+
+    assert_file_exists "${pack_dir}/reports/modelA/quant_4bit_clean/run_1/verify.json" "expected-pass verify output captured"
+    assert_file_exists "${pack_dir}/reports/modelA/prune_50pct_stress/run_1/verify.json" "expected-fail verify output captured"
+    assert_match "\"clean_reports\": 1" "$(cat "${pack_dir}/results/verification_summary.json")" "expected-pass count recorded"
+    assert_match "\"expected_failure_reports\": 1" "$(cat "${pack_dir}/results/verification_summary.json")" "scenario expected-failure count recorded"
+    assert_match "\"failed_reports\": 0" "$(cat "${pack_dir}/results/verification_summary.json")" "failed count recorded"
+}
+
+test_run_pack_build_pack_rejects_expected_failure_report_that_verifies_clean() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}/reports" "${run_dir}/analysis" "${run_dir}/state"
+    mkdir -p "${run_dir}/modelA/reports/prune_50pct_stress/run_1"
+
+    echo "verdict" > "${run_dir}/reports/final_verdict.txt"
+    echo '{"verdict":"PASS"}' > "${run_dir}/reports/final_verdict.json"
+    echo '{"model_list": ["org/model"], "models": {"org/model": {"revision": "abc"}}}' > "${run_dir}/state/model_revisions.json"
+    cat > "${run_dir}/state/scenarios.json" <<'JSON'
+{
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "prune_50pct_stress", "strictness": "must_fail"}
+  ]
+}
+JSON
+    echo "{}" > "${run_dir}/modelA/reports/prune_50pct_stress/run_1/evaluation.report.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+cmd="${1:-}"
+shift || true
+case "${cmd}" in
+    report)
+        sub="${1:-}"
+        if [[ "${sub}" == "html" ]]; then
+            out=""
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --output|-o)
+                        out="$2"
+                        shift 2
+                        ;;
+                    *)
+                        shift
+                        ;;
+                esac
+            done
+            mkdir -p "$(dirname "${out}")"
+            printf '<html>ok</html>\n' > "${out}"
+            exit 0
+        fi
+        ;;
+    verify)
+        echo '{"ok": true}'
+        exit 0
+        ;;
+esac
+echo '{}'
+EOF
+    chmod +x "${bin_dir}/invarlock"
+    export PATH="${bin_dir}:${PATH}"
+
+    PACK_SIGN_MANIFEST=0
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    run pack_build_pack "${run_dir}" "${pack_dir}"
+    assert_rc "1" "${RUN_RC}" "expected-failure report verifying clean fails pack build"
+    assert_match "Expected verify failure passed" "${RUN_ERR}" "unexpected expected-failure pass is explicit"
+}
+
 test_run_pack_build_pack_continues_when_html_report_fails() {
     mock_reset
 
@@ -537,6 +917,16 @@ test_run_pack_helpers_cover_error_paths() {
     assert_rc "1" "${RUN_RC}" "invalid report path returns non-zero"
 
     local pack_dir="${TEST_TMPDIR}/pack"
+    run pack_report_scenario_id "${pack_dir}" "${pack_dir}/reports/evaluation.report.json"
+    assert_rc "1" "${RUN_RC}" "malformed pack report path has no scenario id"
+
+    run pack_report_expects_verify_failure "${pack_dir}" "${pack_dir}/outside/evaluation.report.json"
+    assert_rc "1" "${RUN_RC}" "malformed report path cannot infer expected failure"
+
+    mkdir -p "${pack_dir}/reports/model/errors/nan_injection"
+    run pack_report_expects_verify_failure "${pack_dir}" "${pack_dir}/reports/model/errors/nan_injection/evaluation.report.json"
+    assert_rc "0" "${RUN_RC}" "error-injection report expects verify failure"
+
     mkdir -p "${pack_dir}/reports"
     run pack_verify_reports "${pack_dir}"
     assert_rc "1" "${RUN_RC}" "missing reports returns non-zero"
@@ -549,13 +939,49 @@ test_run_pack_sha256_cmd_fallback_and_sign_toggle() {
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
-    local repo_root
-    repo_root="$(pwd)"
-    cat > "${bin_dir}/shasum" <<EOF
+    cat > "${bin_dir}/shasum" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
-exec python3 "${repo_root}/scripts/evidence_packs/python/shasum_mock.py" "\$@"
+python3 - "$@" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import pathlib
+import sys
+
+args = sys.argv[1:]
+check_file = None
+files: list[str] = []
+i = 0
+while i < len(args):
+    if args[i] == "-a":
+        i += 2
+    elif args[i] == "-c":
+        check_file = args[i + 1] if i + 1 < len(args) else ""
+        i += 2
+    else:
+        files.append(args[i])
+        i += 1
+
+
+def sha256(path: str) -> str:
+    return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+
+
+if check_file:
+    ok = True
+    for line in pathlib.Path(check_file).read_text().splitlines():
+        if not line.strip():
+            continue
+        parts = line.split()
+        if sha256(parts[-1]) != parts[0]:
+            ok = False
+    raise SystemExit(0 if ok else 1)
+
+for filename in files:
+    print(f"{sha256(filename)}  {filename}")
+PY
 EOF
     chmod +x "${bin_dir}/shasum"
 
@@ -597,6 +1023,25 @@ test_run_pack_sign_manifest_writes_package_native_signature() {
         "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["signing_key_fingerprint"])' "${pack_dir}/manifest.json" < /dev/null)" \
         "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["signing_key_fingerprint"])' "${pack_dir}/manifest.signature.json" < /dev/null)" \
         "manifest and signature bundle record the same fingerprint"
+}
+
+test_run_pack_sign_manifest_helper_uses_ephemeral_key_by_default() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    local manifest="${TEST_TMPDIR}/manifest.json"
+    echo "{}" > "${manifest}"
+    local calls="${TEST_TMPDIR}/sign_helper.calls"
+    _cmd_python() {
+        printf '%s\n' "$*" > "${calls}"
+        return 0
+    }
+
+    run pack_sign_manifest_helper "${manifest}"
+    assert_rc "0" "${RUN_RC}" "manifest signing helper succeeds"
+    assert_match "manifest_writer\\.py sign" "$(cat "${calls}")" "sign helper invoked"
+    assert_match "--generate-ephemeral" "$(cat "${calls}")" "ephemeral signing key path is used by default"
 }
 
 test_run_pack_sign_manifest_errors_and_cleans_when_helper_fails() {
@@ -953,6 +1398,21 @@ test_run_pack_build_pack_propagates_staging_and_finalize_failures() {
     [[ ! -d "${TEST_TMPDIR}/staging" ]] || t_fail "staging directory should be cleaned on finalize failure"
 }
 
+test_run_pack_build_pack_propagates_release_review_validation_failure() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}"
+
+    pack_require_passing_run_verdict() { return 0; }
+    pack_validate_release_review_settings() { return 1; }
+
+    run pack_build_pack "${run_dir}" "${TEST_TMPDIR}/pack"
+    assert_rc "1" "${RUN_RC}" "pack build fails when release-review validation fails"
+}
+
 test_run_pack_populate_pack_dir_propagates_environment_and_manifest_write_failures() {
     mock_reset
 
@@ -978,6 +1438,11 @@ test_run_pack_populate_pack_dir_propagates_environment_and_manifest_write_failur
     assert_rc "1" "${RUN_RC}" "populate pack dir fails when environment metadata write fails"
 
     pack_write_environment_metadata() { return 0; }
+    pack_write_edit_artifact_summary() { return 1; }
+    run pack_populate_pack_dir "${run_dir}" "${pack_dir}"
+    assert_rc "1" "${RUN_RC}" "populate pack dir fails when edit artifact summary write fails"
+
+    pack_write_edit_artifact_summary() { return 0; }
     pack_write_readme() { return 1; }
     run pack_populate_pack_dir "${run_dir}" "${pack_dir}"
     assert_rc "1" "${RUN_RC}" "populate pack dir fails when README write fails"
@@ -991,4 +1456,51 @@ test_run_pack_populate_pack_dir_propagates_environment_and_manifest_write_failur
     pack_write_manifest() { return 1; }
     run pack_populate_pack_dir "${run_dir}" "${pack_dir}"
     assert_rc "1" "${RUN_RC}" "populate pack dir fails when manifest write fails"
+}
+
+test_pack_build_pack_and_verify_pack_end_to_end_v2_layout() {
+    mock_reset
+
+    PACK_SKIP_HTML=1
+    PACK_PACK_LAYOUT=v2
+    PACK_SUITE=subset
+    PACK_NET=0
+    PACK_DETERMINISM=throughput
+    PACK_REPEATS=0
+
+    local run_dir="${TEST_TMPDIR}/run"
+    local pack_dir="${TEST_TMPDIR}/pack"
+
+    mkdir -p "${run_dir}/reports" "${run_dir}/analysis" "${run_dir}/state"
+    echo "PASS" > "${run_dir}/reports/final_verdict.txt"
+    echo '{"ok":true}' > "${run_dir}/reports/final_verdict.json"
+    echo 'model,edit' > "${run_dir}/analysis/eval_results.csv"
+    echo 'm,quant_rtn' >> "${run_dir}/analysis/eval_results.csv"
+    echo '{"model_list":["m"],"models":{"m":{"revision":"rev"}}}' > "${run_dir}/state/model_revisions.json"
+
+    mkdir -p "${run_dir}/m/reports/clean/quant_rtn"
+    echo '{}' > "${run_dir}/m/reports/clean/quant_rtn/evaluation.report.json"
+
+    source "${TEST_ROOT}/scripts/evidence_packs/run_pack.sh"
+
+    run pack_build_pack "${run_dir}" "${pack_dir}"
+    assert_rc "0" "${RUN_RC}" "pack_build_pack succeeds"
+
+    assert_file_exists "${pack_dir}/manifest.json" "manifest written"
+    assert_file_exists "${pack_dir}/checksums.sha256" "checksums written"
+    assert_file_exists "${pack_dir}/README.md" "readme written"
+    assert_file_exists "${pack_dir}/results/verification_summary.json" "verification summary written"
+    assert_file_exists "${pack_dir}/reports/m/clean/quant_rtn/evaluation.report.json" "report copied"
+    assert_file_exists "${pack_dir}/manifest.signature.json" "signature bundle written"
+
+    assert_file_exists "${pack_dir}/metadata/manifest.json" "manifest copied to metadata"
+    assert_file_exists "${pack_dir}/metadata/manifest.signature.json" "signature copied to metadata"
+    assert_file_exists "${pack_dir}/metadata/checksums.sha256" "checksum copied to metadata"
+    assert_file_exists "${pack_dir}/metadata/source_repo.json" "source repo metadata copied"
+    assert_file_exists "${pack_dir}/metadata/environment.json" "environment metadata copied"
+
+    local verify_json="${TEST_TMPDIR}/verify.json"
+    run bash "${TEST_ROOT}/scripts/evidence_packs/verify_pack.sh" --pack "${pack_dir}" --json-out "${verify_json}"
+    assert_rc "0" "${RUN_RC}" "verify_pack succeeds"
+    assert_file_exists "${verify_json}" "verify json written"
 }

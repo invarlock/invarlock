@@ -9,7 +9,8 @@
       "intent + primary_guard provide scenario utility metadata for maintainers and external evidence reviewers.",
       "Error scenarios may include generation.env to pin deterministic, scenario-specific injector settings.",
       "Optional sidecar probe artifacts (for example rmt_probe.json) can provide detector evidence when compare-mode guards are delta-internal.",
-      "Scenarios can declare suites: [\"subset\", \"showcase\", \"workshop3\", \"full\", ...]; the suite filters to PACK_SUITE and writes the effective manifest to OUTPUT_DIR/state/scenarios.json."
+      "Scenarios can declare suites: [\"subset\", \"showcase\", \"workshop3\", \"full\", ...]; the suite filters to PACK_SUITE and writes the effective manifest to OUTPUT_DIR/state/scenarios.json.",
+      "artifact_class labels each scenario as validation_subject_checkpoint, deployable_optimized_subject, fault_injection_fixture, or evidence_only_pack."
     ]
   },
   "scenarios": [
@@ -30,7 +31,12 @@
         "kind": "edit",
         "edit_spec": "quant_rtn:clean:ffn",
         "version": "clean"
-      }
+      },
+      "artifact_class": "validation_subject_checkpoint",
+      "deployable_as_hf_checkpoint": true,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "fp8_e5m2_clean",
@@ -49,7 +55,12 @@
         "kind": "edit",
         "edit_spec": "fp8_quant:clean:ffn",
         "version": "clean"
-      }
+      },
+      "artifact_class": "validation_subject_checkpoint",
+      "deployable_as_hf_checkpoint": true,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "prune_clean",
@@ -68,7 +79,12 @@
         "kind": "edit",
         "edit_spec": "magnitude_prune:clean:ffn",
         "version": "clean"
-      }
+      },
+      "artifact_class": "validation_subject_checkpoint",
+      "deployable_as_hf_checkpoint": true,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "svd_rank32_clean",
@@ -87,7 +103,12 @@
         "kind": "edit",
         "edit_spec": "lowrank_svd:clean:ffn",
         "version": "clean"
-      }
+      },
+      "artifact_class": "validation_subject_checkpoint",
+      "deployable_as_hf_checkpoint": true,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "prune_50pct_stress",
@@ -121,7 +142,12 @@
             "expected": true
           }
         ]
-      }
+      },
+      "artifact_class": "validation_subject_checkpoint",
+      "deployable_as_hf_checkpoint": true,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "svd_rank32_stress",
@@ -155,7 +181,12 @@
             "expected": true
           }
         ]
-      }
+      },
+      "artifact_class": "validation_subject_checkpoint",
+      "deployable_as_hf_checkpoint": true,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "quant_4bit_stress",
@@ -192,7 +223,12 @@
             "min": 1
           }
         ]
-      }
+      },
+      "artifact_class": "validation_subject_checkpoint",
+      "deployable_as_hf_checkpoint": true,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "fp8_e5m2_stress",
@@ -229,7 +265,12 @@
             "min": 1
           }
         ]
-      }
+      },
+      "artifact_class": "validation_subject_checkpoint",
+      "deployable_as_hf_checkpoint": true,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "nan_injection",
@@ -259,7 +300,12 @@
             ]
           }
         ]
-      }
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "inf_injection",
@@ -288,7 +334,12 @@
             ]
           }
         ]
-      }
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "shape_mismatch",
@@ -317,7 +368,12 @@
             ]
           }
         ]
-      }
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "missing_tensors",
@@ -352,7 +408,12 @@
             "expected": false
           }
         ]
-      }
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "extreme_quant",
@@ -390,7 +451,12 @@
             "expected": false
           }
         ]
-      }
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "scale_explosion",
@@ -431,7 +497,12 @@
             "expected": true
           }
         ]
-      }
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "rank_collapse",
@@ -468,7 +539,12 @@
             "expected": true
           }
         ]
-      }
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "norm_collapse",
@@ -505,7 +581,12 @@
             "expected": true
           }
         ]
-      }
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "weight_tying_break",
@@ -535,7 +616,12 @@
             ]
           }
         ]
-      }
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "rmt_norm_noise",
@@ -606,7 +692,12 @@
             "expected": false
           }
         ]
-      }
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "spectral_moderate_scale",
@@ -670,7 +761,12 @@
             "min": 1
           }
         ]
-      }
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "ve_mlp_scale_skew",
@@ -730,7 +826,12 @@
             "min": 1
           }
         ]
-      }
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "rmt_norm_noise_strong",
@@ -774,7 +875,12 @@
             "expected": false
           }
         ]
-      }
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "spectral_moderate_scale_mlp",
@@ -812,7 +918,12 @@
             "expected": false
           }
         ]
-      }
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     },
     {
       "id": "ve_mlp_scale_skew_up",
@@ -848,7 +959,12 @@
             "min": 1
           }
         ]
-      }
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
     }
   ]
 }

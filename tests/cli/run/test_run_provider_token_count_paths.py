@@ -10,82 +10,16 @@ import click
 import pytest
 
 from invarlock.cli.commands.run import run_command
-
-
-def _base_cfg(tmp_path: Path, preview=2, final=2) -> Path:
-    p = tmp_path / "config.yaml"
-    p.write_text(
-        f"""
-model:
-  adapter: hf_causal
-  id: gpt2
-  device: cpu
-edit:
-  name: quant_rtn
-  plan: {{}}
-
-dataset:
-  provider: synthetic
-  id: synthetic
-  split: validation
-  seq_len: 8
-  stride: 4
-  preview_n: {preview}
-  final_n: {final}
-
-guards:
-  order: []
-
-eval:
-  loss:
-    type: auto
-
-output:
-  dir: runs
-        """
-    )
-    return p
+from tests.cli.run._support_run_common import (
+    common_ce_patches,
+)
+from tests.cli.run._support_run_common import (
+    write_base_run_config as _base_cfg,
+)
 
 
 def _common_ce():
-    return (
-        patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
-            lambda model_id, adapter: SimpleNamespace(
-                default_loss="ce",
-                model_id=model_id,
-                adapter=adapter,
-                module_selectors={},
-                invariants=set(),
-                cert_lints=[],
-                family="gpt",
-            ),
-        ),
-        patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
-            lambda model_profile: (
-                SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
-                "tokhash123",
-            ),
-        ),
-        patch("invarlock.cli.device.resolve_device", lambda d: d),
-        patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
-        patch(
-            "invarlock.core.registry.get_registry",
-            lambda: SimpleNamespace(
-                get_adapter=lambda name: SimpleNamespace(
-                    name=name, load_model=lambda model_id, device: object()
-                ),
-                get_edit=lambda name: SimpleNamespace(name=name),
-                get_guard=lambda name: SimpleNamespace(name=name),
-                get_plugin_metadata=lambda n, t: {
-                    "name": n,
-                    "module": f"{t}.{n}",
-                    "version": "test",
-                },
-            ),
-        ),
-    )
+    return common_ce_patches(include_registry=True)
 
 
 def test_baseline_tokenizer_hash_mismatch_exit(tmp_path: Path):
@@ -124,7 +58,7 @@ def test_baseline_tokenizer_hash_mismatch_exit(tmp_path: Path):
         # Force tokenizer hash to be 'tokhash123' so a mismatch with baseline occurs
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda profile: (
                     SimpleNamespace(
                         eos_token="</s>", pad_token="</s>", vocab_size=50000

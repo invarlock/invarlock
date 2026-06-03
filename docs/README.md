@@ -1,11 +1,15 @@
 # InvarLock Documentation
 
-InvarLock is edit-agnostic (BYOE). A small built-in RTN dequantized
-weight-edit simulation (`quant_rtn`, 8-bit) exists for advanced smoke and demo
-workflows. See
-[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md).
+InvarLock provides auditable strict verification for edited model checkpoints. It
+validates baseline-vs-subject comparisons, not a specific edit toolchain. A
+small built-in RTN dequantized weight-edit simulation (`quant_rtn`, 8-bit)
+exists for advanced smoke and demo workflows; production workflows are
+bring-your-own-edited-checkpoint (BYOE). See [Compare & evaluate
+(BYOE)](user-guide/compare-and-evaluate.md) and the [Public Evidence
+Walkthrough](user-guide/public-evidence-walkthrough.md).
 
-Welcome to the documentation hub for InvarLock (Edit‑agnostic robustness reports for weight edits).
+Welcome to the documentation hub for InvarLock (auditable strict verification for
+edited model checkpoints).
 The material below is organized so new users can ramp quickly while practitioners
 find detailed reference, design rationales, and assurance notes.
 It is aimed at checkpoint editors, CI and assurance owners, and researchers
@@ -17,7 +21,7 @@ running paired evaluation on text workflows plus the included image-text path.
 
 1. **[Getting Started](user-guide/getting-started.md)** – environment setup and the first `evaluate` → `verify` → `report html` loop.
 2. **[Quickstart](user-guide/quickstart.md)** – CLI highlights for common workflows.
-3. **[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)** – baseline ↔ subject paired evaluation with guardchain.
+3. **[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)** – baseline ↔ subject paired evaluation with the guard chain.
 4. **[Primary Metric Smoke](user-guide/primary-metric-smoke.md)** – tiny examples for ppl/accuracy kinds.
 
 ### Choose Your Path
@@ -35,7 +39,8 @@ pip install "invarlock[hf]"
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline <BASELINE_MODEL> \
   --subject  <SUBJECT_MODEL> \
-  --adapter  auto \
+  --baseline-adapter auto \
+  --subject-adapter  auto \
   --profile  ci
 ```
 
@@ -57,6 +62,8 @@ boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 - [Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)
 - [Primary Metric Smoke](user-guide/primary-metric-smoke.md)
 - [Live Examples](user-guide/live-examples.md)
+- [Integration Examples](user-guide/integrations.md)
+- [Public Evidence Walkthrough](user-guide/public-evidence-walkthrough.md)
 - [Configuration Gallery](user-guide/config-gallery.md)
 - [Example Reports](user-guide/example-reports.md)
 - [Reading a report](user-guide/reading-report.md)
@@ -70,6 +77,7 @@ boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 
 - [Reference Index](reference/index.md)
 - [CLI Reference](reference/cli.md)
+- [Public Contracts](reference/contracts.md)
 - [Tier Policy Tuning CLI (Calibration)](reference/calibration.md) — `invarlock advanced calibrate` for tier policy sweeps
 - [Configuration Schema](reference/config-schema.md)
 - [Guards](reference/guards.md)
@@ -102,11 +110,11 @@ this public docs index.
 - [RMT ε-Rule](assurance/06-rmt-epsilon-rule.md)
 - [VE Predictive Gate](assurance/07-ve-gate-power.md)
 - [Determinism Contracts](assurance/08-determinism-contracts.md)
-- [Tier v1.0 Calibration](assurance/09-tier-v1-calibration.md)
+- [Tier Policy v1 Calibration](assurance/09-tier-v1-calibration.md)
 - [Guard Overhead Method](assurance/10-guard-overhead-method.md)
 - [Policy Provenance & Digest](assurance/11-policy-provenance.md)
 - [Device Drift Bands](assurance/12-device-drift-bands.md)
-- [GPU/MPS-First Guards (Decision Memo)](assurance/13-gpu-mps-first-guards.md)
+- [GPU/MPS-First Guard Measurement Contracts](assurance/13-gpu-mps-first-guards.md)
 - [Guard Validation Smoke](assurance/16-guard-validation-smoke.md)
 - [Empirical Guard Evidence](assurance/17-empirical-guard-evidence.md)
 
@@ -114,7 +122,7 @@ Note: Every assurance claim is backed by automated tests and cross-referenced in
 the docs. See Guard Contracts → Coverage Reference
 (assurance/04-guard-contracts.md) for the test index.
 
-Calibration CSVs and proof reports referenced in these notes are produced by
+Calibration CSVs and evidence reports referenced in these notes are produced by
 local or CI runs (typically under `runs/null_sweeps/**` and
 `reports/calibration/**`) and are not committed to the repository. Attach them
 to change proposals or releases when you update calibration.
@@ -132,7 +140,7 @@ to change proposals or releases when you update calibration.
 
 ### Governance
 
-- [Contribution Guidelines](https://github.com/invarlock/invarlock/blob/v0.9.0/CONTRIBUTING.md)
+- [Contribution Guidelines](https://github.com/invarlock/invarlock/blob/v0.10.0/CONTRIBUTING.md)
 
 ---
 
@@ -162,7 +170,7 @@ configured acceptance envelopes even when aggressive compression is attempted.
   `notebooks/invarlock_python_api.ipynb`, and
   `notebooks/invarlock_policy_tiers.ipynb`.
 - Runnable documentation surfaces can be verified locally with
-  `make docs-live-fast`, `python scripts/verify_live_examples.py`, or
+  `make docs-live-fast`, `python scripts/docs/verify_live_examples.py`, or
   `make docs-live`.
 - The curated fast lane replays concrete Markdown CLI snippets in host
   mode with seeded demo evidence, then smoke-runs the curated notebook subset.
@@ -184,17 +192,19 @@ configured acceptance envelopes even when aggressive compression is attempted.
 ## Building Docs Offline vs Online
 
 - Offline (default): mkdocs builds without contacting the Internet. Mermaid
-  diagrams are disabled by default to keep builds fully local.
-  - Command: `mkdocs build` or run `make docs` without `--strict`.
+  diagrams are disabled by default to keep builds fully local. The generated
+  HTML references MathJax so formulas render in browsers with network access;
+  MathJax is not fetched during the build.
+  - Command: `make docs` or `mkdocs build --strict`.
 - Online (enable networked assets explicitly): enable Mermaid diagrams (via CDN)
   and keep strict checks.
   - Command: `INVARLOCK_DOCS_MERMAID=1 mkdocs build --strict`
 
 Notes
 
-- The configuration references CDNs (MathJax/Polyfill) via `extra_javascript` in
-  the generated HTML. These are not fetched at build time; they load when you
-  view the HTML in a browser with network access.
+- The configuration references MathJax via `extra_javascript` in the generated
+  HTML. This is required for Arithmatex formulas to render on the published
+  docs site.
 - The mermaid2 plugin pings the CDN; we gate it behind the
   `INVARLOCK_DOCS_MERMAID` environment variable to avoid network dependencies by
   default.
@@ -246,13 +256,13 @@ the canonical source of truth for normalized support tiers
 published-basis evidence references.
 
 Model evidence automation lives in
-`scripts/model_evidence_sweep.py`, with tmux-based remote launch support in
-`scripts/run_model_evidence_remote.py` and a nightly/manual runner workflow in
+`scripts/model_evidence/model_evidence_sweep.py`, with tmux-based remote launch support in
+`scripts/model_evidence/run_model_evidence_remote.py` and a nightly/manual runner workflow in
 `.github/workflows/model-evidence-sweep.yml`.
 Repo-prepared-but-not-yet-promoted lanes are tracked in
 `contracts/model_family_catalog.json`.
 For the new Gemma 4 text lane, the repo-maintained local smoke is the included
-manifest dry-run (`scripts/model_evidence_sweep.py --slug gemma4_e2b --dry-run`).
+manifest dry-run (`scripts/model_evidence/model_evidence_sweep.py --slug gemma4_e2b --dry-run`).
 The image-text path also includes an offline demo preset at
 `configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml` plus
 `tests/fixtures/vision_text/demo_manifest.jsonl` for provider/config validation;
@@ -275,7 +285,7 @@ invarlock doctor
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject /path/to/edited \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile ci \
   --preset configs/presets/causal_lm/wikitext2_512.yaml
 ```
@@ -285,7 +295,7 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
 ```bash
 invarlock advanced plugins adapters
 invarlock advanced calibrate --help
-bash scripts/verify_ci_matrix.sh
+make ci-matrix
 ```
 
 ### Production Evaluation
@@ -294,7 +304,7 @@ bash scripts/verify_ci_matrix.sh
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --baseline /path/to/baseline \
   --subject  /path/to/edited \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile release \
   --preset configs/presets/causal_lm/wikitext2_512.yaml
 invarlock verify reports/eval/evaluation.report.json
@@ -341,10 +351,10 @@ output:
 <!-- Quick CPU demos are intentionally omitted from this public docs index. -->
 
 ```bash
-NET=1 INCLUDE_MEASURED_CLS=1 RUN=0 bash scripts/run_tiny_all_matrix.sh
+bash scripts/smoke/run_tiny_all_matrix.sh
 ```
 
-Run with `RUN=1` to execute the matrix.
+Run with `RUN=1 NET=1` to execute the matrix and allow downloads.
 
 ---
 
@@ -353,4 +363,4 @@ Run with `RUN=1` to execute the matrix.
 [CLI Reference](reference/cli.md) ·
 [Primary Metric Smoke](user-guide/primary-metric-smoke.md) ·
 [Example Reports](user-guide/example-reports.md) ·
-[Contributing](https://github.com/invarlock/invarlock/blob/v0.9.0/CONTRIBUTING.md)
+[Contributing](https://github.com/invarlock/invarlock/blob/v0.10.0/CONTRIBUTING.md)

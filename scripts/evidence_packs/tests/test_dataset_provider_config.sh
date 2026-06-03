@@ -3,8 +3,8 @@
 test_dataset_provider_config_default_string_provider() {
     mock_reset
 
-    # shellcheck source=../lib/dataset_provider_config.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/dataset_provider_config.sh"
+    # shellcheck source=../lib/config/dataset_provider_config.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/dataset_provider_config.sh"
 
     unset INVARLOCK_DATASET INVARLOCK_DATASET_PROVIDER_YAML INVARLOCK_DATASET_PROVIDER_JSON
 
@@ -16,8 +16,8 @@ test_dataset_provider_config_default_string_provider() {
 test_dataset_provider_config_yaml_override_supports_blank_lines() {
     mock_reset
 
-    # shellcheck source=../lib/dataset_provider_config.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/dataset_provider_config.sh"
+    # shellcheck source=../lib/config/dataset_provider_config.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/dataset_provider_config.sh"
 
     INVARLOCK_DATASET="wikitext2"
     INVARLOCK_DATASET_PROVIDER_YAML=$'kind: hf_text\n\nfoo: bar'
@@ -34,8 +34,8 @@ test_dataset_provider_config_yaml_override_supports_blank_lines() {
 test_dataset_provider_config_indent_helper_handles_single_line_input() {
     mock_reset
 
-    # shellcheck source=../lib/dataset_provider_config.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/dataset_provider_config.sh"
+    # shellcheck source=../lib/config/dataset_provider_config.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/dataset_provider_config.sh"
 
     local out
     out="$(_pack_indent_lines "    " "alpha: beta")"
@@ -45,8 +45,8 @@ test_dataset_provider_config_indent_helper_handles_single_line_input() {
 test_dataset_provider_config_hf_text_defaults_c4_config_and_uses_cache_dir() {
     mock_reset
 
-    # shellcheck source=../lib/dataset_provider_config.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/dataset_provider_config.sh"
+    # shellcheck source=../lib/config/dataset_provider_config.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/dataset_provider_config.sh"
 
     INVARLOCK_DATASET="hf_text"
     # Legacy "c4" should be migrated to "allenai/c4"
@@ -70,8 +70,8 @@ test_dataset_provider_config_hf_text_defaults_c4_config_and_uses_cache_dir() {
 test_dataset_provider_config_hf_text_trust_remote_code_can_be_forced_false() {
     mock_reset
 
-    # shellcheck source=../lib/dataset_provider_config.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/dataset_provider_config.sh"
+    # shellcheck source=../lib/config/dataset_provider_config.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/dataset_provider_config.sh"
 
     INVARLOCK_DATASET="hf_text"
     INVARLOCK_HF_DATASET_NAME="allenai/c4"
@@ -87,8 +87,8 @@ test_dataset_provider_config_hf_text_trust_remote_code_can_be_forced_false() {
 test_dataset_provider_config_hf_text_trust_remote_code_truthy_values_emit_true() {
     mock_reset
 
-    # shellcheck source=../lib/dataset_provider_config.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/dataset_provider_config.sh"
+    # shellcheck source=../lib/config/dataset_provider_config.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/dataset_provider_config.sh"
 
     INVARLOCK_DATASET="hf_text"
     INVARLOCK_HF_DATASET_NAME="demo/dataset"
@@ -105,8 +105,8 @@ test_dataset_provider_config_hf_text_trust_remote_code_truthy_values_emit_true()
 test_dataset_provider_config_hf_text_trust_remote_code_requires_explicit_allow() {
     mock_reset
 
-    # shellcheck source=../lib/dataset_provider_config.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/dataset_provider_config.sh"
+    # shellcheck source=../lib/config/dataset_provider_config.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/dataset_provider_config.sh"
 
     INVARLOCK_DATASET="hf_text"
     INVARLOCK_HF_DATASET_NAME="demo/dataset"
@@ -124,8 +124,8 @@ test_dataset_provider_config_hf_text_trust_remote_code_requires_explicit_allow()
 test_dataset_provider_config_hf_text_omits_config_and_cache_and_sanitizes_max_samples() {
     mock_reset
 
-    # shellcheck source=../lib/dataset_provider_config.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/dataset_provider_config.sh"
+    # shellcheck source=../lib/config/dataset_provider_config.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/dataset_provider_config.sh"
 
     INVARLOCK_DATASET="hf_text"
     INVARLOCK_HF_DATASET_NAME="wikitext"
@@ -152,8 +152,8 @@ test_dataset_provider_config_hf_text_omits_config_and_cache_and_sanitizes_max_sa
 test_dataset_provider_config_local_jsonl_file_branch() {
     mock_reset
 
-    # shellcheck source=../lib/dataset_provider_config.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/dataset_provider_config.sh"
+    # shellcheck source=../lib/config/dataset_provider_config.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/dataset_provider_config.sh"
 
     INVARLOCK_DATASET="local_jsonl"
     INVARLOCK_LOCAL_JSONL_FILE="/data/file.jsonl"
@@ -172,8 +172,8 @@ test_dataset_provider_config_local_jsonl_file_branch() {
 test_dataset_provider_config_local_jsonl_path_branch_and_sanitizes_max_samples() {
     mock_reset
 
-    # shellcheck source=../lib/dataset_provider_config.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/dataset_provider_config.sh"
+    # shellcheck source=../lib/config/dataset_provider_config.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/dataset_provider_config.sh"
 
     INVARLOCK_DATASET="local_jsonl"
     unset INVARLOCK_LOCAL_JSONL_FILE INVARLOCK_LOCAL_JSONL_DATA_FILES
@@ -191,8 +191,8 @@ test_dataset_provider_config_local_jsonl_path_branch_and_sanitizes_max_samples()
 test_dataset_provider_config_local_jsonl_data_files_branch() {
     mock_reset
 
-    # shellcheck source=../lib/dataset_provider_config.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/dataset_provider_config.sh"
+    # shellcheck source=../lib/config/dataset_provider_config.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/dataset_provider_config.sh"
 
     INVARLOCK_DATASET="local_jsonl"
     unset INVARLOCK_LOCAL_JSONL_FILE INVARLOCK_LOCAL_JSONL_PATH
@@ -210,8 +210,8 @@ test_dataset_provider_config_local_jsonl_data_files_branch() {
 test_dataset_provider_config_local_jsonl_allows_missing_paths() {
     mock_reset
 
-    # shellcheck source=../lib/dataset_provider_config.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/dataset_provider_config.sh"
+    # shellcheck source=../lib/config/dataset_provider_config.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/dataset_provider_config.sh"
 
     INVARLOCK_DATASET="local_jsonl"
     unset INVARLOCK_LOCAL_JSONL_FILE INVARLOCK_LOCAL_JSONL_PATH INVARLOCK_LOCAL_JSONL_DATA_FILES

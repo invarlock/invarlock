@@ -54,10 +54,31 @@ def verify_command(
         "--strict",
         help="Fail closed on missing/invalid signatures and extra unhashed files.",
     ),
+    expected_fingerprint: str | None = typer.Option(
+        None,
+        "--expected-fingerprint",
+        help="Require the manifest signer to match this sha256:... key fingerprint.",
+    ),
+    trust_store: str | None = typer.Option(
+        None,
+        "--trust-store",
+        help=(
+            "JSON trust store of accepted signer fingerprints "
+            "(defaults to ~/.config/invarlock/trusted-signers.json when present)."
+        ),
+    ),
     profile: str = typer.Option(
         "dev",
         "--profile",
         help="Execution profile to use for bundled report verification (dev|ci|release).",
+    ),
+    report_assurance: str = typer.Option(
+        "report",
+        "--report-assurance",
+        help=(
+            "Nested report assurance mode: report honors each report, strict "
+            "requires strict assurance, off verifies reports with assurance disabled."
+        ),
     ),
 ) -> None:
     emit = cli_output.make_command_event_emitter(console)
@@ -67,6 +88,9 @@ def verify_command(
         skip_verify=skip_verify,
         strict=strict,
         profile=profile,
+        report_assurance=report_assurance,
+        expected_fingerprint=expected_fingerprint,
+        trust_store_path=Path(trust_store) if trust_store else None,
     )
     payload = {
         "format_version": EVIDENCE_PACK_VERIFY_FORMAT_VERSION,
@@ -245,6 +269,16 @@ def build_command(
         "--profile",
         help="Execution profile to use for report pre-verification (dev|ci|release).",
     ),
+    report_assurance: str = typer.Option(
+        "report",
+        "--report-assurance",
+        help="Report assurance mode for report pre-verification (report|strict|off).",
+    ),
+    release_review: bool = typer.Option(
+        False,
+        "--release-review",
+        help="Require PASS verdict, signing key, runtime sidecars, and strict report assurance.",
+    ),
     json_out: bool = typer.Option(
         False, "--json", help="Emit machine-readable build JSON."
     ),
@@ -288,6 +322,8 @@ def build_command(
         readme_path=Path(readme) if readme else None,
         signing_key_path=Path(signing_key) if signing_key else None,
         profile=profile,
+        report_assurance=report_assurance,
+        release_review=release_review,
     )
     payload = {
         "format_version": EVIDENCE_PACK_BUILD_FORMAT_VERSION,

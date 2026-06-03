@@ -10,6 +10,13 @@ from tests.cli.run._support_run_baseline_harvest import _Cfg
 
 def test_baseline_harvest_internal_hash_and_multimodal_failure_edges() -> None:
     assert run_pairing_baseline_mod._BaselineScheduleValidator._hash_tokens([]) == b""
+    assert (
+        run_pairing_baseline_mod._BaselineScheduleValidator._hash_tokens([1, -1]) != b""
+    )
+    assert (
+        run_pairing_baseline_mod._BaselineScheduleValidator._hash_window_evidence([])
+        == b""
+    )
 
     cfg = _Cfg()
     cfg.dataset.provider = None

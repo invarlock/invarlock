@@ -6,8 +6,8 @@
 | --- | --- |
 | **Purpose** | Consolidated error code reference and troubleshooting guide. |
 | **Audience** | Users encountering errors during `evaluate`, `verify`, or advanced workflows. |
-| **Exit codes** | `0=success`, `1=generic failure`, `2=schema/config invalid`, `3=hard abort (CI/Release)`. |
-| **Source of truth** | `src/invarlock/cli/commands/run.py`, `src/invarlock/reporting/verify_contract.py`, `src/invarlock/core/doctor_findings.py`. |
+| **Exit codes** | Core verify/evaluate use `0=success`, `1=generic failure`, `2=schema/config invalid`, `3=hard abort (CI/Release)`. Evidence-pack verification also uses structured pack codes `4`-`7`. |
+| **Source of truth** | `src/invarlock/cli/commands/run.py`, `src/invarlock/cli/commands/verify.py`, `src/invarlock/evidence_pack_support.py`, `src/invarlock/reporting/verify_contract.py`, `src/invarlock/core/doctor_findings.py`. |
 
 ## Quick Start
 
@@ -15,7 +15,7 @@
 # Check environment and configuration
 invarlock doctor --config <config.yaml> --profile ci
 
-# Validate an container-backed report bundle
+# Validate a container-backed report bundle
 invarlock verify reports/eval/evaluation.report.json --profile ci
 
 # Enable debug output for detailed traces
@@ -23,7 +23,10 @@ INVARLOCK_DEBUG_TRACE=1 \
   invarlock evaluate --allow-network --execution-mode host --baseline gpt2 --subject gpt2 --preset <config.yaml>
 ```
 
-`verify` expects `runtime.manifest.json` next to evaluation outputs.
+For container-backed outputs, `verify` expects `runtime.manifest.json` next to
+the evaluation report. Host-mode outputs are an unverified provenance path; use
+`--runtime-provenance host --assurance off` only when that non-assurance mode is
+intentional.
 
 ## Error Code Reference
 
@@ -252,12 +255,12 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 | --- | --- |
 | **Code** | `E601` |
 | **Category** | Verification |
-| **Severity** | Hard abort |
-| **Exit code** | `3` |
+| **Severity** | Verification failure |
+| **Exit code** | `2` for malformed/schema-invalid input; `3` for CI/Release policy or gate failure |
 
 **Triggers:**
 
-- report fails schema validation
+- report fails schema validation or is malformed
 - Pairing math recomputation fails
 - Gate checks fail in CI/Release profile
 
@@ -289,6 +292,10 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 | `1` | Generic failure | Unknown error, missing dependencies |
 | `2` | Schema/config invalid | YAML parse error, invalid config keys, `ValidationError` |
 | `3` | Hard abort | E001–E006, E111, E601 in CI/Release profile |
+| `4` | Evidence-pack format failure | Manifest or pack contract malformed |
+| `5` | Evidence-pack signature failure | Missing/invalid `manifest.signature.json` or untrusted signer |
+| `6` | Evidence-pack integrity failure | Checksum or digest binding mismatch |
+| `7` | Evidence-pack report failure | Bundled report verification failed |
 
 ## Common Issues
 
@@ -309,9 +316,9 @@ invarlock evaluate --allow-network --baseline gpt2 --subject gpt2
 **Fix:**
 
 ```bash
-pip install "invarlock[hf]"      # HF adapters + eval
-pip install "invarlock[guards]"  # Guard math
-pip install "invarlock[adapters]" # All adapters
+pip install "invarlock[hf]"       # HF adapters + evaluation stack
+pip install "invarlock[guards]"   # Guard math
+pip install "invarlock[adapters]" # Core HF adapters
 ```
 
 ### Calibration Data Not Indexable
@@ -349,9 +356,9 @@ context:
 
 ### Explicit CUDA Request Rejected Before Container Launch
 
-**Symptom:** Default runtime-container `evaluate`, `run`, or `calibrate` exits early with a
-message that `--device cuda` was requested but no NVIDIA runtime is visible on
-the host.
+**Symptom:** Default runtime-container `evaluate`, advanced calibration, or
+internal config-runner flows exit early with a message that `--device cuda` was
+requested but no NVIDIA runtime is visible on the host.
 
 **Cause:** Explicit CUDA requests are fail-closed for delegated container runs.
 InvarLock requires either `/dev/nvidiactl` or `nvidia-smi` to be visible before

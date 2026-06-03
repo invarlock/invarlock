@@ -1,0 +1,15 @@
+uv run invarlock evaluate \
+  --baseline sshleifer/tiny-gpt2 \
+  --subject sshleifer/tiny-gpt2 \
+  --baseline-adapter auto \
+  --subject-adapter auto \
+  --preset configs/presets/causal_lm/wikitext2_512.yaml \
+  --edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml \
+  --profile release \
+  --assurance strict \
+  --execution-mode container \
+  --allow-network \
+  --out /private/tmp/invarlock-real-run-512/runs \
+  --report-out /private/tmp/invarlock-real-run-512/report \
+  --quiet \
+  --no-progress

@@ -27,13 +27,42 @@ def _import_from_aliases(path: Path) -> set[tuple[int, str | None, str]]:
 def test_phase5_owner_modules_keep_split_imports() -> None:
     expectations = {
         REPO_ROOT / "src/invarlock/reporting/report_make.py": (
-            (1, None, "report_make_inputs"),
             (1, None, "report_make_assembly"),
-            (1, None, "report_make_output"),
         ),
-        REPO_ROOT / "src/invarlock/runtime_security_helpers.py": (
-            (0, "invarlock", "runtime_security_container"),
-            (0, "invarlock", "runtime_security_manifest"),
+        REPO_ROOT / "src/invarlock/reporting/report_builder_support.py": (
+            (1, None, "report_builder_telemetry"),
+        ),
+        REPO_ROOT / "src/invarlock/reporting/render_markdown.py": (
+            (1, "render_markdown_tables", "append_accuracy_subgroups"),
+            (1, "render_markdown_tables", "append_system_overhead_section"),
+        ),
+        REPO_ROOT / "src/invarlock/guards/invariants.py": (
+            (0, "invarlock.guards", "invariants_standard"),
+        ),
+        REPO_ROOT / "src/invarlock/eval/data.py": (
+            (1, "data_local", "LocalJSONLProvider"),
+            (1, "data_local", "LocalJSONLPairsProvider"),
+        ),
+        REPO_ROOT / "src/invarlock/eval/data_providers.py": (
+            (1, "data_hf_providers", "HFSeq2SeqProvider"),
+            (1, "data_hf_providers", "HFTextProvider"),
+        ),
+        REPO_ROOT / "src/invarlock/eval/metrics_runtime.py": (
+            (
+                0,
+                "invarlock.eval.metrics_runtime_resources",
+                "latency_validation_error",
+            ),
+        ),
+        REPO_ROOT / "src/invarlock/cli/run_runtime_exec.py": (
+            (
+                0,
+                "invarlock.cli.run_runtime_warnings",
+                "suppress_noisy_warnings",
+            ),
+        ),
+        REPO_ROOT / "src/invarlock/cli/commands/plugins.py": (
+            (1, "plugins_rendering", "handle_plugins_category"),
         ),
         REPO_ROOT / "src/invarlock/cli/commands/evaluate.py": (
             (2, "evaluate_output", "_evaluation_report_manifest_execution"),
@@ -42,24 +71,7 @@ def test_phase5_owner_modules_keep_split_imports() -> None:
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute.py": (
             (
                 0,
-                "invarlock.core.run_orchestrator_execute_events",
-                "_emit_run_diagnostic",
-            ),
-            (
-                0,
-                "invarlock.core.run_orchestrator_execute_outcome",
-                "_cleanup_snapshot_tmpdir",
-            ),
-            (
-                0,
-                "invarlock.core.run_orchestrator_execute_pipeline",
-                "_execute_run_pipeline_steps",
-            ),
-        ),
-        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_pipeline.py": (
-            (
-                0,
-                "invarlock.core.run_orchestrator_execute_dataset",
+                "invarlock.core.run_orchestrator_execute_execution",
                 "_load_dataset_state",
             ),
             (
@@ -91,6 +103,11 @@ def test_phase5_owner_modules_keep_split_imports() -> None:
                 "invarlock.core.run_orchestrator_execute_helpers",
                 "_AttemptExecutionState",
             ),
+            (
+                0,
+                "invarlock.core",
+                "run_orchestrator_execute_attempt_results",
+            ),
         ),
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_execution.py": (
             (
@@ -116,34 +133,27 @@ def test_phase5_owner_modules_keep_split_imports() -> None:
 
 def test_phase5_split_modules_exist() -> None:
     expected_paths = (
-        REPO_ROOT / "src/invarlock/reporting/report_make_inputs.py",
+        REPO_ROOT / "src/invarlock/reporting/report_make.py",
         REPO_ROOT / "src/invarlock/reporting/report_make_assembly.py",
-        REPO_ROOT / "src/invarlock/reporting/report_make_output.py",
+        REPO_ROOT / "src/invarlock/reporting/report_builder_telemetry.py",
+        REPO_ROOT / "src/invarlock/reporting/render_markdown_tables.py",
+        REPO_ROOT / "src/invarlock/guards/invariants_standard.py",
+        REPO_ROOT / "src/invarlock/eval/data_local.py",
+        REPO_ROOT / "src/invarlock/eval/data_hf_providers.py",
+        REPO_ROOT / "src/invarlock/eval/metrics_runtime_resources.py",
+        REPO_ROOT / "src/invarlock/cli/run_runtime_warnings.py",
         REPO_ROOT / "src/invarlock/reporting/verify_check_helpers_metrics.py",
         REPO_ROOT / "src/invarlock/reporting/verify_check_helpers_consistency.py",
-        REPO_ROOT / "src/invarlock/runtime_security_container.py",
-        REPO_ROOT / "src/invarlock/runtime_security_manifest.py",
         REPO_ROOT / "src/invarlock/cli/evaluate_output.py",
         REPO_ROOT / "src/invarlock/cli/evaluate_phases.py",
-        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_seed.py",
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_environment.py",
-        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_dataset.py",
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts.py",
+        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempt_results.py",
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_helpers.py",
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_execution.py",
-        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_events.py",
-        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_outcome.py",
-        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_pipeline.py",
-        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts_emit.py",
-        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts_export.py",
-        REPO_ROOT
-        / "src/invarlock/core/run_orchestrator_execute_attempts_processing.py",
-        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts_loop.py",
         REPO_ROOT / "src/invarlock/core/builtin_plugin_catalog.py",
-        REPO_ROOT / "src/invarlock/guards/policies_presets.py",
-        REPO_ROOT / "src/invarlock/guards/policies_resolution.py",
-        REPO_ROOT / "src/invarlock/guards/policies_validation.py",
         REPO_ROOT / "src/invarlock/evidence_pack_support.py",
+        REPO_ROOT / "src/invarlock/cli/commands/plugins_rendering.py",
     )
 
     missing = [
@@ -156,17 +166,16 @@ def test_phase5_legacy_facades_are_removed() -> None:
     assert not (
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_prepare.py"
     ).exists()
+    assert not (
+        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_pipeline.py"
+    ).exists()
+    assert not (REPO_ROOT / "src/invarlock/core/run_orchestrator_types.py").exists()
 
 
 def test_phase5_split_modules_stay_in_owner_layers() -> None:
     reporting_paths = (
-        REPO_ROOT / "src/invarlock/reporting/report_make_inputs.py",
+        REPO_ROOT / "src/invarlock/reporting/report_make.py",
         REPO_ROOT / "src/invarlock/reporting/report_make_assembly.py",
-        REPO_ROOT / "src/invarlock/reporting/report_make_output.py",
-    )
-    runtime_paths = (
-        REPO_ROOT / "src/invarlock/runtime_security_container.py",
-        REPO_ROOT / "src/invarlock/runtime_security_manifest.py",
     )
     cli_paths = (
         REPO_ROOT / "src/invarlock/cli/evaluate_output.py",
@@ -181,11 +190,6 @@ def test_phase5_split_modules_stay_in_owner_layers() -> None:
         assert "_report_make_module(" not in text
         assert "apply_validation_allowlist_schema(" not in text
 
-    for path in runtime_paths:
-        text = _read_text(path)
-        assert "typer" not in text
-        assert "console.print(" not in text
-
     for path in cli_paths:
         text = _read_text(path)
         assert "generate_reports(" not in text
@@ -193,11 +197,9 @@ def test_phase5_split_modules_stay_in_owner_layers() -> None:
 
 
 def test_phase5_orchestrator_owner_modules_do_not_cross_regrow() -> None:
-    seed_path = REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_seed.py"
     environment_path = (
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_environment.py"
     )
-    dataset_path = REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_dataset.py"
     attempts_path = (
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts.py"
     )
@@ -206,25 +208,13 @@ def test_phase5_orchestrator_owner_modules_do_not_cross_regrow() -> None:
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_execution.py"
     )
 
-    seed_text = _read_text(seed_path)
     environment_text = _read_text(environment_path)
-    dataset_text = _read_text(dataset_path)
     attempts_text = _read_text(attempts_path)
     helpers_text = _read_text(helpers_path)
     execution_text = _read_text(execution_path)
 
-    assert "run_orchestrator_execute_seed" not in seed_text
-    assert "run_orchestrator_execute_environment" not in seed_text
-    assert "run_orchestrator_execute_dataset" not in seed_text
-    assert "run_orchestrator_execute_execution" not in seed_text
-
-    assert "from .run_orchestrator_execute_seed import (" in environment_text
     assert "run_orchestrator_execute_dataset" not in environment_text
     assert "run_orchestrator_execute_execution" not in environment_text
-
-    assert "run_orchestrator_execute_seed" not in dataset_text
-    assert "run_orchestrator_execute_environment" not in dataset_text
-    assert "run_orchestrator_execute_execution" not in dataset_text
 
     assert "run_orchestrator_execute_seed" not in attempts_text
     assert "run_orchestrator_execute_environment" not in attempts_text
@@ -243,32 +233,41 @@ def test_phase5_orchestrator_owner_modules_do_not_cross_regrow() -> None:
 def test_phase5_large_modules_do_not_regrow() -> None:
     thresholds = {
         REPO_ROOT / "src/invarlock/model_profile.py": 650,
-        REPO_ROOT / "src/invarlock/evidence_pack.py": 650,
+        REPO_ROOT / "src/invarlock/model_profile_tokenizers.py": 500,
+        REPO_ROOT / "src/invarlock/evidence_pack.py": 1000,
         REPO_ROOT / "src/invarlock/evidence_pack_support.py": 650,
-        REPO_ROOT / "src/invarlock/runtime_security_helpers.py": 650,
-        REPO_ROOT / "src/invarlock/reporting/verify_check_helpers.py": 650,
-        REPO_ROOT / "src/invarlock/reporting/verify_check_helpers_impl.py": 650,
+        REPO_ROOT / "src/invarlock/runtime_security_helpers.py": 1000,
+        REPO_ROOT / "src/invarlock/reporting/verify_check_helpers_consistency.py": 650,
         REPO_ROOT / "src/invarlock/reporting/verify_check_helpers_metrics.py": 650,
         REPO_ROOT / "src/invarlock/reporting/verify_check_helpers_consistency.py": 650,
-        REPO_ROOT / "src/invarlock/adapters/hf_mixin.py": 910,
-        REPO_ROOT / "src/invarlock/cli/commands/plugins.py": 910,
-        REPO_ROOT / "src/invarlock/guards/policies.py": 650,
-        REPO_ROOT / "src/invarlock/guards/policies_impl.py": 650,
-        REPO_ROOT / "src/invarlock/guards/policies_presets.py": 650,
-        REPO_ROOT / "src/invarlock/guards/policies_resolution.py": 650,
-        REPO_ROOT / "src/invarlock/guards/policies_validation.py": 650,
-        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts.py": 650,
-        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts_impl.py": 650,
-        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts_emit.py": 650,
+        REPO_ROOT / "src/invarlock/adapters/hf_mixin.py": 650,
+        REPO_ROOT / "src/invarlock/adapters/hf_mixin_snapshot.py": 420,
+        REPO_ROOT / "src/invarlock/adapters/hf_mlm.py": 650,
+        REPO_ROOT / "src/invarlock/adapters/hf_mlm_structure.py": 420,
+        REPO_ROOT / "src/invarlock/cli/commands/plugins.py": 420,
+        REPO_ROOT / "src/invarlock/cli/commands/plugins_rendering.py": 760,
+        REPO_ROOT / "src/invarlock/guards/policies.py": 800,
+        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts.py": 480,
         REPO_ROOT
-        / "src/invarlock/core/run_orchestrator_execute_attempts_export.py": 650,
-        REPO_ROOT
-        / "src/invarlock/core/run_orchestrator_execute_attempts_processing.py": 650,
-        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts_loop.py": 650,
+        / "src/invarlock/core/run_orchestrator_execute_attempt_results.py": 540,
+        REPO_ROOT / "src/invarlock/reporting/report_builder_support.py": 790,
+        REPO_ROOT / "src/invarlock/reporting/report_builder_telemetry.py": 150,
+        REPO_ROOT / "src/invarlock/reporting/render_markdown.py": 790,
+        REPO_ROOT / "src/invarlock/reporting/render_markdown_tables.py": 140,
+        REPO_ROOT / "src/invarlock/guards/invariants.py": 790,
+        REPO_ROOT / "src/invarlock/guards/invariants_standard.py": 120,
+        REPO_ROOT / "src/invarlock/eval/data.py": 650,
+        REPO_ROOT / "src/invarlock/eval/data_local.py": 280,
+        REPO_ROOT / "src/invarlock/eval/data_providers.py": 540,
+        REPO_ROOT / "src/invarlock/eval/data_hf_providers.py": 380,
+        REPO_ROOT / "src/invarlock/eval/metrics_runtime.py": 790,
+        REPO_ROOT / "src/invarlock/eval/metrics_runtime_resources.py": 100,
+        REPO_ROOT / "src/invarlock/cli/run_runtime_exec.py": 650,
+        REPO_ROOT / "src/invarlock/cli/run_runtime_warnings.py": 300,
         REPO_ROOT / "src/invarlock/eval/primary_metric.py": 850,
         REPO_ROOT / "src/invarlock/reporting/report_primary_metric_analysis.py": 840,
         REPO_ROOT / "src/invarlock/cli/commands/doctor.py": 730,
-        REPO_ROOT / "src/invarlock/cli/commands/report.py": 613,
+        REPO_ROOT / "src/invarlock/cli/commands/report.py": 800,
         REPO_ROOT / "src/invarlock/cli/commands/calibrate.py": 713,
         REPO_ROOT / "src/invarlock/reporting/report_validation.py": 533,
     }

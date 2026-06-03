@@ -9,7 +9,9 @@ from typing import Any
 import torch
 import torch.nn as nn
 
-from .variance_scaling import iter_transformer_layers, unwrap_model
+from .adapter_modules import iter_adapter_layer_modules
+from .quantized_weights import is_packed_quantized_module
+from .variance_scaling import iter_transformer_layers
 
 
 def normalize_module_name(name: str) -> str:
@@ -56,9 +58,17 @@ def matches_tap(guard: Any, name: str) -> bool:
             f"layers.{layer_idx}",
         )
         suffixes = (
-            ("mlp.c_proj", "mlp.down_proj", "mlp.fc2")
+            ("mlp.c_proj", "mlp.down_proj", "mlp.fc2", "ffn.down_proj")
             if branch == "mlp"
-            else ("attn.c_proj", "attn.out_proj", "attn.o_proj")
+            else (
+                "attn.c_proj",
+                "attn.out_proj",
+                "attn.o_proj",
+                "self_attn.o_proj",
+                "self_attn.out_proj",
+                "attention.o_proj",
+                "attention.out_proj",
+            )
         )
         for prefix in prefixes:
             for suffix in suffixes:
@@ -245,6 +255,8 @@ def resolve_target_modules(
         class_name = module.__class__.__name__ if module is not None else ""
         if class_name in {"Conv1D", "Linear"}:
             return True
+        if is_packed_quantized_module(module):
+            return True
         weight = getattr(module, "weight", None)
         if weight is None:
             return False
@@ -253,6 +265,25 @@ def resolve_target_modules(
         except (AttributeError, RuntimeError, TypeError, ValueError):
             dim = getattr(weight, "ndim", None)
         return dim == 2
+
+    def canonical_adapter_projection_name(index: int, key: str) -> str | None:
+        lower = key.lower()
+        leaf = lower.rsplit(".", 1)[-1]
+        attn_aliases = {"c_proj", "o_proj", "out_proj"}
+        mlp_aliases = {"c_proj", "down_proj", "fc2", "w2"}
+        if leaf in attn_aliases and any(
+            token in lower for token in ("attn", "attention", "self_attn")
+        ):
+            return f"transformer.h.{index}.attn.c_proj"
+        if leaf in mlp_aliases and any(
+            token in lower
+            for token in ("mlp", "ffn", "feed_forward", "expert", "block_sparse_moe")
+        ):
+            return f"transformer.h.{index}.mlp.c_proj"
+        if leaf == "c_proj":
+            branch = "attn" if "attn" in lower or "attention" in lower else "mlp"
+            return f"transformer.h.{index}.{branch}.c_proj"
+        return None
 
     for index, block in enumerate(iter_transformer_layers(model)):
         if scope in ["attn", "both"] and hasattr(block, "attn"):
@@ -303,72 +334,41 @@ def resolve_target_modules(
     fallback_used = False
     if not targets and adapter is not None and hasattr(adapter, "get_layer_modules"):
         try:
-            n_layers = 0
-            if hasattr(adapter, "describe"):
-                try:
-                    desc = adapter.describe(model)
-                    if isinstance(desc, dict):
-                        n_layers = int(desc.get("n_layer", 0) or 0)
-                except (
-                    AttributeError,
-                    RuntimeError,
-                    TypeError,
-                    ValueError,
-                ) as desc_exc:
-                    guard._log_event(
-                        "adapter_describe_error",
-                        level="DEBUG",
-                        message=f"adapter.describe() failed: {desc_exc}",
-                    )
-            if n_layers == 0:
-                try:
-                    n_layers = sum(1 for _ in iter_transformer_layers(model))
-                except (AttributeError, RuntimeError, TypeError, ValueError):
-                    pass
-            if n_layers == 0:
-                config = getattr(unwrap_model(model), "config", None)
-                if config is not None:
-                    n_layers = (
-                        getattr(config, "n_layer", 0)
-                        or getattr(config, "num_hidden_layers", 0)
-                        or getattr(config, "num_layers", 0)
-                        or 0
-                    )
-            if n_layers == 0:
-                guard._log_event(
-                    "adapter_fallback_no_layers",
-                    level="WARN",
-                    message="Adapter fallback: could not determine layer count",
-                )
 
-            for index in range(n_layers):
-                try:
-                    modules = adapter.get_layer_modules(model, index) or {}
-                except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
-                    record_rejection(
-                        f"transformer.h.{index}", f"adapter_error:{exc}", None
-                    )
+            def direct_layer_count() -> int:
+                return sum(1 for _ in iter_transformer_layers(model))
+
+            for item in iter_adapter_layer_modules(
+                model,
+                adapter,
+                direct_layer_count=direct_layer_count,
+                log_event=guard._log_event,
+                on_layer_error=lambda index, exc: record_rejection(
+                    f"transformer.h.{index}", f"adapter_error:{exc}", None
+                ),
+            ):
+                name = canonical_adapter_projection_name(item.layer_index, item.key)
+                if name is None:
                     continue
-
-                for key, module in modules.items():
-                    if not isinstance(key, str) or not key.endswith("c_proj"):
-                        continue
-                    branch = "attn" if "attn" in key else "mlp"
-                    name = f"transformer.h.{index}.{branch}.c_proj"
-                    if not matches_tap(guard, name):
-                        record_rejection(name, "tap_mismatch", module)
-                        continue
-                    if not is_supported_module(module):
-                        record_rejection(name, "unsupported_type", module)
-                        continue
-                    targets[name] = module
-                    audit_candidates.append(
-                        {
-                            "name": name,
-                            "class": module.__class__.__name__,
-                            "source": "adapter_fallback",
-                        }
-                    )
+                branch = "attn" if ".attn." in name else "mlp"
+                if branch == "attn" and scope not in {"attn", "both"}:
+                    continue
+                if branch == "mlp" and scope not in {"ffn", "both"}:
+                    continue
+                if not matches_tap(guard, name):
+                    record_rejection(name, "tap_mismatch", item.module)
+                    continue
+                if not is_supported_module(item.module):
+                    record_rejection(name, "unsupported_type", item.module)
+                    continue
+                targets[name] = item.module
+                audit_candidates.append(
+                    {
+                        "name": name,
+                        "class": item.module.__class__.__name__,
+                        "source": "adapter_fallback",
+                    }
+                )
             if targets:
                 fallback_used = True
         except (AttributeError, RuntimeError, TypeError, ValueError) as exc:

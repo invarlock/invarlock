@@ -9,6 +9,7 @@ snapshot/restore behavior, and evaluation strategies.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -22,6 +23,10 @@ class QuantizationMethod(Enum):
     BNB_4BIT = "bnb_4bit"
     AWQ = "awq"
     GPTQ = "gptq"
+    TORCHAO_INT8 = "torchao_int8"
+    HQQ = "hqq"
+    QUANTO = "quanto"
+    COMPRESSED_TENSORS = "compressed_tensors"
 
 
 @dataclass(frozen=True)
@@ -152,6 +157,159 @@ class ModelCapabilities:
             device_movable=False,  # GPTQ may have device constraints
         )
 
+    @classmethod
+    def for_torchao_int8(cls) -> ModelCapabilities:
+        """Create capabilities for a torchao int8 weight-only runtime model."""
+        return cls(
+            quantization=QuantizationConfig(
+                method=QuantizationMethod.TORCHAO_INT8,
+                bits=8,
+                from_checkpoint=False,
+            ),
+            device_movable=False,
+        )
+
+    @classmethod
+    def for_hqq(
+        cls,
+        bits: int = 4,
+        group_size: int | None = 64,
+        from_checkpoint: bool = False,
+    ) -> ModelCapabilities:
+        """Create capabilities for a HQQ runtime-quantized model."""
+        return cls(
+            quantization=QuantizationConfig(
+                method=QuantizationMethod.HQQ,
+                bits=bits,
+                group_size=group_size,
+                from_checkpoint=from_checkpoint,
+            ),
+            device_movable=False,
+        )
+
+    @classmethod
+    def for_quanto(
+        cls,
+        bits: int = 8,
+        from_checkpoint: bool = False,
+    ) -> ModelCapabilities:
+        """Create capabilities for a Quanto runtime-quantized model."""
+        return cls(
+            quantization=QuantizationConfig(
+                method=QuantizationMethod.QUANTO,
+                bits=bits,
+                from_checkpoint=from_checkpoint,
+            ),
+            device_movable=False,
+        )
+
+    @classmethod
+    def for_compressed_tensors(
+        cls,
+        bits: int = 8,
+        from_checkpoint: bool = True,
+    ) -> ModelCapabilities:
+        """Create capabilities for a compressed-tensors checkpoint model."""
+        return cls(
+            quantization=QuantizationConfig(
+                method=QuantizationMethod.COMPRESSED_TENSORS,
+                bits=bits,
+                from_checkpoint=from_checkpoint,
+            ),
+            device_movable=False,
+        )
+
+
+def _lower_string(value: Any) -> str:
+    return value.strip().lower() if isinstance(value, str) else ""
+
+
+def _coerce_positive_int(value: Any, *, default: int) -> int:
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, int):
+        resolved = value
+    elif isinstance(value, float | str):
+        try:
+            resolved = int(value)
+        except (TypeError, ValueError, OverflowError):
+            return default
+    else:
+        return default
+    return resolved if resolved > 0 else default
+
+
+def _bits_from_weight_spec(value: Any, *, default: int = 8) -> int:
+    weights = _lower_string(value)
+    if "int4" in weights:
+        return 4
+    if "int8" in weights:
+        return 8
+    return default
+
+
+def _is_compressed_tensors_method(value: Any) -> bool:
+    normalized = _lower_string(value).replace("-", "_")
+    return "compressed_tensors" in normalized or "compressedtensors" in normalized
+
+
+def _compressed_tensors_bits_from_config(value: Any, *, default: int = 8) -> int:
+    if isinstance(value, dict):
+        direct_bits = value.get("bits", value.get("num_bits", value.get("nbits")))
+        bits = _coerce_positive_int(direct_bits, default=0)
+        if bits > 0:
+            return bits
+
+        groups = value.get("config_groups", {})
+        group_candidates: Iterable[Any]
+        if isinstance(groups, dict):
+            group_candidates = groups.values()
+        elif isinstance(groups, (list, tuple)):
+            group_candidates = groups
+        else:
+            group_candidates = ()
+        for group in group_candidates:
+            if not isinstance(group, dict):
+                continue
+            weights = group.get("weights", {})
+            if isinstance(weights, dict):
+                bits = _coerce_positive_int(weights.get("num_bits"), default=0)
+                if bits > 0:
+                    return bits
+        return default
+
+    direct_bits = getattr(
+        value,
+        "bits",
+        getattr(value, "num_bits", getattr(value, "nbits", None)),
+    )
+    bits = _coerce_positive_int(direct_bits, default=0)
+    if bits > 0:
+        return bits
+
+    groups = getattr(value, "config_groups", {})
+    object_group_candidates: Iterable[Any]
+    if isinstance(groups, dict):
+        object_group_candidates = groups.values()
+    elif isinstance(groups, (list, tuple)):
+        object_group_candidates = groups
+    else:
+        object_group_candidates = ()
+    for group in object_group_candidates:
+        weights = (
+            group.get("weights", {})
+            if isinstance(group, dict)
+            else getattr(group, "weights", {})
+        )
+        bits = (
+            _coerce_positive_int(weights.get("num_bits"), default=0)
+            if isinstance(weights, dict)
+            else _coerce_positive_int(getattr(weights, "num_bits", None), default=0)
+        )
+        if bits > 0:
+            return bits
+    return default
+
 
 def detect_quantization_from_config(config: Any) -> QuantizationConfig:
     """
@@ -176,12 +334,20 @@ def detect_quantization_from_config(config: Any) -> QuantizationConfig:
 
     # Handle dict-style config (common in saved checkpoints)
     if isinstance(quant_cfg, dict):
-        quant_method = quant_cfg.get("quant_method", "").lower()
-        load_in_8bit = quant_cfg.get("load_in_8bit", False)
-        load_in_4bit = quant_cfg.get("load_in_4bit", False)
-        bits = quant_cfg.get("bits", 16)
-        group_size = quant_cfg.get("group_size")
-        double_quant = quant_cfg.get("bnb_4bit_use_double_quant", False)
+        quant_method = _lower_string(quant_cfg.get("quant_method", ""))
+        load_in_8bit = quant_cfg.get("load_in_8bit", False) is True
+        load_in_4bit = quant_cfg.get("load_in_4bit", False) is True
+        bits = _coerce_positive_int(
+            quant_cfg.get("bits", quant_cfg.get("nbits", 16)),
+            default=16,
+        )
+        raw_group_size = quant_cfg.get("group_size")
+        group_size = (
+            _coerce_positive_int(raw_group_size, default=128)
+            if raw_group_size is not None
+            else None
+        )
+        double_quant = quant_cfg.get("bnb_4bit_use_double_quant", False) is True
         compute_dtype = quant_cfg.get("bnb_4bit_compute_dtype")
 
         if quant_method == "awq":
@@ -198,13 +364,42 @@ def detect_quantization_from_config(config: Any) -> QuantizationConfig:
                 group_size=group_size,
                 from_checkpoint=True,
             )
-        elif load_in_8bit or quant_method == "bitsandbytes" and bits == 8:
+        elif "torchao" in quant_method:
+            return QuantizationConfig(
+                method=QuantizationMethod.TORCHAO_INT8,
+                bits=8,
+                from_checkpoint=True,
+            )
+        elif quant_method == "hqq":
+            return QuantizationConfig(
+                method=QuantizationMethod.HQQ,
+                bits=bits,
+                group_size=group_size,
+                from_checkpoint=True,
+            )
+        elif quant_method == "quanto":
+            return QuantizationConfig(
+                method=QuantizationMethod.QUANTO,
+                bits=(
+                    bits
+                    if bits != 16
+                    else _bits_from_weight_spec(quant_cfg.get("weights"))
+                ),
+                from_checkpoint=True,
+            )
+        elif _is_compressed_tensors_method(quant_method):
+            return QuantizationConfig(
+                method=QuantizationMethod.COMPRESSED_TENSORS,
+                bits=_compressed_tensors_bits_from_config(quant_cfg),
+                from_checkpoint=True,
+            )
+        elif load_in_8bit or (quant_method == "bitsandbytes" and bits == 8):
             return QuantizationConfig(
                 method=QuantizationMethod.BNB_8BIT,
                 bits=8,
                 from_checkpoint=True,
             )
-        elif load_in_4bit or quant_method == "bitsandbytes" and bits == 4:
+        elif load_in_4bit or (quant_method == "bitsandbytes" and bits == 4):
             return QuantizationConfig(
                 method=QuantizationMethod.BNB_4BIT,
                 bits=4,
@@ -239,8 +434,11 @@ def detect_quantization_from_config(config: Any) -> QuantizationConfig:
             )
 
     if cfg_class in ("AWQConfig",):
-        bits = getattr(quant_cfg, "bits", 4)
-        group_size = getattr(quant_cfg, "group_size", 128)
+        bits = _coerce_positive_int(getattr(quant_cfg, "bits", 4), default=4)
+        group_size = _coerce_positive_int(
+            getattr(quant_cfg, "group_size", 128),
+            default=128,
+        )
         return QuantizationConfig(
             method=QuantizationMethod.AWQ,
             bits=bits,
@@ -249,12 +447,54 @@ def detect_quantization_from_config(config: Any) -> QuantizationConfig:
         )
 
     if cfg_class in ("GPTQConfig",):
-        bits = getattr(quant_cfg, "bits", 4)
-        group_size = getattr(quant_cfg, "group_size", 128)
+        bits = _coerce_positive_int(getattr(quant_cfg, "bits", 4), default=4)
+        group_size = _coerce_positive_int(
+            getattr(quant_cfg, "group_size", 128),
+            default=128,
+        )
         return QuantizationConfig(
             method=QuantizationMethod.GPTQ,
             bits=bits,
             group_size=group_size,
+            from_checkpoint=True,
+        )
+
+    if "TorchAO" in cfg_class or "Int8WeightOnly" in cfg_class:
+        return QuantizationConfig(
+            method=QuantizationMethod.TORCHAO_INT8,
+            bits=8,
+            from_checkpoint=True,
+        )
+
+    if (
+        cfg_class in ("HqqConfig", "HQQConfig")
+        or "Hqq" in cfg_class
+        or "HQQ" in cfg_class
+    ):
+        bits = _coerce_positive_int(getattr(quant_cfg, "nbits", 4), default=4)
+        group_size = getattr(quant_cfg, "group_size", 64)
+        return QuantizationConfig(
+            method=QuantizationMethod.HQQ,
+            bits=bits,
+            group_size=(
+                _coerce_positive_int(group_size, default=64)
+                if group_size is not None
+                else None
+            ),
+            from_checkpoint=True,
+        )
+
+    if cfg_class in ("QuantoConfig",) or "Quanto" in cfg_class:
+        return QuantizationConfig(
+            method=QuantizationMethod.QUANTO,
+            bits=_bits_from_weight_spec(getattr(quant_cfg, "weights", "int8")),
+            from_checkpoint=True,
+        )
+
+    if "CompressedTensors" in cfg_class or "Compressed" in cfg_class:
+        return QuantizationConfig(
+            method=QuantizationMethod.COMPRESSED_TENSORS,
+            bits=_compressed_tensors_bits_from_config(quant_cfg),
             from_checkpoint=True,
         )
 
@@ -319,15 +559,56 @@ def detect_capabilities_from_model(model: Any) -> ModelCapabilities:
                                 from_checkpoint=True,
                             )
                         break
+                    fqcn = f"{module.__class__.__module__}.{module_name}".lower()
+                    if "torchao" in fqcn or "affinequantized" in fqcn:
+                        quant_config = QuantizationConfig(
+                            method=QuantizationMethod.TORCHAO_INT8,
+                            bits=8,
+                            from_checkpoint=True,
+                        )
+                        break
+                    if "hqq" in fqcn:
+                        quant_config = QuantizationConfig(
+                            method=QuantizationMethod.HQQ,
+                            bits=4,
+                            group_size=64,
+                            from_checkpoint=True,
+                        )
+                        break
+                    if "optimum.quanto" in fqcn or ".quanto." in fqcn:
+                        quant_config = QuantizationConfig(
+                            method=QuantizationMethod.QUANTO,
+                            bits=8,
+                            from_checkpoint=True,
+                        )
+                        break
+                    if (
+                        "compressed_tensors" in fqcn
+                        or "compressedtensors" in fqcn
+                        or "compressedlinear" in fqcn
+                    ):
+                        quant_config = QuantizationConfig(
+                            method=QuantizationMethod.COMPRESSED_TENSORS,
+                            bits=8,
+                            from_checkpoint=True,
+                        )
+                        break
             except (TypeError, StopIteration):
                 pass
 
     # Determine if device is movable
     device_movable = not quant_config.is_bnb()
 
-    # For AWQ/GPTQ, check if model has been quantized in a way that
+    # For backend-managed quantized models, check if model has been quantized in a way that
     # prevents device movement
-    if quant_config.method in (QuantizationMethod.AWQ, QuantizationMethod.GPTQ):
+    if quant_config.method in (
+        QuantizationMethod.AWQ,
+        QuantizationMethod.GPTQ,
+        QuantizationMethod.TORCHAO_INT8,
+        QuantizationMethod.HQQ,
+        QuantizationMethod.QUANTO,
+        QuantizationMethod.COMPRESSED_TENSORS,
+    ):
         # These are typically loaded on-device and shouldn't be moved
         device_movable = False
 

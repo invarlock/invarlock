@@ -1,8 +1,50 @@
 from __future__ import annotations
 
+from collections import Counter
 from typing import Any
 
 from .report_types import RunReport
+
+_VOCAB_COERCION_ERRORS = (OverflowError, TypeError, ValueError)
+
+
+def _coerce_vocab_counts(vocab_sizes: Any) -> Counter[int]:
+    counts: Counter[int] = Counter()
+    if not isinstance(vocab_sizes, dict):
+        return counts
+    for value in vocab_sizes.values():
+        try:
+            counts[int(value)] += 1
+        except _VOCAB_COERCION_ERRORS:
+            continue
+    return counts
+
+
+def _embedding_vocab_size_matches(
+    baseline_vocab_sizes: Any,
+    current_vocab_sizes: Any,
+    module_name: str,
+    baseline_size: Any,
+) -> tuple[bool, int | None]:
+    try:
+        expected = int(baseline_size)
+    except _VOCAB_COERCION_ERRORS:
+        return False, None
+    current_size = None
+    if isinstance(current_vocab_sizes, dict):
+        current_size = current_vocab_sizes.get(module_name)
+    if current_size is not None:
+        try:
+            current_int = int(current_size)
+        except _VOCAB_COERCION_ERRORS:
+            return False, None
+        return current_int == expected, current_int
+
+    baseline_counts = _coerce_vocab_counts(baseline_vocab_sizes)
+    current_counts = _coerce_vocab_counts(current_vocab_sizes)
+    if baseline_counts and current_counts.get(expected, 0) >= baseline_counts[expected]:
+        return True, expected
+    return False, None
 
 
 def _extract_invariants(
@@ -107,14 +149,17 @@ def _extract_invariants(
         current_vocab_sizes = current_checks.get("embedding_vocab_sizes")
         if isinstance(baseline_vocab_sizes, dict):
             for module_name, baseline_size in baseline_vocab_sizes.items():
-                current_size = None
-                if isinstance(current_vocab_sizes, dict):
-                    current_size = current_vocab_sizes.get(module_name)
-                if current_size is None or int(current_size) != int(baseline_size):
+                size_matches, current_size = _embedding_vocab_size_matches(
+                    baseline_vocab_sizes,
+                    current_vocab_sizes,
+                    str(module_name),
+                    baseline_size,
+                )
+                if not size_matches:
                     mismatch = {
                         "module": module_name,
                         "baseline": int(baseline_size),
-                        "current": None if current_size is None else int(current_size),
+                        "current": current_size,
                     }
                     violations.append(
                         {

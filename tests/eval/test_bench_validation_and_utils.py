@@ -7,18 +7,18 @@ focusing on areas likely to be uncovered to push coverage from 76% to 80%+.
 
 import pytest
 
-from invarlock.eval.bench import (
+from invarlock.eval.bench_policy import (
     BenchmarkConfig,
     BenchmarkSummary,
     RunResult,
     ScenarioConfig,
     ScenarioResult,
     ValidationGates,
-    _config_to_dict,
-    _scenario_result_to_dict,
-    _summary_to_step14_json,
+    config_to_dict,
     generate_scenarios,
     resolve_epsilon_from_runtime,
+    scenario_result_to_dict,
+    summary_to_step14_json,
 )
 from invarlock.reporting.report_types import create_empty_report
 
@@ -220,7 +220,7 @@ class TestOutputGeneration:
             epsilon_used=0.1,
         )
 
-        result_dict = _scenario_result_to_dict(scenario_result)
+        result_dict = scenario_result_to_dict(scenario_result)
 
         assert result_dict["edit"] == "structured"
         assert result_dict["tier"] == "balanced"
@@ -233,7 +233,7 @@ class TestOutputGeneration:
         config = ScenarioConfig(edit="structured", tier="balanced", probes=2)
         scenario_result = ScenarioResult(config=config)
 
-        result_dict = _scenario_result_to_dict(scenario_result)
+        result_dict = scenario_result_to_dict(scenario_result)
 
         assert result_dict["bare_success"] is False
         assert result_dict["guarded_success"] is False
@@ -247,7 +247,7 @@ class TestOutputGeneration:
             epsilon=0.05,
         )
 
-        config_dict = _config_to_dict(config)
+        config_dict = config_to_dict(config)
 
         assert config_dict["edits"] == ["structured"]
         assert config_dict["epsilon"] == pytest.approx(0.05)
@@ -270,7 +270,7 @@ class TestOutputGeneration:
             execution_time_seconds=10.0,
         )
 
-        json_data = _summary_to_step14_json(summary)
+        json_data = summary_to_step14_json(summary)
 
         scenario = json_data["scenarios"][0]
         assert scenario["skip"] is True

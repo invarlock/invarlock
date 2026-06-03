@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 
 from ._estimators import frobenius_norm_sq, row_col_norm_extrema
+from .quantized_weights import is_quantized_weight
 from .spectral_measurement import compute_sigma_max
 from .spectral_policy import default_family_caps
 
@@ -234,12 +235,21 @@ def detect_spectral_violations(
     metrics: dict[str, float],
     phase: str = "finalize",
     *,
-    compute_sigma_max_fn: Any = compute_sigma_max,
-    classify_module_family_fn: Any = classify_module_family,
-    compute_z_score_for_value_fn: Any = compute_z_score_for_value,
-    default_family_caps_fn: Any = default_family_caps,
+    compute_sigma_max_fn: Any | None = None,
+    classify_module_family_fn: Any | None = None,
+    compute_z_score_for_value_fn: Any | None = None,
+    default_family_caps_fn: Any | None = None,
 ) -> list[dict[str, Any]]:
     """Detect spectral property violations using per-family z-score caps."""
+    if compute_sigma_max_fn is None:
+        compute_sigma_max_fn = compute_sigma_max
+    if classify_module_family_fn is None:
+        classify_module_family_fn = classify_module_family
+    if compute_z_score_for_value_fn is None:
+        compute_z_score_for_value_fn = compute_z_score_for_value
+    if default_family_caps_fn is None:
+        default_family_caps_fn = default_family_caps
+
     violations: list[dict[str, Any]] = []
     latest_z: dict[str, float] = {}
 
@@ -249,6 +259,19 @@ def detect_spectral_violations(
             if getattr(weight, "ndim", None) == 2:
                 sigma_max = metrics.get(name)
                 if sigma_max is None:
+                    if is_quantized_weight(weight):
+                        guard._log_event(
+                            "spectral_quantized_weight_unmeasurable",
+                            level="WARN",
+                            message=(
+                                "Skipping spectral z-score enforcement for "
+                                "quantized weight without a dense matrix view"
+                            ),
+                            module=name,
+                            phase=phase,
+                            dtype=str(getattr(weight, "dtype", "unknown")),
+                        )
+                        continue
                     sigma_max = compute_sigma_max_fn(weight)
 
                 baseline_sigma = guard.baseline_sigmas.get(name, guard.target_sigma)

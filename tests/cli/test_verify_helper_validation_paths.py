@@ -5,7 +5,7 @@ import math
 from pathlib import Path
 
 from invarlock.reporting.report_schema import REPORT_SCHEMA_VERSION
-from tests.conftest import install_transformers_tokenizer_stub
+from tests.cli._support_transformers import install_transformers_tokenizer_stub
 
 
 def _import_verify_module():

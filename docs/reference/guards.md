@@ -4,7 +4,7 @@
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Safety checks that validate edits against baseline-derived contracts. |
+| **Purpose** | Guard checks that validate edits against baseline-derived contracts. |
 | **Audience** | Users tuning guard behavior and reviewing report evidence. |
 | **Supported guards** | `invariants`, `spectral`, `rmt`, `variance` (plus optional plugin guards). |
 | **Requires** | `invarlock[guards]` for torch/numpy guard math. |
@@ -36,9 +36,10 @@ guards:
 > sparingly and keep evidence in the report.
 >
 > Assurance scope note: the published assurance basis covers GPT-2
-> and BERT profiles. Repo-included presets and pilot configs for families such
-> as Mistral 7B, Qwen2 7B, Qwen2.5 7B, and Qwen2.5 14B expand runnable coverage, not the published
-> assurance basis.
+> and BERT profiles. Additional runnable but unpublished lanes are tracked in
+> `contracts/support_matrix.json`; they expand runnable coverage, not the
+> published assurance basis. Examples include Mistral 7B, Qwen2 7B, Qwen2.5 7B,
+> and Qwen2.5 14B; the contract file remains authoritative.
 
 ## Guard Pipeline Flow
 
@@ -85,7 +86,8 @@ guards:
   `finalize`) are only used when you manage guards manually (e.g., with
   `GuardChain`).
 - **Tier policies**: `--tier balanced|conservative|aggressive` resolves a full
-  policy bundle from `runtime/tiers.yaml`; overrides in config are merged on top.
+  policy bundle from packaged `runtime/tiers.yaml`; overrides
+  in config are merged on top.
 - **Measurement contracts**: Spectral and RMT guards record estimator + sampling
   contracts in reports and are enforced by `invarlock verify` in CI/Release,
   alongside required `runtime.manifest.json` runtime provenance for evaluation outputs.
@@ -211,7 +213,7 @@ packaged presets include it by default; remove a guard from the list to skip it.
 ## Related Documentation
 
 - [Tier Policy Catalog](tier-policy-catalog.md)
-- [GPU/MPS-First Guards (Decision Memo)](../assurance/13-gpu-mps-first-guards.md)
+- [GPU/MPS-First Guard Measurement Contracts](../assurance/13-gpu-mps-first-guards.md)
 - [Configuration Schema](config-schema.md)
 - [Environment Variables](env-vars.md)
 - [Guard Contracts & Primer](../assurance/04-guard-contracts.md)

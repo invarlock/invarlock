@@ -13,7 +13,7 @@ import json
 import math
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -244,7 +244,7 @@ def null_sweep(
     # import this module without heavy deps. Import lazily so CLI example
     # validation can parse `invarlock calibrate ...` without installing torch.
     try:
-        from invarlock.calibration.spectral_null import summarize_null_sweep_reports
+        from invarlock.calibration import summarize_null_sweep_reports
     except ModuleNotFoundError as exc:
         missing = getattr(exc, "name", "") or ""
         if missing in {"torch", "transformers"}:
@@ -379,7 +379,7 @@ def null_sweep(
         }
         tiers_patch[tier_name] = spectral_patch
 
-    stamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     payload = {
         "kind": "spectral_null_sweep",
         "generated_at": stamp,
@@ -496,7 +496,7 @@ def ve_sweep(
 ) -> None:
     # Optional deps: see null_sweep() note.
     try:
-        from invarlock.calibration.variance_ve import summarize_ve_sweep_reports
+        from invarlock.calibration import summarize_ve_sweep_reports
     except ModuleNotFoundError as exc:
         missing = getattr(exc, "name", "") or ""
         if missing in {"torch", "transformers"}:
@@ -664,7 +664,7 @@ def ve_sweep(
             }
         )
 
-    stamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     payload = {
         "kind": "variance_ve_sweep",
         "generated_at": stamp,

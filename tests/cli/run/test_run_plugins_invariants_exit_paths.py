@@ -10,97 +10,29 @@ import click
 import pytest
 
 from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_common import (
+    common_ce_patches,
+    write_base_run_config,
+)
+from tests.cli.run._support_run_common import (
+    synthetic_provider_min as _provider_min,
+)
 
 
 def _write_cfg(tmp_path: Path, preview=2, final=2, loss_type="auto") -> Path:
-    p = tmp_path / "config.yaml"
-    p.write_text(
-        f"""
-model:
-  adapter: hf_causal
-  id: gpt2
-  device: cpu
-edit:
-  name: quant_rtn
-  plan: {{}}
-
-dataset:
-  provider: synthetic
-  id: synthetic
-  split: validation
-  seq_len: 8
-  stride: 4
-  preview_n: {preview}
-  final_n: {final}
-
-guards:
-  order: []
-
-eval:
-  spike_threshold: 2.0
-  loss:
-    type: {loss_type}
-
-output:
-  dir: runs
-        """
+    return write_base_run_config(
+        tmp_path,
+        preview,
+        final,
+        eval_fields="  spike_threshold: 2.0\n",
+        loss_type=loss_type,
     )
-    return p
 
 
 def _common_ce():
-    return (
-        patch(
-            "invarlock.reporting.report_files.save_report",
-            lambda report, run_dir, formats, filename_prefix: {
-                "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
-            },
-        ),
-        patch("invarlock.cli.device.resolve_device", lambda d: d),
-        patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
-        patch(
-            "invarlock.core.registry.get_registry",
-            lambda: SimpleNamespace(
-                get_adapter=lambda name: SimpleNamespace(
-                    name=name, load_model=lambda model_id, device=None: object()
-                ),
-                get_edit=lambda name: SimpleNamespace(name=name),
-                get_guard=lambda name: SimpleNamespace(name=name),
-                get_plugin_metadata=lambda n, t: {
-                    "name": n,
-                    "module": f"{t}.{n}",
-                    "version": "test",
-                },
-            ),
-        ),
-        patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
-            lambda model_id=None, adapter=None: SimpleNamespace(
-                default_loss="ce",
-                model_id=model_id,
-                adapter=adapter,
-                module_selectors={},
-                invariants=set(),
-                cert_lints=[],
-                family="gpt",
-            ),
-        ),
-        patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
-            lambda profile: (
-                SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
-                "tokhash123",
-            ),
-        ),
-    )
-
-
-def _provider_min():
-    return SimpleNamespace(
-        windows=lambda **kw: (
-            SimpleNamespace(input_ids=[[1, 2, 3]], attention_masks=[[1, 1, 1]]),
-            SimpleNamespace(input_ids=[[4, 5, 6]], attention_masks=[[1, 1, 1]]),
-        )
+    return common_ce_patches(
+        include_registry=True,
+        include_save_report=True,
     )
 
 
@@ -361,7 +293,7 @@ def test_invariants_injected_into_policy(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.detect_model_profile",
+                "invarlock.cli.run_runtime_exec.detect_model_profile",
                 detect_with_invariants,
             )
         )
@@ -394,7 +326,7 @@ def test_tokenizer_digest_unknown_path(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda profile: (Tok(), None),
             )
         )
@@ -430,7 +362,7 @@ def test_mlm_mask_prob_zero_sets_labels_and_zero_counts(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda profile: (
                     SimpleNamespace(
                         mask_token_id=103,
@@ -506,7 +438,7 @@ def test_mlm_missing_mask_token_exits(tmp_path: Path):
         # No mask_token_id
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda profile: (
                     SimpleNamespace(
                         eos_token="</s>", pad_token="</s>", vocab_size=50000

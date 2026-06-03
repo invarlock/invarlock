@@ -10,128 +10,15 @@ import click
 import pytest
 
 from invarlock.cli.commands.run import run_command
-
-
-def _write_cfg(tmp_path: Path, preview=2, final=2, loss_type="auto") -> Path:
-    p = tmp_path / "config.yaml"
-    p.write_text(
-        f"""
-model:
-  adapter: hf_causal
-  id: gpt2
-  device: cpu
-edit:
-  name: quant_rtn
-  plan: {{}}
-
-dataset:
-  provider: synthetic
-  id: synthetic
-  split: validation
-  seq_len: 8
-  stride: 4
-  preview_n: {preview}
-  final_n: {final}
-
-guards:
-  order: []
-
-eval:
-  spike_threshold: 2.0
-  loss:
-    type: {loss_type}
-
-output:
-  dir: runs
-        """
-    )
-    return p
-
-
-def _common_ce():
-    return (
-        patch(
-            "invarlock.reporting.report_files.save_report",
-            lambda report, run_dir, formats, filename_prefix: {
-                "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
-            },
-        ),
-        patch("invarlock.cli.device.resolve_device", lambda d: d),
-        patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
-        patch(
-            "invarlock.core.registry.get_registry",
-            lambda: SimpleNamespace(
-                get_adapter=lambda name: SimpleNamespace(
-                    name=name, load_model=lambda model_id, device=None: object()
-                ),
-                get_edit=lambda name: SimpleNamespace(name=name),
-                get_guard=lambda name: SimpleNamespace(name=name),
-                get_plugin_metadata=lambda n, t: {
-                    "name": n,
-                    "module": f"{t}.{n}",
-                    "version": "test",
-                },
-            ),
-        ),
-        patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
-            lambda model_id=None, adapter=None: SimpleNamespace(
-                default_loss="ce",
-                model_id=model_id,
-                adapter=adapter,
-                module_selectors={},
-                invariants=set(),
-                cert_lints=[],
-                family="gpt",
-            ),
-        ),
-        patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
-            lambda profile: (
-                SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
-                "tokhash123",
-            ),
-        ),
-    )
-
-
-def _provider_min():
-    return SimpleNamespace(
-        windows=lambda **kw: (
-            SimpleNamespace(input_ids=[[1, 2, 3]], attention_masks=[[1, 1, 1]]),
-            SimpleNamespace(input_ids=[[4, 5, 6]], attention_masks=[[1, 1, 1]]),
-        )
-    )
-
-
-def _baseline_with_meta(tmp_path: Path, meta: dict, preview_ids, final_ids) -> Path:
-    p = tmp_path / "baseline.json"
-    payload = {
-        "meta": meta,
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 1.0,
-                "final": 1.0,
-            }
-        },
-        "edit": {
-            "name": "structured",
-            "plan_digest": "baseline",
-            "deltas": {
-                "params_changed": 0,
-                "heads_pruned": 0,
-                "neurons_pruned": 0,
-                "layers_modified": 0,
-            },
-        },
-        "evaluation_windows": {
-            "preview": {"window_ids": [0], "input_ids": preview_ids},
-            "final": {"window_ids": [1], "input_ids": final_ids},
-        },
-    }
-    p.write_text(json.dumps(payload))
-    return p
+from tests.cli.run._support_run_common import (
+    synthetic_provider_min as _provider_min,
+)
+from tests.cli.run._support_run_plugins import (
+    plugins_invariants_common_ce as _common_ce,
+)
+from tests.cli.run._support_run_plugins import (
+    plugins_invariants_write_cfg as _write_cfg,
+)
 
 
 def test_provider_non_evalwindow_mismatch_counts_no_exit(tmp_path: Path):
@@ -321,8 +208,8 @@ def test_guard_overhead_fail_exits(tmp_path: Path):
         # Patch validator to fail
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.run_runtime.validate_guard_overhead",
-            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
         ):
             stack.enter_context(
                 patch(

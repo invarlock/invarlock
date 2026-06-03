@@ -12,7 +12,15 @@ def test_plugin_adapters_present_in_registry():
     for name in {"hf_causal", "hf_mlm", "hf_multimodal", "hf_seq2seq", "hf_auto"}:
         assert name in adapters
     # Optional plugins should be discoverable (even if not importable)
-    for name in {"hf_gptq", "hf_awq", "hf_bnb"}:
+    for name in {
+        "hf_gptq",
+        "hf_awq",
+        "hf_bnb",
+        "hf_torchao",
+        "hf_hqq",
+        "hf_quanto",
+        "hf_ct",
+    }:
         assert name in adapters
 
 

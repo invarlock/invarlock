@@ -16,9 +16,9 @@ weights.
 ## When To Use InvarLock
 
 - You produced an edited checkpoint (quantization, pruning, fine-tune) and
-  need a machine-verifiable artifact that proves it did not regress beyond
+  need a machine-verifiable artifact showing it stayed within
   configured bounds.
-- A release gate needs a fail-closed `evaluate -> verify` contract with
+- A strict verification workflow needs a fail-closed `evaluate -> verify` contract with
   pairing, guard evidence, and runtime provenance.
 - Reviewers expect a self-contained report bundle they can re-verify offline.
 
@@ -29,7 +29,7 @@ weights.
 - You want production drift monitoring, dashboards, or experiment tracking
   (use MLflow, Evidently, Deepchecks).
 - You need the tool to *produce* the compressed checkpoint (use Optimum,
-  Intel Neural Compressor, AutoGPTQ, etc.); InvarLock validates the artifact
+  Intel Neural Compressor, GPTQModel, etc.); InvarLock validates the artifact
   afterwards.
 
 ## Tool Comparison
@@ -39,20 +39,20 @@ weights.
 | lm-evaluation-harness, LightEval | Broad benchmark quality and task scores. | InvarLock focuses on paired baseline-vs-subject windows, guard evidence, runtime provenance, and a standalone report verifier. |
 | OpenAI Evals | Custom LLM and system evaluations. | InvarLock operates on local checkpoint comparisons and weight-edit evidence. |
 | MLflow, Evidently, Deepchecks | Experiment validation, monitoring, drift, and dashboards. | InvarLock ships a narrow fail-closed artifact contract for weight edits rather than a broad observability platform. |
-| Hugging Face Optimum, Intel Neural Compressor, AutoGPTQ | Producing optimized or compressed model artifacts. | InvarLock validates the artifact after the edit instead of performing the compression. |
+| Hugging Face Optimum, Intel Neural Compressor, GPTQModel | Producing optimized or compressed model artifacts. | InvarLock validates the artifact after the edit instead of performing the compression. |
 
 ## Recommended Combined Workflow
 
 1. Use compression or edit tooling to produce the subject checkpoint.
 2. Use lm-eval / LightEval for broad downstream benchmark confidence.
 3. Use an MLOps platform for tracking, monitoring, and dashboards.
-4. Use InvarLock at the release gate to produce a machine-verifiable report
-   that says a specific edited checkpoint did not exceed configured regression
+4. Use InvarLock in the strict verification workflow to produce a machine-verifiable report
+   that says a specific edited checkpoint stayed within configured regression
    and guard thresholds relative to a fixed baseline.
 
 ## Related Documentation
 
-- [Trust Model](../assurance/14-trust-model.md) — What a strict pass does and does not mean
+- [Trust Model](../assurance/14-trust-model.md) — Strict pass scope
 - [Strict Assurance Checklist](../assurance/15-strict-assurance-checklist.md) — Reviewer acceptance criteria
 - [Reports Reference](reports.md) — Schema, telemetry, and HTML export
 - [Guards Reference](guards.md) — Configuration and evidence

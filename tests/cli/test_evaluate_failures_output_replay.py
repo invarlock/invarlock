@@ -36,7 +36,8 @@ def test_evaluate_quiet_mode_replays_baseline_child_output_on_typer_exit(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
@@ -73,7 +74,8 @@ def test_evaluate_quiet_mode_replays_edited_child_output_on_typer_exit(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
@@ -109,7 +111,8 @@ def test_evaluate_quiet_mode_replays_noop_child_output_on_runtime_error(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
@@ -144,7 +147,8 @@ def test_evaluate_nonquiet_edit_child_typer_exit_skips_buffer_replay(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
@@ -179,7 +183,8 @@ def test_evaluate_quiet_mode_replays_noop_child_output_on_typer_exit(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
@@ -213,7 +218,8 @@ def test_evaluate_nonquiet_noop_child_runtime_error_skips_buffer_replay(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
@@ -245,7 +251,8 @@ def test_evaluate_nonquiet_subject_typer_exit_reaches_no_buffer_replay_branch(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
@@ -275,7 +282,8 @@ def test_evaluate_quiet_mode_replays_baseline_child_output_on_failure(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
@@ -314,7 +322,8 @@ def test_evaluate_quiet_mode_replays_edit_config_child_output_on_failure(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             edit_config=str(edit_cfg),
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -349,7 +358,8 @@ def test_evaluate_quiet_mode_replays_noop_subject_output_on_failure(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
@@ -388,7 +398,8 @@ def test_evaluate_quiet_mode_report_failure_bubbles_without_child_replay(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
@@ -424,7 +435,8 @@ def test_evaluate_non_quiet_edit_config_failure_does_not_replay_buffer(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             edit_config=str(edit_cfg),
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -464,7 +476,8 @@ def test_evaluate_non_quiet_report_failure_bubbles_without_child_replay(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",

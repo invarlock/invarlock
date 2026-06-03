@@ -32,7 +32,8 @@ def test_evaluate_requires_explicit_runner_report_path(monkeypatch, tmp_path: Pa
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
@@ -59,7 +60,8 @@ def test_evaluate_requires_existing_runner_report_path(monkeypatch, tmp_path: Pa
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
@@ -85,7 +87,8 @@ def test_evaluate_requires_file_runner_report_path(monkeypatch, tmp_path: Path):
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
@@ -161,7 +164,8 @@ def test_evaluate_uses_inline_preset_when_repo_preset_missing(monkeypatch, tmp_p
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="hf_causal",
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
         out=str(runs),
         report_out=str(Path("certs")),
         profile="dev",
@@ -219,7 +223,8 @@ def test_evaluate_edit_config_successfully_merges_subject(monkeypatch, tmp_path)
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="hf_causal",
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
         preset=str(preset),
         edit_config=str(edit_cfg),
         out=str(Path("runs")),
@@ -262,7 +267,8 @@ def test_evaluate_uses_returned_run_report_path_over_directory_scan(
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="hf_causal",
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile="dev",
@@ -300,7 +306,8 @@ def test_evaluate_edit_config_invalid_yaml_exits(monkeypatch, tmp_path):
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             edit_config=str(edit_cfg),
             out=str(Path("runs")),
             assurance="off",
@@ -317,7 +324,8 @@ def test_evaluate_missing_baseline_report_exits(monkeypatch, tmp_path: Path):
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(tmp_path / "runs"),
             assurance="off",
         )
@@ -341,7 +349,8 @@ def test_evaluate_missing_edited_report_exits(monkeypatch, tmp_path: Path):
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(runs),
             assurance="off",
         )
@@ -381,7 +390,8 @@ def test_evaluate_failed_edited_run_report_exits_before_report_generation(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             profile="dev",
             assurance="off",
@@ -409,7 +419,8 @@ def test_evaluate_edit_config_missing_exits(monkeypatch, tmp_path: Path):
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             edit_config=str(tmp_path / "missing_edit.yaml"),
             out=str(tmp_path / "runs"),
             assurance="off",
@@ -449,7 +460,8 @@ def test_evaluate_happy_path_with_preset_and_auto_adapter(monkeypatch, tmp_path:
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="auto",
+            baseline_adapter="auto",
+            subject_adapter="auto",
             preset=str(preset),
             out=str(runs),
             report_out=str(certs),
@@ -491,7 +503,8 @@ def test_evaluate_quiet_mode_disables_progress_and_timing(
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="hf_causal",
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile="dev",
@@ -541,7 +554,8 @@ def test_evaluate_edit_config_preserves_explicit_adapter_and_guard_order(
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="hf_causal",
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
         preset=str(preset),
         edit_config=str(edit_cfg),
         out=str(Path("runs")),
@@ -580,7 +594,8 @@ def test_evaluate_edit_label_is_forwarded_to_subject_run(
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="hf_causal",
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile="dev",
@@ -624,7 +639,8 @@ def test_evaluate_filters_report_kwargs_to_supported_signature(
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="hf_causal",
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile="dev",
@@ -666,7 +682,8 @@ def test_evaluate_invalid_preset_guard_order_falls_back_to_default(
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="hf_causal",
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
         preset=str(preset),
         out=str(Path("runs")),
         report_out=str(Path("reports")),

@@ -15,9 +15,15 @@ via `tests/integration/conftest.py`.
 - Final executable owner dirs: `tests/adapters`, `tests/calibration`, `tests/ci`, `tests/cli`, `tests/core`, `tests/docs`, `tests/edits`, `tests/eval`, `tests/fuzzing`, `tests/guards`, `tests/integration`, `tests/lint`, `tests/observability`, `tests/plugins`, `tests/evidence_packs`, `tests/reporting`, `tests/runtime`, `tests/scripts`.
 - Non-executable support and data dirs stay isolated: `tests/_stubs`, `tests/artifacts`, `tests/fixtures`, `tests/schemas`.
 - `tests/artifacts` is the golden-data bucket. Keep stable report fixtures, evidence-pack payloads, and other maintainer-owned artifact snapshots there instead of folding them into `tests/fixtures`.
-- Nested owner buckets are allowed when they clarify ownership. Current nested buckets:
-  - `tests/guards/property`
-  - `tests/guards/differential`
+- Nested owner buckets are allowed when they clarify ownership. Maintained
+  examples include:
+  - `tests/cli/config`, `tests/cli/run`
+  - `tests/eval/providers`
+  - `tests/guards/contracts`, `tests/guards/differential`, `tests/guards/invariants`, `tests/guards/policy`, `tests/guards/property`, `tests/guards/rmt`, `tests/guards/spectral`, `tests/guards/variance`
+  - `tests/integration/monitoring`, `tests/integration/packaging`, `tests/integration/regression`, `tests/integration/scripts`
+  - `tests/reporting/builder`, `tests/reporting/contracts`, `tests/reporting/evidence_pack`, `tests/reporting/guards`, `tests/reporting/overhead`, `tests/reporting/policy`, `tests/reporting/provenance`, `tests/reporting/render`, `tests/reporting/run_report`, `tests/reporting/schema`, `tests/reporting/validation`
+  Do not add nested buckets just to reduce file size; each bucket should map to
+  a real owner surface or behavior family.
 - Owner examples:
   - `tests/core`: orchestration, contracts, runner internals, and core policy logic.
   - `tests/cli`: command-line shells, CLI serialization, and command-facing UX behavior.
@@ -45,26 +51,26 @@ via `tests/integration/conftest.py`.
 
 Run fast/unit tests:
 
-```
+```bash
 INVARLOCK_LIGHT_IMPORT=1 INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=0 \
 pytest -q -m "not integration and not slow and not manual" tests
 ```
 
 Or use the Makefile fast lane:
 
-```
+```bash
 make test-fast
 ```
 
 Run the slower integration/smoke backstop separately:
 
-```
+```bash
 make test-integration
 ```
 
 Run the curated CI subset locally:
 
-```
+```bash
 INVARLOCK_LIGHT_IMPORT=1 INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=0 \
 pytest -q \
   tests/cli/test_python_m_invarlock.py \
@@ -82,6 +88,9 @@ pytest -q \
 
 The curated CI subset is intentionally narrower than `make test-fast`; use it
 when reproducing the fast PR gate selection or debugging that specific lane.
+`tests/integration/scripts/test_tiny_matrix_checklist.py` covers the dry-run
+checklist shape for `scripts/smoke/run_tiny_all_matrix.sh`; it does not execute
+the downloaded model matrix.
 
 ## Runtime artifacts
 

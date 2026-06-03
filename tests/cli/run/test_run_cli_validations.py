@@ -131,7 +131,7 @@ def test_run_command_invalid_probes(mock_load):
             assert exc_info.value.exit_code == 1
 
 
-@patch("invarlock.cli.run_runtime.validate_guard_overhead")
+@patch("invarlock.cli.run_runtime_exec.validate_guard_overhead")
 @patch("invarlock.core.config_loader.load_config")
 @patch("invarlock.core.config_loader.apply_profile")
 @patch("invarlock.cli.device.resolve_device", return_value="cpu")

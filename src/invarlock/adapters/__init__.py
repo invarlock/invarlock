@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from invarlock.core.abi import INVARLOCK_CORE_ABI as INVARLOCK_CORE_ABI
+from invarlock.core import INVARLOCK_CORE_ABI as INVARLOCK_CORE_ABI
 
+from . import auto as auto
 from .base import (
     AdapterConfig,
     AdapterInterface,
@@ -28,6 +29,7 @@ __all__ = [
     "DeviceManager",
     "BasePerformanceMetrics",
     "INVARLOCK_CORE_ABI",
+    "auto",
     # Capabilities
     "ModelCapabilities",
     "QuantizationConfig",

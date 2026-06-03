@@ -8,7 +8,7 @@
 | **Audience** | Operators running production workloads and developers debugging performance issues. |
 | **Supported surface** | `MonitoringManager`, `HealthChecker`, `TelemetryCollector`, `MetricsRegistry`. |
 | **Requires** | `psutil` (included in base install); `torch` for GPU monitoring. |
-| **Network** | Fully offline; no external telemetry is sent. |
+| **Network** | Local by default; external metric exporters or notification channels send data only when explicitly configured. |
 | **Source of truth** | `src/invarlock/observability/*.py`. |
 
 ## Quick Start
@@ -40,7 +40,8 @@ monitor.stop()
 - **Metrics**: counters, gauges, and histograms tracked during runs.
 - **Health checks**: periodic checks for system resources (CPU, memory, disk, GPU).
 - **Telemetry**: operation tracking with start/end times and metadata.
-- **Alerting**: configurable thresholds for warnings (not external notifications).
+- **Alerting**: configurable thresholds for warnings; optional email, webhook,
+  and Slack channels can be configured explicitly.
 
 ### Component Architecture
 

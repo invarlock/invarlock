@@ -7,95 +7,12 @@ import types
 
 import pytest
 
-
-class _OneShotEvent:
-    def __init__(self) -> None:
-        self._set = False
-
-    def is_set(self) -> bool:
-        return self._set
-
-    def wait(self, timeout: float) -> bool:
-        self._set = True
-        return True
-
-    def set(self) -> None:
-        self._set = True
-
-
-class _MemoryInfo:
-    def __init__(self, percent: float, available: int, used: int, total: int) -> None:
-        self.percent = percent
-        self.available = available
-        self.used = used
-        self.total = total
-
-
-class _DiskInfo:
-    def __init__(self, used: int, total: int, free: int | None = None) -> None:
-        self.used = used
-        self.total = total
-        self.free = total - used if free is None else free
-
-
-class _Response:
-    def __init__(self, status_code: int = 200, text: str = "ok") -> None:
-        self.status_code = status_code
-        self.text = text
-        self.raise_calls = 0
-
-    def raise_for_status(self) -> None:
-        self.raise_calls += 1
-        if self.status_code >= 400:
-            raise OSError(self.text)
-
-
-class _SMTPRecorder:
-    started_tls = False
-    logged_in: tuple[str, str] | None = None
-    sent_subjects: list[str] = []
-
-    def __init__(self, host: str, port: int) -> None:
-        self.host = host
-        self.port = port
-
-    def __enter__(self) -> _SMTPRecorder:
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        return None
-
-    def starttls(self) -> None:
-        type(self).started_tls = True
-
-    def login(self, username: str, password: str) -> None:
-        type(self).logged_in = (username, password)
-
-    def send_message(self, message) -> None:
-        type(self).sent_subjects.append(message["Subject"])
-
-
-def _make_alert(alerting_module, *, severity=None):
-    severity = severity or alerting_module.AlertSeverity.WARNING
-    return alerting_module.Alert(
-        id="alert-1",
-        name="Edge Alert",
-        severity=severity,
-        message="edge-case",
-        details={"outer": {"inner": "value"}, "plain": 1},
-        timestamp=1_700_000_000.0,
-    )
-
-
-def _fake_import_without(missing_name: str):
-    real_import = builtins.__import__
-
-    def _import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name == missing_name:
-            raise ImportError(missing_name)
-        return real_import(name, globals, locals, fromlist, level)
-
-    return _import
+from tests.observability._support_coverage import (
+    DiskInfo as _DiskInfo,
+)
+from tests.observability._support_coverage import (
+    MemoryInfo as _MemoryInfo,
+)
 
 
 @pytest.mark.unit
@@ -649,3 +566,62 @@ def test_metrics_existing_registry_and_snapshot_edge_branches(monkeypatch):
         "gpu_memory_mb_peak": 4.0,
         "gpu_memory_reserved_mb_peak": 9.0,
     }
+
+
+@pytest.mark.unit
+def test_metrics_exception_and_fallback_memory_branches(monkeypatch):
+    import invarlock.observability.metrics as metrics
+
+    monkeypatch.setattr(metrics, "torch", sys.modules["torch"], raising=False)
+    monkeypatch.setattr(metrics.torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(
+        metrics.torch.cuda,
+        "reset_peak_memory_stats",
+        lambda: (_ for _ in ()).throw(RuntimeError("cuda reset failed")),
+        raising=False,
+    )
+    metrics.reset_peak_memory_stats()
+
+    process = types.SimpleNamespace(
+        memory_info=lambda: types.SimpleNamespace(rss=32 * 1024 * 1024)
+    )
+    monkeypatch.setattr(sys.modules["psutil"], "Process", lambda pid: process)
+    monkeypatch.setattr(
+        metrics.torch.cuda,
+        "is_available",
+        lambda: (_ for _ in ()).throw(RuntimeError("cuda probe failed")),
+    )
+    snapshot = metrics.capture_memory_snapshot("torch-error", timestamp=1.0)
+    assert snapshot == {"phase": "torch-error", "ts": 1.0, "rss_mb": 32.0}
+
+    summary = metrics.summarize_memory_snapshots(
+        [{"gpu_mb": 2.0, "gpu_reserved_mb": 3.0}]
+    )
+    assert summary == {
+        "gpu_memory_mb_peak": 2.0,
+        "gpu_memory_reserved_mb_peak": 3.0,
+    }
+
+
+@pytest.mark.unit
+def test_health_cpu_loadavg_os_fallback(monkeypatch):
+    import invarlock.observability.health as health
+
+    class PsutilWithoutLoadavg:
+        Error = health.psutil.Error
+
+        @staticmethod
+        def cpu_percent(interval=1):
+            return 1.0
+
+        @staticmethod
+        def cpu_count():
+            return 8
+
+    monkeypatch.setattr(health, "psutil", PsutilWithoutLoadavg)
+    monkeypatch.setattr(health.os, "getloadavg", lambda: (1.0, 2.0, 3.0))
+
+    checker = health.HealthChecker()
+    result = checker.check_component("cpu")
+
+    assert result.details["load_avg"] == (1.0, 2.0, 3.0)

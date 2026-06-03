@@ -38,7 +38,7 @@ jobs:
       PYTHONWARNINGS: "default"
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
@@ -75,14 +75,14 @@ jobs:
             tests/cli/test_doctor_json_cls_measured_no_d012.py \
             tests/cli/test_doctor_json_tiny_relax_note.py \
             tests/integration/scripts/test_tiny_matrix_checklist.py \
-            tests/reporting/test_report_schema_v1_accuracy_tags.py \
-            tests/reporting/test_report_markdown_estimated_suffix.py \
-            tests/reporting/test_report_markdown_no_estimated_for_measured.py
+            tests/reporting/schema/test_report_schema_v1_accuracy_tags.py \
+            tests/reporting/render/test_report_markdown_estimated_suffix.py \
+            tests/reporting/render/test_report_markdown_no_estimated_for_measured.py
 
       - name: Allow-list contracts (fast unit set)
         run: |
           pytest -q \
-            tests/reporting/test_report_acceptance.py \
+            tests/reporting/builder/test_report_acceptance.py \
             tests/cli/test_console_validation_block.py \
             tests/cli/test_verify_json_shape.py::test_verify_json_envelope_is_stable \
             tests/cli/test_verify_json_single_line.py::test_verify_json_single_line \
@@ -90,7 +90,7 @@ jobs:
             tests/cli/test_doctor_json_format_version.py \
             tests/docs/test_docs_lexicon.py \
             tests/docs/test_docs_schema_label.py \
-            tests/reporting/test_evidence_bundle.py \
+            tests/reporting/evidence_pack/test_evidence_bundle.py \
             tests/ci/test_golden_runs_offline.py
 
       - name: Docs build (strict)
@@ -110,7 +110,7 @@ jobs:
       PYTHONWARNINGS: "default"
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
@@ -151,7 +151,7 @@ jobs:
       PYTHONWARNINGS: "default"
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
@@ -183,7 +183,7 @@ jobs:
       PYTHONWARNINGS: "default"
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
@@ -216,7 +216,7 @@ jobs:
       PYTHONPATH: ${{ github.workspace }}/src
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
@@ -259,7 +259,7 @@ jobs:
     timeout-minutes: 10
     if: github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/')
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
@@ -270,7 +270,7 @@ jobs:
         run: python -m pip install --require-hashes -r requirements/workflows/security-ci-py313.txt
 
       - name: Generate tool-environment SBOM
-        run: bash scripts/generate_sbom.sh --scope tool-environment
+        run: bash scripts/security/generate_sbom.sh --scope tool-environment
 
       - name: Run pip-audit
         run: python scripts/security/run_pip_audit.py

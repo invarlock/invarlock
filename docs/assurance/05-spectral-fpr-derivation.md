@@ -4,7 +4,16 @@
 > policy for per-family singular-value drift. Gaussian-tail FPR math applies to
 > the families whose kappas were calibrated for that model; low Balanced
 > `embed`/`other` caps are operational sentinels, not standalone <=5% FPR
-> guarantees.
+> claims.
+
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Explain how spectral guard family caps map to false-positive-rate interpretation under modeled nulls. |
+| **Audience** | Guard maintainers, calibration reviewers, and contributors changing spectral policy. |
+| **Contract scope** | Spectral z-score caps, multiple-testing policy, sentinel caps, and report observability. |
+| **Source of truth** | `src/invarlock/guards/spectral*.py`, `runtime/tiers.yaml`, and spectral assurance tests. |
 
 ## Claim
 
@@ -13,7 +22,8 @@ policy needed to interpret WARNs under the chosen null-modeling assumptions.
 For families whose kappas are calibrated against an approximately Gaussian null,
 the two-sided tail probability gives the expected false-positive rate. Families
 with intentionally low sentinel caps are still monitored and budgeted by
-`max_caps`, but they must not be cited as <=5% Gaussian-tail guarantees.
+`max_caps`; cite them as operational thresholds rather than <=5% Gaussian-tail
+claims.
 
 ## Derivation (sketch)
 
@@ -23,24 +33,26 @@ $$
 z = \frac{s - \mu_f}{\sigma_f}
 $$
 
-for a spectral statistic $s$ (e.g., top singular value). A WARN is issued if
-$|z| \ge \kappa_f$. Under a **modeled null** where $z \approx \mathcal{N}(0,1)$, the
+for a spectral statistic $s$ (e.g., top singular value). A WARN is issued when
+$|z| > \kappa_f$. Under a **modeled null** where $z \approx \mathcal{N}(0,1)$, the
 per-module two-sided tail probability becomes
 
 $$
 p_{\text{tail}} \approx 2\big(1 - \Phi(\kappa_f)\big).
 $$
 
-Applying **Bonferroni** across the $m_f$ modules controls the family-wise error
-rate (FWER); applying **Benjamini–Hochberg (BH)** controls the expected
-false-discovery proportion (FDR). Balanced tiers choose BH (α=0.05, m=4);
-Conservative tiers choose Bonferroni (α=0.000625, m=4). Document the policy
-alongside $\kappa_f$ so auditors can recover the expected per-run WARN rate.
+Applying **Bonferroni** across the tested families controls the family-wise
+error rate (FWER); applying **Benjamini–Hochberg (BH)** controls the expected
+false-discovery proportion (FDR). Module-level WARN volume is budgeted
+separately by `max_caps`. Balanced tiers choose BH (α=0.05, m=4 families);
+Conservative tiers choose Bonferroni (α=0.000625, m=4 families). Document the
+policy alongside $\kappa_f$ so auditors can recover the expected per-run WARN
+rate.
 
 ## Assumptions & Scope
 
-- Baseline runs provide $(\mu_f, \sigma_f)$ per family $f \in
-  \{\text{ffn}, \text{attn}, \text{embed}, \text{other}\}$; when $\sigma_f = 0$
+- Baseline runs provide $(\mu_f, \sigma_f)$ per family
+  `f in {ffn, attn, embed, other}`; when $\sigma_f = 0$
   we fall back to the tier deadband δ.
 - Only 2‑D weight matrices (FFN blocks, attention projections, embeddings) are
   evaluated; **1‑D LayerNorm parameters are explicitly excluded** from spectral
@@ -84,11 +96,12 @@ summary.
   `spectral.family_caps`, and `spectral.families[family]` with `{max, mean,
   count, violations, kappa}`. `sigma_quantile` is the calibrated baseline
   percentile used to derive the reference target.
-- Tier files document multiple-testing metadata and the mapping
-  $\kappa_f \rightarrow$ modeled Gaussian tails. Sentinel caps should be audited
+- Tier files document multiple-testing metadata and the mapping from
+  $\kappa_f$ to modeled Gaussian tails. Sentinel caps should be audited
   as operational thresholds, not as FPR-controlled family caps.
 - Policy metadata records the multiple-testing method
-  (`spectral.multiple_testing`) and the cap limit (`spectral.max_caps`).
+  (`spectral.multiple_testing`) and the cap limit (`spectral.max_caps`, mirrored
+  in `spectral.summary.max_caps` where present).
 
 ## Observability
 
@@ -112,13 +125,15 @@ Calibration values are derived from null-sweep runs using the order-statistic
 and parametric methods described in the tier calibration documentation
 ([09-tier-v1-calibration.md](09-tier-v1-calibration.md)). The calibrated κ
 values are stored in the packaged `tiers.yaml`
-(`runtime/tiers.yaml`).
+(`runtime/tiers.yaml`; overrides use
+`INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml`).
 
-To recalibrate, run null baselines (no edit) and collect per-module z-scores.
-Allocate the WARN budget across families proportionally by module count, then
-set κ(f) via order-statistic (the B(f)-th largest |z| in that family) or
-parametric inversion of the tail probability. Add a small safety margin
-(η ≈ 0.05–0.10) and validate that subsequent null runs stay within the budget.
+To recalibrate, run null baselines (no edit) and collect per-family maximum
+z-scores through the null-sweep summary tooling. The current summarizer
+recommends κ(f) from the maximum observed family z-score plus a safety margin
+and can lower the multiple-testing α if the observed any-warning rate exceeds
+the target. Validate that subsequent null runs stay within the published
+`max_caps` budget.
 
 > *Basis column in Quality Gates tables: "point" = point estimate gate,
 > "upper" = upper-bound gate, "point & upper" = both point and upper bounds must
@@ -127,3 +142,4 @@ parametric inversion of the tail probability. Add a small safety margin
 ## References
 
 - Benjamini, Y., & Hochberg, Y. (1995). “Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing.” *Journal of the Royal Statistical Society: Series B (Methodological)*, 57(1), 289–300. <https://doi.org/10.1111/j.2517-6161.1995.tb02031.x>
+- Dunn, O. J. (1961). “Multiple Comparisons among Means.” *Journal of the American Statistical Association*, 56(293), 52–64. <https://doi.org/10.1080/01621459.1961.10482090>

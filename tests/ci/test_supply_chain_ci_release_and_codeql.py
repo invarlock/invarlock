@@ -175,7 +175,6 @@ def test_docs_workflow_enforces_docs_lint_on_main_and_staging() -> None:
     assert triggers["push"]["branches"] == ["main", "staging/next", "release/v*"]
     assert triggers["pull_request"]["branches"] == [
         "main",
-        "develop",
         "staging/next",
         "release/v*",
     ]
@@ -190,24 +189,13 @@ def test_docs_workflow_enforces_docs_lint_on_main_and_staging() -> None:
         "package.json",
         "package-lock.json",
         "requirements/workflows/docs-ci-py313.txt",
-        "scripts/check_claim_surface_consistency.py",
-        "scripts/check_cli_completeness.py",
-        "scripts/check_config_schema_sync.py",
-        "scripts/check_docs_links.py",
-        "scripts/check_guard_completeness.py",
-        "scripts/check_internal_links.py",
-        "scripts/check_version_consistency.py",
-        "scripts/docs_check.py",
-        "scripts/docs_lint.py",
-        "scripts/lint_assurance_xrefs.py",
-        "scripts/test_cli_examples.py",
-        "scripts/validate_doc_references.py",
-        "scripts/validate_docs_api_refs.py",
-        "scripts/validate_python_examples.py",
-        "scripts/validate_yaml_examples.py",
-        "scripts/verify_live_examples.py",
-        "scripts/verify_markdown_bash_blocks.py",
-        "scripts/verify_notebooks_smoke.py",
+        "scripts/docs/docs_check.py",
+        "scripts/docs/docs_lint.py",
+        "scripts/docs/lint_assurance_xrefs.py",
+        "scripts/docs/test_cli_examples.py",
+        "scripts/docs/verify_live_examples.py",
+        "scripts/docs/verify_markdown_bash_blocks.py",
+        "scripts/docs/verify_notebooks_smoke.py",
         ".github/workflows/docs-ci.yml",
     ]
     assert triggers["push"]["paths"] == expected_paths
@@ -223,9 +211,9 @@ def test_docs_workflow_enforces_docs_lint_on_main_and_staging() -> None:
 
     assert node_step["with"]["node-version"] == "22"
     assert install_node_step["run"] == "npm ci"
-    assert markdown_step["run"] == "python scripts/docs_lint.py --markdown"
+    assert markdown_step["run"] == "python scripts/docs/docs_lint.py --markdown"
     assert "continue-on-error" not in markdown_step
-    assert spell_step["run"] == "python scripts/docs_lint.py --spell"
+    assert spell_step["run"] == "python scripts/docs/docs_lint.py --spell"
     assert "continue-on-error" not in spell_step
     assert upload_step["with"]["path"] == "site/"
     assert step_names.index("Upload build artifacts") < step_names.index(
@@ -305,7 +293,7 @@ def test_codeql_workflow_uses_repo_config():
     analyze_step = _find_step_by_uses_prefix(
         analyze["steps"], "github/codeql-action/analyze@"
     )
-    expected_pin = "7211b7c8077ea37d8641b6271f6a365a22a5fbfa"
+    expected_pin = "87557b9c84dde89fdd9b10e88954ac2f4248e463"
 
     assert init_step["uses"] == f"github/codeql-action/init@{expected_pin}"
     assert autobuild_step["uses"] == f"github/codeql-action/autobuild@{expected_pin}"
@@ -378,7 +366,7 @@ def test_model_evidence_workflow_is_configured() -> None:
     )
 
     sweep = _find_step_by_name(steps, "Run shipped-model evidence sweep")
-    assert "scripts/model_evidence_sweep.py" in sweep["run"]
+    assert "scripts/model_evidence/model_evidence_sweep.py" in sweep["run"]
     assert "--profile ci" in sweep["run"]
     assert "reports/model_evidence/${{ github.run_id }}" in sweep["run"]
 
@@ -418,7 +406,7 @@ def test_gpt2_smoke_workflow_is_configured() -> None:
     assert "make runtime-image" in runtime_image["run"]
 
     smoke = _find_step_by_name(steps, "Run GPT-2 user journey smoke")
-    assert "scripts/run_gpt2_user_journey_smoke.sh" in smoke["run"]
+    assert "scripts/smoke/run_gpt2_user_journey_smoke.sh" in smoke["run"]
 
 
 def test_ci_hf_lockfiles_include_hypothesis_for_property_tests() -> None:
@@ -456,4 +444,4 @@ def test_tiny_container_smoke_workflow_is_configured() -> None:
     assert "make runtime-image" in runtime_image["run"]
 
     smoke = _find_step_by_name(steps, "Run tiny container smoke campaign")
-    assert "scripts/run_tiny_container_smoke.sh" in smoke["run"]
+    assert "scripts/smoke/run_tiny_container_smoke.sh" in smoke["run"]

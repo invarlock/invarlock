@@ -7,7 +7,7 @@ from pathlib import Path
 
 def _load_script_module():
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "docs_check.py"
+    script_path = repo_root / "scripts" / "docs" / "docs_check.py"
     spec = importlib.util.spec_from_file_location("tests_docs_check", script_path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -74,7 +74,7 @@ def test_check_live_fast_uses_host_mode_demo_mode(monkeypatch, capsys) -> None:
     assert commands == [
         [
             sys.executable,
-            "scripts/verify_live_examples.py",
+            "scripts/docs/verify_live_examples.py",
             "--markdown-execution-mode",
             "host",
             "--skip-markdown-model-loading",

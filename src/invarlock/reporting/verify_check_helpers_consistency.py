@@ -60,6 +60,28 @@ def _validate_pairing(report: dict[str, Any]) -> list[str]:
     return errors
 
 
+def _baseline_guard_payload(baseline: Any, guard_name: str) -> dict[str, Any]:
+    """Return baseline guard payload from either an evaluation report or run report."""
+    if not isinstance(baseline, dict):
+        return {}
+    try:
+        block = baseline.get(guard_name)
+        if isinstance(block, dict) and block:
+            return block
+        for guard in baseline.get("guards", []) or []:
+            if not isinstance(guard, dict):
+                continue
+            if str(guard.get("name", "")).lower() != guard_name:
+                continue
+            metrics = guard.get("metrics")
+            if isinstance(metrics, dict) and metrics:
+                return metrics
+            return {}
+    except (AttributeError, RuntimeError, TypeError, ValueError):
+        return {}
+    return {}
+
+
 def _validate_counts(report: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     dataset = report.get("dataset", {})

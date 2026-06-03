@@ -1,18 +1,34 @@
 from __future__ import annotations
 
 import argparse
-import datetime as dt
 import hashlib
 import importlib
 import json
 import os
 import sys
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
-from source_repo_metadata import SourceRepoMetadataError, build_source_repo_payload
+try:
+    from scripts.evidence_packs.python import manifest_writer_provenance as _provenance
+except ImportError:  # pragma: no cover - direct script execution path
+    import manifest_writer_provenance as _provenance
 
-UTC = getattr(dt, "UTC", dt.timezone.utc)  # noqa: UP017
+SourceRepoMetadataError = _provenance.SourceRepoMetadataError
+_ensure_repo_src_path = _provenance._ensure_repo_src_path
+_git_text = _provenance._git_text
+_load_run_state_environment = _provenance._load_run_state_environment
+_maybe_number = _provenance._maybe_number
+_repo_root = _provenance._repo_root
+_snapshot_marker_payload = _provenance._snapshot_marker_payload
+_truthy = _provenance._truthy
+_utc_now = _provenance._utc_now
+build_environment_payload = _provenance.build_environment_payload
+build_source_repo_payload = _provenance.build_source_repo_payload
+write_environment_metadata = _provenance.write_environment_metadata
+write_source_repo_metadata = _provenance.write_source_repo_metadata
+
 _JSON_READ_ERRORS = (OSError, TypeError, ValueError)
 _VERSION_READ_ERRORS = (AttributeError, ImportError, ModuleNotFoundError)
 _CHECKSUM_ERRORS = (OSError, ValueError)
@@ -275,11 +291,19 @@ def _materials(pack_dir: Path) -> list[dict[str, Any]]:
         ("metadata/model_revisions.json", "model_revisions"),
         ("metadata/scenarios.json", "scenarios"),
         ("metadata/tuned_edit_params.json", "tuned_edit_params"),
+        ("results/analysis/edit_artifact_summary.json", "edit_artifact_summary"),
     ):
         reference = _file_reference(pack_dir, rel_path, name=name)
         if reference is not None:
             materials.append(reference)
     return materials
+
+
+def _edit_artifact_summary(pack_dir: Path) -> dict[str, Any]:
+    payload = _load_json(
+        pack_dir / "results" / "analysis" / "edit_artifact_summary.json"
+    )
+    return payload if isinstance(payload, dict) else {}
 
 
 def _scenario_ids() -> list[str]:
@@ -327,7 +351,7 @@ def write_manifest(
 
     payload: dict[str, Any] = {
         "format": "evidence-pack-v1",
-        "generated_at": dt.datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated_at": _utc_now(),
         "suite": suite,
         "network_mode": "online"
         if str(net) in {"1", "true", "yes", "on"}
@@ -361,6 +385,18 @@ def write_manifest(
         },
         "materials": _materials(pack_dir),
     }
+
+    edit_summary = _edit_artifact_summary(pack_dir)
+    if edit_summary:
+        lanes = edit_summary.get("evidence_lanes")
+        if isinstance(lanes, dict):
+            payload["evidence_lanes"] = lanes
+        deployable = edit_summary.get("deployable_subjects")
+        if isinstance(deployable, dict):
+            payload["deployable_subjects"] = deployable
+        counts = edit_summary.get("counts")
+        if isinstance(counts, dict):
+            payload["artifact_class_counts"] = counts
 
     if payload["builder"]["id"] and payload["builder"]["name"]:
         version = payload.get("invarlock_version") or ""
@@ -404,6 +440,105 @@ def write_manifest(
     out_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
+def _render_pack_readme(
+    *,
+    evidence_level: str,
+    clean_reports: int | None,
+    error_reports: int | None,
+    failed_reports: int | None,
+    policy_profile: str | None,
+) -> str:
+    lines = [
+        "# InvarLock Evidence Pack",
+        "",
+        "This evidence pack bundles reports, summary reports, and metadata for offline",
+        "verification. No model weights are included.",
+        "",
+        f"Evidence level: {evidence_level}",
+        (
+            "Review summary: "
+            f"clean_reports={clean_reports if clean_reports is not None else 'unknown'}, "
+            f"error_injection_reports={error_reports if error_reports is not None else 'unknown'}, "
+            f"failed_reports={failed_reports if failed_reports is not None else 'unknown'}, "
+            f"profile={policy_profile or 'unknown'}."
+        ),
+        "",
+        "Why it might be wrong:",
+    ]
+    if failed_reports not in (None, 0):
+        lines.append(
+            "- Unexpected report verification failures were recorded; inspect results/verification_summary.json before trusting final conclusions."
+        )
+    else:
+        lines.append(
+            "- Nested report verification succeeded for the bundled clean reports, but reviewers should still inspect the underlying evaluation.report.json files."
+        )
+    lines.extend(
+        [
+            "- Error-injection reports are expected-failure evidence and should not be interpreted as clean PASS runs.",
+            "- Current validation edit artifacts are checkpoint-shaped subjects, not optimized deployment backends; inspect results/analysis/edit_artifact_summary.json and report-local edit_metadata.json sidecars.",
+            "- By default this is evidence-grade packaging. For strong distributable evidence, require a signed manifest, strict verification, and a PASS final verdict.",
+            "",
+            "## Verify",
+            "",
+            "1) Verify the manifest signature (if present):",
+            "   invarlock advanced evidence-pack verify <pack-dir> --strict --report-assurance strict",
+            "",
+            "2) Verify file checksums:",
+            "   sha256sum -c checksums.sha256",
+            "   # macOS: shasum -a 256 -c checksums.sha256",
+            "",
+            "3) Verify report integrity:",
+            "   invarlock verify --json reports/**/evaluation.report.json",
+            "",
+            "Or use:",
+            "  invarlock advanced evidence-pack verify <pack-dir>",
+            "  invarlock advanced evidence-pack verify <pack-dir> --strict --report-assurance strict",
+            "Repo workflow alternative:",
+            "  scripts/evidence_packs/verify_pack.sh --pack <pack-dir> --strict --report-assurance strict",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def _verification_int(verification: dict[str, Any] | None, key: str) -> int | None:
+    if not isinstance(verification, dict):
+        return None
+    value = verification.get(key)
+    return int(value) if isinstance(value, int) else None
+
+
+def write_pack_readme(pack_dir: Path) -> None:
+    verification = _load_json(pack_dir / "results" / "verification_summary.json")
+    verification_obj = verification if isinstance(verification, dict) else None
+    clean_reports = _verification_int(verification_obj, "clean_reports")
+    error_reports = _verification_int(verification_obj, "error_injection_reports")
+    failed_reports = _verification_int(verification_obj, "failed_reports")
+    policy_profile = (
+        str(verification_obj.get("policy_profile"))
+        if isinstance(verification_obj, dict)
+        and isinstance(verification_obj.get("policy_profile"), str)
+        else None
+    )
+    evidence_level = _derive_evidence_level(
+        subject_present=(pack_dir / "results" / "final_verdict.json").is_file(),
+        clean_reports=clean_reports,
+        failed_reports=failed_reports,
+        has_source_repo_ref=(pack_dir / "metadata" / "source_repo.json").is_file(),
+        has_environment_ref=(pack_dir / "metadata" / "environment.json").is_file(),
+    )
+    (pack_dir / "README.md").write_text(
+        _render_pack_readme(
+            evidence_level=evidence_level,
+            clean_reports=clean_reports,
+            error_reports=error_reports,
+            failed_reports=failed_reports,
+            policy_profile=policy_profile,
+        ),
+        encoding="utf-8",
+    )
+
+
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Write an evidence-pack manifest.json")
     parser.add_argument("--pack-dir", required=True)
@@ -415,7 +550,149 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _parse_source_repo_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Write evidence-pack source repository metadata."
+    )
+    parser.add_argument("--out", required=True)
+    return parser.parse_args(argv)
+
+
+def _parse_environment_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Write evidence-pack environment metadata."
+    )
+    parser.add_argument("--out", required=True)
+    parser.add_argument("--run-dir")
+    return parser.parse_args(argv)
+
+
+def _parse_readme_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Write an evidence-pack README.md.")
+    parser.add_argument("pack_dir")
+    return parser.parse_args(argv)
+
+
+def _parse_sign_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Sign an evidence-pack manifest with a package-native Ed25519 key."
+    )
+    parser.add_argument("--manifest", required=True, help="Path to manifest.json.")
+    parser.add_argument(
+        "--signing-key",
+        help="Optional Ed25519 private key PEM. When omitted, an ephemeral key is generated.",
+    )
+    parser.add_argument(
+        "--signature-out",
+        help="Optional output path for manifest.signature.json.",
+    )
+    parser.add_argument(
+        "--generate-ephemeral",
+        action="store_true",
+        help="Generate an ephemeral Ed25519 key when --signing-key is omitted.",
+    )
+    return parser.parse_args(argv)
+
+
+def _load_manifest_for_signing(path: Path) -> dict[str, object]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("manifest must decode to a JSON object")
+    return payload
+
+
+def _sign_with_key(
+    manifest_path: Path,
+    *,
+    signing_key_path: Path,
+    signature_path: Path | None,
+) -> str:
+    _ensure_repo_src_path()
+    from invarlock.evidence_pack_integrity import (
+        load_private_signing_key,
+        public_key_fingerprint,
+        sign_manifest,
+    )
+
+    fingerprint = public_key_fingerprint(
+        load_private_signing_key(signing_key_path).public_key()
+    )
+    payload = _load_manifest_for_signing(manifest_path)
+    payload["signing_key_fingerprint"] = fingerprint
+    manifest_path.write_text(
+        json.dumps(payload, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    sign_manifest(
+        manifest_path,
+        signing_key_path=signing_key_path,
+        signature_path=signature_path,
+    )
+    return fingerprint
+
+
+def sign_manifest_command(args: argparse.Namespace) -> int:
+    manifest_path = Path(args.manifest)
+    signature_path = Path(args.signature_out) if args.signature_out else None
+
+    if args.signing_key:
+        fingerprint = _sign_with_key(
+            manifest_path,
+            signing_key_path=Path(args.signing_key),
+            signature_path=signature_path,
+        )
+        print(fingerprint)
+        return 0
+
+    if not args.generate_ephemeral:
+        print(
+            "either --signing-key or --generate-ephemeral is required",
+            file=sys.stderr,
+        )
+        return 2
+
+    _ensure_repo_src_path()
+    from invarlock.evidence_pack_integrity import generate_signing_keypair
+
+    with TemporaryDirectory(prefix="invarlock-evidence-pack-signing-") as tmp_dir:
+        private_key_path = Path(tmp_dir) / "ephemeral-signing-key.pem"
+        public_key_path = Path(tmp_dir) / "ephemeral-signing-key.pub.pem"
+        generate_signing_keypair(
+            private_key_path,
+            public_key_path=public_key_path,
+        )
+        fingerprint = _sign_with_key(
+            manifest_path,
+            signing_key_path=private_key_path,
+            signature_path=signature_path,
+        )
+    print(fingerprint)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "source-repo":
+        args = _parse_source_repo_args(argv[1:])
+        try:
+            write_source_repo_metadata(Path(args.out))
+        except SourceRepoMetadataError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+        return 0
+    if argv and argv[0] == "environment":
+        args = _parse_environment_args(argv[1:])
+        run_dir = Path(args.run_dir) if args.run_dir else None
+        write_environment_metadata(out_path=Path(args.out), run_dir=run_dir)
+        return 0
+    if argv and argv[0] == "readme":
+        args = _parse_readme_args(argv[1:])
+        write_pack_readme(Path(args.pack_dir))
+        return 0
+    if argv and argv[0] == "sign":
+        args = _parse_sign_args(argv[1:])
+        return sign_manifest_command(args)
+
     args = _parse_args(argv)
     try:
         repeats = int(args.repeats)

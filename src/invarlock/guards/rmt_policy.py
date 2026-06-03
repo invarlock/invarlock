@@ -1,11 +1,35 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Literal
+from dataclasses import dataclass
+from typing import Any, Literal, TypedDict
 
 from invarlock.core.exceptions import GuardError, ValidationError
 
-from .rmt_types import RMTPolicy, RMTPolicyDict
+
+@dataclass
+class RMTPolicy:
+    """RMT guard policy configuration."""
+
+    q: float | Literal["auto"] = "auto"
+    deadband: float = 0.10
+    margin: float = 1.5
+    correct: bool = True
+
+
+class RMTPolicyDict(TypedDict, total=False):
+    """TypedDict version of the RMT guard policy."""
+
+    q: float | Literal["auto"]
+    deadband: float
+    margin: float
+    correct: bool
+    epsilon_default: float
+    epsilon_by_family: dict[str, float]
+    activation_required: bool
+    estimator: dict[str, Any]
+    activation: dict[str, Any]
+
 
 __all__ = [
     "RMTPolicy",
@@ -140,7 +164,7 @@ def get_rmt_policy(name: str = "balanced") -> RMTPolicyDict:
     """Return the in-module fallback policy set.
 
     The calibrated source of truth used by the runtime is
-    `invarlock.guards.policies_resolution.get_rmt_policy(..., use_yaml=True)`,
+    `invarlock.guards.policies.get_rmt_policy(..., use_yaml=True)`,
     which overlays values from `runtime/tiers.yaml`. These hardcoded values are
     kept only as a defensive fallback for direct imports of this module.
     """

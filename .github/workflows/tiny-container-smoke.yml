@@ -25,7 +25,7 @@ jobs:
       INVARLOCK_RUNTIME_IMAGE: "invarlock-runtime:local"
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: Setup Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
@@ -50,4 +50,4 @@ jobs:
           make runtime-image
 
       - name: Run tiny container smoke campaign
-        run: bash scripts/run_tiny_container_smoke.sh "$RUNNER_TEMP/invarlock-tiny-container-smoke"
+        run: bash scripts/smoke/run_tiny_container_smoke.sh "$RUNNER_TEMP/invarlock-tiny-container-smoke"

@@ -8,7 +8,7 @@ import pytest
 
 from invarlock.cli import run_shell_output as run_output_mod
 from invarlock.cli.commands import evaluate as evaluate_mod
-from invarlock.cli.run_warning_filters import suppress_noisy_warnings
+from invarlock.cli.run_runtime_exec import suppress_noisy_warnings
 
 
 def test_format_guard_chain_preserves_configured_order() -> None:

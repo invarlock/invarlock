@@ -14,7 +14,7 @@ def test_cli_examples_validator_accepts_valid_commands(tmp_path: Path) -> None:
                 "```bash",
                 "invarlock version",
                 "INVARLOCK_ALLOW_NETWORK=0 invarlock doctor",
-                "invarlock evaluate --baseline foo --subject bar --adapter hf_causal --profile ci --tier none",
+                "invarlock evaluate --baseline foo --subject bar --baseline-adapter hf_causal --subject-adapter hf_causal --profile ci --tier none",
                 "python -m invarlock version",
                 "```",
                 "",
@@ -24,7 +24,7 @@ def test_cli_examples_validator_accepts_valid_commands(tmp_path: Path) -> None:
     )
     env = os.environ.copy()
     res = subprocess.run(
-        [sys.executable, "scripts/test_cli_examples.py", "--paths", str(md)],
+        [sys.executable, "scripts/docs/test_cli_examples.py", "--paths", str(md)],
         env=env,
         capture_output=True,
         text=True,
@@ -48,7 +48,7 @@ def test_cli_examples_validator_rejects_invalid_flag(tmp_path: Path) -> None:
     )
     env = os.environ.copy()
     res = subprocess.run(
-        [sys.executable, "scripts/test_cli_examples.py", "--paths", str(md)],
+        [sys.executable, "scripts/docs/test_cli_examples.py", "--paths", str(md)],
         env=env,
         capture_output=True,
         text=True,

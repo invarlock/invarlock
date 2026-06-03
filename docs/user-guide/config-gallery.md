@@ -13,9 +13,10 @@ Pointers to common presets in this repository you can start from. Presets are
 repo assets (not included in wheels). Use flag‑only `invarlock evaluate` when
 installing from PyPI, or clone this repo to reference these files.
 
-Note: Adapter‑based flows such as `invarlock evaluate` with HF models require
-extras like `invarlock[hf]` or `invarlock[adapters]`. The core install
-(`pip install invarlock`) remains torch‑free.
+Note: HF-backed `invarlock evaluate` flows require the evaluation stack from
+`invarlock[hf]`. The narrower `invarlock[adapters]` extra is enough for local
+adapter loading and plugin inspection, but it intentionally omits dataset and
+download helpers. The core install (`pip install invarlock`) remains torch-free.
 
 The `evaluate` examples below use the runtime container by default. Add
 `--execution-mode host` only for host-side workflows that intentionally bypass that
@@ -61,7 +62,8 @@ invarlock evaluate --allow-network --baseline bert-base-uncased --subject /path/
 
 | Preset | Use Case | Model Type | Dataset |
 | --- | --- | --- | --- |
-| `configs/presets/seq2seq/synth_64.yaml` | Quick seq2seq tests | T5 | Synthetic |
+| `configs/presets/seq2seq/synth_64.yaml` | Quick seq2seq tests | T5/BART-style encoder-decoder | Synthetic |
+| `configs/presets/seq2seq/synth_128.yaml` | Longer seq2seq smoke runs | T5/BART-style encoder-decoder | Synthetic |
 
 **When to use:** Encoder-decoder models. Synthetic data keeps runs offline and
 fast for smoke testing.
@@ -87,6 +89,16 @@ invarlock evaluate --allow-network --baseline gpt2 --subject gpt2 \
   --profile ci
 ```
 
+## Model And Dataset Overlays
+
+These partial overlays are useful when composing local presets:
+
+| Overlay | Scope | Use Case |
+| --- | --- | --- |
+| `configs/overlays/models/hf_causal.yaml` | Model adapter | Hugging Face causal LM defaults |
+| `configs/overlays/models/hf_mlm.yaml` | Model adapter | Hugging Face masked LM defaults |
+| `configs/overlays/datasets/wikitext2.yaml` | Dataset | WikiText-2 validation windows |
+
 ## Profiles
 
 Profiles control window counts and bootstrap depth:
@@ -95,14 +107,14 @@ Profiles control window counts and bootstrap depth:
 | --- | --- | --- | --- |
 | `ci` | 240/240 | 1200 | Standard CI evaluation |
 | `release` | 400/400 | 3200 | Production releases |
-| `ci_cpu` | 120/120 | 1200 | CPU-only environments |
+| `ci_cpu` | 120/120 | 1000 fallback | CPU-only environments |
 
 ## Tips
 
 - Use `--profile ci|release|ci_cpu` to apply runtime window counts and
   bootstrapping defaults.
 - Keep `seq_len = stride` for deterministic non‑overlapping windows.
-- Combine presets with edit overlays using multiple `-c` flags or `--edit-config`.
+- Combine a preset with an edit overlay using `--preset` and `--edit-config`.
 - For custom data, see [Bring Your Own Data](bring-your-own-data.md).
 
 ## Related Documentation

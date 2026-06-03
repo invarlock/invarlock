@@ -1,5 +1,9 @@
 # Trust Model
 
+> **Plain language:** A strict pass means one configured weight-edit regression
+> comparison met the declared report and provenance contract. Its scope is that
+> configured comparison and the associated report/provenance evidence.
+
 ## Overview
 
 | Aspect | Details |
@@ -20,11 +24,17 @@ Strict verification also expects the sibling `runtime.manifest.json` for
 container-backed evidence. See [Runtime Provenance Guide](../security/runtime-provenance-guide.md)
 for the manifest contract.
 
+Evidence-pack verification is separate from report verification. A signed
+evidence pack validates manifest integrity; signer authenticity requires pinning
+with `--expected-fingerprint` or a local trust store.
+
 ## What A Strict Pass Means
 
 A strict pass means one configured edited checkpoint comparison did not
 violate the InvarLock weight-edit regression contract for the selected
 baseline, subject, dataset windows, tier, profile, and runtime policy.
+The result is scoped to that configured comparison and its report/provenance
+evidence.
 
 The current strict assurance contract requires:
 
@@ -33,33 +43,39 @@ The current strict assurance contract requires:
 - CI or release profile
 - balanced or conservative tier
 - canonical guard chain: `invariants -> spectral -> rmt -> variance -> invariants`
-- complete guard evidence for every chain stage
-- no synthesized, repaired, fallback, degraded, or monitor-only evidence
+- complete guard evidence for every guard name in the canonical chain; the
+  single `invariants` evidence block covers both pre/post invariant stages in
+  the current report contract
+- zero synthesized, repaired, fallback, degraded, or monitor-only evidence
 - strict paired-window counts and zero overlap
 - primary metric log-space/display-space CI identity
 - tokenizer/provider parity
 - verified runtime provenance
-- no unsupported guard/model status with `assurance_blocking = true`
+- zero unsupported guard/model statuses with `assurance_blocking = true`
 
-## What A Strict Pass Does Not Mean
+## Strict Pass Scope
 
-A strict pass does not mean:
+A strict pass covers the configured evidence surface:
 
-- the model is safe, aligned, or free of content harms
-- the baseline model is trustworthy
-- downstream tasks outside the configured evaluation windows are preserved
-- prompt injection, jailbreak, toxicity, bias, or deployment security risks
-  are addressed
-- host, GPU, dependency, or network isolation is complete
-- unsupported model families have been validated by implication
+- the selected baseline, subject, dataset windows, tier, profile, and runtime
+  policy
+- the report-local strict-assurance shape and guard evidence
+- verified runtime provenance for the generated report
+- signer authenticity when the signer fingerprint is pinned or matched through a
+  trusted local store
+- the published support tier for the model family or adapter lane under review
+
+Adjacent review domains include content safety, alignment, prompt-security,
+deployment security, host isolation, dependency isolation, and model families
+outside the published support basis.
 
 ## Report Statuses
 
 Strict reports include a top-level `assurance` section. Generated reports record
 the intended strict claim and leave runtime provenance verification pending
 until `invarlock verify` checks the sibling `runtime.manifest.json`. Reviewers
-should treat a strict pass as the combination of report-local strict shape and a
-verified runtime-provenance result, not as a successful command exit alone.
+should require the combination of report-local strict shape and a verified
+runtime-provenance result.
 
 | Report field | Required strict value |
 | --- | --- |
@@ -75,7 +91,25 @@ verified runtime-provenance result, not as a successful command exit alone.
 | `blocking_reasons` | empty list |
 
 The verifier JSON result must then include
-`verification.runtime_provenance.status = verified`.
+`results[*].verification.runtime_provenance.status = "verified"`.
+
+## Evidence Pack Signer Authenticity
+
+Package-native evidence packs can include `manifest.signature.json`, an Ed25519
+signature over `manifest.json`. The verifier always derives and reports the
+signing-key fingerprint when a signature is present. That check provides
+tamper evidence for the manifest and checksum chain.
+
+Authenticity is stronger: reviewers must decide which signing keys they accept.
+For distributable evidence, require one of:
+
+- `invarlock advanced evidence-pack verify <dir> --expected-fingerprint sha256:<64-hex-chars>`
+- `invarlock advanced evidence-pack verify <dir> --trust-store <json>`
+- `~/.config/invarlock/trusted-signers.json` containing accepted fingerprints
+
+An unpinned signature should be treated as trust-on-first-use evidence for
+integrity review. Publisher authenticity requires an accepted fingerprint from
+`--expected-fingerprint`, `--trust-store`, or the local trusted-signers file.
 
 ### Example (report fragment)
 
@@ -117,10 +151,9 @@ The verifier JSON result must then include
 
 ## Development Reports
 
-Development and exploratory reports may still be useful for debugging. They
-are not assurance-grade unless the report claims and verifies strict
-assurance. Common non-strict shapes are catalogued in
-[Failure Examples](../user-guide/failure-examples.md).
+Development and exploratory reports may still be useful for debugging. Reports
+become assurance-grade when they claim and verify strict assurance. Common
+non-strict shapes are catalogued in [Failure Examples](../user-guide/failure-examples.md).
 
 ## Related Documentation
 

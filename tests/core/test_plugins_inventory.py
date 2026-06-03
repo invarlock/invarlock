@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from invarlock.core import plugins_inventory as plugins_inventory_mod
 from invarlock.core.plugins_inventory import (
     adapter_inventory_json_items,
     combined_plugins_json_items,
@@ -71,6 +72,35 @@ def test_is_minimal_plugins_view_and_cuda_detection() -> None:
     )
 
 
+def test_safe_import_success_and_attribute_detection(monkeypatch) -> None:
+    monkeypatch.setattr(
+        plugins_inventory_mod.importlib,
+        "import_module",
+        lambda _name: SimpleNamespace(present=object()),
+    )
+
+    assert plugins_inventory_mod._safe_import("demo") is True
+    assert plugins_inventory_mod._safe_import("demo", "present") is True
+    assert plugins_inventory_mod._safe_import("demo", "missing") is False
+
+
+def test_get_adapter_rows_keeps_bitsandbytes_ready_when_runtime_available(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr("invarlock.core.registry.get_registry", lambda: _Registry())
+    monkeypatch.setattr(
+        plugins_inventory_mod,
+        "bitsandbytes_runtime_available",
+        lambda: True,
+    )
+
+    rows = plugins_inventory_mod.get_adapter_rows()
+    bnb_row = next(row for row in rows if row["name"] == "hf_bnb")
+
+    assert bnb_row["backend"] == "bitsandbytes"
+    assert bnb_row["status"] == "ready"
+
+
 def test_gather_adapter_inventory_rows_and_json_payloads() -> None:
     registry = _Registry()
 
@@ -99,6 +129,81 @@ def test_gather_adapter_inventory_rows_and_json_payloads() -> None:
     bnb_item = next(item for item in json_items if item["name"] == "hf_bnb")
     assert bnb_item["status"] == "needs_extra"
     assert bnb_item["backend"] == {"name": "bitsandbytes", "present": False}
+    assert bnb_item["support_tier"] == "optional_backend_loader"
+    assert bnb_item["deployment_claim"] is False
+
+
+def test_gather_adapter_inventory_rows_marks_quanto_missing_extra() -> None:
+    class _QuantoRegistry(_Registry):
+        def __init__(self) -> None:
+            super().__init__()
+            self._adapters = {
+                "hf_quanto": {
+                    "module": "invarlock.plugins.quanto",
+                    "entry_point": "quanto",
+                }
+            }
+
+    rows = gather_adapter_inventory_rows(
+        registry=_QuantoRegistry(),
+        minimal=False,
+        has_cuda=False,
+        is_linux=True,
+        extras_checker=lambda name, _kind: (
+            "⚠️ missing invarlock[quanto]" if name == "hf_quanto" else ""
+        ),
+        provenance_extractor=lambda _name: SimpleNamespace(
+            library="optimum-quanto",
+            version=None,
+        ),
+        bitsandbytes_runtime_available=lambda: True,
+    )
+
+    item = adapter_inventory_json_items(rows)[0]
+    assert item["name"] == "hf_quanto"
+    assert item["status"] == "needs_extra"
+    assert item["backend"] == {"name": "optimum-quanto", "present": False}
+
+
+def test_gather_adapter_inventory_rows_marks_ct_missing_extra() -> None:
+    class _CompressedTensorsRegistry(_Registry):
+        def __init__(self) -> None:
+            super().__init__()
+            self._adapters = {
+                "hf_ct": {
+                    "module": "invarlock.plugins.ct",
+                    "entry_point": "ct",
+                }
+            }
+
+    rows = gather_adapter_inventory_rows(
+        registry=_CompressedTensorsRegistry(),
+        minimal=False,
+        has_cuda=False,
+        is_linux=True,
+        extras_checker=lambda name, _kind: (
+            "⚠️ missing invarlock[compressed-tensors]" if name == "hf_ct" else ""
+        ),
+        provenance_extractor=lambda _name: SimpleNamespace(
+            library="compressed-tensors",
+            version=None,
+        ),
+        bitsandbytes_runtime_available=lambda: True,
+    )
+
+    item = adapter_inventory_json_items(rows)[0]
+    assert item["name"] == "hf_ct"
+    assert item["status"] == "needs_extra"
+    assert item["backend"] == {"name": "compressed-tensors", "present": False}
+
+
+def test_filter_inventory_rows_support_tier_modes() -> None:
+    rows = [
+        {"name": "spectral", "support_tier": "core_supported", "status": "ready"},
+        {"name": "hello", "support_tier": "demo_only", "status": "ready"},
+    ]
+
+    assert filter_inventory_rows(rows, "demo_only") == [rows[1]]
 
 
 def test_gather_generic_and_combined_inventory_payloads() -> None:
@@ -122,6 +227,8 @@ def test_gather_generic_and_combined_inventory_payloads() -> None:
 
     assert any(item["kind"] == "guard" for item in combined)
     assert any(item["origin"] == "third_party" for item in combined)
+    quant_item = next(item for item in combined if item["name"] == "quant_rtn")
+    assert quant_item["support_tier"] == "validation_simulation"
 
 
 def test_gather_adapter_inventory_rows_tolerates_probe_failures() -> None:

@@ -1,0 +1,19 @@
+uv run python public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/external_edit_recipe.py \
+  --output-dir /private/tmp/invarlock-byoe-magnitude-prune-subject \
+  --prune-fraction 0.0025
+
+uv run invarlock evaluate \
+  --baseline sshleifer/tiny-gpt2 \
+  --subject /private/tmp/invarlock-byoe-magnitude-prune-subject \
+  --baseline-adapter auto \
+  --subject-adapter auto \
+  --preset configs/presets/causal_lm/wikitext2_512.yaml \
+  --edit-label custom \
+  --profile release \
+  --assurance strict \
+  --execution-mode container \
+  --allow-network \
+  --out /private/tmp/invarlock-real-byoe-magnitude-prune/runs \
+  --report-out /private/tmp/invarlock-real-byoe-magnitude-prune/report \
+  --quiet \
+  --no-progress

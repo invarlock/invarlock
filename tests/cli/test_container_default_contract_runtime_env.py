@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.cli.test_container_default_contract import (
+from tests.cli._support_container_contract import (
     _build_container_command,
     _env_value,
     _path_is_mounted,

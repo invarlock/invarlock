@@ -11,7 +11,7 @@
 | **Network** | Offline by default; CLI runs use `evaluate --allow-network` for first download, while programmatic callers can set `INVARLOCK_ALLOW_NETWORK=1`. |
 | **Inputs** | Dataset provider name plus provider-specific fields. |
 | **Outputs / Artifacts** | Evaluation windows stored in `report.evaluation_windows` and dataset metadata in `report.data.*`. `vision_text` persists example records instead of token windows. |
-| **Source of truth** | `src/invarlock/eval/data.py`, `src/invarlock/eval/data_support.py`, `src/invarlock/eval/data_tokenization.py`, `src/invarlock/eval/data_windows.py`, and `src/invarlock/eval/data_providers.py`. |
+| **Source of truth** | `src/invarlock/eval/data.py`, `src/invarlock/eval/data_support.py`, `src/invarlock/eval/data_tokenization.py`, and `src/invarlock/eval/data_providers.py`. |
 
 ## Quick Start
 
@@ -39,7 +39,8 @@ For Compare & evaluate, reuse the same `dataset` block in baseline and subject r
   be enforced via `HF_DATASETS_OFFLINE=1`.
 - **Vision-text manifests**: `vision_text` is local-files-only and
   expects JSONL records with `id`, `image_path`, `prompt`, and either `answer`
-  or `answers`. It is fixed to single-image examples and `batch_size=1`.
+  or `answers`. Records are single-image examples; provider batching can still
+  group multiple records when callers request `batch_size > 1`.
 - **Tokenizer contract**: dataset providers expect either a callable tokenizer
   that returns `input_ids` plus optional `attention_mask`, or an `encode(...)`
   method that accepts `truncation=True`, `max_length=...`, and
@@ -111,7 +112,7 @@ Provider-specific config fields (dataset name, paths, fields) are recorded under
 ```yaml
 dataset:
   provider: hf_text
-  dataset_name: wikitext
+  dataset_name: Salesforce/wikitext
   config_name: wikitext-2-raw-v1
   text_field: text
   split: validation

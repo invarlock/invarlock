@@ -15,21 +15,21 @@ def _slice_section(text: str, start_marker: str, end_marker: str | None) -> str:
 
 def test_task_evaluate_edit_passes_baseline_report() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    text = (repo_root / "scripts/evidence_packs/lib/task_functions.sh").read_text(
-        encoding="utf-8"
-    )
+    text = (
+        repo_root / "scripts/evidence_packs/lib/tasks/task_edit_lifecycle.sh"
+    ).read_text(encoding="utf-8")
     section = _slice_section(
         text,
         "task_evaluate_edit() {",
-        "# ============ TASK: CREATE_ERROR",
+        "# ============ TASK: CLEANUP_EDIT",
     )
     assert "--baseline-report" in section
 
 
 def test_task_evaluate_error_passes_baseline_report() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    text = (repo_root / "scripts/evidence_packs/lib/task_functions.sh").read_text(
-        encoding="utf-8"
-    )
+    text = (
+        repo_root / "scripts/evidence_packs/lib/tasks/task_error_lifecycle.sh"
+    ).read_text(encoding="utf-8")
     section = _slice_section(text, "task_evaluate_error() {", None)
     assert "--baseline-report" in section

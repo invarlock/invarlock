@@ -11,7 +11,11 @@ def test_docs_api_refs_script_exits_zero(project_root: Path | None = None) -> No
     This acts as a guardrail to keep examples in sync with the public API.
     """
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "validate_docs_api_refs.py"
-    assert script.exists(), "validation script is missing"
-    proc = subprocess.run([sys.executable, str(script)], capture_output=True, text=True)
+    script = repo_root / "scripts" / "docs" / "docs_check.py"
+    assert script.exists(), "docs check script is missing"
+    proc = subprocess.run(
+        [sys.executable, str(script), "--api-refs"],
+        capture_output=True,
+        text=True,
+    )
     assert proc.returncode == 0, proc.stderr or proc.stdout

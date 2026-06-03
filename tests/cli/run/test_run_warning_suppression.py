@@ -6,7 +6,7 @@ import sys
 import warnings
 from pathlib import Path
 
-from invarlock.cli.run_warning_filters import (
+from invarlock.cli.run_runtime_exec import (
     _apply_warning_filters,
     suppress_noisy_warnings,
 )

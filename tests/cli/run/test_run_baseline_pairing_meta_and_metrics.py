@@ -7,15 +7,30 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from tests.cli.run.test_run_baseline_pairing_hash_and_capacity import (
-    _SNS,
-    _common_patches_ce,
-    _compute_seq_hash,
-    _supp_cfg,
-    _supp_common_patches_detect_ce,
-    _supp_provider_min,
-    _write_base_cfg,
-    run_command,
+import click
+import pytest
+
+from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_common import (
+    SNS as _SNS,
+)
+from tests.cli.run._support_run_pairing import (
+    baseline_pairing_common_patches_ce as _common_patches_ce,
+)
+from tests.cli.run._support_run_pairing import (
+    baseline_pairing_compute_seq_hash as _compute_seq_hash,
+)
+from tests.cli.run._support_run_pairing import (
+    baseline_pairing_write_base_cfg as _write_base_cfg,
+)
+from tests.cli.run._support_run_pairing import (
+    supplemental_cfg as _supp_cfg,
+)
+from tests.cli.run._support_run_pairing import (
+    supplemental_common_patches_detect_ce as _supp_common_patches_detect_ce,
+)
+from tests.cli.run._support_run_pairing import (
+    supplemental_provider_min as _supp_provider_min,
 )
 
 
@@ -61,7 +76,7 @@ def test_metrics_window_plan_stats_and_capacity_mapping(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.detect_model_profile",
+                "invarlock.cli.run_runtime_exec.detect_model_profile",
                 lambda model_id, adapter: SimpleNamespace(
                     default_loss=None,
                     default_provider=None,
@@ -166,7 +181,26 @@ def test_metrics_loss_type_fallback_from_dataset_meta_context(tmp_path: Path):
 
 def test_device_validation_failure_exits(tmp_path: Path):
     cfg = _write_base_cfg(tmp_path)
-    assert cfg.exists()
+
+    with ExitStack() as stack:
+        for ctx in _common_patches_ce():
+            stack.enter_context(ctx)
+        stack.enter_context(
+            patch(
+                "invarlock.cli.device.validate_device_for_config",
+                lambda d: (False, "unsupported device"),
+            )
+        )
+        with pytest.raises(click.exceptions.Exit) as excinfo:
+            run_command(
+                config=str(cfg),
+                device="cpu",
+                profile=None,
+                out=str(tmp_path / "runs"),
+                until_pass=False,
+            )
+
+    assert excinfo.value.exit_code == 1
 
 
 def test_report_meta_includes_tokenizer_hash_on_provider_path(tmp_path: Path):
@@ -499,7 +533,7 @@ def test_dataset_meta_context_non_dict_path(tmp_path: Path):
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda prof: (
                     _SNS(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                     "tokhash123",

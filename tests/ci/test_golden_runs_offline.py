@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from invarlock.evidence_pack import EvidencePackStatus, verify_evidence_pack
 from invarlock.public_contracts import published_basis_lanes
 from invarlock.reporting.report_schema import validate_report
+from invarlock.reporting.verify_contract import VerifyOutcome, run_verify_reports
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -16,9 +18,16 @@ def test_published_basis_lanes_ship_public_evidence_references() -> None:
         report_fixture = evidence.get("evaluation_report_fixture")
         evidence_pack_recipe = evidence.get("evidence_pack_recipe")
         assert isinstance(report_fixture, str) and report_fixture
+        runtime_manifest = evidence.get("runtime_manifest_fixture")
+        assert isinstance(runtime_manifest, str) and runtime_manifest
         assert isinstance(evidence_pack_recipe, str) and evidence_pack_recipe
         assert (REPO_ROOT / report_fixture).is_file(), report_fixture
+        assert (REPO_ROOT / runtime_manifest).is_file(), runtime_manifest
         assert (REPO_ROOT / evidence_pack_recipe).is_file(), evidence_pack_recipe
+        evidence_pack_fixture = evidence.get("evidence_pack_fixture")
+        if evidence_pack_fixture is not None:
+            assert isinstance(evidence_pack_fixture, str) and evidence_pack_fixture
+            assert (REPO_ROOT / evidence_pack_fixture).is_dir(), evidence_pack_fixture
 
 
 def test_packaged_public_evidence_matches_repo_public_evidence() -> None:
@@ -78,3 +87,158 @@ def test_offline_golden_runs_public_fixtures() -> None:
         assert report["meta"]["model_id"] == lane["model_id"]
         assert report["primary_metric"]["kind"] == lane["primary_metric_kind"]
         assert report["validation"]["primary_metric_acceptable"] is True
+
+
+def test_published_basis_public_evidence_verifies_release_strict() -> None:
+    for lane in published_basis_lanes():
+        evidence = lane.get("evidence", {})
+        report_fixture = evidence.get("evaluation_report_fixture")
+        runtime_manifest = evidence.get("runtime_manifest_fixture")
+        assert isinstance(report_fixture, str) and report_fixture
+        assert isinstance(runtime_manifest, str) and runtime_manifest
+        report_path = REPO_ROOT / report_fixture
+        assert (REPO_ROOT / runtime_manifest).is_file()
+
+        result = run_verify_reports(
+            [report_path],
+            profile="release",
+            assurance_mode="strict",
+        )
+
+        assert result.outcome == VerifyOutcome.OK
+        verification = result.payload["results"][0]["verification"]
+        assert verification["runtime_provenance"]["status"] == "verified"
+
+
+def test_public_signed_evidence_pack_verifies_release_strict_pinned() -> None:
+    packs = []
+    for lane in published_basis_lanes():
+        evidence = lane.get("evidence", {})
+        pack_fixture = evidence.get("evidence_pack_fixture")
+        if isinstance(pack_fixture, str) and pack_fixture:
+            packs.append(REPO_ROOT / pack_fixture)
+
+    assert packs
+    for pack_dir in packs:
+        manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
+        fingerprint = manifest["signing_key_fingerprint"]
+
+        result = verify_evidence_pack(
+            pack_dir,
+            strict=True,
+            profile="release",
+            report_assurance="strict",
+            expected_fingerprint=fingerprint,
+        )
+
+        assert result.status == EvidencePackStatus.OK
+        assert result.payload["ok"] is True
+        assert result.payload["authenticity"] == "pinned"
+        assert result.payload["signer_fingerprint"] == fingerprint
+
+
+def test_caught_regression_fixtures_fail_expected_guard() -> None:
+    cases = {
+        "spectral_guard_failure": (
+            "validation.spectral_stable == true",
+            "spectral did not pass",
+        ),
+        "rmt_guard_failure": ("validation.rmt_stable == true", "rmt did not pass"),
+        "variance_guard_failure": (
+            "variance.predictive_gate.passed == true",
+            "variance did not pass",
+        ),
+    }
+
+    for directory, expected_messages in cases.items():
+        report_path = (
+            REPO_ROOT
+            / "public_evidence"
+            / "caught_regressions"
+            / directory
+            / "evaluation.report.json"
+        )
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        assert report["validation"]["primary_metric_acceptable"] is True
+        assert report["primary_metric"]["ratio_vs_baseline"] == 1.0
+
+        result = run_verify_reports(
+            [report_path],
+            profile="release",
+            assurance_mode="strict",
+        )
+
+        assert result.outcome == VerifyOutcome.POLICY_FAIL
+        diagnostics = "\n".join(item.message for item in result.diagnostics)
+        for expected in expected_messages:
+            assert expected in diagnostics
+
+
+def test_policy_failure_fixtures_fail_expected_policy_predicate() -> None:
+    cases = {
+        "invariants_failure": (
+            "validation.invariants_pass == true",
+            "invariants did not pass",
+        ),
+        "primary_metric_failure": (
+            "Primary metric policy gate failed",
+            "validation.primary_metric_acceptable == true",
+        ),
+        "runtime_provenance_failure": (
+            "runtime.manifest.json marks evaluation.report.json as 'host-bypass'",
+            "strict assurance requires verified runtime provenance",
+        ),
+    }
+
+    for directory, expected_messages in cases.items():
+        report_path = (
+            REPO_ROOT
+            / "public_evidence"
+            / "policy_failures"
+            / directory
+            / "evaluation.report.json"
+        )
+
+        result = run_verify_reports(
+            [report_path],
+            profile="release",
+            assurance_mode="strict",
+        )
+
+        assert result.outcome == VerifyOutcome.POLICY_FAIL
+        diagnostics = "\n".join(item.message for item in result.diagnostics)
+        for expected in expected_messages:
+            assert expected in diagnostics
+
+
+def test_byoe_examples_verify_release_strict() -> None:
+    examples = {
+        "magnitude_prune_byoe": "magnitude_prune",
+        "lora_merge_byoe": "lora_merge",
+    }
+
+    for directory, edit_type in examples.items():
+        example_dir = REPO_ROOT / "public_evidence" / "byoe_examples" / directory
+        report_path = example_dir / "evaluation.report.json"
+        refs_path = example_dir / "checkpoint_refs.json"
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        refs = json.loads(refs_path.read_text(encoding="utf-8"))
+
+        assert validate_report(report) is True
+        assert report["artifacts"]["byoe_example"] is True
+        assert report["artifacts"]["external_edit_type"] == edit_type
+        assert report["artifacts"]["built_in_edit_plugin"] is False
+        assert report["plugins"]["edits"] == []
+        assert refs["weights_vendored"] is False
+        assert refs["subject_checkpoint"]["external_edit_type"] == edit_type
+        assert refs["subject_checkpoint"]["built_in_edit_plugin"] is False
+
+        result = run_verify_reports(
+            [report_path],
+            profile="release",
+            assurance_mode="strict",
+        )
+
+        assert result.outcome == VerifyOutcome.OK
+        verification = result.payload["results"][0]["verification"]
+        assert verification["runtime_provenance"]["status"] == "verified"

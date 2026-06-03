@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-import invarlock.calibration.spectral_null as spectral_null
+import invarlock.calibration as calibration
 
 
 def test_summarize_null_sweep_reports_covers_bad_multiple_testing_and_tiny_alpha() -> (
@@ -26,7 +26,7 @@ def test_summarize_null_sweep_reports_covers_bad_multiple_testing_and_tiny_alpha
         ]
     }
 
-    summary = spectral_null.summarize_null_sweep_reports(
+    summary = calibration.summarize_null_sweep_reports(
         [report],
         tier="balanced",
         target_any_warning_rate=0.0,
@@ -49,7 +49,7 @@ def test_summarize_null_sweep_reports_covers_bad_multiple_testing_and_tiny_alpha
         ]
     }
 
-    tiny_alpha_summary = spectral_null.summarize_null_sweep_reports(
+    tiny_alpha_summary = calibration.summarize_null_sweep_reports(
         [tiny_alpha_report],
         tier="balanced",
         target_any_warning_rate=0.0,
@@ -67,7 +67,7 @@ def test_summarize_null_sweep_reports_covers_bad_multiple_testing_and_tiny_alpha
 def test_summarize_null_sweep_reports_skips_invalid_reports_and_non_finite_caps() -> (
     None
 ):
-    summary = spectral_null.summarize_null_sweep_reports(
+    summary = calibration.summarize_null_sweep_reports(
         [
             "bad",
             {},
@@ -116,12 +116,12 @@ def test_summarize_null_sweep_reports_covers_inner_multiple_testing_coercion_fai
     }
 
     monkeypatch.setattr(
-        spectral_null,
+        calibration,
         "_extract_multiple_testing",
         lambda _metrics: {"method": "bh", "alpha": object(), "m": object()},
     )
 
-    summary = spectral_null.summarize_null_sweep_reports(
+    summary = calibration.summarize_null_sweep_reports(
         [report],
         tier="balanced",
         target_any_warning_rate=0.0,
@@ -132,7 +132,7 @@ def test_summarize_null_sweep_reports_covers_inner_multiple_testing_coercion_fai
 
 
 def test_extract_multiple_testing_handles_missing_alpha_and_m_fields() -> None:
-    assert spectral_null._extract_multiple_testing(
+    assert calibration._extract_multiple_testing(
         {"multiple_testing": {"method": "bh"}}
     ) == {"method": "bh"}
 
@@ -141,17 +141,17 @@ def test_summarize_null_sweep_reports_covers_nonfinite_caps_and_full_alpha_grid(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        spectral_null,
+        calibration,
         "_extract_family_max_z",
         lambda _metrics: {"ffn": float("inf")},
     )
     monkeypatch.setattr(
-        spectral_null,
+        calibration,
         "_extract_multiple_testing",
         lambda _metrics: {"method": "bh", "alpha": 2.0},
     )
 
-    summary = spectral_null.summarize_null_sweep_reports(
+    summary = calibration.summarize_null_sweep_reports(
         [
             {
                 "guards": [

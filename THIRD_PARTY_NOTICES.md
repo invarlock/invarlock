@@ -18,16 +18,13 @@ redistributed artifact.
 | click | [pallets/click](https://github.com/pallets/click) | BSD 3-Clause | CLI command parsing and option handling |
 | shellingham | [sarugaku/shellingham](https://github.com/sarugaku/shellingham) | ISC | Shell detection used by CLI helpers |
 | cryptography | [pyca/cryptography](https://github.com/pyca/cryptography) | Apache-2.0 OR BSD-3-Clause | Signature and key handling for evidence-pack integrity verification |
-| pandas | [pandas-dev/pandas](https://github.com/pandas-dev/pandas) | BSD 3-Clause | Tabular result processing and export helpers |
-| scikit-learn | [scikit-learn/scikit-learn](https://github.com/scikit-learn/scikit-learn) | BSD 3-Clause | Metrics and auxiliary ML utilities |
 | pydantic | [pydantic/pydantic](https://github.com/pydantic/pydantic) | MIT | Structured config and validation helpers |
 | rich | [Textualize/rich](https://github.com/Textualize/rich) | MIT | Terminal rendering and formatting |
 | pyyaml | [yaml/pyyaml](https://github.com/yaml/pyyaml) | MIT | YAML configuration parsing |
 | markdown | [Python-Markdown/markdown](https://github.com/Python-Markdown/markdown) | BSD 3-Clause | Markdown rendering utilities |
 | psutil | [giampaolo/psutil](https://github.com/giampaolo/psutil) | BSD-style | Process and system telemetry |
-| hypothesis | [HypothesisWorks/hypothesis](https://github.com/HypothesisWorks/hypothesis) | MPL 2.0 | Property-based testing and validation helpers used by repo test/dev flows |
-| typing-extensions | [python/typing_extensions](https://github.com/python/typing_extensions) | PSF-2.0 | Forward-compatible typing helpers |
 | jsonschema | [python-jsonschema/jsonschema](https://github.com/python-jsonschema/jsonschema) | MIT | Report and manifest schema validation |
+| idna | [kjd/idna](https://github.com/kjd/idna) | BSD 3-Clause | Internationalized domain-name validation used by URL/security checks |
 
 ## Optional Runtime Extras
 
@@ -39,11 +36,13 @@ release tooling.
 | Component | Upstream | License | Notes |
 |-----------|----------|---------|-------|
 | torch | [pytorch/pytorch](https://github.com/pytorch/pytorch) | BSD 3-Clause | Core tensor runtime for adapters and edits |
+| torchvision | [pytorch/vision](https://github.com/pytorch/vision) | BSD 3-Clause | Optional vision/model-definition dependency used by GPTQModel |
 | transformers | [huggingface/transformers](https://github.com/huggingface/transformers) | Apache License 2.0 | Model loading, tokenizers, and generation utilities |
 | safetensors | [huggingface/safetensors](https://github.com/huggingface/safetensors) | Apache License 2.0 | Tensor-only serialization used by secure snapshot flows |
 | datasets | [huggingface/datasets](https://github.com/huggingface/datasets) | Apache License 2.0 | Dataset ingestion and evaluation helpers |
 | requests | [psf/requests](https://github.com/psf/requests) | Apache License 2.0 | Optional HTTP client used by evaluation extras and observability exporters |
 | numpy | [numpy/numpy](https://github.com/numpy/numpy) | BSD 3-Clause | Numerical kernels and array helpers |
+| scikit-learn | [scikit-learn/scikit-learn](https://github.com/scikit-learn/scikit-learn) | BSD 3-Clause | Optional mutual-information/probe utilities |
 | huggingface_hub | [huggingface/huggingface_hub](https://github.com/huggingface/huggingface_hub) | Apache License 2.0 | Model and dataset registry access |
 | accelerate | [huggingface/accelerate](https://github.com/huggingface/accelerate) | Apache License 2.0 | Device placement and distributed helpers |
 | protobuf | [protocolbuffers/protobuf](https://github.com/protocolbuffers/protobuf) | BSD 3-Clause | Serialization support required by many Hugging Face model and tokenizer stacks |
@@ -53,8 +52,9 @@ release tooling.
 | h2 | [python-hyper/h2](https://github.com/python-hyper/h2) | MIT | Optional HTTP/2 support for Hub traffic |
 | pillow | [python-pillow/Pillow](https://github.com/python-pillow/Pillow) | MIT-CMU | Optional image handling for multimodal/runtime helpers |
 | bitsandbytes | [bitsandbytes-foundation/bitsandbytes](https://github.com/bitsandbytes-foundation/bitsandbytes) | MIT | Optional GPU quantization/runtime kernels |
-| auto-gptq | [PanQiWei/AutoGPTQ](https://github.com/PanQiWei/AutoGPTQ) | Apache License 2.0 | Optional GPTQ quantization backend (Linux-only extra) |
-| autoawq | [casper-hansen/AutoAWQ](https://github.com/casper-hansen/AutoAWQ) | Apache License 2.0 | Optional AWQ quantization backend (Linux-only extra) |
+| gptqmodel | [ModelCloud/GPTQModel](https://github.com/ModelCloud/GPTQModel) | Apache License 2.0 | Optional GPTQ and AWQ backend loading |
+| optimum-quanto | [huggingface/optimum-quanto](https://github.com/huggingface/optimum-quanto) | Apache License 2.0 | Optional Quanto runtime quantization backend |
+| compressed-tensors | [neuralmagic/compressed-tensors](https://github.com/neuralmagic/compressed-tensors) | Apache License 2.0 | Optional pre-quantized checkpoint loading backend |
 | triton | [triton-lang/triton](https://github.com/triton-lang/triton) | MIT | Optional GPU kernel compilation/runtime support |
 
 ## Representative Reference Models

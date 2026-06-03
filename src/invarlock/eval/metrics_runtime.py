@@ -5,15 +5,30 @@ from __future__ import annotations
 import logging
 import math
 import time
+from typing import Any, cast
 
 import torch
 import torch.nn as nn
 
-from invarlock.core.exceptions import ValidationError
-from invarlock.eval.data_windows import EvaluationWindow
-from invarlock.eval.metrics_model_io import (
-    call_model,
-    forward_logits_causal,
+from invarlock.core.exceptions import MetricsError, ValidationError
+from invarlock.eval.data_support import EvaluationWindow
+from invarlock.eval.metrics_runtime_resources import (
+    cleanup_memory_measurement_failure as _cleanup_memory_measurement_failure,
+)
+from invarlock.eval.metrics_runtime_resources import (
+    current_memory_mb as _current_memory_mb,
+)
+from invarlock.eval.metrics_runtime_resources import (
+    latency_validation_error as _latency_validation_error,
+)
+from invarlock.eval.metrics_runtime_resources import (
+    maybe_cuda_synchronize as _maybe_cuda_synchronize,
+)
+from invarlock.eval.metrics_runtime_resources import (
+    memory_measurement_baseline as _memory_measurement_baseline,
+)
+from invarlock.eval.metrics_runtime_resources import (
+    memory_validation_error as _memory_validation_error,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,6 +39,113 @@ _METRICS_RUNTIME_ERRORS = (
     TypeError,
     ValueError,
 )
+_MODEL_OUTPUT_FALLBACK_ERRORS = (AttributeError, TypeError, ValueError, RuntimeError)
+
+
+def call_model(model: nn.Module, /, *args: Any, **kwargs: Any) -> Any:
+    return cast(Any, model)(*args, **kwargs)
+
+
+def forward_logits_causal(
+    model: nn.Module,
+    input_ids: torch.Tensor,
+    attention_mask: torch.Tensor | None = None,
+) -> torch.Tensor:
+    try:
+        outputs = call_model(
+            model,
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            return_dict=True,
+        )
+        logits = getattr(outputs, "logits", None)
+        if logits is None and isinstance(outputs, tuple | list) and outputs:
+            logits = outputs[0]
+    except _MODEL_OUTPUT_FALLBACK_ERRORS:
+        outputs = call_model(model, input_ids=input_ids, attention_mask=attention_mask)
+        if isinstance(outputs, tuple | list):
+            logits = outputs[0] if outputs else None
+        else:
+            logits = getattr(outputs, "logits", None)
+            if logits is None:
+                logits = outputs
+
+    if logits is None:
+        raise MetricsError(
+            code="E401",
+            message="METRICS-COMPUTE-FAILED: model returned neither loss nor logits",
+        )
+    if not isinstance(logits, torch.Tensor):
+        raise MetricsError(
+            code="E401",
+            message="METRICS-COMPUTE-FAILED: model logits must be a tensor",
+        )
+    return logits
+
+
+def forward_loss_causal(
+    model: nn.Module,
+    input_ids: torch.Tensor,
+    attention_mask: torch.Tensor | None = None,
+    labels: torch.Tensor | None = None,
+) -> tuple[float, torch.Tensor | None]:
+    import torch.nn.functional as F
+
+    try:
+        outputs = call_model(
+            model,
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            labels=labels,
+            return_dict=True,
+        )
+        if hasattr(outputs, "loss") and outputs.loss is not None:
+            return float(outputs.loss.detach().cpu()), getattr(outputs, "logits", None)
+        logits = getattr(outputs, "logits", None)
+    except (TypeError, AttributeError):
+        outputs = call_model(
+            model, input_ids=input_ids, attention_mask=attention_mask, labels=labels
+        )
+        if isinstance(outputs, tuple | list):
+            if (
+                labels is not None
+                and len(outputs) >= 2
+                and torch.is_tensor(outputs[0])
+                and outputs[0].ndim == 0
+            ):
+                return float(outputs[0].detach().cpu()), outputs[1] if len(
+                    outputs
+                ) > 1 else None
+            logits = outputs[0] if len(outputs) > 0 else None
+        else:
+            maybe_loss = getattr(outputs, "loss", None)
+            maybe_logits = getattr(outputs, "logits", None)
+            if maybe_loss is not None:
+                return float(maybe_loss.detach().cpu()), maybe_logits
+            logits = maybe_logits
+
+    if logits is None:
+        raise MetricsError(
+            code="E401",
+            message="METRICS-COMPUTE-FAILED: model returned neither loss nor logits",
+        )
+
+    if labels is None:
+        raise ValidationError(
+            code="E402",
+            message="METRICS-VALIDATION-FAILED",
+            details={"reason": "labels are required to compute perplexity loss"},
+        )
+
+    shift_logits = logits[:, :-1, :].contiguous()
+    shift_labels = labels[:, 1:].contiguous()
+    loss = F.cross_entropy(
+        shift_logits.view(-1, shift_logits.size(-1)),
+        shift_labels.view(-1),
+        ignore_index=-100,
+        reduction="mean",
+    )
+    return float(loss.detach().cpu()), logits
 
 
 class PerplexityStatus:
@@ -418,57 +540,6 @@ def compute_perplexity(
     return ppl
 
 
-def _latency_validation_error(
-    reason: str, details: dict[str, object]
-) -> ValidationError:
-    return ValidationError(
-        code="E402",
-        message="METRICS-VALIDATION-FAILED",
-        details={"reason": reason, **details},
-    )
-
-
-def _memory_validation_error(
-    reason: str, details: dict[str, object]
-) -> ValidationError:
-    return ValidationError(
-        code="E402",
-        message="METRICS-VALIDATION-FAILED",
-        details={"reason": reason, **details},
-    )
-
-
-def _maybe_cuda_synchronize(device: torch.device) -> None:
-    if device.type == "cuda":
-        torch.cuda.synchronize()
-
-
-def _memory_measurement_baseline(device: torch.device) -> tuple[float, object | None]:
-    if device.type == "cuda":
-        torch.cuda.empty_cache()
-        baseline_memory = torch.cuda.memory_allocated() / (1024 * 1024)
-        torch.cuda.reset_peak_memory_stats()
-        return baseline_memory, None
-
-    import psutil
-
-    process = psutil.Process()
-    baseline_memory = process.memory_info().rss / (1024 * 1024)
-    return baseline_memory, process
-
-
-def _current_memory_mb(device: torch.device, process: object | None) -> float:
-    if device.type == "cuda":
-        return torch.cuda.memory_allocated() / (1024 * 1024)
-    assert process is not None
-    return process.memory_info().rss / (1024 * 1024)
-
-
-def _cleanup_memory_measurement_failure(device: torch.device) -> None:
-    if device.type == "cuda":
-        torch.cuda.empty_cache()
-
-
 @torch.no_grad()
 def compute_ppl(
     model: nn.Module,
@@ -692,9 +763,12 @@ def measure_memory(
 
 __all__ = [
     "PerplexityStatus",
+    "call_model",
     "compute_perplexity",
     "compute_perplexity_strict",
     "compute_ppl",
+    "forward_logits_causal",
+    "forward_loss_causal",
     "measure_latency",
     "measure_memory",
     "validate_perplexity",

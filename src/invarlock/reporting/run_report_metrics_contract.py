@@ -1,20 +1,203 @@
 from __future__ import annotations
 
 import math
+import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
 from invarlock.core.metric_kind_contract import normalize_metric_kind
-from invarlock.reporting.run_metric_utils import (
-    format_debug_metric_diffs,
-    merge_primary_metric_health,
-)
-from invarlock.reporting.run_pairing_contract import (
-    RunReportPolicyViolation,
-    build_dataset_window_stats,
-    validate_pairing_report_metrics,
-)
+
+_PARSE_EXCEPTIONS = (AttributeError, KeyError, OverflowError, TypeError, ValueError)
+
+
+@dataclass(frozen=True)
+class RunReportPolicyViolation:
+    code: str
+    message: str
+    details: dict[str, Any]
+
+
+def _coerce_report_count(value: Any) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def _coerce_fraction(
+    metric_name: str,
+    value: Any,
+) -> tuple[float | None, RunReportPolicyViolation | None]:
+    try:
+        return float(value), None
+    except (TypeError, ValueError, OverflowError):
+        return None, RunReportPolicyViolation(
+            code="E001",
+            message=(
+                "PAIRING-SCHEDULE-INVALID: "
+                f"{metric_name}={value!r} is not a finite numeric fraction"
+            ),
+            details={metric_name: value},
+        )
+
+
+def validate_pairing_report_metrics(
+    metrics_section: Mapping[str, Any] | None,
+    *,
+    baseline_requested: bool,
+    profile: str | None,
+    preview_count_report: Any,
+    final_count_report: Any,
+    expected_preview: Any,
+    expected_final: Any,
+) -> list[RunReportPolicyViolation]:
+    metrics = dict(metrics_section) if isinstance(metrics_section, Mapping) else {}
+    violations: list[RunReportPolicyViolation] = []
+
+    match_fraction = metrics.get("window_match_fraction")
+    if match_fraction is not None:
+        resolved_match_fraction, violation = _coerce_fraction(
+            "window_match_fraction",
+            match_fraction,
+        )
+        if violation is not None:
+            violations.append(violation)
+        elif resolved_match_fraction != 1.0:
+            violations.append(
+                RunReportPolicyViolation(
+                    code="E001",
+                    message=(
+                        "PAIRING-SCHEDULE-MISMATCH: "
+                        f"window_match_fraction={resolved_match_fraction:.3f}"
+                    ),
+                    details={"window_match_fraction": resolved_match_fraction},
+                )
+            )
+
+    overlap_fraction = metrics.get("window_overlap_fraction")
+    if overlap_fraction is not None:
+        resolved_overlap_fraction, violation = _coerce_fraction(
+            "window_overlap_fraction",
+            overlap_fraction,
+        )
+        if violation is not None:
+            violations.append(violation)
+        elif resolved_overlap_fraction is not None and resolved_overlap_fraction > 1e-9:
+            violations.append(
+                RunReportPolicyViolation(
+                    code="E001",
+                    message=(
+                        "PAIRING-SCHEDULE-MISMATCH: "
+                        f"window_overlap_fraction={resolved_overlap_fraction:.3f}"
+                    ),
+                    details={"window_overlap_fraction": resolved_overlap_fraction},
+                )
+            )
+
+    profile_normalized = (profile or "").strip().lower()
+    if baseline_requested and profile_normalized in {"ci", "release"}:
+        pairing_reason = metrics.get("window_pairing_reason")
+        if pairing_reason is not None:
+            violations.append(
+                RunReportPolicyViolation(
+                    code="E001",
+                    message=(
+                        "PAIRING-SCHEDULE-MISMATCH: baseline pairing requested but "
+                        f"run was not paired (window_pairing_reason={pairing_reason})"
+                    ),
+                    details={"window_pairing_reason": pairing_reason},
+                )
+            )
+
+        paired_windows_val = metrics.get("paired_windows")
+        paired_windows_int = _coerce_report_count(paired_windows_val)
+        if paired_windows_int is None or paired_windows_int <= 0:
+            violations.append(
+                RunReportPolicyViolation(
+                    code="E001",
+                    message=(
+                        "PAIRED-WINDOWS-COLLAPSED: paired_windows<=0 under paired "
+                        "baseline. Check device stability, dataset windows, or "
+                        "edit scope."
+                    ),
+                    details={
+                        "paired_windows": paired_windows_val,
+                        "profile": profile_normalized,
+                    },
+                )
+            )
+
+    preview_used = _coerce_report_count(preview_count_report)
+    preview_expected = _coerce_report_count(expected_preview)
+    final_used = _coerce_report_count(final_count_report)
+    final_expected = _coerce_report_count(expected_final)
+    if (
+        preview_used is not None
+        and preview_expected is not None
+        and preview_used != preview_expected
+    ) or (
+        final_used is not None
+        and final_expected is not None
+        and final_used != final_expected
+    ):
+        violations.append(
+            RunReportPolicyViolation(
+                code="E001",
+                message=(
+                    "PAIRING-SCHEDULE-MISMATCH: counts do not match configuration "
+                    "after stratification"
+                ),
+                details={
+                    "preview_used": preview_used if preview_used is not None else -1,
+                    "preview_expected": (
+                        preview_expected if preview_expected is not None else -1
+                    ),
+                    "final_used": final_used if final_used is not None else -1,
+                    "final_expected": (
+                        final_expected if final_expected is not None else -1
+                    ),
+                },
+            )
+        )
+
+    return violations
+
+
+def build_dataset_window_stats(
+    *,
+    match_fraction: Any,
+    overlap_fraction: Any,
+    window_plan: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    stats: dict[str, Any] = {}
+    if match_fraction is not None:
+        resolved_match_fraction, violation = _coerce_fraction(
+            "window_match_fraction",
+            match_fraction,
+        )
+        if violation is not None:
+            raise ValueError(violation.message)
+        stats["window_match_fraction"] = resolved_match_fraction
+    if overlap_fraction is not None:
+        resolved_overlap_fraction, violation = _coerce_fraction(
+            "window_overlap_fraction",
+            overlap_fraction,
+        )
+        if violation is not None:
+            raise ValueError(violation.message)
+        stats["window_overlap_fraction"] = resolved_overlap_fraction
+
+    if isinstance(window_plan, Mapping) and "coverage_ok" in window_plan:
+        stats["coverage"] = bool(window_plan.get("coverage_ok"))
+        stats["preview_total_tokens"] = window_plan.get("preview_total_tokens")
+        stats["final_total_tokens"] = window_plan.get("final_total_tokens")
+        stats["min_tokens_target"] = window_plan.get("min_tokens_target")
+        stats["tokens_floor_met"] = window_plan.get("tokens_floor_met")
+
+    return stats
 
 
 @dataclass(frozen=True)
@@ -26,6 +209,112 @@ class RunReportMetricsEnrichmentResult:
     overlap_fraction: float | None
 
 
+def merge_primary_metric_health(
+    primary_metric: dict[str, Any] | None,
+    core_primary_metric: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Merge health flags from core primary metric into report primary metric."""
+    if not isinstance(primary_metric, dict):
+        return {}
+    merged = dict(primary_metric)
+    if not isinstance(core_primary_metric, dict):
+        return merged
+    if core_primary_metric.get("invalid") is True:
+        merged["invalid"] = True
+        merged["degraded"] = True
+    if core_primary_metric.get("degraded") is True:
+        merged["degraded"] = True
+    core_reason = core_primary_metric.get("degraded_reason")
+    if isinstance(core_reason, str) and core_reason:
+        merged["degraded_reason"] = core_reason
+        merged["degraded"] = True
+    return merged
+
+
+def format_debug_metric_diffs(
+    pm: dict[str, float] | None,
+    metrics: dict[str, float] | None,
+    baseline_report_data: dict | None,
+) -> str:
+    """Build a compact debug line comparing current snapshot vs ppl_* values."""
+    if not isinstance(pm, dict) or not isinstance(metrics, dict):
+        return ""
+    diffs: list[str] = []
+    pm_blk: dict[str, Any] = {}
+    try:
+        raw_pm_blk: Any = metrics.get("primary_metric", {})
+        if isinstance(raw_pm_blk, dict):
+            pm_blk = raw_pm_blk
+        ppl_final_v1 = float(pm_blk.get("final", float("nan")))
+    except _PARSE_EXCEPTIONS:
+        ppl_final_v1 = float("nan")
+    try:
+        ppl_prev_v1 = float(pm_blk.get("preview", float("nan")))
+    except _PARSE_EXCEPTIONS:
+        ppl_prev_v1 = float("nan")
+    try:
+        ppl_final_v2 = float(pm.get("final", float("nan")))
+    except _PARSE_EXCEPTIONS:
+        ppl_final_v2 = float("nan")
+    try:
+        ppl_prev_v2 = float(pm.get("preview", float("nan")))
+    except _PARSE_EXCEPTIONS:
+        ppl_prev_v2 = float("nan")
+
+    if math.isfinite(ppl_final_v1) and math.isfinite(ppl_final_v2):
+        diffs.append(f"final: v1-v1 = {ppl_final_v2 - ppl_final_v1:+.9f}")
+        try:
+            diffs.append(
+                f"Δlog(final): {math.log(ppl_final_v2) - math.log(ppl_final_v1):+.9f}"
+            )
+        except _PARSE_EXCEPTIONS:
+            pass
+    if math.isfinite(ppl_prev_v1) and math.isfinite(ppl_prev_v2):
+        diffs.append(f"preview: v1-v1 = {ppl_prev_v2 - ppl_prev_v1:+.9f}")
+        try:
+            diffs.append(
+                f"Δlog(preview): {math.log(ppl_prev_v2) - math.log(ppl_prev_v1):+.9f}"
+            )
+        except _PARSE_EXCEPTIONS:
+            pass
+
+    try:
+        ratio_v2 = float(pm.get("ratio_vs_baseline", float("nan")))
+    except _PARSE_EXCEPTIONS:
+        ratio_v2 = float("nan")
+    try:
+        ratio_v1 = float(pm_blk.get("ratio_vs_baseline", float("nan")))
+    except _PARSE_EXCEPTIONS:
+        ratio_v1 = float("nan")
+    if (not math.isfinite(ratio_v1)) and isinstance(baseline_report_data, dict):
+        try:
+            metrics_block = baseline_report_data.get("metrics") or {}
+            primary_metric_block = (
+                metrics_block.get("primary_metric", {})
+                if isinstance(metrics_block, dict)
+                else {}
+            )
+            base_final_raw = (
+                primary_metric_block.get("final")
+                if isinstance(primary_metric_block, dict)
+                else None
+            )
+            if base_final_raw is None:
+                raise ValueError("missing baseline final metric")
+            base_final = float(base_final_raw)
+            if (
+                math.isfinite(base_final)
+                and base_final > 0
+                and math.isfinite(ppl_final_v1)
+            ):
+                ratio_v1 = ppl_final_v1 / base_final
+        except _PARSE_EXCEPTIONS:
+            pass
+    if math.isfinite(ratio_v1) and math.isfinite(ratio_v2):
+        diffs.append(f"ratio_vs_baseline: v1-v1 = {ratio_v2 - ratio_v1:+.9f}")
+    return "; ".join(diffs)
+
+
 def _coerce_finite_float(value: Any) -> float | None:
     if isinstance(value, bool):
         return None
@@ -34,6 +323,20 @@ def _coerce_finite_float(value: Any) -> float | None:
     except (TypeError, ValueError, OverflowError):
         return None
     return coerced if math.isfinite(coerced) else None
+
+
+def _pseudo_accuracy_allowed(profile: str, run_config: Any) -> bool:
+    if str(profile or "").strip().lower() == "dev":
+        return True
+    env_value = str(os.environ.get("INVARLOCK_ALLOW_PSEUDO_ACCURACY", "")).lower()
+    if env_value in {"1", "true", "yes"}:
+        return True
+    context = getattr(run_config, "context", None)
+    eval_context = context.get("eval") if isinstance(context, Mapping) else None
+    return bool(
+        isinstance(eval_context, Mapping)
+        and eval_context.get("allow_pseudo_accuracy") is True
+    )
 
 
 def _classification_records(arm_payload: Any) -> list[dict[str, Any]]:
@@ -233,6 +536,15 @@ def enrich_run_report_metrics(
                     c_prev, n_prev = (prev_n, prev_n) if prev_n > 0 else (0, 0)
                     c_fin, n_fin = (fin_n, fin_n) if fin_n > 0 else (0, 0)
                     used_pseudo_counts = prev_n > 0 or fin_n > 0
+                    if used_pseudo_counts and not _pseudo_accuracy_allowed(
+                        profile_normalized or "",
+                        run_config,
+                    ):
+                        raise ValueError(
+                            "pseudo accuracy is only allowed in dev profile or when "
+                            "INVARLOCK_ALLOW_PSEUDO_ACCURACY=1 / "
+                            "eval.allow_pseudo_accuracy=true is set"
+                        )
 
             classification_metrics = {
                 "preview": {"correct_total": int(c_prev), "total": int(n_prev)},

@@ -6,15 +6,13 @@ from pathlib import Path
 from typing import Any
 
 from invarlock import evidence_pack_integrity as evidence_pack_integrity_mod
-from invarlock import evidence_pack_manifest as evidence_pack_manifest_mod
-from invarlock import evidence_pack_metadata as evidence_pack_metadata_mod
 from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 
-EVIDENCE_PACK_FORMAT = evidence_pack_manifest_mod.EVIDENCE_PACK_FORMAT
-_load_json = evidence_pack_manifest_mod._load_json
-_load_json_object = evidence_pack_manifest_mod._load_json_object
-_manual_validate_manifest = evidence_pack_manifest_mod._manual_validate_manifest
-validate_manifest = evidence_pack_manifest_mod.validate_manifest
+EVIDENCE_PACK_FORMAT = evidence_pack_integrity_mod.EVIDENCE_PACK_FORMAT
+_load_json = evidence_pack_integrity_mod._load_json
+_load_json_object = evidence_pack_integrity_mod._load_json_object
+_manual_validate_manifest = evidence_pack_integrity_mod._manual_validate_manifest
+validate_manifest = evidence_pack_integrity_mod.validate_manifest
 _relative_file_paths = evidence_pack_integrity_mod.relative_file_paths
 _write_checksums_file = evidence_pack_integrity_mod.write_checksums_file
 _copy_file = evidence_pack_integrity_mod.copy_file
@@ -25,18 +23,129 @@ _verify_checksums = evidence_pack_integrity_mod.verify_checksums
 _parse_checksums = evidence_pack_integrity_mod.parse_checksums
 _verify_no_extra_files = evidence_pack_integrity_mod.verify_no_extra_files
 _validate_signing_key = evidence_pack_integrity_mod.validate_signing_key
-_sha256_bytes = evidence_pack_manifest_mod._sha256_bytes
-_sha256_file = evidence_pack_manifest_mod._sha256_file
-_validate_material_name = evidence_pack_manifest_mod._validate_material_name
-verify_manifest_provenance = evidence_pack_manifest_mod.verify_manifest_provenance
-_evidence_pack_counts_from_verification = (
-    evidence_pack_metadata_mod._evidence_pack_counts_from_verification
-)
-_derive_evidence_pack_evidence_level = (
-    evidence_pack_metadata_mod._derive_evidence_pack_evidence_level
-)
+_sha256_bytes = evidence_pack_integrity_mod._sha256_bytes
+_sha256_file = evidence_pack_integrity_mod._sha256_file
+_validate_material_name = evidence_pack_integrity_mod._validate_material_name
+verify_manifest_provenance = evidence_pack_integrity_mod.verify_manifest_provenance
 _CONTROL_FILES = evidence_pack_integrity_mod.CONTROL_FILES
 MANIFEST_SIGNATURE_FILENAME = evidence_pack_integrity_mod.MANIFEST_SIGNATURE_FILENAME
+
+
+def _evidence_pack_counts_from_verification(
+    verification: dict[str, Any] | None,
+) -> tuple[int | None, int | None, int | None]:
+    if not isinstance(verification, dict):
+        return None, None, None
+    clean_reports = verification.get("clean_reports")
+    error_reports = verification.get("error_injection_reports")
+    failed_reports = verification.get("failed_reports")
+    return (
+        int(clean_reports) if isinstance(clean_reports, int) else None,
+        int(error_reports) if isinstance(error_reports, int) else None,
+        int(failed_reports) if isinstance(failed_reports, int) else None,
+    )
+
+
+def _derive_evidence_pack_evidence_level(
+    *,
+    subject_present: bool,
+    checksums_bound: bool,
+    clean_reports: int | None,
+    failed_reports: int | None,
+    has_source_repo_ref: bool,
+    has_environment_ref: bool,
+) -> str:
+    if (
+        subject_present
+        and checksums_bound
+        and isinstance(clean_reports, int)
+        and clean_reports > 0
+        and failed_reports == 0
+        and has_source_repo_ref
+        and has_environment_ref
+    ):
+        return "high"
+    if (
+        subject_present
+        and checksums_bound
+        and isinstance(clean_reports, int)
+        and clean_reports > 0
+    ):
+        return "medium"
+    return "low"
+
+
+def _render_evidence_pack_readme(
+    *,
+    evidence_level: str,
+    clean_reports: int | None,
+    error_reports: int | None,
+    failed_reports: int | None,
+    policy_profile: str | None,
+    strict_ready: bool,
+    signer_fingerprint: str | None,
+) -> str:
+    lines = [
+        "# InvarLock Evidence Pack",
+        "",
+        "This evidence pack bundles reports, summary reports, and metadata for offline",
+        "verification. No model weights are included.",
+        "",
+        f"Evidence level: {evidence_level}",
+        (
+            "Review summary: "
+            f"clean_reports={clean_reports if clean_reports is not None else 'unknown'}, "
+            f"error_injection_reports={error_reports if error_reports is not None else 'unknown'}, "
+            f"failed_reports={failed_reports if failed_reports is not None else 'unknown'}, "
+            f"profile={policy_profile or 'unknown'}."
+        ),
+        "",
+        "Why it might be wrong:",
+    ]
+    if failed_reports not in (None, 0):
+        lines.append(
+            "- Unexpected report verification failures were recorded; inspect results/verification_summary.json before trusting final conclusions."
+        )
+    else:
+        lines.append(
+            "- Nested report verification succeeded for the bundled clean reports, but reviewers should still inspect the underlying evaluation.report.json files."
+        )
+    lines.append(
+        "- Error-injection reports are expected-failure evidence and should not be interpreted as clean PASS runs."
+    )
+    if strict_ready:
+        lines.append(
+            "- The pack is ready for strict verification; signed manifest and checksum sealing are present."
+        )
+    else:
+        lines.append(
+            "- By default this is evidence-grade packaging. For strong distributable evidence, require a signed manifest, strict verification, and a PASS final verdict."
+        )
+    if signer_fingerprint:
+        lines.append(f"- Signer fingerprint: {signer_fingerprint}")
+
+    lines.extend(
+        [
+            "",
+            "## Verify",
+            "",
+            "1. Verify the manifest signature and strict pack integrity:",
+            "   invarlock advanced evidence-pack verify <pack-dir> --strict",
+            "",
+            "2. Verify file checksums:",
+            "   sha256sum -c checksums.sha256",
+            "   # macOS: shasum -a 256 -c checksums.sha256",
+            "",
+            "3. Verify report integrity:",
+            "   invarlock verify --json reports/**/evaluation.report.json",
+            "",
+            "Or use:",
+            "  invarlock advanced evidence-pack verify <pack-dir> --strict",
+            "Repo workflow alternative:",
+            "  scripts/evidence_packs/verify_pack.sh --pack <pack-dir> --strict",
+        ]
+    )
+    return "\n".join(lines) + "\n"
 
 
 class EvidencePackStatus(IntEnum):
@@ -102,6 +211,21 @@ def _collect_build_evidence_pack_errors(
                 runtime_manifest_path, label="runtime manifest"
             )
             errors.extend(runtime_manifest_errors)
+        for sidecar_name in (
+            "edit_metadata.json",
+            "deployable_artifact_validation.json",
+            "backend_inventory.json",
+            "memory_report.json",
+            "load_smoke.json",
+            "inference_smoke.json",
+        ):
+            sidecar_path = report_path.parent / sidecar_name
+            if sidecar_path.is_file():
+                _, sidecar_errors = _load_json_object(
+                    sidecar_path,
+                    label=sidecar_name,
+                )
+                errors.extend(sidecar_errors)
     return errors
 
 
@@ -155,6 +279,19 @@ def _copy_build_evidence_pack_artifacts(
             out_dir / runtime_manifest_rel,
         )
         rel_paths.append(runtime_manifest_rel)
+        for sidecar_name in (
+            "edit_metadata.json",
+            "deployable_artifact_validation.json",
+            "backend_inventory.json",
+            "memory_report.json",
+            "load_smoke.json",
+            "inference_smoke.json",
+        ):
+            sidecar_path = report_path.parent / sidecar_name
+            if sidecar_path.is_file():
+                sidecar_rel = f"{report_dir_rel}/{sidecar_name}"
+                _copy_file(sidecar_path, out_dir / sidecar_rel)
+                rel_paths.append(sidecar_rel)
 
     return final_dest, rel_paths, material_refs
 

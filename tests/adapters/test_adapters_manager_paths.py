@@ -19,12 +19,10 @@ import torch.nn as nn
 # Import invarlock adapters namespace
 from invarlock.adapters.base import (
     AdapterManager,
+    AdapterState,
     AdapterUtils,
     BaseAdapter,
     PerformanceTracker,
-)
-from invarlock.adapters.base_types import (
-    AdapterState,
 )
 
 
@@ -334,6 +332,30 @@ class TestPerformanceTracker:
         assert metrics["count"] == 3
         assert metrics["average_duration"] > 0
 
+    def test_performance_tracker_disabled_skips_collection(self):
+        """Disabled tracking should not record timings or memory snapshots."""
+        tracker = PerformanceTracker(
+            {"enabled": False, "track_performance": True, "track_memory": True}
+        )
+
+        with tracker.time_operation("disabled_op"):
+            pass
+        tracker.record_memory_usage("disabled_memory")
+
+        assert tracker.get_metrics() == {}
+
+    def test_performance_tracker_respects_individual_track_flags(self):
+        """Performance and memory collection flags should be independent."""
+        tracker = PerformanceTracker(
+            {"enabled": True, "track_performance": False, "track_memory": False}
+        )
+
+        with tracker.time_operation("disabled_perf"):
+            pass
+        tracker.record_memory_usage("disabled_memory")
+
+        assert tracker.get_metrics() == {}
+
     def test_performance_tracker_memory_recording(self):
         """Test memory usage recording."""
         tracker = PerformanceTracker({"track_memory": True})
@@ -527,6 +549,11 @@ class TestAdapterUtils:
         requirements = {"python": "3.8", "torch": "1.10.0"}
         system_info = {"python": "3.9.0", "torch": "1.11.0"}
 
+        result = AdapterUtils.check_compatibility(requirements, system_info)
+        assert result["compatible"] is True
+
+        # Numeric version parsing should treat Python 3.10 as newer than 3.8.
+        system_info = {"python": "3.10.0", "torch": "1.11.0"}
         result = AdapterUtils.check_compatibility(requirements, system_info)
         assert result["compatible"] is True
 

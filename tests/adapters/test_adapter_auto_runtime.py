@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib
 import json
-import sys
 import types
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,15 +11,7 @@ def _load_auto_module(monkeypatch) -> types.ModuleType:
     root = Path(__file__).resolve().parents[2]
     monkeypatch.syspath_prepend(str(root / "src"))
 
-    import invarlock
-
-    adapters_pkg = types.ModuleType("invarlock.adapters")
-    adapters_pkg.__path__ = [str(root / "src" / "invarlock" / "adapters")]
-    monkeypatch.setitem(sys.modules, "invarlock.adapters", adapters_pkg)
-    monkeypatch.setattr(invarlock, "adapters", adapters_pkg, raising=False)
-
-    sys.modules.pop("invarlock.adapters.auto", None)
-    return importlib.import_module("invarlock.adapters.auto")
+    return importlib.reload(importlib.import_module("invarlock.adapters.auto"))
 
 
 def _delegate_class(label: str):
@@ -116,6 +107,38 @@ def test_detect_quantization_from_path_variants(tmp_path: Path, monkeypatch) -> 
     )
     assert auto_mod._detect_quantization_from_path(str(bnb)) == "hf_bnb"
 
+    torchao = tmp_path / "torchao"
+    torchao.mkdir()
+    (torchao / "config.json").write_text(
+        json.dumps({"quantization_config": {"quant_method": "torchao"}}),
+        encoding="utf-8",
+    )
+    assert auto_mod._detect_quantization_from_path(str(torchao)) == "hf_torchao"
+
+    hqq = tmp_path / "hqq"
+    hqq.mkdir()
+    (hqq / "config.json").write_text(
+        json.dumps({"quantization_config": {"quant_method": "hqq"}}),
+        encoding="utf-8",
+    )
+    assert auto_mod._detect_quantization_from_path(str(hqq)) == "hf_hqq"
+
+    quanto = tmp_path / "quanto"
+    quanto.mkdir()
+    (quanto / "config.json").write_text(
+        json.dumps({"quantization_config": {"quant_method": "quanto"}}),
+        encoding="utf-8",
+    )
+    assert auto_mod._detect_quantization_from_path(str(quanto)) == "hf_quanto"
+
+    compressed = tmp_path / "compressed"
+    compressed.mkdir()
+    (compressed / "config.json").write_text(
+        json.dumps({"quantization_config": {"quant_method": "compressed-tensors"}}),
+        encoding="utf-8",
+    )
+    assert auto_mod._detect_quantization_from_path(str(compressed)) == "hf_ct"
+
     unknown = tmp_path / "unknown"
     unknown.mkdir()
     (unknown / "config.json").write_text(
@@ -160,6 +183,33 @@ def test_detect_quantization_from_model_variants(monkeypatch) -> None:
     )
     assert auto_mod._detect_quantization_from_model(dict_bnb) == "hf_bnb"
 
+    dict_torchao = SimpleNamespace(
+        config=SimpleNamespace(quantization_config={"quant_method": "torchao"})
+    )
+    assert auto_mod._detect_quantization_from_model(dict_torchao) == "hf_torchao"
+
+    dict_hqq = SimpleNamespace(
+        config=SimpleNamespace(quantization_config={"quant_method": "hqq"})
+    )
+    assert auto_mod._detect_quantization_from_model(dict_hqq) == "hf_hqq"
+
+    dict_quanto = SimpleNamespace(
+        config=SimpleNamespace(quantization_config={"quant_method": "quanto"})
+    )
+    assert auto_mod._detect_quantization_from_model(dict_quanto) == "hf_quanto"
+
+    dict_compressed = SimpleNamespace(
+        config=SimpleNamespace(
+            quantization_config={"quant_method": "compressed-tensors"}
+        )
+    )
+    assert auto_mod._detect_quantization_from_model(dict_compressed) == "hf_ct"
+
+    dict_unknown = SimpleNamespace(
+        config=SimpleNamespace(quantization_config={"quant_method": "marlin"})
+    )
+    assert auto_mod._detect_quantization_from_model(dict_unknown) is None
+
     dict_bad = SimpleNamespace(
         config=SimpleNamespace(quantization_config={"quant_method": 42})
     )
@@ -183,6 +233,28 @@ def test_detect_quantization_from_model_variants(monkeypatch) -> None:
     )
     assert auto_mod._detect_quantization_from_model(short_bnb_model) == "hf_bnb"
 
+    torchao_cfg = type("TorchAOInt8WeightOnlyConfig", (), {})
+    torchao_model = SimpleNamespace(
+        config=SimpleNamespace(quantization_config=torchao_cfg())
+    )
+    assert auto_mod._detect_quantization_from_model(torchao_model) == "hf_torchao"
+
+    hqq_cfg = type("HqqConfig", (), {})
+    hqq_model = SimpleNamespace(config=SimpleNamespace(quantization_config=hqq_cfg()))
+    assert auto_mod._detect_quantization_from_model(hqq_model) == "hf_hqq"
+
+    quanto_cfg = type("QuantoConfig", (), {})
+    quanto_model = SimpleNamespace(
+        config=SimpleNamespace(quantization_config=quanto_cfg())
+    )
+    assert auto_mod._detect_quantization_from_model(quanto_model) == "hf_quanto"
+
+    compressed_cfg = type("CompressedTensorsConfig", (), {})
+    compressed_model = SimpleNamespace(
+        config=SimpleNamespace(quantization_config=compressed_cfg())
+    )
+    assert auto_mod._detect_quantization_from_model(compressed_model) == "hf_ct"
+
     other_cfg = type("UnknownConfig", (), {})
     other_model = SimpleNamespace(
         config=SimpleNamespace(quantization_config=other_cfg())
@@ -198,12 +270,19 @@ def test_load_adapter_dispatches_all_known_adapter_names(monkeypatch) -> None:
         ".hf_mlm": ("HF_MLM_Adapter", "hf_mlm"),
         ".hf_multimodal": ("HF_Multimodal_Adapter", "hf_multimodal"),
         ".hf_seq2seq": ("HF_Seq2Seq_Adapter", "hf_seq2seq"),
-        "invarlock.plugins.hf_bnb_adapter": ("HF_BNB_Adapter", "hf_bnb"),
-        "invarlock.plugins.hf_awq_adapter": ("HF_AWQ_Adapter", "hf_awq"),
-        "invarlock.plugins.hf_gptq_adapter": ("HF_GPTQ_Adapter", "hf_gptq"),
     }
 
     def _fake_import(name: str, package: str | None = None):
+        if name == "invarlock.plugins":
+            return SimpleNamespace(
+                HF_BNB_Adapter=_delegate_class("hf_bnb"),
+                HF_AWQ_Adapter=_delegate_class("hf_awq"),
+                HF_GPTQ_Adapter=_delegate_class("hf_gptq"),
+                HF_TorchAO_Adapter=_delegate_class("hf_torchao"),
+                HF_HQQ_Adapter=_delegate_class("hf_hqq"),
+                HF_Quanto_Adapter=_delegate_class("hf_quanto"),
+                HF_CompressedTensors_Adapter=_delegate_class("hf_ct"),
+            )
         attr_name, label = delegate_specs[name]
         return SimpleNamespace(**{attr_name: _delegate_class(label)})
 
@@ -219,6 +298,10 @@ def test_load_adapter_dispatches_all_known_adapter_names(monkeypatch) -> None:
     assert adapter._load_adapter("hf_bnb").label == "hf_bnb"
     assert adapter._load_adapter("hf_awq").label == "hf_awq"
     assert adapter._load_adapter("hf_gptq").label == "hf_gptq"
+    assert adapter._load_adapter("hf_torchao").label == "hf_torchao"
+    assert adapter._load_adapter("hf_hqq").label == "hf_hqq"
+    assert adapter._load_adapter("hf_quanto").label == "hf_quanto"
+    assert adapter._load_adapter("hf_ct").label == "hf_ct"
     assert adapter._load_adapter("something-else").label == "hf_causal"
 
 

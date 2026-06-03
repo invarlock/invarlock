@@ -100,7 +100,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
           fetch-depth: 0
@@ -178,7 +178,7 @@ jobs:
       - name: Run release pip-audit
         run: python scripts/security/run_pip_audit.py --path "${{ steps.install_surface.outputs.site_packages }}"
       - name: Generate release install-surface SBOM
-        run: bash scripts/generate_sbom.sh --scope install-surface --python "${{ steps.install_surface.outputs.python }}" artifacts/supply-chain/sbom.json
+        run: bash scripts/security/generate_sbom.sh --scope install-surface --python "${{ steps.install_surface.outputs.python }}" artifacts/supply-chain/sbom.json
       - name: Upload dist artifacts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -230,7 +230,7 @@ jobs:
         (github.event_name == 'workflow_dispatch' && inputs.publish == true && inputs.release_tag != '')
       }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
           fetch-depth: 0

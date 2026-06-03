@@ -3,7 +3,7 @@
 test_get_gpu_available_memory_uses_mock_nvidia_smi() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export GPU_RESERVATION_DIR="${TEST_TMPDIR}/gpu_res"
     mkdir -p "${GPU_RESERVATION_DIR}"
@@ -19,7 +19,7 @@ test_get_gpu_available_memory_uses_mock_nvidia_smi() {
 test_is_reservation_valid_ttl_and_liveness() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -53,7 +53,7 @@ test_is_reservation_valid_ttl_and_liveness() {
 test_is_gpu_available_cleans_stale_reservation() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -86,7 +86,7 @@ test_is_gpu_available_cleans_stale_reservation() {
 test_find_and_claim_task_releases_reservation_when_claim_fails() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -112,7 +112,7 @@ test_find_and_claim_task_releases_reservation_when_claim_fails() {
 test_list_gpu_ids_and_cache_helpers_cover_branches() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     # GPU_ID_LIST takes precedence and is parsed into a newline list.
     export GPU_ID_LIST="2,4,,7"
@@ -143,7 +143,7 @@ test_list_gpu_ids_and_cache_helpers_cover_branches() {
 test_gpu_cache_ttl_sanitizes_invalid_value() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export GPU_RESERVATION_DIR="${TEST_TMPDIR}/gpu_res"
     mkdir -p "${GPU_RESERVATION_DIR}"
@@ -159,7 +159,7 @@ test_gpu_cache_ttl_sanitizes_invalid_value() {
 test_task_reservation_lock_sanitizes_invalid_timeout() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export GPU_RESERVATION_DIR="${TEST_TMPDIR}/gpu_res"
     mkdir -p "${GPU_RESERVATION_DIR}"
@@ -173,7 +173,7 @@ test_task_reservation_lock_sanitizes_invalid_timeout() {
 test_is_reservation_valid_sanitizes_invalid_ttl() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -196,7 +196,7 @@ test_is_reservation_valid_sanitizes_invalid_ttl() {
 test_is_gpu_usable_sanitizes_invalid_min_free() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     GPU_MIN_FREE_GB="bad"
     GPU_REQUIRE_IDLE="false"
@@ -211,7 +211,7 @@ test_is_gpu_usable_sanitizes_invalid_min_free() {
 test_refresh_all_gpu_cache_and_scheduler_lock_file_empty_fallback_cover_lines() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     local calls=""
     list_gpu_ids() { echo "0 1"; }
@@ -228,7 +228,7 @@ test_refresh_all_gpu_cache_and_scheduler_lock_file_empty_fallback_cover_lines() 
 test_scheduler_lock_and_task_reservation_lock_sleep_on_contention() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     local out="${TEST_TMPDIR}/out"
     export QUEUE_DIR="${out}/queue"
@@ -277,7 +277,7 @@ test_scheduler_lock_and_task_reservation_lock_sleep_on_contention() {
 test_scheduler_gpu_memory_and_process_helpers_cover_lines() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     mock_python3_stub_enable
     fixture_write "python3.rc" "0"
@@ -310,7 +310,7 @@ test_scheduler_gpu_memory_and_process_helpers_cover_lines() {
 test_reserve_gpus_cleans_stale_existing_reservation() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     local out="${TEST_TMPDIR}/out"
     export QUEUE_DIR="${out}/queue"
@@ -334,7 +334,7 @@ test_reserve_gpus_cleans_stale_existing_reservation() {
 test_release_gpus_cleans_locks_even_when_task_gpu_list_file_is_missing() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export GPU_RESERVATION_DIR="${TEST_TMPDIR}/gpu_res"
     mkdir -p "${GPU_RESERVATION_DIR}"
@@ -351,7 +351,7 @@ test_release_gpus_cleans_locks_even_when_task_gpu_list_file_is_missing() {
 test_print_scheduling_report_outputs_sections() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     local out="${TEST_TMPDIR}/out"
     export QUEUE_DIR="${out}/queue"
@@ -378,7 +378,7 @@ test_print_scheduling_report_outputs_sections() {
 test_gpu_cache_file_returns_empty_when_reservation_dir_is_empty() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     GPU_RESERVATION_DIR=""
     assert_eq "" "$(_gpu_cache_file 0)" "no cache file when reservation dir is empty"
@@ -387,7 +387,7 @@ test_gpu_cache_file_returns_empty_when_reservation_dir_is_empty() {
 test_refresh_gpu_cache_and_memory_queries_cover_cache_hit_and_miss_branches() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export GPU_RESERVATION_DIR="${TEST_TMPDIR}/gpu_res"
     mkdir -p "${GPU_RESERVATION_DIR}"
@@ -434,7 +434,7 @@ test_refresh_gpu_cache_and_memory_queries_cover_cache_hit_and_miss_branches() {
 test_get_gpu_available_memory_returns_zero_when_nvidia_smi_command_fails() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     GPU_RESERVATION_DIR=""
     _cmd_nvidia_smi() { return 1; }
@@ -447,7 +447,7 @@ test_get_gpu_available_memory_returns_zero_when_nvidia_smi_command_fails() {
 test_is_reservation_valid_returns_stale_when_meta_missing_timestamp() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -465,7 +465,7 @@ test_is_reservation_valid_returns_stale_when_meta_missing_timestamp() {
 test_get_available_gpus_returns_empty_when_not_enough_gpus_available() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     list_gpu_ids() { echo "0 1"; }
     is_gpu_usable() { return 0; }
@@ -478,7 +478,7 @@ test_get_available_gpus_returns_empty_when_not_enough_gpus_available() {
 test_scheduler_lock_file_and_acquire_lock_timeout_and_stale_owner_branches() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     unset QUEUE_DIR
     export GPU_RESERVATION_DIR="${TEST_TMPDIR}/gpu_res"
@@ -508,7 +508,7 @@ test_scheduler_lock_file_and_acquire_lock_timeout_and_stale_owner_branches() {
 test_should_use_adaptive_gpus_counts_single_gpu_tasks_and_adapts_only_when_safe() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -528,7 +528,7 @@ test_should_use_adaptive_gpus_counts_single_gpu_tasks_and_adapts_only_when_safe(
 test_required_gpu_category_helper_removed() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     if type -t get_required_gpus_from_category >/dev/null 2>&1; then
         t_fail "expected legacy get_required_gpus_from_category helper to be removed"
@@ -538,7 +538,7 @@ test_required_gpu_category_helper_removed() {
 test_task_reservation_lock_timeout_stale_owner_and_ownerless_grace_branches() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export GPU_RESERVATION_DIR="${TEST_TMPDIR}/gpu_res"
     mkdir -p "${GPU_RESERVATION_DIR}"
@@ -574,7 +574,7 @@ test_task_reservation_lock_timeout_stale_owner_and_ownerless_grace_branches() {
 test_reserve_gpus_failure_branches_for_lock_and_existing_valid_reservations() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -605,7 +605,7 @@ test_reserve_gpus_failure_branches_for_lock_and_existing_valid_reservations() {
 test_reserve_gpus_rejects_empty_gpu_list() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -624,7 +624,7 @@ test_reserve_gpus_rejects_empty_gpu_list() {
 test_reserve_gpus_errors_when_gpu_lock_file_write_fails() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -652,7 +652,7 @@ test_reserve_gpus_errors_when_gpu_lock_file_write_fails() {
 test_reserve_gpus_errors_when_gpu_list_file_move_fails() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -684,7 +684,7 @@ test_reserve_gpus_errors_when_gpu_list_file_move_fails() {
 test_is_reservation_valid_fallback_to_gpus_file_mtime_when_metadata_missing() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -705,7 +705,7 @@ test_is_reservation_valid_fallback_to_gpus_file_mtime_when_metadata_missing() {
 test_is_gpu_usable_rejects_reserved_low_memory_and_busy_idle_required_paths() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     is_gpu_available() { return 1; }
     if is_gpu_usable 0; then
@@ -730,7 +730,7 @@ test_is_gpu_usable_rejects_reserved_low_memory_and_busy_idle_required_paths() {
 test_get_available_gpus_selection_branches_must_include_spread_and_short_selection_error_path() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     list_gpu_ids() { echo "0 1 2"; }
     is_gpu_usable() { return 0; }
@@ -768,7 +768,7 @@ test_get_available_gpus_selection_branches_must_include_spread_and_short_selecti
 test_get_task_gpus_handles_missing_dir_and_missing_file_paths() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     GPU_RESERVATION_DIR=""
     if get_task_gpus "t1" >/dev/null; then
@@ -785,7 +785,7 @@ test_get_task_gpus_handles_missing_dir_and_missing_file_paths() {
 test_init_gpu_reservations_sets_dir_and_refreshes_cache() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     local refresh_calls=0
@@ -801,7 +801,7 @@ test_init_gpu_reservations_sets_dir_and_refreshes_cache() {
 test_cleanup_stale_reservations_skips_valid_and_cleans_stale_branches() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -818,7 +818,7 @@ test_cleanup_stale_reservations_skips_valid_and_cleans_stale_branches() {
 test_oom_helpers_cover_missing_file_risk_and_risk_levels() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     if check_oom_safe "${TEST_TMPDIR}/nope.task" "0" >/dev/null; then
         t_fail "expected check_oom_safe to fail for missing task file"
@@ -858,7 +858,7 @@ test_oom_helpers_cover_missing_file_risk_and_risk_levels() {
 test_priority_calculation_and_blocked_counts_cover_boost_and_validation_branches() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -894,7 +894,7 @@ test_priority_calculation_and_blocked_counts_cover_boost_and_validation_branches
 test_find_best_task_covers_retry_gating_fit_checks_and_adaptive_multi_gpu_paths() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -947,7 +947,7 @@ test_find_best_task_covers_retry_gating_fit_checks_and_adaptive_multi_gpu_paths(
 test_find_best_task_covers_effective_memory_branches_for_mid_and_low_memory() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -963,7 +963,7 @@ test_find_best_task_covers_effective_memory_branches_for_mid_and_low_memory() {
 test_find_best_task_skips_multi_gpu_task_when_not_enough_gpus_and_no_adaptive() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -984,7 +984,7 @@ test_find_best_task_skips_multi_gpu_task_when_not_enough_gpus_and_no_adaptive() 
 test_find_and_claim_task_covers_no_task_races_adaptive_paths_and_success_updates() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -1042,7 +1042,7 @@ test_find_and_claim_task_covers_no_task_races_adaptive_paths_and_success_updates
 test_find_and_claim_task_covers_lock_race_and_reserve_failure_branches() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -1071,7 +1071,7 @@ test_find_and_claim_task_covers_lock_race_and_reserve_failure_branches() {
 test_apply_work_stealing_boost_covers_model_stats_no_models_and_skip_branches() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -1111,7 +1111,7 @@ test_apply_work_stealing_boost_covers_model_stats_no_models_and_skip_branches() 
 test_apply_work_stealing_boost_returns_cleanly_when_queue_lock_unavailable() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -1128,7 +1128,7 @@ test_apply_work_stealing_boost_returns_cleanly_when_queue_lock_unavailable() {
 test_get_scheduling_stats_counts_created_at_branch() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -1150,7 +1150,7 @@ test_get_scheduling_stats_counts_created_at_branch() {
 test_reserve_gpus_errors_when_metadata_move_fails() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -1169,7 +1169,7 @@ test_reserve_gpus_errors_when_metadata_move_fails() {
 test_find_and_claim_task_short_circuits_when_scheduler_lock_unavailable() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
@@ -1190,7 +1190,7 @@ test_find_and_claim_task_short_circuits_when_scheduler_lock_unavailable() {
 test_acquire_scheduler_lock_cleans_ownerless_lock_and_normalizes_invalid_grace_seconds() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}"
@@ -1209,9 +1209,9 @@ test_acquire_scheduler_lock_cleans_ownerless_lock_and_normalizes_invalid_grace_s
 test_get_required_gpus_delegates_to_calculate_required_gpus() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     assert_eq "$(calculate_required_gpus 200)" "$(get_required_gpus 200)" "delegates to calculate_required_gpus"
 }
@@ -1219,7 +1219,7 @@ test_get_required_gpus_delegates_to_calculate_required_gpus() {
 test_is_gpu_usable_returns_zero_when_available_and_has_free_memory() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     GPU_MIN_FREE_GB=10
     GPU_REQUIRE_IDLE="false"
@@ -1232,7 +1232,7 @@ test_is_gpu_usable_returns_zero_when_available_and_has_free_memory() {
 test_scheduler_is_gpu_usable_relaxes_for_single_gpu() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     is_gpu_available() { return 0; }
     get_gpu_available_memory() { echo "0"; }
@@ -1248,7 +1248,7 @@ test_scheduler_is_gpu_usable_relaxes_for_single_gpu() {
 test_scheduler_is_gpu_usable_sanitizes_invalid_min_free() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     GPU_MIN_FREE_GB="nope"
     GPU_REQUIRE_IDLE="false"
@@ -1263,7 +1263,7 @@ test_scheduler_is_gpu_usable_sanitizes_invalid_min_free() {
 test_scheduler_find_and_claim_logs_reserve_failure_when_debug() {
     mock_reset
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}/ready" "${QUEUE_DIR}/running"
@@ -1289,4 +1289,51 @@ test_scheduler_find_and_claim_logs_reserve_failure_when_debug() {
     run find_and_claim_task 100 0
     assert_rc "1" "${RUN_RC}" "reserve failure returns non-zero"
     assert_match "reserve_gpus failed" "${RUN_ERR}" "debug message emitted"
+}
+
+test_lock_ownerless_recovery() {
+    mock_reset
+
+    export QUEUE_DIR="${TEST_TMPDIR}/queue"
+    mkdir -p "${QUEUE_DIR}"/{pending,ready,running,completed,failed}
+
+    export GPU_RESERVATION_DIR="${TEST_TMPDIR}/workers/gpu_reservations"
+    mkdir -p "${GPU_RESERVATION_DIR}"
+
+    # shellcheck source=../scheduler.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
+
+    mkdir -p "${QUEUE_DIR}/queue.lock.d"
+    QUEUE_LOCK_NOOWNER_STALE_SECONDS=0 acquire_queue_lock 5
+    assert_dir_exists "${QUEUE_LOCK_DIR}"
+    release_queue_lock
+
+    mkdir -p "${QUEUE_DIR}/scheduler.lock.d"
+    SCHEDULER_LOCK_NOOWNER_STALE_SECONDS=0 acquire_scheduler_lock 5
+    assert_dir_exists "${SCHEDULER_LOCK_DIR}"
+    release_scheduler_lock
+
+    mkdir -p "${GPU_RESERVATION_DIR}/task_test.lock.d"
+    GPU_RESERVATION_LOCK_NOOWNER_STALE_SECONDS=0 _acquire_task_reservation_lock test 5
+    _release_task_reservation_lock test
+}
+
+test_reservation_scoping_does_not_clobber_locals() {
+    mock_reset
+
+    export QUEUE_DIR="${TEST_TMPDIR}/queue"
+    mkdir -p "${QUEUE_DIR}"/{pending,ready,running,completed,failed}
+
+    export GPU_RESERVATION_DIR="${TEST_TMPDIR}/workers/gpu_reservations"
+    mkdir -p "${GPU_RESERVATION_DIR}"
+
+    # shellcheck source=../scheduler.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
+
+    local gpu_id="SENTINEL_GPU_ID"
+    reserve_gpus "task_scoping" "0,1" >/dev/null
+    assert_eq "SENTINEL_GPU_ID" "${gpu_id}" "gpu_id clobbered after reserve_gpus()"
+
+    release_gpus "task_scoping" >/dev/null || true
+    assert_eq "SENTINEL_GPU_ID" "${gpu_id}" "gpu_id clobbered after release_gpus()"
 }

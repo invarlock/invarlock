@@ -16,8 +16,6 @@ from typing import Any, cast
 
 import numpy as np
 
-from invarlock.model_utils import set_seed
-
 _TORCH_UNSET = object()
 torch: Any = _TORCH_UNSET
 
@@ -32,6 +30,18 @@ def _get_torch() -> Any:
         else:
             torch = _torch
     return None if torch is _TORCH_UNSET else torch
+
+
+def set_seed(seed: int = 42) -> None:
+    """Deterministic seeds for Python, NumPy and Torch when available."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch = _get_torch()
+    if torch is not None:
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
 
 _THREAD_ENV_VARS: tuple[str, ...] = (

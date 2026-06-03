@@ -10,92 +10,27 @@ import click
 import pytest
 
 from invarlock.cli.commands.run import run_command
-
-_SNS = SimpleNamespace
-
-
-def _write_base_cfg(tmp_path: Path, preview_n=2, final_n=2) -> Path:
-    cfg = tmp_path / "config.yaml"
-    cfg.write_text(
-        f"""
-model:
-  adapter: hf_causal
-  id: gpt2
-  device: cpu
-edit:
-  name: quant_rtn
-  plan: {{}}
-
-dataset:
-  provider: synthetic
-  id: synthetic
-  split: validation
-  seq_len: 8
-  stride: 4
-  preview_n: {preview_n}
-  final_n: {final_n}
-
-guards:
-  order: []
-
-eval:
-  loss:
-    type: auto
-
-output:
-  dir: runs
-        """
-    )
-    return cfg
-
-
-def _common_patches_ce():
-    return (
-        patch(
-            "invarlock.core.registry.get_registry",
-            lambda: SimpleNamespace(
-                get_adapter=lambda name: SimpleNamespace(
-                    name=name, load_model=lambda model_id, device: object()
-                ),
-                get_edit=lambda name: SimpleNamespace(name=name),
-                get_guard=lambda name: (_ for _ in ()).throw(KeyError("no guard")),
-                get_plugin_metadata=lambda n, t: {
-                    "name": n,
-                    "module": f"{t}.{n}",
-                    "version": "test",
-                },
-            ),
-        ),
-        patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
-            lambda model_id, adapter: SimpleNamespace(
-                default_loss="ce",
-                default_provider=None,
-                default_metric=None,
-                model_id=model_id,
-                adapter=adapter,
-                family="gpt2",
-                module_selectors={},
-                invariants=[],
-                cert_lints=[],
-            ),
-        ),
-        patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
-            lambda model_profile: (
-                SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
-                "tokhash123",
-            ),
-        ),
-        patch("invarlock.cli.device.resolve_device", lambda d: d),
-        patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
-        patch(
-            "invarlock.reporting.report_files.save_report",
-            lambda report, run_dir, formats, filename_prefix: {
-                "json": str(run_dir / (filename_prefix + ".json"))
-            },
-        ),
-    )
+from tests.cli.run._support_run_common import (
+    SNS as _SNS,
+)
+from tests.cli.run._support_run_pairing import (
+    baseline_pairing_common_patches_ce as _common_patches_ce,
+)
+from tests.cli.run._support_run_pairing import (
+    baseline_pairing_compute_seq_hash as _compute_seq_hash,
+)
+from tests.cli.run._support_run_pairing import (
+    baseline_pairing_write_base_cfg as _write_base_cfg,
+)
+from tests.cli.run._support_run_pairing import (
+    supplemental_cfg as _supp_cfg,
+)
+from tests.cli.run._support_run_pairing import (
+    supplemental_common_patches_detect_ce as _supp_common_patches_detect_ce,
+)
+from tests.cli.run._support_run_pairing import (
+    supplemental_provider_min as _supp_provider_min,
+)
 
 
 def _common_patches_mlm():
@@ -116,7 +51,7 @@ def _common_patches_mlm():
             ),
         ),
         patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
+            "invarlock.cli.run_runtime_exec.detect_model_profile",
             lambda model_id, adapter: SimpleNamespace(
                 default_loss="mlm",
                 default_provider=None,
@@ -130,7 +65,7 @@ def _common_patches_mlm():
             ),
         ),
         patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
             lambda model_profile: (
                 SimpleNamespace(
                     mask_token_id=103,
@@ -153,90 +88,9 @@ def _common_patches_mlm():
     )
 
 
-def _compute_seq_hash(seqs: list[list[int]]) -> str:
-    import hashlib
-    from array import array
-
-    h = hashlib.blake2s(digest_size=16)
-    for seq in seqs:
-        h.update(len(seq).to_bytes(4, "little", signed=False))
-        arr = array("I", (int(tok) & 0xFFFFFFFF for tok in seq))
-        h.update(arr.tobytes())
-    return h.hexdigest()
-
-
 # --------------------
 # Merged from test_run_branch_supplemental.py
 # --------------------
-
-
-def _supp_cfg(tmp_path: Path, preview=1, final=1) -> Path:
-    p = tmp_path / "config.yaml"
-    p.write_text(
-        f"""
-model:
-  adapter: hf_causal
-  id: gpt2
-  device: cpu
-edit:
-  name: quant_rtn
-  plan: {{}}
-
-dataset:
-  provider: synthetic
-  id: synthetic
-  split: validation
-  seq_len: 8
-  stride: 4
-  preview_n: {preview}
-  final_n: {final}
-
-guards:
-  order: []
-
-eval:
-  loss:
-    type: auto
-
-output:
-  dir: runs
-        """
-    )
-    return p
-
-
-def _supp_common_patches_detect_ce():
-    return (
-        patch("invarlock.cli.device.resolve_device", lambda d: d),
-        patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
-        patch(
-            "invarlock.reporting.report_files.save_report",
-            lambda report, run_dir, formats, filename_prefix=None: {
-                "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
-            },
-        ),
-        patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
-            lambda model_id=None, adapter=None: _SNS(
-                default_loss="ce",
-                model_id=model_id,
-                adapter=adapter,
-                module_selectors={},
-                invariants=set(),
-                cert_lints=[],
-                family="gpt2",
-            ),
-        ),
-    )
-
-
-def _supp_provider_min():
-    return _SNS(
-        windows=lambda **kw: (
-            _SNS(input_ids=[[1, 2, 3]], attention_masks=[[1, 1, 1]]),
-            _SNS(input_ids=[[4, 5, 6]], attention_masks=[[1, 1, 1]]),
-        )
-    )
 
 
 def test_baseline_pairing_computes_hashes_and_tokens_in_dataset_meta(tmp_path: Path):
@@ -361,7 +215,7 @@ def test_window_match_fraction_mismatch_exit(tmp_path: Path):
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda prof: (
                     _SNS(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                     "tokhash123",
@@ -679,7 +533,7 @@ def test_module_selectors_injected_into_edit_config(tmp_path: Path):
         # override detect_model_profile after common patches
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.detect_model_profile",
+                "invarlock.cli.run_runtime_exec.detect_model_profile",
                 lambda model_id, adapter: SimpleNamespace(
                     default_loss="ce",
                     model_id=model_id,

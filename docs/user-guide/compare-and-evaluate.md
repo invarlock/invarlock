@@ -20,17 +20,22 @@ report. This avoids coupling to any particular edit stack and keeps your
 existing tooling intact whether you are validating quantization, pruning,
 fine-tuning, or other checkpoint-edit workflows.
 
+That is the production boundary in InvarLock: guards and verifier policy inspect
+the resulting subject checkpoint and paired metrics, not the external program
+that produced the subject. Built-in edit generation is kept to demo/smoke
+support; production validation should normally use BYOE.
+
 ## TL;DR
 
 - Produce your baseline and edited checkpoints (any external tool).
 - Ensure both use the same tokenizer (InvarLock verify lints tokenizer hash when
   present).
-- Run `invarlock evaluate --baseline <baseline> --subject <subject> --adapter auto`.
+- Run `invarlock evaluate --baseline <baseline> --subject <subject> --baseline-adapter auto --subject-adapter auto`.
 
 By default, `evaluate` runs inside the runtime container. Use `--execution-mode host`
 only for host-side workflows that intentionally run model loading on the
 host. If you choose that host-side path, verify the resulting report with
-`invarlock verify --runtime-provenance host ...`.
+`invarlock verify --runtime-provenance host --assurance off ...`.
 
 Example (wheel-first, GPT‑2, CPU/MPS friendly; requires `invarlock[hf]` or equivalent HF extra):
 
@@ -38,7 +43,7 @@ Example (wheel-first, GPT‑2, CPU/MPS friendly; requires `invarlock[hf]` or equ
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline sshleifer/tiny-gpt2 \
   --subject /path/to/your/edited-model \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile ci \
   --out runs/eval_smoke \
   --report-out reports/eval_smoke
@@ -64,7 +69,8 @@ Requirements:
 
 - Baseline report must be from a no-op run (`edit.name == "noop"`).
 - Baseline report must include stored evaluation windows (set `INVARLOCK_STORE_EVAL_WINDOWS=1` when generating it).
-- The baseline report must match the intended `--profile`, `--tier`, and adapter family.
+- The baseline report must match the intended baseline model, `--profile`, `--tier`, adapter family,
+  assurance mode, and dataset/window-plan fields.
 
 Example:
 
@@ -73,7 +79,7 @@ Example:
 INVARLOCK_STORE_EVAL_WINDOWS=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline sshleifer/tiny-gpt2 \
   --subject sshleifer/tiny-gpt2 \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile ci \
   --tier balanced \
   --out runs/baseline_once \
@@ -85,7 +91,7 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline-report runs/baseline_once/source/<timestamp>/report.json \
   --baseline sshleifer/tiny-gpt2 \
   --subject /path/to/your/edited-model \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile ci \
   --tier balanced \
   --out runs/eval_subject_1 \
@@ -109,6 +115,9 @@ keep `seq_len=stride` for deterministic non-overlapping windows.
 - Stable: your edit stack remains yours; InvarLock focuses on gates and evidence.
 - Portable: reports are self-contained artifacts with provenance.
 - Low maintenance: you can update your edit tools without waiting for InvarLock updates.
+- Auditable: public BYOE fixtures under `public_evidence/byoe_examples/` show
+  dense magnitude pruning and LoRA-merge style subjects verifying through the
+  same strict verification path.
 
 ## When to use built-in edits
 

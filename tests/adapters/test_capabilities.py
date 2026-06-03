@@ -80,6 +80,34 @@ class TestQuantizationConfig:
         assert cfg.is_quantized() is True
         assert cfg.is_bnb() is False
 
+    def test_torchao_int8_config(self):
+        """torchao int8 config should be correctly identified."""
+        cfg = QuantizationConfig(method=QuantizationMethod.TORCHAO_INT8, bits=8)
+        assert cfg.is_quantized() is True
+        assert cfg.is_bnb() is False
+
+    def test_hqq_config(self):
+        """HQQ config should be correctly identified."""
+        cfg = QuantizationConfig(method=QuantizationMethod.HQQ, bits=4, group_size=64)
+        assert cfg.is_quantized() is True
+        assert cfg.is_bnb() is False
+
+    def test_quanto_config(self):
+        """Quanto config should be correctly identified."""
+        cfg = QuantizationConfig(method=QuantizationMethod.QUANTO, bits=8)
+        assert cfg.is_quantized() is True
+        assert cfg.is_bnb() is False
+
+    def test_compressed_tensors_config(self):
+        """compressed-tensors config should be correctly identified."""
+        cfg = QuantizationConfig(
+            method=QuantizationMethod.COMPRESSED_TENSORS,
+            bits=8,
+            from_checkpoint=True,
+        )
+        assert cfg.is_quantized() is True
+        assert cfg.is_bnb() is False
+
     def test_frozen_immutable(self):
         """QuantizationConfig should be immutable (frozen)."""
         from dataclasses import FrozenInstanceError
@@ -134,6 +162,36 @@ class TestModelCapabilities:
         assert caps.device_movable is False
         assert caps.quantization.method == QuantizationMethod.GPTQ
         assert caps.quantization.bits == 8
+
+    def test_for_torchao_int8(self):
+        """Factory for torchao int8 should create non-movable capabilities."""
+        caps = ModelCapabilities.for_torchao_int8()
+        assert caps.device_movable is False
+        assert caps.quantization.method == QuantizationMethod.TORCHAO_INT8
+        assert caps.quantization.bits == 8
+
+    def test_for_hqq(self):
+        """Factory for HQQ should create non-movable capabilities."""
+        caps = ModelCapabilities.for_hqq(bits=4, group_size=64)
+        assert caps.device_movable is False
+        assert caps.quantization.method == QuantizationMethod.HQQ
+        assert caps.quantization.bits == 4
+        assert caps.quantization.group_size == 64
+
+    def test_for_quanto(self):
+        """Factory for Quanto should create non-movable capabilities."""
+        caps = ModelCapabilities.for_quanto(bits=8)
+        assert caps.device_movable is False
+        assert caps.quantization.method == QuantizationMethod.QUANTO
+        assert caps.quantization.bits == 8
+
+    def test_for_compressed_tensors(self):
+        """Factory for compressed-tensors should create non-movable capabilities."""
+        caps = ModelCapabilities.for_compressed_tensors(bits=4)
+        assert caps.device_movable is False
+        assert caps.quantization.method == QuantizationMethod.COMPRESSED_TENSORS
+        assert caps.quantization.bits == 4
+        assert caps.quantization.from_checkpoint is True
 
 
 class TestDetectQuantizationFromConfig:
@@ -204,6 +262,88 @@ class TestDetectQuantizationFromConfig:
         assert cfg.bits == 4
         assert cfg.group_size == 128
 
+    def test_dict_style_torchao(self):
+        """Dict-style torchao config should be detected."""
+        mock_config = MagicMock()
+        mock_config.quantization_config = {"quant_method": "torchao"}
+        cfg = detect_quantization_from_config(mock_config)
+        assert cfg.method == QuantizationMethod.TORCHAO_INT8
+        assert cfg.bits == 8
+
+    def test_dict_style_hqq(self):
+        """Dict-style HQQ config should be detected."""
+        mock_config = MagicMock()
+        mock_config.quantization_config = {
+            "quant_method": "hqq",
+            "nbits": 4,
+            "group_size": 64,
+        }
+        cfg = detect_quantization_from_config(mock_config)
+        assert cfg.method == QuantizationMethod.HQQ
+        assert cfg.bits == 4
+        assert cfg.group_size == 64
+
+    def test_dict_style_quanto(self):
+        """Dict-style Quanto config should be detected."""
+        mock_config = MagicMock()
+        mock_config.quantization_config = {"quant_method": "quanto", "weights": "int8"}
+        cfg = detect_quantization_from_config(mock_config)
+        assert cfg.method == QuantizationMethod.QUANTO
+        assert cfg.bits == 8
+
+    def test_dict_style_quanto_int4_weights(self):
+        """Dict-style Quanto weight precision should determine bit width."""
+        mock_config = MagicMock()
+        mock_config.quantization_config = {"quant_method": "quanto", "weights": "int4"}
+        cfg = detect_quantization_from_config(mock_config)
+        assert cfg.method == QuantizationMethod.QUANTO
+        assert cfg.bits == 4
+
+    def test_dict_style_compressed_tensors(self):
+        """Dict-style compressed-tensors config should be detected."""
+        mock_config = MagicMock()
+        mock_config.quantization_config = {
+            "quant_method": "compressed-tensors",
+            "config_groups": {
+                "group_0": {
+                    "weights": {
+                        "num_bits": 4,
+                    }
+                }
+            },
+        }
+        cfg = detect_quantization_from_config(mock_config)
+        assert cfg.method == QuantizationMethod.COMPRESSED_TENSORS
+        assert cfg.bits == 4
+
+    def test_dict_style_quantization_config_tolerates_malformed_values(self):
+        """Malformed serialized config fields should not crash detection."""
+        mock_config = MagicMock()
+        mock_config.quantization_config = {
+            "quant_method": 7,
+            "bits": "4",
+            "group_size": "128",
+        }
+
+        cfg = detect_quantization_from_config(mock_config)
+
+        assert cfg.method == QuantizationMethod.NONE
+
+    def test_dict_style_quantization_config_normalizes_numeric_strings(self):
+        """Serialized string numeric fields should still be detected."""
+        mock_config = MagicMock()
+        mock_config.quantization_config = {
+            "quant_method": "gptq",
+            "bits": "4",
+            "group_size": "128",
+        }
+
+        cfg = detect_quantization_from_config(mock_config)
+
+        assert cfg.method == QuantizationMethod.GPTQ
+        assert cfg.bits == 4
+        assert cfg.group_size == 128
+
     def test_object_style_bnb_8bit(self):
         """Object-style BitsAndBytesConfig should be detected."""
         mock_quant_cfg = MagicMock()
@@ -231,6 +371,48 @@ class TestDetectQuantizationFromConfig:
         cfg = detect_quantization_from_config(mock_config)
         assert cfg.method == QuantizationMethod.BNB_4BIT
         assert cfg.double_quant is True
+
+    def test_object_style_hqq(self):
+        """Object-style HqqConfig should be detected."""
+        mock_quant_cfg = MagicMock()
+        mock_quant_cfg.__class__.__name__ = "HqqConfig"
+        mock_quant_cfg.nbits = 4
+        mock_quant_cfg.group_size = 64
+
+        mock_config = MagicMock()
+        mock_config.quantization_config = mock_quant_cfg
+
+        cfg = detect_quantization_from_config(mock_config)
+        assert cfg.method == QuantizationMethod.HQQ
+        assert cfg.bits == 4
+        assert cfg.group_size == 64
+
+    def test_object_style_quanto(self):
+        """Object-style QuantoConfig should be detected."""
+        mock_quant_cfg = MagicMock()
+        mock_quant_cfg.__class__.__name__ = "QuantoConfig"
+
+        mock_config = MagicMock()
+        mock_config.quantization_config = mock_quant_cfg
+
+        cfg = detect_quantization_from_config(mock_config)
+        assert cfg.method == QuantizationMethod.QUANTO
+        assert cfg.bits == 8
+
+    def test_object_style_compressed_tensors(self):
+        """Object-style compressed-tensors config should be detected."""
+        mock_quant_cfg = MagicMock()
+        mock_quant_cfg.__class__.__name__ = "CompressedTensorsConfig"
+        mock_quant_cfg.config_groups = {
+            "group_0": {"weights": {"num_bits": 4}},
+        }
+
+        mock_config = MagicMock()
+        mock_config.quantization_config = mock_quant_cfg
+
+        cfg = detect_quantization_from_config(mock_config)
+        assert cfg.method == QuantizationMethod.COMPRESSED_TENSORS
+        assert cfg.bits == 4
 
 
 class TestDetectCapabilitiesFromModel:
@@ -278,6 +460,74 @@ class TestDetectCapabilitiesFromModel:
         caps = detect_capabilities_from_model(mock_model)
         assert caps.device_movable is False
         assert caps.quantization.method == QuantizationMethod.AWQ
+
+    def test_torchao_module_model(self):
+        """torchao module markers should have non-movable capabilities."""
+
+        class TorchAoLinear:
+            __module__ = "torchao.dtypes.affine_quantized_tensor"
+
+        mock_model = MagicMock()
+        mock_model.config = MagicMock()
+        mock_model.config.quantization_config = None
+        mock_model.config.model_type = "mistral"
+        mock_model.config.architectures = ["MistralForCausalLM"]
+        mock_model.modules.return_value = [TorchAoLinear()]
+
+        caps = detect_capabilities_from_model(mock_model)
+        assert caps.device_movable is False
+        assert caps.quantization.method == QuantizationMethod.TORCHAO_INT8
+
+    def test_hqq_module_model(self):
+        """HQQ module markers should have non-movable capabilities."""
+
+        class HQQLinear:
+            __module__ = "hqq.core.quantize"
+
+        mock_model = MagicMock()
+        mock_model.config = MagicMock()
+        mock_model.config.quantization_config = None
+        mock_model.config.model_type = "mistral"
+        mock_model.config.architectures = ["MistralForCausalLM"]
+        mock_model.modules.return_value = [HQQLinear()]
+
+        caps = detect_capabilities_from_model(mock_model)
+        assert caps.device_movable is False
+        assert caps.quantization.method == QuantizationMethod.HQQ
+
+    def test_quanto_module_model(self):
+        """Quanto module markers should have non-movable capabilities."""
+
+        class QLinear:
+            __module__ = "optimum.quanto.nn.qlinear"
+
+        mock_model = MagicMock()
+        mock_model.config = MagicMock()
+        mock_model.config.quantization_config = None
+        mock_model.config.model_type = "mistral"
+        mock_model.config.architectures = ["MistralForCausalLM"]
+        mock_model.modules.return_value = [QLinear()]
+
+        caps = detect_capabilities_from_model(mock_model)
+        assert caps.device_movable is False
+        assert caps.quantization.method == QuantizationMethod.QUANTO
+
+    def test_compressed_tensors_module_model(self):
+        """compressed-tensors module markers should have non-movable capabilities."""
+
+        class CompressedLinear:
+            __module__ = "compressed_tensors.quantization.linear"
+
+        mock_model = MagicMock()
+        mock_model.config = MagicMock()
+        mock_model.config.quantization_config = None
+        mock_model.config.model_type = "mistral"
+        mock_model.config.architectures = ["MistralForCausalLM"]
+        mock_model.modules.return_value = [CompressedLinear()]
+
+        caps = detect_capabilities_from_model(mock_model)
+        assert caps.device_movable is False
+        assert caps.quantization.method == QuantizationMethod.COMPRESSED_TENSORS
 
     def test_bert_model_metric(self):
         """BERT model should use MLM metric."""

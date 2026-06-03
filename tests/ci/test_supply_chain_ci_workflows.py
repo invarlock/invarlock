@@ -1,5 +1,6 @@
 import json
 import re
+import subprocess
 import tomllib
 from datetime import date
 from pathlib import Path
@@ -96,6 +97,12 @@ def _extract_transformers_550_hashes(path: Path) -> set[str]:
     match = TRANSFORMERS_550_RE.search(path.read_text(encoding="utf-8"))
     assert match is not None, f"transformers==5.5.0 stanza missing in {path}"
     return {match.group("digest1"), match.group("digest2")}
+
+
+def test_precommit_workflow_uses_named_check_context() -> None:
+    workflow = _load_workflow(Path(".github/workflows/pre-commit.yml"))
+
+    assert workflow["jobs"]["run"]["name"] == "pre-commit"
 
 
 def test_supply_chain_job_configured():
@@ -216,7 +223,8 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
 
     sbom_step = _find_step_by_name(steps, "Generate install-surface SBOM")
     assert (
-        "scripts/generate_sbom.sh --scope install-surface --python" in sbom_step["run"]
+        "scripts/security/generate_sbom.sh --scope install-surface --python"
+        in sbom_step["run"]
     )
     assert "artifacts/supply-chain/sbom.json" in sbom_step["run"]
 
@@ -286,13 +294,27 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
 
 
 def test_generate_sbom_script_exists():
-    script_path = Path("scripts/generate_sbom.sh")
+    script_path = Path("scripts/security/generate_sbom.sh")
     assert script_path.exists(), "SBOM generator script missing"
 
     contents = script_path.read_text(encoding="utf-8")
     assert "cyclonedx-bom" in contents
     assert "--scope install-surface" in contents
     assert "SBOM written to" in contents
+
+
+def test_generate_sbom_rejects_unknown_scope_before_tool_lookup() -> None:
+    script_path = Path("scripts/security/generate_sbom.sh")
+
+    result = subprocess.run(
+        ["bash", str(script_path), "--scope", "unknown"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "--scope must be environment" in result.stderr
 
 
 def test_pip_audit_allowlist_is_owned_and_time_boxed() -> None:

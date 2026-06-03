@@ -1,0 +1,8 @@
+{
+  "models": {
+    "sshleifer/tiny-gpt2": {
+      "revision": "fixture-public-basis",
+      "role": "public_fixture_model"
+    }
+  }
+}

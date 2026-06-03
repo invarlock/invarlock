@@ -5,16 +5,24 @@ import math
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 import torch
 import torch.nn as nn
 
-from .variance_types import ScaleComputationResult
+from .quantized_weights import is_quantized_weight
 
 ProgressPhase = Literal["calibration"]
 _VARIANCE_SCALING_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError)
+
+
+@dataclass(frozen=True)
+class ScaleComputationResult:
+    raw_scales: dict[str, float]
+    filtered_scales: dict[str, float]
+    backstop_used: bool
+    trimmed_to_limit: bool
 
 
 @dataclass(frozen=True)
@@ -91,6 +99,7 @@ def equalise_residual_variance(
     clamp_range: tuple | None = (0.9, 1.1),
     apply: bool = True,
     progress_callback: ProgressCallback | None = None,
+    target_modules: dict[str, nn.Module] | None = None,
 ) -> dict[str, float]:
     """Apply data-driven variance equalization to transformer branches."""
     torch.manual_seed(seed)
@@ -113,6 +122,48 @@ def equalise_residual_variance(
             sample_values[name].append(float(y.pow(2).mean().item()))
 
         return fn
+
+    def compute_alpha(values: list[float]) -> float | None:
+        if not values:
+            return None
+        tensor_vals = torch.tensor(values, dtype=torch.float64)
+        if tensor_vals.numel() >= 10:
+            lower = torch.quantile(tensor_vals, 0.02)
+            upper = torch.quantile(tensor_vals, 0.98)
+            tensor_vals = torch.clamp(tensor_vals, lower.item(), upper.item())
+        group_count = 8 if tensor_vals.numel() >= 8 else tensor_vals.numel()
+        if group_count > 1:
+            chunks = torch.chunk(tensor_vals, group_count)
+            group_means = torch.stack([chunk.mean() for chunk in chunks])
+            var_f = group_means.median().item()
+        else:
+            var_f = tensor_vals.mean().item()
+        alpha = (1.0 / max(var_f, 1e-9)) ** 0.5
+        if clamp_range is not None:
+            alpha = max(clamp_range[0], min(alpha, clamp_range[1]))
+        if abs(alpha - 1.0) < tol:
+            return None
+        return float(alpha)
+
+    def scale_projection(module: Any, alpha: float) -> bool:
+        if not apply:
+            return True
+        with torch.no_grad():
+            weight = getattr(module, "weight", None)
+            if isinstance(weight, torch.Tensor):
+                if is_quantized_weight(weight):
+                    return False
+                weight.mul_(alpha)
+                bias = getattr(module, "bias", None)
+                if scale_bias and isinstance(bias, torch.Tensor):
+                    bias.mul_(alpha)
+                return True
+            elif isinstance(module, torch.Tensor) and not is_quantized_weight(module):
+                module.mul_(alpha)
+                return True
+            elif weight is not None:
+                return not is_quantized_weight(weight)
+        return False
 
     def moe_expert_out_modules(block: Any) -> list[Any]:
         experts = getattr(block, "experts", None)
@@ -181,6 +232,14 @@ def equalise_residual_variance(
                     name = f"block{index}.mlp"
                     hooks[name] = mlp_container.register_forward_hook(branch_hook(name))
 
+    adapter_target_names: set[str] = set()
+    if not hooks and target_modules:
+        for name, module in target_modules.items():
+            if not hasattr(module, "register_forward_hook"):
+                continue
+            hooks[name] = module.register_forward_hook(branch_hook(name))
+            adapter_target_names.add(name)
+
     try:
         batches = list(itertools.islice(iter(dataloader), windows))
     except (StopIteration, TypeError):
@@ -211,6 +270,16 @@ def equalise_residual_variance(
         hook.remove()
 
     applied_scales: dict[str, float] = {}
+    if adapter_target_names:
+        for name in sorted(adapter_target_names):
+            alpha = compute_alpha(sample_values.get(name, []))
+            if alpha is None:
+                continue
+            module = target_modules[name] if target_modules is not None else None
+            if scale_projection(module, alpha):
+                applied_scales[name] = alpha
+        return applied_scales
+
     for index, block in enumerate(iter_transformer_layers(model)):
         if hasattr(block, "attn"):
             attn_proj = getattr(block.attn, "c_proj", None) or getattr(
@@ -218,31 +287,9 @@ def equalise_residual_variance(
             )
             if attn_proj is not None:
                 name = f"block{index}.attn"
-                values = sample_values.get(name, [])
-                if values:
-                    tensor_vals = torch.tensor(values, dtype=torch.float64)
-                    if tensor_vals.numel() >= 10:
-                        lower = torch.quantile(tensor_vals, 0.02)
-                        upper = torch.quantile(tensor_vals, 0.98)
-                        tensor_vals = torch.clamp(
-                            tensor_vals, lower.item(), upper.item()
-                        )
-                    group_count = 8 if tensor_vals.numel() >= 8 else tensor_vals.numel()
-                    if group_count > 1:
-                        chunks = torch.chunk(tensor_vals, group_count)
-                        group_means = torch.stack([chunk.mean() for chunk in chunks])
-                        var_f = group_means.median().item()
-                    else:
-                        var_f = tensor_vals.mean().item()
-                    alpha = (1.0 / max(var_f, 1e-9)) ** 0.5
-                    if clamp_range is not None:
-                        alpha = max(clamp_range[0], min(alpha, clamp_range[1]))
-                    if abs(alpha - 1.0) >= tol:
-                        if apply:
-                            with torch.no_grad():
-                                attn_proj.weight.mul_(alpha)
-                                if scale_bias and attn_proj.bias is not None:
-                                    attn_proj.bias.mul_(alpha)
+                alpha = compute_alpha(sample_values.get(name, []))
+                if alpha is not None:
+                    if scale_projection(attn_proj, alpha):
                         applied_scales[name] = alpha
 
         mlp_container = getattr(block, "mlp", None)
@@ -258,52 +305,22 @@ def equalise_residual_variance(
             or getattr(mlp_container, "fc2", None)
         )
         name = f"block{index}.mlp"
-        values = sample_values.get(name, [])
-        if not values:
-            continue
-
-        tensor_vals = torch.tensor(values, dtype=torch.float64)
-        if tensor_vals.numel() >= 10:
-            lower = torch.quantile(tensor_vals, 0.02)
-            upper = torch.quantile(tensor_vals, 0.98)
-            tensor_vals = torch.clamp(tensor_vals, lower.item(), upper.item())
-        group_count = 8 if tensor_vals.numel() >= 8 else tensor_vals.numel()
-        if group_count > 1:
-            chunks = torch.chunk(tensor_vals, group_count)
-            group_means = torch.stack([chunk.mean() for chunk in chunks])
-            var_f = group_means.median().item()
-        else:
-            var_f = tensor_vals.mean().item()
-
-        alpha = (1.0 / max(var_f, 1e-9)) ** 0.5
-        if clamp_range is not None:
-            alpha = max(clamp_range[0], min(alpha, clamp_range[1]))
-        if abs(alpha - 1.0) < tol:
+        alpha = compute_alpha(sample_values.get(name, []))
+        if alpha is None:
             continue
 
         if mlp_proj is not None:
-            if apply:
-                with torch.no_grad():
-                    mlp_proj.weight.mul_(alpha)
-                    if scale_bias and mlp_proj.bias is not None:
-                        mlp_proj.bias.mul_(alpha)
-            applied_scales[name] = alpha
+            if scale_projection(mlp_proj, alpha):
+                applied_scales[name] = alpha
             continue
 
         moe_out = moe_expert_out_modules(mlp_container)
         if moe_out:
-            if apply:
-                with torch.no_grad():
-                    for proj in moe_out:
-                        weight = getattr(proj, "weight", None)
-                        if isinstance(weight, torch.Tensor):
-                            weight.mul_(alpha)
-                            bias = getattr(proj, "bias", None)
-                            if scale_bias and isinstance(bias, torch.Tensor):
-                                bias.mul_(alpha)
-                        elif isinstance(proj, torch.Tensor):
-                            proj.mul_(alpha)
-            applied_scales[name] = alpha
+            scaled_any = False
+            for proj in moe_out:
+                scaled_any = scale_projection(proj, alpha) or scaled_any
+            if scaled_any:
+                applied_scales[name] = alpha
 
     return applied_scales
 
@@ -312,8 +329,6 @@ def compute_variance_scales(
     guard: Any,
     model: nn.Module,
     dataloader,
-    *,
-    equalise_fn: Any = equalise_residual_variance,
 ) -> ScaleComputationResult:
     """Compute filtered VE scales for the guard state."""
     if guard._monitor_only:
@@ -325,7 +340,7 @@ def compute_variance_scales(
         return ScaleComputationResult({}, {}, False, False)
 
     tensor_ready_batches = guard._tensorize_calibration_batches(dataloader)
-    proposed_scales = equalise_fn(
+    proposed_scales = equalise_residual_variance(
         model=model,
         dataloader=tensor_ready_batches,
         windows=min(guard._policy["max_calib"] // 10, 50),
@@ -335,12 +350,13 @@ def compute_variance_scales(
         clamp_range=guard._policy["clamp"],
         allow_empty=True,
         apply=False,
+        target_modules=guard._target_modules or None,
     )
 
     if not proposed_scales and guard._policy.get("deadband", 0.0) > 0.0:
         relaxed_tol = max(guard._policy["deadband"] * 0.5, 1e-4)
         tensor_ready_batches = guard._tensorize_calibration_batches(dataloader)
-        proposed_scales = equalise_fn(
+        proposed_scales = equalise_residual_variance(
             model=model,
             dataloader=tensor_ready_batches,
             windows=min(guard._policy["max_calib"] // 10, 50),
@@ -350,6 +366,7 @@ def compute_variance_scales(
             clamp_range=guard._policy["clamp"],
             allow_empty=True,
             apply=False,
+            target_modules=guard._target_modules or None,
         )
 
     raw_scales = dict(proposed_scales)
@@ -381,7 +398,7 @@ def compute_variance_scales(
         )
     guard._stats.setdefault("raw_scales_observations", []).append(
         {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "count": len(focus_raw_scales),
             "scales": focus_raw_scales,
         }
@@ -467,7 +484,7 @@ def compute_variance_scales(
     }
     guard._stats.setdefault("filtered_scales_observations", []).append(
         {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "count": len(filtered_normalized),
             "scales": filtered_normalized,
             "backstop_used": backstop_used,

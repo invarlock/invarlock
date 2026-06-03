@@ -6,7 +6,7 @@ import pytest
 
 from invarlock.core.api import Guard
 from invarlock.core.runner import CoreRunner
-from tests.core.test_runner_execution_metrics_and_memory import (
+from tests.core._support_runner_execution import (
     DummyAdapter,
     DummyEdit,
     DummyModel,

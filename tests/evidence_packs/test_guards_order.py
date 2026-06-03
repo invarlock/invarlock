@@ -35,7 +35,7 @@ def test_config_generator_default_guards_order() -> None:
             "-c",
             (
                 "set -e\n"
-                "source scripts/evidence_packs/lib/config_generator.sh\n"
+                "source scripts/evidence_packs/lib/config/config_generator.sh\n"
                 'generate_invarlock_config "model" "/dev/stdout" "noop" 42 10 20 100 '
                 "128 64 1\n"
             ),

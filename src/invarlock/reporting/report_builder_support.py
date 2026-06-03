@@ -2,14 +2,32 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import json
 import math
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
+from invarlock.core.assurance_contract import (
+    REPORT_BUILD_EVENT_CATEGORIES,
+    build_assurance_section,
+    report_build_has_blocking_evidence_events,
+    resolve_report_runtime_provenance_declared,
+)
 from invarlock.core.exceptions import MetricsError
+from invarlock.core.metric_kind_contract import is_ppl_metric_kind
+from invarlock.core.retry import RetryDiagnostic
 from invarlock.eval.primary_metric import compute_primary_metric_from_report
 
+from . import report_builder_telemetry as _report_builder_telemetry
 from .report_types import RunReport
 from .utils import _coerce_int, _sanitize_seed_bundle
+
+build_telemetry_payload = _report_builder_telemetry.build_telemetry_payload
+save_telemetry_report = _report_builder_telemetry.save_telemetry_report
+telemetry_summary_line = _report_builder_telemetry.telemetry_summary_line
+telemetry_output_enabled = _report_builder_telemetry.telemetry_output_enabled
 
 _NON_FATAL_EXCEPTIONS = (
     AttributeError,
@@ -19,6 +37,476 @@ _NON_FATAL_EXCEPTIONS = (
     RuntimeError,
     OSError,
 )
+_NUMERIC_EXCEPTIONS = (OverflowError, TypeError, ValueError)
+_VALIDATION_EXCEPTIONS = (
+    AttributeError,
+    FileNotFoundError,
+    json.JSONDecodeError,
+    KeyError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
+
+@dataclass(frozen=True)
+class RetryReportValidationResult:
+    status: str
+    passed: bool
+    validation: dict[str, Any]
+    validation_gates: tuple[str, ...]
+    attempt_summary: dict[str, Any]
+    evaluation_report: dict[str, Any] | None = None
+    telemetry_summary: str | None = None
+    diagnostic: RetryDiagnostic | None = None
+
+
+def validate_retry_evaluation_report(
+    *,
+    report: dict[str, Any],
+    baseline_report_data: dict[str, Any] | None,
+    baseline_path: Path | None,
+    build_retry_result_summary_fn: Any,
+    make_report_fn: Any | None = None,
+    telemetry_output_enabled_fn: Any = telemetry_output_enabled,
+    telemetry_summary_line_fn: Any = telemetry_summary_line,
+) -> RetryReportValidationResult:
+    try:
+        baseline_report = baseline_report_data
+        if baseline_report is None and baseline_path is not None:
+            with baseline_path.open(encoding="utf-8") as handle:
+                loaded = json.load(handle)
+            if isinstance(loaded, dict):
+                baseline_report = loaded
+
+        if baseline_report is None:
+            raise FileNotFoundError("Baseline report unavailable")
+
+        report_factory: Any = make_report_fn
+        if report_factory is None:
+            from .report_make import make_report
+
+            report_factory = make_report
+
+        evaluation_report = report_factory(report, baseline_report)
+        telemetry_summary = None
+        if telemetry_output_enabled_fn():
+            telemetry_summary = telemetry_summary_line_fn(evaluation_report)
+        validation = (
+            evaluation_report.get("validation", {})
+            if isinstance(evaluation_report, dict)
+            else {}
+        )
+        if not isinstance(validation, dict):
+            validation = {}
+        attempt_summary = build_retry_result_summary_fn(validation)
+        validation_gates = tuple(attempt_summary.get("failures", []) or [])
+        passed = bool(attempt_summary.get("passed"))
+        return RetryReportValidationResult(
+            status="passed" if passed else "failed",
+            passed=passed,
+            validation=validation,
+            validation_gates=validation_gates,
+            attempt_summary=attempt_summary,
+            evaluation_report=evaluation_report,
+            telemetry_summary=telemetry_summary,
+            diagnostic=None,
+        )
+    except _VALIDATION_EXCEPTIONS as exc:
+        return RetryReportValidationResult(
+            status="error",
+            passed=False,
+            validation={},
+            validation_gates=("report_error",),
+            attempt_summary={
+                "passed": False,
+                "failures": ["report_error"],
+                "validation": {},
+            },
+            evaluation_report=None,
+            telemetry_summary=None,
+            diagnostic=RetryDiagnostic(
+                code="retry.validation_report_error",
+                message=str(exc),
+                severity="error",
+                details={"validation_gates": ("report_error",)},
+            ),
+        )
+
+
+def ensure_report_build_evidence(report: dict[str, Any]) -> dict[str, Any]:
+    section = report.setdefault("report_build", {})
+    if not isinstance(section, dict):
+        section = {}
+        report["report_build"] = section
+    for category in REPORT_BUILD_EVENT_CATEGORIES:
+        events = section.get(category)
+        if not isinstance(events, list):
+            section[category] = []
+    return section
+
+
+def record_report_build_event(
+    report: dict[str, Any],
+    *,
+    category: str,
+    field: str,
+    reason: str,
+    source: str,
+) -> None:
+    if category not in REPORT_BUILD_EVENT_CATEGORIES:
+        raise ValueError(f"Unknown report-build event category: {category}")
+    section = ensure_report_build_evidence(report)
+    events = section[category]
+    events.append(
+        {
+            "field": str(field),
+            "reason": str(reason),
+            "source": str(source),
+        }
+    )
+
+
+def report_build_has_evidence_events(report: dict[str, Any]) -> bool:
+    section = report.get("report_build")
+    if not isinstance(section, dict):
+        return False
+    for category in REPORT_BUILD_EVENT_CATEGORIES:
+        events = section.get(category)
+        if isinstance(events, list) and bool(events):
+            return True
+    return False
+
+
+@dataclass
+class ReportBuildContext:
+    evaluation_report: dict[str, Any]
+
+    def ensure_evidence(self) -> dict[str, Any]:
+        return ensure_report_build_evidence(self.evaluation_report)
+
+    def has_repair_or_fallback_events(self) -> bool:
+        self.ensure_evidence()
+        return report_build_has_blocking_evidence_events(self.evaluation_report)
+
+    def attach_pending_assurance(self) -> dict[str, Any]:
+        self.ensure_evidence()
+        assurance = build_assurance_section(
+            self.evaluation_report,
+            fallback_fields_used=self.has_repair_or_fallback_events(),
+            runtime_provenance_verified=None,
+            runtime_provenance_declared=resolve_report_runtime_provenance_declared(
+                self.evaluation_report
+            ),
+            runtime_provenance_verification_status="pending",
+        )
+        self.evaluation_report["assurance"] = assurance
+        return assurance
+
+
+class EvaluationReportBuilder:
+    def __init__(self, evaluation_report: dict[str, Any]) -> None:
+        self.context = ReportBuildContext(evaluation_report=evaluation_report)
+
+    def finalize_assurance(self) -> dict[str, Any]:
+        return self.context.attach_pending_assurance()
+
+
+def extract_telemetry(report: RunReport, device_name: Any) -> dict[str, Any]:
+    telemetry: dict[str, Any] = {}
+    metrics_section = report.get("metrics", {})
+    if isinstance(metrics_section, dict):
+        for key in (
+            "latency_ms_per_tok",
+            "memory_mb_peak",
+            "gpu_memory_mb_peak",
+            "gpu_memory_reserved_mb_peak",
+            "throughput_tok_per_s",
+        ):
+            value = metrics_section.get(key)
+            if isinstance(value, int | float) and math.isfinite(value):
+                telemetry[key] = float(value)
+
+        for key in ("preview_total_tokens", "final_total_tokens"):
+            value = metrics_section.get(key)
+            if isinstance(value, int | float) and value >= 0:
+                telemetry[key] = float(value)
+        for key in (
+            "masked_tokens_total",
+            "masked_tokens_preview",
+            "masked_tokens_final",
+        ):
+            value = metrics_section.get(key)
+            if isinstance(value, int | float) and value >= 0:
+                telemetry[key] = float(value)
+
+        edge_ctx = metrics_section.get("edge_device")
+        if isinstance(edge_ctx, dict):
+            telemetry["edge_device"] = edge_ctx
+
+    if device_name:
+        telemetry.setdefault("device", device_name)
+    return telemetry
+
+
+def build_artifacts_payload(report: RunReport) -> dict[str, Any]:
+    raw_artifacts = report.get("artifacts", {})
+    report_artifacts = dict(raw_artifacts) if isinstance(raw_artifacts, dict) else {}
+    artifacts_payload: dict[str, Any] = {
+        "events_path": report_artifacts.get("events_path", ""),
+        "logs_path": report_artifacts.get("logs_path", ""),
+        "checkpoint_path": report_artifacts.get("checkpoint_path", ""),
+        "report_path": report_artifacts.get(
+            "report_path", report_artifacts.get("logs_path", "")
+        ),
+        "generated_at": datetime.now().isoformat(),
+    }
+    masks_path = report_artifacts.get("masks_path")
+    if isinstance(masks_path, str) and masks_path:
+        artifacts_payload["masks_path"] = masks_path
+    return artifacts_payload
+
+
+def attach_schedule_digest(
+    report: RunReport, guard_overhead_section: dict[str, Any]
+) -> str | None:
+    schedule_digest = None
+    try:
+        final_windows_ctx = (
+            report.get("evaluation_windows", {}).get("final", {})
+            if isinstance(report.get("evaluation_windows"), dict)
+            else {}
+        )
+        window_ids = final_windows_ctx.get("window_ids")
+        if isinstance(window_ids, list) and window_ids:
+            digest = hashlib.blake2s(digest_size=16)
+            for wid in window_ids:
+                try:
+                    digest.update(int(wid).to_bytes(8, "little", signed=True))
+                except _NON_FATAL_EXCEPTIONS:
+                    digest.update(str(wid).encode("utf-8", "ignore"))
+            schedule_digest = digest.hexdigest()
+            guard_overhead_section["schedule_digest"] = schedule_digest
+    except _NON_FATAL_EXCEPTIONS:
+        schedule_digest = None
+    return schedule_digest
+
+
+def build_moe_section(
+    report: RunReport,
+    baseline_raw: RunReport | dict[str, Any],
+    baseline_normalized: RunReport | dict[str, Any],
+) -> dict[str, Any]:
+    moe_section: dict[str, Any] = {}
+    try:
+        run_moe = (
+            report.get("metrics", {}).get("moe")
+            if isinstance(report.get("metrics"), dict)
+            else None
+        )
+        base_moe = None
+        if isinstance(baseline_raw, dict):
+            try:
+                base_moe = baseline_raw.get("moe")
+            except _NON_FATAL_EXCEPTIONS:
+                base_moe = None
+        if (not isinstance(base_moe, dict) or not base_moe) and isinstance(
+            baseline_normalized, dict
+        ):
+            try:
+                bm = baseline_normalized.get("moe")
+                if isinstance(bm, dict) and bm:
+                    base_moe = bm
+                else:
+                    metrics = (
+                        baseline_normalized.get("metrics")
+                        if isinstance(baseline_normalized.get("metrics"), dict)
+                        else None
+                    )
+                    if isinstance(metrics, dict):
+                        base_moe = metrics.get("moe")
+            except _NON_FATAL_EXCEPTIONS:
+                pass
+        if isinstance(run_moe, dict) and run_moe:
+            for key in (
+                "top_k",
+                "capacity_factor",
+                "expert_drop_rate",
+                "load_balance_loss",
+                "router_entropy",
+            ):
+                val = run_moe.get(key)
+                if isinstance(val, int | float):
+                    moe_section[key] = float(val)
+            util = run_moe.get("utilization")
+            if isinstance(util, list) and util:
+                try:
+                    util_vals = [float(x) for x in util]
+                    moe_section["utilization_mean"] = float(
+                        sum(util_vals) / max(1, len(util_vals))
+                    )
+                    moe_section["utilization_count"] = int(len(util_vals))
+                except _NON_FATAL_EXCEPTIONS:
+                    pass
+            if isinstance(base_moe, dict) and base_moe:
+                for key in ("load_balance_loss", "router_entropy"):
+                    run_value = run_moe.get(key)
+                    base_value = base_moe.get(key)
+                    if isinstance(run_value, int | float) and isinstance(
+                        base_value, int | float
+                    ):
+                        moe_section[f"delta_{key}"] = float(run_value) - float(
+                            base_value
+                        )
+                bu = base_moe.get("utilization")
+                if isinstance(util, list) and isinstance(bu, list) and util and bu:
+                    try:
+                        util_vals = [float(x) for x in util]
+                        base_vals = [float(x) for x in bu]
+                        mu = float(sum(util_vals) / len(util_vals))
+                        mb = float(sum(base_vals) / len(base_vals))
+                        moe_section["delta_utilization_mean"] = mu - mb
+                    except _NON_FATAL_EXCEPTIONS:
+                        pass
+    except _NON_FATAL_EXCEPTIONS:
+        moe_section = {}
+    return moe_section
+
+
+def resolve_capacity_context(
+    window_capacity_ctx: Any, dataset_info: dict[str, Any]
+) -> tuple[int | None, int | None]:
+    capacity_tokens: int | None = None
+    capacity_examples: int | None = None
+    try:
+        if isinstance(window_capacity_ctx, dict):
+            token_value = window_capacity_ctx.get("total_tokens")
+            if isinstance(token_value, int | float):
+                capacity_tokens = int(token_value)
+            examples = (
+                window_capacity_ctx.get("available_unique")
+                or window_capacity_ctx.get("available_nonoverlap")
+                or window_capacity_ctx.get("candidate_limit")
+            )
+            if isinstance(examples, int | float):
+                capacity_examples = int(examples)
+        if capacity_examples is None:
+            try:
+                capacity_examples = int(
+                    dataset_info.get("windows", {}).get("preview", 0)
+                ) + int(dataset_info.get("windows", {}).get("final", 0))
+            except _NON_FATAL_EXCEPTIONS:
+                capacity_examples = None
+    except _NON_FATAL_EXCEPTIONS:
+        capacity_tokens = None
+        capacity_examples = None
+    return capacity_tokens, capacity_examples
+
+
+def evaluate_primary_metric_tail(
+    report: RunReport,
+    baseline_normalized: RunReport | dict[str, Any],
+    resolved_policy: dict[str, Any],
+    evaluate_metric_tail_fn: Any,
+) -> dict[str, Any]:
+    pm_tail_result: dict[str, Any] = {}
+    try:
+        pm_kind = None
+        try:
+            pm_block = (
+                report.get("metrics", {}).get("primary_metric")
+                if isinstance(report.get("metrics"), dict)
+                else None
+            )
+            if isinstance(pm_block, dict):
+                pm_kind = pm_block.get("kind")
+        except _NON_FATAL_EXCEPTIONS:
+            pm_kind = None
+
+        pm_tail_policy: dict[str, Any] = {}
+        try:
+            metrics_policy = (
+                resolved_policy.get("metrics", {})
+                if isinstance(resolved_policy, dict)
+                else {}
+            )
+            if isinstance(metrics_policy, dict) and isinstance(
+                metrics_policy.get("pm_tail"), dict
+            ):
+                pm_tail_policy = dict(metrics_policy.get("pm_tail") or {})
+        except _NON_FATAL_EXCEPTIONS:
+            pm_tail_policy = {}
+
+        deltas: list[float] = []
+        weights: list[float] = []
+        if is_ppl_metric_kind(pm_kind):
+            run_windows = (
+                report.get("evaluation_windows", {}).get("final", {})
+                if isinstance(report.get("evaluation_windows"), dict)
+                else {}
+            )
+            base_windows = (
+                baseline_normalized.get("evaluation_windows", {}).get("final", {})
+                if isinstance(baseline_normalized, dict)
+                else {}
+            )
+            run_ids = (
+                run_windows.get("window_ids") if isinstance(run_windows, dict) else None
+            )
+            run_ll = (
+                run_windows.get("logloss") if isinstance(run_windows, dict) else None
+            )
+            run_tc = (
+                run_windows.get("token_counts")
+                if isinstance(run_windows, dict)
+                else None
+            )
+            base_ids = (
+                base_windows.get("window_ids")
+                if isinstance(base_windows, dict)
+                else None
+            )
+            base_ll = (
+                base_windows.get("logloss") if isinstance(base_windows, dict) else None
+            )
+            if (
+                isinstance(run_ids, list)
+                and isinstance(run_ll, list)
+                and isinstance(base_ids, list)
+                and isinstance(base_ll, list)
+            ):
+                base_map: dict[int, float] = {}
+                for b_id, b_val in zip(base_ids, base_ll, strict=False):
+                    if isinstance(b_id, int | float) and isinstance(b_val, int | float):
+                        base_map[int(b_id)] = float(b_val)
+                for idx, (r_id, r_val) in enumerate(zip(run_ids, run_ll, strict=False)):
+                    if not (
+                        isinstance(r_id, int | float) and isinstance(r_val, int | float)
+                    ):
+                        continue
+                    key = int(r_id)
+                    if key not in base_map:
+                        continue
+                    delta_value = float(r_val) - base_map[key]
+                    if math.isfinite(delta_value):
+                        deltas.append(float(delta_value))
+                        if isinstance(run_tc, list) and idx < len(run_tc):
+                            try:
+                                weight_value = float(run_tc[idx])
+                            except _NUMERIC_EXCEPTIONS:
+                                weight_value = 0.0
+                            weights.append(float(max(weight_value, 0.0)))
+
+        pm_tail_result = evaluate_metric_tail_fn(
+            deltas=deltas,
+            weights=weights if (weights and len(weights) == len(deltas)) else None,
+            policy=pm_tail_policy,
+        )
+        pm_tail_result["source"] = "paired_baseline.final"
+    except _NON_FATAL_EXCEPTIONS:
+        pm_tail_result = {"mode": "warn", "evaluated": False, "passed": True}
+    return pm_tail_result
 
 
 def optional_text(value: Any) -> str | None:
@@ -246,6 +734,7 @@ def build_baseline_reference(
     baseline_ref: dict[str, Any] = {
         "run_id": optional_text(baseline_normalized.get("run_id")),
         "model_id": optional_text(baseline_normalized.get("model_id")),
+        "adapter": optional_text(baseline_normalized.get("adapter")),
         "primary_metric": {
             "kind": baseline_pm.get("kind", "ppl_causal"),
             "final": float(baseline_final),

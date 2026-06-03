@@ -8,7 +8,7 @@
 | **Audience** | Release reviewers, security reviewers, operators packaging evidence bundles. |
 | **Contract scope** | Current strict assurance behavior, runtime manifest schema v1. |
 | **Required artifact** | `runtime.manifest.json` adjacent to every container-backed `evaluation.report.json`. |
-| **Source of truth** | `src/invarlock/core/runtime_manifest_verify.py`, `src/invarlock/runtime_provenance.py`, `contracts/runtime_manifest.schema.json`, `docs/security/threat-model.md`. |
+| **Source of truth** | `src/invarlock/runtime_verify.py`, `src/invarlock/runtime_provenance.py`, `contracts/runtime_manifest.schema.json`, `docs/security/threat-model.md`. |
 
 Strict assurance requires runtime provenance. The verifier must be able to
 connect an evaluation report to the runtime environment that produced it.
@@ -27,8 +27,8 @@ invarlock advanced runtime-verify \
 
 The default `invarlock evaluate --execution-mode container` flow emits
 `runtime.manifest.json` next to `evaluation.report.json` automatically. Host
-execution requires `verify --runtime-provenance host` and forfeits strict
-assurance unless `--assurance off` is explicit.
+execution forfeits strict assurance and should be verified explicitly with
+`verify --runtime-provenance host --assurance off`.
 
 ## Strict Runtime Requirements
 
@@ -39,16 +39,15 @@ assurance unless `--assurance off` is explicit.
 - Host execution and unverified provenance force the report out of strict
   assurance.
 
-## What The Manifest Proves
+## What The Manifest Records
 
 The runtime manifest records the execution mode, runtime tool, image
 reference, image digest or local-image allowance, command context, and policy
 allowances used for the evaluation.
 
-It does not prove kernel-level isolation, cloud tenancy, GPU firmware
-integrity, or that the baseline model itself is trustworthy. See
-[Threat Model](threat-model.md) for the wider set of assumptions and
-out-of-scope concerns.
+Kernel-level isolation, cloud tenancy, GPU firmware integrity, and baseline
+model trust are outside the manifest boundary. See [Threat Model](threat-model.md)
+for the wider set of assumptions and out-of-scope concerns.
 
 ## Recommended Review
 

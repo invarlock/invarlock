@@ -335,7 +335,7 @@ def test_doctor_non_json_device_and_optional_paths(monkeypatch):
     )
 
     def fake_find_spec(name):
-        if name in {"auto_gptq", "bitsandbytes"}:
+        if name in {"gptqmodel", "bitsandbytes"}:
             return None
         return types.SimpleNamespace(name=name)
 

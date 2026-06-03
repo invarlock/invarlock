@@ -10,7 +10,7 @@ def test_run_model_evidence_remote_dry_run_emits_tmux_launch_plan(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "run_model_evidence_remote.py"
+    script = repo_root / "scripts" / "model_evidence" / "run_model_evidence_remote.py"
 
     proc = subprocess.run(
         [
@@ -51,15 +51,17 @@ def test_run_model_evidence_remote_dry_run_emits_tmux_launch_plan(
     )
     assert "/root/venvs/invarlock/bin/python" in payload["remote_python_candidates"]
     assert 'REPO_DIR=""' in payload["sync_command"]
+    assert "for candidate in $REPO_DIR/.venv/bin/python" in payload["sync_command"]
+    assert "'$REPO_DIR/.venv/bin/python'" not in payload["sync_command"]
     assert "git checkout staging/next" in payload["sync_command"]
     assert (
-        "$PYTHON_BIN scripts/sync_packaged_contracts.py --check"
+        "$PYTHON_BIN scripts/checks/sync_packaged_contracts.py --check"
         in payload["sync_command"]
     )
     assert len(payload["launches"]) == 2
     assert payload["launches"][0]["session"] == "model-evidence-20260319T120000Z-g0"
     assert (
-        "$PYTHON_BIN scripts/model_evidence_sweep.py"
+        "$PYTHON_BIN scripts/model_evidence/model_evidence_sweep.py"
         in payload["launches"][0]["remote_command"]
     )
     assert "cd $REPO_DIR" in payload["launches"][0]["remote_command"]
@@ -74,7 +76,7 @@ def test_run_model_evidence_remote_dry_run_emits_tmux_launch_plan(
 
 def test_run_model_evidence_remote_dry_run_respects_skip_sync() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "run_model_evidence_remote.py"
+    script = repo_root / "scripts" / "model_evidence" / "run_model_evidence_remote.py"
 
     proc = subprocess.run(
         [
@@ -104,7 +106,7 @@ def test_run_model_evidence_remote_dry_run_respects_skip_sync() -> None:
 
 def test_run_model_evidence_remote_host_mode_is_forwarded() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "run_model_evidence_remote.py"
+    script = repo_root / "scripts" / "model_evidence" / "run_model_evidence_remote.py"
 
     proc = subprocess.run(
         [
@@ -133,7 +135,7 @@ def test_run_model_evidence_remote_host_mode_is_forwarded() -> None:
 
 def test_run_model_evidence_remote_dry_run_respects_explicit_remote_repo() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "run_model_evidence_remote.py"
+    script = repo_root / "scripts" / "model_evidence" / "run_model_evidence_remote.py"
 
     proc = subprocess.run(
         [

@@ -1,5 +1,9 @@
 # Guard Validation Smoke
 
+> **Plain language:** The smoke command checks the synthetic guard-validation
+> harness still runs and records deterministic guard behavior. Real model-family
+> evidence remains a separate release-evidence surface.
+
 ## Overview
 
 | Aspect | Details |
@@ -7,7 +11,7 @@
 | **Purpose** | Track the lightweight guard-validation evidence surface for spectral, RMT, and variance guards. |
 | **Audience** | Maintainers, release reviewers, and calibration owners. |
 | **Contract scope** | Deterministic synthetic smoke only; empirical model-family calibration remains a release-evidence requirement. |
-| **Source of truth** | `scripts/guard_validation_smoke.py`, generated `artifacts/guard-validation/*`, and guard-specific assurance docs. |
+| **Source of truth** | `scripts/smoke/guard_validation_smoke.py`, generated `artifacts/guard-validation/*`, and guard-specific assurance docs. |
 
 ## Maintainer Command
 
@@ -29,15 +33,16 @@ for checking that the release evidence path exists and stays deterministic.
 
 ## Interpretation
 
-The generated rows are not a substitute for real checkpoint validation. They
-do not prove thresholds for GPT-2, LLaMA, Qwen, BERT, or any other model family.
-They only provide a repeatable harness shape for:
+The generated rows provide a repeatable harness shape for synthetic validation
+and a release-evidence floor. Real checkpoint validation carries the
+model-family threshold evidence for GPT-2, LLaMA, Qwen, BERT, and other model
+families:
 
 - type-I error reporting
 - power reporting
 - calibration-window sensitivity
-- model-family sensitivity placeholders
-- injected-defect detection examples
+- model-family placeholder rows
+- synthetic shifted-power rates
 
 Release reviewers should treat the smoke as a floor. Empirical artifacts for
 real model families still belong in the release evidence bundle when a release
@@ -49,8 +54,8 @@ The repo also ships real-run evidence machinery that is separate from this
 synthetic smoke:
 
 - `make model-evidence-sweep` runs maintained shipped-model lanes through
-  `scripts/model_evidence_sweep.py`.
-- `scripts/run_model_evidence_remote.py` launches the same sweep on remote GPU
+  `scripts/model_evidence/model_evidence_sweep.py`.
+- `scripts/model_evidence/run_model_evidence_remote.py` launches the same sweep on remote GPU
   hosts.
 - `invarlock advanced calibrate null-sweep` and
   `invarlock advanced calibrate ve-sweep` emit empirical calibration artifacts.
@@ -59,8 +64,8 @@ synthetic smoke:
 
 Use `make empirical-guard-evidence-check` to validate a portable empirical
 guard-evidence manifest when real evidence is attached for release review.
-That checker does not replace `make guard-validation-smoke`; it validates the
-separate non-synthetic artifact bundle.
+That checker validates the separate non-synthetic artifact bundle; `make
+guard-validation-smoke` remains the deterministic smoke floor.
 
 ## Related Documentation
 

@@ -22,14 +22,8 @@ from invarlock.reporting.dataset_hashing import (
 from invarlock.reporting.guards_invariants import (
     _extract_invariants,
 )
-from invarlock.reporting.guards_rmt import (
-    _extract_rmt_analysis,
-)
 from invarlock.reporting.guards_spectral import (
     _extract_spectral_analysis,
-)
-from invarlock.reporting.guards_variance import (
-    _extract_variance_analysis,
 )
 from invarlock.reporting.policy_utils import (
     _build_resolved_policies,
@@ -48,9 +42,6 @@ from invarlock.reporting.render_markdown import (
 from invarlock.reporting.report_builder_support import (
     extract_report_meta as _extract_report_meta,
 )
-from invarlock.reporting.report_console import (
-    compute_report_hash as _compute_report_hash,
-)
 from invarlock.reporting.report_edit_summary import (
     analyze_bitwidth_map as _analyze_bitwidth_map,
 )
@@ -63,7 +54,11 @@ from invarlock.reporting.report_edit_summary import (
 from invarlock.reporting.report_edit_summary import (
     extract_structural_deltas as _extract_structural_deltas,
 )
-from invarlock.reporting.report_make import make_report
+from invarlock.reporting.report_make import (
+    _extract_rmt_analysis,
+    _extract_variance_analysis,
+    make_report,
+)
 from invarlock.reporting.report_normalization import (
     _generate_run_id,
 )
@@ -77,6 +72,9 @@ from invarlock.reporting.report_provenance import (
     compute_report_digest as _compute_report_digest,
 )
 from invarlock.reporting.report_schema import REPORT_SCHEMA_VERSION, validate_report
+from invarlock.reporting.report_summary import (
+    compute_report_hash as _compute_report_hash,
+)
 from invarlock.reporting.report_validation import (
     compute_validation_flags as _compute_validation_flags,
 )

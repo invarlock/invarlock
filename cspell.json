@@ -16,6 +16,13 @@
     "mkdocs",
     "checkpointing",
     "gptq",
+    "hqq",
+    "quanto",
+    "optimum",
+    "llmcompressor",
+    "compressedtensors",
+    "compressedlinear",
+    "torchao",
     "conftest",
     "Deepchecks",
     "deadband",
@@ -106,6 +113,7 @@
     "mistralai",
     "Ministral",
     "Mixtral",
+    "perplexity",
     "subshells",
     "BLAS",
     "Hella",
@@ -129,6 +137,10 @@
     "safetensors",
     "lockfiles",
     "dequantize",
-    "dequantized"
+    "dequantized",
+    "Arithmatex",
+    "Sbornik",
+    "Silverstein",
+    "checksummed"
   ]
 }

@@ -3,8 +3,8 @@ from __future__ import annotations
 import importlib.metadata as importlib_metadata
 from types import SimpleNamespace
 
-import invarlock.core.doctor_inventory as mod
-from invarlock.core.doctor_inventory import (
+import invarlock.core.doctor_findings as mod
+from invarlock.core.doctor_findings import (
     build_adapter_inventory_rows,
     build_dataset_inventory_rows,
     build_generic_inventory_rows,
@@ -30,6 +30,14 @@ class _FakeRegistry:
     def get_plugin_info(self, name: str, kind: str) -> dict[str, str]:
         if name == "hf_bnb":
             return {"module": "thirdparty.adapters.hf_bnb", "entry_point": name}
+        if name == "hf_torchao":
+            return {"module": "thirdparty.adapters.hf_torchao", "entry_point": name}
+        if name == "hf_hqq":
+            return {"module": "thirdparty.adapters.hf_hqq", "entry_point": name}
+        if name == "hf_quanto":
+            return {"module": "thirdparty.adapters.hf_quanto", "entry_point": name}
+        if name == "hf_ct":
+            return {"module": "thirdparty.adapters.hf_ct", "entry_point": name}
         return {"module": f"invarlock.{kind}.{name}", "entry_point": name}
 
 
@@ -77,7 +85,7 @@ def test_build_adapter_inventory_rows_marks_bitsandbytes_unsupported_without_run
     assert rows[0].detail == "bitsandbytes unavailable on this host"
 
 
-def test_build_adapter_inventory_rows_marks_auto_adapter_and_linux_only_quantizers(
+def test_build_adapter_inventory_rows_marks_auto_adapter_and_optional_awq(
     monkeypatch,
 ) -> None:
     registry = _FakeRegistry(adapters=["hf_auto", "hf_awq"], edits=[], guards=[])
@@ -99,8 +107,105 @@ def test_build_adapter_inventory_rows_marks_auto_adapter_and_linux_only_quantize
     assert rows[0].mode == "auto-matcher"
     assert rows[0].origin == "core"
     assert rows[0].version == "4.0.0"
-    assert rows[1].status == "unsupported"
-    assert rows[1].detail == "Linux-only"
+    assert rows[1].backend == "gptqmodel"
+    assert rows[1].status == "ready"
+    assert rows[1].detail is None
+
+
+def test_build_adapter_inventory_rows_marks_optional_torchao() -> None:
+    registry = _FakeRegistry(adapters=["hf_torchao"], edits=[], guards=[])
+
+    missing_rows = build_adapter_inventory_rows(
+        registry,
+        has_cuda=False,
+        is_linux=True,
+        find_spec_safe=lambda _name: None,
+        bitsandbytes_runtime_ready=True,
+    )
+    assert missing_rows[0].backend == "torchao"
+    assert missing_rows[0].status == "needs_extra"
+    assert missing_rows[0].required_extra == "invarlock[torchao]"
+
+    ready_rows = build_adapter_inventory_rows(
+        registry,
+        has_cuda=False,
+        is_linux=True,
+        find_spec_safe=lambda name: SimpleNamespace(name=name),
+        bitsandbytes_runtime_ready=True,
+    )
+    assert ready_rows[0].status == "ready"
+
+
+def test_build_adapter_inventory_rows_marks_optional_hqq() -> None:
+    registry = _FakeRegistry(adapters=["hf_hqq"], edits=[], guards=[])
+
+    missing_rows = build_adapter_inventory_rows(
+        registry,
+        has_cuda=False,
+        is_linux=True,
+        find_spec_safe=lambda _name: None,
+        bitsandbytes_runtime_ready=True,
+    )
+    assert missing_rows[0].backend == "hqq"
+    assert missing_rows[0].status == "needs_extra"
+    assert missing_rows[0].required_extra == "invarlock[hqq]"
+
+    ready_rows = build_adapter_inventory_rows(
+        registry,
+        has_cuda=False,
+        is_linux=True,
+        find_spec_safe=lambda name: SimpleNamespace(name=name),
+        bitsandbytes_runtime_ready=True,
+    )
+    assert ready_rows[0].status == "ready"
+
+
+def test_build_adapter_inventory_rows_marks_optional_quanto() -> None:
+    registry = _FakeRegistry(adapters=["hf_quanto"], edits=[], guards=[])
+
+    missing_rows = build_adapter_inventory_rows(
+        registry,
+        has_cuda=False,
+        is_linux=True,
+        find_spec_safe=lambda _name: None,
+        bitsandbytes_runtime_ready=True,
+    )
+    assert missing_rows[0].backend == "optimum.quanto"
+    assert missing_rows[0].status == "needs_extra"
+    assert missing_rows[0].required_extra == "invarlock[quanto]"
+
+    ready_rows = build_adapter_inventory_rows(
+        registry,
+        has_cuda=False,
+        is_linux=True,
+        find_spec_safe=lambda name: SimpleNamespace(name=name),
+        bitsandbytes_runtime_ready=True,
+    )
+    assert ready_rows[0].status == "ready"
+
+
+def test_build_adapter_inventory_rows_marks_optional_compressed_tensors() -> None:
+    registry = _FakeRegistry(adapters=["hf_ct"], edits=[], guards=[])
+
+    missing_rows = build_adapter_inventory_rows(
+        registry,
+        has_cuda=False,
+        is_linux=True,
+        find_spec_safe=lambda _name: None,
+        bitsandbytes_runtime_ready=True,
+    )
+    assert missing_rows[0].backend == "compressed_tensors"
+    assert missing_rows[0].status == "needs_extra"
+    assert missing_rows[0].required_extra == "invarlock[compressed-tensors]"
+
+    ready_rows = build_adapter_inventory_rows(
+        registry,
+        has_cuda=False,
+        is_linux=True,
+        find_spec_safe=lambda name: SimpleNamespace(name=name),
+        bitsandbytes_runtime_ready=True,
+    )
+    assert ready_rows[0].status == "ready"
 
 
 def test_build_adapter_inventory_rows_keeps_missing_extra_hint_optional() -> None:

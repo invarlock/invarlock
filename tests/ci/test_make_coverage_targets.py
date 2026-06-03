@@ -5,7 +5,12 @@ from pathlib import Path
 
 
 def _load_coverage_policy():
-    policy_path = Path(__file__).resolve().parents[2] / "scripts" / "coverage_policy.py"
+    policy_path = (
+        Path(__file__).resolve().parents[2]
+        / "scripts"
+        / "coverage"
+        / "check_coverage_thresholds.py"
+    )
     spec = importlib.util.spec_from_file_location("coverage_policy", policy_path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -94,24 +99,35 @@ def test_coverage_policy_is_shared_with_makefile_and_expanded_surface() -> None:
     makefile = Path(__file__).resolve().parents[2] / "Makefile"
     text = makefile.read_text(encoding="utf-8")
 
-    assert "COVERAGE_POLICY := $(PYTHON) scripts/coverage_policy.py" in text
+    assert (
+        "COVERAGE_POLICY := $(PYTHON) scripts/coverage/check_coverage_thresholds.py"
+        in text
+    )
     assert "COVERAGE_MODULES := \\" in text
     assert "\t$(shell $(COVERAGE_POLICY) coverage-modules)" in text
     assert "COVERAGE_INCLUDE := $(shell $(COVERAGE_POLICY) coverage-include)" in text
     assert "empirical-guard-evidence-check:" in text
 
     assert "src/invarlock/observability/" in policy.CORE_PREFIXES
-    assert "src/invarlock/config.py" in policy.CORE_FILES
+    assert "src/invarlock/__init__.py" in policy.CORE_FILES
     assert "src/invarlock/adapters/auto.py" in policy.CORE_FILES
     assert "scripts/release/evidence_contracts.py" in policy.CORE_FILES
-    assert "scripts/release/check_empirical_guard_evidence.py" in policy.CORE_FILES
-    assert "scripts/release/check_release_evidence.py" in policy.CORE_FILES
-    assert "src/invarlock/reporting/report_build_evidence.py" in policy.CORE_FILES
-    assert "src/invarlock/reporting/evaluation_report_builder.py" in policy.CORE_FILES
-    assert "src/invarlock/reporting/report_make_output.py" in policy.CORE_FILES
+    assert "src/invarlock/calibration.py" in policy.CORE_FILES
+    assert "src/invarlock/calibration.py" in policy.THRESHOLDS
+    assert "src/invarlock/eval/data_local.py" in policy.CORE_FILES
+    assert "src/invarlock/eval/data_local.py" in policy.THRESHOLDS
+    assert "src/invarlock/eval/metrics_runtime_resources.py" in policy.CORE_FILES
+    assert "src/invarlock/eval/metrics_runtime_resources.py" in policy.THRESHOLDS
+    assert "src/invarlock/reporting/report_builder_support.py" in policy.THRESHOLDS
+    assert "src/invarlock/reporting/report_builder_telemetry.py" in policy.THRESHOLDS
+    assert "src/invarlock/reporting/report_bundle.py" in policy.THRESHOLDS
+    assert "src/invarlock/reporting/report_make.py" in policy.CORE_FILES
     assert (
         "src/invarlock/reporting/report_primary_metric_policy.py" in policy.CORE_FILES
     )
+    assert policy.CORE_FLOOR_DEFAULT == 0.90
+    assert policy.DEFAULT_FLOOR_DEFAULT == 0.90
+    assert set(policy.THRESHOLDS.values()) == {1.00}
 
     assert policy.COVERAGE_MODULE_FLAGS == ("--cov",)
 
@@ -121,11 +137,13 @@ def test_coverage_policy_is_shared_with_makefile_and_expanded_surface() -> None:
 
     for pattern in (
         "src/invarlock/observability/*",
-        "src/invarlock/config.py",
+        "src/invarlock/__init__.py",
+        "src/invarlock/calibration.py",
         "src/invarlock/adapters/auto.py",
         "scripts/release/*.py",
         "invarlock/observability/*",
-        "invarlock/config.py",
+        "invarlock/__init__.py",
+        "invarlock/calibration.py",
         "invarlock/adapters/auto.py",
     ):
         assert pattern in policy.COVERAGE_INCLUDE_PATTERNS
@@ -174,7 +192,7 @@ def test_makefile_exposes_actionlint_and_minimal_packaging_smoke_targets() -> No
     ) in text
     assert "docs-live-fast:" in text
     assert "docs-live:" in text
-    assert "scripts/verify_live_examples.py" in text
+    assert "scripts/docs/verify_live_examples.py" in text
     docs_live_fast_block = text.split("docs-live-fast:", 1)[1].split("docs-live:", 1)[0]
     docs_live_block = text.split("docs-live:", 1)[1].split("docs-check-build:", 1)[0]
 
@@ -212,10 +230,10 @@ def test_makefile_assurance_lane_includes_strict_assurance_tests() -> None:
 
     for expected in (
         "tests/core/test_assurance_contract.py",
-        "tests/reporting/test_verify_assurance_guard_chain.py",
+        "tests/reporting/validation/test_verify_assurance_guard_chain.py",
         "tests/core/test_bootstrap.py::test_paired_delta_log_ci_property_strict_identity",
         "tests/core/test_bootstrap.py::test_paired_delta_log_ci_property_rejects_mismatched_lengths",
-        "tests/guards/test_unsupported_assurance_shape.py",
+        "tests/guards/contracts/test_unsupported_assurance_shape.py",
     ):
         assert expected in target_block
 
@@ -263,7 +281,7 @@ def test_makefile_exposes_typed_surface_target() -> None:
     assert "mypy-typed-surface:" in text
     for path in (
         "src/invarlock/observability/metrics.py",
-        "src/invarlock/config.py",
+        "src/invarlock/__init__.py",
         "src/invarlock/adapters/auto.py",
         "src/invarlock/core/assurance_contract.py",
         "src/invarlock/core/bootstrap.py",
@@ -272,17 +290,18 @@ def test_makefile_exposes_typed_surface_target() -> None:
         "src/invarlock/core/evaluate_plan.py",
         "src/invarlock/core/metric_provider_resolution.py",
         "src/invarlock/core/runner_eval_metrics_stats.py",
-        "src/invarlock/core/run_orchestrator_execute_seed.py",
+        "src/invarlock/core/run_orchestrator.py",
+        "src/invarlock/core/run_orchestrator_execute.py",
         "src/invarlock/core/run_orchestrator_execute_environment.py",
-        "src/invarlock/core/run_orchestrator_execute_dataset.py",
         "src/invarlock/core/run_orchestrator_execute_attempts.py",
+        "src/invarlock/core/run_orchestrator_execute_attempt_results.py",
         "src/invarlock/core/run_orchestrator_execute_execution.py",
         "src/invarlock/core/run_orchestrator_execute_helpers.py",
         "src/invarlock/cli/app.py",
-        "src/invarlock/cli/runtime_verify.py",
-        "src/invarlock/eval/probes/mi.py",
-        "src/invarlock/reporting/report_build_evidence.py",
-        "src/invarlock/reporting/report_make_output.py",
+        "src/invarlock/eval/probes/importance.py",
+        "src/invarlock/reporting/report_builder_telemetry.py",
+        "src/invarlock/reporting/report_builder_support.py",
+        "src/invarlock/reporting/report_make.py",
         "src/invarlock/reporting/report_primary_metric_policy.py",
         "src/invarlock/reporting/report_schema.py",
         "src/invarlock/reporting/verify_contract.py",
@@ -308,7 +327,7 @@ def test_makefile_exposes_isolated_security_gate() -> None:
     assert ".PHONY: security supply-chain-security" in text
     assert "security: supply-chain-security" in text
     assert "command -v uv" in text
-    assert "scripts/generate_sbom.sh --scope tool-environment" in text
+    assert "scripts/security/generate_sbom.sh --scope tool-environment" in text
     assert "$(SECURITY_ARTIFACT_DIR)/sbom.json" in text
     assert "python scripts/security/run_pip_audit.py" in text
 
@@ -356,5 +375,6 @@ def test_coverage_include_does_not_embed_space_prefixed_cli_patterns() -> None:
     assert "src/invarlock/cli/commands/*" in include
     assert "src/invarlock/public_contracts.py" in include
     assert "src/invarlock/evidence_pack.py" in include
+    assert "src/invarlock/evidence_pack_edit_metadata.py" in include
     assert "src/invarlock/runtime_security.py" in include
     assert "invarlock/cli/commands/*" in include

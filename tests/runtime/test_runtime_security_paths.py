@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import invarlock.cli.runtime_launch_plan as runtime_launch_plan
+import invarlock.runtime_security as runtime_launch_plan
 import invarlock.runtime_security as runtime_security
 import invarlock.runtime_security_helpers as runtime_security_helpers
 
@@ -658,6 +658,10 @@ def test_path_env_value_and_delegated_env_pairs_translate_workspace_paths(
     monkeypatch.setenv(runtime_security.ALLOW_REMOTE_CODE_ENV, "0")
     monkeypatch.setenv(runtime_security.ALLOW_THIRD_PARTY_PLUGINS_ENV, "1")
     monkeypatch.setenv(runtime_security.ALLOW_UNVERIFIED_PROVENANCE_ENV, "0")
+    monkeypatch.setenv(
+        runtime_security.RUNTIME_IMAGE_ENV,
+        "invarlock-runtime:cuda-quant",
+    )
     monkeypatch.setenv("INVARLOCK_SNAPSHOT_MODE", "audit")
     monkeypatch.setenv("INVARLOCK_EVALUATE_TMP_DIR", str(inside_tmp))
     monkeypatch.setenv("TMPDIR", str(external_tmp))
@@ -691,6 +695,10 @@ def test_path_env_value_and_delegated_env_pairs_translate_workspace_paths(
         assert env_pairs[runtime_security.ALLOW_REMOTE_CODE_ENV] == "1"
         assert env_pairs[runtime_security.ALLOW_THIRD_PARTY_PLUGINS_ENV] == "0"
         assert env_pairs[runtime_security.ALLOW_UNVERIFIED_PROVENANCE_ENV] == "1"
+        assert (
+            env_pairs[runtime_security.RUNTIME_IMAGE_ENV]
+            == "invarlock-runtime:cuda-quant"
+        )
         assert env_pairs["INVARLOCK_SNAPSHOT_MODE"] == "audit"
         assert env_pairs["INVARLOCK_EVALUATE_TMP_DIR"] == "/workspace/tmp-cache"
         assert env_pairs["TMPDIR"] == str(external_tmp.resolve())

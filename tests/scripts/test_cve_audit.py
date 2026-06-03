@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from types import ModuleType
+
+import pytest
 
 
 def _load_script_module() -> ModuleType:
@@ -111,6 +114,31 @@ def test_findings_include_all_matched_advisories_and_allowlist_classified() -> N
     assert findings[0]["fixed_versions"] == ["2.7.0"]
 
 
+def test_load_allowlist_uses_strict_pip_audit_policy(tmp_path: Path) -> None:
+    module = _load_script_module()
+    allowlist = tmp_path / "allowlist.json"
+    allowlist.write_text(
+        json.dumps(
+            {
+                "owner": "security-maintainers",
+                "entries": [
+                    {
+                        "advisory": "GHSA-test-test-test",
+                        "owner": "security-maintainers",
+                        "expires": (date.today() + timedelta(days=7)).isoformat(),
+                        "tracking_issue": "https://github.com/example/repo/pull/1",
+                        "reason": "fixture",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit, match="must link to a GitHub tracking issue"):
+        module.load_allowlist(allowlist)
+
+
 def test_build_report_can_run_inventory_only(tmp_path: Path) -> None:
     module = _load_script_module()
     (tmp_path / "requirements" / "workflows").mkdir(parents=True)
@@ -132,3 +160,31 @@ def test_build_report_can_run_inventory_only(tmp_path: Path) -> None:
     assert report["inventory"]["src_used_component_count"] == 1
     assert "since" not in report
     assert report["findings"] == []
+
+
+def test_parse_args_rejects_non_positive_batch_size() -> None:
+    module = _load_script_module()
+
+    with pytest.raises(SystemExit):
+        module.parse_args(["--batch-size", "0"])
+
+
+def test_query_osv_batch_rejects_malformed_result_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_script_module()
+    component = module.Component(
+        ecosystem="PyPI",
+        name="urllib3",
+        version="2.6.3",
+        sources={"uv.lock"},
+    )
+
+    monkeypatch.setattr(
+        module,
+        "_read_json_url",
+        lambda *_args, **_kwargs: {"results": []},
+    )
+
+    with pytest.raises(RuntimeError, match="returned 0 results for 1 components"):
+        module.query_osv_batch([component], 100, enrich=False)

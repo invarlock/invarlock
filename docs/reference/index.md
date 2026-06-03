@@ -10,7 +10,7 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 | [CLI Reference](cli.md) | Command-line interface and options | All users |
 | [Tier Policy Tuning CLI (Calibration)](calibration.md) | Tier policy sweep harnesses | Operators recalibrating thresholds |
 | [Configuration Schema](config-schema.md) | YAML config structure and precedence | CLI users |
-| [Guards](guards.md) | Safety check configuration and evidence | Users tuning guards |
+| [Guards](guards.md) | Guard configuration and evidence | Users tuning guards |
 | [Model Adapters](model-adapters.md) | Adapter selection and capabilities | CLI and API users |
 | [Model Family Catalog](model-family-catalog.md) | Authoritative support inventory and backlog | Reviewers, tool authors |
 | [Public Contracts](contracts.md) | Stable public contracts for reports, verification, and policy artifacts | Tool authors, reviewers |
@@ -43,7 +43,7 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 1. [Guards](guards.md) — Configuration and evidence
 2. [Tier Policy Catalog](tier-policy-catalog.md) — Threshold rationale
 3. [Tier Policy Tuning CLI (Calibration)](calibration.md) — Sweep harnesses for recalibrating thresholds
-4. [GPU/MPS-First Guards](../assurance/13-gpu-mps-first-guards.md) — Design decisions
+4. [GPU/MPS-First Guard Measurement Contracts](../assurance/13-gpu-mps-first-guards.md) — Accelerator guard evidence contracts
 
 ### Programming Against InvarLock
 
@@ -64,5 +64,5 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 ## Related Documentation
 
 - [User Guide](../user-guide/getting-started.md) — Task-oriented workflows
-- [Assurance](../assurance/00-assurance-case.md) — Assurance claims and derivations
+- [Assurance](../assurance/00-assurance-case.md) — Assurance rationale and derivations
 - [Security](../security/pip-audit-allowlist.md) — Security policies

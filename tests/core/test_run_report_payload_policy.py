@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from invarlock.core.run_report_payload_policy import (
+from invarlock.reporting.run_report_contract import (
     build_artifacts_payload,
     build_edit_payload,
     build_flags_payload,
@@ -43,6 +43,20 @@ def test_build_run_report_context_splits_known_sections() -> None:
             "acceptance_range": {"min": 0.95, "max": 1.1},
         },
     }
+
+
+def test_build_run_report_context_copies_runtime_and_guard_chain() -> None:
+    payload = build_run_report_context(
+        profile_normalized="release",
+        auto_config={},
+        run_context={
+            "runtime": {"mode": "container"},
+            "guard_chain_observed": ["spectral", "rmt"],
+        },
+    )
+
+    assert payload["runtime"] == {"mode": "container"}
+    assert payload["guard_chain_observed"] == ["spectral", "rmt"]
 
 
 def test_build_run_report_meta_collects_profile_and_optional_fields() -> None:

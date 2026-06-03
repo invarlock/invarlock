@@ -53,9 +53,12 @@ def require_run_report_artifact(run_result: str | Path | None, *, stage: str) ->
 def load_validated_baseline_report(
     report_path: str | Path,
     *,
+    expected_model_id: str,
     expected_profile: str,
     expected_tier: str,
     expected_adapter: str,
+    expected_assurance_mode: str,
+    expected_dataset: dict[str, Any] | None = None,
 ) -> tuple[Path, dict[str, Any]]:
     """Load and validate a reusable baseline report for `evaluate`."""
 
@@ -74,9 +77,12 @@ def load_validated_baseline_report(
     _validate_baseline_report_payload(
         payload,
         resolved_report=resolved_report,
+        expected_model_id=expected_model_id,
         expected_profile=expected_profile,
         expected_tier=expected_tier,
         expected_adapter=expected_adapter,
+        expected_assurance_mode=expected_assurance_mode,
+        expected_dataset=expected_dataset,
     )
     return resolved_report, payload
 
@@ -102,9 +108,12 @@ def _validate_baseline_report_payload(
     payload: dict[str, Any],
     *,
     resolved_report: Path,
+    expected_model_id: str,
     expected_profile: str,
     expected_tier: str,
     expected_adapter: str,
+    expected_assurance_mode: str,
+    expected_dataset: dict[str, Any] | None = None,
 ) -> None:
     edit_block = payload.get("edit")
     edit_name = edit_block.get("name") if isinstance(edit_block, dict) else None
@@ -119,51 +128,92 @@ def _validate_baseline_report_payload(
         )
 
     meta = payload.get("meta")
-    if isinstance(meta, dict):
-        baseline_adapter = meta.get("adapter")
-        if isinstance(baseline_adapter, str) and baseline_adapter != expected_adapter:
-            raise ValidationError(
-                code="E222",
-                message=(
-                    "Baseline report adapter mismatch. "
-                    f"Expected {expected_adapter!r}, got {baseline_adapter!r} in "
-                    f"{resolved_report}"
-                ),
-                details={"path": str(resolved_report), "field": "meta.adapter"},
-            )
+    if not isinstance(meta, dict):
+        raise ValidationError(
+            code="E222",
+            message=f"Baseline report missing meta object in {resolved_report}",
+            details={"path": str(resolved_report), "field": "meta"},
+        )
+    baseline_model_id = meta.get("model_id")
+    if not isinstance(baseline_model_id, str) or not _model_ids_equivalent(
+        baseline_model_id,
+        expected_model_id,
+    ):
+        raise ValidationError(
+            code="E222",
+            message=(
+                "Baseline report model mismatch. "
+                f"Expected {expected_model_id!r}, got {baseline_model_id!r} in "
+                f"{resolved_report}"
+            ),
+            details={"path": str(resolved_report), "field": "meta.model_id"},
+        )
+    baseline_adapter = meta.get("adapter")
+    if not isinstance(baseline_adapter, str) or baseline_adapter != expected_adapter:
+        raise ValidationError(
+            code="E222",
+            message=(
+                "Baseline report adapter mismatch. "
+                f"Expected {expected_adapter!r}, got {baseline_adapter!r} in "
+                f"{resolved_report}"
+            ),
+            details={"path": str(resolved_report), "field": "meta.adapter"},
+        )
 
     context = payload.get("context")
-    if isinstance(context, dict):
-        baseline_profile = context.get("profile")
-        if (
-            isinstance(baseline_profile, str)
-            and baseline_profile.strip().lower() != expected_profile.strip().lower()
-        ):
-            raise ValidationError(
-                code="E222",
-                message=(
-                    "Baseline report profile mismatch. "
-                    f"Expected {expected_profile!r}, got {baseline_profile!r} in "
-                    f"{resolved_report}"
-                ),
-                details={"path": str(resolved_report), "field": "context.profile"},
-            )
-        auto_ctx = context.get("auto")
-        if isinstance(auto_ctx, dict):
-            baseline_tier = auto_ctx.get("tier")
-            if isinstance(baseline_tier, str) and baseline_tier != expected_tier:
-                raise ValidationError(
-                    code="E222",
-                    message=(
-                        "Baseline report tier mismatch. "
-                        f"Expected {expected_tier!r}, got {baseline_tier!r} in "
-                        f"{resolved_report}"
-                    ),
-                    details={
-                        "path": str(resolved_report),
-                        "field": "context.auto.tier",
-                    },
-                )
+    if not isinstance(context, dict):
+        raise ValidationError(
+            code="E222",
+            message=f"Baseline report missing context object in {resolved_report}",
+            details={"path": str(resolved_report), "field": "context"},
+        )
+    baseline_profile = context.get("profile")
+    if (
+        not isinstance(baseline_profile, str)
+        or baseline_profile.strip().lower() != expected_profile.strip().lower()
+    ):
+        raise ValidationError(
+            code="E222",
+            message=(
+                "Baseline report profile mismatch. "
+                f"Expected {expected_profile!r}, got {baseline_profile!r} in "
+                f"{resolved_report}"
+            ),
+            details={"path": str(resolved_report), "field": "context.profile"},
+        )
+    baseline_tier = _baseline_report_tier(payload, context)
+    if not isinstance(baseline_tier, str) or baseline_tier != expected_tier:
+        raise ValidationError(
+            code="E222",
+            message=(
+                "Baseline report tier mismatch. "
+                f"Expected {expected_tier!r}, got {baseline_tier!r} in "
+                f"{resolved_report}"
+            ),
+            details={
+                "path": str(resolved_report),
+                "field": "context.auto.tier",
+            },
+        )
+    baseline_assurance = _baseline_report_assurance_mode(payload, context)
+    if (
+        not isinstance(baseline_assurance, str)
+        or baseline_assurance.strip().lower() != expected_assurance_mode.strip().lower()
+    ):
+        raise ValidationError(
+            code="E222",
+            message=(
+                "Baseline report assurance mode mismatch. "
+                f"Expected {expected_assurance_mode!r}, got {baseline_assurance!r} "
+                f"in {resolved_report}"
+            ),
+            details={"path": str(resolved_report), "field": "context.assurance.mode"},
+        )
+    _validate_baseline_dataset(
+        payload,
+        resolved_report=resolved_report,
+        expected_dataset=expected_dataset or {},
+    )
 
     eval_windows = payload.get("evaluation_windows")
     if not isinstance(eval_windows, dict):
@@ -269,6 +319,104 @@ def _validate_evaluation_window_phase(
             "field": f"evaluation_windows.{phase_name}",
         },
     )
+
+
+def _model_ids_equivalent(actual: str, expected: str) -> bool:
+    if actual == expected:
+        return True
+    actual_path = Path(actual).expanduser()
+    expected_path = Path(expected).expanduser()
+    if actual_path.exists() or expected_path.exists():
+        try:
+            return actual_path.resolve() == expected_path.resolve()
+        except OSError:
+            return False
+    return False
+
+
+def _baseline_report_tier(
+    payload: dict[str, Any],
+    context: dict[str, Any],
+) -> str | None:
+    auto_ctx = context.get("auto")
+    tier = auto_ctx.get("tier") if isinstance(auto_ctx, dict) else None
+    if isinstance(tier, str):
+        return tier
+    tier = context.get("tier")
+    if isinstance(tier, str):
+        return tier
+    auto_top = payload.get("auto")
+    tier = auto_top.get("tier") if isinstance(auto_top, dict) else None
+    if isinstance(tier, str):
+        return tier
+    meta = payload.get("meta")
+    auto_meta = meta.get("auto") if isinstance(meta, dict) else None
+    tier = auto_meta.get("tier") if isinstance(auto_meta, dict) else None
+    if isinstance(tier, str):
+        return tier
+    return None
+
+
+def _baseline_report_assurance_mode(
+    payload: dict[str, Any],
+    context: dict[str, Any],
+) -> str | None:
+    context_assurance = context.get("assurance")
+    mode = (
+        context_assurance.get("mode") if isinstance(context_assurance, dict) else None
+    )
+    if isinstance(mode, str):
+        return mode
+    report_assurance = payload.get("assurance")
+    mode = report_assurance.get("mode") if isinstance(report_assurance, dict) else None
+    if isinstance(mode, str):
+        return mode
+    return None
+
+
+def _validate_baseline_dataset(
+    payload: dict[str, Any],
+    *,
+    resolved_report: Path,
+    expected_dataset: dict[str, Any],
+) -> None:
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        raise ValidationError(
+            code="E222",
+            message=f"Baseline report missing data object in {resolved_report}",
+            details={"path": str(resolved_report), "field": "data"},
+        )
+    aliases = {
+        "provider": ("provider", "dataset"),
+        "split": ("split", "dataset_split"),
+        "seq_len": ("seq_len", "sequence_length"),
+        "stride": ("stride",),
+        "preview_n": ("preview_n",),
+        "final_n": ("final_n",),
+        "seed": ("seed",),
+    }
+    for expected_key, report_keys in aliases.items():
+        if expected_key not in expected_dataset:
+            continue
+        expected_value = expected_dataset.get(expected_key)
+        actual_value = next(
+            (data.get(report_key) for report_key in report_keys if report_key in data),
+            None,
+        )
+        if actual_value != expected_value:
+            raise ValidationError(
+                code="E222",
+                message=(
+                    "Baseline report dataset/window-plan mismatch. "
+                    f"Expected {expected_key}={expected_value!r}, "
+                    f"got {actual_value!r} in {resolved_report}"
+                ),
+                details={
+                    "path": str(resolved_report),
+                    "field": f"data.{expected_key}",
+                },
+            )
 
 
 @dataclass(frozen=True)

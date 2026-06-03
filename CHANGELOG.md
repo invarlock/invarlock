@@ -7,6 +7,165 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.10.0] - 2026-06-03
+
+### Added
+
+- Added evidence-pack artifact taxonomy and edit metadata sidecars so validation
+  checkpoints, fault-injection fixtures, deployable optimized subjects, and
+  evidence-only packs are labeled explicitly in scenarios, packaged evidence,
+  and summary outputs.
+- Added package-native evidence-pack report-assurance controls and release-review
+  hardening so pack integrity strictness and nested report assurance are
+  configured separately.
+- Added backend-inventory, load-smoke, inference-smoke, memory-report, and
+  deployable-sidecar validation contracts for optional quantized subject
+  adapters.
+- Added detached evidence-pack source snapshot support and a clean quant-runtime
+  evidence path for optional quantized-subject runs.
+- Added evidence-pack signer authentication via `--expected-fingerprint`, local
+  trust stores, and verifier JSON `authenticity` states (`pinned`, `unpinned`,
+  `mismatch`).
+- Added signed public GPT-2 evidence pack fixtures, strict public GPT-2/BERT
+  evidence reports, real tiny-GPT-2 quant and external magnitude-prune BYOE
+  runs, checkpoint-reference artifact packages, non-quant BYOE examples, and
+  caught-regression fixtures for guard and policy failures.
+- Added `make public-evidence-audit` and CI coverage for classifying public
+  evidence fixtures, verifying signed pack metadata, and preventing overclaims
+  in packaged public evidence.
+- Added public evidence walkthrough documentation with pinned evidence-pack
+  verification commands and explicit integrity-versus-authenticity guidance.
+- Added scripts inventory governance, architecture-fragmentation tracking, and
+  guard fallback diagnostic checks so repository maintenance surfaces are
+  classified and auditable.
+- Added guard fault-injection seam documentation and regression coverage for
+  spectral, RMT, variance, and fallback diagnostic paths.
+- Added public contract stability documentation for report schemas,
+  evidence-pack formats, verifier outputs, CLI stability classes, adapter
+  support tiers, and the pre-1.0 package stability posture.
+- Added optional `hf_torchao` adapter discovery for torchao int8 runtime
+  quantization, including module maps for guard targeting and public adapter
+  capability metadata, plus a runnable TorchAO integration example that proves
+  the `hf_torchao` subject adapter path.
+- Added optional `hf_hqq` adapter discovery for HQQ runtime quantization,
+  including capability metadata, guard targeting, backend inventory, and a
+  runnable HQQ integration example with host/off and CUDA/container strict
+  lanes.
+- Added optional `hf_quanto` adapter discovery for Quanto runtime
+  quantization, including capability metadata, backend inventory, a narrow
+  example-only CUDA runtime image, and a runnable Quanto integration example
+  with host/off and CUDA/container strict lanes.
+- Added optional `hf_ct` adapter discovery for compressed-tensors
+  pre-quantized checkpoints, including capability metadata, backend inventory,
+  and a narrow example-only CUDA runtime image smoke path.
+- Added the root README evaluation and verification flow diagram as a versioned
+  SVG asset.
+
+### Changed
+
+- Clarified plugin support tiers and public descriptions: built-in guards and
+  adapters now expose support metadata, `quant_rtn` is described as an RTN
+  dequantized weight-edit simulation, and the demo hello guard is registered as
+  demo-only.
+- Updated evidence-pack validation edits to use shared edit implementations,
+  shared artifact saving, schema-aware `edit_metadata.json`, and metadata-aware
+  artifact validation in both single-edit and batch-edit paths.
+- Updated evaluate and evidence-pack command surfaces for separate baseline and
+  subject adapters, deferred optional report rendering, canonical WikiText
+  dataset identifiers, stale pack-staging report ignores, and Qwen14 sentinel
+  cleanup guidance.
+- Updated quantized adapter documentation and runtime image guidance around
+  GPTQModel-backed GPTQ/AWQ loaders, platform-dependent BNB loading, and
+  torchao runtime quantization.
+- Updated quant runtime image builds to use portable build dependencies, a CUDA
+  devel base, and a retained JIT toolchain for quantized adapter evidence paths.
+- Expanded CUDA quant runtime-image smoke coverage across BNB, GPTQModel-backed
+  GPTQ/AWQ, TorchAO, HQQ, Quanto, and compressed-tensors adapter families.
+- Re-scoped grouped evidence evaluation to the simpler ungrouped path after
+  remote timing showed no useful default speedup.
+- Consolidated run-orchestrator execution helpers and reporting render/context
+  modules to reduce re-export shims and one-helper-per-file fragmentation.
+- Reorganized `scripts/` into maintained families (`checks`, `coverage`,
+  `docs`, `security`, `smoke`, `model_evidence`) with an inventory manifest and
+  a `make scripts-audit` gate.
+- Refactored evidence-pack script helpers so queue state, validation state,
+  edit implementations, edit metadata, artifact saving, artifact validation, and
+  pack verification logic live in Python modules instead of brittle shell-only
+  state handling.
+- Refactored smoke and maintenance scripts around shared helpers, clearer
+  runtime modes, explicit model-download behavior, and stronger exit/status
+  reporting for the tiny all-model matrix and evidence script flows.
+- Refactored source and test maintainability hotspots, including core source
+  helper extraction, run-command test helper consolidation, core test topology
+  cleanup, and validation-suite orchestration splits.
+- Standardized assurance document openings, glossary examples, math rendering,
+  and README/doc references so public docs match the current implementation and
+  render consistently on GitHub.
+- Reframed assurance-boundary prose around scoped evidence and configured
+  weight-edit regression reviews.
+- Updated repository surface metadata, security response wording, npm package
+  identity metadata, and third-party notices to match the current packaged and
+  optional dependency surfaces.
+- Updated dependency floors and tool pins, including Torch, `matplotlib`,
+  setuptools, `shellingham`, Ruff, markdownlint, and KaTeX.
+- Updated `CODEOWNERS` to use the organization `core-maintainers` team for
+  protected ownership rules.
+- Updated the pre-commit workflow check context to report as `pre-commit`
+  instead of the generic `run` job name.
+- Updated contributor guidance with PR-ready local gate expectations, including
+  docs, coverage, typed-surface, supply-chain, packaging, and public-evidence
+  checks before protected-branch PRs are pushed for review.
+
+### Removed
+
+- Removed unverified TorchAO deployable evidence plumbing and kept deployable
+  edit generation absent until a backend can provide complete sidecars and
+  target-stack evidence.
+- Removed public ClusterFuzzLite/fuzzer surfaces from the OSS repo layout and
+  ignore surface.
+- Removed transient release-hardening and release-checklist pages from the
+  published docs tree so durable docs stay focused on current repository
+  behavior and stable user-facing contracts.
+- Removed stale docs workflow targeting for the retired `develop` branch.
+
+### Fixed
+
+- Fixed evidence-pack release-review edge cases, including report-assurance
+  forwarding, dev-profile rejection, strict PASS requirements, runtime sidecar
+  requirements, signed-pack requirements, and deployable sidecar semantic
+  validation failures.
+- Fixed evidence-pack verification and host evidence semantics for
+  expected-failure reports and host model evidence that should not claim strict
+  assurance.
+- Fixed invariant-vocabulary guard compatibility for quantized wrapper models.
+- Fixed pseudo-accuracy handling so non-dev report generation fails unless
+  pseudo metrics are explicitly allowed, and report output marks pseudo or
+  non-assurance results visibly.
+- Ratcheted critical coverage thresholds and added edge-path coverage for
+  registry metadata and metrics runtime behavior.
+- Fixed typed-surface mypy coverage after orchestrator consolidation by removing
+  stale file paths from the maintained check list.
+- Fixed stale workflow/check metadata after GitHub ruleset hardening so
+  protected branches require current CI contexts only.
+- Fixed smoke configuration presets for seq2seq model paths and the tiny matrix
+  checklist network metadata.
+- Fixed public documentation to refer to the packaged runtime tier policy as
+  logical `runtime/tiers.yaml` while retaining the documented override path.
+- Fixed secret-scanning false positives on model architecture names without
+  changing adapter behavior.
+- Fixed reporting test import ordering to satisfy the active pre-commit gate.
+- Fixed additional guard and reporting compatibility edge cases, including
+  variance fault-injection preservation, telemetry monkeypatch stability,
+  canonical reporting imports, and shared check-script IO helpers.
+
 ## [0.9.0] - 2026-05-25
 
 ### Added
@@ -740,7 +899,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bumped `katex` from `0.16.27` to `0.16.28`.
 - Bumped `markdownlint-cli2` from `0.20.0` to `0.21.0`.
 
-- Replaced remaining certification wording with evaluation terminology in docs.
+- Replaced remaining legacy assurance-label wording with evaluation terminology
+  in docs.
 - Clarified calibration policy/preset guidance and aligned ASCII diagram connector formatting.
 
 ### Fixed
@@ -797,7 +957,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation CI can now be run on demand via `workflow_dispatch`.
 
 ### Fixed
-- CI: update workflow test paths after the report/certificate rename.
+- CI: update workflow test paths after the report artifact rename.
 - Tests: apply ruff-format to warning suppression coverage test.
 - CLI: `invarlock report explain` drift gate now prints the resolved drift band (no hard-coded threshold).
 - CLI: align `invarlock report` “ARTIFACTS” block so artifact paths start in the same column.
@@ -815,8 +975,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Proof packs: `verify_pack.sh --strict` (or `PACK_STRICT_MODE=1`) to fail closed on missing/invalid GPG signatures and unexpected pack contents.
 
 ### Changed
-- **Breaking:** Rename “certificate” → “report” across artifacts, docs, scripts, notebooks, and Python API surfaces.
-- **Breaking:** CLI terminology unified on `evaluate` (replaces `certify`).
+- **Breaking:** Rename legacy evaluation artifacts to “report” across artifacts,
+  docs, scripts, notebooks, and Python API surfaces.
+- **Breaking:** CLI terminology unified on `evaluate`.
 - Config: reject legacy HF v4 load keys `model.torch_dtype`, `model.load_in_8bit`, and `model.load_in_4bit`; use `model.dtype` and/or `model.quantization_config`.
 - Evaluation report bundle filenames updated (JSON: `evaluation.report.json`, Markdown: `evaluation_report.md`).
 - Presets: bump default WikiText-2 dataset seed for the causal LM preset from `42` → `43`.
@@ -834,7 +995,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adapters: snapshot config serialization no longer emits deprecated attributes.
 - Scripts: CLI example validator ignores internal tool dirs and supports external paths.
 - CLI: keep `invarlock calibrate` import-safe so docs/example validation can run without torch installed.
-- Proof packs: fix `verify_pack.sh` cert discovery to verify `certs/**/evaluation.report.json`.
+- Proof packs: fix `verify_pack.sh` legacy report discovery for nested
+  `evaluation.report.json` files.
 - Proof packs: close a tamper-evidence gap by binding `checksums.sha256` to the signed manifest (and enforcing “no extra files” in strict verification).
 
 ## [0.3.7] - 2026-01-22
@@ -842,16 +1004,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Role-based HuggingFace adapters with updated auto-routing (replaces model-name adapters).
 - Proof packs: v2 pack layout, scenarios manifest, and assurance verdict generation.
-- CLI flags: `invarlock run --edit-label` and `invarlock certify --baseline-report`.
-- CI notebook smoke runner (`scripts/verify_notebooks_smoke.py`).
+- CLI flags: `invarlock run --edit-label` and baseline-report reuse on the
+  retired evaluation command.
+- CI notebook smoke runner (`scripts/docs/verify_notebooks_smoke.py`).
 - Task-metric overrides, richer telemetry snapshots/reports, and CLI
   progress/NO_COLOR output refinements for longer-running evaluation flows.
 
 ### Changed
 - Proof-pack workflows hardened: baseline-report reuse, calibrate-only behavior, tuned-params hygiene, and improved task sizing/memory planning.
-- Evaluation certificate rendering was refreshed with revamped Markdown output,
-  richer HTML/glossary support, and the rename from “Safety Certificate” to
-  “Evaluation Certificate”.
+- Legacy evaluation artifact rendering was refreshed with revamped Markdown
+  output, richer HTML/glossary support, and updated report terminology.
 - Presets/overlays updated for new adapter roles and additional model families.
 - CI: bump `actions/download-artifact` to v7; remove the legacy B200 backend validation harness.
 
@@ -888,7 +1050,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed B200 scheduling and evaluation reliability on constrained GPU hosts,
   including single-GPU runs, restored edit evaluation flow, and corrected
   metric parsing for generated reports.
-- Fixed degraded primary-metric and certificate handling so pairing
+- Fixed degraded primary-metric and legacy report handling so pairing
   mismatches, non-finite metrics, and degraded verdicts surface correctly
   through the generated artifacts.
 
@@ -896,7 +1058,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Evidence pack bash test suite (`scripts/evidence_packs/tests/*`, `scripts/evidence_packs/tests/run.sh`) with deterministic command mocks and optional branch/line coverage checks.
-- Evidence pack runtime helpers (`scripts/evidence_packs/lib/runtime.sh`) plus pack build/verify helpers (`scripts/evidence_packs/run_pack.sh`, `scripts/evidence_packs/verify_pack.sh`) to capture artifacts during long runs.
+- Evidence pack runtime helpers (`scripts/evidence_packs/lib/core/runtime.sh`) plus pack build/verify helpers (`scripts/evidence_packs/run_pack.sh`, `scripts/evidence_packs/verify_pack.sh`) to capture artifacts during long runs.
 - Perplexity token-id sanitization to mask out-of-range IDs (and ignore them in labels) instead of triggering device-side asserts.
 
 ### Changed
@@ -1002,7 +1164,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Prevents re-quantization when loading saved BNB checkpoints
 - **Quantization-aware auto-adapter routing**
   - `_detect_quantization_from_path()` and `_detect_quantization_from_model()` in `auto.py`
-  - Auto-routes to `hf_bnb`, `hf_awq`, or `hf_gptq` based on checkpoint metadata
+  - Auto-routes to quantized HF adapters based on checkpoint metadata
 - **Comprehensive adapter test coverage** (46 new tests)
   - `test_capabilities.py` - QuantizationMethod, QuantizationConfig, ModelCapabilities
   - `test_safe_device.py` - Safe device movement and capability detection
@@ -1011,8 +1173,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - `hf_causal.py`: Uses `_safe_to_device()` instead of direct `model.to()` call
-- `hf_awq_adapter.py`: Uses `_safe_to_device()` with AWQ capabilities
-- `hf_gptq_adapter.py`: Uses `_safe_to_device()` with GPTQ capabilities
+- `invarlock.plugins` AWQ adapter: Uses `_safe_to_device()` with AWQ capabilities
+- `invarlock.plugins` GPTQ adapter: Uses `_safe_to_device()` with GPTQ capabilities
 
 - Added quantized adapter section to `docs/reference/model-adapters.md`
   - BNB adapter usage and pre-quantized detection

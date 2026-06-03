@@ -1,0 +1,22 @@
+{
+  "artifact_paths": {
+    "artifact_package": "artifact_package",
+    "evaluation_report": "evaluation.report.json",
+    "evidence_pack": "evidence_pack",
+    "evidence_pack_recipe": "evidence_pack_recipe.json",
+    "runtime_manifest": "runtime.manifest.json"
+  },
+  "evidence_class": "strict_pass_fixture",
+  "expected_fingerprint": "sha256:eff9de615ddb03ecd5f90e2ba3fa7cf13a0dddeb651df7a4f587b7ca348f9059",
+  "generated_by": "public fixture assembly",
+  "non_goals": [
+    "Model weights are external references.",
+    "Deployable quantization and runtime compression are outside this evidence package."
+  ],
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "Strict-pass verifier fixture for the GPT-2-style published-basis lane.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/published_basis/gpt2/evaluation.report.json --profile release --assurance strict",
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/gpt2/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:eff9de615ddb03ecd5f90e2ba3fa7cf13a0dddeb651df7a4f587b7ca348f9059"
+  ]
+}

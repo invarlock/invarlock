@@ -1,13 +1,31 @@
 from __future__ import annotations
 
+import importlib
+import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from . import report_files
+from invarlock.core.backend_inventory import (
+    BACKEND_INVENTORY_FILENAME,
+    write_backend_inventory_sidecar,
+)
+
 from .report_types import RunReport
+from .run_report_payloads import build_artifacts_payload as build_artifacts_payload
+from .run_report_payloads import build_edit_payload as build_edit_payload
+from .run_report_payloads import build_flags_payload as build_flags_payload
+from .run_report_payloads import build_guard_entries as build_guard_entries
+from .run_report_payloads import build_metrics_payload as build_metrics_payload
+from .run_report_payloads import build_run_report_context as build_run_report_context
+from .run_report_payloads import build_run_report_data as build_run_report_data
+from .run_report_payloads import build_run_report_meta as build_run_report_meta
+from .run_report_payloads import build_snapshot_provenance as build_snapshot_provenance
+from .run_report_payloads import merge_core_timing_metrics as merge_core_timing_metrics
 
+report_files = cast(Any, importlib.import_module("invarlock.reporting.report_files"))
 _NON_FATAL_EXCEPTIONS = (AttributeError, KeyError, OSError, TypeError, ValueError)
 
 
@@ -25,6 +43,12 @@ class RunReportPersistenceResult:
     report_path_out: str | None
     telemetry_saved_path: str | None = None
     telemetry_error: str | None = None
+
+
+@dataclass(frozen=True)
+class RunProvenanceResult:
+    missing_evaluation_windows_for_baseline: bool = False
+    missing_evaluation_windows_message: str | None = None
 
 
 def _detect_commit_value(cfg: Any) -> str:
@@ -91,6 +115,132 @@ def _collect_env_flags(
     except (AttributeError, RuntimeError, TypeError, ValueError, OSError):
         return {}
     return env_flags
+
+
+def _window_payload_has_signal(window_payload: Any) -> bool:
+    if not isinstance(window_payload, Mapping):
+        return False
+    for key in (
+        "window_ids",
+        "example_ids",
+        "logloss",
+        "input_ids",
+        "attention_masks",
+        "token_counts",
+        "masked_token_counts",
+        "actual_token_counts",
+        "labels",
+        "records",
+    ):
+        value = window_payload.get(key)
+        if isinstance(value, list) and value:
+            return True
+    return False
+
+
+def _evaluation_windows_have_signal(serialized_windows: Any) -> bool:
+    if not isinstance(serialized_windows, Mapping):
+        return False
+    return _window_payload_has_signal(serialized_windows.get("preview")) or (
+        _window_payload_has_signal(serialized_windows.get("final"))
+    )
+
+
+def finalize_run_provenance(
+    *,
+    report: dict[str, Any],
+    core_report: Any,
+    preview_records: list[dict[str, Any]],
+    final_records: list[dict[str, Any]],
+    use_mlm: bool,
+    preview_mask_counts: list[int] | None,
+    final_mask_counts: list[int] | None,
+    had_baseline: bool,
+    profile: str | None,
+    resolved_split: str | None,
+    used_fallback_split: bool,
+    baseline_report_data: dict[str, Any] | None,
+    serialize_evaluation_windows_fn: Any,
+    build_fallback_evaluation_windows_fn: Any,
+    compute_provider_digest_fn: Any,
+    enforce_provider_parity_fn: Any,
+) -> RunProvenanceResult:
+    """Finalize evaluation windows plus run provenance and provider parity."""
+
+    serialized_evaluation_windows = serialize_evaluation_windows_fn(
+        getattr(core_report, "evaluation_windows", None)
+    )
+    if _evaluation_windows_have_signal(serialized_evaluation_windows):
+        report["evaluation_windows"] = serialized_evaluation_windows
+    else:
+        try:
+            fallback_evaluation_windows = build_fallback_evaluation_windows_fn(
+                preview_records,
+                final_records,
+                use_mlm=use_mlm,
+                preview_mask_counts=preview_mask_counts,
+                final_mask_counts=final_mask_counts,
+            )
+            if fallback_evaluation_windows:
+                report["evaluation_windows"] = fallback_evaluation_windows
+        except _NON_FATAL_EXCEPTIONS:
+            pass
+        if (
+            "evaluation_windows" not in report
+            and had_baseline
+            and (profile or "").lower() in {"ci", "release"}
+        ):
+            return RunProvenanceResult(
+                missing_evaluation_windows_for_baseline=True,
+                missing_evaluation_windows_message=(
+                    "[INVARLOCK:E001] PAIRING-SCHEDULE-MISMATCH: baseline pairing "
+                    "requested but evaluation windows were not produced. Check "
+                    "capacity/pairing config."
+                ),
+            )
+
+    provenance = report.get("provenance")
+    if not isinstance(provenance, dict):
+        provenance = {}
+        report["provenance"] = provenance
+
+    try:
+        provenance["dataset_split"] = str(resolved_split)
+        provenance["split_fallback"] = bool(used_fallback_split)
+    except _NON_FATAL_EXCEPTIONS:
+        pass
+
+    try:
+        provider_digest = compute_provider_digest_fn(report)
+    except _NON_FATAL_EXCEPTIONS:
+        provider_digest = None
+    if not provider_digest:
+        return RunProvenanceResult()
+
+    provenance["provider_digest"] = provider_digest
+    provenance["digest_version"] = 1
+
+    if not isinstance(baseline_report_data, dict):
+        return RunProvenanceResult()
+
+    base_digest = None
+    base_provenance = baseline_report_data.get("provenance")
+    if isinstance(base_provenance, dict):
+        base_provider_digest = base_provenance.get("provider_digest")
+        if isinstance(base_provider_digest, dict):
+            base_digest = base_provider_digest
+    if base_digest is None:
+        try:
+            base_digest = compute_provider_digest_fn(baseline_report_data)
+        except _NON_FATAL_EXCEPTIONS:
+            base_digest = None
+
+    enforce_provider_parity_fn(
+        provider_digest,
+        base_digest,
+        profile=(str(profile).lower() if profile else None),
+    )
+    return RunProvenanceResult()
 
 
 def assemble_run_report(
@@ -332,6 +482,31 @@ def persist_run_report_outputs(
         filename_prefix="report",
     )
     saved_files = {key: str(value) for key, value in saved_paths.items()}
+    run_context = getattr(run_config, "context", None)
+    backend_inventory = (
+        run_context.get("_backend_inventory") if isinstance(run_context, dict) else None
+    )
+    if isinstance(backend_inventory, dict):
+        backend_inventory = dict(backend_inventory)
+        backend_inventory["load_smoke"] = backend_inventory.get("load_smoke") is True
+        backend_inventory["inference_smoke"] = True
+    existing_backend_inventory_path = run_dir / BACKEND_INVENTORY_FILENAME
+    existing_backend_inventory = None
+    if existing_backend_inventory_path.is_file():
+        try:
+            existing_backend_inventory = json.loads(
+                existing_backend_inventory_path.read_text(encoding="utf-8")
+            )
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            existing_backend_inventory = None
+
+    backend_inventory_path = write_backend_inventory_sidecar(
+        report,
+        run_dir,
+        inventory=backend_inventory or existing_backend_inventory,
+    )
+    if backend_inventory_path is not None:
+        saved_files["backend_inventory"] = str(backend_inventory_path)
 
     report_path_out = saved_files.get("json")
     if report_path_out:
@@ -362,6 +537,18 @@ def persist_run_report_outputs(
 __all__ = [
     "RunReportAssemblyResult",
     "RunReportPersistenceResult",
+    "RunProvenanceResult",
     "assemble_run_report",
+    "build_artifacts_payload",
+    "build_edit_payload",
+    "build_flags_payload",
+    "build_guard_entries",
+    "build_metrics_payload",
+    "build_run_report_context",
+    "build_run_report_data",
+    "build_run_report_meta",
+    "build_snapshot_provenance",
+    "finalize_run_provenance",
+    "merge_core_timing_metrics",
     "persist_run_report_outputs",
 ]

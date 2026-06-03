@@ -11,7 +11,10 @@ import typer
 
 from tests.cli._support_evaluate_failures import (
     RecordingConsole,
+    _evaluate_basic,
     _fake_run_command_with_paths,
+    _patch_generate_reports_noop,
+    _patch_run_command_reports,
     _prepare_evaluate_paths,
     _write_json,
     mod,
@@ -20,79 +23,48 @@ from tests.cli._support_evaluate_failures import (
 
 
 def test_evaluate_ci_profile_invalid_json_exits(monkeypatch, tmp_path):
-    monkeypatch.chdir(tmp_path)
-    src = Path("src")
-    edt = Path("edt")
-    src.mkdir()
-    edt.mkdir()
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
 
-    baseline_report = tmp_path / "baseline.json"
-    baseline_report.write_text("{}", encoding="utf-8")
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
     bad_report = tmp_path / "edited.json"
     bad_report.write_text("{not-json", encoding="utf-8")
 
-    monkeypatch.setattr(
-        run_mod,
-        "run_command",
-        _fake_run_command_with_paths({"source": baseline_report, "edited": bad_report}),
-        raising=False,
+    _patch_run_command_reports(
+        monkeypatch,
+        baseline_report=baseline_report,
+        edited_report=bad_report,
     )
-    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
+    _patch_generate_reports_noop(monkeypatch)
 
     with pytest.raises(click.exceptions.Exit):
-        mod.evaluate_command(
-            baseline=str(src),
-            subject=str(edt),
-            adapter="hf_causal",
-            out=str(Path("runs")),
-            profile="ci",
-            assurance="off",
-        )
+        _evaluate_basic(src, edt)
 
 
 def test_evaluate_ci_nonfinite_primary_metric_exits(monkeypatch, tmp_path):
-    monkeypatch.chdir(tmp_path)
-    src = Path("src")
-    edt = Path("edt")
-    src.mkdir()
-    edt.mkdir()
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
 
-    baseline_report = tmp_path / "baseline.json"
-    baseline_report.write_text("{}", encoding="utf-8")
-    edited_report = tmp_path / "edited.json"
-    edited_report.write_text(
-        json.dumps(
-            {
-                "meta": {"device": "cpu", "adapter": "hf_causal"},
-                "edit": {"name": "quant_rtn"},
-                "metrics": {"primary_metric": {"final": {"bad": "value"}}},
-            }
-        ),
-        encoding="utf-8",
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    edited_report = _write_json(
+        tmp_path / "edited.json",
+        {
+            "meta": {"device": "cpu", "adapter": "hf_causal"},
+            "edit": {"name": "quant_rtn"},
+            "metrics": {"primary_metric": {"final": {"bad": "value"}}},
+        },
     )
 
-    monkeypatch.setattr(
-        run_mod,
-        "run_command",
-        _fake_run_command_with_paths(
-            {"source": baseline_report, "edited": edited_report}
-        ),
-        raising=False,
+    _patch_run_command_reports(
+        monkeypatch,
+        baseline_report=baseline_report,
+        edited_report=edited_report,
     )
-    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
+    _patch_generate_reports_noop(monkeypatch)
     monkeypatch.setattr(
         mod, "resolve_command_exit_code", lambda err, profile: 9, raising=False
     )
 
     with pytest.raises(click.exceptions.Exit) as exc:
-        mod.evaluate_command(
-            baseline=str(src),
-            subject=str(edt),
-            adapter="hf_causal",
-            out=str(Path("runs")),
-            profile="ci",
-            assurance="off",
-        )
+        _evaluate_basic(src, edt)
 
     assert exc.value.exit_code == 9
 
@@ -120,13 +92,10 @@ def test_evaluate_ci_nonfinite_primary_metric_skips_report_generation(
     )
     report_calls: list[dict[str, object]] = []
 
-    monkeypatch.setattr(
-        run_mod,
-        "run_command",
-        _fake_run_command_with_paths(
-            {"source": baseline_report, "edited": edited_report}
-        ),
-        raising=False,
+    _patch_run_command_reports(
+        monkeypatch,
+        baseline_report=baseline_report,
+        edited_report=edited_report,
     )
     monkeypatch.setattr(
         mod,
@@ -139,14 +108,7 @@ def test_evaluate_ci_nonfinite_primary_metric_skips_report_generation(
     )
 
     with pytest.raises(click.exceptions.Exit) as exc:
-        mod.evaluate_command(
-            baseline=str(src),
-            subject=str(edt),
-            adapter="hf_causal",
-            out=str(Path("runs")),
-            profile="ci",
-            assurance="off",
-        )
+        _evaluate_basic(src, edt)
 
     assert exc.value.exit_code == 9
     assert report_calls == []
@@ -164,15 +126,12 @@ def test_evaluate_ci_nonfinite_primary_metric_handles_float_cast_failure(
         def __float__(self) -> float:
             raise RuntimeError("boom")
 
-    monkeypatch.setattr(
-        run_mod,
-        "run_command",
-        _fake_run_command_with_paths(
-            {"source": baseline_report, "edited": edited_report}
-        ),
-        raising=False,
+    _patch_run_command_reports(
+        monkeypatch,
+        baseline_report=baseline_report,
+        edited_report=edited_report,
     )
-    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
+    _patch_generate_reports_noop(monkeypatch)
     monkeypatch.setattr(
         mod.json,
         "load",
@@ -193,14 +152,7 @@ def test_evaluate_ci_nonfinite_primary_metric_handles_float_cast_failure(
     )
 
     with pytest.raises(click.exceptions.Exit) as exc:
-        mod.evaluate_command(
-            baseline=str(src),
-            subject=str(edt),
-            adapter="hf_causal",
-            out=str(Path("runs")),
-            profile="ci",
-            assurance="off",
-        )
+        _evaluate_basic(src, edt)
 
     assert exc.value.exit_code == 9
 
@@ -281,7 +233,7 @@ def test_evaluate_quiet_summary_variants(tmp_path: Path, monkeypatch) -> None:
     )
     console.calls.clear()
     monkeypatch.setattr(
-        "invarlock.reporting.report_console.compute_console_validation_block",
+        "invarlock.reporting.report_summary.compute_console_validation_block",
         lambda _report: (_ for _ in ()).throw(RuntimeError("boom")),
         raising=False,
     )
@@ -333,7 +285,7 @@ def test_evaluate_yaml_tmp_dir_and_successful_quiet_summary(
     )
     runtime_manifest.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(
-        "invarlock.reporting.report_console.compute_console_validation_block",
+        "invarlock.reporting.report_summary.compute_console_validation_block",
         lambda _report: {
             "rows": [{"ok": True}, {"ok": False}],
             "overall_pass": True,
@@ -359,7 +311,7 @@ def test_evaluate_prints_timing_summary_when_requested(
     baseline_report = _write_json(tmp_path / "baseline.json", {})
     edited_report = _write_json(tmp_path / "edited.json", {})
     summary_calls: list[tuple[dict[str, float], list[tuple[str, str]]]] = []
-    perf_values = iter([100.0, 104.0])
+    perf_values = iter([100.0, 100.1, 100.4, 104.0])
 
     @contextmanager
     def fake_timed_step(*, timings, key, **_kwargs):
@@ -400,7 +352,8 @@ def test_evaluate_prints_timing_summary_when_requested(
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="hf_causal",
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile="dev",
@@ -410,10 +363,12 @@ def test_evaluate_prints_timing_summary_when_requested(
 
     assert len(summary_calls) == 1
     timings, order = summary_calls[0]
+    assert timings["plan"] == pytest.approx(0.3)
     assert timings["baseline"] == 1.25
     assert timings["subject"] == 2.0
     assert timings["evaluation_report"] == 0.5
     assert timings["total"] == 4.0
+    assert order[0] == ("Plan", "plan")
     assert order[-1] == ("Total", "total")
 
 
@@ -462,7 +417,8 @@ def test_evaluate_degraded_primary_metric_exits_without_report_generation(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="release",
@@ -483,7 +439,7 @@ def test_evaluate_quiet_summary_skips_primary_metric_line_when_ratio_missing(
     _write_json(report_out / "evaluation.report.json", {"primary_metric": {}})
 
     monkeypatch.setattr(
-        "invarlock.reporting.report_console.compute_console_validation_block",
+        "invarlock.reporting.report_summary.compute_console_validation_block",
         lambda _report: {"rows": [], "overall_pass": False},
         raising=False,
     )
@@ -523,7 +479,8 @@ def test_evaluate_verbose_mode_prints_debug_lines(monkeypatch, tmp_path: Path) -
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="auto",
+        baseline_adapter="auto",
+        subject_adapter="auto",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile="dev",
@@ -533,7 +490,7 @@ def test_evaluate_verbose_mode_prints_debug_lines(monkeypatch, tmp_path: Path) -
     )
 
     joined = console.joined()
-    assert "Adapter:auto -> hf_causal" in joined
+    assert "Adapter:auto -> baseline=hf_causal, subject=hf_causal" in joined
     assert "Baseline report:" in joined
     assert "Edited report:" in joined
 
@@ -583,7 +540,8 @@ def test_evaluate_profile_str_failure_falls_back_to_non_ci(
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="hf_causal",
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile=profile,
@@ -633,7 +591,8 @@ def test_evaluate_stable_text_uses_fallback_when_stringification_raises(
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="hf_causal",
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile=profile,
@@ -671,7 +630,8 @@ def test_evaluate_report_validation_failure_exits_cleanly(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
@@ -730,7 +690,8 @@ def test_evaluate_timing_summary_uses_accumulated_total_when_style_disables_timi
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="hf_causal",
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile="dev",
