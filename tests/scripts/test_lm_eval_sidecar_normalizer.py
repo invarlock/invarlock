@@ -36,7 +36,13 @@ def test_lm_eval_sidecar_runner_wires_preflight_and_lane_label() -> None:
     assert "integration_log_header" in text
     assert "integration_log_step" in text
     assert "integration_log_kv" in text
+    assert "select_python_bin lm_eval" in text
+    assert 'for candidate in python "$REPO_ROOT/.venv/bin/python" python3' in text
+    assert "import ${required_module}" in text
     assert '} > "$report_out/run_command.txt"' not in text
+
+    readme = (RUNNER.parent / "README.md").read_text(encoding="utf-8")
+    assert 'uv run --extra hf --with "lm_eval[hf]"' in readme
 
 
 def _write_lm_eval_report(path: Path, word_perplexity: float) -> None:

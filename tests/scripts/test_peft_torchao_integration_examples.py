@@ -71,6 +71,9 @@ def test_peft_lora_runner_wires_local_fixture() -> None:
     assert "integration_log_header" in text
     assert "integration_log_step" in text
     assert "lane_artifact_label" in text
+    assert "select_python_bin peft" in text
+    assert 'for candidate in python "$REPO_ROOT/.venv/bin/python" python3' in text
+    assert "import ${required_module}" in text
 
 
 def test_integration_example_readmes_document_run_lanes() -> None:
@@ -142,12 +145,19 @@ def test_integration_example_readmes_document_run_lanes() -> None:
     )
     assert "`mps-host-off`" in lm_eval_text
     assert "--device mps" in lm_eval_text
+    assert 'uv run --extra hf --with "lm_eval[hf]"' in lm_eval_text
+    assert "uv run --extra hf --with peft" in lm_eval_text
     assert lm_eval_text.index("`cuda-container-strict`") < lm_eval_text.index(
         "`cuda-host-off`"
     )
     assert "primary evidence" in lm_eval_text
     assert "run_summary.txt" in lm_eval_text
     assert "verifier status, runtime provenance status" in lm_eval_text
+
+    peft_text = (integrations / "peft_lora" / "README.md").read_text(
+        encoding="utf-8"
+    )
+    assert "uv run --extra hf --with peft" in peft_text
 
 
 def test_integration_runners_default_reports_are_lane_scoped() -> None:
