@@ -13,7 +13,7 @@ These paths are exercised by `make docs-live-fast` and by GitHub Actions:
 - `notebooks/invarlock_python_api.ipynb`
 - `notebooks/invarlock_policy_tiers.ipynb`
 
-Use this lane when you need deterministic proof that the documented
+Use this lane when you need deterministic evidence that the documented
 `evaluate -> verify -> report html` path still works.
 
 For Markdown examples, this lane replays the documented commands in
