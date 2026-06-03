@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.10.0] - 2026-06-03
+
+### Added
+
 - Added evidence-pack artifact taxonomy and edit metadata sidecars so validation
   checkpoints, fault-injection fixtures, deployable optimized subjects, and
   evidence-only packs are labeled explicitly in scenarios, packaged evidence,
@@ -56,6 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added optional `hf_ct` adapter discovery for compressed-tensors
   pre-quantized checkpoints, including capability metadata, backend inventory,
   and a narrow example-only CUDA runtime image smoke path.
+- Added the root README evaluation and verification flow diagram as a versioned
+  SVG asset.
 
 ### Changed
 

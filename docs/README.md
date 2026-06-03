@@ -140,7 +140,7 @@ to change proposals or releases when you update calibration.
 
 ### Governance
 
-- [Contribution Guidelines](https://github.com/invarlock/invarlock/blob/v0.9.0/CONTRIBUTING.md)
+- [Contribution Guidelines](https://github.com/invarlock/invarlock/blob/v0.10.0/CONTRIBUTING.md)
 
 ---
 
@@ -363,4 +363,4 @@ Run with `RUN=1 NET=1` to execute the matrix and allow downloads.
 [CLI Reference](reference/cli.md) ·
 [Primary Metric Smoke](user-guide/primary-metric-smoke.md) ·
 [Example Reports](user-guide/example-reports.md) ·
-[Contributing](https://github.com/invarlock/invarlock/blob/v0.9.0/CONTRIBUTING.md)
+[Contributing](https://github.com/invarlock/invarlock/blob/v0.10.0/CONTRIBUTING.md)

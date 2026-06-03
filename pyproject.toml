@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock"
-version = "0.9.0"
+version = "0.10.0"
 description = "Auditable strict verification for edited model checkpoints (InvarLock framework)"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
@@ -43,9 +43,9 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/invarlock/invarlock"
 Repository = "https://github.com/invarlock/invarlock"
-Documentation = "https://invarlock.github.io/invarlock/0.9.0/"
+Documentation = "https://invarlock.github.io/invarlock/0.10.0/"
 Issues = "https://github.com/invarlock/invarlock/issues"
-Changelog = "https://github.com/invarlock/invarlock/blob/v0.9.0/CHANGELOG.md"
+Changelog = "https://github.com/invarlock/invarlock/blob/v0.10.0/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Core torch dependencies for adapters
