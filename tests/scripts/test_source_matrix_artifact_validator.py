@@ -48,10 +48,33 @@ def _write_matrix_artifact_set(report_dir: Path) -> None:
         + "\n",
         encoding="utf-8",
     )
-    (report_dir / "runtime.manifest.json").write_text("{}\n", encoding="utf-8")
+    (report_dir / "runtime.manifest.json").write_text(
+        json.dumps(
+            {
+                "runtime": {
+                    "image_digest": (
+                        "sha256:"
+                        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    ),
+                    "image_ref": "ghcr.io/invarlock/invarlock-example-runtime:test",
+                }
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     (report_dir / "evaluation.html").write_text("<html></html>\n", encoding="utf-8")
     (report_dir / "backend_inventory.json").write_text(
-        '{"backend": "hqq"}\n', encoding="utf-8"
+        json.dumps(
+            {
+                "schema": "invarlock/backend-inventory-v1",
+                "adapter": "hf_hqq",
+                "backend": "hqq",
+                "quantized_module_count": 1,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
     )
     (report_dir / "lane_artifact.json").write_text(
         json.dumps({"lane_artifact_label": "cuda-container-strict"}) + "\n",
@@ -86,7 +109,11 @@ def _write_test_source_matrix(repo_root: Path) -> Path:
                         "readme": "examples/integrations/hqq/README.md",
                         "runner": "examples/integrations/hqq/run_tiny_hf_hqq.sh",
                         "report_path": "reports/tiny-hf-hqq/<artifact-lane>",
+                        "subject_adapter": "hf_hqq",
                         "lane": "cuda-container-strict",
+                        "runtime_image": {
+                            "digest_source": "runtime.manifest.json",
+                        },
                         "expected": {
                             "lane_artifact_label": "cuda-container-strict",
                             "verify_status": "ok",
@@ -188,3 +215,62 @@ def test_source_matrix_artifact_validator_reports_artifact_and_status_mismatches
     assert any(
         "runtime provenance verified flag mismatch" in message for message in messages
     )
+
+
+def test_source_matrix_artifact_validator_checks_inventory_and_runtime_manifest(
+    tmp_path: Path,
+) -> None:
+    validator = _load_validator()
+    matrix_path = _write_test_source_matrix(tmp_path)
+    report_dir = _report_dir(tmp_path)
+    _write_matrix_artifact_set(report_dir)
+    (report_dir / "backend_inventory.json").write_text(
+        json.dumps(
+            {
+                "schema": "other",
+                "adapter": "hf_other",
+                "backend": "hqq",
+                "quantized_module_count": -1,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (report_dir / "runtime.manifest.json").write_text(
+        json.dumps({"runtime": {"image_digest": "", "image_ref": ""}}) + "\n",
+        encoding="utf-8",
+    )
+
+    _, issues = validator.validate_matrix(
+        repo_root=tmp_path,
+        matrix_path=matrix_path,
+        targets={"hqq"},
+    )
+    messages = [issue.message for issue in issues]
+
+    assert any("backend inventory schema mismatch" in message for message in messages)
+    assert any("backend inventory adapter mismatch" in message for message in messages)
+    assert any("quantized_module_count" in message for message in messages)
+    assert "runtime manifest runtime.image_digest must be present" in messages
+    assert "runtime manifest runtime.image_ref must be present" in messages
+
+
+def test_source_matrix_artifact_validator_reports_malformed_json_artifacts(
+    tmp_path: Path,
+) -> None:
+    validator = _load_validator()
+    matrix_path = _write_test_source_matrix(tmp_path)
+    report_dir = _report_dir(tmp_path)
+    _write_matrix_artifact_set(report_dir)
+    (report_dir / "lane_artifact.json").write_text("{", encoding="utf-8")
+    (report_dir / "verify.json").write_text("{", encoding="utf-8")
+
+    _, issues = validator.validate_matrix(
+        repo_root=tmp_path,
+        matrix_path=matrix_path,
+        targets={"hqq"},
+    )
+    messages = [issue.message for issue in issues]
+
+    assert any("lane artifact is invalid JSON" in message for message in messages)
+    assert any("verify artifact is invalid JSON" in message for message in messages)

@@ -19,6 +19,28 @@ integration_log_kv() {
   printf '     %s: %s\n' "$key" "${value:-<unset>}" >&2
 }
 
+integration_filter_source_archive_stderr() {
+  local line
+
+  while IFS= read -r line; do
+    case "$line" in
+      "fatal: not a git repository (or any of the parent directories): .git")
+        ;;
+      *)
+        printf '%s\n' "$line" >&2
+        ;;
+    esac
+  done
+}
+
+integration_run_source_archive_clean() {
+  if [[ -n "${REPO_ROOT:-}" && -d "$REPO_ROOT/.git" ]]; then
+    "$@"
+  else
+    "$@" 2> >(integration_filter_source_archive_stderr)
+  fi
+}
+
 integration_effective_execution_mode() {
   local lane="$1"
   local execution_mode="$2"

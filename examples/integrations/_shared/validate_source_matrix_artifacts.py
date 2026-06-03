@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 DEFAULT_MATRIX = Path("examples/integrations/source_matrix.json")
+BACKEND_INVENTORY_SCHEMA = "invarlock/backend-inventory-v1"
 
 
 @dataclass(frozen=True)
@@ -74,6 +75,111 @@ def _summary_fields(path: Path) -> dict[str, str]:
     return fields
 
 
+def _read_required_json_object(
+    *,
+    target: str,
+    path: Path,
+    artifact_name: str,
+) -> tuple[dict[str, Any] | None, ValidationIssue | None]:
+    try:
+        payload = _read_json(path)
+    except json.JSONDecodeError as exc:
+        return None, ValidationIssue(
+            target=target,
+            path=str(path),
+            message=f"{artifact_name} is invalid JSON: {exc.msg}",
+        )
+    if not isinstance(payload, dict):
+        return None, ValidationIssue(
+            target=target,
+            path=str(path),
+            message=f"{artifact_name} must contain a JSON object",
+        )
+    return payload, None
+
+
+def _validate_backend_inventory(
+    *,
+    target: str,
+    path: Path,
+    payload: dict[str, Any],
+    expected_adapter: str | None,
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    if payload.get("schema") != BACKEND_INVENTORY_SCHEMA:
+        issues.append(
+            ValidationIssue(
+                target=target,
+                path=str(path),
+                message=(
+                    "backend inventory schema mismatch: "
+                    f"expected {BACKEND_INVENTORY_SCHEMA!r}, "
+                    f"got {payload.get('schema')!r}"
+                ),
+            )
+        )
+    if expected_adapter and payload.get("adapter") != expected_adapter:
+        issues.append(
+            ValidationIssue(
+                target=target,
+                path=str(path),
+                message=(
+                    "backend inventory adapter mismatch: "
+                    f"expected {expected_adapter!r}, got {payload.get('adapter')!r}"
+                ),
+            )
+        )
+    quantized_count = payload.get("quantized_module_count")
+    if not isinstance(quantized_count, int) or quantized_count < 0:
+        issues.append(
+            ValidationIssue(
+                target=target,
+                path=str(path),
+                message=(
+                    "backend inventory quantized_module_count must be a "
+                    "non-negative integer"
+                ),
+            )
+        )
+    return issues
+
+
+def _validate_runtime_manifest(
+    *,
+    target: str,
+    path: Path,
+    payload: dict[str, Any],
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    runtime = payload.get("runtime")
+    if not isinstance(runtime, dict):
+        issues.append(
+            ValidationIssue(
+                target=target,
+                path=str(path),
+                message="runtime manifest runtime field must contain an object",
+            )
+        )
+        runtime = {}
+    if not str(runtime.get("image_digest") or "").strip():
+        issues.append(
+            ValidationIssue(
+                target=target,
+                path=str(path),
+                message="runtime manifest runtime.image_digest must be present",
+            )
+        )
+    if not str(runtime.get("image_ref") or "").strip():
+        issues.append(
+            ValidationIssue(
+                target=target,
+                path=str(path),
+                message="runtime manifest runtime.image_ref must be present",
+            )
+        )
+    return issues
+
+
 def validate_entry(repo_root: Path, entry: dict[str, Any]) -> list[ValidationIssue]:
     target = str(entry["target"])
     issues: list[ValidationIssue] = []
@@ -133,9 +239,21 @@ def validate_entry(repo_root: Path, entry: dict[str, Any]) -> list[ValidationIss
 
     lane_artifact_path = report_dir / "lane_artifact.json"
     if lane_artifact_path.is_file():
-        lane_artifact = _read_json(lane_artifact_path)
-        lane_label = lane_artifact.get("lane_artifact_label")
-        if lane_label != expected.get("lane_artifact_label"):
+        lane_label: str | None = None
+        lane_artifact, lane_error = _read_required_json_object(
+            target=target,
+            path=lane_artifact_path,
+            artifact_name="lane artifact",
+        )
+        if lane_error is not None:
+            issues.append(lane_error)
+        elif lane_artifact is not None:
+            lane_label = (
+                str(lane_artifact["lane_artifact_label"])
+                if "lane_artifact_label" in lane_artifact
+                else None
+            )
+        if lane_error is None and lane_label != expected.get("lane_artifact_label"):
             issues.append(
                 ValidationIssue(
                     target=target,
@@ -170,7 +288,15 @@ def validate_entry(repo_root: Path, entry: dict[str, Any]) -> list[ValidationIss
 
     verify_path = report_dir / "verify.json"
     if verify_path.is_file():
-        verify_payload = _read_json(verify_path)
+        verify_payload, verify_error = _read_required_json_object(
+            target=target,
+            path=verify_path,
+            artifact_name="verify artifact",
+        )
+        if verify_error is not None or verify_payload is None:
+            if verify_error is not None:
+                issues.append(verify_error)
+            verify_payload = {}
         status = _verify_status(verify_payload)
         if status != expected.get("verify_status"):
             issues.append(
@@ -208,6 +334,51 @@ def validate_entry(repo_root: Path, entry: dict[str, Any]) -> list[ValidationIss
                         f"expected {expected.get('runtime_provenance_verified')!r}, "
                         f"got {runtime.get('verified')!r}"
                     ),
+                )
+            )
+
+    backend_inventory_path = report_dir / "backend_inventory.json"
+    if backend_inventory_path.is_file():
+        expected_adapter = entry.get("subject_adapter")
+        backend_inventory, backend_error = _read_required_json_object(
+            target=target,
+            path=backend_inventory_path,
+            artifact_name="backend inventory",
+        )
+        if backend_error is not None:
+            issues.append(backend_error)
+        elif backend_inventory is not None:
+            issues.extend(
+                _validate_backend_inventory(
+                    target=target,
+                    path=backend_inventory_path,
+                    payload=backend_inventory,
+                    expected_adapter=(
+                        expected_adapter if isinstance(expected_adapter, str) else None
+                    ),
+                )
+            )
+
+    runtime_manifest_path = report_dir / "runtime.manifest.json"
+    runtime_image = entry.get("runtime_image")
+    if (
+        runtime_manifest_path.is_file()
+        and isinstance(runtime_image, dict)
+        and runtime_image.get("digest_source") == "runtime.manifest.json"
+    ):
+        runtime_manifest, runtime_error = _read_required_json_object(
+            target=target,
+            path=runtime_manifest_path,
+            artifact_name="runtime manifest",
+        )
+        if runtime_error is not None:
+            issues.append(runtime_error)
+        elif runtime_manifest is not None:
+            issues.extend(
+                _validate_runtime_manifest(
+                    target=target,
+                    path=runtime_manifest_path,
+                    payload=runtime_manifest,
                 )
             )
 

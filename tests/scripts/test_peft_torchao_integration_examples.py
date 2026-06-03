@@ -71,6 +71,9 @@ def test_peft_lora_runner_wires_local_fixture() -> None:
     assert "integration_log_header" in text
     assert "integration_log_step" in text
     assert "lane_artifact_label" in text
+    assert "select_python_bin peft" in text
+    assert 'for candidate in python "$REPO_ROOT/.venv/bin/python" python3' in text
+    assert "import ${required_module}" in text
 
 
 def test_integration_example_readmes_document_run_lanes() -> None:
@@ -142,12 +145,17 @@ def test_integration_example_readmes_document_run_lanes() -> None:
     )
     assert "`mps-host-off`" in lm_eval_text
     assert "--device mps" in lm_eval_text
+    assert 'uv run --extra hf --with "lm_eval[hf]"' in lm_eval_text
+    assert "uv run --extra hf --with peft" in lm_eval_text
     assert lm_eval_text.index("`cuda-container-strict`") < lm_eval_text.index(
         "`cuda-host-off`"
     )
     assert "primary evidence" in lm_eval_text
     assert "run_summary.txt" in lm_eval_text
     assert "verifier status, runtime provenance status" in lm_eval_text
+
+    peft_text = (integrations / "peft_lora" / "README.md").read_text(encoding="utf-8")
+    assert "uv run --extra hf --with peft" in peft_text
 
 
 def test_integration_runners_default_reports_are_lane_scoped() -> None:
@@ -159,6 +167,27 @@ def test_integration_runners_default_reports_are_lane_scoped() -> None:
         assert "report_out_was_default=1" in text, f"{runner} missing default flag"
         assert "report_out_was_default=0" in text, f"{runner} missing override flag"
         assert "integration_lane_report_out" in text, f"{runner} missing lane output"
+
+
+def test_source_archive_git_warning_filter_is_shared_for_external_materializers() -> (
+    None
+):
+    preflight = (
+        REPO_ROOT / "examples" / "integrations" / "_shared" / "preflight.sh"
+    ).read_text(encoding="utf-8")
+
+    assert "integration_filter_source_archive_stderr" in preflight
+    assert "integration_run_source_archive_clean" in preflight
+    assert "fatal: not a git repository" in preflight
+
+    for runner in [
+        INTEGRATIONS_DIR / "awq" / "run_tiny_awq.sh",
+        INTEGRATIONS_DIR / "gptqmodel" / "run_tiny_gptqmodel.sh",
+        INTEGRATIONS_DIR / "lm_eval_harness" / "run_tiny_lm_eval_sidecar.sh",
+        INTEGRATIONS_DIR / "peft_lora" / "run_tiny_peft_lora.sh",
+    ]:
+        text = runner.read_text(encoding="utf-8")
+        assert "integration_run_source_archive_clean" in text
 
 
 def test_integration_readmes_use_run_lane_subsections() -> None:

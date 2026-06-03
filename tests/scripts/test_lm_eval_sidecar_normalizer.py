@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -36,7 +38,125 @@ def test_lm_eval_sidecar_runner_wires_preflight_and_lane_label() -> None:
     assert "integration_log_header" in text
     assert "integration_log_step" in text
     assert "integration_log_kv" in text
+    assert "select_python_bin lm_eval" in text
+    assert "integration_run_source_archive_clean" in text
+    assert 'for candidate in python "$REPO_ROOT/.venv/bin/python" python3' in text
+    assert "import ${required_module}" in text
     assert '} > "$report_out/run_command.txt"' not in text
+
+    readme = (RUNNER.parent / "README.md").read_text(encoding="utf-8")
+    assert 'uv run --extra hf --with "lm_eval[hf]"' in readme
+
+
+def test_lm_eval_sidecar_runner_filters_source_archive_git_warning(
+    tmp_path: Path,
+) -> None:
+    source_root = tmp_path / "source"
+    source_lm_eval_dir = source_root / "examples" / "integrations" / "lm_eval_harness"
+    source_shared_dir = source_root / "examples" / "integrations" / "_shared"
+    source_lm_eval_dir.mkdir(parents=True)
+    source_shared_dir.mkdir(parents=True)
+    (source_root / "src").mkdir()
+
+    shutil.copy2(RUNNER, source_lm_eval_dir / RUNNER.name)
+    shutil.copy2(NORMALIZER, source_lm_eval_dir / NORMALIZER.name)
+    shutil.copy2(
+        REPO_ROOT / "examples" / "integrations" / "_shared" / "preflight.sh",
+        source_shared_dir / "preflight.sh",
+    )
+
+    fake_module_dir = tmp_path / "fake_modules" / "lm_eval"
+    fake_module_dir.mkdir(parents=True)
+    (fake_module_dir / "__init__.py").write_text("", encoding="utf-8")
+    (fake_module_dir / "__main__.py").write_text(
+        """
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+print("fake harness stderr stays visible", file=sys.stderr)
+print(
+    "fatal: not a git repository (or any of the parent directories): .git",
+    file=sys.stderr,
+)
+
+output_dir = Path(sys.argv[sys.argv.index("--output_path") + 1])
+output_dir.mkdir(parents=True, exist_ok=True)
+(output_dir / "results_fake.json").write_text(
+    json.dumps(
+        {
+            "results": {
+                "wikitext": {
+                    "alias": "wikitext",
+                    "sample_len": 1,
+                    "word_perplexity,none": 100.0,
+                }
+            },
+            "versions": {"wikitext": 2.0},
+            "n-samples": {"wikitext": {"original": 1, "effective": 1}},
+            "higher_is_better": {"wikitext": {"word_perplexity": False}},
+            "config": {
+                "device": "cpu",
+                "limit": 1.0,
+                "batch_size": "1",
+                "model_sha": "abc123",
+                "random_seed": 0,
+                "numpy_seed": 1234,
+                "torch_seed": 1234,
+                "fewshot_seed": 1234,
+            },
+            "git_hash": None,
+            "lm_eval_version": "fake",
+            "model_source": "hf",
+            "model_name": "fake-model",
+        }
+    ),
+    encoding="utf-8",
+)
+""",
+        encoding="utf-8",
+    )
+
+    report_out = tmp_path / "reports"
+    result = subprocess.run(
+        [
+            "bash",
+            str(source_lm_eval_dir / RUNNER.name),
+            "--baseline",
+            "baseline",
+            "--subject",
+            "subject",
+            "--report-out",
+            str(report_out),
+            "--force",
+        ],
+        cwd=source_root,
+        env={
+            "PATH": os.environ["PATH"],
+            "PYTHON_BIN": sys.executable,
+            "PYTHONPATH": str(tmp_path / "fake_modules"),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "fake harness stderr stays visible" in result.stderr
+    assert "fatal: not a git repository" not in result.stderr
+
+    summary = json.loads(
+        (report_out / "lm_eval_sidecar_summary.json").read_text(encoding="utf-8")
+    )
+    assert summary["lane_artifact_label"] == "cpu-host-off"
+    assert (
+        summary["comparison"]["wikitext"]["word_perplexity,none"][
+            "subject_over_baseline"
+        ]
+        == 1.0
+    )
 
 
 def _write_lm_eval_report(path: Path, word_perplexity: float) -> None:

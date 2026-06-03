@@ -51,8 +51,11 @@ prerequisites, commands, and generated artifact list.
 
    ```bash
    python3 examples/integrations/_shared/validate_source_matrix_artifacts.py \
-     --targets hqq quanto compressed_tensors
+     --targets <target>
    ```
+
+   Omit `--targets` only after every source-matrix entry has generated
+   strict-lane reports in the checkout.
 
 7. Record the output paths and any backend limitations in the example README.
 

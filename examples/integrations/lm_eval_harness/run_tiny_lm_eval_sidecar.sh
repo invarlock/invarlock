@@ -106,13 +106,30 @@ if [[ -z "$baseline" || -z "$tasks" || -z "$limit" || -z "$device" || -z "$batch
   exit 2
 fi
 
-PYTHON_BIN="${PYTHON_BIN:-}"
-if [[ -z "$PYTHON_BIN" ]]; then
+select_python_bin() {
+  local required_module="$1"
+  local candidate
+  for candidate in python "$REPO_ROOT/.venv/bin/python" python3; do
+    if [[ "$candidate" == */* ]]; then
+      [[ -x "$candidate" ]] || continue
+    elif ! command -v "$candidate" >/dev/null 2>&1; then
+      continue
+    fi
+    if "$candidate" -c "import ${required_module}" >/dev/null 2>&1; then
+      PYTHON_BIN="$candidate"
+      return
+    fi
+  done
   if [[ -x "$REPO_ROOT/.venv/bin/python" ]]; then
     PYTHON_BIN="$REPO_ROOT/.venv/bin/python"
   else
     PYTHON_BIN="python3"
   fi
+}
+
+PYTHON_BIN="${PYTHON_BIN:-}"
+if [[ -z "$PYTHON_BIN" ]]; then
+  select_python_bin lm_eval
 fi
 
 # shellcheck source=../_shared/preflight.sh
@@ -256,7 +273,7 @@ run_lm_eval() {
 
   append_command_log "$label" "${cmd[@]}"
   integration_log_step "run LM Eval Harness: $label"
-  "${cmd[@]}"
+  integration_run_source_archive_clean "${cmd[@]}"
 }
 
 find_result_json() {

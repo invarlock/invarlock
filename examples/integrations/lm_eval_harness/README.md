@@ -37,6 +37,14 @@ sidecar dependency into that environment with:
 uv pip install --python .venv/bin/python "lm_eval[hf]"
 ```
 
+From a source checkout, you can also keep the optional dependency scoped to the
+example command:
+
+```bash
+uv run --extra hf --with "lm_eval[hf]" \
+  examples/integrations/lm_eval_harness/run_tiny_lm_eval_sidecar.sh --help
+```
+
 ## Run
 
 ### Lane Support
@@ -62,6 +70,7 @@ subject and fixture:
 make runtime-image-cuda
 
 INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-local \
+uv run --extra hf --with peft \
 examples/integrations/peft_lora/run_tiny_peft_lora.sh \
   --allow-network \
   --force \
@@ -98,6 +107,7 @@ to the baseline.
 From the repository root:
 
 ```bash
+uv run --extra hf --with "lm_eval[hf]" \
 examples/integrations/lm_eval_harness/run_tiny_lm_eval_sidecar.sh \
   --allow-network \
   --force \
@@ -108,6 +118,7 @@ To compare a subject checkpoint that is already loadable by Hugging Face, pass
 the subject path or model ID:
 
 ```bash
+uv run --extra hf --with "lm_eval[hf]" \
 examples/integrations/lm_eval_harness/run_tiny_lm_eval_sidecar.sh \
   --baseline sshleifer/tiny-gpt2 \
   --subject ./examples/integrations/peft_lora/models/tiny-gpt2-peft-lora-merged \
@@ -123,6 +134,7 @@ Run this lane on a host where LM Evaluation Harness and the selected model can
 use a CUDA device:
 
 ```bash
+uv run --extra hf --with "lm_eval[hf]" \
 examples/integrations/lm_eval_harness/run_tiny_lm_eval_sidecar.sh \
   --allow-network \
   --force \
