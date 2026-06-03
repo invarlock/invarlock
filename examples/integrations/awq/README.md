@@ -38,7 +38,7 @@ uv run --extra awq python -c "import gptqmodel"
 | Artifact lane label | Command shape | Notes |
 | --- | --- | --- |
 | `cuda-container-strict` | `--lane cuda` | Primary evidence path with the example-specific GPTQModel/AWQ image. |
-| `cuda-host-off` | `--lane host` | Secondary local CUDA dependency bring-up without strict container evidence. |
+| `cuda-host-off` | `--lane host --device cuda` | Secondary local CUDA dependency bring-up without strict container evidence. |
 
 Host lanes run prerequisite preflight before model materialization and
 evaluation. This AWQ example is CUDA-only because AWQ materialization requires
@@ -77,7 +77,8 @@ uv run --extra awq \
   examples/integrations/awq/run_tiny_awq.sh \
   --allow-network \
   --force \
-  --lane host
+  --lane host \
+  --device cuda
 ```
 
 The host path uses `--execution-mode host --assurance off` because the AWQ

@@ -127,4 +127,5 @@ invarlock verify --profile release --assurance strict \
 ```
 
 Use that fixture as the stable public reference when the local example
-environment does not have `torchao` installed.
+environment does not have `torchao` installed. It is a generic strict InvarLock
+quantization fixture, not TorchAO-specific integration evidence.

@@ -50,7 +50,7 @@ non-assurance.
 verify failed: runtime_manifest_missing
 ```
 
-**Meaning:** the verifier cannot prove the runtime provenance required by strict
+**Meaning:** the verifier cannot verify the runtime provenance required by strict
 assurance.
 
 **Action:** rerun in container mode and keep `runtime.manifest.json` with the
