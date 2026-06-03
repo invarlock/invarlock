@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -698,6 +698,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -2022,7 +2078,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2134,7 +2190,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2620,22 +2676,26 @@ baseline and the subject checkpoints, and InvarLock produces a deterministic
 report. This avoids coupling to any particular edit stack and keeps your
 existing tooling intact whether you are validating quantization, pruning,
 fine-tuning, or other checkpoint-edit workflows.</p>
+<p>That is the production boundary in InvarLock: guards and verifier policy inspect
+the resulting subject checkpoint and paired metrics, not the external program
+that produced the subject. Built-in edit generation is kept to demo/smoke
+support; production validation should normally use BYOE.</p>
 <h2 id="tldr">TL;DR<a class="headerlink" href="#tldr" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Produce your baseline and edited checkpoints (any external tool).</li>
 <li>Ensure both use the same tokenizer (InvarLock verify lints tokenizer hash when
   present).</li>
-<li>Run <code>invarlock evaluate --baseline &lt;baseline&gt; --subject &lt;subject&gt; --adapter auto</code>.</li>
+<li>Run <code>invarlock evaluate --baseline &lt;baseline&gt; --subject &lt;subject&gt; --baseline-adapter auto --subject-adapter auto</code>.</li>
 </ul>
 <p>By default, <code>evaluate</code> runs inside the runtime container. Use <code>--execution-mode host</code>
 only for host-side workflows that intentionally run model loading on the
 host. If you choose that host-side path, verify the resulting report with
-<code>invarlock verify --runtime-provenance host ...</code>.</p>
+<code>invarlock verify --runtime-provenance host --assurance off ...</code>.</p>
 <p>Example (wheel-first, GPT‑2, CPU/MPS friendly; requires <code>invarlock[hf]</code> or equivalent HF extra):</p>
 <div class="codehilite"><pre><span></span><code><span class="nv">INVARLOCK_DEDUP_TEXTS</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>invarlock<span class="w"> </span>evaluate<span class="w"> </span>--allow-network<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--baseline<span class="w"> </span>sshleifer/tiny-gpt2<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--subject<span class="w"> </span>/path/to/your/edited-model<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--baseline-adapter<span class="w"> </span>auto<span class="w"> </span>--subject-adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--profile<span class="w"> </span>ci<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--out<span class="w"> </span>runs/eval_smoke<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--report-out<span class="w"> </span>reports/eval_smoke
@@ -2658,14 +2718,15 @@ baseline <code>report.json</code> file and skip the baseline evaluation portion 
 <ul>
 <li>Baseline report must be from a no-op run (<code>edit.name == "noop"</code>).</li>
 <li>Baseline report must include stored evaluation windows (set <code>INVARLOCK_STORE_EVAL_WINDOWS=1</code> when generating it).</li>
-<li>The baseline report must match the intended <code>--profile</code>, <code>--tier</code>, and adapter family.</li>
+<li>The baseline report must match the intended baseline model, <code>--profile</code>, <code>--tier</code>, adapter family,
+  assurance mode, and dataset/window-plan fields.</li>
 </ul>
 <p>Example:</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># 1) Produce a reusable baseline report once (writes runs/baseline_once/source/&lt;timestamp&gt;/report.json)</span>
 <span class="nv">INVARLOCK_STORE_EVAL_WINDOWS</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">INVARLOCK_DEDUP_TEXTS</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>invarlock<span class="w"> </span>evaluate<span class="w"> </span>--allow-network<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--baseline<span class="w"> </span>sshleifer/tiny-gpt2<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--subject<span class="w"> </span>sshleifer/tiny-gpt2<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--baseline-adapter<span class="w"> </span>auto<span class="w"> </span>--subject-adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--profile<span class="w"> </span>ci<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--tier<span class="w"> </span>balanced<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--out<span class="w"> </span>runs/baseline_once<span class="w"> </span><span class="se">\</span>
@@ -2677,7 +2738,7 @@ baseline <code>report.json</code> file and skip the baseline evaluation portion 
 <span class="w">  </span>--baseline-report<span class="w"> </span>runs/baseline_once/source/&lt;timestamp&gt;/report.json<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--baseline<span class="w"> </span>sshleifer/tiny-gpt2<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--subject<span class="w"> </span>/path/to/your/edited-model<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--baseline-adapter<span class="w"> </span>auto<span class="w"> </span>--subject-adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--profile<span class="w"> </span>ci<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--tier<span class="w"> </span>balanced<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--out<span class="w"> </span>runs/eval_subject_1<span class="w"> </span><span class="se">\</span>
@@ -2700,6 +2761,9 @@ keep <code>seq_len=stride</code> for deterministic non-overlapping windows.</p>
 <li>Stable: your edit stack remains yours; InvarLock focuses on gates and evidence.</li>
 <li>Portable: reports are self-contained artifacts with provenance.</li>
 <li>Low maintenance: you can update your edit tools without waiting for InvarLock updates.</li>
+<li>Auditable: public BYOE fixtures under <code>public_evidence/byoe_examples/</code> show
+  dense magnitude pruning and LoRA-merge style subjects verifying through the
+  same strict verification path.</li>
 </ul>
 <h2 id="when-to-use-built-in-edits">When to use built-in edits<a class="headerlink" href="#when-to-use-built-in-edits" title="Permanent link">&para;</a></h2>
 <p>InvarLock ships a single built-in edit tuned for portable smokes:</p>
@@ -2782,6 +2846,10 @@ reports and <code>runtime.manifest.json</code> and revalidated by <code>invarloc
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -2181,7 +2237,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2293,7 +2349,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2909,7 +2965,7 @@
 <tbody>
 <tr>
 <td><strong>Purpose</strong></td>
-<td>Edit-agnostic safety evaluation framework for ML model weight modifications.</td>
+<td>Auditable strict-verification framework for ML model weight modifications.</td>
 </tr>
 <tr>
 <td><strong>Audience</strong></td>
@@ -2921,7 +2977,7 @@
 </tr>
 <tr>
 <td><strong>Design goals</strong></td>
-<td>Torch-independent core, edit-agnostic guards, deterministic evaluation, explicit artifact contracts, full provenance.</td>
+<td>Torch-independent core, edit-stack-neutral guards, deterministic evaluation, explicit artifact contracts, full provenance.</td>
 </tr>
 <tr>
 <td><strong>Source of truth</strong></td>
@@ -2983,8 +3039,8 @@ the canonical guard chain, policy digest, and measurement contract.</p>
 │                     CORE POLICY / CONTRACT LAYER                            │
 │  ┌─────────────────────────────────────────────────────────────────┐        │
 │  │ evaluate_plan · report_inputs · doctor_findings                │        │
-│  │ verify_contract · run_retry_policy · run_snapshot_contract     │        │
-│  │ run_guard_overhead_policy · run_provenance_contract            │        │
+│  │ verify_contract · retry · run_snapshot_contract                │        │
+│  │ run_report_contract · runtime_verify                          │        │
 │  └─────────────────────────────────────────────────────────────────┘        │
 │                                                                             │
 ├─────────────────────────────────────────────────────────────────────────────┤
@@ -3007,7 +3063,7 @@ the canonical guard chain, policy digest, and measurement contract.</p>
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                          REPORTING / FILES LAYER                            │
 │  ┌──────────────┐ ┌──────────────┐ ┌────────────┐ ┌────────────┐            │
-│  │ report_make  │ │ report_files │ │   render   │ │  manifest  │            │
+│  │ report_make  │ │report_bundle │ │   render   │ │  schema    │            │
 │  │ + console    │ │ + evidence   │ │  (MD/HTML) │ │   (JSON)   │            │
 │  └──────────────┘ └──────────────┘ └────────────┘ └────────────┘            │
 │                                                                             │
@@ -3020,10 +3076,10 @@ the canonical guard chain, policy digest, and measurement contract.</p>
 modules should stay thin: parse arguments, call core/reporting owners, render
 output, and map failures to exit codes.</p>
 <p>Shell support modules such as <code>cli/config_execution.py</code>, <code>cli/run_execution.py</code>,
-<code>cli/run_config.py</code>, <code>cli/run_pairing.py</code>, <code>cli/run_overhead.py</code>, and
-<code>cli/run_artifacts.py</code> belong to this boundary layer as well. They can perform
-CLI-facing adaptation and console/event rendering, but they must not become
-policy owners.</p>
+<code>cli/run_config.py</code>, <code>cli/run_pairing.py</code>, and <code>cli/run_overhead.py</code> belong to
+this boundary layer as well. They can perform CLI-facing adaptation and
+console/event rendering; policy ownership stays in the core and reporting
+owners.</p>
 <table>
 <thead>
 <tr>
@@ -3097,7 +3153,7 @@ by the CLI and non-CLI entrypoints.</p>
 <td>Structured report-verification service used by <code>verify</code> and evidence-pack flows</td>
 </tr>
 <tr>
-<td><code>runtime_manifest_verify.py</code> + <code>runtime_provenance.py</code></td>
+<td><code>runtime_verify.py</code> + <code>runtime_provenance.py</code></td>
 <td>Authoritative runtime-manifest verification and runtime-provenance ownership for report verification</td>
 </tr>
 <tr>
@@ -3105,34 +3161,26 @@ by the CLI and non-CLI entrypoints.</p>
 <td>Shared run policy helpers such as split choice, PM thresholds, and overhead policy</td>
 </tr>
 <tr>
-<td><code>run_retry_policy.py</code></td>
-<td>Retry-attempt summaries and retry state transitions</td>
+<td><code>retry.py</code></td>
+<td>Retry controller, edit-parameter adjustment, attempt summaries, and retry state transitions</td>
 </tr>
 <tr>
-<td><code>run_snapshot_contract.py</code> + <code>run_snapshot_policy.py</code></td>
+<td><code>run_snapshot_contract.py</code></td>
 <td>Snapshot planning, restore behavior, and retry transitions</td>
 </tr>
 <tr>
-<td><code>run_guard_overhead_policy.py</code></td>
-<td>Guard-overhead normalization, summary building, and report shaping</td>
-</tr>
-<tr>
-<td><code>run_provenance_contract.py</code> + <code>run_report_contract.py</code></td>
-<td>Run provenance and run-report assembly contracts</td>
-</tr>
-<tr>
-<td><code>run_report_payload_policy.py</code></td>
-<td>Deterministic payload shaping for context, metrics, guards, and flags</td>
+<td><code>run_report_contract.py</code></td>
+<td>Run provenance finalization, payload shaping, and run-report assembly contracts</td>
 </tr>
 </tbody>
 </table>
 <h3 id="runtime-provenance-verification-ownership">Runtime Provenance Verification Ownership<a class="headerlink" href="#runtime-provenance-verification-ownership" title="Permanent link">&para;</a></h3>
 <p>Runtime provenance uses a single verifier implementation:</p>
 <ul>
-<li><code>core/runtime_manifest_verify.py</code> is the authoritative verifier for
+<li><code>runtime_verify.py</code> is the authoritative programmatic verifier for
   <code>runtime.manifest.json</code> plus report-digest binding checks.</li>
-<li><code>runtime_verify.py</code> and <code>cli/runtime_verify.py</code> are the programmatic and CLI
-  entrypoints for that verifier.</li>
+<li><code>cli/commands/verify.py</code> owns the CLI entrypoints for both report verification
+  and advanced runtime-manifest verification.</li>
 <li><code>runtime_provenance.py</code> calls the same verifier when <code>invarlock verify</code>
   enforces runtime provenance on container-backed reports.</li>
 <li>Product behavior does not depend on finding an external verifier binary on
@@ -3224,19 +3272,11 @@ by the CLI and non-CLI entrypoints.</p>
 </tr>
 <tr>
 <td><code>report_make.py</code></td>
-<td>Public evaluation-report entrypoint that coordinates the split report-making owners</td>
-</tr>
-<tr>
-<td><code>report_make_inputs.py</code></td>
-<td>Input normalization, baseline reference building, and build-section extraction</td>
+<td>Evaluation-report input normalization, build-section extraction, output shaping, and public report assembly</td>
 </tr>
 <tr>
 <td><code>report_make_assembly.py</code></td>
 <td>Policy/provenance/guard assembly and report build-context composition</td>
-</tr>
-<tr>
-<td><code>report_make_output.py</code></td>
-<td>Final evaluation-report shaping and output payload construction</td>
 </tr>
 <tr>
 <td><code>report_bundle.py</code></td>
@@ -3247,15 +3287,15 @@ by the CLI and non-CLI entrypoints.</p>
 <td>Input loading and report-generation planning</td>
 </tr>
 <tr>
-<td><code>report_console.py</code></td>
-<td>Console/report validation summary helpers used by CLI/reporting surfaces</td>
+<td><code>report_overhead.py</code></td>
+<td>Guard-overhead normalization, summary building, and report shaping</td>
 </tr>
 <tr>
 <td><code>report_summary.py</code></td>
-<td>Shared executive-summary/view-model derivation for reporting surfaces</td>
+<td>Console validation blocks and shared executive-summary/view-model derivation for reporting surfaces</td>
 </tr>
 <tr>
-<td><code>render.py</code></td>
+<td><code>render_markdown.py</code></td>
 <td>Markdown rendering for evaluation reports</td>
 </tr>
 <tr>
@@ -3263,16 +3303,12 @@ by the CLI and non-CLI entrypoints.</p>
 <td>HTML export with styling</td>
 </tr>
 <tr>
-<td><code>report_files.py</code></td>
-<td>Raw run-report JSON/Markdown/HTML persistence</td>
+<td><code>core/guard_evidence.py</code></td>
+<td>Canonical guard-evidence normalization before reporting assembly</td>
 </tr>
 <tr>
-<td><code>evidence.py</code></td>
-<td>Evidence file normalization and attachment helpers</td>
-</tr>
-<tr>
-<td><code>telemetry.py</code></td>
-<td>Performance metrics collection</td>
+<td><code>report_builder_support.py</code></td>
+<td>Report build context, telemetry extraction, telemetry payloads, artifacts, and baseline references</td>
 </tr>
 </tbody>
 </table>
@@ -3406,10 +3442,10 @@ tests. The intended invariants are:</p>
   <code>guards/__init__.py</code>. Package roots should expose only explicit canonical
   exports.</li>
 <li>No <code>rmt_legacy</code> references in production source. RMT ownership lives in
-  <code>rmt.py</code>, <code>rmt_analysis.py</code>, <code>rmt_detection.py</code>, and <code>rmt_math.py</code>.</li>
-<li>No dependency-map orchestration in command shells. Public command owners must
-  stay thin and must not rebuild giant <code>deps</code> dictionaries or inject callables
-  to recreate removed indirection.</li>
+  <code>rmt.py</code>, <code>rmt_analysis.py</code>, and <code>rmt_detection.py</code>.</li>
+<li>No dependency-map orchestration in command shells. Public command owners stay
+  thin and avoid giant <code>deps</code> dictionaries or injected callables that recreate
+  removed indirection.</li>
 <li>No compatibility-only command signatures once a canonical owner contract
   exists. Example: lens-metric calculation takes a required <code>MetricsConfig</code>
   instead of deprecated per-call overrides.</li>
@@ -3436,9 +3472,9 @@ verification and programmatic execution.</p>
 <td>Adapter protocol in <code>core/api.py</code></td>
 </tr>
 <tr>
-<td><strong>Edit-agnostic guards</strong></td>
-<td>Guards work with any weight modification (quantization, pruning, LoRA merge).</td>
-<td>Guard protocol validates model state, not edit type</td>
+<td><strong>Edit-stack-neutral guards</strong></td>
+<td>Guards work with subject checkpoints from quantization, pruning, LoRA merge, fine-tuning, or other weight-edit workflows.</td>
+<td>Guard protocol validates model state, not edit toolchain</td>
 </tr>
 <tr>
 <td><strong>Tier-based policies</strong></td>
@@ -3458,7 +3494,7 @@ verification and programmatic execution.</p>
 <tr>
 <td><strong>Single verifier ownership</strong></td>
 <td>Runtime-manifest verification should not vary with host tooling, so it must use one product implementation.</td>
-<td><code>core/runtime_manifest_verify.py</code>, <code>runtime_verify.py</code>, <code>runtime_provenance.py</code></td>
+<td><code>runtime_verify.py</code>, <code>runtime_provenance.py</code></td>
 </tr>
 <tr>
 <td><strong>Plugin architecture</strong></td>
@@ -3472,6 +3508,11 @@ verification and programmatic execution.</p>
 </tr>
 </tbody>
 </table>
+<p>Edit-stack neutral means the stable production boundary is BYOE: an external
+quantization tool, pruner, adapter merge, or fine-tuning pipeline produces the
+subject checkpoint, and InvarLock validates the resulting
+baseline-vs-subject evidence.
+Built-in edit generation is limited to demo/smoke support.</p>
 <h2 id="module-dependencies">Module Dependencies<a class="headerlink" href="#module-dependencies" title="Permanent link">&para;</a></h2>
 <div class="codehilite"><pre><span></span><code>┌─────────────────────────────────────────────────────────────────────────────┐
 │                         MODULE DEPENDENCY GRAPH                             │
@@ -3486,7 +3527,7 @@ verification and programmatic execution.</p>
 │                   ┌──────────────────────────────┐                           │
 │                   │ cli shell support modules    │                           │
 │                   │ run_config/run_pairing/      │                           │
-│                   │ run_overhead/run_artifacts   │                           │
+│                   │ run_execution/run_overhead   │                           │
 │                   └─────────────┬────────────────┘                           │
 │                                 │                                            │
 │                                 ▼                                            │
@@ -3539,7 +3580,7 @@ verification and programmatic execution.</p>
 <tr>
 <td>Adapters</td>
 <td><code>invarlock.adapters</code></td>
-<td><code>hf_causal</code>, <code>hf_mlm</code>, <code>hf_causal</code></td>
+<td><code>hf_causal</code>, <code>hf_mlm</code>, <code>hf_seq2seq</code>, <code>hf_multimodal</code>, <code>hf_auto</code>, <code>hf_bnb</code>, <code>hf_awq</code>, <code>hf_gptq</code>, <code>hf_torchao</code>, <code>hf_hqq</code>, <code>hf_quanto</code>, <code>hf_ct</code></td>
 </tr>
 <tr>
 <td>Guards</td>
@@ -3549,7 +3590,7 @@ verification and programmatic execution.</p>
 <tr>
 <td>Edits</td>
 <td><code>invarlock.edits</code></td>
-<td><code>quant_rtn</code>, <code>noop</code></td>
+<td><code>quant_rtn</code> (<code>noop</code> is built in for internal/catalog use, not a pyproject entry-point example)</td>
 </tr>
 </tbody>
 </table>
@@ -3650,6 +3691,10 @@ verification and programmatic execution.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

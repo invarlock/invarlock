@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -2137,7 +2193,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2249,7 +2305,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2871,18 +2927,25 @@
   resolves guard thresholds from <code>tiers.yaml</code>.</li>
 <li><strong>Defaults merging</strong>: the optional top-level <code>defaults</code> mapping is merged into
   the config before execution.</li>
+<li><strong>Evaluate adapter split</strong>: <code>invarlock evaluate</code> accepts
+  <code>--baseline-adapter</code> and <code>--subject-adapter</code>, then materializes separate
+  baseline and subject run configs. Each generated run config still uses the
+  existing single-run <code>model.adapter</code> field.</li>
 <li><strong>Programmatic access</strong>: <code>load_config()</code> returns an explicit mapping-backed
   <code>InvarLockConfig</code>. Use <code>cfg["model"]["id"]</code> or
-  <code>cfg.require_section("model")["id"]</code>; attribute-style access is unsupported.</li>
+  <code>cfg.require_section("model")["id"]</code> as the canonical form. Typed
+  attribute access is also available for known sections, for example
+  <code>cfg.model.id</code>, when callers want the typed section-object view.</li>
 <li><strong>Unsupported keys</strong>: <code>edit.kind</code>, <code>edit.parameters</code>, unknown
   <code>assurance.*</code> keys, and <code>guards.{spectral,rmt}.mode</code> are rejected to keep the
   config surface explicit.</li>
 </ul>
 <p><strong>Precedence (highest → lowest)</strong></p>
 <ol>
-<li>CLI flags (e.g. <code>--device</code>, <code>--tier</code>, <code>--probes</code>).</li>
+<li>Public CLI flags (e.g. <code>--device</code>, <code>--tier</code>); advanced/internal config
+   runners also accept runner-specific flags such as <code>--probes</code>.</li>
 <li>Profile selection (<code>--profile ci|release</code>) — window counts + determinism knobs.</li>
-<li>YAML config (<code>-c config.yaml</code>).</li>
+<li>YAML config selected through <code>--preset</code> or an internal config runner.</li>
 <li><code>defaults:</code> block in YAML (DRY base).</li>
 <li>Packaged runtime defaults (fallback).</li>
 </ol>
@@ -2925,11 +2988,11 @@
 </tr>
 <tr>
 <td><code>auto.probes</code></td>
-<td><code>--probes</code></td>
+<td>internal <code>--probes</code></td>
 <td>—</td>
 <td>✅</td>
 <td>✅</td>
-<td>CLI wins.</td>
+<td>Internal runner flag wins.</td>
 </tr>
 </tbody>
 </table>
@@ -3033,7 +3096,7 @@ or external subject artifacts for deployable packed quantization backends.</p>
 <span class="w">  </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <span class="w">  </span><span class="nt">tier</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">balanced</span>
 <span class="w">  </span><span class="nt">probes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
-<span class="w">  </span><span class="nt">target_pm_ratio</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2.0</span>
+<span class="w">  </span><span class="nt">target_pm_ratio</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span>
 </code></pre></div>
 
 <h3 id="primary-metric-policy-hints">Primary metric policy hints<a class="headerlink" href="#primary-metric-policy-hints" title="Permanent link">&para;</a></h3>
@@ -3093,7 +3156,7 @@ provenance. <code>assurance.mode: off</code> is for exploratory/dev reports only
 <div class="codehilite"><pre><span></span><code><span class="nt">eval</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">max_pm_ratio</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.5</span>
 <span class="w">  </span><span class="nt">metric</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span><span class="w">            </span><span class="c1"># auto|ppl_causal|ppl_mlm|ppl_seq2seq|accuracy</span>
+<span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span><span class="w">            </span><span class="c1"># resolver value; report kinds include ppl_causal, ppl_mlm, ppl_seq2seq, accuracy, bleu, f1, rouge</span>
 <span class="w">    </span><span class="nt">reps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2000</span>
 <span class="w">    </span><span class="nt">ci_level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.95</span>
 </code></pre></div>
@@ -3103,7 +3166,7 @@ provenance. <code>assurance.mode: off</code> is for exploratory/dev reports only
 <li><strong>Unsupported keys rejected</strong>: remove <code>edit.kind</code>, <code>edit.parameters</code>,
   unknown <code>assurance.*</code> keys, or guard <code>mode</code> keys.</li>
 <li><strong>Provider not found</strong>: verify <code>dataset.provider</code> and install <code>invarlock[eval]</code>.</li>
-<li><strong>Preset drift</strong>: run <code>python scripts/check_config_schema_sync.py</code> after edits.</li>
+<li><strong>Preset drift</strong>: run <code>python scripts/docs/docs_check.py --config-schema-sync</code> after edits.</li>
 </ul>
 <h2 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h2>
 <ul>
@@ -3175,6 +3238,10 @@ provenance. <code>assurance.mode: off</code> is for exploratory/dev reports only
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

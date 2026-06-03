@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -2126,7 +2182,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2238,7 +2294,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2799,7 +2855,7 @@
 <tbody>
 <tr>
 <td><strong>Purpose</strong></td>
-<td>Safety checks that validate edits against baseline-derived contracts.</td>
+<td>Guard checks that validate edits against baseline-derived contracts.</td>
 </tr>
 <tr>
 <td><strong>Audience</strong></td>
@@ -2851,9 +2907,10 @@ as kappa threshold, epsilon band, and guard overhead.</p>
 <p>Most thresholds come from the tier defaults (see <code>tiers.yaml</code>). Use overrides
 sparingly and keep evidence in the report.</p>
 <p>Assurance scope note: the published assurance basis covers GPT-2
-and BERT profiles. Repo-included presets and pilot configs for families such
-as Mistral 7B, Qwen2 7B, Qwen2.5 7B, and Qwen2.5 14B expand runnable coverage, not the published
-assurance basis.</p>
+and BERT profiles. Additional runnable but unpublished lanes are tracked in
+<code>contracts/support_matrix.json</code>; they expand runnable coverage, not the
+published assurance basis. Examples include Mistral 7B, Qwen2 7B, Qwen2.5 7B,
+and Qwen2.5 14B; the contract file remains authoritative.</p>
 </blockquote>
 <h2 id="guard-pipeline-flow">Guard Pipeline Flow<a class="headerlink" href="#guard-pipeline-flow" title="Permanent link">&para;</a></h2>
 <div class="codehilite"><pre><span></span><code>┌─────────────────────────────────────────────────────────────────────────┐
@@ -2898,7 +2955,8 @@ assurance basis.</p>
   <code>finalize</code>) are only used when you manage guards manually (e.g., with
   <code>GuardChain</code>).</li>
 <li><strong>Tier policies</strong>: <code>--tier balanced|conservative|aggressive</code> resolves a full
-  policy bundle from <code>runtime/tiers.yaml</code>; overrides in config are merged on top.</li>
+  policy bundle from packaged <code>runtime/tiers.yaml</code>; overrides
+  in config are merged on top.</li>
 <li><strong>Measurement contracts</strong>: Spectral and RMT guards record estimator + sampling
   contracts in reports and are enforced by <code>invarlock verify</code> in CI/Release,
   alongside required <code>runtime.manifest.json</code> runtime provenance for evaluation outputs.</li>
@@ -3108,7 +3166,7 @@ packaged presets include it by default; remove a guard from the list to skip it.
 <h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../tier-policy-catalog/">Tier Policy Catalog</a></li>
-<li><a href="../../assurance/13-gpu-mps-first-guards/">GPU/MPS-First Guards (Decision Memo)</a></li>
+<li><a href="../../assurance/13-gpu-mps-first-guards/">GPU/MPS-First Guard Measurement Contracts</a></li>
 <li><a href="../config-schema/">Configuration Schema</a></li>
 <li><a href="../env-vars/">Environment Variables</a></li>
 <li><a href="../../assurance/04-guard-contracts/">Guard Contracts &amp; Primer</a></li>
@@ -3166,6 +3224,10 @@ packaged presets include it by default; remove a guard from the list to skip it.
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -2181,7 +2237,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2293,7 +2349,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2917,7 +2973,7 @@
 </tr>
 <tr>
 <td><strong>Scope</strong></td>
-<td>CLI commands and programmatic runs; config values override env when both are set.</td>
+<td>CLI commands and programmatic runs; precedence is setting-specific when env and config/CLI both exist.</td>
 </tr>
 <tr>
 <td><strong>Network</strong></td>
@@ -2925,7 +2981,7 @@
 </tr>
 <tr>
 <td><strong>Source of truth</strong></td>
-<td><code>docs/reference/env-vars.md</code>, <code>src/invarlock/cli/commands/*</code>, <code>src/invarlock/cli/backend_runtime.py</code>, <code>src/invarlock/runtime_security.py</code>, <code>src/invarlock/core/runner.py</code>.</td>
+<td><code>docs/reference/env-vars.md</code>, <code>src/invarlock/cli/commands/*</code>, <code>src/invarlock/core/plugins_inventory.py</code>, <code>src/invarlock/runtime_security.py</code>, <code>src/invarlock/core/runner.py</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -2948,8 +3004,8 @@
 </ul>
 <p><strong>Precedence (conflict cases)</strong></p>
 <ol>
-<li>CLI/config values for assurance-critical policy (strictness, drift/acceptance bands, overhead skip, tiny relax).</li>
-<li>Env overrides only for explicitly env-scoped toggles (for example, downloads and calibration materialization).</li>
+<li>CLI/config values for assurance-critical policy (strictness, drift/acceptance bands, overhead skip).</li>
+<li>Env overrides only for explicitly env-scoped toggles (for example, downloads, calibration materialization, and tiny-relax smoke behavior).</li>
 <li>Packaged defaults when no explicit setting exists.</li>
 </ol>
 <h3 id="key-override-matrix">Key override matrix<a class="headerlink" href="#key-override-matrix" title="Permanent link">&para;</a></h3>
@@ -2970,6 +3026,13 @@
 <td><code>context.eval.materialize_calibration</code> / <code>context.eval.allow_iterable_calibration</code></td>
 <td>Env wins.</td>
 <td>Config shows in <code>report.context</code>; env is not recorded.</td>
+</tr>
+<tr>
+<td>Tiny relax</td>
+<td><code>INVARLOCK_TINY_RELAX</code></td>
+<td><code>context.run.tiny_relax</code></td>
+<td>Either opt-in enables tiny-relax run/report policy.</td>
+<td>Recorded in run context and surfaced through report validation.</td>
 </tr>
 <tr>
 <td>Network downloads</td>
@@ -3049,9 +3112,10 @@
 </tr>
 </tbody>
 </table>
-<p><code>INVARLOCK_ALLOW_REMOTE_CODE</code> is the only environment gate for remote model
-code execution. Use <code>INVARLOCK_ALLOW_REMOTE_CODE=1</code> or <code>--allow-remote-code</code>
-when remote code is required.</p>
+<p><code>INVARLOCK_ALLOW_REMOTE_CODE</code> is the public environment gate for remote model
+code execution. Use <code>INVARLOCK_ALLOW_REMOTE_CODE=1</code> for <code>invarlock evaluate</code>
+when remote code is required; <code>--allow-remote-code</code> is exposed on advanced
+calibration/config-runner commands that load models directly.</p>
 <h3 id="evaluation-pairing">Evaluation &amp; pairing<a class="headerlink" href="#evaluation-pairing" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -3063,14 +3127,9 @@ when remote code is required.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>INVARLOCK_BOOTSTRAP_BCA</code></td>
-<td>unset</td>
-<td>Prefer BCa bootstrap CIs when sample size allows.</td>
-</tr>
-<tr>
 <td><code>INVARLOCK_TINY_RELAX</code></td>
 <td>unset</td>
-<td>Doctor-only hint for tiny local demos (does not drive assurance gates).</td>
+<td>Dev/demo compare-evaluate override for tiny smoke runs; records tiny-relax provenance and applies tiny-relax report-policy semantics. Do not use for production assurance.</td>
 </tr>
 <tr>
 <td><code>INVARLOCK_EVAL_DEVICE</code></td>
@@ -3089,6 +3148,8 @@ when remote code is required.</p>
 </tr>
 </tbody>
 </table>
+<p>Bootstrap CI method and replicate counts are controlled by runtime profile,
+tier policy, and report policy. There is no public env var that forces BCa.</p>
 <h3 id="dataset-preparation">Dataset preparation<a class="headerlink" href="#dataset-preparation" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -3141,8 +3202,22 @@ when remote code is required.</p>
 <td>unset</td>
 <td>Avoid heavy imports for docs/tests.</td>
 </tr>
+<tr>
+<td><code>PACK_DEFER_REPORT_RENDERING</code></td>
+<td>unset (<code>1</code> under <code>run_pack.sh --release-review</code>)</td>
+<td>Evidence-pack wrapper toggle that skips optional markdown/reviewer rendering during evaluation.</td>
+</tr>
+<tr>
+<td><code>PACK_DEFER_OPTIONAL_REPORT_RENDERING</code></td>
+<td>unset</td>
+<td>Alias for <code>PACK_DEFER_REPORT_RENDERING</code>.</td>
+</tr>
 </tbody>
 </table>
+<p>Evidence-pack evaluation-loop toggles are repo-wrapper controls, not public
+<code>invarlock evaluate</code> defaults. Required JSON reports and sidecars are still
+written; <code>PACK_DEFER_REPORT_RENDERING=1</code> skips optional rendered review files in
+the evaluation hot path.</p>
 <h3 id="checkpointing-snapshots">Checkpointing &amp; snapshots<a class="headerlink" href="#checkpointing-snapshots" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -3315,6 +3390,11 @@ Strictness/tiny-relax/overhead-skip are also config/profile policy:
 <td>unset</td>
 <td>Supply the immutable digest recorded into <code>runtime.manifest.json</code>.</td>
 </tr>
+<tr>
+<td><code>PACK_RUNTIME_IMAGE_FLAVOR</code></td>
+<td><code>default</code></td>
+<td>Remote evidence-pack setup helper image selector. Use <code>quant</code> on CUDA hosts to build/use <code>invarlock-runtime:cuda-quant</code> for containerized <code>hf_bnb</code>, <code>hf_gptq</code>, <code>hf_awq</code>, <code>hf_torchao</code>, <code>hf_hqq</code>, <code>hf_quanto</code>, and <code>hf_ct</code> evidence. The quant image uses a pinned CUDA devel base so GPTQModel can JIT-compile kernels with <code>nvcc</code>; strict custom-image evidence still requires <code>INVARLOCK_RUNTIME_IMAGE_DIGEST</code>.</td>
+</tr>
 </tbody>
 </table>
 <h3 id="docs-build">Docs build<a class="headerlink" href="#docs-build" title="Permanent link">&para;</a></h3>
@@ -3332,11 +3412,6 @@ Strictness/tiny-relax/overhead-skip are also config/profile policy:
 <td>unset</td>
 <td>Enable Mermaid diagrams in MkDocs.</td>
 </tr>
-<tr>
-<td><code>INVARLOCK_DOCS_EXTRA_JS</code></td>
-<td>unset</td>
-<td>Extra JavaScript URLs for docs build.</td>
-</tr>
 </tbody>
 </table>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
@@ -3345,7 +3420,8 @@ Strictness/tiny-relax/overhead-skip are also config/profile policy:
 <li><strong>Multiple container engines installed</strong>: set <code>INVARLOCK_CONTAINER_ENGINE=podman</code> or <code>INVARLOCK_CONTAINER_ENGINE=docker</code>.</li>
 <li><strong>HF dataset cache lock/permission errors on local reruns</strong>: set <code>INVARLOCK_HF_DATASETS_CACHE=/path/to/writable/cache</code> or let InvarLock retry under its own writable cache.</li>
 <li><strong>Calibration iterables fail</strong>: use <code>INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1</code>.</li>
-<li><strong>Third-party plugins missing</strong>: set <code>INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1</code> or use <code>--allow-third-party-plugins</code>.</li>
+<li><strong>Third-party plugins missing</strong>: set <code>INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1</code>;
+  advanced plugin/calibration commands also expose <code>--allow-third-party-plugins</code>.</li>
 </ul>
 <h2 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h2>
 <ul>
@@ -3412,6 +3488,10 @@ Strictness/tiny-relax/overhead-skip are also config/profile policy:
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

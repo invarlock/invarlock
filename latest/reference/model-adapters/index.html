@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1273,6 +1329,17 @@
     <span class="md-ellipsis">
       
         Quick Start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#support-tiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Support Tiers
       
     </span>
   </a>
@@ -2104,7 +2171,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2216,7 +2283,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2569,6 +2636,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#support-tiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Support Tiers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#concepts" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2763,11 +2841,11 @@
 </tr>
 <tr>
 <td><strong>Supported surface</strong></td>
-<td>Core HF text and image-text adapters, auto-match adapters, platform-dependent BNB, and Linux-only AWQ/GPTQ quantized adapters.</td>
+<td>Core HF text and image-text adapters, auto-match adapters, platform-dependent BNB, GPTQModel-backed AWQ/GPTQ adapters, torchao runtime quantization, HQQ runtime quantization, Quanto runtime quantization, and compressed-tensors checkpoint loading.</td>
 </tr>
 <tr>
 <td><strong>Requires</strong></td>
-<td><code>invarlock[adapters]</code> or <code>invarlock[hf]</code> for core HF adapters; <code>invarlock[gpu]</code>, <code>invarlock[awq]</code>, <code>invarlock[gptq]</code> for quantized adapters.</td>
+<td><code>invarlock[adapters]</code> or <code>invarlock[hf]</code> for core HF adapters; <code>invarlock[gpu]</code>, <code>invarlock[awq]</code>, <code>invarlock[gptq]</code>, <code>invarlock[torchao]</code>, <code>invarlock[hqq]</code>, <code>invarlock[quanto]</code>, or <code>invarlock[compressed-tensors]</code> for quantized adapters.</td>
 </tr>
 <tr>
 <td><strong>Network</strong></td>
@@ -2783,7 +2861,7 @@
 </tr>
 <tr>
 <td><strong>Source of truth</strong></td>
-<td><code>src/invarlock/adapters/*</code>, <code>src/invarlock/plugins/hf_*_adapter.py</code>.</td>
+<td><code>src/invarlock/adapters/*</code>, built-in plugin metadata in <code>src/invarlock/core/builtin_plugin_catalog.py</code>, optional adapter implementations in <code>src/invarlock/plugins/__init__.py</code>, and adapter entry points in <code>pyproject.toml</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -2798,7 +2876,7 @@ invarlock<span class="w"> </span>advanced<span class="w"> </span>plugins<span cl
 invarlock<span class="w"> </span>evaluate<span class="w"> </span>--allow-network<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--baseline<span class="w"> </span>gpt2<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--subject<span class="w"> </span>gpt2<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--adapter<span class="w"> </span>auto
+<span class="w">  </span>--baseline-adapter<span class="w"> </span>auto<span class="w"> </span>--subject-adapter<span class="w"> </span>auto
 </code></pre></div>
 
 <p>The CLI example above uses the runtime container by default. Add
@@ -2813,23 +2891,69 @@ intentionally bypass that boundary.</p>
 
 <blockquote>
 <p>Adapter availability is broader than the published assurance basis. GPT-2 and
-BERT back the published calibrated basis; repo-included pilot configs
-for Mistral 7B, Ministral 3 text-only, Qwen2 7B, Qwen2.5 7B, Qwen2.5 14B, and additional experimental families are for
-experimentation until supporting artifacts are attached. See the Model Family
-Catalog for the authoritative family-by-family inventory.</p>
+BERT back the published calibrated basis; current experimental lanes are
+enumerated in <code>contracts/support_matrix.json</code>, with broader inventory in the
+Model Family Catalog. Examples include Mistral 7B, Qwen2 7B, Qwen2.5 7B, and
+Qwen2.5 14B; treat the contract files as authoritative for the complete list.</p>
 </blockquote>
+<h2 id="support-tiers">Support Tiers<a class="headerlink" href="#support-tiers" title="Permanent link">&para;</a></h2>
+<p>Adapter capability and model-lane support are related but separate contracts.
+<code>contracts/adapter_capabilities.json</code> says what an adapter can do mechanically:
+load, snapshot/restore, expose modules to guards, and report runtime limits.
+<code>contracts/support_matrix.json</code> says which model/runtime/adapter lanes have
+public evidence support.</p>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>Applies to</th>
+<th>Promise</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>published_basis</code></td>
+<td>Model/runtime/adapter lane</td>
+<td>Public evidence fixture set with report, runtime-manifest, and evidence-pack provenance where available.</td>
+</tr>
+<tr>
+<td><code>supported_experimental</code></td>
+<td>Model/runtime/adapter lane</td>
+<td>Repo-included preset/config/test/smoke path exists, but no published-basis fixture set is claimed.</td>
+</tr>
+<tr>
+<td><code>community_experimental</code></td>
+<td>Model/runtime/adapter lane</td>
+<td>Path is usable for community experimentation without a maintained public evidence basis.</td>
+</tr>
+</tbody>
+</table>
+<p>Do not infer <code>published_basis</code> from adapter availability alone. For example,
+<code>hf_causal</code> may be fully capable for a family while that family remains
+<code>supported_experimental</code> until public evidence artifacts are attached.</p>
 <h2 id="concepts">Concepts<a class="headerlink" href="#concepts" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Adapters hide model-specific logic</strong>: they handle loading, structure description,
   and snapshot/restore so edits/guards stay model-agnostic.</li>
-<li><strong>Auto selection</strong>: use <code>adapter: auto</code> (config/CLI shortcut) or <code>--adapter hf_auto</code>
-  (adapter plugin) to choose a concrete role adapter (<code>hf_causal</code>, <code>hf_mlm</code>,
+<li><strong>Auto selection</strong>: use <code>adapter: auto</code> in a single-run config, or use
+  <code>--baseline-adapter auto --subject-adapter auto</code> for paired evaluation to
+  choose concrete role adapters (<code>hf_causal</code>, <code>hf_mlm</code>,
   <code>hf_seq2seq</code>) plus quant adapters when detected. Local paths can use
   <code>config.json</code>; remote IDs fall back to name heuristics and default to
   <code>hf_causal</code> when unsure. Image-text models use the explicit
   <code>hf_multimodal</code> adapter rather than adapter auto.</li>
-<li><strong>Quantized adapters</strong> (<code>hf_bnb</code>, <code>hf_awq</code>, <code>hf_gptq</code>) handle their own device
-  placement; avoid calling <code>.to(...)</code> on the loaded model.</li>
+<li><strong>Quantized adapters</strong> (<code>hf_bnb</code>, <code>hf_awq</code>, <code>hf_gptq</code>, <code>hf_torchao</code>, <code>hf_hqq</code>, <code>hf_quanto</code>, <code>hf_ct</code>) handle
+  their own device placement; avoid calling <code>.to(...)</code> on the loaded model.</li>
+<li><strong>Containerized quant evidence</strong> requires a runtime image with the optional
+  quant backends installed. For remote CUDA evidence-pack setup, set
+  <code>PACK_RUNTIME_IMAGE_FLAVOR=quant</code> to select/build
+  <code>invarlock-runtime:cuda-quant</code> instead of the default CUDA runtime image.
+  This opt-in image uses the pinned CUDA devel base and retains the compiler
+  toolchain because GPTQModel-backed GPTQ/AWQ kernels may JIT-compile CUDA
+  extensions at model-load time and require <code>nvcc</code>/<code>CUDA_HOME</code>.
+  Strict release-review evidence still needs normal runtime provenance: use a
+  local InvarLock runtime image tag or set <code>INVARLOCK_RUNTIME_IMAGE_DIGEST</code> for
+  custom image references.</li>
 <li><strong>Snapshot strategy</strong>: HF adapters expose <code>snapshot</code>/<code>restore</code> and
   <code>snapshot_chunked</code>/<code>restore_chunked</code> (large-model friendly). The CLI selects the
   strategy automatically via <code>context.snapshot.*</code>.</li>
@@ -2895,7 +3019,31 @@ Catalog for the authoritative family-by-family inventory.</p>
 <td>Quantized (<code>hf_awq</code>, <code>hf_gptq</code>)</td>
 <td>Best-effort</td>
 <td>Full when modules exposed</td>
-<td>Linux</td>
+<td>GPTQModel-supported platforms</td>
+</tr>
+<tr>
+<td>Quantized (<code>hf_torchao</code>)</td>
+<td>Best-effort</td>
+<td>Full when modules exposed</td>
+<td>Platform-dependent</td>
+</tr>
+<tr>
+<td>Quantized (<code>hf_hqq</code>)</td>
+<td>Best-effort</td>
+<td>Full when modules exposed</td>
+<td>Platform-dependent</td>
+</tr>
+<tr>
+<td>Quantized (<code>hf_quanto</code>)</td>
+<td>Best-effort</td>
+<td>Full when modules exposed</td>
+<td>Platform-dependent</td>
+</tr>
+<tr>
+<td>Quantized (<code>hf_ct</code>)</td>
+<td>Best-effort</td>
+<td>Full when modules exposed</td>
+<td>Platform-dependent</td>
 </tr>
 </tbody>
 </table>
@@ -2961,15 +3109,43 @@ Catalog for the authoritative family-by-family inventory.</p>
 <td><code>hf_awq</code></td>
 <td>AWQ quantized LMs</td>
 <td><code>invarlock[awq]</code></td>
-<td>Linux only</td>
-<td>Requires <code>autoawq</code>/<code>triton</code>.</td>
+<td>GPTQModel-supported platforms</td>
+<td>Uses the Transformers AWQ loader backed by GPTQModel; GPU recommended for quantized inference.</td>
 </tr>
 <tr>
 <td><code>hf_gptq</code></td>
 <td>GPTQ quantized LMs</td>
 <td><code>invarlock[gptq]</code></td>
-<td>Linux only</td>
-<td>Requires <code>auto-gptq</code>/<code>triton</code>; packaged extras currently stop at upstream-supported pre-3.13 Python stacks, and newer Python/CUDA combinations may require a vendor build.</td>
+<td>GPTQModel-supported platforms</td>
+<td>Uses GPTQModel for GPTQ subject loading; GPU recommended for quantized inference.</td>
+</tr>
+<tr>
+<td><code>hf_torchao</code></td>
+<td>HF causal LMs quantized at runtime with torchao</td>
+<td><code>invarlock[torchao]</code></td>
+<td>Platform-dependent</td>
+<td>Applies torchao int8 weight-only quantization after HF load; strict container evidence should be proven for the selected runtime before externally sharing strict-evidence results.</td>
+</tr>
+<tr>
+<td><code>hf_hqq</code></td>
+<td>HF causal LMs quantized at runtime with HQQ</td>
+<td><code>invarlock[hqq]</code></td>
+<td>Platform-dependent</td>
+<td>Applies native HQQ runtime quantization after HF load; strict container evidence should be proven for the selected runtime before externally sharing strict-evidence results.</td>
+</tr>
+<tr>
+<td><code>hf_quanto</code></td>
+<td>HF causal LMs quantized at runtime with Quanto</td>
+<td><code>invarlock[quanto]</code></td>
+<td>Platform-dependent</td>
+<td>Loads through Transformers with a Quanto quantization config; strict container evidence should be proven for the selected runtime before externally sharing strict-evidence results.</td>
+</tr>
+<tr>
+<td><code>hf_ct</code></td>
+<td>HF causal LMs from compressed-tensors pre-quantized checkpoints</td>
+<td><code>invarlock[compressed-tensors]</code></td>
+<td>Platform-dependent</td>
+<td>Loads pre-quantized compressed-tensors checkpoints; use llmcompressor or other tooling to create them outside the adapter.</td>
 </tr>
 </tbody>
 </table>
@@ -2991,7 +3167,7 @@ Catalog for the authoritative family-by-family inventory.</p>
 <td>Uses <code>HFAdapterMixin</code> snapshots.</td>
 </tr>
 <tr>
-<td>Quantized HF adapters (<code>hf_bnb</code>, <code>hf_awq</code>, <code>hf_gptq</code>)</td>
+<td>Quantized HF adapters (<code>hf_bnb</code>, <code>hf_awq</code>, <code>hf_gptq</code>, <code>hf_torchao</code>, <code>hf_hqq</code>, <code>hf_quanto</code>, <code>hf_ct</code>)</td>
 <td>Yes (best-effort)</td>
 <td>Full when modules are exposed</td>
 <td>Avoid explicit <code>.to()</code> calls.</td>
@@ -3052,7 +3228,7 @@ simple heuristics to choose a concrete built-in adapter name.</p>
 </tr>
 <tr>
 <td><code>trust_remote_code</code></td>
-<td>Enable custom model code only with explicit <code>--allow-remote-code</code> / <code>INVARLOCK_ALLOW_REMOTE_CODE=1</code></td>
+<td>Enable custom model code only with <code>INVARLOCK_ALLOW_REMOTE_CODE=1</code> for public <code>evaluate</code>; advanced model-loading commands also expose <code>--allow-remote-code</code></td>
 <td>HF adapters</td>
 </tr>
 <tr>
@@ -3096,12 +3272,27 @@ simple heuristics to choose a concrete built-in adapter name.</p>
 <ul>
 <li><strong>Adapter missing from <code>invarlock advanced plugins adapters</code></strong>: install the required extra
   (<code>invarlock[adapters]</code>, <code>invarlock[gpu]</code>, <code>invarlock[gptq]</code>, <code>invarlock[awq]</code>).</li>
-<li><strong>Linux-only adapters not available</strong>: <code>hf_awq</code> and <code>hf_gptq</code> depend on
-  <code>triton</code> and remain Linux-only in <code>pyproject.toml</code>.</li>
-<li><strong>GPTQ install fails even on Linux/CUDA</strong>: <code>auto-gptq</code> packaging is
-  upstream-dependent; Python 3.13+ and some newer CUDA stacks may require a
-  pinned or vendor wheel, or a supported interpreter, beyond
-  <code>pip install "invarlock[gptq]"</code>.</li>
+<li><strong>GPTQModel-backed adapters unavailable</strong>: <code>hf_awq</code> and <code>hf_gptq</code> use
+  GPTQModel-backed loading; verify the selected GPTQModel wheel supports your
+  Python, PyTorch, and accelerator stack.</li>
+<li><strong>torchao adapter unavailable</strong>: <code>hf_torchao</code> requires the torchao optional
+  stack. Install <code>invarlock[torchao]</code> in the environment that performs the
+  model load.</li>
+<li><strong>HQQ adapter unavailable</strong>: <code>hf_hqq</code> requires the HQQ optional stack. Install
+  <code>invarlock[hqq]</code> in the environment that performs the model load.</li>
+<li><strong>Quanto adapter unavailable</strong>: <code>hf_quanto</code> requires the Quanto optional stack.
+  Install <code>invarlock[quanto]</code> in the environment that performs the model load.</li>
+<li><strong>compressed-tensors adapter unavailable</strong>: <code>hf_ct</code> requires the
+  compressed-tensors optional stack. Install <code>invarlock[compressed-tensors]</code> in
+  the environment that performs the model load.</li>
+<li><strong>Container report fails with missing quant extra</strong>: build or select the quant
+  CUDA runtime image (<code>make runtime-image-cuda-quant</code>, or
+  <code>PACK_RUNTIME_IMAGE_FLAVOR=quant</code> for the remote setup helper). The default
+  CUDA runtime image is intentionally limited to the core evaluation stack.</li>
+<li><strong>GPTQ/AWQ container load fails during JIT compile</strong>: use the quant CUDA
+  runtime image rather than the default CUDA runtime. The quant image is built
+  from the pinned CUDA devel base so <code>nvcc</code> and <code>CUDA_HOME</code> are available for
+  GPTQModel kernel compilation.</li>
 <li><strong>Bitsandbytes not detected</strong>: <code>hf_bnb</code> is platform-dependent. If the backend
   imports cleanly, <code>invarlock advanced plugins adapters</code> will report it as ready even on
   non-CUDA hosts.</li>
@@ -3175,6 +3366,10 @@ simple heuristics to choose a concrete built-in adapter name.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

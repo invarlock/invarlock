@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -573,6 +573,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../user-guide/bring-your-own-data/" class="md-nav__link">
         
   
@@ -1017,6 +1073,17 @@
     <span class="md-ellipsis">
       
         Top-Level Command Index
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stable-vs-experimental-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stable vs Experimental Commands
       
     </span>
   </a>
@@ -2114,7 +2181,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2226,7 +2293,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2634,6 +2701,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#stable-vs-experimental-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stable vs Experimental Commands
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#invarlock-evaluate" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2799,7 +2877,7 @@
 </tr>
 <tr>
 <td><strong>Source of truth</strong></td>
-<td><code>src/invarlock/cli/app.py</code>, <code>src/invarlock/cli/commands/*.py</code>, <code>src/invarlock/cli/runtime_verify.py</code>.</td>
+<td><code>src/invarlock/cli/app.py</code>, <code>src/invarlock/cli/commands/*.py</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -2856,7 +2934,7 @@ pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot
 invarlock<span class="w"> </span>evaluate<span class="w"> </span>--allow-network<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--baseline<span class="w"> </span>gpt2<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--subject<span class="w"> </span>distilgpt2<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--baseline-adapter<span class="w"> </span>auto<span class="w"> </span>--subject-adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--profile<span class="w"> </span>ci<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--assurance<span class="w"> </span>strict
 
@@ -3035,6 +3113,38 @@ invarlock<span class="w"> </span>report<span class="w"> </span>explain<span clas
 </table>
 <p>Exit codes: <code>0=success</code>, <code>1=generic failure</code>, <code>2=usage/schema/config failure</code>,
 <code>3=hard abort</code> for profile-aware fail-closed paths.</p>
+<h2 id="stable-vs-experimental-commands">Stable vs Experimental Commands<a class="headerlink" href="#stable-vs-experimental-commands" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Stability class</th>
+<th>Commands</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Stable core workflow</td>
+<td><code>invarlock evaluate</code>, <code>invarlock verify</code>, <code>invarlock report html</code>, <code>invarlock report explain</code>, <code>invarlock report validate</code>, <code>invarlock doctor</code>, <code>invarlock version</code></td>
+<td>Documented command names, documented options, exit-code meaning, and artifact paths are stable within the current CLI policy.</td>
+</tr>
+<tr>
+<td>Stable JSON automation</td>
+<td><code>invarlock doctor --json</code>, <code>invarlock verify --json</code>, <code>invarlock advanced runtime-verify --json</code>, <code>invarlock advanced plugins list --json</code>, <code>invarlock advanced plugins adapters --json</code>, <code>invarlock advanced evidence-pack verify --json</code>, <code>invarlock advanced policy verify --json</code></td>
+<td>Required envelope fields and <code>format_version</code> values are stable; optional fields are additive.</td>
+</tr>
+<tr>
+<td>Stable advanced verifiers</td>
+<td><code>invarlock advanced runtime-verify</code>, <code>invarlock advanced evidence-pack inspect</code>, <code>invarlock advanced evidence-pack verify</code>, <code>invarlock advanced policy build</code>, <code>invarlock advanced policy verify</code>, <code>invarlock advanced plugins list</code>, <code>invarlock advanced plugins adapters</code></td>
+<td>Public operational commands outside the core user loop. Their documented behavior is maintained, while additional subcommands may evolve faster.</td>
+</tr>
+<tr>
+<td>Experimental or maintainer-only</td>
+<td><code>invarlock advanced calibrate</code>, repo scripts under <code>scripts/</code>, package-internal config runners, undocumented flags, and local harness entrypoints</td>
+<td>Useful for development, calibration, and release work; not covered by the public CLI stability contract until promoted here.</td>
+</tr>
+</tbody>
+</table>
 <h2 id="invarlock-evaluate"><code>invarlock evaluate</code><a class="headerlink" href="#invarlock-evaluate" title="Permanent link">&para;</a></h2>
 <p>Purpose: compare a baseline against a subject and emit an evaluation report.</p>
 <p>Common options:</p>
@@ -3042,8 +3152,11 @@ invarlock<span class="w"> </span>report<span class="w"> </span>explain<span clas
 <li><code>--baseline</code>: baseline checkpoint path or model ID</li>
 <li><code>--subject</code>: subject checkpoint path or model ID</li>
 <li><code>--baseline-report</code>: reuse a stored baseline report by passing the explicit
-  <code>report.json</code> file path that captured the baseline windows</li>
-<li><code>--adapter</code>: adapter name or <code>auto</code></li>
+  <code>report.json</code> file path that captured the baseline windows. Reused reports
+  must match the requested baseline model, profile, tier, adapter family,
+  assurance mode, and dataset/window-plan fields.</li>
+<li><code>--baseline-adapter</code>: baseline-side adapter name or <code>auto</code></li>
+<li><code>--subject-adapter</code>: subject-side adapter name or <code>auto</code></li>
 <li><code>--profile</code>: <code>ci</code>, <code>release</code>, or another included profile</li>
 <li><code>--tier</code>: tier label for policy context</li>
 <li><code>--preset</code>: optional repo preset path</li>
@@ -3052,23 +3165,25 @@ invarlock<span class="w"> </span>report<span class="w"> </span>explain<span clas
 <li><code>--execution-mode container|host</code>: execution policy for <code>evaluate</code>.
   <code>container</code> keeps model loading inside the runtime container; <code>host</code>
   allows host-side execution and produces host artifacts that should
-  be verified with <code>verify --runtime-provenance host</code>.</li>
+  be verified with <code>verify --runtime-provenance host --assurance off</code>.</li>
 <li><code>--assurance strict|off</code>: strict is the default assurance contract;
-  off is for exploratory/dev reports that must not be treated as assurance
-  evidence.</li>
+  off is for exploratory/dev reports outside the assurance-evidence surface.</li>
 <li><code>--edit-config</code>: optional demo/smoke edit overlay such as <code>quant_rtn</code></li>
 </ul>
 <p>Example:</p>
 <div class="codehilite"><pre><span></span><code><span class="nv">INVARLOCK_DEDUP_TEXTS</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>invarlock<span class="w"> </span>evaluate<span class="w"> </span>--allow-network<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--baseline<span class="w"> </span>gpt2<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--subject<span class="w"> </span>distilgpt2<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--baseline-adapter<span class="w"> </span>auto<span class="w"> </span>--subject-adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--profile<span class="w"> </span>ci<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--report-out<span class="w"> </span>reports/eval
 </code></pre></div>
 
 <h2 id="invarlock-verify"><code>invarlock verify</code><a class="headerlink" href="#invarlock-verify" title="Permanent link">&para;</a></h2>
-<p>Purpose: verify existing evaluation report JSON files.</p>
+<p>Purpose: verify existing evaluation report JSON files end to end. This command
+checks report schema, primary-metric recomputation, paired-window consistency,
+policy gates, strict-assurance claims when requested, and runtime provenance
+through the report's sibling <code>runtime.manifest.json</code>.</p>
 <p>Arguments:</p>
 <ul>
 <li><code>REPORTS...</code>: one or more evaluation report JSON paths or directories containing
@@ -3117,6 +3232,10 @@ invarlock<span class="w"> </span>report<span class="w"> </span>explain<span clas
 <li><code>verify</code> accepts directories containing canonical <code>evaluation.report.json</code>
     and optional baselines containing canonical <code>report.json</code> or
     <code>evaluation.report.json</code><ul>
+<li>A directory containing only <code>report.json</code> is a raw run directory, not a
+  verifier bundle. Generate <code>evaluation.report.json</code> first with
+  <code>invarlock report generate --run &lt;subject report.json&gt;
+  --baseline-run-report &lt;baseline report.json&gt; --format report -o &lt;output-dir&gt;</code>.</li>
 <li>If a directory contains both canonical filenames, it is ambiguous and
   rejected; pass the exact file path instead.</li>
 </ul>
@@ -3150,23 +3269,27 @@ invarlock<span class="w"> </span>report<span class="w"> </span>explain<span clas
 
 <h2 id="invarlock-advanced"><code>invarlock advanced</code><a class="headerlink" href="#invarlock-advanced" title="Permanent link">&para;</a></h2>
 <p>Purpose: advanced and maintenance-oriented workflows that are intentionally
-outside the core product contract.</p>
+outside the core user loop, except for the explicitly versioned JSON contracts
+listed below.</p>
 <p>Subcommands:</p>
 <ul>
 <li><code>invarlock advanced evidence-pack</code></li>
-<li>Inspect, build, and verify evidence packs</li>
+<li>Inspect, build, sign/keygen, and verify evidence packs</li>
 <li><code>invarlock advanced policy</code></li>
 <li>Build and verify policy-pack artifacts</li>
 <li><code>invarlock advanced plugins</code></li>
 <li>Read-only plugin discovery and explanation</li>
 <li><code>invarlock advanced calibrate</code></li>
 <li>Tier-policy calibration and sweep tooling</li>
+<li><code>invarlock advanced runtime-verify</code></li>
+<li>Low-level runtime-manifest verification for an existing report</li>
 </ul>
 <p>Examples:</p>
-<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>advanced<span class="w"> </span>evidence-pack<span class="w"> </span>verify<span class="w"> </span>&lt;pack&gt;<span class="w"> </span>--strict
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>advanced<span class="w"> </span>evidence-pack<span class="w"> </span>verify<span class="w"> </span>&lt;pack&gt;<span class="w"> </span>--strict<span class="w"> </span>--report-assurance<span class="w"> </span>strict
 invarlock<span class="w"> </span>advanced<span class="w"> </span>policy<span class="w"> </span>verify<span class="w"> </span>policy-pack.json<span class="w"> </span>--json
 invarlock<span class="w"> </span>advanced<span class="w"> </span>plugins<span class="w"> </span>list<span class="w"> </span>--json
 invarlock<span class="w"> </span>advanced<span class="w"> </span>calibrate<span class="w"> </span>--help
+invarlock<span class="w"> </span>advanced<span class="w"> </span>runtime-verify<span class="w"> </span>--report<span class="w"> </span>reports/eval/evaluation.report.json<span class="w"> </span>--manifest<span class="w"> </span>reports/eval/runtime.manifest.json
 </code></pre></div>
 
 <h2 id="plugins-entry-points">Plugins &amp; Entry Points<a class="headerlink" href="#plugins-entry-points" title="Permanent link">&para;</a></h2>
@@ -3187,8 +3310,11 @@ pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot
 
 <p>Plugin install and uninstall commands are not part of the CLI surface.</p>
 <h2 id="invarlock-advanced-runtime-verify"><code>invarlock advanced runtime-verify</code><a class="headerlink" href="#invarlock-advanced-runtime-verify" title="Permanent link">&para;</a></h2>
-<p>Purpose: package-native runtime provenance verification for an existing
-evaluation report and its sibling runtime manifest.</p>
+<p>Purpose: low-level runtime provenance verification for an existing evaluation
+report and runtime manifest. This command validates the manifest contract,
+container execution fields, image digest presence, and the report SHA-256
+binding. It is scoped to runtime provenance; <code>invarlock verify</code> owns
+primary-metric gates, paired-window math, and strict-assurance report policy.</p>
 <p>Common options:</p>
 <ul>
 <li><code>--report</code>: path to <code>evaluation.report.json</code></li>
@@ -3202,15 +3328,58 @@ evaluation report and its sibling runtime manifest.</p>
 </code></pre></div>
 
 <h2 id="json-output">JSON Output<a class="headerlink" href="#json-output" title="Permanent link">&para;</a></h2>
-<p>Stable machine-readable output is available on the verification and advanced
-plugin surfaces.</p>
-<ul>
-<li><code>invarlock verify --json</code></li>
-<li><code>invarlock advanced plugins list --json</code></li>
-<li><code>invarlock advanced evidence-pack verify --json</code></li>
-<li><code>invarlock advanced policy verify --json</code></li>
-</ul>
-<p>These commands emit a single JSON object suitable for CI parsing.</p>
+<p>Stable machine-readable output is available on these surfaces:</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Format version</th>
+<th>Stability</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>invarlock doctor --json</code></td>
+<td><code>doctor-v1</code></td>
+<td>Required envelope fields are stable.</td>
+</tr>
+<tr>
+<td><code>invarlock verify --json</code></td>
+<td><code>verify-v1</code></td>
+<td>Required envelope fields and exit-code meaning are stable.</td>
+</tr>
+<tr>
+<td><code>invarlock advanced runtime-verify --json</code></td>
+<td><code>runtime-verify-v1</code></td>
+<td>Runtime-manifest verification envelope is stable.</td>
+</tr>
+<tr>
+<td><code>invarlock advanced plugins list --json</code></td>
+<td><code>plugins-v1</code></td>
+<td>Plugin catalog envelope and contract catalog keys are stable.</td>
+</tr>
+<tr>
+<td><code>invarlock advanced plugins adapters --json</code></td>
+<td><code>plugins-v1</code></td>
+<td>Adapter rows and contract catalog keys are stable.</td>
+</tr>
+<tr>
+<td><code>invarlock advanced evidence-pack verify --json</code></td>
+<td><code>evidence-pack-verify-v1</code></td>
+<td>Evidence-pack verification envelope is stable.</td>
+</tr>
+<tr>
+<td><code>invarlock advanced policy verify --json</code></td>
+<td><code>policy-pack-verify-v1</code></td>
+<td>Policy-pack verification envelope is stable.</td>
+</tr>
+</tbody>
+</table>
+<p>These commands emit a single JSON object suitable for CI parsing. Within a
+format version, new optional fields may be added and consumers should ignore
+unknown fields. Removing a required field, renaming a required field, changing a
+field type, or changing pass/fail exit-code meaning requires a new format
+version.</p>
 <h2 id="command-layout">Command Layout<a class="headerlink" href="#command-layout" title="Permanent link">&para;</a></h2>
 <ul>
 <li>The public top level is <code>evaluate</code>, <code>verify</code>, <code>report</code>, <code>doctor</code>,
@@ -3290,6 +3459,10 @@ plugin surfaces.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

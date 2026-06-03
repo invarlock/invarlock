@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1675,10 +1731,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#command-surface" class="md-nav__link">
+  <a href="#machine-checked-command-surface" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Command Surface
+        Machine-Checked Command Surface
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reviewer-confirmed-policy-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reviewer-Confirmed Policy Context
       
     </span>
   </a>
@@ -1690,6 +1757,17 @@
     <span class="md-ellipsis">
       
         Guard Chain
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guard-fallback-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guard Fallback Policy
       
     </span>
   </a>
@@ -2015,7 +2093,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2127,7 +2205,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2480,10 +2558,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#command-surface" class="md-nav__link">
+  <a href="#machine-checked-command-surface" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Command Surface
+        Machine-Checked Command Surface
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reviewer-confirmed-policy-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reviewer-Confirmed Policy Context
       
     </span>
   </a>
@@ -2495,6 +2584,17 @@
     <span class="md-ellipsis">
       
         Guard Chain
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guard-fallback-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guard Fallback Policy
       
     </span>
   </a>
@@ -2566,6 +2666,11 @@
 
 
 <h1 id="strict-assurance-checklist">Strict Assurance Checklist<a class="headerlink" href="#strict-assurance-checklist" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>Plain language:</strong> This is the reviewer checklist for deciding whether a
+strict report and its sibling runtime manifest can be accepted as assurance
+evidence.</p>
+</blockquote>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2601,26 +2706,46 @@ for numbered error codes.</p>
 <div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>verify<span class="w"> </span>--assurance<span class="w"> </span>strict<span class="w"> </span>reports/eval/evaluation.report.json
 </code></pre></div>
 
-<p>A green exit from this command satisfies the machine-checkable items below.
-The remaining items are reviewer judgment about policy allowances and bundle
-contents.</p>
-<h2 id="command-surface">Command Surface<a class="headerlink" href="#command-surface" title="Permanent link">&para;</a></h2>
+<p>A green exit from this command satisfies the report/manifest checks that are
+machine-checkable from the submitted evidence. The remaining items are reviewer
+judgment about policy allowances and bundle contents.</p>
+<h2 id="machine-checked-command-surface">Machine-Checked Command Surface<a class="headerlink" href="#machine-checked-command-surface" title="Permanent link">&para;</a></h2>
 <ul>
 <li>[ ] <code>invarlock evaluate</code> ran with <code>--assurance strict</code> or the default strict mode.</li>
 <li>[ ] <code>--profile</code> was <code>ci</code> or <code>release</code>.</li>
 <li>[ ] <code>--tier</code> was <code>balanced</code> or <code>conservative</code>.</li>
 <li>[ ] Runtime execution was container-backed.</li>
 <li>[ ] Unverified provenance was not allowed.</li>
+</ul>
+<h2 id="reviewer-confirmed-policy-context">Reviewer-Confirmed Policy Context<a class="headerlink" href="#reviewer-confirmed-policy-context" title="Permanent link">&para;</a></h2>
+<ul>
 <li>[ ] Network and remote-code allowances were reviewed and recorded.</li>
+<li>[ ] The original evaluate command and staged bundle contents match the
+  release/review intent.</li>
 </ul>
 <h2 id="guard-chain">Guard Chain<a class="headerlink" href="#guard-chain" title="Permanent link">&para;</a></h2>
 <ul>
 <li>[ ] The observed guard chain is exactly:
   <code>invariants -&gt; spectral -&gt; rmt -&gt; variance -&gt; invariants</code>.</li>
-<li>[ ] No guard evidence is missing.</li>
+<li>[ ] No guard evidence is missing; the single <code>invariants</code> evidence block
+  covers both pre/post invariant stages in the current report contract.</li>
 <li>[ ] No guard was skipped, duplicated outside the canonical chain, or marked
   monitor-only for a pass.</li>
 <li>[ ] Unsupported guard/model statuses are explicit and block assurance.</li>
+</ul>
+<h2 id="guard-fallback-policy">Guard Fallback Policy<a class="headerlink" href="#guard-fallback-policy" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[ ] Numeric measurement fallbacks are recorded as diagnostics or events; a
+  neutral fallback value alone is not acceptable evidence.</li>
+<li>[ ] Spectral estimator failures, non-tensor weights, non-finite weights, and
+  quantized-weight skips include structured <code>spectral_sigma_fallback_*</code>
+  diagnostics.</li>
+<li>[ ] RMT correction failures are emitted as <code>rmt_correct_failed</code> error events
+  and do not silently erase the original outlier.</li>
+<li>[ ] Variance guard preparation/finalization failures fail closed unless an
+  explicit monitor-only policy is recorded in the report.</li>
+<li>[ ] Reviewer-facing reports expose fallback diagnostics under the relevant
+  guard result, and strict assurance blocks unsupported or degraded guard states.</li>
 </ul>
 <h2 id="metrics-and-windows">Metrics And Windows<a class="headerlink" href="#metrics-and-windows" title="Permanent link">&para;</a></h2>
 <ul>
@@ -2648,11 +2773,11 @@ contents.</p>
 <li>[ ] <code>assurance.runtime_provenance_verified</code> is <code>false</code> before verifier confirmation.</li>
 <li>[ ] <code>assurance.blocking_reasons</code> is empty.</li>
 <li>[ ] <code>invarlock verify --assurance strict</code> exits successfully and reports
-  <code>verification.runtime_provenance.status = verified</code>.</li>
+  <code>results[*].verification.runtime_provenance.status = "verified"</code>.</li>
 </ul>
 <h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../14-trust-model/">Trust Model</a> — What a strict pass does and does not mean</li>
+<li><a href="../14-trust-model/">Trust Model</a> — Strict pass scope</li>
 <li><a href="../00-assurance-case/">Assurance Case Overview</a> — Claims, evidence, and tests</li>
 <li><a href="../../security/runtime-provenance-guide/">Runtime Provenance Guide</a> — Manifest requirements</li>
 <li><a href="../../user-guide/failure-examples/">Failure Examples</a> — Common non-pass shapes</li>
@@ -2713,6 +2838,10 @@ contents.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

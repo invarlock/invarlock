@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -752,6 +752,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -2076,7 +2132,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2188,7 +2244,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2759,7 +2815,7 @@ or datasets, opt in per command with <code>--allow-network</code>:</p>
 <div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>evaluate<span class="w"> </span>--allow-network<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--baseline<span class="w"> </span>gpt2<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--subject<span class="w"> </span>distilgpt2<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--baseline-adapter<span class="w"> </span>auto<span class="w"> </span>--subject-adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--profile<span class="w"> </span>ci
 </code></pre></div>
 
@@ -2772,7 +2828,7 @@ container and emits <code>runtime.manifest.json</code> beside the evaluation rep
 <div class="codehilite"><pre><span></span><code><span class="nv">INVARLOCK_DEDUP_TEXTS</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>invarlock<span class="w"> </span>evaluate<span class="w"> </span>--allow-network<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--baseline<span class="w"> </span>gpt2<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--subject<span class="w"> </span>distilgpt2<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--baseline-adapter<span class="w"> </span>auto<span class="w"> </span>--subject-adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--profile<span class="w"> </span>ci<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--report-out<span class="w"> </span>reports/eval
 </code></pre></div>
@@ -2842,6 +2898,10 @@ render a shareable HTML artifact from the same report.</p>
 <td>Getting Started → <a href="../evidence-packs/">Evidence Packs</a> → <a href="../evidence-packs-internals/">Evidence Packs Internals</a></td>
 </tr>
 <tr>
+<td><strong>Integration author</strong></td>
+<td>Getting Started → <a href="../integrations/">Integration Examples</a> → <a href="../compare-and-evaluate/">Compare &amp; evaluate (BYOE)</a></td>
+</tr>
+<tr>
 <td><strong>Security auditor</strong></td>
 <td>Getting Started → <a href="../../security/threat-model/">Threat Model</a> → <a href="../../security/best-practices/">Best Practices</a></td>
 </tr>
@@ -2858,14 +2918,13 @@ surfaces live under <code>invarlock advanced</code>:</p>
 </ul>
 <p>Installed packages also include the evidence-pack verifier, so bundles can be
 inspected without cloning the repository:</p>
-<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>advanced<span class="w"> </span>evidence-pack<span class="w"> </span>verify<span class="w"> </span>&lt;pack&gt;<span class="w"> </span>--strict
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>advanced<span class="w"> </span>evidence-pack<span class="w"> </span>verify<span class="w"> </span>&lt;pack&gt;<span class="w"> </span>--strict<span class="w"> </span>--report-assurance<span class="w"> </span>strict
 </code></pre></div>
 
 <p>Optional adapter and backend installs use Python extras such as
 <code>pip install "invarlock[awq,gptq]"</code>; they are not managed through CLI
-install or uninstall commands. On Python 3.13+ stacks, <code>gptq</code> may still
-require a vendor wheel or a supported older interpreter because upstream
-<code>auto-gptq</code> packaging remains narrower than the core InvarLock support matrix.</p>
+install or uninstall commands. The <code>awq</code> and <code>gptq</code> extras use
+GPTQModel-backed subject loading.</p>
 <h2 id="device-support">Device Support<a class="headerlink" href="#device-support" title="Permanent link">&para;</a></h2>
 <p>InvarLock defaults to <code>--device auto</code>, probing <strong>CUDA → MPS → CPU</strong> in that
 order. All guard calculations and reports are device-agnostic; CUDA is
@@ -2889,6 +2948,10 @@ for local smoke and portability runs.</p>
 <tr>
 <td>evaluate my own edited checkpoint workflow</td>
 <td><a href="../compare-and-evaluate/">Compare &amp; evaluate (BYOE)</a></td>
+</tr>
+<tr>
+<td>attach evidence to an external edit toolchain</td>
+<td><a href="../integrations/">Integration Examples</a></td>
 </tr>
 <tr>
 <td>understand the CLI commands</td>
@@ -2973,6 +3036,10 @@ for local smoke and portability runs.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

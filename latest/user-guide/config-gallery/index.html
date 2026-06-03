@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -576,6 +576,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../bring-your-own-data/" class="md-nav__link">
         
   
@@ -757,6 +813,17 @@
     <span class="md-ellipsis">
       
         Edit Overlays (Demo RTN Quantization)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-and-dataset-overlays" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model And Dataset Overlays
       
     </span>
   </a>
@@ -2032,7 +2099,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2144,7 +2211,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2547,6 +2614,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#model-and-dataset-overlays" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model And Dataset Overlays
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#profiles" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2630,9 +2708,10 @@
 <p>Pointers to common presets in this repository you can start from. Presets are
 repo assets (not included in wheels). Use flag‑only <code>invarlock evaluate</code> when
 installing from PyPI, or clone this repo to reference these files.</p>
-<p>Note: Adapter‑based flows such as <code>invarlock evaluate</code> with HF models require
-extras like <code>invarlock[hf]</code> or <code>invarlock[adapters]</code>. The core install
-(<code>pip install invarlock</code>) remains torch‑free.</p>
+<p>Note: HF-backed <code>invarlock evaluate</code> flows require the evaluation stack from
+<code>invarlock[hf]</code>. The narrower <code>invarlock[adapters]</code> extra is enough for local
+adapter loading and plugin inspection, but it intentionally omits dataset and
+download helpers. The core install (<code>pip install invarlock</code>) remains torch-free.</p>
 <p>The <code>evaluate</code> examples below use the runtime container by default. Add
 <code>--execution-mode host</code> only for host-side workflows that intentionally bypass that
 boundary.</p>
@@ -2711,7 +2790,13 @@ network access is unavailable or for CI smoke tests.</p>
 <tr>
 <td><code>configs/presets/seq2seq/synth_64.yaml</code></td>
 <td>Quick seq2seq tests</td>
-<td>T5</td>
+<td>T5/BART-style encoder-decoder</td>
+<td>Synthetic</td>
+</tr>
+<tr>
+<td><code>configs/presets/seq2seq/synth_128.yaml</code></td>
+<td>Longer seq2seq smoke runs</td>
+<td>T5/BART-style encoder-decoder</td>
 <td>Synthetic</td>
 </tr>
 </tbody>
@@ -2755,6 +2840,34 @@ own pre-edited checkpoint instead.</p>
 <span class="w">  </span>--profile<span class="w"> </span>ci
 </code></pre></div>
 
+<h2 id="model-and-dataset-overlays">Model And Dataset Overlays<a class="headerlink" href="#model-and-dataset-overlays" title="Permanent link">&para;</a></h2>
+<p>These partial overlays are useful when composing local presets:</p>
+<table>
+<thead>
+<tr>
+<th>Overlay</th>
+<th>Scope</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>configs/overlays/models/hf_causal.yaml</code></td>
+<td>Model adapter</td>
+<td>Hugging Face causal LM defaults</td>
+</tr>
+<tr>
+<td><code>configs/overlays/models/hf_mlm.yaml</code></td>
+<td>Model adapter</td>
+<td>Hugging Face masked LM defaults</td>
+</tr>
+<tr>
+<td><code>configs/overlays/datasets/wikitext2.yaml</code></td>
+<td>Dataset</td>
+<td>WikiText-2 validation windows</td>
+</tr>
+</tbody>
+</table>
 <h2 id="profiles">Profiles<a class="headerlink" href="#profiles" title="Permanent link">&para;</a></h2>
 <p>Profiles control window counts and bootstrap depth:</p>
 <table>
@@ -2782,7 +2895,7 @@ own pre-edited checkpoint instead.</p>
 <tr>
 <td><code>ci_cpu</code></td>
 <td>120/120</td>
-<td>1200</td>
+<td>1000 fallback</td>
 <td>CPU-only environments</td>
 </tr>
 </tbody>
@@ -2792,7 +2905,7 @@ own pre-edited checkpoint instead.</p>
 <li>Use <code>--profile ci|release|ci_cpu</code> to apply runtime window counts and
   bootstrapping defaults.</li>
 <li>Keep <code>seq_len = stride</code> for deterministic non‑overlapping windows.</li>
-<li>Combine presets with edit overlays using multiple <code>-c</code> flags or <code>--edit-config</code>.</li>
+<li>Combine a preset with an edit overlay using <code>--preset</code> and <code>--edit-config</code>.</li>
 <li>For custom data, see <a href="../bring-your-own-data/">Bring Your Own Data</a>.</li>
 </ul>
 <h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
@@ -2855,6 +2968,10 @@ own pre-edited checkpoint instead.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

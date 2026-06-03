@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1325,6 +1381,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#versioned-sub-contracts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioned sub-contracts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#machine-readable-contract-files" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1340,6 +1407,17 @@
     <span class="md-ellipsis">
       
         CLI surfaces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adapter-support-tiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adapter support tiers
       
     </span>
   </a>
@@ -1982,7 +2060,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2094,7 +2172,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2436,6 +2514,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#versioned-sub-contracts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioned sub-contracts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#machine-readable-contract-files" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2451,6 +2540,17 @@
     <span class="md-ellipsis">
       
         CLI surfaces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adapter-support-tiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adapter support tiers
       
     </span>
   </a>
@@ -2505,6 +2605,8 @@
 reports, verification, evidence packs, calibration artifacts, and policy packs.
 These contracts are intended to be consumed as-is by automation, review, and
 auditing workflows.</p>
+<p>InvarLock is pre-1.0 as a package, but the core evidence-artifact surfaces are
+versioned and intended to be stable within their declared contract versions.</p>
 <p>The public contract surface covers:</p>
 <ul>
 <li><code>evaluation.report.json</code> semantics and report schema validation</li>
@@ -2515,6 +2617,66 @@ auditing workflows.</p>
 <li>adapter capability metadata</li>
 <li>runtime tiers/profiles and calibration artifact semantics</li>
 <li>policy digests, policy provenance, and policy-pack verification</li>
+</ul>
+<h2 id="versioned-sub-contracts">Versioned sub-contracts<a class="headerlink" href="#versioned-sub-contracts" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Sub-contract</th>
+<th>Version field</th>
+<th>Current value</th>
+<th>Canonical source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Report schema</td>
+<td><code>evaluation.report.json.schema_version</code></td>
+<td><code>v1</code></td>
+<td><code>invarlock.reporting.report_schema.REPORT_JSON_SCHEMA</code></td>
+</tr>
+<tr>
+<td>Evidence-pack format</td>
+<td><code>manifest.json.format</code></td>
+<td><code>evidence-pack-v1</code></td>
+<td><code>contracts/evidence_pack_manifest.schema.json</code></td>
+</tr>
+<tr>
+<td>Verifier output</td>
+<td><code>invarlock verify --json.format_version</code></td>
+<td><code>verify-v1</code></td>
+<td><code>contracts/verify_output.schema.json</code></td>
+</tr>
+<tr>
+<td>Runtime manifest</td>
+<td><code>runtime.manifest.json.verifier_contract_version</code></td>
+<td><code>runtime-manifest-v1</code></td>
+<td><code>contracts/runtime_manifest.schema.json</code></td>
+</tr>
+<tr>
+<td>CLI stability policy</td>
+<td>policy identifier</td>
+<td><code>cli-stability-v1</code></td>
+<td><code>docs/reference/cli.md</code></td>
+</tr>
+<tr>
+<td>Adapter/model support tiers</td>
+<td><code>support_matrix.support_tiers[]</code></td>
+<td><code>published_basis</code>, <code>supported_experimental</code>, <code>community_experimental</code></td>
+<td><code>contracts/support_matrix.json</code></td>
+</tr>
+</tbody>
+</table>
+<p>Compatibility rules:</p>
+<ul>
+<li>Within a <code>v1</code> contract, new optional fields may be added and consumers should
+  ignore fields they do not understand.</li>
+<li>Removing a required field, renaming a field, changing a field type, or
+  changing pass/fail semantics requires a new version value.</li>
+<li>Report, evidence-pack, runtime-manifest, and verifier validators fail closed
+  on mismatched explicit version fields.</li>
+<li>Optional report blocks can graduate into the required core only with a report
+  schema version bump.</li>
 </ul>
 <h2 id="machine-readable-contract-files">Machine-readable contract files<a class="headerlink" href="#machine-readable-contract-files" title="Permanent link">&para;</a></h2>
 <table>
@@ -2550,6 +2712,11 @@ auditing workflows.</p>
 <td>Runtime manifest</td>
 <td><code>contracts/runtime_manifest.schema.json</code></td>
 <td>Runtime provenance schema for <code>runtime.manifest.json</code> sidecars</td>
+</tr>
+<tr>
+<td>Verify output</td>
+<td><code>contracts/verify_output.schema.json</code></td>
+<td>JSON output schema for <code>invarlock verify --json</code></td>
 </tr>
 <tr>
 <td>Evidence-pack manifest</td>
@@ -2592,14 +2759,15 @@ plugins ... --json</code>.</p>
 <ul>
 <li><code>invarlock verify --json</code></li>
 <li><code>invarlock advanced runtime-verify --json</code></li>
+<li><code>invarlock advanced plugins list --json</code></li>
 <li><code>invarlock advanced plugins adapters --json</code></li>
 <li><code>invarlock doctor --json</code></li>
 <li><code>invarlock advanced evidence-pack verify --json</code></li>
 <li><code>invarlock advanced policy build</code></li>
-<li><code>invarlock advanced policy verify</code></li>
-<li><code>scripts/evidence_packs/verify_pack.sh --strict</code></li>
+<li><code>invarlock advanced policy verify --json</code></li>
+<li><code>scripts/evidence_packs/verify_pack.sh --pack &lt;dir&gt; --strict --report-assurance strict</code></li>
 </ul>
-<p>The first seven surfaces are available from installed packages. The low-level
+<p>The first eight surfaces are available from installed packages. The low-level
 <code>invarlock advanced runtime-verify</code> command is the package-native
 runtime-manifest verifier used for direct report/manifest checks. The repo
 shell verifier remains available for evidence-pack workflow maintainers, and
@@ -2614,13 +2782,52 @@ expose both the strict <code>support_matrix</code> contract and the broader
 and <code>metric_kinds</code> entries from the public contract catalog.</p>
 <p>The versioned JSON surfaces are intentionally explicit:</p>
 <ul>
+<li><code>invarlock doctor --json</code> emits <code>format_version: "doctor-v1"</code></li>
 <li><code>invarlock verify --json</code> emits <code>format_version: "verify-v1"</code></li>
 <li><code>invarlock advanced runtime-verify --json</code> emits
   <code>format_version: "runtime-verify-v1"</code></li>
+<li><code>invarlock advanced plugins list --json</code> and
+  <code>invarlock advanced plugins adapters --json</code> emit
+  <code>format_version: "plugins-v1"</code></li>
+<li><code>invarlock advanced policy verify --json</code> emits
+  <code>format_version: "policy-pack-verify-v1"</code></li>
 <li><code>invarlock advanced evidence-pack verify --json</code> emits
   <code>format_version: "evidence-pack-verify-v1"</code> and nests the bundled report
   verification result under <code>verify.format_version: "verify-v1"</code></li>
 </ul>
+<p>The CLI stability policy covers command names, documented options, exit-code
+meaning, and the required fields of the listed JSON envelopes. Commands under
+<code>advanced</code> remain outside the core user loop, but the JSON surfaces listed here
+are public automation contracts.</p>
+<h2 id="adapter-support-tiers">Adapter support tiers<a class="headerlink" href="#adapter-support-tiers" title="Permanent link">&para;</a></h2>
+<p>Adapter availability and public assurance support are separate concepts.
+<code>contracts/adapter_capabilities.json</code> describes whether an adapter can load,
+snapshot, restore, and expose guard-compatible modules. <code>contracts/support_matrix.json</code>
+describes the public support tier for a model/runtime/adapter lane.</p>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>published_basis</code></td>
+<td>Maintained public evidence floor with report, runtime-manifest, and evidence-pack provenance where available.</td>
+</tr>
+<tr>
+<td><code>supported_experimental</code></td>
+<td>Repo ships preset/config/test/smoke paths, but no published-basis fixture set is claimed.</td>
+</tr>
+<tr>
+<td><code>community_experimental</code></td>
+<td>Adapter/runtime path is usable for community experimentation without a maintained public evidence basis.</td>
+</tr>
+</tbody>
+</table>
+<p>Policy packs that declare <code>compatibility.support_tiers</code> must use one of those
+three tier values.</p>
 <h2 id="packaged-public-contract-data">Packaged public contract data<a class="headerlink" href="#packaged-public-contract-data" title="Permanent link">&para;</a></h2>
 <p>The maintained public contract data ships in two places:</p>
 <ul>
@@ -2633,8 +2840,11 @@ carriers.</p>
 <code>public_evidence/published_basis/...</code> references. Installed wheels resolve those
 logical paths from packaged files under
 <code>invarlock/_data/public_evidence/published_basis/...</code>, so installed packages can
-render the shipped published-basis <code>evaluation.report.json</code> examples and
-load the paired <code>evidence_pack_recipe.json</code> data without cloning the repo.</p>
+render and verify the shipped published-basis <code>evaluation.report.json</code> examples
+with their sibling <code>runtime.manifest.json</code> files, and load the paired
+<code>evidence_pack_recipe.json</code> data without cloning the repo. The GPT-2
+published-basis lane also packages a signed <code>evidence_pack/</code> directory for
+strict offline evidence-pack verification.</p>
 <h2 id="policy-packs">Policy packs<a class="headerlink" href="#policy-packs" title="Permanent link">&para;</a></h2>
 <p>Policy packs are Git-native artifacts that bind:</p>
 <ul>
@@ -2706,6 +2916,10 @@ invarlock<span class="w"> </span>advanced<span class="w"> </span>policy<span cla
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

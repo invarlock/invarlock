@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -2115,7 +2171,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2227,7 +2283,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2805,7 +2861,7 @@
 </tr>
 <tr>
 <td><strong>Source of truth</strong></td>
-<td><code>src/invarlock/eval/data.py</code>, <code>src/invarlock/eval/data_support.py</code>, <code>src/invarlock/eval/data_tokenization.py</code>, <code>src/invarlock/eval/data_windows.py</code>, and <code>src/invarlock/eval/data_providers.py</code>.</td>
+<td><code>src/invarlock/eval/data.py</code>, <code>src/invarlock/eval/data_support.py</code>, <code>src/invarlock/eval/data_tokenization.py</code>, and <code>src/invarlock/eval/data_providers.py</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -2832,7 +2888,8 @@
   be enforced via <code>HF_DATASETS_OFFLINE=1</code>.</li>
 <li><strong>Vision-text manifests</strong>: <code>vision_text</code> is local-files-only and
   expects JSONL records with <code>id</code>, <code>image_path</code>, <code>prompt</code>, and either <code>answer</code>
-  or <code>answers</code>. It is fixed to single-image examples and <code>batch_size=1</code>.</li>
+  or <code>answers</code>. Records are single-image examples; provider batching can still
+  group multiple records when callers request <code>batch_size &gt; 1</code>.</li>
 <li><strong>Tokenizer contract</strong>: dataset providers expect either a callable tokenizer
   that returns <code>input_ids</code> plus optional <code>attention_mask</code>, or an <code>encode(...)</code>
   method that accepts <code>truncation=True</code>, <code>max_length=...</code>, and
@@ -3041,7 +3098,7 @@
 <h3 id="hf-text-provider-example">HF text provider example<a class="headerlink" href="#hf-text-provider-example" title="Permanent link">&para;</a></h3>
 <div class="codehilite"><pre><span></span><code><span class="nt">dataset</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hf_text</span>
-<span class="w">  </span><span class="nt">dataset_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wikitext</span>
+<span class="w">  </span><span class="nt">dataset_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Salesforce/wikitext</span>
 <span class="w">  </span><span class="nt">config_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wikitext-2-raw-v1</span>
 <span class="w">  </span><span class="nt">text_field</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">text</span>
 <span class="w">  </span><span class="nt">split</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">validation</span>
@@ -3168,6 +3225,10 @@
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

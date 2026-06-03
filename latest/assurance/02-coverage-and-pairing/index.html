@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1737,6 +1793,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#claim" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2004,7 +2071,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2116,7 +2183,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2447,6 +2514,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#claim" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2549,17 +2627,44 @@
 Baseline and edited runs reuse the exact same windows. Tier‑based minima are
 validated at runtime and surfaced in the report.</p>
 </blockquote>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Purpose</strong></td>
+<td>Define the pairing, non-overlap, seed, and tier-floor requirements for evaluation windows.</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>Evaluation pipeline maintainers, release reviewers, and operators preparing paired evidence.</td>
+</tr>
+<tr>
+<td><strong>Contract scope</strong></td>
+<td>Baseline/subject window reuse, pairing statistics, coverage floors, and report-verifier checks.</td>
+</tr>
+<tr>
+<td><strong>Source of truth</strong></td>
+<td><code>src/invarlock/core/runner_pairing.py</code>, <code>src/invarlock/eval/window_planning.py</code>, and report pairing tests.</td>
+</tr>
+</tbody>
+</table>
 <h2 id="claim">Claim<a class="headerlink" href="#claim" title="Permanent link">&para;</a></h2>
 <p>A valid evaluation schedule uses non‑overlapping, paired windows with fixed
 seeds and reuses the baseline window IDs for edited runs. The runner enforces
-tier‑based minima and aborts in CI/Release when pairing or coverage is
-insufficient.</p>
+tier-based minima. CI/Release runs hard-fail pairing/count drift when a baseline
+pairing context exists, and report verification rejects invalid pairing.</p>
 <h2 id="window-selection-assumptions">Window Selection (assumptions)<a class="headerlink" href="#window-selection-assumptions" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Non‑overlap:</strong> set <code>seq_len == stride</code> so windows do not overlap.</li>
 <li><strong>Deterministic:</strong> record and reuse the seed bundle (<code>python</code>, <code>numpy</code>, <code>torch</code>) and bootstrap seed (when applicable).</li>
 <li><strong>Dedupe:</strong> deduplication is allowed for pilots/probes; <strong>release evidence uses strict non‑overlap on the full plan</strong>.</li>
-<li><strong>Exact pairing:</strong> preview/final counts must match and the edited run must reuse baseline window IDs; mixing schedules voids the paired Δlog guarantees.</li>
+<li><strong>Exact pairing:</strong> preview/final counts must match and the edited run must reuse baseline window IDs; mixing schedules invalidates the paired Δlog assumptions.</li>
 </ul>
 <h2 id="pairing-reuse-baseline-edited">Pairing Reuse (baseline → edited)<a class="headerlink" href="#pairing-reuse-baseline-edited" title="Permanent link">&para;</a></h2>
 <ul>
@@ -2567,7 +2672,8 @@ insufficient.</p>
 <li>report lints pairing and overlap:</li>
 <li><code>dataset.windows.stats.window_match_fraction == 1.0</code></li>
 <li><code>dataset.windows.stats.window_overlap_fraction == 0.0</code></li>
-<li>CI/Release abort if counts differ, pairing &lt; 1.0, or overlap &gt; 0.0.</li>
+<li>CI/Release abort if counts differ, pairing &lt; 1.0, or overlap &gt; 0.0 when a
+  baseline pairing context exists.</li>
 </ul>
 <h2 id="tier-minima-runner-defaults">Tier Minima (runner defaults)<a class="headerlink" href="#tier-minima-runner-defaults" title="Permanent link">&para;</a></h2>
 <p>Sane defaults enforced by the runner per tier (guard-rail floors; profiles may
@@ -2603,13 +2709,17 @@ request higher counts):</p>
 </tbody>
 </table>
 <p>These minima are derived from half‑width targets on paired Δlog‑loss (see
-Tier v1.0 Calibration). CI/Release profiles treat shortfalls as hard errors;
-dev flows surface warnings but also record coverage in the container-backed report bundle.</p>
+<a href="../09-tier-v1-calibration/">Tier Policy v1 Calibration</a>). CI/Release profiles treat
+shortfalls as hard errors; dev flows surface warnings but also record coverage
+in the generated report bundle.</p>
 <h2 id="runtime-contract-report">Runtime Contract (report)<a class="headerlink" href="#runtime-contract-report" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Window plan: <code>dataset.windows.stats.{requested_preview,requested_final,actual_preview,actual_final}</code></li>
 <li>Pairing/overlap: <code>dataset.windows.stats.{window_match_fraction,window_overlap_fraction,paired_windows}</code></li>
-<li>Bootstrap coverage: <code>dataset.windows.stats.bootstrap.{replicates,seed}</code> meets/exceeds the tier floor (profiles may request higher counts)</li>
+<li>Coverage floors: <code>dataset.windows.stats.coverage.{preview,final}</code> meets/exceeds
+  the window tier floor (profiles may request higher counts)</li>
+<li>Bootstrap metadata: <code>dataset.windows.stats.bootstrap.{method,alpha,replicates,seed}</code>
+  records the interval method, replicate count, and RNG seed</li>
 </ul>
 <h2 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h2>
 <ul>
@@ -2623,9 +2733,9 @@ dev flows surface warnings but also record coverage in the container-backed repo
 <li>Dataset or tokenizer changes that affect tokenization invalidate recorded
   pairing schedules.</li>
 <li>Window pairing must be exact (ID reuse) and non‑overlapping; mixing schedules
-  voids paired Δlog guarantees.</li>
+  invalidate paired Δlog assumptions.</li>
 <li>This plan is calibrated for Linux/macOS environments and the tier profiles
-  documented in Tier v1.0 Calibration.</li>
+  documented in <a href="../09-tier-v1-calibration/">Tier Policy v1 Calibration</a>.</li>
 </ul>
 
 
@@ -2680,6 +2790,10 @@ dev flows surface warnings but also record coverage in the container-backed repo
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

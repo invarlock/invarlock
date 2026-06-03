@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1880,7 +1936,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -1959,6 +2015,17 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#claim" class="md-nav__link">
@@ -2116,7 +2183,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2447,6 +2514,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#claim" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2552,12 +2630,42 @@ unavailable ratios as <code>evaluated=false</code> for tiny/noisy runs; release
 verification requires evaluated overhead evidence unless the run explicitly
 records an overhead skip.</p>
 </blockquote>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Purpose</strong></td>
+<td>Define the paired bare-vs-guarded overhead measurement and the release-evidence budget.</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>Release reviewers, runtime maintainers, and operators producing overhead evidence.</td>
+</tr>
+<tr>
+<td><strong>Contract scope</strong></td>
+<td>Guard overhead ratio/percent reporting, soft-pass diagnostics, and release verifier requirements.</td>
+</tr>
+<tr>
+<td><strong>Source of truth</strong></td>
+<td><code>src/invarlock/reporting/report_overhead.py</code>, <code>src/invarlock/reporting/verify_check_helpers_consistency.py</code>, and overhead tests.</td>
+</tr>
+</tbody>
+</table>
 <h2 id="claim">Claim<a class="headerlink" href="#claim" title="Permanent link">&para;</a></h2>
 <ul>
-<li>overhead_ratio = PM(guarded) / PM(bare)  (for ppl‑like kinds this is a ratio; for accuracy use Δ pp)</li>
+<li>overhead_ratio = PM(guarded) / PM(bare) for ppl‑like/lower-is-better primary
+  metrics.</li>
 <li>overhead_percent = (overhead_ratio − 1) × 100</li>
 </ul>
-<p>PM(bare) is computed with guards disabled; PM(guarded) with the full GuardChain enabled.</p>
+<p>PM(bare) is computed with guards disabled; PM(guarded) with the full GuardChain enabled.
+Accuracy-style quality deltas are handled outside this ratio gate; do not read
+<code>guard_overhead.overhead_ratio</code> as an accuracy percentage-point delta.</p>
 <h2 id="protocol-single-toggle-paired-schedule">Protocol (single toggle, paired schedule)<a class="headerlink" href="#protocol-single-toggle-paired-schedule" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Same window plan: identical <code>seq_len</code>, <code>stride</code>, counts, and window IDs.</li>
@@ -2600,7 +2708,9 @@ records an overhead skip.</p>
 </ul>
 <h2 id="observability-provenance">Observability &amp; Provenance<a class="headerlink" href="#observability-provenance" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Seeds and device: <code>meta.seeds.*</code>, <code>meta.device</code> recorded for both bare and guarded arms.</li>
+<li>Seeds and device: <code>meta.seeds.*</code>, <code>meta.device</code>, paired overhead metrics, and
+  the schedule/policy digest are recorded in the final report. Embedded
+  bare/guarded arm metadata is sanitized before report publication.</li>
 <li>Policy snapshot &amp; digest: <code>/resolved_policy</code>, <code>/policy_provenance.policy_digest</code>, <code>/auto.policy_digest</code>, and <code>/policy_digest</code> (thresholds digest) pin the evaluated policy and floors.</li>
 </ul>
 <h2 id="remediation-if-the-gate-fails">Remediation (if the gate fails)<a class="headerlink" href="#remediation-if-the-gate-fails" title="Permanent link">&para;</a></h2>
@@ -2612,8 +2722,8 @@ records an overhead skip.</p>
 </ul>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
-<li>report Schema → Guard Overhead section (field list and example JSON)</li>
-<li>Guard Contracts → Overview of guards and expected budgets</li>
+<li><a href="../../reference/reports/">Reports Reference</a> — Guard overhead field list and example JSON</li>
+<li><a href="../04-guard-contracts/">Guard Contracts</a> — Overview of guards and expected budgets</li>
 </ul>
 
 
@@ -2668,6 +2778,10 @@ records an overhead skip.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -576,6 +576,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../bring-your-own-data/" class="md-nav__link">
         
   
@@ -964,6 +1020,17 @@
     <span class="md-ellipsis">
       
         Stress edits
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deployable-edits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployable edits
       
     </span>
   </a>
@@ -2553,7 +2620,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2665,7 +2732,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -3128,6 +3195,17 @@
     <span class="md-ellipsis">
       
         Stress edits
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deployable-edits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployable edits
       
     </span>
   </a>
@@ -3665,8 +3743,12 @@ global <code>runtime/tiers.yaml</code>.</p>
 <td>Hardware-agnostic Phase 0 validation harness for edit detection</td>
 </tr>
 <tr>
-<td>Version</td>
+<td>Harness version</td>
 <td><code>evidence-packs-v1</code></td>
+</tr>
+<tr>
+<td>Manifest format</td>
+<td><code>evidence-pack-v1</code></td>
 </tr>
 <tr>
 <td>Hardware</td>
@@ -3703,14 +3785,21 @@ global <code>runtime/tiers.yaml</code>.</p>
 </tbody>
 </table>
 <h2 id="quick-start-context">Quick Start (Context)<a class="headerlink" href="#quick-start-context" title="Permanent link">&para;</a></h2>
+<p>The suite wrappers fail closed unless remote model code has been explicitly
+approved. The examples below assume <code>INVARLOCK_ALLOW_REMOTE_CODE=1</code> is exported
+for the shell that launches <code>run_suite.sh</code> or <code>run_pack.sh</code>.</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># Run the subset suite (offline by default)</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">INVARLOCK_ALLOW_REMOTE_CODE</span><span class="o">=</span><span class="m">1</span>
 ./scripts/evidence_packs/run_suite.sh<span class="w"> </span>--suite<span class="w"> </span>subset
 
 <span class="c1"># Run the full suite and build an evidence pack</span>
-./scripts/evidence_packs/run_pack.sh<span class="w"> </span>--suite<span class="w"> </span>full<span class="w"> </span>--net<span class="w"> </span><span class="m">1</span>
+./scripts/evidence_packs/run_pack.sh<span class="w"> </span>--suite<span class="w"> </span>full<span class="w"> </span>--net<span class="w"> </span><span class="m">1</span><span class="w"> </span>--release-review
 
 <span class="c1"># Verify an existing evidence pack</span>
-invarlock<span class="w"> </span>advanced<span class="w"> </span>evidence-pack<span class="w"> </span>verify<span class="w"> </span>./evidence_pack_runs/subset_20250101_000000/evidence_pack<span class="w"> </span>--strict
+invarlock<span class="w"> </span>advanced<span class="w"> </span>evidence-pack<span class="w"> </span>verify<span class="w"> </span>./evidence_pack_runs/subset_20250101_000000/evidence_pack<span class="w"> </span>--strict<span class="w"> </span>--report-assurance<span class="w"> </span>strict
+
+<span class="c1"># Verify and pin the expected package-native signer</span>
+invarlock<span class="w"> </span>advanced<span class="w"> </span>evidence-pack<span class="w"> </span>verify<span class="w"> </span>./evidence_pack_runs/subset_20250101_000000/evidence_pack<span class="w"> </span>--strict<span class="w"> </span>--report-assurance<span class="w"> </span>strict<span class="w"> </span>--expected-fingerprint<span class="w"> </span>sha256:&lt;<span class="m">64</span>-hex-chars&gt;
 </code></pre></div>
 
 <h2 id="hardware-target">Hardware Target<a class="headerlink" href="#hardware-target" title="Permanent link">&para;</a></h2>
@@ -3732,22 +3821,35 @@ invarlock<span class="w"> </span>advanced<span class="w"> </span>evidence-pack<s
 <li><code>scripts/evidence_packs/verify_pack.sh</code> validates an evidence pack in repo workflows.</li>
 <li><code>invarlock advanced evidence-pack verify</code> provides the package-native verifier path for
   installed wheels.</li>
-<li><code>scripts/evidence_packs/suites.sh</code> defines the model suites and allows
+<li><code>scripts/evidence_packs/run_suite.sh</code> defines the model suites and allows
   <code>MODEL_1</code>–<code>MODEL_8</code> overrides.</li>
-<li><code>scripts/evidence_packs/lib/validation_suite.sh</code> orchestrates the run: preflight,
+<li><code>scripts/evidence_packs/lib/validation/validation_suite.sh</code> orchestrates the run: preflight,
   queue creation, worker launch, and monitoring.</li>
 </ul>
 <h3 id="library-modules">Library modules<a class="headerlink" href="#library-modules" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>lib/task_serialization.sh</code>: task schema, JSON helpers, GPU planning.</li>
-<li><code>lib/queue_manager.sh</code>: queue states, dependency resolution, task generation.</li>
-<li><code>lib/scheduler.sh</code>: dynamic priority, memory gating, reservations.</li>
+<li><code>lib/queue/queue_manager.sh</code>: compatibility facade for queue state, dependency, and task-generation modules.</li>
+<li><code>lib/queue/queue_core.sh</code>: queue setup, locking, summaries, and terminal-state helpers.</li>
+<li><code>lib/queue/queue_lifecycle.sh</code>: task state transitions and orphan reclamation.</li>
+<li><code>lib/queue/queue_dependencies.sh</code>: dependency resolution and dependent promotion.</li>
+<li><code>lib/queue/queue_memory_plan.sh</code>: profile-based memory refresh and memory-plan export.</li>
+<li><code>lib/queue/queue_generation.sh</code>: progress state, task search, and task graph generation.</li>
+<li><code>lib/queue/scheduler.sh</code>: compatibility facade for scheduler modules.</li>
+<li><code>lib/queue/scheduler_core.sh</code>: GPU ID/cache helpers, scheduler lock, and GPU-count policy.</li>
+<li><code>lib/queue/scheduler_gpu_runtime.sh</code>: OOM checks, memory probes, utilization, and purge helpers.</li>
+<li><code>lib/queue/scheduler_reservations.sh</code>: GPU reservation and availability helpers.</li>
+<li><code>lib/queue/scheduler_selection.sh</code>: task priority, selection, work stealing, and scheduling metrics.</li>
 <li><code>lib/gpu_worker.sh</code>: worker loop, heartbeats, task execution glue.</li>
-<li><code>lib/task_functions.sh</code>: implementations for each task type.</li>
-<li><code>lib/model_creation.sh</code>: edit and error-model creation helpers (<code>create_model_variant</code> dispatcher).</li>
-<li><code>lib/config_generator.sh</code>: InvarLock config generation and wrapper helpers.</li>
-<li><code>lib/result_compiler.sh</code>: analysis and verdict compilation.</li>
-<li><code>lib/fault_tolerance.sh</code>: error classification and retry/backoff logic.</li>
+<li><code>lib/tasks/task_functions.sh</code>: compatibility facade and <code>execute_task</code> dispatcher.</li>
+<li><code>lib/tasks/task_common.sh</code>: shared scheduling, model, preset, and reusable baseline-report helpers.</li>
+<li><code>lib/tasks/task_baseline.sh</code>: baseline setup, calibration, preset generation, and shared baseline report preparation.</li>
+<li><code>lib/tasks/task_edit_lifecycle.sh</code>: edit creation, batch edit creation, evaluation, and cleanup.</li>
+<li><code>lib/tasks/task_error_lifecycle.sh</code>: error-model creation, evaluation probes, structural-failure reports, and cleanup.</li>
+<li><code>lib/tasks/model_creation.sh</code>: edit and error-model creation helpers (<code>create_model_variant</code> dispatcher).</li>
+<li><code>lib/config/config_generator.sh</code>: InvarLock config generation and wrapper helpers.</li>
+<li><code>lib/validation/validation_suite.sh</code>: validation orchestration, analysis setup, and verdict compilation.</li>
+<li><code>lib/core/fault_tolerance.sh</code>: error classification and retry/backoff logic.</li>
 <li><code>scripts/evidence_packs/python/manifest_writer.py</code>: evidence pack <code>manifest.json</code> writer.</li>
 <li><code>scripts/evidence_packs/python/preset_generator.py</code>: preset derivation + edit-type variants.</li>
 </ul>
@@ -3768,15 +3870,16 @@ invarlock<span class="w"> </span>advanced<span class="w"> </span>evidence-pack<s
 │                   ┌───────────────┴───────────────┐                   │
 │                   ▼                               ▼                   │
 │ TASK EXECUTION                                  CORE SERVICES         │
-│   lib/gpu_worker.sh                               queue_manager       │
-│   task claim -&gt; precheck -&gt; execute -&gt; cleanup    scheduler           │
+│   lib/gpu_worker.sh                               queue_* modules     │
+│   task claim -&gt; precheck -&gt; execute -&gt; cleanup    scheduler_* modules │
 │                                                  task_serialization   │
 │                                                  fault_tolerance      │
 │                   │                                                   │
 │                   ▼                                                   │
 │ TASK FUNCTIONS                                                        │
-│   SETUP_BASELINE, CALIBRATION_RUN, GENERATE_PRESET                    │
-│   CREATE_EDITS(_BATCH), CREATE_ERROR, evaluate_*                      │
+│   task_functions facade + task_common shared helpers                  │
+│   task_baseline | task_edit_lifecycle | task_error_lifecycle          │
+│   SETUP_BASELINE, CALIBRATION_RUN, GENERATE_PRESET, evaluate_*        │
 └───────────────────────────────────────────────────────────────────────┘
 </code></pre></div>
 
@@ -3804,7 +3907,7 @@ invarlock<span class="w"> </span>advanced<span class="w"> </span>evidence-pack<s
 </code></pre></div>
 
 <h2 id="model-suite">Model Suite<a class="headerlink" href="#model-suite" title="Permanent link">&para;</a></h2>
-<p>Model suites are defined in <code>scripts/evidence_packs/suites.sh</code> and applied by
+<p>Model suites are defined and applied by
 <code>run_suite.sh</code>.</p>
 <table>
 <thead>
@@ -3890,17 +3993,22 @@ invarlock<span class="w"> </span>advanced<span class="w"> </span>evidence-pack<s
 <ul>
 <li>Override models via <code>MODEL_1</code>–<code>MODEL_8</code>; set an empty string to disable a slot.</li>
 <li><code>validation_suite.sh</code> includes a fallback list of large causal models if it is
-  run directly without <code>suites.sh</code>.</li>
+  run directly without separate suite plumbing.</li>
 </ul>
 <h2 id="edit-types">Edit Types<a class="headerlink" href="#edit-types" title="Permanent link">&para;</a></h2>
-<p>Each model runs 8 edit experiments (4 types × 2 versions) plus optional error
-injection tests.</p>
+<p>Each model runs 8 validation-subject edit experiments (4 types × 2 versions)
+plus optional error-injection tests. <code>scripts/evidence_packs/scenarios.json</code>
+is the source of truth for each scenario's <code>artifact_class</code>.</p>
 <p>Evidence-pack <code>quant_rtn</code> scenarios are generated as external subject
 artifacts: the helper applies RTN quantize/dequantize simulation and saves
 floating-point dequantized weights. Those scenarios may use <code>bits</code> and
 <code>group_size</code> to shape the generated artifact, but they are not the built-in
 <code>edit.name: quant_rtn</code> plugin plan and they do not produce packed runtime
 quantization.</p>
+<p>The same distinction applies to the other current edits: FP8 round-trips tensors
+through FP8 or float16 and saves ordinary floating-point weights; magnitude
+pruning writes zeros into dense tensors; low-rank SVD writes dense approximated
+tensors instead of factorized low-rank modules.</p>
 <h3 id="clean-edits-tuned">Clean edits (tuned)<a class="headerlink" href="#clean-edits-tuned" title="Permanent link">&para;</a></h3>
 <p>Clean edits use tuned parameters supplied via <code>PACK_TUNED_EDIT_PARAMS_FILE</code>.
 The suite uses <code>:clean:</code> as a sentinel in the edit spec and resolves concrete
@@ -3909,6 +4017,7 @@ parameters at runtime.</p>
 <thead>
 <tr>
 <th>Edit Type</th>
+<th>Artifact class</th>
 <th>Parameters</th>
 <th>Scope</th>
 </tr>
@@ -3916,21 +4025,25 @@ parameters at runtime.</p>
 <tbody>
 <tr>
 <td>RTN dequantized external-subject simulation</td>
+<td>validation subject checkpoint</td>
 <td>tuned (<code>bits</code>, <code>group_size</code>) from tuned params file</td>
 <td>FFN only</td>
 </tr>
 <tr>
-<td>FP8 Quantization</td>
+<td>FP8 dequantized external-subject simulation</td>
+<td>validation subject checkpoint</td>
 <td>tuned (<code>format</code>) from tuned params file</td>
 <td>FFN only</td>
 </tr>
 <tr>
-<td>Magnitude Pruning</td>
+<td>Dense magnitude-pruned checkpoint</td>
+<td>validation subject checkpoint</td>
 <td>tuned (<code>prune_level</code>) from tuned params file</td>
 <td>FFN only</td>
 </tr>
 <tr>
-<td>Low-Rank SVD</td>
+<td>Dense low-rank-SVD approximated checkpoint</td>
+<td>validation subject checkpoint</td>
 <td>tuned (<code>rank</code>) from tuned params file</td>
 <td>FFN only</td>
 </tr>
@@ -3949,6 +4062,7 @@ without manufacturing clean false positives.</p>
 <thead>
 <tr>
 <th>Edit Type</th>
+<th>Artifact class</th>
 <th>Parameters</th>
 <th>Scope</th>
 </tr>
@@ -3956,26 +4070,38 @@ without manufacturing clean false positives.</p>
 <tbody>
 <tr>
 <td>RTN dequantized external-subject simulation</td>
+<td>validation subject checkpoint</td>
 <td><code>quant_rtn:8:all</code> (8-bit)</td>
 <td>All layers</td>
 </tr>
 <tr>
-<td>FP8 Quantization</td>
+<td>FP8 dequantized external-subject simulation</td>
+<td>validation subject checkpoint</td>
 <td><code>fp8_quant:e5m2:all</code></td>
 <td>All layers</td>
 </tr>
 <tr>
-<td>Magnitude Pruning</td>
+<td>Dense magnitude-pruned checkpoint</td>
+<td>validation subject checkpoint</td>
 <td><code>magnitude_prune:0.5:all</code> (50% sparsity)</td>
 <td>All layers</td>
 </tr>
 <tr>
-<td>Low-Rank SVD</td>
+<td>Dense low-rank-SVD approximated checkpoint</td>
+<td>validation subject checkpoint</td>
 <td><code>lowrank_svd:32:all</code> (rank 32)</td>
 <td>All layers</td>
 </tr>
 </tbody>
 </table>
+<h3 id="deployable-edits">Deployable edits<a class="headerlink" href="#deployable-edits" title="Permanent link">&para;</a></h3>
+<p>Deployable scenarios use <code>artifact_class: deployable_optimized_subject</code> and are
+not part of the default validation lanes. A deployable scenario must carry a
+backend contract (<code>packed_quantized_storage</code>, reload smoke, inference smoke,
+and memory/storage evidence) and package the corresponding sidecars into the
+evidence pack. The OSS suite currently has no runnable deployable scenario; add
+one only when the backend can produce or load an artifact and provide all
+required sidecars on the target GPU stack.</p>
 <h3 id="error-injection-tests">Error injection tests<a class="headerlink" href="#error-injection-tests" title="Permanent link">&para;</a></h3>
 <p>Enabled when <code>RUN_ERROR_INJECTION=true</code> (default):</p>
 <ul>
@@ -4106,12 +4232,27 @@ workers/gpu_reservations/
 <h2 id="batch-optimizations">Batch optimizations<a class="headerlink" href="#batch-optimizations" title="Permanent link">&para;</a></h2>
 <p>Small/medium models default to batch edit creation:</p>
 <ul>
-<li><strong>Batch edit creation</strong>: <code>CREATE_EDITS_BATCH</code> loads a model once and creates
-  all 8 edits (cuts repeated model loads).</li>
+<li><strong>Batch edit creation</strong>: <code>CREATE_EDITS_BATCH</code> parses and schedules all edit
+  specs together, but reloads the baseline per edit by default to avoid
+  deep-copying large loaded models. Set <code>PACK_BATCH_EDIT_STRATEGY=deepcopy</code>
+  only for small models where single-load throughput is more important than
+  peak memory.</li>
+<li><strong>Deferred optional report rendering</strong>: <code>PACK_DEFER_REPORT_RENDERING=1</code>
+  keeps <code>evaluation.report.json</code>, <code>runtime.manifest.json</code>, and JSON evidence
+  sidecars in the hot path while skipping markdown/reviewer bundle rendering.
+  Pack verification does not require those optional rendered files. Release
+  review mode enables this default so evaluation workers spend less time on
+  report-heavy filesystem writes; pack-level HTML export still runs unless
+  <code>PACK_SKIP_HTML=1</code> is set.</li>
+<li><strong>Evaluation-loop telemetry</strong>: each <code>evaluate_timing.json</code> records top-level
+  evaluate timings plus nested baseline/subject run timings when reports expose
+  them. The pack-level <code>evaluation_optimization_summary.json</code> aggregates those
+  timings so reviewers can separate process startup savings from model load,
+  dataset preparation, guard/eval, and report-generation costs.</li>
 </ul>
-<p>Large or MoE models disable batch edits automatically (or via
+<p>Large or MoE models can still disable batch edit tasks automatically (or via
 <code>PACK_USE_BATCH_EDITS=false</code>) and fall back to per-edit tasks
-(<code>CREATE_EDIT → evaluate_EDIT</code>).</p>
+(<code>CREATE_EDIT -&gt; evaluate_EDIT</code>).</p>
 <h3 id="task-dependency-graphs">Task dependency graphs<a class="headerlink" href="#task-dependency-graphs" title="Permanent link">&para;</a></h3>
 <p>Batch (default):</p>
 <div class="codehilite"><pre><span></span><code>SETUP_BASELINE
@@ -4124,6 +4265,9 @@ workers/gpu_reservations/
 <ul>
 <li>Error injection tasks (<code>CREATE_ERROR</code> → <code>evaluate_ERROR</code>) branch off
   <code>SETUP_BASELINE</code> and require the preset for evaluation.</li>
+<li>Grouped edit evaluation is opt-in because it trades some multi-GPU task
+  parallelism for lower per-scenario process startup overhead. It is most useful
+  for many short edit evaluations on one model.</li>
 </ul>
 <p>Per-edit path (large/MoE or <code>PACK_USE_BATCH_EDITS=false</code>):</p>
 <div class="codehilite"><pre><span></span><code>SETUP_BASELINE
@@ -4134,25 +4278,24 @@ workers/gpu_reservations/
 
 <h2 id="task-breakdown-per-model-defaults">Task breakdown per model (defaults)<a class="headerlink" href="#task-breakdown-per-model-defaults" title="Permanent link">&para;</a></h2>
 <p>Defaults: <code>DRIFT_CALIBRATION_RUNS=5</code>, <code>CLEAN_EDIT_RUNS=3</code>,
-<code>STRESS_EDIT_RUNS=2</code>, <code>RUN_ERROR_INJECTION=true</code>.</p>
-<p>Batch path (default for small/medium):</p>
+<code>STRESS_EDIT_RUNS=2</code>, <code>RUN_ERROR_INJECTION=true</code>, and
+<code>PACK_USE_BATCH_EDITS=auto</code>.</p>
+<p>The task graph is manifest-driven and may add eager baseline, reusable-baseline,
+and cleanup tasks. Use the generated queue summary as the authoritative count.
+At a high level, each model includes:</p>
 <ul>
 <li>Setup baseline: 1 task</li>
 <li>Preset-derivation runs + preset generation: 6 tasks</li>
-<li>Batch edits: 1 task</li>
-<li>evaluate edits: 20 tasks</li>
-<li>Error injection: 10 tasks</li>
+<li>Edit creation: one batch task when grouped edit creation is explicitly
+  enabled, otherwise one creation task per edit</li>
+<li>Edit evaluation: edit count × clean/stress run counts</li>
+<li>Error injection: suite manifest scenarios (12 for <code>subset</code>, 15 for
+  <code>showcase</code>, <code>workshop3</code>, and <code>full</code> by default)</li>
+<li>Cleanup tasks when cleanup mode is enabled</li>
 </ul>
-<p>Total: ~38 tasks/model (varies with overrides).</p>
-<p>Per-edit path (large/MoE or <code>PACK_USE_BATCH_EDITS=false</code>):</p>
-<ul>
-<li>Setup baseline: 1 task</li>
-<li>Preset-derivation runs + preset generation: 6 tasks</li>
-<li>Create edits: 8 tasks</li>
-<li>evaluate edits: 20 tasks</li>
-<li>Error injection: 10 tasks</li>
-</ul>
-<p>Total: ~45 tasks/model (varies with overrides).</p>
+<p><code>PACK_USE_BATCH_EDITS=auto</code> currently favors the per-edit path for
+cleanup-safe default runs. Set <code>PACK_USE_BATCH_EDITS=true</code> only when the reduced
+startup overhead is worth the lower task-level parallelism for that campaign.</p>
 <h2 id="execution-phases">Execution phases<a class="headerlink" href="#execution-phases" title="Permanent link">&para;</a></h2>
 <div class="codehilite"><pre><span></span><code>PHASE 0: Environment setup
   - Dependency checks, GPU pool configuration, disk preflight
@@ -4162,6 +4305,7 @@ PHASE 2: GPU worker launch
   - Spawn one worker per GPU, dynamic scheduling in loop
 PHASE 3: Reports + verdict
   - Compile reports into final verdict reports
+  - Write results/analysis/evaluation_optimization_summary.json
 </code></pre></div>
 
 <h2 id="run-directory-layout">Run directory layout<a class="headerlink" href="#run-directory-layout" title="Permanent link">&para;</a></h2>
@@ -4225,6 +4369,7 @@ these sidecars into the packaged evidence pack under <code>reports/**/</code>.</
 <h2 id="determinism-vs-throughput">Determinism vs throughput<a class="headerlink" href="#determinism-vs-throughput" title="Permanent link">&para;</a></h2>
 <p><code>PACK_DETERMINISM</code> controls harness-level determinism:</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># Throughput (default)</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">INVARLOCK_ALLOW_REMOTE_CODE</span><span class="o">=</span><span class="m">1</span>
 <span class="nv">PACK_DETERMINISM</span><span class="o">=</span>throughput<span class="w"> </span>./scripts/evidence_packs/run_suite.sh<span class="w"> </span>--suite<span class="w"> </span>subset
 
 <span class="c1"># Strict</span>
@@ -4305,7 +4450,9 @@ budget is roughly:</p>
 <li>Verifies digest-backed manifest references (<code>subject</code>, <code>invocation.config_source</code>,
   <code>environment</code>, and <code>materials</code>) against on-pack files.</li>
 <li>Verifies <code>checksums.sha256</code> (and thus all hashed artifacts).</li>
-<li>Verifies the package-native Ed25519 signature bundle when present; <code>--strict</code> requires it.</li>
+<li>Verifies the package-native Ed25519 signature bundle; a missing
+  <code>manifest.signature.json</code> is a signature failure by default.</li>
+<li>Enforces signer authenticity when <code>--expected-fingerprint</code> or <code>--trust-store</code> is supplied.</li>
 <li>Enforces “no extra files” semantics in <code>--strict</code> mode.</li>
 <li>Runs <code>invarlock verify</code> across all bundled reports (JSON output optional) with
   runtime-manifest enforcement on; each packaged <code>evaluation.report.json</code>
@@ -4325,12 +4472,18 @@ package-native Ed25519 manifest-signature format as the installed CLI.</p>
 <ul>
 <li><code>run_pack.sh</code> writes <code>metadata/source_repo.json</code> from the active Git checkout.</li>
 <li>If <code>git</code> is unavailable or the repository metadata cannot be collected, pack
-  creation stops instead of silently emitting partial provenance.</li>
+  creation stops instead of silently emitting partial provenance unless an
+  explicit snapshot marker is present.</li>
+<li>Detached artifact-tree runs may provide <code>GPU_RUN_SOURCE.txt</code> in the repository
+  root, or point <code>INVARLOCK_SOURCE_REPO_MARKER</code> at an equivalent key-value file.
+  The marker must include <code>source_commit=&lt;40-hex-commit&gt;</code> and may include
+  <code>source_branch</code>, <code>source_describe</code>, <code>source_uri</code>, and <code>source_dirty</code>.</li>
 <li>If you need to package from a detached artifact tree, write a complete
-  <code>metadata/source_repo.json</code> first rather than relying on fallback inference.</li>
+  <code>metadata/source_repo.json</code> first or provide that explicit snapshot marker
+  rather than relying on fallback inference.</li>
 </ul>
 <h2 id="remote-setup-helper">Remote setup helper<a class="headerlink" href="#remote-setup-helper" title="Permanent link">&para;</a></h2>
-<p><code>scripts/evidence_packs/lib/setup_remote.sh</code> is an optional bootstrap script for
+<p><code>scripts/evidence_packs/lib/core/setup_remote.sh</code> is an optional bootstrap script for
 fresh GPU hosts. It clones the repo, creates a venv, installs PyTorch and
 InvarLock, and leaves the host ready to run <code>run_pack.sh</code>.</p>
 <p>Operational guidance for remote evidence-pack work:</p>
@@ -4351,9 +4504,13 @@ InvarLock, and leaves the host ready to run <code>run_pack.sh</code>.</p>
   set <code>INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1</code> on the remote host before the
   evidence-pack entrypoint; the default runtime-container launcher rejects that config
   graph before container start when the override is missing.</li>
-<li>After Qwen2.5-14B campaigns, run
+<li>After Qwen2.5-14B campaigns run with <code>PACK_CLEANUP_MODELS=0</code>, run
   <code>scripts/evidence_packs/run_qwen14_sentinels.sh</code> from the same fresh work tree to
-  validate saved-model direct evaluate and the public quant smoke.</li>
+  validate saved-model direct evaluate and the public quant smoke. The sentinel
+  helper reloads retained edit subject directories, so default cleanup mode is
+  not sufficient for this follow-up check. The helper defaults to
+  <code>--profile dev --assurance off</code> and requires evaluate/verify subprocesses to
+  exit zero.</li>
 </ul>
 <p>Recommended remote validation checklist after security-default changes:</p>
 <ol>
@@ -4361,7 +4518,7 @@ InvarLock, and leaves the host ready to run <code>run_pack.sh</code>.</p>
    <code>INVARLOCK_CONFIG_ROOT</code> overrides.</li>
 <li>Run one delegated <code>invarlock evaluate</code> with external <code>--edit-config</code>,
    <code>TMPDIR</code>, and <code>INVARLOCK_EXPORT_DIR</code> roots.</li>
-<li>Run one <code>scripts/model_evidence_sweep.py --execution-mode container</code> lane
+<li>Run one <code>scripts/model_evidence/model_evidence_sweep.py --execution-mode container</code> lane
    with an external output root and confirm the published report path is
    populated.</li>
 </ol>
@@ -4385,7 +4542,7 @@ InvarLock, and leaves the host ready to run <code>run_pack.sh</code>.</p>
 <tr>
 <td><code>PACK_SUITE</code></td>
 <td><code>subset</code></td>
-<td>Suite name (<code>subset</code> or <code>full</code>)</td>
+<td>Suite name (<code>subset</code>, <code>showcase</code>, <code>workshop3</code>, or <code>full</code>)</td>
 </tr>
 <tr>
 <td><code>PACK_NET</code></td>
@@ -4431,6 +4588,16 @@ InvarLock, and leaves the host ready to run <code>run_pack.sh</code>.</p>
 <td><code>PACK_USE_BATCH_EDITS</code></td>
 <td><code>auto</code></td>
 <td>Force/disable batch edit creation</td>
+</tr>
+<tr>
+<td><code>PACK_DEFER_REPORT_RENDERING</code></td>
+<td><code>0</code> (<code>1</code> under <code>--release-review</code>)</td>
+<td>Skip optional markdown/reviewer bundle rendering during evaluation</td>
+</tr>
+<tr>
+<td><code>PACK_RUNTIME_IMAGE_FLAVOR</code></td>
+<td><code>default</code></td>
+<td>Remote setup runtime image flavor; use <code>quant</code> on CUDA hosts for optional quant adapter container evidence, including <code>hf_bnb</code>, <code>hf_awq</code>, <code>hf_gptq</code>, <code>hf_torchao</code>, <code>hf_hqq</code>, <code>hf_quanto</code>, and <code>hf_ct</code></td>
 </tr>
 <tr>
 <td><code>RESUME_MODE</code></td>
@@ -4720,8 +4887,8 @@ InvarLock, and leaves the host ready to run <code>run_pack.sh</code>.</p>
 <tbody>
 <tr>
 <td><code>PACK_BASELINE_STORAGE_MODE</code></td>
-<td><code>snapshot_symlink</code></td>
-<td>Baseline storage mode (<code>snapshot_symlink</code>, <code>snapshot_copy</code>, or <code>save_pretrained</code>)</td>
+<td><code>snapshot_copy</code></td>
+<td>Baseline storage mode for <code>run_suite.sh</code> and <code>run_pack.sh</code> (<code>snapshot_symlink</code>, <code>snapshot_copy</code>, or <code>save_pretrained</code>)</td>
 </tr>
 <tr>
 <td><code>MIN_FREE_DISK_GB</code></td>
@@ -4842,12 +5009,33 @@ InvarLock, and leaves the host ready to run <code>run_pack.sh</code>.</p>
 <td><code>dev</code></td>
 <td>Profile for <code>invarlock verify</code></td>
 </tr>
+<tr>
+<td><code>PACK_REPORT_ASSURANCE</code></td>
+<td><code>report</code></td>
+<td>Nested report assurance mode passed to report verification (<code>report</code>, <code>strict</code>, or <code>off</code>)</td>
+</tr>
+<tr>
+<td><code>PACK_REQUIRE_PASS</code></td>
+<td><code>0</code></td>
+<td>Fail pack generation unless <code>final_verdict.json</code> is <code>PASS</code></td>
+</tr>
+<tr>
+<td><code>PACK_REQUIRE_RUNTIME_MANIFESTS</code></td>
+<td><code>0</code></td>
+<td>Require report-adjacent runtime manifests during hardened pack generation</td>
+</tr>
+<tr>
+<td><code>PACK_RELEASE_REVIEW</code></td>
+<td><code>0</code></td>
+<td>Set by <code>run_pack.sh --release-review</code>; requires PASS verdicts, signed manifests, runtime manifests, CI profile, and strict report assurance</td>
+</tr>
 </tbody>
 </table>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <h3 id="missing-model-revisions-offline">Missing model revisions (offline)<a class="headerlink" href="#missing-model-revisions-offline" title="Permanent link">&para;</a></h3>
 <p>If offline runs fail with “requires model revisions”, run a preflight:</p>
-<div class="codehilite"><pre><span></span><code>./scripts/evidence_packs/run_suite.sh<span class="w"> </span>--suite<span class="w"> </span>subset<span class="w"> </span>--net<span class="w"> </span><span class="m">1</span>
+<div class="codehilite"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">INVARLOCK_ALLOW_REMOTE_CODE</span><span class="o">=</span><span class="m">1</span>
+./scripts/evidence_packs/run_suite.sh<span class="w"> </span>--suite<span class="w"> </span>subset<span class="w"> </span>--net<span class="w"> </span><span class="m">1</span>
 </code></pre></div>
 
 <p>Or point to an existing revisions file with <code>PACK_MODEL_REVISIONS_FILE</code>.</p>
@@ -4864,7 +5052,8 @@ Use <code>MIN_FREE_DISK_GB=0</code> or <code>PACK_SKIP_DISK_PREFLIGHT=1</code> o
 risk of partial artifacts.</p>
 <h3 id="task-timeouts">Task timeouts<a class="headerlink" href="#task-timeouts" title="Permanent link">&para;</a></h3>
 <p>Increase the default or per-task timeout:</p>
-<div class="codehilite"><pre><span></span><code><span class="nv">TASK_TIMEOUT_DEFAULT</span><span class="o">=</span><span class="m">28800</span><span class="w"> </span>./scripts/evidence_packs/run_suite.sh<span class="w"> </span>--suite<span class="w"> </span>subset
+<div class="codehilite"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">INVARLOCK_ALLOW_REMOTE_CODE</span><span class="o">=</span><span class="m">1</span>
+<span class="nv">TASK_TIMEOUT_DEFAULT</span><span class="o">=</span><span class="m">28800</span><span class="w"> </span>./scripts/evidence_packs/run_suite.sh<span class="w"> </span>--suite<span class="w"> </span>subset
 <span class="nv">TASK_TIMEOUT_CREATE_EDIT</span><span class="o">=</span><span class="m">28800</span><span class="w"> </span>./scripts/evidence_packs/run_suite.sh<span class="w"> </span>--suite<span class="w"> </span>subset
 </code></pre></div>
 
@@ -4927,6 +5116,10 @@ risk of partial artifacts.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

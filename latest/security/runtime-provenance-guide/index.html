@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1877,7 +1933,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -1989,7 +2045,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2333,10 +2389,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-the-manifest-proves" class="md-nav__link">
+  <a href="#what-the-manifest-records" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What The Manifest Proves
+        What The Manifest Records
       
     </span>
   </a>
@@ -2469,10 +2525,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-the-manifest-proves" class="md-nav__link">
+  <a href="#what-the-manifest-records" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What The Manifest Proves
+        What The Manifest Records
       
     </span>
   </a>
@@ -2549,7 +2605,7 @@
 </tr>
 <tr>
 <td><strong>Source of truth</strong></td>
-<td><code>src/invarlock/core/runtime_manifest_verify.py</code>, <code>src/invarlock/runtime_provenance.py</code>, <code>contracts/runtime_manifest.schema.json</code>, <code>docs/security/threat-model.md</code>.</td>
+<td><code>src/invarlock/runtime_verify.py</code>, <code>src/invarlock/runtime_provenance.py</code>, <code>contracts/runtime_manifest.schema.json</code>, <code>docs/security/threat-model.md</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -2567,8 +2623,8 @@ invarlock<span class="w"> </span>advanced<span class="w"> </span>runtime-verify<
 
 <p>The default <code>invarlock evaluate --execution-mode container</code> flow emits
 <code>runtime.manifest.json</code> next to <code>evaluation.report.json</code> automatically. Host
-execution requires <code>verify --runtime-provenance host</code> and forfeits strict
-assurance unless <code>--assurance off</code> is explicit.</p>
+execution forfeits strict assurance and should be verified explicitly with
+<code>verify --runtime-provenance host --assurance off</code>.</p>
 <h2 id="strict-runtime-requirements">Strict Runtime Requirements<a class="headerlink" href="#strict-runtime-requirements" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Container execution is required for strict assurance.</li>
@@ -2578,14 +2634,13 @@ assurance unless <code>--assurance off</code> is explicit.</p>
 <li>Host execution and unverified provenance force the report out of strict
   assurance.</li>
 </ul>
-<h2 id="what-the-manifest-proves">What The Manifest Proves<a class="headerlink" href="#what-the-manifest-proves" title="Permanent link">&para;</a></h2>
+<h2 id="what-the-manifest-records">What The Manifest Records<a class="headerlink" href="#what-the-manifest-records" title="Permanent link">&para;</a></h2>
 <p>The runtime manifest records the execution mode, runtime tool, image
 reference, image digest or local-image allowance, command context, and policy
 allowances used for the evaluation.</p>
-<p>It does not prove kernel-level isolation, cloud tenancy, GPU firmware
-integrity, or that the baseline model itself is trustworthy. See
-<a href="../threat-model/">Threat Model</a> for the wider set of assumptions and
-out-of-scope concerns.</p>
+<p>Kernel-level isolation, cloud tenancy, GPU firmware integrity, and baseline
+model trust are outside the manifest boundary. See <a href="../threat-model/">Threat Model</a>
+for the wider set of assumptions and out-of-scope concerns.</p>
 <h2 id="recommended-review">Recommended Review<a class="headerlink" href="#recommended-review" title="Permanent link">&para;</a></h2>
 <p>Before accepting release evidence:</p>
 <ul>
@@ -2661,6 +2716,10 @@ out-of-scope concerns.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

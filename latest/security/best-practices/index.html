@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1877,7 +1933,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -1989,7 +2045,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2540,10 +2596,11 @@
 <p>Copy-paste checklist for production or CI deployments:</p>
 <div class="codehilite"><pre><span></span><code><span class="gu">## Pre-deployment</span>
 <span class="k">- [ ]</span> Network-off by default (<span class="sb">`INVARLOCK_ALLOW_NETWORK`</span> unset)
-<span class="k">- [ ]</span> Dependencies locked (<span class="sb">`pip freeze &gt; requirements.lock`</span>)
+<span class="k">- [ ]</span> Dependencies locked with repo tooling (<span class="sb">`make lock-sync`</span> / <span class="sb">`uv.lock`</span>);
+      downstream deployments may still export an environment snapshot when needed
 <span class="k">- [ ]</span> Python ≥ 3.12
 <span class="k">- [ ]</span> pip-audit clean or exceptions documented
-<span class="k">- [ ]</span> SBOM generated from the installed release surface (<span class="sb">`scripts/generate_sbom.sh --scope install-surface --python ...`</span>)
+<span class="k">- [ ]</span> SBOM generated from the installed release surface (<span class="sb">`scripts/security/generate_sbom.sh --scope install-surface --python ...`</span>)
 
 <span class="gu">## Model &amp; Data</span>
 <span class="k">- [ ]</span> Model source verified (local path or trusted HF repo)
@@ -2659,6 +2716,10 @@
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

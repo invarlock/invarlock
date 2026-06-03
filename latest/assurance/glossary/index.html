@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1681,6 +1737,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#quick-reference-tables" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1805,10 +1872,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#report" class="md-nav__link">
+  <a href="#evaluation-report" class="md-nav__link">
     <span class="md-ellipsis">
       
-        report
+        Evaluation Report
       
     </span>
   </a>
@@ -1844,10 +1911,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#evidence-bundle" class="md-nav__link">
+  <a href="#evidence-pack-evaluation-bundle" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Evidence Bundle
+        Evidence Pack / Evaluation Bundle
       
     </span>
   </a>
@@ -1988,10 +2055,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#report_1" class="md-nav__link">
+  <a href="#run-report" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Report
+        Run Report
       
     </span>
   </a>
@@ -2432,7 +2499,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2544,7 +2611,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2875,6 +2942,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#quick-reference-tables" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2999,10 +3077,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#report" class="md-nav__link">
+  <a href="#evaluation-report" class="md-nav__link">
     <span class="md-ellipsis">
       
-        report
+        Evaluation Report
       
     </span>
   </a>
@@ -3038,10 +3116,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#evidence-bundle" class="md-nav__link">
+  <a href="#evidence-pack-evaluation-bundle" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Evidence Bundle
+        Evidence Pack / Evaluation Bundle
       
     </span>
   </a>
@@ -3182,10 +3260,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#report_1" class="md-nav__link">
+  <a href="#run-report" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Report
+        Run Report
       
     </span>
   </a>
@@ -3401,14 +3479,42 @@
 
 <h1 id="glossary">Glossary<a class="headerlink" href="#glossary" title="Permanent link">&para;</a></h1>
 <blockquote>
+<p><strong>Plain language:</strong> When reading a report or debugging a pipeline, use this
+glossary to understand what each field means and where the term originated.</p>
+</blockquote>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Purpose</strong></td>
+<td>Define key assurance, report, guard, data, policy, and provenance terms in one reference.</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>Report readers, contributors, reviewers, and operators following cross-document terminology.</td>
+</tr>
+<tr>
+<td><strong>Contract scope</strong></td>
+<td>Terminology only; runtime behavior is governed by the linked assurance docs and reference pages.</td>
+</tr>
+<tr>
+<td><strong>Source of truth</strong></td>
+<td>This glossary, linked assurance notes, report schemas, and public contract data under <code>src/invarlock/_data/contracts/</code>.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
 <p><strong>TL;DR:</strong> This glossary defines key terms used across InvarLock documentation,
 reports, and code. Terms are grouped by domain (metrics, guards, data,
 provenance) for quick reference. Each entry includes a definition, context,
 and cross-references to relevant assurance documents.</p>
-<p><strong>Plain language:</strong> When reading a report or debugging a pipeline, use this
-glossary to understand what each field means and where the term originated.</p>
 </blockquote>
-<hr />
 <h2 id="quick-reference-tables">Quick Reference Tables<a class="headerlink" href="#quick-reference-tables" title="Permanent link">&para;</a></h2>
 <h3 id="primary-metric-terms">Primary Metric Terms<a class="headerlink" href="#primary-metric-terms" title="Permanent link">&para;</a></h3>
 <table>
@@ -3416,7 +3522,7 @@ glossary to understand what each field means and where the term originated.</p>
 <tr>
 <th>Term</th>
 <th>Short Definition</th>
-<th>report Field</th>
+<th>Report Field</th>
 </tr>
 </thead>
 <tbody>
@@ -3432,7 +3538,7 @@ glossary to understand what each field means and where the term originated.</p>
 </tr>
 <tr>
 <td>Ratio vs Baseline</td>
-<td>Edited ÷ baseline metric (ppl: lower=worse, acc: higher=better)</td>
+<td>PPL-like subject final ÷ baseline final (<code>&gt;1</code> is worse); accuracy gates use baseline delta</td>
 <td><code>primary_metric.ratio_vs_baseline</code></td>
 </tr>
 <tr>
@@ -3448,14 +3554,14 @@ glossary to understand what each field means and where the term originated.</p>
 <tr>
 <th>Term</th>
 <th>Short Definition</th>
-<th>report Field</th>
+<th>Report Field</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>Canonical Guard Chain</td>
 <td>invariants (pre) → spectral → RMT → variance → invariants (post)</td>
-<td><code>validation.{invariants_pass,spectral_stable,rmt_stable}</code>, <code>variance.{enabled,predictive_gate.passed}</code></td>
+<td><code>assurance.{guard_chain_observed,canonical_guard_chain}</code>, <code>validation.{invariants_pass,spectral_stable,rmt_stable}</code></td>
 </tr>
 <tr>
 <td>κ (kappa) Threshold</td>
@@ -3469,7 +3575,7 @@ glossary to understand what each field means and where the term originated.</p>
 </tr>
 <tr>
 <td>Guard Overhead</td>
-<td>Performance cost of guards vs bare run</td>
+<td>Primary-metric impact of guarded evaluation vs a bare control run</td>
 <td><code>guard_overhead.*</code></td>
 </tr>
 <tr>
@@ -3485,7 +3591,7 @@ glossary to understand what each field means and where the term originated.</p>
 <tr>
 <th>Term</th>
 <th>Short Definition</th>
-<th>report Field</th>
+<th>Report Field</th>
 </tr>
 </thead>
 <tbody>
@@ -3512,7 +3618,7 @@ glossary to understand what each field means and where the term originated.</p>
 <tr>
 <th>Term</th>
 <th>Short Definition</th>
-<th>report Field</th>
+<th>Report Field</th>
 </tr>
 </thead>
 <tbody>
@@ -3547,7 +3653,7 @@ glossary to understand what each field means and where the term originated.</p>
 </tr>
 <tr>
 <td><strong>Related terms</strong></td>
-<td>Subject Run, Window Pairing, report</td>
+<td>Subject Run, Window Pairing, Evaluation Report</td>
 </tr>
 <tr>
 <td><strong>report fields</strong></td>
@@ -3560,8 +3666,8 @@ glossary to understand what each field means and where the term originated.</p>
 </tbody>
 </table>
 <p><strong>Example:</strong> <code>invarlock evaluate --baseline gpt2 --subject gpt2-quant</code>
-This follows the default runtime-container path unless a host-side
-workflow uses <code>--execution-mode host</code>.</p>
+This follows the default runtime-container path unless a host-side,
+non-assurance workflow uses <code>--execution-mode host</code>.</p>
 <hr />
 <h4 id="bca-bootstrap">BCa Bootstrap<a class="headerlink" href="#bca-bootstrap" title="Permanent link">&para;</a></h4>
 <p>Bias-corrected and accelerated bootstrap method for estimating confidence intervals.</p>
@@ -3591,11 +3697,12 @@ workflow uses <code>--execution-mode host</code>.</p>
 </tr>
 </tbody>
 </table>
-<p><strong>Example:</strong> BCa bootstrap with 2000 replicates produces <code>ci: [0.995, 1.008]</code> on
-paired ΔlogNLL, then exponentiated to ratio CI.</p>
+<p><strong>Example:</strong> BCa bootstrap with 2000 replicates produces a log-space
+<code>ci: [-0.005, 0.008]</code> on paired ΔlogNLL, then exponentiates it to
+<code>display_ci: [0.995, 1.008]</code> for the ratio view.</p>
 <hr />
 <h3 id="cd">C–D<a class="headerlink" href="#cd" title="Permanent link">&para;</a></h3>
-<h4 id="report">report<a class="headerlink" href="#report" title="Permanent link">&para;</a></h4>
+<h4 id="evaluation-report">Evaluation Report<a class="headerlink" href="#evaluation-report" title="Permanent link">&para;</a></h4>
 <p>Structured evidence artifact summarizing an evaluation run and its validation status.</p>
 <table>
 <thead>
@@ -3607,11 +3714,11 @@ paired ΔlogNLL, then exponentiated to ratio CI.</p>
 <tbody>
 <tr>
 <td><strong>Context</strong></td>
-<td>Generated by <code>invarlock evaluate</code> or <code>invarlock report --format report</code></td>
+<td>Generated by <code>invarlock evaluate</code> or <code>invarlock report generate --format report</code></td>
 </tr>
 <tr>
 <td><strong>Related terms</strong></td>
-<td>Report, Evidence Bundle, Manifest</td>
+<td>Run Report, Evidence Pack, Evaluation Bundle, Manifest</td>
 </tr>
 <tr>
 <td><strong>report fields</strong></td>
@@ -3619,11 +3726,11 @@ paired ΔlogNLL, then exponentiated to ratio CI.</p>
 </tr>
 <tr>
 <td><strong>See also</strong></td>
-<td><a href="../../reference/reports/">reports Reference</a></td>
+<td><a href="../../reference/reports/">Reports Reference</a></td>
 </tr>
 </tbody>
 </table>
-<p><strong>Example:</strong> <code>evaluation.report.json</code> with <code>schema_version: v1</code> and <code>validation.overall_pass: true</code></p>
+<p><strong>Example:</strong> <code>evaluation.report.json</code> with <code>schema_version: v1</code> and <code>validation.primary_metric_acceptable: true</code></p>
 <hr />
 <h4 id="compare-evaluate-byoe">Compare &amp; evaluate (BYOE)<a class="headerlink" href="#compare-evaluate-byoe" title="Permanent link">&para;</a></h4>
 <p>Workflow that compares a subject model to a baseline, optionally with an external edit
@@ -3642,7 +3749,7 @@ paired ΔlogNLL, then exponentiated to ratio CI.</p>
 </tr>
 <tr>
 <td><strong>Related terms</strong></td>
-<td>Baseline, Subject Run, report</td>
+<td>Baseline, Subject Run, Evaluation Report</td>
 </tr>
 <tr>
 <td><strong>report fields</strong></td>
@@ -3658,9 +3765,10 @@ paired ΔlogNLL, then exponentiated to ratio CI.</p>
 unmodified baseline.</p>
 <hr />
 <h3 id="eg">E–G<a class="headerlink" href="#eg" title="Permanent link">&para;</a></h3>
-<h4 id="evidence-bundle">Evidence Bundle<a class="headerlink" href="#evidence-bundle" title="Permanent link">&para;</a></h4>
-<p>Set of files produced for audit: reports, runtime-provenance sidecars, and supporting
-events or derived renderings.</p>
+<h4 id="evidence-pack-evaluation-bundle">Evidence Pack / Evaluation Bundle<a class="headerlink" href="#evidence-pack-evaluation-bundle" title="Permanent link">&para;</a></h4>
+<p>Set of files produced for audit. An evidence pack is the portable signed/checksummed
+package shape; an evaluation bundle is the local output directory containing
+reports, runtime-provenance sidecars, events, or derived renderings.</p>
 <table>
 <thead>
 <tr>
@@ -3671,11 +3779,11 @@ events or derived renderings.</p>
 <tbody>
 <tr>
 <td><strong>Context</strong></td>
-<td>Output directory from <code>invarlock evaluate</code> or <code>report --format report</code></td>
+<td>Output directory from <code>invarlock evaluate</code> or <code>invarlock report generate --format report</code></td>
 </tr>
 <tr>
 <td><strong>Related terms</strong></td>
-<td>Run report, evaluation report, Runtime manifest</td>
+<td>Run Report, Evaluation Report, Runtime Manifest</td>
 </tr>
 <tr>
 <td><strong>Typical contents</strong></td>
@@ -3701,7 +3809,7 @@ events or derived renderings.</p>
 <tbody>
 <tr>
 <td><strong>Context</strong></td>
-<td>Core safety checks in <code>run</code> and <code>evaluate</code> flows</td>
+<td>Core guard checks in <code>evaluate</code> and internal config-runner flows</td>
 </tr>
 <tr>
 <td><strong>Canonical order</strong></td>
@@ -3717,8 +3825,11 @@ events or derived renderings.</p>
 </tr>
 </tbody>
 </table>
-<p><strong>Enforcement:</strong> Guards execute in canonical order for reproducibility; results are
-recorded in <code>validation.invariants_pass</code>, <code>validation.spectral_stable</code>,
+<p><strong>Enforcement:</strong> Guards execute in canonical order for reproducibility; strict
+reports can record <code>assurance.guard_chain_observed</code>,
+<code>assurance.canonical_guard_chain</code>, and
+<code>assurance.canonical_guard_chain_enforced</code>. Guard outcomes are also recorded in
+<code>validation.invariants_pass</code>, <code>validation.spectral_stable</code>, and
 <code>validation.rmt_stable</code>.</p>
 <hr />
 <h4 id="guard-chain-canonical-order">Guard Chain (Canonical Order)<a class="headerlink" href="#guard-chain-canonical-order" title="Permanent link">&para;</a></h4>
@@ -3734,7 +3845,7 @@ auditable outcomes.</p>
 <tbody>
 <tr>
 <td><strong>Context</strong></td>
-<td>Defined by <code>guards.order</code> in config YAML</td>
+<td>Canonical default enforced by strict assurance; config may request order, but strict reports must match the canonical chain</td>
 </tr>
 <tr>
 <td><strong>Related terms</strong></td>
@@ -3742,7 +3853,7 @@ auditable outcomes.</p>
 </tr>
 <tr>
 <td><strong>report fields</strong></td>
-<td>Not stored directly (order is config-driven).</td>
+<td><code>assurance.{canonical_guard_chain,guard_chain_observed,canonical_guard_chain_enforced}</code></td>
 </tr>
 <tr>
 <td><strong>See also</strong></td>
@@ -3752,7 +3863,8 @@ auditable outcomes.</p>
 </table>
 <hr />
 <h4 id="guard-overhead">Guard Overhead<a class="headerlink" href="#guard-overhead" title="Permanent link">&para;</a></h4>
-<p>Performance impact of guard checks vs bare control run (no guards).</p>
+<p>Primary-metric impact of guard checks vs a bare control run (no guards).
+This is not a wall-clock latency benchmark.</p>
 <table>
 <thead>
 <tr>
@@ -3832,7 +3944,7 @@ auditable outcomes.</p>
 </tr>
 <tr>
 <td><strong>report fields</strong></td>
-<td><code>spectral.measurement_contract_hash</code>, <code>rmt.measurement_contract_hash</code></td>
+<td><code>spectral.{measurement_contract_hash,baseline_measurement_contract_hash,measurement_contract_match}</code>, <code>rmt.{measurement_contract_hash,baseline_measurement_contract_hash,measurement_contract_match}</code></td>
 </tr>
 <tr>
 <td><strong>See also</strong></td>
@@ -3864,7 +3976,7 @@ baseline and subject.</p>
 </tr>
 <tr>
 <td><strong>report fields</strong></td>
-<td><code>policy_digest.thresholds_hash</code>, <code>policy_provenance.*</code></td>
+<td><code>policy_digest.thresholds_hash</code>, <code>policy_provenance.*</code>, <code>auto.policy_digest</code></td>
 </tr>
 <tr>
 <td><strong>See also</strong></td>
@@ -3885,11 +3997,11 @@ baseline and subject.</p>
 <tbody>
 <tr>
 <td><strong>Supported kinds</strong></td>
-<td><code>ppl_causal</code>, <code>ppl_mlm</code>, <code>accuracy</code>, <code>accuracy</code></td>
+<td><code>accuracy</code>, <code>bleu</code>, <code>f1</code>, <code>ppl_causal</code>, <code>ppl_mlm</code>, <code>ppl_seq2seq</code>, <code>rouge</code></td>
 </tr>
 <tr>
 <td><strong>Gating logic</strong></td>
-<td>Ratio vs baseline must stay within tier thresholds</td>
+<td>PPL-like kinds gate on ratio vs baseline; accuracy gates on percentage-point delta vs baseline</td>
 </tr>
 <tr>
 <td><strong>Related terms</strong></td>
@@ -3901,7 +4013,7 @@ baseline and subject.</p>
 </tr>
 <tr>
 <td><strong>See also</strong></td>
-<td><a href="../../reference/reports/">reports Reference</a></td>
+<td><a href="../../reference/reports/">Reports Reference</a></td>
 </tr>
 </tbody>
 </table>
@@ -3935,7 +4047,7 @@ baseline and subject.</p>
 </tr>
 <tr>
 <td><strong>See also</strong></td>
-<td><a href="../../reference/reports/">reports Reference</a></td>
+<td><a href="../../reference/reports/">Reports Reference</a></td>
 </tr>
 </tbody>
 </table>
@@ -3969,7 +4081,7 @@ baseline and subject.</p>
 </tbody>
 </table>
 <hr />
-<h4 id="report_1">Report<a class="headerlink" href="#report_1" title="Permanent link">&para;</a></h4>
+<h4 id="run-report">Run Report<a class="headerlink" href="#run-report" title="Permanent link">&para;</a></h4>
 <p>Run-level artifact with metrics, guard results, and metadata.</p>
 <table>
 <thead>
@@ -3985,7 +4097,7 @@ baseline and subject.</p>
 </tr>
 <tr>
 <td><strong>Related terms</strong></td>
-<td>report, Evidence Bundle</td>
+<td>Evaluation Report, Evidence Pack, Evaluation Bundle</td>
 </tr>
 <tr>
 <td><strong>File format</strong></td>
@@ -4022,7 +4134,7 @@ baseline and subject.</p>
 </tr>
 <tr>
 <td><strong>report fields</strong></td>
-<td><code>rmt.{epsilon_default,epsilon_by_family,stable,max_edge_ratio,max_edge_delta}</code></td>
+<td><code>rmt.{epsilon_default,epsilon_by_family,epsilon_violations,stable,status,max_edge_ratio,max_edge_delta}</code></td>
 </tr>
 <tr>
 <td><strong>See also</strong></td>
@@ -4055,7 +4167,7 @@ baseline and subject.</p>
 </tr>
 <tr>
 <td><strong>report fields</strong></td>
-<td><code>rmt.{families,stable,max_edge_delta}</code></td>
+<td><code>rmt.{families,stable,status,max_edge_ratio,max_edge_delta}</code></td>
 </tr>
 <tr>
 <td><strong>See also</strong></td>
@@ -4143,7 +4255,7 @@ baseline and subject.</p>
 </tr>
 <tr>
 <td><strong>Related terms</strong></td>
-<td>Baseline, report, Window Pairing</td>
+<td>Baseline, Evaluation Report, Window Pairing</td>
 </tr>
 <tr>
 <td><strong>report fields</strong></td>
@@ -4186,7 +4298,7 @@ baseline and subject.</p>
 </table>
 <hr />
 <h4 id="tier-policy">Tier Policy<a class="headerlink" href="#tier-policy" title="Permanent link">&para;</a></h4>
-<p>Guard threshold preset selecting the safety profile for a run.</p>
+<p>Guard threshold preset selecting the tier profile for a run.</p>
 <table>
 <thead>
 <tr>
@@ -4201,7 +4313,7 @@ baseline and subject.</p>
 </tr>
 <tr>
 <td><strong>Source</strong></td>
-<td><code>runtime/tiers.yaml</code></td>
+<td>Packaged <code>runtime/tiers.yaml</code>; overrides use <code>INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml</code></td>
 </tr>
 <tr>
 <td><strong>Related terms</strong></td>
@@ -4267,7 +4379,7 @@ baseline and subject.</p>
 </tr>
 <tr>
 <td><strong>report fields</strong></td>
-<td><code>data.tokenizer_hash</code>, <code>meta.tokenizer_hash</code></td>
+<td><code>meta.tokenizer_hash</code></td>
 </tr>
 <tr>
 <td><strong>See also</strong></td>
@@ -4293,7 +4405,7 @@ baseline and subject.</p>
 </tr>
 <tr>
 <td><strong>Enabling condition</strong></td>
-<td>CI excludes 0 AND mean Δ ≤ -min_effect_lognll</td>
+<td>Predictive CI upper bound ≤ -min_effect_lognll and mean Δ ≤ -min_effect_lognll; enabled VE also requires A/B provenance</td>
 </tr>
 <tr>
 <td><strong>Related terms</strong></td>
@@ -4301,7 +4413,7 @@ baseline and subject.</p>
 </tr>
 <tr>
 <td><strong>report fields</strong></td>
-<td><code>variance.{enabled,gain,predictive_gate.delta_ci,predictive_gate.passed}</code></td>
+<td><code>variance.{enabled,gain,predictive_gate.delta_ci,predictive_gate.passed,ab_test}</code></td>
 </tr>
 <tr>
 <td><strong>See also</strong></td>
@@ -4357,7 +4469,7 @@ baseline and subject.</p>
 <tbody>
 <tr>
 <td><strong>Formula</strong></td>
-<td><code>z = (σ_edited - μ_baseline) / std_baseline</code></td>
+<td><code>z = (ŝ - μ_f) / σ_f</code> for the guard's measured spectral statistic</td>
 </tr>
 <tr>
 <td><strong>Thresholding</strong></td>
@@ -4385,7 +4497,7 @@ baseline and subject.</p>
 <li><a href="../04-guard-contracts/">Guard Contracts</a> — Guard behavior specifications</li>
 <li><a href="../../reference/cli/">CLI Reference</a> — Command-line usage</li>
 <li><a href="../../reference/guards/">Guards Reference</a> — Guard configuration</li>
-<li><a href="../../reference/reports/">reports Reference</a> — report schema</li>
+<li><a href="../../reference/reports/">Reports Reference</a> — report schema</li>
 </ul>
 
 
@@ -4440,6 +4552,10 @@ baseline and subject.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

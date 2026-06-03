@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -2160,7 +2216,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2272,7 +2328,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2879,7 +2935,7 @@
 </tr>
 <tr>
 <td><strong>Source of truth</strong></td>
-<td>Packaged <code>runtime/tiers.yaml</code> (override via <code>INVARLOCK_CONFIG_ROOT</code>).</td>
+<td>Packaged <code>runtime/tiers.yaml</code> (override via <code>INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml</code>).</td>
 </tr>
 </tbody>
 </table>
@@ -2958,7 +3014,7 @@ invarlock<span class="w"> </span>report<span class="w"> </span>explain<span clas
 <h2 id="concepts">Concepts<a class="headerlink" href="#concepts" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Calibrated vs policy keys</strong>: calibrated values come from pilot runs; policy
-  keys define safety margins and floors.</li>
+  keys define conservative margins and floors.</li>
 <li><strong>Resolved policies</strong> are recorded in reports under <code>resolved_policy.*</code>.</li>
 </ul>
 <p><strong>Policy resolution order (highest → lowest)</strong></p>
@@ -3017,8 +3073,8 @@ resolved from tier policies (tiers.yaml + defaults) and surfaced under
 <code>resolved_policy.metrics.*</code>.</p>
 <h2 id="reference">Reference<a class="headerlink" href="#reference" title="Permanent link">&para;</a></h2>
 <blockquote>
-<p><strong>Plain language:</strong> The packaged <code>runtime/tiers.yaml</code> is the source of truth
-for tier defaults. Some values are <strong>calibrated</strong> from pilot/null runs (e.g.,
+<p><strong>Plain language:</strong> The packaged <code>runtime/tiers.yaml</code> is
+the source of truth for tier defaults. Some values are <strong>calibrated</strong> from pilot/null runs (e.g.,
 Spectral κ, RMT ε, VE min‑effect). The rest are <strong>policies</strong> (explicit design
 choices like sample-size floors, dead bands, and caps). This page is the “why
 map”: for every key in <code>tiers.yaml</code>, it explains what it controls and where to
@@ -3183,7 +3239,7 @@ rule.</p>
 <li><code>deadband</code> <em>(policy)</em> — additional tolerance used by the RMT outlier
   diagnostics/correction path (separate from ε-band acceptance), aligning the
   “ignore small changes” behavior with other guards.</li>
-<li><code>margin</code> <em>(policy)</em> — safety multiplier for the same outlier
+<li><code>margin</code> <em>(policy)</em> — tolerance multiplier for the same outlier
   diagnostics/correction path; higher margins tolerate more deviation before
   flagging.</li>
 </ul>
@@ -3209,7 +3265,7 @@ gate and min-effect semantics.</p>
   semantics (Balanced) vs two-sided CI (Conservative); see
   <code>docs/assurance/07-ve-gate-power.md</code>.</li>
 <li><code>min_effect_lognll</code> <em>(calibrated)</em> — minimum absolute improvement required for
-  VE enablement; derived from <code>z·σ̂/√n</code> per tier, see
+  VE enablement; derived from <span class="arithmatex">\(z\,\hat{\sigma}/\sqrt{n}\)</span> per tier, see
   <code>docs/assurance/07-ve-gate-power.md</code>.</li>
 <li><code>deadband</code> <em>(policy)</em> — ignores small proposed adjustments (prevents
   “flicker”/tiny rescaling).</li>
@@ -3302,6 +3358,10 @@ gate and min-effect semantics.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

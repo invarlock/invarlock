@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -2082,7 +2138,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2194,7 +2250,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2702,7 +2758,8 @@
 <h1 id="tier-policy-tuning-cli-calibration">Tier Policy Tuning CLI (Calibration)<a class="headerlink" href="#tier-policy-tuning-cli-calibration" title="Permanent link">&para;</a></h1>
 <blockquote>
 <p>Scope note: this page covers <strong>Tier Policy Tuning</strong> via <code>invarlock advanced calibrate ...</code>.
-It outputs <code>tiers_patch_*.yaml</code> recommendations for <code>runtime/tiers.yaml</code>.
+It outputs <code>tiers_patch_*.yaml</code> recommendations for a reviewed tier-policy
+override or the packaged source tier file (<code>runtime/tiers.yaml</code>).
 For evidence-pack run-scoped preset derivation (<code>CALIBRATION_RUN -&gt; GENERATE_PRESET</code>),
 see <a href="../../user-guide/evidence-packs-internals/">Evidence Pack Internals</a>.</p>
 </blockquote>
@@ -2737,7 +2794,7 @@ see <a href="../../user-guide/evidence-packs-internals/">Evidence Pack Internals
 </tr>
 <tr>
 <td><strong>Source of truth</strong></td>
-<td><code>src/invarlock/cli/commands/calibrate.py</code>, <code>src/invarlock/calibration/</code>.</td>
+<td><code>src/invarlock/cli/commands/calibrate.py</code>, <code>src/invarlock/calibration.py</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -2997,7 +3054,8 @@ attached.</p>
 <li><code>tiers_patch_variance_ve.yaml</code> — Recommended <code>variance_guard</code> settings for <code>tiers.yaml</code>.</li>
 </ul>
 <h3 id="applying-recommendations">Applying recommendations<a class="headerlink" href="#applying-recommendations" title="Permanent link">&para;</a></h3>
-<p>After a sweep, merge the <code>tiers_patch_*.yaml</code> into your <code>runtime/tiers.yaml</code>:</p>
+<p>After a sweep, merge the <code>tiers_patch_*.yaml</code> into a reviewed
+<code>runtime/tiers.yaml</code> override or the source tier policy:</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># Review recommendations</span>
 cat<span class="w"> </span>reports/calibration/null_sweep/tiers_patch_spectral_null.yaml
 
@@ -3081,6 +3139,10 @@ cat<span class="w"> </span>reports/calibration/null_sweep/tiers_patch_spectral_n
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

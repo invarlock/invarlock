@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1597,15 +1653,26 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#scope-assumptions-and-nongoals" class="md-nav__link">
+  <a href="#overview" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Scope, assumptions, and non‑goals
+        Overview
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Scope, assumptions, and non‑goals">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope-assumptions-and-adjacent-domains" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope, Assumptions, and Adjacent Domains
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scope, Assumptions, and Adjacent Domains">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1620,10 +1687,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#out-of-scope-nongoals" class="md-nav__link">
+  <a href="#separate-review-domains" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Out of scope (non‑goals)
+        Separate Review Domains
       
     </span>
   </a>
@@ -1966,7 +2033,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2078,7 +2145,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2409,15 +2476,26 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#scope-assumptions-and-nongoals" class="md-nav__link">
+  <a href="#overview" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Scope, assumptions, and non‑goals
+        Overview
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Scope, assumptions, and non‑goals">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope-assumptions-and-adjacent-domains" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope, Assumptions, and Adjacent Domains
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scope, Assumptions, and Adjacent Domains">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2432,10 +2510,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#out-of-scope-nongoals" class="md-nav__link">
+  <a href="#separate-review-domains" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Out of scope (non‑goals)
+        Separate Review Domains
       
     </span>
   </a>
@@ -2469,8 +2547,40 @@
 
 <h1 id="assurance-case-overview-v10">Assurance Case Overview (v1.0)<a class="headerlink" href="#assurance-case-overview-v10" title="Permanent link">&para;</a></h1>
 <blockquote>
-<p><strong>TL;DR:</strong> InvarLock evaluates whether <strong>weight edits</strong> (quantization, pruning, etc.) regress a model beyond defined bounds. It does <strong>not</strong> evaluate content safety, alignment, or deployment security. The assurance case covers: (1) paired primary metrics with bootstrap CIs, (2) the canonical five-stage guard chain (<code>invariants</code> pre, <code>spectral</code>, <code>RMT</code>, <code>variance</code>, <code>invariants</code> post), (3) deterministic evaluation with full provenance. Each claim has tests and report evidence.</p>
-<p><strong>Plain language:</strong> This overview lists every assurance claim, the evidence we ship with the repo, and the runtime contracts that enforce each claim in production.</p>
+<p><strong>Plain language:</strong> This overview lists every assurance claim, the evidence we ship with the repo, and the runtime contracts that enforce each claim in CI/release review.</p>
+</blockquote>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Purpose</strong></td>
+<td>Index the assurance claims, evidence notes, and runtime enforcement paths for weight-edit regression review.</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>Maintainers, release reviewers, auditors, and contributors changing assurance-critical behavior.</td>
+</tr>
+<tr>
+<td><strong>Contract scope</strong></td>
+<td>Assurance case v1.0 for one configured baseline, subject, dataset window plan, tier, profile, and runtime policy.</td>
+</tr>
+<tr>
+<td><strong>Source of truth</strong></td>
+<td>This claim table, the linked assurance notes, <code>src/invarlock/core/assurance_contract.py</code>, and <code>src/invarlock/reporting/verify_contract.py</code>.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>TL;DR:</strong> InvarLock evaluates whether <strong>weight edits</strong> (quantization, pruning, etc.) regress a model beyond defined bounds. The assurance case covers: (1) paired primary metrics with bootstrap CIs, (2) the canonical five-stage guard chain (<code>invariants</code> pre, <code>spectral</code>, <code>RMT</code>, <code>variance</code>, <code>invariants</code> post), (3) deterministic evaluation with full provenance. Content safety, alignment, and deployment security remain separate review domains. Each claim has tests and report evidence.</p>
+<p><strong>Assurance boundary:</strong> The assurance case supports a configured weight-edit
+regression review for one baseline, subject, dataset window plan, tier,
+profile, and runtime policy.</p>
 </blockquote>
 <p>This note enumerates the explicit <strong>assurance claims</strong> the toolkit makes, the
 <strong>evidence</strong> included in-tree, and the <strong>runtime contracts</strong> that enforce each
@@ -2482,10 +2592,11 @@ pairing), see the <a href="../glossary/">Glossary</a>.</p>
    (“Runtime enforcement”).</p>
 <p>We also list <strong>observability</strong>—the report fields that let reviewers verify
 the claim.</p>
-<h2 id="scope-assumptions-and-nongoals">Scope, assumptions, and non‑goals<a class="headerlink" href="#scope-assumptions-and-nongoals" title="Permanent link">&para;</a></h2>
-<p>InvarLock’s assurance case is intentionally narrow. It is about <strong>regression risk
-from weight edits relative to a chosen baseline under a specific configuration</strong>,
-not about global model safety.</p>
+<h2 id="scope-assumptions-and-adjacent-domains">Scope, Assumptions, and Adjacent Domains<a class="headerlink" href="#scope-assumptions-and-adjacent-domains" title="Permanent link">&para;</a></h2>
+<p>InvarLock’s assurance case is intentionally narrow. It is focused on
+<strong>regression risk from weight edits relative to a chosen baseline under a
+specific configuration</strong>. Content safety, alignment, and deployment security
+belong to separate review domains.</p>
 <h3 id="in-scope">In scope<a class="headerlink" href="#in-scope" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Structured or quantization‑style <strong>weight edits</strong> applied to an existing model
@@ -2501,22 +2612,22 @@ not about global model safety.</p>
 <li>Execution on <strong>Linux/macOS</strong> environments using the pinned HF/PyTorch stack
   and profiles documented in the configs and docs.</li>
 </ul>
-<h3 id="out-of-scope-nongoals">Out of scope (non‑goals)<a class="headerlink" href="#out-of-scope-nongoals" title="Permanent link">&para;</a></h3>
+<h3 id="separate-review-domains">Separate Review Domains<a class="headerlink" href="#separate-review-domains" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Preventing or detecting <strong>content harms</strong> (toxicity, bias, jailbreaks),
-  prompt‑level attacks, or alignment failures in general use.</li>
-<li>Guaranteeing safety for <strong>unrelated training changes</strong>, new datasets, or new
-  architectures that fall outside the calibrated families and tiers.</li>
-<li>Enforcing infrastructure or deployment hardening (authz, data governance,
-  access control); these live outside the InvarLock runtime.</li>
-<li>Guaranteeing correctness on environments outside the stated support matrix
-  (e.g., native Windows, custom CUDA stacks, arbitrary dependency versions).</li>
+<li><strong>Content-harm review</strong> for toxicity, bias, jailbreak behavior, prompt-level
+  attacks, and alignment behavior in general use.</li>
+<li><strong>Model-change review</strong> for unrelated training changes, new datasets, or new
+  architectures outside calibrated families and tiers.</li>
+<li><strong>Infrastructure and deployment review</strong> for authz, data governance, access
+  control, and runtime hardening outside the InvarLock evaluation runtime.</li>
+<li><strong>Platform qualification</strong> for environments outside the stated support matrix
+  such as native Windows, custom CUDA stacks, or arbitrary dependency versions.</li>
 </ul>
 <p>The table below should be read with this scope in mind: each row is a claim
 about <strong>paired evaluation and guard behavior for weight edits</strong> under the
-documented tiers and environments, not a universal guarantee about model safety.</p>
+documented tiers and environments.</p>
 <blockquote>
-<p>For the end-to-end validation protocol (Step-0 through Step-8 reproducibility and guard overhead checks), see the methodology overview in the docs.</p>
+<p>For the end-to-end report lifecycle, see <a href="../../reference/one-run-lifecycle/">One Run Lifecycle</a>. Guard overhead evidence is detailed in <a href="../10-guard-overhead-method/">Guard Overhead Method</a>.</p>
 </blockquote>
 <table>
 <thead>
@@ -2532,14 +2643,14 @@ documented tiers and environments, not a universal guarantee about model safety.
 <tr>
 <td>Paired ratios are computed in <strong>log space</strong>, <strong>token‑weighted</strong>, then re‑exponentiated.</td>
 <td><code>docs/assurance/01-eval-math-derivation.md</code></td>
-<td>The report pairs windows and enforces <code>ratio_ci == exp(logloss_delta_ci)</code> within tolerance; see tests <code>tests/reporting/test_report_paired_ci_identity.py::test_paired_ci_identity_holds</code> and <code>tests/core/test_bootstrap.py::test_compute_paired_delta_and_ratio_ci_consistency</code>.</td>
+<td>The report pairs windows and enforces <code>ratio_ci == exp(logloss_delta_ci)</code> within tolerance; see tests <code>tests/reporting/policy/test_report_paired_ci_identity.py::test_paired_ci_identity_holds</code> and <code>tests/core/test_bootstrap.py::test_compute_paired_delta_and_ratio_ci_consistency</code>.</td>
 <td><code>primary_metric.{ratio_vs_baseline,display_ci}</code>, <code>dataset.windows.stats.{paired_windows,window_match_fraction,window_overlap_fraction}</code>.</td>
 <td>Windows are <strong>paired</strong>, <strong>non‑overlapping</strong>; token counts are known. BCa bootstrap used on paired ΔlogNLL; if all windows equal length, weighting reduces to simple mean.</td>
 </tr>
 <tr>
 <td>Tier-specific <strong>primary metric</strong> gates keep edits within acceptance bands (Balanced base ≤ 1.10×, Conservative base ≤ 1.05× for ppl‑like; effective acceptance adds the published <code>hysteresis_ratio</code>).</td>
 <td><code>docs/assurance/04-guard-contracts.md</code></td>
-<td><code>make_report</code> applies tier thresholds and hysteresis; see <code>tests/eval/test_assurance_contracts.py::test_ppl_ratio_gate_enforced</code> and <code>tests/reporting/test_report_policy_edges.py::test_ppl_hysteresis_applied_near_threshold</code>.</td>
+<td><code>make_report</code> applies tier thresholds and hysteresis; see <code>tests/eval/test_assurance_contracts.py::test_ppl_ratio_gate_enforced</code> and <code>tests/reporting/contracts/test_report_policy_edges.py::test_ppl_hysteresis_applied_near_threshold</code>.</td>
 <td><code>validation.primary_metric_acceptable</code>, <code>validation.hysteresis_applied</code>, <code>primary_metric.{ratio_vs_baseline,display_ci}</code>, <code>resolved_policy.metrics.pm_ratio</code>, <code>auto.tier</code>.</td>
 <td>Baseline/reference pairing intact; CLI tier selection propagated.</td>
 </tr>
@@ -2555,28 +2666,28 @@ documented tiers and environments, not a universal guarantee about model safety.
 <td><code>docs/assurance/06-rmt-epsilon-rule.md</code></td>
 <td><code>tests/eval/test_assurance_contracts.py::test_rmt_epsilon_rule_acceptance_band</code>.</td>
 <td><code>rmt.{edge_risk_by_family_base,edge_risk_by_family,epsilon_default,epsilon_by_family,epsilon_violations,stable,status}</code>, <code>rmt.families.*.{edge_base,edge_cur,delta}</code></td>
-<td>ε calibrated on <strong>null</strong> runs and stored in <code>tiers.yaml</code>.</td>
+<td>ε calibrated on <strong>null</strong> runs and stored in packaged <code>runtime/tiers.yaml</code>; overrides use <code>INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml</code>.</td>
 </tr>
 <tr>
 <td>Variance Equalization (VE) <strong>enables only</strong> when the <strong>predictive</strong> paired ΔlogNLL CI upper bound ≤ −<code>min_effect_lognll</code> <strong>and</strong> mean Δ ≤ −<code>min_effect_lognll</code> (tier‑specific sidedness for CI width).</td>
 <td><code>docs/assurance/07-ve-gate-power.md</code></td>
-<td>report verifier validates enabled-VE predictive A/B provenance &amp; CI; see <code>tests/eval/test_assurance_contracts.py::test_predictive_gate_respects_min_effect</code> and <code>tests/reporting/test_reporting_regression_matrix.py::test_validate_variance_enablement_rejects_missing_gate_provenance</code>.</td>
+<td>report verifier validates enabled-VE predictive A/B provenance &amp; CI; see <code>tests/eval/test_assurance_contracts.py::test_predictive_gate_respects_min_effect</code> and <code>tests/reporting/contracts/test_reporting_regression_matrix.py::test_validate_variance_enablement_rejects_missing_gate_provenance</code>.</td>
 <td><code>variance.{enabled,predictive_gate,ab_test,scope,proposed_scales}</code>, <code>resolved_policy.variance.{min_effect_lognll,predictive_one_sided}</code></td>
 <td>Balanced = <strong>one‑sided</strong> improvement; Conservative = <strong>two‑sided</strong> CI with improvement‑only gating (CI entirely above +<code>min_effect_lognll</code> is treated as regression). Calibrated on same windows.</td>
 </tr>
 <tr>
 <td>Model invariants are checked before evaluation (fatal by default for no NaNs and tokenizer alignment; structural checks warn unless strict/block policy is configured).</td>
 <td><code>docs/assurance/04-guard-contracts.md</code></td>
-<td><code>invarlock.guards.invariants</code> blocks fatal invariant types before eval; structural drift/evidence gaps are warnings in monitor mode. See <code>tests/guards/test_invariants_guard.py::test_invariants_guard_detects_non_finite_weights</code>.</td>
+<td><code>invarlock.guards.invariants</code> blocks fatal invariant types before eval; structural drift/evidence gaps are warnings in monitor mode. See <code>tests/guards/invariants/test_invariants_guard.py::test_invariants_guard_detects_non_finite_weights</code>.</td>
 <td><code>validation.invariants_pass</code>, <code>invariants.status</code>, <code>meta.tokenizer_hash</code>, <code>provenance.provider_digest</code>, <code>policy_digest</code></td>
 <td>CI/release policy can configure strict/block behavior for structural invariant drift; default monitor mode preserves audit visibility without aborting every warning.</td>
 </tr>
 <tr>
 <td>Bootstrap sanity holds (paired windows, zero overlap, sufficient replicates).</td>
 <td><code>docs/assurance/04-guard-contracts.md</code></td>
-<td>report builder enforces pairing/overlap/replicate counts; see <code>tests/core/test_runner_pairing.py::test_assess_bootstrap_coverage_paths</code>, <code>tests/reporting/test_report_pairing_and_validation_helpers.py::test_enforce_pairing_and_coverage_path_matrix</code>, and <code>tests/eval/test_assurance_contracts.py::test_seed_bundle_contract</code>.</td>
+<td>report builder enforces pairing/overlap/replicate counts; see <code>tests/core/test_runner_pairing.py::test_assess_bootstrap_coverage_paths</code>, <code>tests/reporting/policy/test_report_pairing_and_validation_helpers.py::test_enforce_pairing_and_coverage_path_matrix</code>, and <code>tests/eval/test_assurance_contracts.py::test_seed_bundle_contract</code>.</td>
 <td><code>dataset.windows.stats.{paired_windows,window_match_fraction,window_overlap_fraction,coverage,bootstrap}</code></td>
-<td>Abort evaluation when pairing &lt; 1.0, overlap &gt; 0, or replicates below tier minimum (CI/Release profiles).</td>
+<td>CI/Release hard-fail pairing/count drift when a baseline pairing context exists; report verification rejects invalid pairing and under-floor coverage.</td>
 </tr>
 <tr>
 <td>Deterministic evaluation requires <strong>seed bundle</strong>, dataset/tokenizer hashes, and <strong>perfect pairing</strong>.</td>
@@ -2585,9 +2696,15 @@ documented tiers and environments, not a universal guarantee about model safety.
 <td><code>meta.seeds</code>, <code>meta.tokenizer_hash</code>, <code>provenance.provider_digest</code>, <code>dataset.windows.stats.{window_match_fraction,window_overlap_fraction,paired_windows,coverage}</code>, <code>policy_digest</code></td>
 <td>Deterministic flags set; equal preview/final counts; reuse baseline window IDs.</td>
 </tr>
+<tr>
+<td>Guard Overhead stays within budget (≤ +1.0% PM when evaluated).</td>
+<td><code>docs/assurance/10-guard-overhead-method.md</code></td>
+<td>report gate <code>validation.guard_overhead_acceptable</code>; release verification requires evaluated <code>guard_overhead</code> unless explicitly skipped.</td>
+<td><code>guard_overhead.*</code>, <code>validation.guard_overhead_acceptable</code></td>
+<td>Same schedule and seeds; bare control is guard-free. Tiny runs may soft-pass unevaluated, but release verification blocks missing overhead unless skipped.</td>
+</tr>
 </tbody>
 </table>
-<p>| Guard Overhead stays within budget (≤ +1.0% PM when evaluated). | <code>docs/assurance/10-guard-overhead-method.md</code> | report gate <code>validation.guard_overhead_acceptable</code>; release verification requires evaluated <code>guard_overhead</code> unless explicitly skipped. | <code>guard_overhead.*</code>, <code>validation.guard_overhead_acceptable</code> | Same schedule and seeds; bare control is guard-free. Tiny runs may soft-pass unevaluated, but release verification blocks missing overhead unless skipped. |</p>
 <p><strong>Summary</strong></p>
 <ul>
 <li>Every assurance-critical guard links to a short assurance note and an automated test.</li>
@@ -2595,13 +2712,15 @@ documented tiers and environments, not a universal guarantee about model safety.
 <li>Observability fields make the assurance case auditable in reports and evidence packs.</li>
 </ul>
 <blockquote>
-<p>Tier scope: Balanced and Conservative are the supported published assurance tiers. The Aggressive tier is research‑oriented and not covered by this assurance case. The <code>none</code> tier is provided only for dev/demo flows (loosest gates) and is <strong>explicitly outside</strong> the assurance case.</p>
+<p>Tier scope: Balanced and Conservative are the supported published assurance tiers. The Aggressive tier is research‑oriented and outside the current assurance case. <code>none</code> is omitted from packaged runtime tiers; report-policy compatibility treats it like Balanced if encountered, so it is unsuitable as a separate assurance claim.</p>
 <p>🔍 <strong>Verify on your machine</strong></p>
 <p><code>bash
-OMP_NUM_THREADS=1 conda run -n invarlock pytest -q
-OMP_NUM_THREADS=1 conda run -n invarlock python scripts/check_docs_links.py
-OMP_NUM_THREADS=1 conda run -n invarlock mkdocs build --strict</code></p>
-<p>Running the suite above mirrors the CI guardrails: it replays the assurance tests, regenerates tier tables, validates doc links, and ensures the MkDocs build stays clean.</p>
+make verify
+make docs-check-build
+make docs-lint-strict</code></p>
+<p>Running the suite above exercises the repo-native verification and docs
+guardrails: tests, runtime verifier, lint/format checks, strict docs build,
+link checks, and strict docs lint.</p>
 </blockquote>
 
 
@@ -2656,6 +2775,10 @@ OMP_NUM_THREADS=1 conda run -n invarlock mkdocs build --strict</code></p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

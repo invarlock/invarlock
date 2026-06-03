@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1877,7 +1933,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -1989,7 +2045,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2565,7 +2621,7 @@
   container-backed <code>evaluate</code> path, while
   <code>make container-front-door-smoke</code> covers the fuller
   <code>evaluate -&gt; verify -&gt; report html</code> journey. <code>make runtime-smoke</code> only
-  proves the local runtime image can import its core dependencies.</li>
+  confirms the local runtime image can import its core dependencies.</li>
 <li>Third-party plugin discovery and remote model code execution are separate
   explicit opt-ins (<code>INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1</code>,
   <code>INVARLOCK_ALLOW_REMOTE_CODE=1</code>).</li>
@@ -2589,7 +2645,7 @@
 </ul>
 <h2 id="supply-chain-reference">Supply chain (reference)<a class="headerlink" href="#supply-chain-reference" title="Permanent link">&para;</a></h2>
 <ul>
-<li>SBOM generation (see <code>scripts/generate_sbom.sh</code>), run against the installed-artifact environment in PR/release jobs and the tool environment in the scheduled backstop.</li>
+<li>SBOM generation (see <code>scripts/security/generate_sbom.sh</code>), run against the installed-artifact environment in PR/release jobs and the tool environment in the scheduled backstop.</li>
 <li><code>pip-audit</code> with a small allowlist (see pip-audit page) in CI, run against the base install surface plus the pinned <code>hf</code> and <code>advanced</code> shipped surfaces in PR jobs, and against the installed-artifact release surface in release jobs.</li>
 <li><code>gitleaks</code> history scanning with JSON/SARIF artifacts in PR and release jobs.</li>
 <li>Pre-commit formatting/linting and version checks in CI to reduce drift.</li>
@@ -2658,6 +2714,10 @@
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

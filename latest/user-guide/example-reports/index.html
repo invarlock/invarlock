@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -556,6 +556,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1982,7 +2038,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2094,7 +2150,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2563,7 +2619,8 @@ invarlock<span class="w"> </span>report<span class="w"> </span>explain<span clas
 <p>The command below shows the default runtime-container path. It writes a
 container-backed <code>runtime.manifest.json</code> next to <code>evaluation.report.json</code>.
 Public host-side workflows use <code>--execution-mode host</code> and should verify the
-resulting report with <code>invarlock verify --runtime-provenance host ...</code>.
+resulting report with
+<code>invarlock verify --runtime-provenance host --assurance off ...</code>.
 This reproduction uses repo-owned preset and overlay files so it matches the
 example artifacts checked into this repository version; wheel-only installs
 should start with <a href="../getting-started/">Getting Started</a> for the first evaluation
@@ -2571,7 +2628,7 @@ run, then come back here once they already have an evaluation bundle.</p>
 <div class="codehilite"><pre><span></span><code><span class="nv">INVARLOCK_DEDUP_TEXTS</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>invarlock<span class="w"> </span>evaluate<span class="w"> </span>--allow-network<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--baseline<span class="w"> </span>sshleifer/tiny-gpt2<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--subject<span class="w">  </span>sshleifer/tiny-gpt2<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--baseline-adapter<span class="w"> </span>auto<span class="w"> </span>--subject-adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--profile<span class="w"> </span>release<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--tier<span class="w"> </span>balanced<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--preset<span class="w"> </span>configs/presets/causal_lm/wikitext2_512.yaml<span class="w"> </span><span class="se">\</span>
@@ -2698,6 +2755,10 @@ against the adjacent <code>runtime.manifest.json</code>.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

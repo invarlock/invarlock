@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1993,7 +2049,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2105,7 +2161,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2555,9 +2611,9 @@ weights.</p>
 <h2 id="when-to-use-invarlock">When To Use InvarLock<a class="headerlink" href="#when-to-use-invarlock" title="Permanent link">&para;</a></h2>
 <ul>
 <li>You produced an edited checkpoint (quantization, pruning, fine-tune) and
-  need a machine-verifiable artifact that proves it did not regress beyond
+  need a machine-verifiable artifact showing it stayed within
   configured bounds.</li>
-<li>A release gate needs a fail-closed <code>evaluate -&gt; verify</code> contract with
+<li>A strict verification workflow needs a fail-closed <code>evaluate -&gt; verify</code> contract with
   pairing, guard evidence, and runtime provenance.</li>
 <li>Reviewers expect a self-contained report bundle they can re-verify offline.</li>
 </ul>
@@ -2568,7 +2624,7 @@ weights.</p>
 <li>You want production drift monitoring, dashboards, or experiment tracking
   (use MLflow, Evidently, Deepchecks).</li>
 <li>You need the tool to <em>produce</em> the compressed checkpoint (use Optimum,
-  Intel Neural Compressor, AutoGPTQ, etc.); InvarLock validates the artifact
+  Intel Neural Compressor, GPTQModel, etc.); InvarLock validates the artifact
   afterwards.</li>
 </ul>
 <h2 id="tool-comparison">Tool Comparison<a class="headerlink" href="#tool-comparison" title="Permanent link">&para;</a></h2>
@@ -2597,7 +2653,7 @@ weights.</p>
 <td>InvarLock ships a narrow fail-closed artifact contract for weight edits rather than a broad observability platform.</td>
 </tr>
 <tr>
-<td>Hugging Face Optimum, Intel Neural Compressor, AutoGPTQ</td>
+<td>Hugging Face Optimum, Intel Neural Compressor, GPTQModel</td>
 <td>Producing optimized or compressed model artifacts.</td>
 <td>InvarLock validates the artifact after the edit instead of performing the compression.</td>
 </tr>
@@ -2608,13 +2664,13 @@ weights.</p>
 <li>Use compression or edit tooling to produce the subject checkpoint.</li>
 <li>Use lm-eval / LightEval for broad downstream benchmark confidence.</li>
 <li>Use an MLOps platform for tracking, monitoring, and dashboards.</li>
-<li>Use InvarLock at the release gate to produce a machine-verifiable report
-   that says a specific edited checkpoint did not exceed configured regression
+<li>Use InvarLock in the strict verification workflow to produce a machine-verifiable report
+   that says a specific edited checkpoint stayed within configured regression
    and guard thresholds relative to a fixed baseline.</li>
 </ol>
 <h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../../assurance/14-trust-model/">Trust Model</a> — What a strict pass does and does not mean</li>
+<li><a href="../../assurance/14-trust-model/">Trust Model</a> — Strict pass scope</li>
 <li><a href="../../assurance/15-strict-assurance-checklist/">Strict Assurance Checklist</a> — Reviewer acceptance criteria</li>
 <li><a href="../reports/">Reports Reference</a> — Schema, telemetry, and HTML export</li>
 <li><a href="../guards/">Guards Reference</a> — Configuration and evidence</li>
@@ -2674,6 +2730,10 @@ weights.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

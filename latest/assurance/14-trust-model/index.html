@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1658,10 +1714,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-a-strict-pass-does-not-mean" class="md-nav__link">
+  <a href="#strict-pass-scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What A Strict Pass Does Not Mean
+        Strict Pass Scope
       
     </span>
   </a>
@@ -1677,7 +1733,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Report Statuses">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evidence-pack-signer-authenticity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence Pack Signer Authenticity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Evidence Pack Signer Authenticity">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2032,7 +2099,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2144,7 +2211,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2508,10 +2575,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-a-strict-pass-does-not-mean" class="md-nav__link">
+  <a href="#strict-pass-scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What A Strict Pass Does Not Mean
+        Strict Pass Scope
       
     </span>
   </a>
@@ -2527,7 +2594,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Report Statuses">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evidence-pack-signer-authenticity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence Pack Signer Authenticity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Evidence Pack Signer Authenticity">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2600,6 +2678,11 @@
 
 
 <h1 id="trust-model">Trust Model<a class="headerlink" href="#trust-model" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>Plain language:</strong> A strict pass means one configured weight-edit regression
+comparison met the declared report and provenance contract. Its scope is that
+configured comparison and the associated report/provenance evidence.</p>
+</blockquote>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2635,10 +2718,15 @@ invarlock<span class="w"> </span>verify<span class="w"> </span>--assurance<span 
 <p>Strict verification also expects the sibling <code>runtime.manifest.json</code> for
 container-backed evidence. See <a href="../../security/runtime-provenance-guide/">Runtime Provenance Guide</a>
 for the manifest contract.</p>
+<p>Evidence-pack verification is separate from report verification. A signed
+evidence pack validates manifest integrity; signer authenticity requires pinning
+with <code>--expected-fingerprint</code> or a local trust store.</p>
 <h2 id="what-a-strict-pass-means">What A Strict Pass Means<a class="headerlink" href="#what-a-strict-pass-means" title="Permanent link">&para;</a></h2>
 <p>A strict pass means one configured edited checkpoint comparison did not
 violate the InvarLock weight-edit regression contract for the selected
-baseline, subject, dataset windows, tier, profile, and runtime policy.</p>
+baseline, subject, dataset windows, tier, profile, and runtime policy.
+The result is scoped to that configured comparison and its report/provenance
+evidence.</p>
 <p>The current strict assurance contract requires:</p>
 <ul>
 <li><code>assurance.mode = strict</code></li>
@@ -2646,31 +2734,36 @@ baseline, subject, dataset windows, tier, profile, and runtime policy.</p>
 <li>CI or release profile</li>
 <li>balanced or conservative tier</li>
 <li>canonical guard chain: <code>invariants -&gt; spectral -&gt; rmt -&gt; variance -&gt; invariants</code></li>
-<li>complete guard evidence for every chain stage</li>
-<li>no synthesized, repaired, fallback, degraded, or monitor-only evidence</li>
+<li>complete guard evidence for every guard name in the canonical chain; the
+  single <code>invariants</code> evidence block covers both pre/post invariant stages in
+  the current report contract</li>
+<li>zero synthesized, repaired, fallback, degraded, or monitor-only evidence</li>
 <li>strict paired-window counts and zero overlap</li>
 <li>primary metric log-space/display-space CI identity</li>
 <li>tokenizer/provider parity</li>
 <li>verified runtime provenance</li>
-<li>no unsupported guard/model status with <code>assurance_blocking = true</code></li>
+<li>zero unsupported guard/model statuses with <code>assurance_blocking = true</code></li>
 </ul>
-<h2 id="what-a-strict-pass-does-not-mean">What A Strict Pass Does Not Mean<a class="headerlink" href="#what-a-strict-pass-does-not-mean" title="Permanent link">&para;</a></h2>
-<p>A strict pass does not mean:</p>
+<h2 id="strict-pass-scope">Strict Pass Scope<a class="headerlink" href="#strict-pass-scope" title="Permanent link">&para;</a></h2>
+<p>A strict pass covers the configured evidence surface:</p>
 <ul>
-<li>the model is safe, aligned, or free of content harms</li>
-<li>the baseline model is trustworthy</li>
-<li>downstream tasks outside the configured evaluation windows are preserved</li>
-<li>prompt injection, jailbreak, toxicity, bias, or deployment security risks
-  are addressed</li>
-<li>host, GPU, dependency, or network isolation is complete</li>
-<li>unsupported model families have been validated by implication</li>
+<li>the selected baseline, subject, dataset windows, tier, profile, and runtime
+  policy</li>
+<li>the report-local strict-assurance shape and guard evidence</li>
+<li>verified runtime provenance for the generated report</li>
+<li>signer authenticity when the signer fingerprint is pinned or matched through a
+  trusted local store</li>
+<li>the published support tier for the model family or adapter lane under review</li>
 </ul>
+<p>Adjacent review domains include content safety, alignment, prompt-security,
+deployment security, host isolation, dependency isolation, and model families
+outside the published support basis.</p>
 <h2 id="report-statuses">Report Statuses<a class="headerlink" href="#report-statuses" title="Permanent link">&para;</a></h2>
 <p>Strict reports include a top-level <code>assurance</code> section. Generated reports record
 the intended strict claim and leave runtime provenance verification pending
 until <code>invarlock verify</code> checks the sibling <code>runtime.manifest.json</code>. Reviewers
-should treat a strict pass as the combination of report-local strict shape and a
-verified runtime-provenance result, not as a successful command exit alone.</p>
+should require the combination of report-local strict shape and a verified
+runtime-provenance result.</p>
 <table>
 <thead>
 <tr>
@@ -2722,7 +2815,22 @@ verified runtime-provenance result, not as a successful command exit alone.</p>
 </tbody>
 </table>
 <p>The verifier JSON result must then include
-<code>verification.runtime_provenance.status = verified</code>.</p>
+<code>results[*].verification.runtime_provenance.status = "verified"</code>.</p>
+<h2 id="evidence-pack-signer-authenticity">Evidence Pack Signer Authenticity<a class="headerlink" href="#evidence-pack-signer-authenticity" title="Permanent link">&para;</a></h2>
+<p>Package-native evidence packs can include <code>manifest.signature.json</code>, an Ed25519
+signature over <code>manifest.json</code>. The verifier always derives and reports the
+signing-key fingerprint when a signature is present. That check provides
+tamper evidence for the manifest and checksum chain.</p>
+<p>Authenticity is stronger: reviewers must decide which signing keys they accept.
+For distributable evidence, require one of:</p>
+<ul>
+<li><code>invarlock advanced evidence-pack verify &lt;dir&gt; --expected-fingerprint sha256:&lt;64-hex-chars&gt;</code></li>
+<li><code>invarlock advanced evidence-pack verify &lt;dir&gt; --trust-store &lt;json&gt;</code></li>
+<li><code>~/.config/invarlock/trusted-signers.json</code> containing accepted fingerprints</li>
+</ul>
+<p>An unpinned signature should be treated as trust-on-first-use evidence for
+integrity review. Publisher authenticity requires an accepted fingerprint from
+<code>--expected-fingerprint</code>, <code>--trust-store</code>, or the local trusted-signers file.</p>
 <h3 id="example-report-fragment">Example (report fragment)<a class="headerlink" href="#example-report-fragment" title="Permanent link">&para;</a></h3>
 <div class="codehilite"><pre><span></span><code><span class="p">{</span>
 <span class="w">  </span><span class="nt">&quot;assurance&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
@@ -2758,10 +2866,9 @@ verified runtime-provenance result, not as a successful command exit alone.</p>
 </code></pre></div>
 
 <h2 id="development-reports">Development Reports<a class="headerlink" href="#development-reports" title="Permanent link">&para;</a></h2>
-<p>Development and exploratory reports may still be useful for debugging. They
-are not assurance-grade unless the report claims and verifies strict
-assurance. Common non-strict shapes are catalogued in
-<a href="../../user-guide/failure-examples/">Failure Examples</a>.</p>
+<p>Development and exploratory reports may still be useful for debugging. Reports
+become assurance-grade when they claim and verify strict assurance. Common
+non-strict shapes are catalogued in <a href="../../user-guide/failure-examples/">Failure Examples</a>.</p>
 <h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../00-assurance-case/">Assurance Case Overview</a></li>
@@ -2825,6 +2932,10 @@ assurance. Common non-strict shapes are catalogued in
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

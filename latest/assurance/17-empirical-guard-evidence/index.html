@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1880,7 +1936,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -1992,7 +2048,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2522,6 +2578,11 @@
 
 
 <h1 id="empirical-guard-evidence">Empirical Guard Evidence<a class="headerlink" href="#empirical-guard-evidence" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>Plain language:</strong> Empirical guard evidence is the portable manifest layer
+that points reviewers to real model/checkpoint runs for spectral, RMT, and
+variance behavior.</p>
+</blockquote>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2541,11 +2602,11 @@
 </tr>
 <tr>
 <td><strong>Contract scope</strong></td>
-<td>Portable evidence manifests that point to real-run artifacts; not a substitute for the strict verifier report contract.</td>
+<td>Portable evidence manifests that point to real-run artifacts; strict report acceptance remains governed by the verifier report contract.</td>
 </tr>
 <tr>
 <td><strong>Source of truth</strong></td>
-<td><code>scripts/release/check_empirical_guard_evidence.py</code>, <code>scripts/model_evidence_sweep.py</code>, calibration commands, and evidence-pack scripts.</td>
+<td><code>scripts/release/evidence_contracts.py empirical</code>, <code>scripts/model_evidence/model_evidence_sweep.py</code>, calibration commands, and evidence-pack scripts.</td>
 </tr>
 </tbody>
 </table>
@@ -2563,9 +2624,9 @@ different location.</p>
 <p>The empirical bundle is meant to reference artifacts produced by existing
 non-synthetic workflows:</p>
 <ul>
-<li><code>make model-evidence-sweep</code> or <code>scripts/model_evidence_sweep.py</code> for
+<li><code>make model-evidence-sweep</code> or <code>scripts/model_evidence/model_evidence_sweep.py</code> for
   maintained shipped-model lanes.</li>
-<li><code>scripts/run_model_evidence_remote.py</code> for remote GPU execution of the same
+<li><code>scripts/model_evidence/run_model_evidence_remote.py</code> for remote GPU execution of the same
   model-evidence sweep.</li>
 <li><code>invarlock advanced calibrate null-sweep</code> for empirical spectral null
   behavior.</li>
@@ -2625,16 +2686,19 @@ family coverage, absolute artifact paths, and paths that escape the evidence
 root.</p>
 <h2 id="interpretation">Interpretation<a class="headerlink" href="#interpretation" title="Permanent link">&para;</a></h2>
 <p>Passing the empirical checker means the release bundle contains portable
-non-synthetic evidence references with the required guard coverage. It does not
-mean every threshold is statistically final, and it does not replace
-<code>invarlock verify --assurance strict</code> for strict report acceptance.</p>
+manifest references that self-declare non-synthetic evidence with the required
+guard coverage. The checker validates manifest shape, required guard/model rows,
+declared evidence kinds/statuses, command markers, and relative nonempty
+artifact paths. Artifact content review, producer authentication, statistical
+finality, and strict report acceptance are handled by their dedicated evidence
+and verifier gates.</p>
 <h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../16-guard-validation-smoke/">Guard Validation Smoke</a></li>
 <li><a href="../05-spectral-fpr-derivation/">Spectral False-Positive Control</a></li>
 <li><a href="../06-rmt-epsilon-rule/">RMT Epsilon Rule</a></li>
 <li><a href="../07-ve-gate-power/">VE Predictive Gate</a></li>
-<li><a href="../09-tier-v1-calibration/">Tier v1.0 Calibration</a></li>
+<li><a href="../09-tier-v1-calibration/">Tier Policy v1 Calibration</a></li>
 <li><a href="../../reference/calibration/">Calibration Reference</a></li>
 <li><a href="../../user-guide/evidence-packs/">Evidence Packs</a></li>
 </ul>
@@ -2691,6 +2755,10 @@ mean every threshold is statistically final, and it does not replace
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

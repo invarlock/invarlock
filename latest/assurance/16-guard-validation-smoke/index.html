@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1880,7 +1936,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -1992,7 +2048,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2500,6 +2556,11 @@
 
 
 <h1 id="guard-validation-smoke">Guard Validation Smoke<a class="headerlink" href="#guard-validation-smoke" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>Plain language:</strong> The smoke command checks the synthetic guard-validation
+harness still runs and records deterministic guard behavior. Real model-family
+evidence remains a separate release-evidence surface.</p>
+</blockquote>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2523,7 +2584,7 @@
 </tr>
 <tr>
 <td><strong>Source of truth</strong></td>
-<td><code>scripts/guard_validation_smoke.py</code>, generated <code>artifacts/guard-validation/*</code>, and guard-specific assurance docs.</td>
+<td><code>scripts/smoke/guard_validation_smoke.py</code>, generated <code>artifacts/guard-validation/*</code>, and guard-specific assurance docs.</td>
 </tr>
 </tbody>
 </table>
@@ -2542,15 +2603,16 @@
 variance guard surfaces across several calibration-window counts. It is useful
 for checking that the release evidence path exists and stays deterministic.</p>
 <h2 id="interpretation">Interpretation<a class="headerlink" href="#interpretation" title="Permanent link">&para;</a></h2>
-<p>The generated rows are not a substitute for real checkpoint validation. They
-do not prove thresholds for GPT-2, LLaMA, Qwen, BERT, or any other model family.
-They only provide a repeatable harness shape for:</p>
+<p>The generated rows provide a repeatable harness shape for synthetic validation
+and a release-evidence floor. Real checkpoint validation carries the
+model-family threshold evidence for GPT-2, LLaMA, Qwen, BERT, and other model
+families:</p>
 <ul>
 <li>type-I error reporting</li>
 <li>power reporting</li>
 <li>calibration-window sensitivity</li>
-<li>model-family sensitivity placeholders</li>
-<li>injected-defect detection examples</li>
+<li>model-family placeholder rows</li>
+<li>synthetic shifted-power rates</li>
 </ul>
 <p>Release reviewers should treat the smoke as a floor. Empirical artifacts for
 real model families still belong in the release evidence bundle when a release
@@ -2560,8 +2622,8 @@ claims new or expanded guard calibration.</p>
 synthetic smoke:</p>
 <ul>
 <li><code>make model-evidence-sweep</code> runs maintained shipped-model lanes through
-  <code>scripts/model_evidence_sweep.py</code>.</li>
-<li><code>scripts/run_model_evidence_remote.py</code> launches the same sweep on remote GPU
+  <code>scripts/model_evidence/model_evidence_sweep.py</code>.</li>
+<li><code>scripts/model_evidence/run_model_evidence_remote.py</code> launches the same sweep on remote GPU
   hosts.</li>
 <li><code>invarlock advanced calibrate null-sweep</code> and
   <code>invarlock advanced calibrate ve-sweep</code> emit empirical calibration artifacts.</li>
@@ -2570,8 +2632,8 @@ synthetic smoke:</p>
 </ul>
 <p>Use <code>make empirical-guard-evidence-check</code> to validate a portable empirical
 guard-evidence manifest when real evidence is attached for release review.
-That checker does not replace <code>make guard-validation-smoke</code>; it validates the
-separate non-synthetic artifact bundle.</p>
+That checker validates the separate non-synthetic artifact bundle; <code>make
+guard-validation-smoke</code> remains the deterministic smoke floor.</p>
 <h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../05-spectral-fpr-derivation/">Spectral False-Positive Control</a></li>
@@ -2633,6 +2695,10 @@ separate non-synthetic artifact bundle.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1905,6 +1961,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#claim" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1959,6 +2026,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1982,7 +2060,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2094,7 +2172,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2425,6 +2503,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#claim" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2479,6 +2568,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2502,14 +2602,43 @@
 <h1 id="determinism-contracts">Determinism Contracts<a class="headerlink" href="#determinism-contracts" title="Permanent link">&para;</a></h1>
 <blockquote>
 <p><strong>Plain language:</strong> If we fix the seed bundle, record dataset/tokenizer
-hashes, and keep the paired window schedule stable, every evaluation run is
-reproducible within float tolerance—and we surface those checks in the
+hashes, and keep the paired window schedule stable, evaluation runs should be
+reproducible within float tolerance under the stated backend/version
+preconditions—and we surface those checks in the
 report.</p>
 </blockquote>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Purpose</strong></td>
+<td>State the determinism preconditions and report evidence required for reproducible paired evaluation.</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>Evaluation maintainers, CI/release reviewers, and operators comparing run evidence.</td>
+</tr>
+<tr>
+<td><strong>Contract scope</strong></td>
+<td>Seed bundle, dataset/tokenizer hashes, paired schedules, backend flags, and drift boundaries.</td>
+</tr>
+<tr>
+<td><strong>Source of truth</strong></td>
+<td><code>src/invarlock/core/determinism_policy.py</code>, run/report provenance code, and determinism contract tests.</td>
+</tr>
+</tbody>
+</table>
 <h2 id="claim">Claim<a class="headerlink" href="#claim" title="Permanent link">&para;</a></h2>
-<p>With fixed seeds, dataset/tokenizer hashes, and a paired, non‑overlapping
-schedule, evaluation is reproducible (within float tolerance) and reports
-are stable.</p>
+<p>With fixed seeds, dataset/tokenizer hashes, a paired non-overlapping schedule,
+and a pinned backend stack, evaluation should be reproducible within float
+tolerance on the same backend. Cross-backend and cross-version results are
+empirical drift checks, not strict reproducibility claims.</p>
 <h2 id="derivation-sketch">Derivation (sketch)<a class="headerlink" href="#derivation-sketch" title="Permanent link">&para;</a></h2>
 <p>Evaluation stays deterministic when the following preconditions hold—each item
 ties the runtime contract back to reproducible maths:</p>
@@ -2533,8 +2662,10 @@ ties the runtime contract back to reproducible maths:</p>
 </ol>
 <h2 id="runtime-contract">Runtime Contract<a class="headerlink" href="#runtime-contract" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Runs <strong>abort</strong> for CI/Release if pairing &lt; 1.0, overlap &gt; 0.0, or counts differ.</li>
-<li>report contains seeds/hashes, pairing metrics, and policy tier/digest.</li>
+<li>CI/Release runs hard-fail if a baseline pairing context exists and pairing is
+  incomplete, windows overlap, or counts differ.</li>
+<li>report contains seeds/hashes, pairing metrics, coverage floors, bootstrap
+  metadata, and policy tier/digest.</li>
 </ul>
 <h2 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h2>
 <ul>
@@ -2549,20 +2680,24 @@ ties the runtime contract back to reproducible maths:</p>
 <h2 id="assumptions-scope">Assumptions &amp; Scope<a class="headerlink" href="#assumptions-scope" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Applies to inference-only evaluation loops; training/edit algorithms may
-  introduce additional nondeterminism not covered here.</li>
+  introduce additional nondeterminism governed by their own evidence surfaces.</li>
 <li>Identical seeds, configs, and backend should yield identical numeric evidence,
   pairings, hashes, and policy/provenance digests after normalizing volatile
   artifact paths and timestamps. Raw report files can differ in generated-time
   metadata and timestamped run directories.</li>
 <li>Determinism is best-effort on some backends; enforce <code>|Δ ratio| ≤ 1e-6</code> when
   regenerating reports on the <strong>same backend</strong> (see
-  <code>tests/reporting/test_report_paired_ci_identity.py::test_paired_ci_identity_holds</code>).</li>
+  <code>tests/reporting/policy/test_report_paired_ci_identity.py::test_paired_ci_identity_holds</code>).</li>
 <li>Cross-device drift must stay within the bands listed in
-  <code>docs/assurance/04-guard-contracts.md</code>; use <code>scripts/check_device_drift.py</code> in
-  CI to guard the limit.</li>
+  <a href="../12-device-drift-bands/">Cross-Device Drift Bands</a>; use
+  <code>scripts/smoke/check_device_drift.py</code> in CI to guard the limit.</li>
 <li>Some hardware backends (e.g., GPUs without deterministic kernels) may exceed
   float tolerances despite the flags; document deviations in the report
   metadata.</li>
+</ul>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li>PyTorch. “Reproducibility.” <a href="https://docs.pytorch.org/docs/2.12/notes/randomness.html">https://docs.pytorch.org/docs/2.12/notes/randomness.html</a></li>
 </ul>
 
 
@@ -2617,6 +2752,10 @@ ties the runtime contract back to reproducible maths:</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

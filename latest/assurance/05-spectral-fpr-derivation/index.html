@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1821,6 +1877,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#claim" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2021,7 +2088,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2133,7 +2200,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2464,6 +2531,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#claim" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2583,35 +2661,65 @@
 policy for per-family singular-value drift. Gaussian-tail FPR math applies to
 the families whose kappas were calibrated for that model; low Balanced
 <code>embed</code>/<code>other</code> caps are operational sentinels, not standalone &lt;=5% FPR
-guarantees.</p>
+claims.</p>
 </blockquote>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Purpose</strong></td>
+<td>Explain how spectral guard family caps map to false-positive-rate interpretation under modeled nulls.</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>Guard maintainers, calibration reviewers, and contributors changing spectral policy.</td>
+</tr>
+<tr>
+<td><strong>Contract scope</strong></td>
+<td>Spectral z-score caps, multiple-testing policy, sentinel caps, and report observability.</td>
+</tr>
+<tr>
+<td><strong>Source of truth</strong></td>
+<td><code>src/invarlock/guards/spectral*.py</code>, <code>runtime/tiers.yaml</code>, and spectral assurance tests.</td>
+</tr>
+</tbody>
+</table>
 <h2 id="claim">Claim<a class="headerlink" href="#claim" title="Permanent link">&para;</a></h2>
 <p>The spectral guard monitors per-family z-scores and records the multiple-testing
 policy needed to interpret WARNs under the chosen null-modeling assumptions.
 For families whose kappas are calibrated against an approximately Gaussian null,
 the two-sided tail probability gives the expected false-positive rate. Families
 with intentionally low sentinel caps are still monitored and budgeted by
-<code>max_caps</code>, but they must not be cited as &lt;=5% Gaussian-tail guarantees.</p>
+<code>max_caps</code>; cite them as operational thresholds rather than &lt;=5% Gaussian-tail
+claims.</p>
 <h2 id="derivation-sketch">Derivation (sketch)<a class="headerlink" href="#derivation-sketch" title="Permanent link">&para;</a></h2>
 <p>Per-family spectral monitoring computes z-scores</p>
 <div class="arithmatex">\[
 z = \frac{s - \mu_f}{\sigma_f}
 \]</div>
-<p>for a spectral statistic <span class="arithmatex">\(s\)</span> (e.g., top singular value). A WARN is issued if
-<span class="arithmatex">\(|z| \ge \kappa_f\)</span>. Under a <strong>modeled null</strong> where <span class="arithmatex">\(z \approx \mathcal{N}(0,1)\)</span>, the
+<p>for a spectral statistic <span class="arithmatex">\(s\)</span> (e.g., top singular value). A WARN is issued when
+<span class="arithmatex">\(|z| &gt; \kappa_f\)</span>. Under a <strong>modeled null</strong> where <span class="arithmatex">\(z \approx \mathcal{N}(0,1)\)</span>, the
 per-module two-sided tail probability becomes</p>
 <div class="arithmatex">\[
 p_{\text{tail}} \approx 2\big(1 - \Phi(\kappa_f)\big).
 \]</div>
-<p>Applying <strong>Bonferroni</strong> across the <span class="arithmatex">\(m_f\)</span> modules controls the family-wise error
-rate (FWER); applying <strong>Benjamini–Hochberg (BH)</strong> controls the expected
-false-discovery proportion (FDR). Balanced tiers choose BH (α=0.05, m=4);
-Conservative tiers choose Bonferroni (α=0.000625, m=4). Document the policy
-alongside <span class="arithmatex">\(\kappa_f\)</span> so auditors can recover the expected per-run WARN rate.</p>
+<p>Applying <strong>Bonferroni</strong> across the tested families controls the family-wise
+error rate (FWER); applying <strong>Benjamini–Hochberg (BH)</strong> controls the expected
+false-discovery proportion (FDR). Module-level WARN volume is budgeted
+separately by <code>max_caps</code>. Balanced tiers choose BH (α=0.05, m=4 families);
+Conservative tiers choose Bonferroni (α=0.000625, m=4 families). Document the
+policy alongside <span class="arithmatex">\(\kappa_f\)</span> so auditors can recover the expected per-run WARN
+rate.</p>
 <h2 id="assumptions-scope">Assumptions &amp; Scope<a class="headerlink" href="#assumptions-scope" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Baseline runs provide <span class="arithmatex">\((\mu_f, \sigma_f)\)</span> per family <span class="arithmatex">\(f \in
-  \{\text{ffn}, \text{attn}, \text{embed}, \text{other}\}\)</span>; when <span class="arithmatex">\(\sigma_f = 0\)</span>
+<li>Baseline runs provide <span class="arithmatex">\((\mu_f, \sigma_f)\)</span> per family
+  <code>f in {ffn, attn, embed, other}</code>; when <span class="arithmatex">\(\sigma_f = 0\)</span>
   we fall back to the tier deadband δ.</li>
 <li>Only 2‑D weight matrices (FFN blocks, attention projections, embeddings) are
   evaluated; <strong>1‑D LayerNorm parameters are explicitly excluded</strong> from spectral
@@ -2654,11 +2762,12 @@ summary.</p>
   <code>spectral.family_caps</code>, and <code>spectral.families[family]</code> with <code>{max, mean,
   count, violations, kappa}</code>. <code>sigma_quantile</code> is the calibrated baseline
   percentile used to derive the reference target.</li>
-<li>Tier files document multiple-testing metadata and the mapping
-  <span class="arithmatex">\(\kappa_f \rightarrow\)</span> modeled Gaussian tails. Sentinel caps should be audited
+<li>Tier files document multiple-testing metadata and the mapping from
+  <span class="arithmatex">\(\kappa_f\)</span> to modeled Gaussian tails. Sentinel caps should be audited
   as operational thresholds, not as FPR-controlled family caps.</li>
 <li>Policy metadata records the multiple-testing method
-  (<code>spectral.multiple_testing</code>) and the cap limit (<code>spectral.max_caps</code>).</li>
+  (<code>spectral.multiple_testing</code>) and the cap limit (<code>spectral.max_caps</code>, mirrored
+  in <code>spectral.summary.max_caps</code> where present).</li>
 </ul>
 <h2 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h2>
 <ul>
@@ -2681,12 +2790,14 @@ summary.</p>
 and parametric methods described in the tier calibration documentation
 (<a href="../09-tier-v1-calibration/">09-tier-v1-calibration.md</a>). The calibrated κ
 values are stored in the packaged <code>tiers.yaml</code>
-(<code>runtime/tiers.yaml</code>).</p>
-<p>To recalibrate, run null baselines (no edit) and collect per-module z-scores.
-Allocate the WARN budget across families proportionally by module count, then
-set κ(f) via order-statistic (the B(f)-th largest |z| in that family) or
-parametric inversion of the tail probability. Add a small safety margin
-(η ≈ 0.05–0.10) and validate that subsequent null runs stay within the budget.</p>
+(<code>runtime/tiers.yaml</code>; overrides use
+<code>INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml</code>).</p>
+<p>To recalibrate, run null baselines (no edit) and collect per-family maximum
+z-scores through the null-sweep summary tooling. The current summarizer
+recommends κ(f) from the maximum observed family z-score plus a safety margin
+and can lower the multiple-testing α if the observed any-warning rate exceeds
+the target. Validate that subsequent null runs stay within the published
+<code>max_caps</code> budget.</p>
 <blockquote>
 <p><em>Basis column in Quality Gates tables: "point" = point estimate gate,
 "upper" = upper-bound gate, "point &amp; upper" = both point and upper bounds must
@@ -2695,6 +2806,7 @@ pass.</em></p>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Benjamini, Y., &amp; Hochberg, Y. (1995). “Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing.” <em>Journal of the Royal Statistical Society: Series B (Methodological)</em>, 57(1), 289–300. <a href="https://doi.org/10.1111/j.2517-6161.1995.tb02031.x">https://doi.org/10.1111/j.2517-6161.1995.tb02031.x</a></li>
+<li>Dunn, O. J. (1961). “Multiple Comparisons among Means.” <em>Journal of the American Statistical Association</em>, 56(293), 52–64. <a href="https://doi.org/10.1080/01621459.1961.10482090">https://doi.org/10.1080/01621459.1961.10482090</a></li>
 </ul>
 
 
@@ -2749,6 +2861,10 @@ pass.</em></p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

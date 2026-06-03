@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1709,6 +1765,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#claim" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2043,7 +2110,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2155,7 +2222,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2486,6 +2553,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#claim" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2628,13 +2706,40 @@ the token-weighted mean Δlog-loss, and the confidence interval comes from
 exponentiating the same paired bootstrap; this note derives both facts in the
 report's operating context.</p>
 </blockquote>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Purpose</strong></td>
+<td>Derive the paired log-space primary-metric ratio and its displayed confidence interval.</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>Report verifier maintainers, statistics reviewers, and contributors changing paired metric code.</td>
+</tr>
+<tr>
+<td><strong>Contract scope</strong></td>
+<td>PPL-like metrics on paired evaluation windows with known token counts and non-overlapping schedules.</td>
+</tr>
+<tr>
+<td><strong>Source of truth</strong></td>
+<td><code>src/invarlock/core/bootstrap.py</code>, report pairing logic, and paired-CI contract tests.</td>
+</tr>
+</tbody>
+</table>
 <h2 id="claim">Claim<a class="headerlink" href="#claim" title="Permanent link">&para;</a></h2>
-<p>For paired evaluation windows <code>i = 1..n</code> with token counts <code>t_i</code>, the reported
+<p>For ppl-like metrics on paired evaluation windows <code>i = 1..n</code> with token counts <code>t_i</code>, the reported
 <strong>ratio</strong> between two arms A and B (e.g., preview/final or edited/baseline)
 satisfies</p>
 <div class="arithmatex">\[
 \text{ratio} = \exp\!\Big(\overline{\Delta \ell}_{\text{w}}\Big),\quad
-\Delta \ell_i = \ell^{(B)}_i - \ell^{(A)}_i,
+\Delta \ell_i = \ell^{(B)}_i - \ell^{(A)}_i
 \]</div>
 <p>where <span class="arithmatex">\(\ell_i\)</span> is the <strong>per‑token</strong> log‑loss on window <span class="arithmatex">\(i\)</span>, and the <strong>weighted</strong> mean is</p>
 <div class="arithmatex">\[
@@ -2691,8 +2796,13 @@ token‑weighted).</p>
 </code></pre></div>
 
 <h2 id="derivation-sketch">Derivation (sketch)<a class="headerlink" href="#derivation-sketch" title="Permanent link">&para;</a></h2>
-<p>For ppl-like primary metrics (perplexity), <span class="arithmatex">\(\text{PPL} = \exp(\bar{\ell})\)</span> where <span class="arithmatex">\(\bar{\ell} = \sum t_i \ell_i / \sum t_i\)</span>.
-Thus the ratio:</p>
+<p>For ppl-like primary metrics (perplexity):</p>
+<div class="arithmatex">\[
+\text{PPL} = \exp(\bar{\ell}),
+\qquad
+\bar{\ell} = \frac{\sum_i t_i \ell_i}{\sum_i t_i}
+\]</div>
+<p>Thus the ratio:</p>
 <div class="arithmatex">\[
 \frac{\text{PM}^{(B)}}{\text{PM}^{(A)}} \quad \text{(ratio in display space for ppl-like metrics)}
 = \exp\Big(\bar{\ell}^{(B)} - \bar{\ell}^{(A)}\Big)
@@ -2706,18 +2816,27 @@ proportional to <span class="arithmatex">\(t_i\)</span>) yields CI <span class="
 <div class="arithmatex">\[
 \mathbb{E}\big[\overline{\Delta \ell}_{\text{w}}\big]
 = \frac{\sum_i t_i\, \mathbb{E}[\Delta \ell_i]}{\sum_i t_i}
-= \log\Bigg(\prod_i \Big(\tfrac{p_i^{(B)}}{p_i^{(A)}}\Big)^{\,t_i/\sum_j t_j}\Bigg),
+= \log\Bigg(\prod_i
+\Bigg(\frac{p_i^{(B)}}{p_i^{(A)}}\Bigg)^{t_i/\sum_j t_j}
+\Bigg)
 \]</div>
 <p>so, under the stated window-level assumptions, the estimator targets the log of
 the token‑weighted ratio. Under mild assumptions (ergodicity across windows),
 the point estimator converges to the population log‑ratio.</p>
 <h3 id="jensen-inequality-note">Jensen inequality note<a class="headerlink" href="#jensen-inequality-note" title="Permanent link">&para;</a></h3>
-<p>Let <span class="arithmatex">\(r_i = \exp(\Delta \ell_i) = \mathrm{PPL}^{(B)}_i / \mathrm{PPL}^{(A)}_i\)</span>. Then
-<span class="arithmatex">\(\exp\big(\overline{\Delta \ell}_{\text{w}}\big)\)</span> is the weighted geometric mean
-of <span class="arithmatex">\(r_i\)</span>. By AM-GM (equivalently Jensen on <span class="arithmatex">\(\log\)</span>), the weighted geometric mean
-is <span class="arithmatex">\(\le\)</span> the weighted arithmetic mean of <span class="arithmatex">\(r_i\)</span>. The ratio of mean perplexities
-is a different quantity and can be larger or smaller; see the counter-example
-below.</p>
+<p>Let</p>
+<div class="arithmatex">\[
+r_i = \exp(\Delta \ell_i) =
+\frac{\mathrm{PPL}^{(B)}_i}{\mathrm{PPL}^{(A)}_i}
+\]</div>
+<p>Then</p>
+<div class="arithmatex">\[
+\exp\big(\overline{\Delta \ell}_{\text{w}}\big)
+\]</div>
+<p>is the weighted geometric mean of <span class="arithmatex">\(r_i\)</span>. By AM-GM (equivalently Jensen on
+<span class="arithmatex">\(\log\)</span>), the weighted geometric mean is <span class="arithmatex">\(\le\)</span> the weighted arithmetic mean of
+<span class="arithmatex">\(r_i\)</span>. The ratio of mean perplexities is a different quantity and can be larger
+or smaller; see the counter-example below.</p>
 <h2 id="why-logspace-vs-ratio-of-means-counterexample">Why log‑space vs ratio of means (counter‑example)<a class="headerlink" href="#why-logspace-vs-ratio-of-means-counterexample" title="Permanent link">&para;</a></h2>
 <p>The naive ratio of mean perplexities can be biased toward high‑perplexity
 windows. A simple two‑window example shows the pitfall:</p>
@@ -2751,7 +2870,9 @@ windows. A simple two‑window example shows the pitfall:</p>
 <p><code>dataset.windows.stats.window_match_fraction == 1.0</code> and <code>dataset.windows.stats.window_overlap_fraction == 0.0</code>.</p>
 </li>
 <li>
-<p>Runs <strong>abort</strong> in CI/Release profiles if preview/final counts differ or pairing &lt; 1.0.</p>
+<p>Runs hard-fail in CI/Release profiles when a baseline pairing context exists
+  and preview/final counts differ, pairing is incomplete, or windows overlap.
+  Verification also rejects invalid pairing in generated reports.</p>
 </li>
 </ul>
 <h2 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h2>
@@ -2772,6 +2893,8 @@ windows. A simple two‑window example shows the pitfall:</p>
 <ul>
 <li>Jurafsky, D., &amp; Martin, J. H. (2023). <em>Speech and Language Processing</em> (3rd ed. draft), chapters on language modeling and perplexity. <a href="https://web.stanford.edu/~jurafsky/slp3/">https://web.stanford.edu/~jurafsky/slp3/</a></li>
 <li>Manning, C. D., &amp; Schütze, H. (1999). <em>Foundations of Statistical Natural Language Processing.</em> MIT Press.</li>
+<li>Hugging Face Transformers. “Perplexity of fixed-length models.”
+  <a href="https://huggingface.co/docs/transformers/perplexity">https://huggingface.co/docs/transformers/perplexity</a></li>
 </ul>
 
 
@@ -2826,6 +2949,10 @@ windows. A simple two‑window example shows the pitfall:</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

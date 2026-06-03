@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -2115,7 +2171,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2227,7 +2283,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2793,7 +2849,7 @@
 </tr>
 <tr>
 <td><strong>Network</strong></td>
-<td>Fully offline; no external telemetry is sent.</td>
+<td>Local by default; external metric exporters or notification channels send data only when explicitly configured.</td>
 </tr>
 <tr>
 <td><strong>Source of truth</strong></td>
@@ -2828,7 +2884,8 @@
 <li><strong>Metrics</strong>: counters, gauges, and histograms tracked during runs.</li>
 <li><strong>Health checks</strong>: periodic checks for system resources (CPU, memory, disk, GPU).</li>
 <li><strong>Telemetry</strong>: operation tracking with start/end times and metadata.</li>
-<li><strong>Alerting</strong>: configurable thresholds for warnings (not external notifications).</li>
+<li><strong>Alerting</strong>: configurable thresholds for warnings; optional email, webhook,
+  and Slack channels can be configured explicitly.</li>
 </ul>
 <h3 id="component-architecture">Component Architecture<a class="headerlink" href="#component-architecture" title="Permanent link">&para;</a></h3>
 <table>
@@ -3228,6 +3285,10 @@ adds <code>--execution-mode host</code>.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

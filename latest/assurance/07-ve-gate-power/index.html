@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1877,6 +1933,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#claim" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2026,7 +2093,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2138,7 +2205,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2469,6 +2536,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#claim" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2593,33 +2671,64 @@
 ΔlogNLL shows a real improvement—Balanced needs a one-sided win, Conservative
 needs a two-sided push—and the report explains why VE stayed on or off.</p>
 </blockquote>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Purpose</strong></td>
+<td>Define when the variance guard may enable scaling and how the predictive gate is audited.</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>Variance guard maintainers, calibration reviewers, and release reviewers checking VE evidence.</td>
+</tr>
+<tr>
+<td><strong>Contract scope</strong></td>
+<td>Predictive paired delta-log-loss gates, tier sidedness, minimum effect, and enablement provenance.</td>
+</tr>
+<tr>
+<td><strong>Source of truth</strong></td>
+<td><code>src/invarlock/guards/variance*.py</code>, <code>runtime/tiers.yaml</code>, and variance assurance tests.</td>
+</tr>
+</tbody>
+</table>
 <h2 id="claim">Claim<a class="headerlink" href="#claim" title="Permanent link">&para;</a></h2>
-<p>VE proposes scales only when the <strong>predictive</strong> paired ΔlogNLL CI excludes 0
-with the tier's sidedness and the mean effect exceeds <code>min_effect_lognll</code>
-in the <strong>improvement</strong> direction (negative ΔlogNLL).</p>
+<p>VE proposes scales only when the <strong>predictive</strong> paired ΔlogNLL CI upper bound
+and mean effect both meet or beat −<code>min_effect_lognll</code> in the <strong>improvement</strong>
+direction (negative ΔlogNLL), using the tier's sidedness.</p>
 <ul>
 <li><strong>Balanced</strong>: <strong>one‑sided improvement</strong> test. VE enables only when the
   predictive CI <strong>upper bound</strong> ≤ −<code>min_effect_lognll</code> and the mean Δ ≤
   −<code>min_effect_lognll</code>.</li>
-<li><strong>Conservative</strong>: <strong>two‑sided</strong> CI (z₀.₉₇₅) with <strong>improvement‑only</strong> gating.
+<li><strong>Conservative</strong>: <strong>two‑sided</strong> CI with <span class="arithmatex">\(z = z_{0.975}\)</span> and
+  <strong>improvement‑only</strong> gating.
   VE enables only when the predictive CI <strong>upper bound</strong> ≤ −<code>min_effect_lognll</code>
   and the mean Δ ≤ −<code>min_effect_lognll</code>. If the CI lies entirely above
   +<code>min_effect_lognll</code>, VE stays off and the gate records a regression.</li>
 </ul>
-<p>Example (Balanced): with <code>min_effect_lognll = 0.0</code>, a predictive estimate
-Δ̄ = −0.002 with CI [−0.003, −0.001] enables VE because both the mean and the
-CI upper bound beat −<code>min_effect_lognll</code>.</p>
+<p>Example (Balanced): with <code>min_effect_lognll = 0.0</code>, a predictive
+<code>mean_delta</code> of <code>-0.002</code> with CI <code>[-0.003, -0.001]</code> enables VE because both the
+mean and the CI upper bound beat <code>-min_effect_lognll</code>.</p>
 <p>Example (Conservative): with <code>min_effect_lognll = 0.016</code>, a predictive estimate
-Δ̄ = −0.020 with CI [−0.030, −0.017] enables VE because the entire CI lies
-outside the interval [−<code>min_effect_lognll</code>, +<code>min_effect_lognll</code>]. A CI that
-touches or sits within this interval (e.g., [−0.015, −0.002]) does not enable VE.</p>
+<code>mean_delta = -0.020</code> with CI <code>[-0.030, -0.017]</code> enables VE because the entire
+CI lies outside the interval <code>[-min_effect_lognll, +min_effect_lognll]</code>. A CI
+that touches or sits within this interval (e.g., <code>[-0.015, -0.002]</code>) does not
+enable VE.</p>
 <h2 id="derivation-power-target">Derivation (power target)<a class="headerlink" href="#derivation-power-target" title="Permanent link">&para;</a></h2>
 <p>Let paired Δ values on calibration windows have standard deviation
-<span class="arithmatex">\(\sigma_{\text{pred}}\)</span> and count <span class="arithmatex">\(n\)</span>. The CI half-width is approximately
-<code>h ≈ z · σ_pred / √n</code>,
-with <span class="arithmatex">\(z = z_{0.95}\)</span> (one‑sided) or <span class="arithmatex">\(z_{0.975}\)</span> (two‑sided). Choose
-<code>min_effect_lognll ≈ h</code> to obtain ~50% power at the boundary; raise for
-stricter tiers.</p>
+<span class="arithmatex">\(\sigma_{\text{pred}}\)</span> and count <span class="arithmatex">\(n\)</span>. The CI half-width is approximately:</p>
+<div class="arithmatex">\[
+h \approx z \cdot \frac{\sigma_{\text{pred}}}{\sqrt{n}}
+\]</div>
+<p>Use <span class="arithmatex">\(z = z_{0.95}\)</span> for one-sided gates or <span class="arithmatex">\(z = z_{0.975}\)</span> for two-sided gates.
+Choose <code>min_effect_lognll ≈ h</code> as an approximate sizing heuristic for boundary
+cases; raise for stricter tiers.</p>
 <h2 id="tier-knobs-pilot-coverage">Tier knobs (pilot coverage)<a class="headerlink" href="#tier-knobs-pilot-coverage" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2654,20 +2763,26 @@ stricter tiers.</p>
 </tr>
 </tbody>
 </table>
-<p>Values are stored in the packaged <code>tiers.yaml</code> and maintain VE responsiveness
-without triggering false positives under the chosen window budgets.</p>
+<p>Values are stored in packaged <code>runtime/tiers.yaml</code> and
+maintain VE responsiveness without triggering false positives under the chosen
+window budgets.</p>
 <blockquote>
-<p><strong>Source of truth:</strong> tier thresholds are drawn from the packaged <code>tiers.yaml</code>.</p>
+<p><strong>Source of truth:</strong> tier thresholds are drawn from packaged
+<code>runtime/tiers.yaml</code>; overrides use
+<code>INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml</code>.</p>
+<p><strong>Note:</strong> <code>max_adjusted_modules = 0</code> means no module-count cap is enforced in
+the current VE scaling policy, not "adjust zero modules."</p>
 </blockquote>
 <h2 id="calibration">Calibration<a class="headerlink" href="#calibration" title="Permanent link">&para;</a></h2>
 <p>The <code>min_effect_lognll</code> values are derived from paired ΔlogNLL statistics on
-calibration windows using the formula <code>min_effect ≈ z × σ_pred / √n</code> with the
-appropriate z-quantile per tier. Calibrated values are stored in the packaged
-<code>tiers.yaml</code>. See the full calibration methodology in
+calibration windows using the half-width formula above with the appropriate
+z-quantile per tier. Calibrated values are stored in the packaged
+<code>runtime/tiers.yaml</code>. See the full calibration methodology in
 <a href="../09-tier-v1-calibration/">09-tier-v1-calibration.md</a>.</p>
 <p>To recalibrate, run null baselines (no edit) and compute the paired Δ standard
-deviation σ̂ across calibration windows. Use z = z₀.₉₅ for one-sided (Balanced)
-or z = z₀.₉₇₅ for two-sided (Conservative), then set min_effect ≈ z × σ̂ / √n.</p>
+deviation <span class="arithmatex">\(\hat{\sigma}\)</span> across calibration windows. Use <span class="arithmatex">\(z = z_{0.95}\)</span> for
+one-sided gates (Balanced) or <span class="arithmatex">\(z = z_{0.975}\)</span> for two-sided gates
+(Conservative), then set <code>min_effect_lognll</code> from the half-width formula.</p>
 <h2 id="provenance-tap">Provenance &amp; tap<a class="headerlink" href="#provenance-tap" title="Permanent link">&para;</a></h2>
 <ul>
 <li>VE must evaluate A = <strong>edited model (no VE)</strong> and B = <strong>virtual VE</strong> on the
@@ -2687,7 +2802,7 @@ or z = z₀.₉₇₅ for two-sided (Conservative), then set min_effect ≈ z ×
 <li><code>variance.{enabled,target_modules,proposed_scales}</code> — VE decision state and adjusted modules.</li>
 <li><code>variance.predictive_gate.{delta_ci,mean_delta,reason,passed}</code> — statistical outcome.</li>
 <li><code>variance.ab_test.{seed,windows_used,provenance}</code> — reproducibility of the predictive A/B.</li>
-<li><code>resolved_policy.variance.{min_effect_lognll,predictive_one_sided,max_adjusted_modules}</code> — tier knobs for the proof.</li>
+<li><code>resolved_policy.variance.{min_effect_lognll,predictive_one_sided,max_adjusted_modules}</code> — tier knobs for the evidence check.</li>
 </ul>
 <h2 id="assumptions-scope">Assumptions &amp; Scope<a class="headerlink" href="#assumptions-scope" title="Permanent link">&para;</a></h2>
 <ul>
@@ -2756,6 +2871,10 @@ or z = z₀.₉₇₅ for two-sided (Conservative), then set min_effect ≈ z ×
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

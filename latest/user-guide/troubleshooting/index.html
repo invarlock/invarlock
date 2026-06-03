@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -556,6 +556,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -2249,7 +2305,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2361,7 +2417,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -3053,11 +3109,11 @@
 </tr>
 <tr>
 <td><strong>Exit codes</strong></td>
-<td><code>0=success</code>, <code>1=generic failure</code>, <code>2=schema/config invalid</code>, <code>3=hard abort (CI/Release)</code>.</td>
+<td>Core verify/evaluate use <code>0=success</code>, <code>1=generic failure</code>, <code>2=schema/config invalid</code>, <code>3=hard abort (CI/Release)</code>. Evidence-pack verification also uses structured pack codes <code>4</code>-<code>7</code>.</td>
 </tr>
 <tr>
 <td><strong>Source of truth</strong></td>
-<td><code>src/invarlock/cli/commands/run.py</code>, <code>src/invarlock/reporting/verify_contract.py</code>, <code>src/invarlock/core/doctor_findings.py</code>.</td>
+<td><code>src/invarlock/cli/commands/run.py</code>, <code>src/invarlock/cli/commands/verify.py</code>, <code>src/invarlock/evidence_pack_support.py</code>, <code>src/invarlock/reporting/verify_contract.py</code>, <code>src/invarlock/core/doctor_findings.py</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -3065,7 +3121,7 @@
 <div class="codehilite"><pre><span></span><code><span class="c1"># Check environment and configuration</span>
 invarlock<span class="w"> </span>doctor<span class="w"> </span>--config<span class="w"> </span>&lt;config.yaml&gt;<span class="w"> </span>--profile<span class="w"> </span>ci
 
-<span class="c1"># Validate an container-backed report bundle</span>
+<span class="c1"># Validate a container-backed report bundle</span>
 invarlock<span class="w"> </span>verify<span class="w"> </span>reports/eval/evaluation.report.json<span class="w"> </span>--profile<span class="w"> </span>ci
 
 <span class="c1"># Enable debug output for detailed traces</span>
@@ -3073,7 +3129,10 @@ invarlock<span class="w"> </span>verify<span class="w"> </span>reports/eval/eval
 <span class="w">  </span>invarlock<span class="w"> </span>evaluate<span class="w"> </span>--allow-network<span class="w"> </span>--execution-mode<span class="w"> </span>host<span class="w"> </span>--baseline<span class="w"> </span>gpt2<span class="w"> </span>--subject<span class="w"> </span>gpt2<span class="w"> </span>--preset<span class="w"> </span>&lt;config.yaml&gt;
 </code></pre></div>
 
-<p><code>verify</code> expects <code>runtime.manifest.json</code> next to evaluation outputs.</p>
+<p>For container-backed outputs, <code>verify</code> expects <code>runtime.manifest.json</code> next to
+the evaluation report. Host-mode outputs are an unverified provenance path; use
+<code>--runtime-provenance host --assurance off</code> only when that non-assurance mode is
+intentional.</p>
 <h2 id="error-code-reference">Error Code Reference<a class="headerlink" href="#error-code-reference" title="Permanent link">&para;</a></h2>
 <h3 id="pairing-errors-e001e006">Pairing Errors (E001–E006)<a class="headerlink" href="#pairing-errors-e001e006" title="Permanent link">&para;</a></h3>
 <p>These errors relate to window pairing, tokenizer consistency, and evidence integrity.</p>
@@ -3399,17 +3458,17 @@ invarlock<span class="w"> </span>verify<span class="w"> </span>reports/eval/eval
 </tr>
 <tr>
 <td><strong>Severity</strong></td>
-<td>Hard abort</td>
+<td>Verification failure</td>
 </tr>
 <tr>
 <td><strong>Exit code</strong></td>
-<td><code>3</code></td>
+<td><code>2</code> for malformed/schema-invalid input; <code>3</code> for CI/Release policy or gate failure</td>
 </tr>
 </tbody>
 </table>
 <p><strong>Triggers:</strong></p>
 <ul>
-<li>report fails schema validation</li>
+<li>report fails schema validation or is malformed</li>
 <li>Pairing math recomputation fails</li>
 <li>Gate checks fail in CI/Release profile</li>
 </ul>
@@ -3460,6 +3519,26 @@ invarlock<span class="w"> </span>verify<span class="w"> </span>reports/eval/eval
 <td>Hard abort</td>
 <td>E001–E006, E111, E601 in CI/Release profile</td>
 </tr>
+<tr>
+<td><code>4</code></td>
+<td>Evidence-pack format failure</td>
+<td>Manifest or pack contract malformed</td>
+</tr>
+<tr>
+<td><code>5</code></td>
+<td>Evidence-pack signature failure</td>
+<td>Missing/invalid <code>manifest.signature.json</code> or untrusted signer</td>
+</tr>
+<tr>
+<td><code>6</code></td>
+<td>Evidence-pack integrity failure</td>
+<td>Checksum or digest binding mismatch</td>
+</tr>
+<tr>
+<td><code>7</code></td>
+<td>Evidence-pack report failure</td>
+<td>Bundled report verification failed</td>
+</tr>
 </tbody>
 </table>
 <h2 id="common-issues">Common Issues<a class="headerlink" href="#common-issues" title="Permanent link">&para;</a></h2>
@@ -3472,9 +3551,9 @@ invarlock<span class="w"> </span>verify<span class="w"> </span>reports/eval/eval
 <h3 id="dependency-missing">Dependency Missing<a class="headerlink" href="#dependency-missing" title="Permanent link">&para;</a></h3>
 <p><strong>Symptom:</strong> <code>ModuleNotFoundError</code> for <code>torch</code>, <code>transformers</code>, etc.</p>
 <p><strong>Fix:</strong></p>
-<div class="codehilite"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;invarlock[hf]&quot;</span><span class="w">      </span><span class="c1"># HF adapters + eval</span>
-pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;invarlock[guards]&quot;</span><span class="w">  </span><span class="c1"># Guard math</span>
-pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;invarlock[adapters]&quot;</span><span class="w"> </span><span class="c1"># All adapters</span>
+<div class="codehilite"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;invarlock[hf]&quot;</span><span class="w">       </span><span class="c1"># HF adapters + evaluation stack</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;invarlock[guards]&quot;</span><span class="w">   </span><span class="c1"># Guard math</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;invarlock[adapters]&quot;</span><span class="w"> </span><span class="c1"># Core HF adapters</span>
 </code></pre></div>
 
 <h3 id="calibration-data-not-indexable">Calibration Data Not Indexable<a class="headerlink" href="#calibration-data-not-indexable" title="Permanent link">&para;</a></h3>
@@ -3501,9 +3580,9 @@ pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot
 <li>Reduce edit scope or batch size</li>
 </ol>
 <h3 id="explicit-cuda-request-rejected-before-container-launch">Explicit CUDA Request Rejected Before Container Launch<a class="headerlink" href="#explicit-cuda-request-rejected-before-container-launch" title="Permanent link">&para;</a></h3>
-<p><strong>Symptom:</strong> Default runtime-container <code>evaluate</code>, <code>run</code>, or <code>calibrate</code> exits early with a
-message that <code>--device cuda</code> was requested but no NVIDIA runtime is visible on
-the host.</p>
+<p><strong>Symptom:</strong> Default runtime-container <code>evaluate</code>, advanced calibration, or
+internal config-runner flows exit early with a message that <code>--device cuda</code> was
+requested but no NVIDIA runtime is visible on the host.</p>
 <p><strong>Cause:</strong> Explicit CUDA requests are fail-closed for delegated container runs.
 InvarLock requires either <code>/dev/nvidiactl</code> or <code>nvidia-smi</code> to be visible before
 it adds <code>--gpus all</code> to the container launch.</p>
@@ -3592,6 +3671,10 @@ invarlock<span class="w"> </span>advanced<span class="w"> </span>plugins<span cl
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

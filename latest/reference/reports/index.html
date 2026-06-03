@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -2215,7 +2271,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2327,7 +2383,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -3163,8 +3219,10 @@ invarlock<span class="w"> </span>report<span class="w"> </span>html<span class="
 <h2 id="schema">Schema<a class="headerlink" href="#schema" title="Permanent link">&para;</a></h2>
 <h3 id="concepts">Concepts<a class="headerlink" href="#concepts" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Schema stability</strong>: v1 is a PM-only contract; breaking changes require a
-  schema-version bump.</li>
+<li><strong>Schema stability</strong>: v1 has a stable core around primary metric,
+  dataset/window metadata, artifacts, plugins, and report identity. Optional
+  policy, guard, provenance, telemetry, and confidence blocks are additive
+  unless promoted into the required core, which requires a schema-version bump.</li>
 <li><strong>Validation allow-list</strong>: only specific <code>validation.*</code> flags are accepted by
   the schema validator.</li>
 <li><strong>Baseline pairing</strong>: reports assume paired windows; verification enforces
@@ -3319,11 +3377,11 @@ fields while enforcing a small, stable core:</p>
 <p><strong>Required top‑level fields:</strong></p>
 <ul>
 <li><code>schema_version</code> — must equal <code>"v1"</code>.</li>
-<li><code>run_id</code> — non‑empty string (minimum length 4).</li>
+<li><code>run_id</code> — non‑empty string (minimum length 1).</li>
 <li><code>meta</code> — object (model/device/seeds; validator does not fix sub‑shape).</li>
 <li><code>dataset</code> — object with at least:</li>
 <li><code>provider</code>: string</li>
-<li><code>seq_len</code>: integer ≥ 1</li>
+<li><code>seq_len</code>: integer ≥ 0</li>
 <li><code>windows.preview</code>: integer ≥ 0</li>
 <li><code>windows.final</code>: integer ≥ 0</li>
 <li><code>windows.stats</code>: object (paired-window stats and coverage)</li>
@@ -3331,12 +3389,12 @@ fields while enforcing a small, stable core:</p>
 <li><code>plugins</code> — object listing discovered adapters/edits/guards.</li>
 <li><code>primary_metric</code> — object (canonical primary metric snapshot).</li>
 </ul>
-<p><strong>Primary metric block (required):</strong></p>
+<p><strong>Primary metric block (object required, only <code>kind</code> required by schema):</strong></p>
 <ul>
 <li><code>primary_metric.kind</code>: string (e.g., <code>"ppl_causal"</code>, <code>"accuracy"</code>).</li>
-<li><code>primary_metric.preview</code> / <code>primary_metric.final</code>: numbers.</li>
-<li><code>primary_metric.ratio_vs_baseline</code>: number.</li>
-<li><code>primary_metric.display_ci</code>: two‑element numeric array <code>[lo, hi]</code>.</li>
+<li><code>primary_metric.preview</code> / <code>primary_metric.final</code>: numbers when available.</li>
+<li><code>primary_metric.ratio_vs_baseline</code>: number when available.</li>
+<li><code>primary_metric.display_ci</code>: two‑element numeric array <code>[lo, hi]</code> when available.</li>
 <li>Additional optional fields: <code>unit</code>, <code>direction</code>, <code>ci</code>, <code>gating_basis</code>,
   <code>aggregation_scope</code>, <code>estimated</code>, etc.</li>
 </ul>
@@ -3520,7 +3578,7 @@ baseline and the tail-gate evaluation outcome:</p>
 <h2 id="telemetry-fields">Telemetry Fields<a class="headerlink" href="#telemetry-fields" title="Permanent link">&para;</a></h2>
 <p>Telemetry values are copied from <code>report.json</code> into reports and always
 include the execution device. CPU telemetry sweeps are collected via
-<code>scripts/run_cpu_telemetry.sh</code>.</p>
+<code>scripts/smoke/run_cpu_telemetry.sh</code>.</p>
 <table>
 <thead>
 <tr>
@@ -3599,7 +3657,7 @@ print-friendly rules.</p>
 <li><strong>Schema validation fails</strong>: check <code>schema_version</code> and required top-level
   fields (<code>run_id</code>, <code>meta</code>, <code>dataset</code>, <code>artifacts</code>, <code>primary_metric</code>).</li>
 <li><strong>Unexpected validation keys</strong>: ensure <code>validation.*</code> keys match the allow-list
-  in <code>report_schema</code>.</li>
+  in <code>contracts/validation_keys.json</code>.</li>
 </ul>
 <h3 id="telemetry-issues">Telemetry Issues<a class="headerlink" href="#telemetry-issues" title="Permanent link">&para;</a></h3>
 <ul>
@@ -3608,7 +3666,8 @@ print-friendly rules.</p>
 </ul>
 <h3 id="html-export-issues">HTML Export Issues<a class="headerlink" href="#html-export-issues" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Missing report</strong>: generate one first via <code>invarlock report --format report</code>.</li>
+<li><strong>Missing report</strong>: generate one first via
+  <code>invarlock report generate --run &lt;subject report.json&gt; --baseline-run-report &lt;baseline report.json&gt; --format report -o &lt;output-dir&gt;</code>.</li>
 <li><strong>HTML missing styles</strong>: omit <code>--no-embed-css</code> or apply custom CSS later in your publishing layer.</li>
 </ul>
 <hr />
@@ -3681,6 +3740,10 @@ print-friendly rules.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

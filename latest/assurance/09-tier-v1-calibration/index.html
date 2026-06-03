@@ -23,11 +23,11 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>Tier v1.0 Calibration (Pilot) - InvarLock Documentation</title>
+        <title>Tier Policy v1 Calibration (Pilot) - InvarLock Documentation</title>
       
     
     
@@ -68,7 +68,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#tier-v10-calibration-pilot-method" class="md-skip">
+        <a href="#tier-policy-v1-calibration-pilot-method" class="md-skip">
           Skip to content
         </a>
       
@@ -102,7 +102,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Tier v1.0 Calibration (Pilot)
+              Tier Policy v1 Calibration (Pilot)
             
           </span>
         </div>
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1889,7 +1945,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -1907,7 +1963,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -1931,6 +1987,17 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#spectral-z-caps-targets-and-method" class="md-nav__link">
@@ -2222,7 +2289,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2553,6 +2620,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#spectral-z-caps-targets-and-method" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2755,21 +2833,55 @@
   
 
 
-<h1 id="tier-v10-calibration-pilot-method">Tier v1.0 Calibration (Pilot + Method)<a class="headerlink" href="#tier-v10-calibration-pilot-method" title="Permanent link">&para;</a></h1>
+<h1 id="tier-policy-v1-calibration-pilot-method">Tier Policy v1 Calibration (Pilot + Method)<a class="headerlink" href="#tier-policy-v1-calibration-pilot-method" title="Permanent link">&para;</a></h1>
 <blockquote>
 <p><strong>Plain language:</strong> This appendix has two roles:
-(1) the <strong>pilot numbers</strong> we measured for GPT-2 small and BERT base (Nov 2025) that underpin the <strong>Balanced</strong> and <strong>Conservative</strong> tiers; and
-(2) the <strong>exact recipe</strong> to recalibrate from scratch on your setup (weight-based Spectral κ, activation-based RMT ε, VE min-effect, and window sizing).
+(1) the <strong>pilot calibration lanes</strong> that underpin the <strong>Balanced</strong> and
+<strong>Conservative</strong> tiers; and
+(2) the <strong>exact recipe</strong> to recalibrate from scratch on your setup
+(weight-based Spectral κ, activation-based RMT ε, VE min-effect, and window
+sizing).
 Every knob is surfaced in run reports and reports so reviewers can audit or recompute.
-The public evidence floor is the packaged <code>published_basis</code> fixture set:
+The public evidence floor is the packaged <code>published_basis</code> fixture set. That
+fixture set demonstrates the public report/evidence-pack contract; it is not
+the entire calibration corpus used to justify every numeric tier constant:
 <code>src/invarlock/_data/public_evidence/published_basis/gpt2/evaluation.report.json</code>,
 <code>src/invarlock/_data/public_evidence/published_basis/gpt2/evidence_pack_recipe.json</code>,
+<code>src/invarlock/_data/public_evidence/published_basis/gpt2/evidence_pack/</code>,
 <code>src/invarlock/_data/public_evidence/published_basis/bert/evaluation.report.json</code>,
 and <code>src/invarlock/_data/public_evidence/published_basis/bert/evidence_pack_recipe.json</code>.</p>
 <p>For a key-by-key explanation of every value in the packaged tier file
-(<code>runtime/tiers.yaml</code>), see <a href="../../reference/tier-policy-catalog/">Tier Policy Catalog</a>.</p>
+(<code>runtime/tiers.yaml</code>; override path
+<code>INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml</code>), see
+<a href="../../reference/tier-policy-catalog/">Tier Policy Catalog</a>.</p>
 </blockquote>
-<hr />
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Purpose</strong></td>
+<td>Summarize the pilot calibration basis and the recipe for recalibrating tier policy values.</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>Calibration owners, release reviewers, and contributors updating tier thresholds.</td>
+</tr>
+<tr>
+<td><strong>Contract scope</strong></td>
+<td>Balanced and Conservative tier values for Spectral kappa, RMT epsilon, VE min-effect, and window sizing.</td>
+</tr>
+<tr>
+<td><strong>Source of truth</strong></td>
+<td><code>runtime/tiers.yaml</code>, public evidence fixtures, and the Tier Policy Catalog.</td>
+</tr>
+</tbody>
+</table>
 <h2 id="spectral-z-caps-targets-and-method">Spectral κ (z-caps) — Targets <strong>and</strong> Method<a class="headerlink" href="#spectral-z-caps-targets-and-method" title="Permanent link">&para;</a></h2>
 <h3 id="what-the-tier-ships-with-pilot">What the tier ships with (pilot)<a class="headerlink" href="#what-the-tier-ships-with-pilot" title="Permanent link">&para;</a></h3>
 <ul>
@@ -2779,39 +2891,70 @@ and <code>src/invarlock/_data/public_evidence/published_basis/bert/evidence_pack
 <li><strong>Conservative</strong> tightens caps and budget:
   <code>ffn: 3.849</code>, <code>attn: 2.6</code>, <code>embed: 2.8</code>, <code>other: 2.8</code>, <strong>Bonferroni</strong> (<code>α=0.000625</code>), and <code>max_caps = 3</code>.</li>
 </ul>
-<p><strong>Runtime visibility.</strong> reports record per-family WARNs and effective caps under <code>spectral.*</code> (summary, multiple_testing, families, family_caps) and the resolved policy under <code>resolved_policy.spectral</code>.</p>
+<p><strong>Runtime visibility.</strong> reports record per-family WARNs and effective caps under
+<code>spectral.*</code> (summary, multiple_testing, families, family_caps) and the resolved
+policy under <code>resolved_policy.spectral</code>.</p>
 <h3 id="window-minima-rationale-countspower">Window Minima Rationale (counts/power)<a class="headerlink" href="#window-minima-rationale-countspower" title="Permanent link">&para;</a></h3>
 <ul>
-<li>The CI profile targets 200×200 non‑overlapping, paired windows with BCa replicates ≈ 1.2k. The Release profile targets 400×400 with ≈ 3.2k replicates. These counts follow a half‑width sizing rule on the paired Δlog‑loss CI (power ≈ 50% at the boundary for the chosen <code>min_effect_lognll</code>), verified on pilot runs.</li>
-<li>Release evidence must meet the requested counts; runs that under‑cover preview/final windows or bootstrap replicates fail evaluation in CI/Release profiles (see Coverage &amp; Pairing Plan).</li>
+<li>The CI profile targets 240×240 non‑overlapping, paired windows with BCa
+  replicates ≈ 1.2k. The Release profile targets 400×400 with ≈ 3.2k
+  replicates. Tier floors remain lower guard rails (Balanced 180×180,
+  Conservative 220×220) so profiles can request stricter counts. These counts
+  follow a half‑width sizing rule on the paired Δlog‑loss CI (power ≈ 50% at the
+  boundary for the chosen <code>min_effect_lognll</code>), verified on pilot runs.</li>
+<li>CI/Release profiles request stricter counts than the base tier floors. The
+  runtime/report gates enforce perfect pairing, zero overlap, and selected
+  tier-floor minima; reviewers should compare requested profile counts to the
+  recorded used counts when judging a release evidence package.</li>
 </ul>
 <p><strong>Spectral calibration provenance.</strong> Aggregated null-run stats are derived from
 calibration runs. The repo ships the public published-basis reports and recipes
 under <code>src/invarlock/_data/public_evidence/published_basis/{gpt2,bert}/</code>.
 Local tooling can parse evaluation report JSON files (glob pattern
-<code>**/evaluation.report.json</code>) to extract per-family z-scores and compute summary
-statistics (mean, stdev, quantiles). Persist results in CSV format with hashes
-for reproducibility and attach calibration reports to change proposals.</p>
+<code>**/evaluation.report.json</code>) and run reports to extract spectral evidence,
+summarize per-family maximum z-scores, and recommend updated family caps and
+multiple-testing α. Persist results in JSON/Markdown/CSV form with hashes for
+reproducibility and attach calibration reports to change proposals.</p>
 <hr />
 <h3 id="how-to-recalibrate-on-your-machine-budget-aware">How to recalibrate κ on your machine (budget-aware)<a class="headerlink" href="#how-to-recalibrate-on-your-machine-budget-aware" title="Permanent link">&para;</a></h3>
 <blockquote>
-<p><strong>Key idea.</strong> Keep the <strong>budget</strong> <code>max_caps</code> fixed (e.g., 5 for Balanced); tune per-family κ so a clean baseline produces ≤ that many WARNs <strong>per run</strong> under BH. <strong>Do not</strong> enable an absolute clamp in Balanced.</p>
+<p><strong>Key idea.</strong> Keep the <strong>budget</strong> <code>max_caps</code> fixed (e.g., 5 for Balanced);
+tune per-family κ so clean baselines stay inside that budget under the
+published multiple-testing policy. <strong>Do not</strong> enable an absolute clamp in
+Balanced.</p>
 </blockquote>
 <ol>
 <li>
-<p><strong>Gather per-module |z| by family.</strong> From a baseline run, collect spectral z-scores
-   <span class="arithmatex">\(z(i) = \big(s(i) - \mu(f)\big)/\sigma(f)\)</span> for each 2-D weight in family <span class="arithmatex">\(f \in \{\text{ffn},\text{attn},\text{embed},\text{other}\}\)</span>.
-   <em>(Tip: ensure the guard emits <code>final_z_scores</code> so you have module-level |z|.)</em></p>
+<p><strong>Gather spectral evidence.</strong> From null/no-op runs, collect spectral guard
+   evidence with per-family z-score summaries. Run reports may expose
+   guard-level <code>final_z_scores</code> (or <code>extras.final_z_scores</code>); evaluation reports
+   expose rendered spectral summaries such as <code>spectral.top_z_scores</code> when
+   present.</p>
 </li>
 <li>
-<p><strong>Allocate the WARN budget across families.</strong> Let <span class="arithmatex">\(m(f)\)</span> be the module count in family <span class="arithmatex">\(f\)</span> and <span class="arithmatex">\(M = \sum_{g} m(g)\)</span> the total across families. With budget <span class="arithmatex">\(B\)</span> (Balanced: 5), assign
-   <span class="arithmatex">\(B(f) = \left\lfloor B \cdot \frac{m(f)}{M} + \tfrac{1}{2} \right\rfloor\)</span></p>
+<p><strong>Summarize null sweeps.</strong> Use the null-sweep calibration path
+   (<code>invarlock advanced calibrate null-sweep</code>) or the underlying
+   <code>summarize_null_sweep_reports</code> helper to compute:</p>
+</li>
+<li><code>observed.family_max_z</code></li>
+<li><code>observed.any_warning_rate</code></li>
+<li><code>recommendations.family_caps</code></li>
+<li>
+<p><code>recommendations.multiple_testing</code></p>
 </li>
 <li>
-<p><strong>Order-statistic recipe (recommended).</strong> Sort <span class="arithmatex">\(Z(f) = \{\, |z(i)| : i \in f\,\}\)</span> in descending order; set <span class="arithmatex">\(\kappa(f) = \max\big(\kappa^{\mathrm{default}}(f),\ Z(f)^{(B(f))}\big) + \eta\)</span> with a small safety margin <span class="arithmatex">\(\eta \in [0.05, 0.10]\)</span> for robustness.</p>
+<p><strong>Cap recommendation.</strong> The current summarizer recommends
+   <span class="arithmatex">\(\kappa(f) = \max_z(f) \times (1+\eta)\)</span>, rounded for report stability, where
+   <span class="arithmatex">\(\eta\)</span> is the configured safety margin (default 0.05). If the observed
+   any-warning rate is above target, it also recommends a lower
+   multiple-testing α on a bounded grid.</p>
 </li>
 <li>
-<p><strong>Parametric alternative.</strong> With two-sided tail <span class="arithmatex">\(\mathrm{pTail}(\kappa)=2\big(1-\Phi(\kappa)\big)\)</span> and target <span class="arithmatex">\(m(f)\,\mathrm{pTail}(\kappa(f))\approx B(f)\)</span>, <span class="arithmatex">\(\kappa(f) = \Phi^{-1}\left(1-\frac{B(f)}{2\,m(f)}\right)\)</span> then add the same small margin.</p>
+<p><strong>Parametric cross-check.</strong> With two-sided tail
+   <span class="arithmatex">\(\mathrm{pTail}(\kappa)=2\big(1-\Phi(\kappa)\big)\)</span>, compare the proposed caps
+   to modeled Gaussian tails for calibrated high-kappa families. Treat low
+   Balanced <code>embed</code>/<code>other</code> caps as operational sentinels, not standalone
+   Gaussian-tail claims.</p>
 </li>
 <li>
 <p><strong>Keep these fixed (Balanced).</strong> <code>multiple_testing: {method: bh, alpha: 0.05, m: 4}</code>, <code>deadband: 0.10</code>, <code>scope: all</code>, <code>max_caps: 5</code>, <code>max_spectral_norm: null</code>.</p>
@@ -2822,8 +2965,11 @@ for reproducibility and attach calibration reports to change proposals.</p>
 </blockquote>
 <h3 id="worked-example-recalibrating-spectral-for-a-custom-gpt-2-run">Worked Example: Recalibrating Spectral κ for a Custom GPT-2 Run<a class="headerlink" href="#worked-example-recalibrating-spectral-for-a-custom-gpt-2-run" title="Permanent link">&para;</a></h3>
 <p>Suppose you ran a baseline and extracted z-scores from the report:</p>
-<div class="codehilite"><pre><span></span><code><span class="c1"># 1. Run baseline</span>
-<span class="nv">INVARLOCK_ALLOW_HOST_EXECUTION</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>invarlock<span class="w"> </span>evaluate<span class="w"> </span><span class="se">\</span>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Calibration-only / non-assurance example.</span>
+<span class="c1"># Do not accept host-mode output as strict assurance evidence.</span>
+<span class="c1"># 1. Run baseline</span>
+invarlock<span class="w"> </span>evaluate<span class="w"> </span>--allow-network<span class="w"> </span>--execution-mode<span class="w"> </span>host<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--assurance<span class="w"> </span>off<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--baseline<span class="w"> </span>gpt2<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--subject<span class="w"> </span>gpt2<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--preset<span class="w"> </span>configs/presets/causal_lm/wikitext2_512.yaml<span class="w"> </span><span class="se">\</span>
@@ -2833,14 +2979,38 @@ for reproducibility and attach calibration reports to change proposals.</p>
 <span class="w">  </span>--report-out<span class="w"> </span>reports/baseline_calib
 
 <span class="c1"># 2. Extract z-scores from the baseline run report (example using jq)</span>
-jq<span class="w"> </span><span class="s1">&#39;.guards[] | select(.name == &quot;spectral&quot;) | .metrics.final_z_scores&#39;</span><span class="w"> </span><span class="se">\</span>
+jq<span class="w"> </span><span class="s1">&#39;.guards[] | select(.name == &quot;spectral&quot;) |</span>
+<span class="s1">    (.final_z_scores // .extras.final_z_scores // .metrics.top_z_scores)&#39;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>runs/baseline_calib/source/*/report.json<span class="w"> </span>&gt;<span class="w"> </span>z_scores.json
 </code></pre></div>
 
 <p>With 120 total modules distributed as: FFN=40, Attn=40, Embed=8, Other=32.</p>
 <p><strong>Step-by-step κ calculation:</strong></p>
 <ol>
-<li><strong>Allocate budget.</strong> With budget B=5 and M=120 total modules:</li>
+<li><strong>Summarize observed maxima.</strong> Suppose the null-sweep summary reports 120
+   total modules and the following per-family maxima:</li>
+<li><code>ffn</code>: 1.8</li>
+<li><code>attn</code>: 2.6</li>
+<li><code>embed</code>: 1.4</li>
+<li>
+<p><code>other</code>: 1.1</p>
+</li>
+<li>
+<p><strong>Apply margin.</strong> With safety margin η=0.05, recommended κ values are:</p>
+</li>
+<li>κ(ffn) = 1.8 × 1.05 = <strong>1.89</strong></li>
+<li>κ(attn) = 2.6 × 1.05 = <strong>2.73</strong></li>
+<li>κ(embed) = 1.4 × 1.05 = <strong>1.47</strong></li>
+<li>
+<p>κ(other) = 1.1 × 1.05 = <strong>1.155</strong></p>
+</li>
+<li>
+<p><strong>Review warning rate.</strong> If observed any-warning rate exceeds the target,
+   lower the multiple-testing α according to the null-sweep recommendation.</p>
+</li>
+<li>
+<p><strong>Record module distribution for audit.</strong> With budget B=5 and M=120 total modules:</p>
+</li>
 <li>B(ffn) = ⌊5 × 40/120 + 0.5⌋ = ⌊2.17⌋ = 2</li>
 <li>B(attn) = ⌊5 × 40/120 + 0.5⌋ = 2</li>
 <li>B(embed) = ⌊5 × 8/120 + 0.5⌋ = 1</li>
@@ -2848,41 +3018,40 @@ jq<span class="w"> </span><span class="s1">&#39;.guards[] | select(.name == &quo
 <p>B(other) = ⌊5 × 32/120 + 0.5⌋ = 1</p>
 </li>
 <li>
-<p><strong>Sort |z| per family.</strong> Suppose FFN z-scores sorted descending are:
-   [2.1, 1.8, 1.6, 1.5, 1.4, 1.3, ...]</p>
-</li>
-<li>
-<p><strong>Set κ using order statistic.</strong> κ(ffn) = Z(ffn)^(B(ffn)) + margin = 1.8 + 0.1 = <strong>1.9</strong></p>
-</li>
-<li>
-<p><strong>Repeat for other families.</strong> If Attn's 2nd-largest |z| is 2.6, κ(attn) = 2.7.</p>
-</li>
-<li>
-<p><strong>Write local override:</strong></p>
+<p><strong>Write local override:</strong> Start from
+   <code>configs/overrides/spectral_balanced_local.example.yaml</code>, copy it for local
+   editing, and update the calibrated caps.</p>
 </li>
 </ol>
 <p><code>yaml
-   # configs/overrides/spectral_local.yaml
+   # Based on configs/overrides/spectral_balanced_local.example.yaml
    guards:
      spectral:
        family_caps:
-         ffn: 1.9
-         attn: 2.7
-         embed: 1.5
-         other: 1.2</code></p>
+         ffn: {kappa: 1.89}
+         attn: {kappa: 2.73}
+         embed: {kappa: 1.5}
+         other: {kappa: 1.2}</code></p>
 <ol>
-<li><strong>Re-run with override:</strong></li>
+<li><strong>Re-run with override:</strong> The command below uses the committed example path
+   for reproducibility; replace it with your edited local copy when trialing new
+   caps.</li>
 </ol>
 <p><code>bash
-   INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock evaluate \
+   # Calibration-only / non-assurance example.
+   # Do not accept host-mode output as strict assurance evidence.
+   invarlock evaluate --allow-network --execution-mode host \
+     --assurance off \
      --baseline gpt2 \
      --subject gpt2 \
      --preset configs/presets/causal_lm/wikitext2_512.yaml \
-     --edit-config configs/overrides/spectral_local.yaml \
+     --edit-config configs/overrides/spectral_balanced_local.example.yaml \
      --profile ci \
      --tier balanced</code></p>
 <ol>
-<li><strong>Verify.</strong> Check <code>report.guards[spectral].metrics.warnings_count ≤ 5</code> on clean baselines.</li>
+<li><strong>Verify.</strong> Check <code>spectral.caps_applied &lt;= spectral.max_caps</code> and
+   <code>spectral.caps_exceeded == false</code> (or the same values mirrored under
+   <code>spectral.summary</code>) on clean baselines.</li>
 </ol>
 <hr />
 <h2 id="rmt-acceptance-bands">RMT ε (acceptance bands)<a class="headerlink" href="#rmt-acceptance-bands" title="Permanent link">&para;</a></h2>
@@ -2891,19 +3060,26 @@ jq<span class="w"> </span><span class="s1">&#39;.guards[] | select(.name == &quo
 <li><strong>Balanced</strong> ε per family: <code>{ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01}</code></li>
 <li><strong>Conservative</strong>: <code>{ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01}</code></li>
 </ul>
-<p>Acceptance rule per family <span class="arithmatex">\(f\)</span>: with baseline edge‑risk <span class="arithmatex">\(r_f^{\text{base}}\)</span> and current edge‑risk <span class="arithmatex">\(r_f^{\text{cur}}\)</span>,
-<span class="arithmatex">\(r_f^{\text{cur}} \le \left(1+\varepsilon(f)\right)\, r_f^{\text{base}}\)</span>.</p>
+<p>Acceptance rule per family <span class="arithmatex">\(f\)</span>: with baseline edge risk
+<span class="arithmatex">\(r_f^{\text{base}}\)</span> and current edge risk <span class="arithmatex">\(r_f^{\text{cur}}\)</span>:</p>
+<div class="arithmatex">\[
+r_f^{\text{cur}} \le \left(1+\varepsilon(f)\right) r_f^{\text{base}}
+\]</div>
 <p><strong>Runtime visibility.</strong> report fields under <code>rmt.*</code> report baseline/current edge‑risk, ε (default and by family), status, and <code>validation.rmt_stable</code>.</p>
 <p><strong>RMT calibration provenance.</strong> Aggregated null-run stats are derived from
-calibration reports. Local tooling can parse report JSON files to
-extract <code>rmt.families.*.{edge_base,edge_cur,delta}</code> per family, and report
-quantile summaries of Δ(f) = r_cur(f)/r_base(f) − 1 (skip cases with missing or
-zero baseline).</p>
+calibration reports. The current repo does not ship a dedicated RMT ε
+calibration CLI summarizer; recalibration is a manual/reviewer-audited procedure
+using report JSON fields such as <code>rmt.families.*.{edge_base,edge_cur,delta}</code>.
+Report quantile summaries of Δ(f) = r_cur(f)/r_base(f) − 1 and skip cases with
+missing or zero baseline.</p>
 <hr />
 <h3 id="how-to-recalibrate">How to recalibrate ε<a class="headerlink" href="#how-to-recalibrate" title="Permanent link">&para;</a></h3>
 <ol>
-<li>Run <strong>null</strong> baselines (no edit) and compute per-family deltas <span class="arithmatex">\(\Delta(f) = r_{\text{cur}}(f)/r_{\text{base}}(f) - 1\)</span> (skip cases with <span class="arithmatex">\(r_{\text{base}}(f)=0\)</span>).</li>
-<li>Set <span class="arithmatex">\(\varepsilon(f) = \mathrm{Quantile}\big(\Delta(f);\ q\big)\)</span> with <span class="arithmatex">\(q \in [0.95, 0.99]\)</span>.</li>
+<li>Run <strong>null</strong> baselines (no edit) and compute per-family deltas
+   <span class="arithmatex">\(\Delta(f) = r_{\text{cur}}(f)/r_{\text{base}}(f) - 1\)</span> (skip cases with
+   <span class="arithmatex">\(r_{\text{base}}(f)=0\)</span>).</li>
+<li>Set <span class="arithmatex">\(\varepsilon(f) = \mathrm{Quantile}(\Delta(f); q)\)</span> with
+   <span class="arithmatex">\(q \in [0.95, 0.99]\)</span>.</li>
 <li>Use a slightly larger ε for tiny families (discreteness: <span class="arithmatex">\(b(f)\in\{0,1\}\)</span> matters).</li>
 </ol>
 <hr />
@@ -2920,7 +3096,16 @@ reports. Local tooling can parse report JSON files to extract
 standard deviation across runs.</p>
 <hr />
 <h3 id="how-to-recalibrate-min-effect">How to recalibrate min-effect<a class="headerlink" href="#how-to-recalibrate-min-effect" title="Permanent link">&para;</a></h3>
-<p>For paired ΔlogNLL with stdev <span class="arithmatex">\(\hat{\sigma}\)</span> over <span class="arithmatex">\(n\)</span> windows, <span class="arithmatex">\(\text{min effect (logNLL)} \approx z \cdot \frac{\hat{\sigma}}{\sqrt{n}}\)</span> with <strong>Balanced</strong> using one-sided <span class="arithmatex">\(z = z_{0.95}\)</span> and <strong>Conservative</strong> two-sided <span class="arithmatex">\(z = z_{0.975}\)</span>. VE enables only if the predictive CI upper bound ≤ −<code>min_effect_lognll</code> and the mean Δ ≤ −<code>min_effect_lognll</code>; a CI entirely above +<code>min_effect_lognll</code> is treated as regression (VE stays off).</p>
+<p>For paired ΔlogNLL with standard deviation <span class="arithmatex">\(\hat{\sigma}\)</span> over <span class="arithmatex">\(n\)</span> windows:</p>
+<div class="arithmatex">\[
+\text{min effect (logNLL)}
+\approx
+z \cdot \frac{\hat{\sigma}}{\sqrt{n}}
+\]</div>
+<p>Balanced uses one-sided <span class="arithmatex">\(z = z_{0.95}\)</span> and Conservative uses two-sided
+<span class="arithmatex">\(z = z_{0.975}\)</span>. VE enables only if the predictive CI upper bound is at most
+<code>-min_effect_lognll</code> and the mean Δ is at most <code>-min_effect_lognll</code>; a CI
+entirely above <code>+min_effect_lognll</code> is treated as regression, so VE stays off.</p>
 <hr />
 <h2 id="evaluation-window-sizing-coverage">Evaluation window sizing (coverage)<a class="headerlink" href="#evaluation-window-sizing-coverage" title="Permanent link">&para;</a></h2>
 <p>Pick preview/final counts so the <strong>BCa half-width</strong> on ΔlogNLL is within target:</p>
@@ -2939,10 +3124,15 @@ unprofiled runs.
 <hr />
 <h2 id="fast-path-recalibration-summary">“Fast path” recalibration (summary)<a class="headerlink" href="#fast-path-recalibration-summary" title="Permanent link">&para;</a></h2>
 <ol>
-<li><strong>Baseline (release, Balanced).</strong> Run once and collect <code>final_z_scores</code>.</li>
-<li><strong>Spectral κ.</strong> Allocate budget (<span class="arithmatex">\(B=5\)</span>) → per-family (<span class="arithmatex">\(B(f)\)</span>); compute <span class="arithmatex">\(\kappa(f)\)</span> via order-statistic (or parametric) + margin; <strong>keep</strong> BH, deadband, scope, <code>max_caps</code>, and <strong>no clamp</strong>.</li>
-<li><strong>RMT ε.</strong> From null runs, set <span class="arithmatex">\(\varepsilon(f)\)</span> to the q95–q99 quantile of <span class="arithmatex">\(\big(g(f)/b(f) - 1\big)\)</span> per family (adjust for small <span class="arithmatex">\(b(f)\)</span>).</li>
-<li><strong>VE min-effect.</strong> (<span class="arithmatex">\(\approx z\,\hat{\sigma}/\sqrt{n}\)</span>) with tier-appropriate sidedness.</li>
+<li><strong>Baseline/null sweep (release, Balanced).</strong> Collect guard-level
+   <code>final_z_scores</code> or evaluation-report spectral summaries.</li>
+<li><strong>Spectral κ.</strong> Run the null-sweep summary, set κ from per-family max z plus
+   safety margin, optionally lower α if warning rate is high; <strong>keep</strong> BH,
+   deadband, scope, <code>max_caps</code>, and <strong>no clamp</strong> unless the change proposal says
+   otherwise.</li>
+<li><strong>RMT ε.</strong> From null runs, set <span class="arithmatex">\(\varepsilon(f)\)</span> to the q95–q99 quantile of
+   <span class="arithmatex">\(g(f)/b(f) - 1\)</span> per family (adjust when <code>b(f)</code> is small).</li>
+<li><strong>VE min-effect.</strong> Use <span class="arithmatex">\(z\,\hat{\sigma}/\sqrt{n}\)</span> with tier-appropriate sidedness.</li>
 <li><strong>Windows.</strong> Size <span class="arithmatex">\(n\)</span> to hit the half-width target; enforce non-overlap and pairing.</li>
 <li><strong>Trial via override.</strong> Write calibrated values to a local override YAML (e.g., <code>configs/overrides/spectral_balanced_local.example.yaml</code>, copied locally and edited) and merge it into a local run preset under <code>guards:</code> instead of editing the global tier. Re-run baseline + edits; pre-screen gates; then build reports.</li>
 </ol>
@@ -2957,6 +3147,11 @@ fields make such updates auditable end-to-end.</p>
 <ul>
 <li><a href="../../reference/tier-policy-catalog/">Tier Policy Catalog</a> — Policy keys and where they appear in reports</li>
 <li><a href="../../reference/guards/">Guards Reference</a> — Guard configuration options</li>
+<li><a href="../03-bca-bootstrap/">BCa Bootstrap</a> — Primary-metric interval mechanics</li>
+<li><a href="../05-spectral-fpr-derivation/">Spectral False-Positive Control</a> — Multiple-testing and spectral cap rationale</li>
+<li><a href="../06-rmt-epsilon-rule/">RMT Epsilon Rule</a> — Activation edge-risk rule</li>
+<li><a href="../07-ve-gate-power/">VE Predictive Gate</a> — Variance-effect threshold sizing</li>
+<li><a href="../17-empirical-guard-evidence/">Empirical Guard Evidence</a> — Release evidence manifest scope</li>
 </ul>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
@@ -3015,6 +3210,10 @@ fields make such updates auditable end-to-end.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

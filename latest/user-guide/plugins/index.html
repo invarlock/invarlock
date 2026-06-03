@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -68,7 +68,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#plugin-workflow-adapters-and-guards" class="md-skip">
+        <a href="#plugin-workflow-adapters-guards-and-edits" class="md-skip">
           Skip to content
         </a>
       
@@ -556,6 +556,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -2154,7 +2210,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2266,7 +2322,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2843,10 +2899,9 @@
   
 
 
-<h1 id="plugin-workflow-adapters-and-guards">Plugin Workflow: Adapters and Guards<a class="headerlink" href="#plugin-workflow-adapters-and-guards" title="Permanent link">&para;</a></h1>
-<p>InvarLock's plugin system extends model loading and guard capabilities. Plugins do
-not add additional edit algorithms beyond the built-in RTN dequantized
-simulation edit.</p>
+<h1 id="plugin-workflow-adapters-guards-and-edits">Plugin Workflow: Adapters, Guards, and Edits<a class="headerlink" href="#plugin-workflow-adapters-guards-and-edits" title="Permanent link">&para;</a></h1>
+<p>InvarLock's plugin system extends model loading, guard checks, and edit
+algorithms through explicit entry points and ABI checks.</p>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2858,7 +2913,7 @@ simulation edit.</p>
 <tbody>
 <tr>
 <td><strong>Purpose</strong></td>
-<td>Extend InvarLock with custom adapters and guards.</td>
+<td>Extend InvarLock with custom adapters, guards, and edits.</td>
 </tr>
 <tr>
 <td><strong>Audience</strong></td>
@@ -2866,7 +2921,7 @@ simulation edit.</p>
 </tr>
 <tr>
 <td><strong>Plugin types</strong></td>
-<td>Adapters (model loading), Guards (validation checks).</td>
+<td>Adapters (model loading), Guards (validation checks), Edits (model modifications).</td>
 </tr>
 <tr>
 <td><strong>Registration</strong></td>
@@ -2874,7 +2929,7 @@ simulation edit.</p>
 </tr>
 <tr>
 <td><strong>Source of truth</strong></td>
-<td><code>src/invarlock/plugins/hello_guard.py</code> (example).</td>
+<td>Plugin discovery in <code>src/invarlock/core/registry.py</code>, built-in catalog metadata in <code>src/invarlock/core/builtin_plugin_catalog.py</code>, and the ABI contract in <code>contracts/plugin_compatibility.json</code>. Optional/demo implementations live in <code>src/invarlock/plugins/__init__.py</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -2917,6 +2972,7 @@ invarlock<span class="w"> </span>advanced<span class="w"> </span>plugins<span cl
 <div class="codehilite"><pre><span></span><code><span class="c1"># src/my_plugin/my_guard.py</span>
 <span class="sd">&quot;&quot;&quot;A simple guard that checks for NaN values in weights.&quot;&quot;&quot;</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">INVARLOCK_CORE_ABI</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.core.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">Guard</span>
 
 
@@ -2999,13 +3055,14 @@ invarlock<span class="w"> </span>advanced<span class="w"> </span>plugins<span cl
 </code></pre></div>
 
 <h2 id="guard-plugin-complete-example">Guard Plugin (Complete Example)<a class="headerlink" href="#guard-plugin-complete-example" title="Permanent link">&para;</a></h2>
-<p>This example shows a production-ready guard with policy support and tests.</p>
+<p>This example shows a policy-aware guard with tests.</p>
 <h3 id="guard-implementation">Guard Implementation<a class="headerlink" href="#guard-implementation" title="Permanent link">&para;</a></h3>
 <div class="codehilite"><pre><span></span><code><span class="c1"># src/my_plugin/threshold_guard.py</span>
 <span class="sd">&quot;&quot;&quot;Guard that monitors weight magnitude changes.&quot;&quot;&quot;</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">INVARLOCK_CORE_ABI</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.core.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">Guard</span>
 
 
@@ -3223,6 +3280,7 @@ skeleton for a custom adapter.</p>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">INVARLOCK_CORE_ABI</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.core.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelAdapter</span>
 
 
@@ -3235,6 +3293,10 @@ skeleton for a custom adapter.</p>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;custom_format&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">can_handle</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return true for local paths in the custom format.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">Path</span><span class="p">(</span><span class="n">model_id</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">load_model</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -3322,12 +3384,12 @@ skeleton for a custom adapter.</p>
 <h2 id="plugin-debugging">Plugin Debugging<a class="headerlink" href="#plugin-debugging" title="Permanent link">&para;</a></h2>
 <h3 id="check-registration">Check Registration<a class="headerlink" href="#check-registration" title="Permanent link">&para;</a></h3>
 <div class="codehilite"><pre><span></span><code><span class="c1"># Verify plugin is discovered</span>
-invarlock<span class="w"> </span>advanced<span class="w"> </span>plugins<span class="w"> </span>list<span class="w"> </span>--verbose
+invarlock<span class="w"> </span>advanced<span class="w"> </span>plugins<span class="w"> </span>list<span class="w"> </span>--verbose<span class="w"> </span>--allow-third-party-plugins
 
 <span class="c1"># Get details for specific plugin</span>
-invarlock<span class="w"> </span>advanced<span class="w"> </span>plugins<span class="w"> </span>adapters<span class="w"> </span>--explain<span class="w"> </span>custom_format
+invarlock<span class="w"> </span>advanced<span class="w"> </span>plugins<span class="w"> </span>adapters<span class="w"> </span>--explain<span class="w"> </span>custom_format<span class="w"> </span>--allow-third-party-plugins
 <span class="c1"># For guards, use --verbose to show module and entry point details</span>
-invarlock<span class="w"> </span>advanced<span class="w"> </span>plugins<span class="w"> </span>guards<span class="w"> </span>--verbose
+invarlock<span class="w"> </span>advanced<span class="w"> </span>plugins<span class="w"> </span>guards<span class="w"> </span>--verbose<span class="w"> </span>--allow-third-party-plugins
 </code></pre></div>
 
 <h3 id="debug-loading-issues">Debug Loading Issues<a class="headerlink" href="#debug-loading-issues" title="Permanent link">&para;</a></h3>
@@ -3446,6 +3508,10 @@ python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;f
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

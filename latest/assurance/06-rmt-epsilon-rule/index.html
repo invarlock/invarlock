@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -553,6 +553,62 @@
     
   
     Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
   
 
     
@@ -1849,6 +1905,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#claim" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1910,10 +1977,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#calibration" class="md-nav__link">
+  <a href="#recalibration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Calibration
+        Recalibration
       
     </span>
   </a>
@@ -2043,7 +2110,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2155,7 +2222,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2486,6 +2553,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#claim" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2547,10 +2625,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#calibration" class="md-nav__link">
+  <a href="#recalibration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Calibration
+        Recalibration
       
     </span>
   </a>
@@ -2627,6 +2705,33 @@
 can grow beyond its baseline, ensuring structural shifts trigger a failure
 while expected noise passes.</p>
 </blockquote>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Purpose</strong></td>
+<td>Define the RMT edge-risk acceptance band and the report fields needed to audit it.</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>RMT guard maintainers, calibration reviewers, and release reviewers checking activation evidence.</td>
+</tr>
+<tr>
+<td><strong>Contract scope</strong></td>
+<td>Baseline-relative activation edge-risk growth, per-family epsilon bands, and report-verifier behavior.</td>
+</tr>
+<tr>
+<td><strong>Source of truth</strong></td>
+<td><code>src/invarlock/guards/rmt*.py</code>, <code>runtime/tiers.yaml</code>, and RMT assurance tests.</td>
+</tr>
+</tbody>
+</table>
 <h2 id="claim">Claim<a class="headerlink" href="#claim" title="Permanent link">&para;</a></h2>
 <p>The Random Matrix Theory (RMT) guard accepts an edit when the activation <strong>edge
 risk score</strong> stays within the calibrated ε‑band for each family.</p>
@@ -2639,10 +2744,10 @@ r_f^{\text{cur}} \le (1+\epsilon_f)\, r_f^{\text{base}}
 <p>with <span class="arithmatex">\(\epsilon_f\)</span> calibrated from <strong>null</strong> runs (e.g., 95th–99th percentile of
 <span class="arithmatex">\(r_f^{\text{cur}}/r_f^{\text{base}} - 1\)</span>).</p>
 <h3 id="what-is-the-edge-risk-score">What is the edge risk score?<a class="headerlink" href="#what-is-the-edge-risk-score" title="Permanent link">&para;</a></h3>
-<p>For a (token×hidden) activation matrix <span class="arithmatex">\(A\)</span>, the guard forms a whitened matrix
-<span class="arithmatex">\(A'\)</span> (centered and standardised), estimates its top singular value
-<span class="arithmatex">\(\hat{\sigma}_{\max}(A')\)</span> via a deterministic matvec estimator, and normalizes by
-the Marchenko–Pastur edge <span class="arithmatex">\(\sigma_{\mathrm{MP}}(m,n)\)</span> for the same shape:</p>
+<p>For a (token×hidden) activation matrix, the guard forms a whitened centered and
+standardized matrix, estimates its top singular value via a deterministic
+matvec estimator, and normalizes by the Marchenko–Pastur edge for the same
+shape:</p>
 <div class="arithmatex">\[
 r = \frac{\hat{\sigma}_{\max}(A')}{\sigma_{\mathrm{MP}}(m,n)}
 \]</div>
@@ -2663,7 +2768,8 @@ inside <code>src/invarlock/guards/rmt.py</code>.</p>
 <ul>
 <li>Null calibration must cover each family <code>{ffn, attn, embed, other}</code>; default ε values are exposed whenever data is sparse.</li>
 <li>Baseline and current scores use identical activation sampling and <strong>token‑weighted aggregation</strong>.</li>
-<li>Evidence requires activation-based scoring; if activation batches are missing, the RMT guard fails closed.</li>
+<li>CI/release and activation-required evidence require activation-based scoring;
+  if activation batches are missing in those paths, the RMT guard fails closed.</li>
 </ul>
 <h2 id="calibration-pilot-derived">Calibration (pilot-derived)<a class="headerlink" href="#calibration-pilot-derived" title="Permanent link">&para;</a></h2>
 <ul>
@@ -2677,17 +2783,17 @@ inside <code>src/invarlock/guards/rmt.py</code>.</p>
 </ul>
 <p><em>Example:</em> with <code>r_base = 1.20</code> and ε = 0.01, the guard allows
 <code>r_cur ≤ (1+0.01) × 1.20 = 1.212</code>.</p>
-<h2 id="calibration">Calibration<a class="headerlink" href="#calibration" title="Permanent link">&para;</a></h2>
+<h2 id="recalibration">Recalibration<a class="headerlink" href="#recalibration" title="Permanent link">&para;</a></h2>
 <p>Calibration values are derived from null-sweep runs and stored in the packaged
-<code>tiers.yaml</code>. See the full calibration methodology in
+<code>runtime/tiers.yaml</code>. See the full calibration methodology in
 <a href="../09-tier-v1-calibration/">09-tier-v1-calibration.md</a>.</p>
 <p>To recalibrate, run null baselines (no edit) and compute per-family deltas
-Δ(f) = r_cur(f)/r_base(f) − 1 (skip cases with missing baseline). Set ε(f) to the
-q95–q99 quantile of Δ(f). For small families or tiny sample sizes, use a slightly
-larger ε to avoid spurious failures.</p>
+Δ(f) = r_cur(f)/r_base(f) − 1 (skip cases with missing or zero baseline). Set
+ε(f) to the q95–q99 quantile of Δ(f). For small families or tiny sample sizes,
+use a slightly larger ε to avoid spurious failures.</p>
 <h2 id="runtime-contract-report">Runtime Contract (report)<a class="headerlink" href="#runtime-contract-report" title="Permanent link">&para;</a></h2>
 <ul>
-<li>report reports <code>rmt.{mode,edge_risk_by_family_base,edge_risk_by_family,epsilon_default,epsilon_by_family,epsilon_violations,stable,status}</code>.</li>
+<li>report records <code>rmt.{mode,edge_risk_by_family_base,edge_risk_by_family,epsilon_default,epsilon_by_family,epsilon_violations,stable,status}</code>.</li>
 <li>Per-family details for rendering live under <code>rmt.families.*.{edge_base,edge_cur,epsilon,allowed,ratio,delta}</code>.</li>
 <li><code>rmt.measurement_contract.kind = "activation_edge_risk"</code> records which RMT
   measurement path produced the evidence.</li>
@@ -2698,7 +2804,7 @@ larger ε to avoid spurious failures.</p>
 <li><code>rmt.edge_risk_by_family_base.*</code> and <code>rmt.edge_risk_by_family.*</code>.</li>
 <li><code>rmt.epsilon_default</code> and <code>rmt.epsilon_by_family.*</code>.</li>
 <li><code>rmt.status</code> / <code>rmt.stable</code> and <code>rmt.epsilon_violations</code> for pass/fail context.</li>
-<li><code>resolved_policy.rmt.{margin,deadband,epsilon_by_family}</code> — resolved thresholds archived with the container-backed report bundle.</li>
+<li><code>resolved_policy.rmt.{margin,deadband,epsilon_by_family}</code> — resolved thresholds archived with the report bundle.</li>
 </ul>
 <h2 id="edge-cases">Edge cases<a class="headerlink" href="#edge-cases" title="Permanent link">&para;</a></h2>
 <ul>
@@ -2706,6 +2812,11 @@ larger ε to avoid spurious failures.</p>
 </ul>
 <h2 id="background-reading">Background reading<a class="headerlink" href="#background-reading" title="Permanent link">&para;</a></h2>
 <ul>
+<li>Marchenko, V. A., &amp; Pastur, L. A. (1967). “Distribution of eigenvalues for
+  some sets of random matrices.” <em>Mathematics of the USSR-Sbornik</em>, 1(4),
+  457–483.</li>
+<li>Bai, Z. D., &amp; Silverstein, J. W. (2010). <em>Spectral Analysis of Large
+  Dimensional Random Matrices</em> (2nd ed.). Springer.</li>
 <li>Pennington, J., &amp; Worah, P. (2017). “Nonlinear Random Matrix Theory for Deep Learning.” <em>Advances in Neural Information Processing Systems (NeurIPS)</em>. <a href="https://papers.nips.cc/paper/6857-nonlinear-random-matrix-theory-for-deep-learning">https://papers.nips.cc/paper/6857-nonlinear-random-matrix-theory-for-deep-learning</a></li>
 <li>Martin, C. H., &amp; Mahoney, M. W. (2021). “Implicit Self-Regularization in Deep Neural Networks: Evidence from Random Matrix Theory and Implications for Learning.” <em>Journal of Machine Learning Research</em>, 22(165), 1–73. Preprint: <a href="https://arxiv.org/abs/1810.01075">https://arxiv.org/abs/1810.01075</a></li>
 </ul>
@@ -2762,6 +2873,10 @@ larger ε to avoid spurious failures.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -576,6 +576,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../bring-your-own-data/" class="md-nav__link">
         
   
@@ -796,6 +852,17 @@
     <span class="md-ellipsis">
       
         Unsupported Model Family
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guard-catches-clean-primary-metric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guard Catches Clean Primary Metric
       
     </span>
   </a>
@@ -2004,7 +2071,7 @@
   <span class="md-ellipsis">
     
   
-    Tier v1.0 Calibration (Pilot)
+    Tier Policy v1 Calibration (Pilot)
   
 
     
@@ -2116,7 +2183,7 @@
   <span class="md-ellipsis">
     
   
-    GPU/MPS-First Guards
+    GPU/MPS-First Guard Measurement Contracts
   
 
     
@@ -2502,6 +2569,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#guard-catches-clean-primary-metric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guard Catches Clean Primary Metric
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#development-fallback" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2601,7 +2679,7 @@ non-assurance.</p>
 <div class="codehilite"><pre><span></span><code>verify failed: runtime_manifest_missing
 </code></pre></div>
 
-<p><strong>Meaning:</strong> the verifier cannot prove the runtime provenance required by strict
+<p><strong>Meaning:</strong> the verifier cannot verify the runtime provenance required by strict
 assurance.</p>
 <p><strong>Action:</strong> rerun in container mode and keep <code>runtime.manifest.json</code> with the
 evaluation report. See <a href="../../security/runtime-provenance-guide/">Runtime Provenance Guide</a>.</p>
@@ -2620,6 +2698,23 @@ family under the strict claim.</p>
 tests, or treat the run as exploratory. See
 <a href="../../reference/model-family-catalog/">Model Family Catalog</a> for the current
 support inventory.</p>
+<h2 id="guard-catches-clean-primary-metric">Guard Catches Clean Primary Metric<a class="headerlink" href="#guard-catches-clean-primary-metric" title="Permanent link">&para;</a></h2>
+<p><strong>Reproduce:</strong></p>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span class="w"> </span>release<span class="w"> </span>--assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/caught_regressions/spectral_guard_failure/evaluation.report.json
+</code></pre></div>
+
+<p><strong>Symptom:</strong></p>
+<div class="codehilite"><pre><span></span><code>Release verification requires validation.spectral_stable == true
+spectral did not pass
+</code></pre></div>
+
+<p><strong>Meaning:</strong> the primary metric can still look acceptable while a guard blocks
+release. In the shipped fixture, <code>primary_metric.ratio_vs_baseline</code> is <code>1.0</code>,
+but the spectral guard records a release-blocking weight-geometry violation.</p>
+<p><strong>Action:</strong> inspect the guard diagnostics, regenerate the edited checkpoint, or
+route the run to exploratory/non-assurance review. See
+<a href="../public-evidence-walkthrough/">Public Evidence Walkthrough</a>.</p>
 <h2 id="development-fallback">Development Fallback<a class="headerlink" href="#development-fallback" title="Permanent link">&para;</a></h2>
 <p><strong>Symptom:</strong></p>
 <div class="codehilite"><pre><span></span><code><span class="p">{</span>
@@ -2695,6 +2790,10 @@ evidence.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>
