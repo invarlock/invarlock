@@ -1,7 +1,8 @@
 # Quanto Runtime Integration Example
 
-Status: `runnable`; `cuda-container-strict`, `cuda-host-off`, and `cpu-host-off`
-lanes are supported.
+Status: `runnable`; strict container evidence is verified for the
+`cuda-container-strict` lane on CUDA for this tiny Quanto example.
+`cuda-host-off` and `cpu-host-off` lanes are supported.
 
 This example shows how to attach InvarLock regression evidence to a Hugging
 Face causal checkpoint loaded through InvarLock's `hf_quanto` adapter. It creates a

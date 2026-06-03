@@ -12,6 +12,9 @@ under a local output directory outside version-controlled source files, such as
 | `runtime.manifest.json` | Strict mode | Runtime provenance emitted by the container-backed evaluation path. |
 | `backend_inventory.json` | Quantized adapters | Backend, adapter, smoke, and quantized-module inventory emitted by InvarLock report persistence when adapter provenance is available. |
 | `checkpoint_refs.json` | Target dependent | Baseline/subject provenance for materialized checkpoints or runtime adapter subjects. |
+| `external_edit_summary.json` | Target dependent | Edit or quantization materialization metadata and file hashes for examples that create a subject checkpoint before evaluation. |
+| `adapter_runtime_summary.json` | Target dependent | Runtime adapter metadata, quantization settings, save-boundary notes, and file hashes for adapter-loaded subject paths. |
+| `fixture_summary.json` | Target dependent | Local fixture parameters and file hashes copied into the lane output by examples that generate fixture data. |
 | `lane_artifact.json` | Recommended | Canonical artifact-lane label and effective execution, assurance, runtime provenance, and device settings. |
 | `run_command.txt` | Recommended | Wrapper invocation and concrete evaluate, verify, and render commands. |
 | `run_summary.txt` | Recommended | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
@@ -36,5 +39,8 @@ For release-profile strict verification, use:
 ```bash
 invarlock verify --profile release --assurance strict \
   --runtime-provenance container \
-  reports/<target>/cuda-container-strict/evaluation.report.json
+  reports/<target>/<artifact-lane>/evaluation.report.json
 ```
+
+For the primary CUDA/container strict lane, `<artifact-lane>` is
+`cuda-container-strict`.
