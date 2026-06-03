@@ -1,8 +1,8 @@
 <svg
   xmlns="http://www.w3.org/2000/svg"
   width="1200"
-  height="675"
-  viewBox="0 0 1600 900"
+  height="641"
+  viewBox="0 0 1600 855"
   role="img"
   aria-labelledby="title desc"
 >
@@ -88,7 +88,7 @@
     </style>
   </defs>
 
-  <rect width="1600" height="900" rx="0" fill="#ffffff" />
+  <rect width="1600" height="855" rx="0" fill="#ffffff" />
 
   <rect x="70" y="45" width="1460" height="320" rx="22" class="band-blue" />
   <text x="105" y="188" class="section-label" fill="#1d4ed8">1. Inputs /</text>
@@ -118,51 +118,51 @@
   <path d="M 1110 131 C 1110 159 980 160 927 175" class="arrow" />
   <path d="M 800 253 L 800 281" class="arrow" />
 
-  <rect x="70" y="430" width="1460" height="205" rx="22" class="band-green" />
-  <text x="105" y="520" class="section-label" fill="#166534">2. Output</text>
-  <text x="105" y="554" class="section-label" fill="#166534">Artifacts</text>
+  <rect x="70" y="385" width="1460" height="205" rx="22" class="band-green" />
+  <text x="105" y="475" class="section-label" fill="#166534">2. Output</text>
+  <text x="105" y="509" class="section-label" fill="#166534">Artifacts</text>
 
-  <rect x="335" y="470" width="330" height="80" rx="12" class="box-blue" />
-  <text x="500" y="504" text-anchor="middle" class="box-text">runs/.../report.json</text>
-  <text x="500" y="532" text-anchor="middle" class="box-text">baseline/subject traces</text>
+  <rect x="335" y="425" width="330" height="80" rx="12" class="box-blue" />
+  <text x="500" y="459" text-anchor="middle" class="box-text">runs/.../report.json</text>
+  <text x="500" y="487" text-anchor="middle" class="box-text">baseline/subject traces</text>
 
-  <rect x="330" y="580" width="340" height="48" rx="10" class="box-blue" />
-  <text x="500" y="612" text-anchor="middle" class="box-text">report generate / explain</text>
+  <rect x="330" y="535" width="340" height="48" rx="10" class="box-blue" />
+  <text x="500" y="567" text-anchor="middle" class="box-text">report generate / explain</text>
 
-  <rect x="850" y="470" width="445" height="90" rx="12" class="box-green" />
-  <text x="1072" y="506" text-anchor="middle" class="box-text">
+  <rect x="850" y="425" width="445" height="90" rx="12" class="box-green" />
+  <text x="1072" y="461" text-anchor="middle" class="box-text">
     reports/&lt;name&gt;/evaluation.report.json
   </text>
-  <text x="1072" y="538" text-anchor="middle" class="box-text">
+  <text x="1072" y="493" text-anchor="middle" class="box-text">
     reports/&lt;name&gt;/runtime.manifest.json
   </text>
 
-  <path d="M 690 347 C 690 440 565 448 510 470" class="arrow" />
-  <path d="M 930 347 C 930 440 1015 447 1065 470" class="arrow" />
-  <path d="M 500 550 L 500 580" class="arrow" />
+  <path d="M 690 347 C 690 395 565 403 510 425" class="arrow" />
+  <path d="M 930 347 C 930 395 1015 402 1065 425" class="arrow" />
+  <path d="M 500 505 L 500 535" class="arrow" />
 
-  <rect x="70" y="655" width="1460" height="230" rx="22" class="band-purple" />
-  <text x="105" y="742" class="section-label" fill="#5b21b6">3. Verification</text>
-  <text x="105" y="776" class="section-label" fill="#5b21b6">and Outcome</text>
+  <rect x="70" y="610" width="1460" height="230" rx="22" class="band-purple" />
+  <text x="105" y="697" class="section-label" fill="#5b21b6">3. Verification</text>
+  <text x="105" y="731" class="section-label" fill="#5b21b6">and Outcome</text>
 
-  <rect x="815" y="675" width="420" height="72" rx="12" class="box-purple" />
-  <text x="1025" y="705" text-anchor="middle" class="box-title">verify command</text>
-  <text x="1025" y="731" text-anchor="middle" class="small-text">
+  <rect x="815" y="630" width="420" height="72" rx="12" class="box-purple" />
+  <text x="1025" y="660" text-anchor="middle" class="box-title">verify command</text>
+  <text x="1025" y="686" text-anchor="middle" class="small-text">
     schema + pairing + gates + provenance
   </text>
 
-  <rect x="655" y="764" width="250" height="48" rx="10" class="box-green" />
-  <text x="780" y="796" text-anchor="middle" class="box-title">PASS: promote</text>
+  <rect x="655" y="719" width="250" height="48" rx="10" class="box-green" />
+  <text x="780" y="751" text-anchor="middle" class="box-title">PASS: promote</text>
 
-  <rect x="1115" y="764" width="230" height="48" rx="10" class="box-purple" />
-  <text x="1230" y="796" text-anchor="middle" class="box-title">FAIL: block</text>
+  <rect x="1115" y="719" width="230" height="48" rx="10" class="box-purple" />
+  <text x="1230" y="751" text-anchor="middle" class="box-title">FAIL: block</text>
 
-  <rect x="655" y="830" width="250" height="46" rx="10" class="box-purple" />
-  <text x="780" y="849" text-anchor="middle" class="box-text">report html command</text>
-  <text x="780" y="868" text-anchor="middle" class="small-text">optional evidence pack</text>
+  <rect x="655" y="785" width="250" height="46" rx="10" class="box-purple" />
+  <text x="780" y="804" text-anchor="middle" class="box-text">report html command</text>
+  <text x="780" y="823" text-anchor="middle" class="small-text">optional evidence pack</text>
 
-  <path d="M 1072 560 L 1072 675" class="arrow" />
-  <path d="M 1025 747 C 1000 756 915 761 860 764" class="arrow" />
-  <path d="M 1025 747 C 1068 756 1145 761 1198 764" class="arrow" />
-  <path d="M 780 812 L 780 830" class="arrow" />
+  <path d="M 1072 515 L 1072 630" class="arrow" />
+  <path d="M 1025 702 C 1000 711 915 716 860 719" class="arrow" />
+  <path d="M 1025 702 C 1068 711 1145 716 1198 719" class="arrow" />
+  <path d="M 780 767 L 780 785" class="arrow" />
 </svg>
