@@ -354,9 +354,7 @@ def validate_entry(repo_root: Path, entry: dict[str, Any]) -> list[ValidationIss
                     path=backend_inventory_path,
                     payload=backend_inventory,
                     expected_adapter=(
-                        expected_adapter
-                        if isinstance(expected_adapter, str)
-                        else None
+                        expected_adapter if isinstance(expected_adapter, str) else None
                     ),
                 )
             )
