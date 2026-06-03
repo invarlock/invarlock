@@ -169,6 +169,27 @@ def test_integration_runners_default_reports_are_lane_scoped() -> None:
         assert "integration_lane_report_out" in text, f"{runner} missing lane output"
 
 
+def test_source_archive_git_warning_filter_is_shared_for_external_materializers() -> (
+    None
+):
+    preflight = (
+        REPO_ROOT / "examples" / "integrations" / "_shared" / "preflight.sh"
+    ).read_text(encoding="utf-8")
+
+    assert "integration_filter_source_archive_stderr" in preflight
+    assert "integration_run_source_archive_clean" in preflight
+    assert "fatal: not a git repository" in preflight
+
+    for runner in [
+        INTEGRATIONS_DIR / "awq" / "run_tiny_awq.sh",
+        INTEGRATIONS_DIR / "gptqmodel" / "run_tiny_gptqmodel.sh",
+        INTEGRATIONS_DIR / "lm_eval_harness" / "run_tiny_lm_eval_sidecar.sh",
+        INTEGRATIONS_DIR / "peft_lora" / "run_tiny_peft_lora.sh",
+    ]:
+        text = runner.read_text(encoding="utf-8")
+        assert "integration_run_source_archive_clean" in text
+
+
 def test_integration_readmes_use_run_lane_subsections() -> None:
     for example in README_EXAMPLES:
         readme = INTEGRATIONS_DIR / example / "README.md"

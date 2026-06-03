@@ -211,7 +211,7 @@ if [[ "$force" -eq 1 ]]; then
 fi
 
 integration_log_step "materialize tiny LoRA subject and local fixture"
-"${materialize_cmd[@]}"
+integration_run_source_archive_clean "${materialize_cmd[@]}"
 
 if [[ "$materialize_only" -eq 1 ]]; then
   echo "Wrote subject checkpoint: $subject_dir"

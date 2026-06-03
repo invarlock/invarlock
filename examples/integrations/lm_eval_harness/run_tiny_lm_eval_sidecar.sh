@@ -250,20 +250,6 @@ append_command_log() {
   } >> "$run_command_txt"
 }
 
-filter_lm_eval_source_archive_stderr() {
-  local line
-
-  while IFS= read -r line; do
-    case "$line" in
-      "fatal: not a git repository (or any of the parent directories): .git")
-        ;;
-      *)
-        printf '%s\n' "$line" >&2
-        ;;
-    esac
-  done
-}
-
 run_lm_eval() {
   local label="$1"
   local model_ref="$2"
@@ -287,11 +273,7 @@ run_lm_eval() {
 
   append_command_log "$label" "${cmd[@]}"
   integration_log_step "run LM Eval Harness: $label"
-  if [[ -d "$REPO_ROOT/.git" ]]; then
-    "${cmd[@]}"
-  else
-    "${cmd[@]}" 2> >(filter_lm_eval_source_archive_stderr)
-  fi
+  integration_run_source_archive_clean "${cmd[@]}"
 }
 
 find_result_json() {
