@@ -7,46 +7,40 @@
   aria-labelledby="title desc"
 >
   <title id="title">InvarLock mark</title>
-  <desc id="desc">InvarLock bracket and signal mark in the T1 Warm Ledger light register.</desc>
-  <defs>
-    <linearGradient id="invarlock-signal" x1="156" y1="212" x2="356" y2="332" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#136f63" />
-      <stop offset="1" stop-color="#ad6a2c" />
-    </linearGradient>
-  </defs>
+  <desc id="desc">InvarLock bracket and signal mark in the T2 Technical Seal dark register.</desc>
   <path
     d="M174 150 H126 V362 H174"
     fill="none"
-    stroke="#1b2b25"
+    stroke="#f3eadc"
     stroke-width="34"
     stroke-linecap="round"
     stroke-linejoin="round"
-    opacity="0.74"
+    opacity="0.86"
   />
   <path
     d="M338 150 H386 V362 H338"
     fill="none"
-    stroke="#1b2b25"
+    stroke="#f3eadc"
     stroke-width="34"
     stroke-linecap="round"
     stroke-linejoin="round"
-    opacity="0.74"
+    opacity="0.86"
   />
   <path
     d="M156 292 C 198 212, 230 212, 256 252 S 314 332, 356 242"
     fill="none"
-    stroke="url(#invarlock-signal)"
+    stroke="#5fcaac"
     stroke-width="32"
     stroke-linecap="round"
-    opacity="0.58"
+    opacity="0.72"
   />
   <path
     d="M156 292 C 198 212, 230 212, 256 252 S 314 332, 356 242"
     fill="none"
-    stroke="#1b2b25"
+    stroke="#f3eadc"
     stroke-width="14"
     stroke-linecap="round"
     opacity="0.5"
   />
-  <circle cx="256" cy="252" r="9" fill="#1b2b25" opacity="0.62" />
+  <circle cx="256" cy="252" r="9" fill="#f3eadc" opacity="0.62" />
 </svg>

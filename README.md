@@ -2,9 +2,13 @@
   <picture>
     <source
       media="(prefers-color-scheme: dark)"
-      srcset="docs/assets/invarlock-logo-dark.svg"
+      srcset="https://raw.githubusercontent.com/invarlock/invarlock/main/docs/assets/invarlock-logo-dark.svg"
     />
-    <img src="docs/assets/invarlock-logo.svg" alt="InvarLock" />
+    <img
+      src="https://raw.githubusercontent.com/invarlock/invarlock/main/docs/assets/invarlock-logo.svg"
+      alt="InvarLock"
+      width="480"
+    />
   </picture>
 </p>
 
@@ -12,19 +16,19 @@
 
 <p align="center">
   <a href="https://github.com/invarlock/invarlock/actions/workflows/ci.yml">
-    <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&logo=github&label=CI" />
+    <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&label=CI&logo=github&labelColor=172b25&color=0f7669" />
   </a>
   <a href="https://pypi.org/project/invarlock/">
-    <img alt="PyPI" src="https://badge.fury.io/py/invarlock.svg" />
+    <img alt="PyPI" src="https://img.shields.io/pypi/v/invarlock?label=PyPI&logo=pypi&labelColor=172b25&color=0f7669" />
   </a>
   <a href="https://invarlock.github.io/invarlock/0.10.0/">
-    <img alt="Docs" src="https://img.shields.io/badge/docs-quickstart-blue.svg" />
+    <img alt="Docs" src="https://img.shields.io/badge/docs-quickstart-0f7669?labelColor=172b25" />
   </a>
   <a href="LICENSE">
-    <img alt="License: Apache-2.0" src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" />
+    <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-b56a3d?labelColor=172b25" />
   </a>
   <a href="https://www.python.org/downloads/release/python-3120/">
-    <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12+-blue.svg" />
+    <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-0f7669?logo=python&logoColor=f3eadc&labelColor=172b25" />
   </a>
 </p>
 
@@ -73,7 +77,7 @@ runs with signed, fingerprint-pinned evidence packs.
 
 <p align="center">
   <img
-    src="docs/assets/evaluation-verification-flow.svg"
+    src="https://raw.githubusercontent.com/invarlock/invarlock/main/docs/assets/evaluation-verification-flow.svg"
     alt="InvarLock evaluation and verification flow"
     width="100%"
   />
