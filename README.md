@@ -24,7 +24,7 @@
     <img alt="Docs" src="https://img.shields.io/badge/docs-quickstart-0f7669?labelColor=172b25" />
   </a>
   <a href="LICENSE">
-    <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-b56a3d?labelColor=172b25" />
+    <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-0f7669?labelColor=172b25" />
   </a>
   <a href="https://www.python.org/downloads/release/python-3120/">
     <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-0f7669?logo=python&logoColor=f3eadc&labelColor=172b25" />
