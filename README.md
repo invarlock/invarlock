@@ -7,7 +7,6 @@
     <img
       src="https://raw.githubusercontent.com/invarlock/invarlock/main/docs/assets/invarlock-logo.svg"
       alt="InvarLock"
-      width="480"
     />
   </picture>
 </p>

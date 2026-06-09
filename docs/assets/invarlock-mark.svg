@@ -14,39 +14,41 @@
       <stop offset="1" stop-color="#ad6a2c" />
     </linearGradient>
   </defs>
-  <path
-    d="M174 150 H126 V362 H174"
-    fill="none"
-    stroke="#1b2b25"
-    stroke-width="34"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-    opacity="0.74"
-  />
-  <path
-    d="M338 150 H386 V362 H338"
-    fill="none"
-    stroke="#1b2b25"
-    stroke-width="34"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-    opacity="0.74"
-  />
-  <path
-    d="M156 292 C 198 212, 230 212, 256 252 S 314 332, 356 242"
-    fill="none"
-    stroke="url(#invarlock-signal)"
-    stroke-width="32"
-    stroke-linecap="round"
-    opacity="0.58"
-  />
-  <path
-    d="M156 292 C 198 212, 230 212, 256 252 S 314 332, 356 242"
-    fill="none"
-    stroke="#1b2b25"
-    stroke-width="14"
-    stroke-linecap="round"
-    opacity="0.5"
-  />
-  <circle cx="256" cy="252" r="9" fill="#1b2b25" opacity="0.62" />
+  <g transform="translate(256 256) scale(1.55) translate(-256 -256)">
+    <path
+      d="M174 150 H126 V362 H174"
+      fill="none"
+      stroke="#1b2b25"
+      stroke-width="21.94"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      opacity="0.74"
+    />
+    <path
+      d="M338 150 H386 V362 H338"
+      fill="none"
+      stroke="#1b2b25"
+      stroke-width="21.94"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      opacity="0.74"
+    />
+    <path
+      d="M156 292 C 198 212, 230 212, 256 252 S 314 332, 356 242"
+      fill="none"
+      stroke="url(#invarlock-signal)"
+      stroke-width="20.65"
+      stroke-linecap="round"
+      opacity="0.58"
+    />
+    <path
+      d="M156 292 C 198 212, 230 212, 256 252 S 314 332, 356 242"
+      fill="none"
+      stroke="#1b2b25"
+      stroke-width="9.03"
+      stroke-linecap="round"
+      opacity="0.5"
+    />
+    <circle cx="256" cy="252" r="5.81" fill="#1b2b25" opacity="0.62" />
+  </g>
 </svg>
