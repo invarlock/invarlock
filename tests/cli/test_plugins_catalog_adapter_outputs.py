@@ -461,7 +461,7 @@ def test_plugins_command_unknown_category(monkeypatch):
 
 
 def test_check_plugin_extras_missing(monkeypatch):
-    def fake_import(name):
+    def fake_import(name, *args, **kwargs):
         raise ImportError("missing")
 
     monkeypatch.setattr("builtins.__import__", fake_import)

@@ -8,9 +8,12 @@ Supports a minimal view via INVARLOCK_MINIMAL=1 to hide built‑in adapters.
 
 import importlib
 import importlib.metadata as importlib_metadata
+import io
 import os
 import platform
 import re
+import warnings
+from contextlib import redirect_stderr, redirect_stdout
 from typing import Any
 
 import typer
@@ -248,7 +251,17 @@ def _plugin_package_importable(package_name: str) -> bool:
         if not bitsandbytes_runtime_available():
             raise ImportError("bitsandbytes not importable")
         return True
-    __import__(package_name)
+    if package_name == "gptqmodel":
+        from invarlock.plugins import _patch_gptqmodel_transformers_hub_compat
+
+        _patch_gptqmodel_transformers_hub_compat()
+    with (
+        warnings.catch_warnings(),
+        redirect_stdout(io.StringIO()),
+        redirect_stderr(io.StringIO()),
+    ):
+        warnings.simplefilter("ignore")
+        __import__(package_name)
     return True
 
 
