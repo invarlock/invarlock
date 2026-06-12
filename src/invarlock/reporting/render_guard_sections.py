@@ -63,12 +63,14 @@ def append_guard_check_details_section(
         if isinstance(spectral_summary, dict)
         else None
     )
-    caps_measure = f"{caps_applied} violations" if caps_applied is not None else "N/A"
+    caps_measure = (
+        f"{caps_applied} caps applied" if caps_applied is not None else "N/A"
+    )
     spectral_threshold = (
-        f"< {spectral_summary.get('max_caps')}"
+        f"<= {spectral_summary.get('max_caps')}"
         if isinstance(spectral_summary, dict)
         and spectral_summary.get("max_caps") is not None
-        else "< 5"
+        else "<= 5"
     )
     lines.append(
         f"| Spectral Stability | {spec_status} | {caps_measure} | {spectral_threshold} | Weight matrix spectral norms |"
@@ -250,7 +252,7 @@ def _append_spectral_observability(
         elif max_abs_z <= kappa_f:
             max_status = f"✅ Within κ={kappa_f:.3f}"
         else:
-            max_status = f"❌ Exceeds κ={kappa_f:.3f}"
+            max_status = f"⚠️ Above κ={kappa_f:.3f}"
         lines.append(f"| Max |z| | {max_val} | {max_status} |")
 
     mt_info = spectral_info.get("multiple_testing", {}) or {}
@@ -281,7 +283,7 @@ def _append_spectral_observability(
     lines.append("<details>")
     lines.append("<summary>Per-family details</summary>")
     lines.append("")
-    lines.append("| Family | κ | q95 | Max |z| | Violations |")
+    lines.append("| Family | κ | q95 | Max |z| | Caps Applied |")
     lines.append("|--------|---|-----|--------|------------|")
 
     families: set[str] = set()
@@ -306,10 +308,10 @@ def _append_spectral_observability(
                 max_z = stats.get("max")
         q95_str = f"{q95:.3f}" if isinstance(q95, (int, float)) else "-"
         max_str = f"{max_z:.3f}" if isinstance(max_z, (int, float)) else "-"
-        violations = (
+        caps = (
             caps_by_family.get(family) if isinstance(caps_by_family, dict) else None
         )
-        v_str = str(int(violations)) if isinstance(violations, (int, float)) else "0"
+        v_str = str(int(caps)) if isinstance(caps, (int, float)) else "0"
         lines.append(f"| {family} | {kappa_str} | {q95_str} | {max_str} | {v_str} |")
 
     if isinstance(top_scores, dict) and top_scores:
@@ -507,3 +509,39 @@ def append_guard_observability_sections(
     )
     _append_rmt_observability(lines, evaluation_report=evaluation_report)
     _append_guard_overhead_observability(lines, evaluation_report=evaluation_report)
+
+
+def append_guard_warnings_section(
+    lines: list[str], evaluation_report: dict[str, Any]
+) -> None:
+    guard_warnings = evaluation_report.get("guard_warnings")
+    if not isinstance(guard_warnings, dict):
+        return
+    warnings = guard_warnings.get("warnings")
+    if not isinstance(warnings, list) or not warnings:
+        return
+    lines.append("## Guard Warnings")
+    lines.append("")
+    lines.append(
+        "Policy can still pass with guard warnings; these are baseline-relative guard-signal changes, not hard policy failures unless strict warning mode is enabled."
+    )
+    lines.append("")
+    lines.append("| Guard | Kind | Location | Policy | Detail |")
+    lines.append("|-------|------|----------|--------|--------|")
+    for entry_raw in warnings:
+        if not isinstance(entry_raw, dict):
+            continue
+        guard = entry_raw.get("guard", "guard")
+        kind = entry_raw.get("kind", "warning")
+        family = entry_raw.get("family")
+        module = entry_raw.get("module")
+        location_parts = []
+        if family:
+            location_parts.append(str(family))
+        if module:
+            location_parts.append(str(module))
+        location = " / ".join(location_parts) if location_parts else "-"
+        policy = entry_raw.get("policy_gate", "unknown")
+        message = str(entry_raw.get("message") or "Guard signal changed versus baseline.")
+        lines.append(f"| {guard} | {kind} | {location} | {policy} | {message} |")
+    lines.append("")

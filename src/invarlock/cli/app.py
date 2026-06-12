@@ -511,6 +511,16 @@ def _verify_typed(
         "--assurance",
         help="Assurance verification mode (report|strict|off).",
     ),
+    warning_policy: str = typer.Option(
+        "pass",
+        "--warning-policy",
+        help="Guard-warning handling mode (pass|fail).",
+    ),
+    fail_on_warnings: bool = typer.Option(
+        False,
+        "--fail-on-warnings",
+        help="Alias for --warning-policy fail.",
+    ),
 ):
     from pathlib import Path as _Path
 
@@ -537,6 +547,7 @@ def _verify_typed(
         json_out=json_out,
         runtime_provenance=runtime_provenance.value,
         assurance=assurance,
+        warning_policy="fail" if fail_on_warnings else warning_policy,
     )
 
 

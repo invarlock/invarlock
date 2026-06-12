@@ -222,6 +222,24 @@ def _apply_probe_guard_overrides(
             record["guard_flags"]["variance"] = True
 
 
+def _guard_warnings_summary(cert: dict[str, Any]) -> dict[str, Any]:
+    guard_warnings = cert.get("guard_warnings")
+    if not isinstance(guard_warnings, dict):
+        return {"present": False, "warning_count": 0, "warnings": []}
+    warnings = guard_warnings.get("warnings")
+    if not isinstance(warnings, list):
+        warnings = []
+    warning_count = _as_int(
+        guard_warnings.get("warning_count"),
+        default=len(warnings),
+    )
+    return {
+        "present": bool(guard_warnings.get("present")) or warning_count > 0,
+        "warning_count": max(0, warning_count),
+        "warnings": warnings,
+    }
+
+
 def _build_record(
     *,
     cert: dict[str, Any],
@@ -282,6 +300,7 @@ def _build_record(
         "primary_guard_required": primary_guard_required,
         "invariants_status": outcome.invariants_status,
         "guard_flags": outcome.guard_flags,
+        "guard_warnings": _guard_warnings_summary(cert),
         "spectral_caps_applied": _spectral_caps_applied(cert),
         "spectral_baseline_relative_required": spectral_baseline_relative_required,
         "spectral_baseline_relative": spectral_baseline_relative,

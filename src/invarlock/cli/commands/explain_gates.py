@@ -296,6 +296,69 @@ def explain_gates_command(
         console.print(f"  threshold: {float(drift_min):.3f}-{float(drift_max):.3f}")
         console.print(f"  status: {drift_status}")
 
+    spectral = (
+        evaluation_report.get("spectral", {})
+        if isinstance(evaluation_report.get("spectral"), dict)
+        else {}
+    )
+    if spectral:
+        spectral_status = "PASS" if bool(validation.get("spectral_stable")) else "FAIL"
+        caps_applied = spectral.get("caps_applied")
+        max_caps = spectral.get("max_caps")
+        console.print("\n[bold]Gate: Spectral Guard[/bold]")
+        if isinstance(caps_applied, int | float):
+            console.print(f"  observed: {int(caps_applied)} caps applied")
+        else:
+            console.print("  observed: caps not recorded")
+        if isinstance(max_caps, int | float):
+            console.print(f"  threshold: <= {int(max_caps)} caps")
+        else:
+            console.print("  threshold: resolved tier max_caps")
+        console.print(f"  status: {spectral_status}")
+        console.print(
+            "  note: budgeted caps are guard observations; they are hard failures only when the policy budget is exceeded."
+        )
+
+    rmt = (
+        evaluation_report.get("rmt", {})
+        if isinstance(evaluation_report.get("rmt"), dict)
+        else {}
+    )
+    if rmt:
+        rmt_status = "PASS" if bool(validation.get("rmt_stable")) else "FAIL"
+        epsilon_violations = rmt.get("epsilon_violations")
+        console.print("\n[bold]Gate: RMT Guard[/bold]")
+        if isinstance(epsilon_violations, list):
+            console.print(f"  observed: {len(epsilon_violations)} epsilon violations")
+        elif rmt.get("status"):
+            console.print(f"  observed: {rmt.get('status')}")
+        else:
+            console.print("  observed: N/A")
+        console.print("  threshold: ε-rule")
+        console.print(f"  status: {rmt_status}")
+
+    guard_warnings = (
+        evaluation_report.get("guard_warnings", {})
+        if isinstance(evaluation_report.get("guard_warnings"), dict)
+        else {}
+    )
+    warnings = guard_warnings.get("warnings")
+    if isinstance(warnings, list) and warnings:
+        console.print("\n[bold]Guard Warnings[/bold]")
+        console.print(
+            "  note: guard warnings are baseline-relative signal changes, not hard policy failures unless strict warning mode is enabled."
+        )
+        for entry in warnings[:5]:
+            if not isinstance(entry, dict):
+                continue
+            guard_name = entry.get("guard", "guard")
+            kind_name = entry.get("kind", "warning")
+            module = entry.get("module")
+            location = f" module={module}" if isinstance(module, str) and module else ""
+            console.print(
+                f"  - {guard_name}.{kind_name}{location}; policy: {entry.get('policy_gate', 'unknown')}"
+            )
+
     # Guard Overhead explanation (if present)
     overhead = (
         evaluation_report.get("guard_overhead", {})

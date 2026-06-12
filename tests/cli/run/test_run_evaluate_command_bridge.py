@@ -318,8 +318,8 @@ def test_evaluate_command_reuses_baseline_report_for_bridge(monkeypatch, tmp_pat
                     "split": "validation",
                     "seq_len": 512,
                     "stride": 512,
-                    "preview_n": 64,
-                    "final_n": 64,
+                    "preview_n": 240,
+                    "final_n": 240,
                     "seed": 43,
                 },
                 "evaluation_windows": {

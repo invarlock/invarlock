@@ -7,6 +7,7 @@ import yaml
 from .render_guard_sections import (
     append_guard_check_details_section,
     append_guard_observability_sections,
+    append_guard_warnings_section,
 )
 from .render_markdown_structure import (
     append_appendix_sections as _append_appendix_sections,
@@ -680,6 +681,8 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
     _append_quality_gates_section(lines, evaluation_report)
 
     append_guard_check_details_section(lines, evaluation_report)
+
+    append_guard_warnings_section(lines, evaluation_report)
 
     _append_primary_metric_section(lines, evaluation_report)
 

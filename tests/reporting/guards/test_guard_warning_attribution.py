@@ -1,0 +1,108 @@
+from __future__ import annotations
+
+from invarlock.reporting.guard_warnings import build_guard_warnings
+
+
+def _spectral_report(*, module: str = "layers.0.mlp.up_proj", z: float = 4.2) -> dict:
+    return {
+        "caps_applied": 1,
+        "max_caps": 5,
+        "deadband": 0.1,
+        "family_caps": {"ffn": {"kappa": 3.0}},
+        "top_violations": [
+            {
+                "module": module,
+                "family": "ffn",
+                "z_score": z,
+                "kappa": 3.0,
+                "severity": "warn",
+            }
+        ],
+        "top_z_scores": {"ffn": [{"module": module, "z": z}]},
+    }
+
+
+def test_spectral_same_baseline_cap_does_not_warn() -> None:
+    baseline = {"spectral": _spectral_report()}
+    subject = {"spectral": _spectral_report(z=4.24)}
+
+    guard_warnings = build_guard_warnings(
+        subject=subject,
+        baseline=baseline,
+        validation={"spectral_stable": True},
+    )
+
+    assert guard_warnings == {"present": False, "warning_count": 0, "warnings": []}
+
+
+def test_spectral_same_raw_baseline_guard_cap_does_not_warn() -> None:
+    baseline = {
+        "guards": [
+            {
+                "name": "spectral",
+                "metrics": {"caps_applied": 1, "max_caps": 5},
+                "violations": [
+                    {
+                        "type": "family_z_cap",
+                        "module": "layers.0.mlp.up_proj",
+                        "family": "ffn",
+                        "z_score": 4.2,
+                        "kappa": 3.0,
+                    }
+                ],
+            }
+        ]
+    }
+    subject = {"spectral": _spectral_report(z=4.24)}
+
+    guard_warnings = build_guard_warnings(
+        subject=subject,
+        baseline=baseline,
+        validation={"spectral_stable": True},
+    )
+
+    assert guard_warnings == {"present": False, "warning_count": 0, "warnings": []}
+
+
+def test_spectral_new_capped_module_warns_without_policy_failure() -> None:
+    baseline = {"spectral": _spectral_report(module="layers.0.mlp.up_proj")}
+    subject = {
+        "spectral": {
+            **_spectral_report(module="layers.0.mlp.up_proj"),
+            "caps_applied": 2,
+            "top_violations": [
+                {
+                    "module": "layers.0.mlp.up_proj",
+                    "family": "ffn",
+                    "z_score": 4.2,
+                    "kappa": 3.0,
+                },
+                {
+                    "module": "layers.31.mlp.up_proj",
+                    "family": "ffn",
+                    "z_score": 9.7,
+                    "kappa": 3.0,
+                },
+            ],
+            "top_z_scores": {
+                "ffn": [
+                    {"module": "layers.0.mlp.up_proj", "z": 4.2},
+                    {"module": "layers.31.mlp.up_proj", "z": 9.7},
+                ]
+            },
+        }
+    }
+
+    guard_warnings = build_guard_warnings(
+        subject=subject,
+        baseline=baseline,
+        validation={"spectral_stable": True},
+    )
+
+    assert guard_warnings["present"] is True
+    assert guard_warnings["warning_count"] == 1
+    warning = guard_warnings["warnings"][0]
+    assert warning["guard"] == "spectral"
+    assert warning["kind"] == "new_capped_module"
+    assert warning["module"] == "layers.31.mlp.up_proj"
+    assert warning["policy_gate"] == "pass"
