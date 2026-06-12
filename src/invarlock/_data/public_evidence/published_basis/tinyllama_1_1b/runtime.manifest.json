@@ -1,0 +1,31 @@
+{
+  "config": {
+    "path": null,
+    "sha256": "b78832e5af13e6196aebc8de504d83ed6339d5fcad20186d6eb472cbafee401e",
+    "source": "inline"
+  },
+  "context": {
+    "assurance": "strict",
+    "command": "evaluate",
+    "execution_mode": "container",
+    "profile": "ci",
+    "tier": "balanced"
+  },
+  "execution_mode": "container",
+  "generated_at_utc": "2026-06-12T02:06:27.507303+00:00",
+  "manifest_version": 1,
+  "report": {
+    "filename": "evaluation.report.json",
+    "path": "/workspace/tmp/model_evidence_container/7c4edafd87dfb727/eval/tinyllama_1_1b/report/evaluation.report.json",
+    "sha256": "cb9afee4cc6b4ff19e96fc70900c5219d44fe222fb71c8ba2eb0e27e144d37e4"
+  },
+  "runtime": {
+    "allow_network": true,
+    "allow_remote_code": false,
+    "allow_third_party_plugins": false,
+    "container_execution": true,
+    "image_digest": "sha256:dc735a60fad29fc02681bd86dec92c23f4e7388f00414d3ffc97e6c33b3fa773",
+    "image_ref": "invarlock-runtime:cuda-local"
+  },
+  "verifier_contract_version": "runtime-manifest-v1"
+}

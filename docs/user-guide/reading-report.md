@@ -69,6 +69,11 @@ re-checked with `invarlock verify`.
 Tip: Use `invarlock verify` to recheck schema, pairing, ratio math, and the
 adjacent `runtime.manifest.json`.
 
+`invarlock report explain --evaluation-report` needs the evaluation bundle to
+link back to raw subject and baseline `report.json` files. Public evidence
+fixtures may omit those raw run reports while still being valid for
+`verify`, `report html`, and `report validate`.
+
 ### Executive Summary Interpretation
 
 - **Overall** mirrors the canonical gate allow-list. A FAIL means at least one gate failed.

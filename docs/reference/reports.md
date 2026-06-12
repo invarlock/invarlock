@@ -59,6 +59,13 @@ Artifact model:
 | `evaluation.report.json` | `invarlock evaluate`, `invarlock report generate --format report` | `invarlock verify`, `invarlock report html`, `invarlock report validate`, `invarlock report explain --evaluation-report`, `invarlock advanced runtime-verify` |
 | `report.json` | Baseline/subject run directories under `runs/...` | `invarlock report generate`, `invarlock report explain --subject-report ... --baseline-report ...` |
 
+`report explain --evaluation-report` requires provenance links to the raw
+subject and baseline run reports. Some public fixtures intentionally ship only
+`evaluation.report.json`, `runtime.manifest.json`, and evidence metadata; those
+fixtures are still valid inputs for `verify`, `report html`, and
+`report validate`, but they cannot be explained unless the corresponding raw
+run reports are also available.
+
 ## report Layout
 
 The markdown report is structured to highlight evaluation outcomes first:

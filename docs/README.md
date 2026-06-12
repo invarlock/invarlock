@@ -213,38 +213,103 @@ Notes
 
 ## Support Matrix
 
+### Baseline Fixtures
+
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | GPT-2 causal LM | Yes | Yes | Yes | Yes |
 | BERT / RoBERTa MLM | Yes | Yes | Yes | Yes |
-| Mistral 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
-| Ministral 3 causal LM (text-only eval) | Yes | Yes | Yes | No, repo-included pilot config only |
-| Qwen2 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
-| Qwen2.5 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
-| Qwen2.5 14B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
-| Qwen3 causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
-| DeepSeek-R1-Distill-Qwen causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
-| Phi-4 causal LM (text-only eval) | Yes | Yes | Yes | No, repo-included pilot config only |
+
+### Published Small/Local Decoder Evidence
+
+| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
+| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
+| TinyLlama 1.1B causal LM | Yes | Yes | Yes | Yes |
+
+### Published 7B-9B Decoder Evidence
+
+| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
+| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
+| Mistral 7B causal LM | Yes | Yes | Yes | Yes |
+| Ministral 3 8B causal LM (text-only eval) | Yes | Yes | Yes | Yes |
+| Qwen2 7B causal LM | Yes | Yes | Yes | Yes |
+| Qwen2.5 7B causal LM | Yes | Yes | Yes | Yes |
+| Qwen3 causal LM | Yes | Yes | Yes | Yes |
+| Qwen3.5 causal LM | Yes | Yes | Yes | Yes |
+| DeepSeek-R1-Distill-Qwen causal LM | Yes | Yes | Yes | Yes |
+
+### Published 13B-14B And Reasoning Decoder Evidence
+
+| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
+| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
+| Ministral 3 14B causal LM (text-only eval) | Yes | Yes | Yes | Yes |
+| OLMo 2 13B causal LM | Yes | Yes | Yes | Yes |
+| Qwen2.5 14B causal LM | Yes | Yes | Yes | Yes |
+| Phi-4 causal LM (text-only eval) | Yes | Yes | Yes | Yes |
+
+### Repo-Maintained Pilot Lanes
+
+| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
+| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
+| OLMo 2 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | Gemma 4 E2B causal LM (text-only eval) | Yes | Yes | Yes | No, repo-included pilot config only |
-| TinyLlama 1.1B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
-| OLMo 2 causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
-| Qwen3.5 causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+
+### Prepared Small/Local Candidate Backlog
+
+| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
+| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
+| Ministral 3 3B causal LM (text-only eval candidate) | Yes | Yes | Yes | No, repo-included pilot config only |
+| Granite 4.1 3B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+| SmolLM3 3B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+| Phi-4 mini causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+
+### Prepared 7B-14B Candidate Backlog
+
+| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
+| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
+| Granite 4.1 8B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+| DeepSeek-R1-Distill-Qwen 14B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+| DeepSeek-R1-0528-Qwen3 8B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+| Falcon-H1R 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+
+### Multimodal Candidate Backlog
+
+| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
+| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
+| Gemma 4 12B any-to-any LM | No | Candidate adapter path | No | No |
+
+### Generic Seq2Seq And Local Pairs
+
+| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
+| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | Seq2Seq / local pairs | Yes | Yes | No | No |
 
-Published assurance basis covers GPT-2 and BERT profiles. Repo-included
-presets and pilot calibration configs for additional experimental families,
-including Mistral 7B, Ministral 3 text-only, Qwen2 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3,
-DeepSeek-R1-Distill-Qwen, Phi-4 text-only, Gemma 4 E2B text-only, TinyLlama
-1.1B, OLMo 2, and Qwen3.5, do not become part of the published
-assurance basis until supporting artifacts are attached. Access-gated vendor
-checkpoints are intentionally excluded from the included support matrix and
-preset inventory, and ungated families without clean pilot lanes remain in the
-model family backlog rather than the support matrix.
+Published assurance basis covers GPT-2, BERT, Mistral 7B, Ministral 3 8B,
+Ministral 3 14B, TinyLlama 1.1B, OLMo 2 13B, Qwen2 7B, Qwen2.5 7B,
+Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B, DeepSeek-R1-Distill-Qwen 7B, and
+Phi-4 text-only profiles. Repo-included presets and pilot calibration configs
+for additional experimental families, including OLMo 2 7B, Gemma 4 E2B
+text-only, and the prepared practical-pick lanes, do not become part of the
+published assurance basis until supporting artifacts are attached.
+The empirical guard manifest includes no-op published-basis summaries for the
+modern promoted families. They are null-behavior evidence and calibration
+inputs, but they do not re-derive the packaged spectral/RMT/variance tier
+constants; transferred attention caps remain budgeted sentinels until a
+family-specific null sweep supports an FPR interpretation.
+Practical-pick families without tuned edit params or public evidence fixtures
+are tracked as `community_experimental` rows, even when a repo pilot preset and
+calibration config are already present. Access-gated vendor checkpoints are
+intentionally excluded from the included preset inventory.
+The Phi-4 public fixture is text-only and skips guard-overhead measurement by
+preset policy; strict release verification accepts that declared skip.
 
 `published_basis` remains the narrow public evidence floor, while
 `supported_experimental` means the repo ships the preset, calibration config,
-targeted tests, and smoke/evidence path for the lane without claiming a
-published-basis fixture set.
+targeted tests, smoke/evidence path, and tuned edit-param coverage for the lane
+without claiming a published-basis fixture set. `community_experimental` rows
+are candidate inventory entries; some already have repo pilot presets and
+calibration configs, but still need the remaining promotion artifacts before
+they become release-supported lanes.
 
 Image-text evaluation uses the built-in
 `hf_multimodal` adapter and the `vision_text` provider. Public support remains

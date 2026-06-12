@@ -79,11 +79,20 @@ invarlock advanced calibrate ve-sweep \
 
 ## Published Basis vs Included Configs
 
-Published assurance basis covers GPT-2 and BERT profiles. The repo
-also includes pilot calibration configs for additional families such as Mistral 7B,
-Qwen2 7B, Qwen2.5 7B, and Qwen2.5 14B under `configs/calibration/`, but those configs are
-not part of the published assurance basis until supporting artifacts are
-attached.
+Published assurance basis covers GPT-2, BERT, Mistral 7B, Ministral 3 8B,
+Ministral 3 14B, TinyLlama 1.1B, OLMo 2 13B, Qwen2 7B, Qwen2.5 7B,
+Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B, DeepSeek-R1-Distill-Qwen 7B, and
+Phi-4 text-only profiles. The repo also includes pilot calibration configs for
+additional families such as OLMo 2 7B and Gemma 4 E2B text-only under
+`configs/calibration/`, but those configs are not part of the published
+assurance basis until supporting artifacts are attached.
+
+The empirical guard manifest also indexes no-op published-basis reports for the
+modern promoted families as null-behavior evidence. Those reports are useful
+calibration inputs, but they do not update the packaged tier constants by
+themselves. Until a family-specific null sweep re-derives κ, transferred
+attention caps should be interpreted as budgeted sentinels rather than
+Gaussian-tail FPR claims for that family.
 
 ### Policy-Tuning Sweep → Tier Policy Flow
 

@@ -1,0 +1,31 @@
+{
+  "config": {
+    "path": null,
+    "sha256": "0327ecb0eab26dc619e59f1e6cb4fe2ea4eb6c431098b205126b0bff91c720d7",
+    "source": "inline"
+  },
+  "context": {
+    "assurance": "strict",
+    "command": "evaluate",
+    "execution_mode": "container",
+    "profile": "ci",
+    "tier": "balanced"
+  },
+  "execution_mode": "container",
+  "generated_at_utc": "2026-06-11T22:57:18.243676+00:00",
+  "manifest_version": 1,
+  "report": {
+    "filename": "evaluation.report.json",
+    "path": "/workspace/tmp/model_evidence_container/474dacb5acb7b3f6/eval/mistral_7b/report/evaluation.report.json",
+    "sha256": "e63c0b0c05966f9204e9790f784230455c3294e6b4f6904b2bd293e390c24fd2"
+  },
+  "runtime": {
+    "allow_network": true,
+    "allow_remote_code": false,
+    "allow_third_party_plugins": false,
+    "container_execution": true,
+    "image_digest": "sha256:dc735a60fad29fc02681bd86dec92c23f4e7388f00414d3ffc97e6c33b3fa773",
+    "image_ref": "invarlock-runtime:cuda-local"
+  },
+  "verifier_contract_version": "runtime-manifest-v1"
+}

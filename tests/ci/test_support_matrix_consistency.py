@@ -68,7 +68,8 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         "GPT-2 causal LM",
         "BERT / RoBERTa MLM",
         "Mistral 7B causal LM",
-        "Ministral 3 causal LM (text-only eval)",
+        "Ministral 3 8B causal LM (text-only eval)",
+        "Ministral 3 14B causal LM (text-only eval)",
         "Qwen2 7B causal LM",
         "Qwen2.5 7B causal LM",
         "Qwen2.5 14B causal LM",
@@ -77,38 +78,70 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         "Phi-4 causal LM (text-only eval)",
         "Gemma 4 E2B causal LM (text-only eval)",
         "TinyLlama 1.1B causal LM",
-        "OLMo 2 causal LM",
+        "OLMo 2 7B causal LM",
+        "OLMo 2 13B causal LM",
         "Qwen3.5 causal LM",
+        "Gemma 4 12B any-to-any LM",
+        "Ministral 3 3B causal LM (text-only eval candidate)",
+        "Granite 4.1 8B causal LM",
+        "Granite 4.1 3B causal LM",
+        "SmolLM3 3B causal LM",
+        "Phi-4 mini causal LM",
+        "DeepSeek-R1-Distill-Qwen 14B causal LM",
+        "DeepSeek-R1-0528-Qwen3 8B causal LM",
+        "Falcon-H1R 7B causal LM",
         "Seq2Seq / local pairs",
     }
     assert families["GPT-2 causal LM"]["support_tier"] == "published_basis"
     assert families["BERT / RoBERTa MLM"]["support_tier"] == "published_basis"
-    assert families["Mistral 7B causal LM"]["support_tier"] != "published_basis"
+    assert families["Mistral 7B causal LM"]["support_tier"] == "published_basis"
     assert (
-        families["Ministral 3 causal LM (text-only eval)"]["support_tier"]
-        == "supported_experimental"
+        families["Ministral 3 8B causal LM (text-only eval)"]["support_tier"]
+        == "published_basis"
     )
-    assert families["Qwen2 7B causal LM"]["support_tier"] != "published_basis"
-    assert families["Qwen2.5 7B causal LM"]["support_tier"] == "supported_experimental"
-    assert families["Qwen2.5 14B causal LM"]["support_tier"] == "supported_experimental"
-    assert families["Qwen3 causal LM"]["support_tier"] == "supported_experimental"
+    assert (
+        families["Ministral 3 14B causal LM (text-only eval)"]["support_tier"]
+        == "published_basis"
+    )
+    assert families["Qwen2 7B causal LM"]["support_tier"] == "published_basis"
+    assert families["Qwen2.5 7B causal LM"]["support_tier"] == "published_basis"
+    assert families["Qwen2.5 14B causal LM"]["support_tier"] == "published_basis"
+    assert families["Qwen3 causal LM"]["support_tier"] == "published_basis"
     assert (
         families["DeepSeek-R1-Distill-Qwen causal LM"]["support_tier"]
-        == "supported_experimental"
+        == "published_basis"
     )
     assert (
         families["Phi-4 causal LM (text-only eval)"]["support_tier"]
-        == "supported_experimental"
+        == "published_basis"
     )
     assert (
         families["Gemma 4 E2B causal LM (text-only eval)"]["support_tier"]
         == "supported_experimental"
     )
-    assert (
-        families["TinyLlama 1.1B causal LM"]["support_tier"] == "supported_experimental"
+    assert families["TinyLlama 1.1B causal LM"]["support_tier"] == "published_basis"
+    assert families["OLMo 2 7B causal LM"]["support_tier"] == "supported_experimental"
+    assert families["OLMo 2 13B causal LM"]["support_tier"] == "published_basis"
+    assert families["Qwen3.5 causal LM"]["support_tier"] == "published_basis"
+    assert families["Gemma 4 12B any-to-any LM"]["support_tier"] == (
+        "community_experimental"
     )
-    assert families["OLMo 2 causal LM"]["support_tier"] == "supported_experimental"
-    assert families["Qwen3.5 causal LM"]["support_tier"] == "supported_experimental"
+    for family in (
+        "Ministral 3 3B causal LM (text-only eval candidate)",
+        "Granite 4.1 8B causal LM",
+        "Granite 4.1 3B causal LM",
+        "SmolLM3 3B causal LM",
+        "Phi-4 mini causal LM",
+        "DeepSeek-R1-Distill-Qwen 14B causal LM",
+        "DeepSeek-R1-0528-Qwen3 8B causal LM",
+        "Falcon-H1R 7B causal LM",
+    ):
+        assert families[family]["support_tier"] == "community_experimental"
+        assert families[family]["evidence_status"] == "repo_included_pilot_config"
+        assert families[family]["docs_label"] == (
+            "No, repo-included pilot config only"
+        )
 
     for family, lane in families.items():
         assert docs_labels[family] == lane["docs_label"]
+        assert lane["support_groups"], family

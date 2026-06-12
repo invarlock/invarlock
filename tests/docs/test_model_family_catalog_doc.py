@@ -51,5 +51,22 @@ def test_model_family_catalog_doc_matches_contract_sections() -> None:
 
     assert (
         "| Qwen2.5 7B causal LM | `Qwen/Qwen2.5-7B` | "
-        "`promote_now` | `supported_experimental` |" in promotion_text
+        "`promoted_published_basis` | `published_basis` |" in promotion_text
+    )
+    assert (
+        "| Qwen2.5 14B causal LM | `Qwen/Qwen2.5-14B` | "
+        "`promoted_published_basis` | `published_basis` |" in promotion_text
+    )
+    assert (
+        "| Qwen3 8B causal LM | `Qwen/Qwen3-8B` | "
+        "`promoted_published_basis` | `published_basis` |" in promotion_text
+    )
+    assert (
+        "| DeepSeek-R1-Distill-Qwen causal LM | "
+        "`deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` | "
+        "`promoted_published_basis` | `published_basis` |" in promotion_text
+    )
+    assert (
+        "| Phi-4 reasoning-plus causal LM | `microsoft/Phi-4-reasoning-plus` | "
+        "`promoted_published_basis` | `published_basis` |" in promotion_text
     )

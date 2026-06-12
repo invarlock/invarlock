@@ -1,0 +1,66 @@
+{
+  "execution_mode": "container",
+  "files": [
+    {
+      "bytes": 11610272,
+      "path": "eval/qwen2_5_14b/report/evaluation.report.json",
+      "sha256": "56605e7d8cab9ee8634ef6534323ca08370335f50ca8b76d746832b4f5f435c3"
+    },
+    {
+      "bytes": 658,
+      "path": "eval/qwen2_5_14b/verify.json",
+      "sha256": "0080385767e1e386b9ce2a913bf3346d31c44858a62dc56150511de3382d4632"
+    },
+    {
+      "bytes": 5016,
+      "path": "logs/qwen2_5_14b.log",
+      "sha256": "17dbdd96ff2c82f4f41ba97f8b02c2ec8b7efb0d5e6205275f70a8adfac38a2f"
+    },
+    {
+      "bytes": 435,
+      "path": "manifest.json",
+      "sha256": "4cefbefe1593fd112e181bd7caee1c81e198d5a0905c9aee7c087a797a315b9d"
+    },
+    {
+      "bytes": 664,
+      "path": "model_revisions.json",
+      "sha256": "c78bb0c52fba4966ea0da39be49cfb1c91e74b53b0365e91ddade5e8fb9ed4a5"
+    },
+    {
+      "bytes": 235,
+      "path": "status.log",
+      "sha256": "0d435cd7e54a3114554364226ca2a737bf59d263098b5ad57873427ab4451a9d"
+    },
+    {
+      "bytes": 719,
+      "path": "summary.json",
+      "sha256": "df9f2675ac9e813c7191ddcb5c80d9008075b4dd126a28bd7a5d2de3c5eadc9f"
+    },
+    {
+      "bytes": 220,
+      "path": "summary.tsv",
+      "sha256": "d881a701c87d3ba3d4148b9caff90067bd810beb3452b9989b4387178d167b45"
+    }
+  ],
+  "generated_at": "2026-06-11T23:56:13.577588+00:00",
+  "lane_results": [
+    {
+      "detail": null,
+      "evaluate_exit": 0,
+      "lane_id": "qwen2-5-14b-causal-hf",
+      "model_id": "Qwen/Qwen2.5-14B",
+      "ok": true,
+      "preset": "configs/presets/causal_lm/qwen2_5_14b_512.yaml",
+      "report_path": "/root/model-evidence/20260611Tqwen2514bQwen38bParallelZ/shard-00-gpu-0/eval/qwen2_5_14b/report/evaluation.report.json",
+      "slug": "qwen2_5_14b",
+      "status": "ok",
+      "verify_exit": 0,
+      "verify_path": "/root/model-evidence/20260611Tqwen2514bQwen38bParallelZ/shard-00-gpu-0/eval/qwen2_5_14b/verify.json"
+    }
+  ],
+  "ok": true,
+  "schema": "invarlock/model-evidence-artifact-manifest-v1",
+  "shard_count": 2,
+  "shard_index": 0,
+  "suite": "current-supported-experimental"
+}

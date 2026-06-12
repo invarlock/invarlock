@@ -58,6 +58,7 @@ def test_repo_mentioned_gpu_suite_includes_basis_canaries_and_experimental() -> 
         "qwen3_5_9b_public",
         "deepseek_r1_distill_qwen_7b_public",
         "phi4_reasoning_plus_public",
+        "olmo2_7b",
         "gemma4_e2b",
     }.issubset(slugs)
 
@@ -475,9 +476,7 @@ def test_select_specs_sharding_is_stable() -> None:
         shard_count=3,
     )
 
-    assert [lane.slug for lane in shard] == [
-        "gemma4_e2b",
-    ]
+    assert [lane.slug for lane in shard] == ["gemma4_e2b"]
 
 
 def test_model_evidence_sweep_host_mode_emits_explicit_runtime_flags(

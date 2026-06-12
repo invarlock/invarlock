@@ -1,0 +1,9 @@
+{
+  "assurance": "strict",
+  "basis": "public_evidence/published_basis/qwen2_5_14b/evaluation.report.json",
+  "evidence_run": "20260611Tqwen2514bQwen38bParallelZ",
+  "model_id": "Qwen/Qwen2.5-14B",
+  "note": "Container-backed CI-profile Qwen2.5 14B published-basis evidence run.",
+  "profile": "release",
+  "verdict": "PASS"
+}

@@ -31,28 +31,26 @@ def test_published_basis_lanes_ship_public_evidence_references() -> None:
 
 
 def test_packaged_public_evidence_matches_repo_public_evidence() -> None:
-    pairs = [
-        (
-            REPO_ROOT / "public_evidence" / "published_basis" / "gpt2",
-            REPO_ROOT
-            / "src"
-            / "invarlock"
-            / "_data"
-            / "public_evidence"
-            / "published_basis"
-            / "gpt2",
-        ),
-        (
-            REPO_ROOT / "public_evidence" / "published_basis" / "bert",
-            REPO_ROOT
-            / "src"
-            / "invarlock"
-            / "_data"
-            / "public_evidence"
-            / "published_basis"
-            / "bert",
-        ),
-    ]
+    pairs = []
+    packaged_basis_root = (
+        REPO_ROOT
+        / "src"
+        / "invarlock"
+        / "_data"
+        / "public_evidence"
+        / "published_basis"
+    )
+    for lane in published_basis_lanes():
+        evidence = lane.get("evidence", {})
+        report_fixture = evidence.get("evaluation_report_fixture")
+        assert isinstance(report_fixture, str)
+        basis_id = Path(report_fixture).parts[2]
+        pairs.append(
+            (
+                REPO_ROOT / "public_evidence" / "published_basis" / basis_id,
+                packaged_basis_root / basis_id,
+            )
+        )
 
     for source_dir, packaged_dir in pairs:
         assert source_dir.is_dir(), source_dir
@@ -78,7 +76,22 @@ def test_offline_golden_runs_public_fixtures() -> None:
     manifest_path = REPO_ROOT / "tests/artifacts/golden_runs/manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
-    assert manifest["published_basis"] == ["gpt2", "bert"]
+    assert manifest["published_basis"] == [
+        "gpt2",
+        "bert",
+        "mistral_7b",
+        "ministral3_8b",
+        "ministral3_14b",
+        "tinyllama_1_1b",
+        "olmo2_13b",
+        "qwen2_7b",
+        "qwen2_5_7b",
+        "qwen2_5_14b",
+        "qwen3_8b",
+        "qwen3_5_9b",
+        "deepseek_r1_distill_qwen_7b",
+        "phi4_reasoning_plus",
+    ]
 
     for lane in manifest["lanes"]:
         report_path = REPO_ROOT / lane["report"]
@@ -172,6 +185,46 @@ def test_caught_regression_fixtures_fail_expected_guard() -> None:
         diagnostics = "\n".join(item.message for item in result.diagnostics)
         for expected in expected_messages:
             assert expected in diagnostics
+
+
+def test_caught_regressions_show_pm_only_passes_but_guard_chain_rejects() -> None:
+    guard_failures = {
+        "spectral_guard_failure": ("spectral", "spectral_stable"),
+        "rmt_guard_failure": ("rmt", "rmt_stable"),
+        "variance_guard_failure": ("variance", None),
+    }
+
+    for directory, (guard_key, validation_key) in guard_failures.items():
+        report_path = (
+            REPO_ROOT
+            / "public_evidence"
+            / "caught_regressions"
+            / directory
+            / "evaluation.report.json"
+        )
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+
+        pm = report["primary_metric"]
+        pm_only_accepts = (
+            report["validation"]["primary_metric_acceptable"] is True
+            and pm["ratio_vs_baseline"] == 1.0
+        )
+        assert pm_only_accepts is True
+
+        guard = report[guard_key]
+        assert guard["status"] == "fail"
+        assert guard["passed"] is False
+        if validation_key is not None:
+            assert report["validation"][validation_key] is False
+        else:
+            assert report["variance"]["predictive_gate"]["passed"] is False
+
+        result = run_verify_reports(
+            [report_path],
+            profile="release",
+            assurance_mode="strict",
+        )
+        assert result.outcome == VerifyOutcome.POLICY_FAIL
 
 
 def test_policy_failure_fixtures_fail_expected_policy_predicate() -> None:

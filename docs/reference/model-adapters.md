@@ -41,11 +41,15 @@ model = adapter.load_model("gpt2", device="auto")
 print(adapter.describe(model)["model_type"])
 ```
 
-> Adapter availability is broader than the published assurance basis. GPT-2 and
-> BERT back the published calibrated basis; current experimental lanes are
-> enumerated in `contracts/support_matrix.json`, with broader inventory in the
-> Model Family Catalog. Examples include Mistral 7B, Qwen2 7B, Qwen2.5 7B, and
-> Qwen2.5 14B; treat the contract files as authoritative for the complete list.
+> Adapter availability is broader than the published assurance basis. GPT-2,
+> BERT, Mistral 7B, Ministral 3 8B, Ministral 3 14B, TinyLlama 1.1B,
+> OLMo 2 13B, Qwen2 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B,
+> DeepSeek-R1-Distill-Qwen 7B, and Phi-4 text-only back the published
+> calibrated basis; current experimental lanes are enumerated in
+> `contracts/support_matrix.json`, with broader inventory in the Model Family
+> Catalog. Current examples include OLMo 2 7B, Gemma 4 E2B text-only, SmolLM3
+> 3B, Granite 4.1, Phi-4 mini, DeepSeek-R1 14B/8B variants, and Falcon-H1R;
+> treat the contract files as authoritative for the complete list.
 
 ## Support Tiers
 

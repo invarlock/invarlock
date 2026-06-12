@@ -58,13 +58,15 @@ policy under `resolved_policy.spectral`.
   recorded used counts when judging a release evidence package.
 
 **Spectral calibration provenance.** Aggregated null-run stats are derived from
-calibration runs. The repo ships the public published-basis reports and recipes
-under `src/invarlock/_data/public_evidence/published_basis/{gpt2,bert}/`.
-Local tooling can parse evaluation report JSON files (glob pattern
-`**/evaluation.report.json`) and run reports to extract spectral evidence,
-summarize per-family maximum z-scores, and recommend updated family caps and
-multiple-testing α. Persist results in JSON/Markdown/CSV form with hashes for
-reproducibility and attach calibration reports to change proposals.
+calibration runs. The tier constants are justified by the calibration artifacts
+under `artifacts/guard-validation/empirical/calibration/`; published-basis
+model reports under `public_evidence/published_basis/` add no-op null-behavior
+observations but do not re-derive `runtime/tiers.yaml`. Local tooling can parse
+evaluation report JSON files (glob pattern `**/evaluation.report.json`) and run
+reports to extract spectral evidence, summarize per-family maximum z-scores,
+and recommend updated family caps and multiple-testing α. Persist results in
+JSON/Markdown/CSV form with hashes for reproducibility and attach calibration
+reports to change proposals.
 
 ---
 
@@ -97,9 +99,10 @@ reproducibility and attach calibration reports to change proposals.
 
 4. **Parametric cross-check.** With two-sided tail
    $\mathrm{pTail}(\kappa)=2\big(1-\Phi(\kappa)\big)$, compare the proposed caps
-   to modeled Gaussian tails for calibrated high-kappa families. Treat low
-   Balanced `embed`/`other` caps as operational sentinels, not standalone
-   Gaussian-tail claims.
+   to modeled Gaussian tails for families covered by the null calibration basis.
+   Treat transferred attention caps in newly promoted no-op reports, and low
+   Balanced `embed`/`other` caps, as operational sentinels until a family-specific
+   null sweep supports an FPR interpretation.
 
 5. **Keep these fixed (Balanced).** `multiple_testing: {method: bh, alpha: 0.05, m: 4}`, `deadband: 0.10`, `scope: all`, `max_caps: 5`, `max_spectral_norm: null`.
 
