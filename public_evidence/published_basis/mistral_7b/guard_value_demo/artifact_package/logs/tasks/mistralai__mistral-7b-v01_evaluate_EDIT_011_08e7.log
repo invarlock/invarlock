@@ -1,0 +1,81 @@
+[2026-06-12 07:09:30] Starting task: mistralai__mistral-7b-v01_evaluate_EDIT_011_08e7
+  Type: evaluate_EDIT
+  Model: mistralai/Mistral-7B-v0.1
+  GPU(s): 1
+  Params: {
+  "edit_spec": "fp8_quant:e5m2:all",
+  "version": "stress",
+  "run": 2
+}
+[2026-06-12 07:09:33] evaluating: fp8_e5m2_stress run 2
+  CI window override: preview=400, final=400
+  Staged baseline report for evaluate runtime: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/reports/fp8_e5m2_stress/run_2/runtime_inputs/baseline_report.json
+  Reusing baseline report: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/baseline_reports/ci_balanced_seq512_pv400_fn400/baseline_report.json
+  Using edit-type preset: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/presets/calibrated_preset_mistralai__mistral-7b-v01__fp8_quant.yaml
+  Staged preset for evaluate runtime: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/reports/fp8_e5m2_stress/run_2/runtime_inputs/calibrated_preset_mistralai__mistral-7b-v01__fp8_quant.yaml
+  Normalized staged preset dataset for evaluate runtime from baseline report: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/reports/fp8_e5m2_stress/run_2/runtime_inputs/baseline_report.json
+╭──────────────────── Evaluate ─────────────────────╮
+│ INVARLOCK v0.10.0 · Evaluation Pipeline           │
+│ Profile: ci · Tier: balanced · Adapter: hf_causal │
+╰───────────────────────────────────────────────────╯
+
+[EXEC] Using provided baseline report (skipping baseline evaluation)
+
+PHASE 2/3 · SUBJECT EVALUATION
+-------------------------------------------------------------------
+[EXEC] Running edited (no-op, Compare & Evaluate)
+[INIT] Loading configuration:
+/workspace/tmp/.evaluate/run-gcqnmmct/edited_noop.yaml
+[INIT] Deterministic seeds → python=42, numpy=42, torch=42
+  Device    : cuda:0 (auto-resolved)
+  Output    :
+/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7
+b-v01/reports/fp8_e5m2_stress/run_2/edited/20260612_070944
+  Run ID    : edited-20260612_070944
+[DATA] Loaded baseline evaluation schedule for pairing
+[INIT] Starting InvarLock pipeline...
+[DATA] Adapter: hf_causal
+[EXEC] Executing pipeline with 5 guards...
+  Edit      : noop
+  Guards    : invariants → spectral → rmt → variance → invariants
+[INIT] Loading model once:
+/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7
+b-v01/models/fp8_e5m2_stress
+
+Loading weights:   0%|          | 0/291 [00:00<?, ?it/s]
+Loading weights:   5%|▌         | 15/291 [00:00<00:01, 140.26it/s]
+Loading weights:  12%|█▏        | 36/291 [00:00<00:01, 180.14it/s]
+Loading weights:  20%|█▉        | 57/291 [00:00<00:01, 180.11it/s]
+Loading weights:  27%|██▋       | 78/291 [00:00<00:01, 186.91it/s]
+Loading weights:  34%|███▍      | 100/291 [00:00<00:00, 196.98it/s]
+Loading weights:  41%|████      | 120/291 [00:00<00:00, 192.98it/s]
+Loading weights:  48%|████▊     | 140/291 [00:00<00:00, 185.42it/s]
+Loading weights:  55%|█████▌    | 161/291 [00:00<00:00, 192.30it/s]
+Loading weights:  62%|██████▏   | 181/291 [00:00<00:00, 181.63it/s]
+Loading weights:  69%|██████▊   | 200/291 [00:01<00:00, 183.19it/s]
+Loading weights:  75%|███████▌  | 219/291 [00:01<00:00, 183.49it/s]
+Loading weights:  82%|████████▏ | 238/291 [00:01<00:00, 184.55it/s]
+Loading weights:  88%|████████▊ | 257/291 [00:01<00:00, 171.59it/s]
+Loading weights:  95%|█████████▍| 275/291 [00:01<00:00, 173.00it/s]
+Loading weights: 100%|██████████| 291/291 [00:01<00:00, 184.25it/s]
+[INIT] Snapshot mode: enabled
+[PASS] Run completed successfully!
+[DATA] Report:
+/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7
+b-v01/reports/fp8_e5m2_stress/run_2/edited/20260612_070944/report.json
+[DATA] Events:
+/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7
+b-v01/reports/fp8_e5m2_stress/run_2/edited/20260612_070944/events.jsonl
+[METRIC] Primary Metric [ppl_causal] — preview: 9.669, final: 9.113
+[METRIC] Ratio vs baseline [ppl_causal]: 1.025
+[METRIC] Guard Overhead: PASS +0.01% (≤ +1.0%)
+[INFO] Cleanup: skipped
+[EXEC] Execute pipeline done (425.27s)
+[INIT] Loading model done (3.60s)
+[EXEC] Subject done (426.73s)
+
+PHASE 3/3 · EVALUATION REPORT GENERATION
+-------------------------------------------------------------------
+[EXEC] Emitting evaluation report
+[EXEC] Evaluation Report done (0.78s)
+[2026-06-12 07:16:52] Task mistralai__mistral-7b-v01_evaluate_EDIT_011_08e7 finished with exit code: 0

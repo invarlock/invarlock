@@ -1,0 +1,11 @@
+[2026-06-12 07:24:12] Starting task: mistralai__mistral-7b-v01_CLEANUP_ERROR_015_1670
+  Type: CLEANUP_ERROR
+  Model: mistralai/Mistral-7B-v0.1
+  GPU(s): 1
+  Params: {
+  "error_type": "scale_explosion",
+  "error_env": {}
+}
+[2026-06-12 07:24:12] Cleaning up error model: scale_explosion
+  Removed: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/models/error_scale_explosion
+[2026-06-12 07:24:15] Task mistralai__mistral-7b-v01_CLEANUP_ERROR_015_1670 finished with exit code: 0

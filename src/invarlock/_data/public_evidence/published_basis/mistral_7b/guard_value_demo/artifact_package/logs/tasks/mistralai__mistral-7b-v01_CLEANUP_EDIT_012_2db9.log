@@ -1,0 +1,11 @@
+[2026-06-12 07:24:10] Starting task: mistralai__mistral-7b-v01_CLEANUP_EDIT_012_2db9
+  Type: CLEANUP_EDIT
+  Model: mistralai/Mistral-7B-v0.1
+  GPU(s): 0
+  Params: {
+  "edit_spec": "fp8_quant:e5m2:all",
+  "version": "stress"
+}
+[2026-06-12 07:24:12] Cleaning up edit model: fp8_e5m2_stress
+  Removed: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/models/fp8_e5m2_stress
+[2026-06-12 07:24:15] Task mistralai__mistral-7b-v01_CLEANUP_EDIT_012_2db9 finished with exit code: 0

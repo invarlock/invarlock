@@ -1,0 +1,10 @@
+[2026-06-12 06:55:05] Starting task: mistralai__mistral-7b-v01_SETUP_BASELINE_001_6f25
+  Type: SETUP_BASELINE
+  Model: mistralai/Mistral-7B-v0.1
+  GPU(s): 0
+  Params: {
+  "model_idx": 1
+}
+[2026-06-12 06:55:05] Setting up baseline: mistralai/Mistral-7B-v0.1
+  Baseline ready at: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/models/mistralai__mistral-7b-v01/baseline
+[2026-06-12 06:55:43] Task mistralai__mistral-7b-v01_SETUP_BASELINE_001_6f25 finished with exit code: 0

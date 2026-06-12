@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -239,6 +240,9 @@ def test_real_guard_value_demo_records_pm_only_pass_with_spectral_intervention()
         (demo_dir / "guard_value_summary.json").read_text(encoding="utf-8")
     )
     metadata = json.loads((demo_dir / "evidence.meta.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (demo_dir / "guard_value_manifest.json").read_text(encoding="utf-8")
+    )
     final_verdict = json.loads(
         (
             demo_dir / "artifact_package" / "reports" / "final_verdict.json"
@@ -255,6 +259,16 @@ def test_real_guard_value_demo_records_pm_only_pass_with_spectral_intervention()
     assert final_verdict["verdict"] == "PASS"
     assert final_verdict["counts"]["primary_guard_required_hits"] == 1
     assert final_verdict["counts"]["error_injection_detected"] == 2
+    log_entries = [
+        entry
+        for entry in manifest["files"]
+        if entry["path"].startswith("artifact_package/logs/")
+    ]
+    assert len(log_entries) == 19
+    for entry in manifest["files"]:
+        path = demo_dir / entry["path"]
+        assert path.is_file(), entry["path"]
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == entry["sha256"]
 
     comparison = summary["pm_only_vs_pm_plus_guards"]
     assert comparison["scenario_id"] == "fp8_e5m2_stress"
