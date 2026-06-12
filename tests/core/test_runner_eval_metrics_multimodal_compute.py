@@ -91,6 +91,9 @@ def test_compute_real_metrics_supports_vision_text_classification() -> None:
     assert metrics["classification"]["counts_source"] == "measured"
     assert eval_windows["preview"]["example_ids"] == ["ex-1"]
     assert eval_windows["final"]["records"][0]["correct"] is False
+    assert eval_windows["preview"]["input_records"][0]["image_path"] == "/tmp/a.png"
+    assert eval_windows["preview"]["input_records"][0]["answers"] == ["cat"]
+    assert "prediction" not in eval_windows["preview"]["input_records"][0]
     assert metrics["primary_metric"]["preview"] == 1.0
     assert metrics["primary_metric"]["final"] == 0.0
 
@@ -225,6 +228,9 @@ def test_compute_real_metrics_retries_multimodal_processor_without_truncation(
     assert metrics["classification"]["estimated"] is False
     assert eval_windows["preview"]["records"][0]["correct"] is True
     assert eval_windows["final"]["records"][0]["correct"] is False
+    assert eval_windows["preview"]["input_records"][0]["image_path"] == str(image_path)
+    assert eval_windows["preview"]["input_records"][0]["prompt"] == "what is shown?"
+    assert eval_windows["preview"]["input_records"][0]["answers"] == ["cat"]
     assert any(
         truncation is False and max_length is None
         for _text, truncation, max_length in processor.calls

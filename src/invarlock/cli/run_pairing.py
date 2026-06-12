@@ -170,7 +170,9 @@ def extract_pairing_schedule(
         return raw
 
     def _sanitize_multimodal(section: dict[str, Any]) -> dict[str, Any] | None:
-        records_raw = section.get("records")
+        records_raw = section.get("input_records")
+        if not isinstance(records_raw, list):
+            records_raw = section.get("records")
         example_ids_raw = section.get("example_ids")
         records: list[dict[str, Any]] = []
         if isinstance(records_raw, list):

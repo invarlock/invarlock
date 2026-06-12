@@ -51,6 +51,25 @@ def _normalize_reference_answers(value: Any) -> list[str]:
     return [str(item).strip() for item in candidates if str(item).strip()]
 
 
+def _replay_input_record(batch: dict[str, Any], *, example_id: str) -> dict[str, Any]:
+    record: dict[str, Any] = {"id": example_id, "example_id": example_id}
+    for key in (
+        "image_path",
+        "prompt",
+        "answer",
+        "answers",
+        "image_sha256",
+        "prompt_sha256",
+        "answer_sha256",
+        "source_file",
+        "source_line",
+    ):
+        value = batch.get(key)
+        if value is not None:
+            record[key] = value
+    return record
+
+
 def _is_multimodal_batch(batch: Any) -> bool:
     return isinstance(batch, dict) and (
         "image_path" in batch or "example_id" in batch or "answers" in batch
@@ -98,6 +117,7 @@ def _evaluate_vision_text_arm(
     token_counts: list[int] = []
     example_correct: list[int] = []
     records: list[dict[str, Any]] = []
+    input_records: list[dict[str, Any]] = []
     example_ids: list[str] = []
     processor_sha: str | None = None
     latency_ms = 0.0
@@ -150,6 +170,7 @@ def _evaluate_vision_text_arm(
             or ""
         )
         example_ids.append(example_id)
+        input_records.append(_replay_input_record(batch, example_id=example_id))
         if processor_sha is None:
             candidate = generation_inputs.get("_processor_sha256")
             if isinstance(candidate, str) and candidate:
@@ -186,6 +207,8 @@ def _evaluate_vision_text_arm(
         "total_tokens": total_answer_tokens,
         "mean_logloss": mean_logloss,
     }
+    if input_records:
+        payload["input_records"] = input_records
     if processor_sha:
         payload["processor_sha256"] = processor_sha
     return payload, latency_ms
@@ -279,6 +302,7 @@ def _build_multimodal_eval_result(
         "preview": {
             "example_ids": list(preview_payload["example_ids"]),
             "records": list(preview_payload["records"]),
+            "input_records": list(preview_payload.get("input_records", [])),
             "logloss": list(preview_payload["logloss"]),
             "token_counts": list(preview_payload["token_counts"]),
             "processor_sha256": preview_payload.get("processor_sha256"),
@@ -286,6 +310,7 @@ def _build_multimodal_eval_result(
         "final": {
             "example_ids": list(final_payload["example_ids"]),
             "records": list(final_payload["records"]),
+            "input_records": list(final_payload.get("input_records", [])),
             "logloss": list(final_payload["logloss"]),
             "token_counts": list(final_payload["token_counts"]),
             "processor_sha256": final_payload.get("processor_sha256")

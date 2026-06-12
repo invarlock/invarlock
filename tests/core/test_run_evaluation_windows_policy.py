@@ -109,6 +109,7 @@ def test_serialize_evaluation_windows_keeps_records_and_processor_digest() -> No
         {
             "preview": {
                 "records": [{"id": "ex-1"}, "ignore-me"],
+                "input_records": [{"id": "ex-1", "image_path": "/tmp/a.ppm"}],
                 "processor_sha256": "proc-123",
             },
             "final": {"records": "bad"},
@@ -127,6 +128,7 @@ def test_serialize_evaluation_windows_keeps_records_and_processor_digest() -> No
             "actual_token_counts": [],
             "labels": [],
             "records": [{"id": "ex-1"}],
+            "input_records": [{"id": "ex-1", "image_path": "/tmp/a.ppm"}],
             "processor_sha256": "proc-123",
         },
         "final": {
