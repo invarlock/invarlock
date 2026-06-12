@@ -148,6 +148,8 @@ def _validate_baseline_report(args: argparse.Namespace) -> int:
     expected_profile = str(args.expected_profile)
     expected_tier = str(args.expected_tier)
     expected_assurance = str(getattr(args, "expected_assurance", "off"))
+    expected_preview_n = getattr(args, "expected_preview_n", None)
+    expected_final_n = getattr(args, "expected_final_n", None)
 
     try:
         payload = json.loads(report_path.read_text(encoding="utf-8"))
@@ -219,8 +221,7 @@ def _validate_baseline_report(args: argparse.Namespace) -> int:
         return 1
     if assurance.strip().lower() != expected_assurance.strip().lower():
         print(
-            "baseline_report_assurance_mismatch:"
-            f"{assurance!r}!={expected_assurance!r}",
+            f"baseline_report_assurance_mismatch:{assurance!r}!={expected_assurance!r}",
             file=sys.stderr,
         )
         return 1
@@ -245,6 +246,16 @@ def _validate_baseline_report(args: argparse.Namespace) -> int:
             return 1
         if len(window_ids) != len(input_ids):
             print(f"baseline_report_mismatched_windows:{phase_name}", file=sys.stderr)
+            return 1
+        expected_count = (
+            expected_preview_n if phase_name == "preview" else expected_final_n
+        )
+        if expected_count is not None and len(window_ids) != expected_count:
+            print(
+                "baseline_report_window_count_mismatch:"
+                f"{phase_name}:{len(window_ids)}!={expected_count}",
+                file=sys.stderr,
+            )
             return 1
 
     return 0

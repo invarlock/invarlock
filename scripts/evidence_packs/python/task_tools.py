@@ -228,6 +228,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     baseline_parser.add_argument("expected_profile")
     baseline_parser.add_argument("expected_tier")
     baseline_parser.add_argument("expected_assurance", nargs="?", default="off")
+    baseline_parser.add_argument("--expected-preview-n", type=int, default=None)
+    baseline_parser.add_argument("--expected-final-n", type=int, default=None)
     baseline_parser.set_defaults(func=_validate_baseline_report)
 
     stamp_seed_parser = subparsers.add_parser(
