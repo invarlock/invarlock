@@ -112,6 +112,32 @@ def test_build_adapter_inventory_rows_marks_auto_adapter_and_optional_awq(
     assert rows[1].detail is None
 
 
+def test_build_adapter_inventory_rows_marks_multimodal_stack_requirement(
+    monkeypatch,
+) -> None:
+    registry = _FakeRegistry(adapters=["hf_multimodal"], edits=[], guards=[])
+
+    monkeypatch.setattr(
+        mod.importlib_metadata,
+        "version",
+        lambda package_name: "5.5.0"
+        if package_name == "transformers"
+        else "0.26.0",
+    )
+
+    rows = build_adapter_inventory_rows(
+        registry,
+        has_cuda=False,
+        is_linux=True,
+        find_spec_safe=lambda name: SimpleNamespace(name=name),
+        bitsandbytes_runtime_ready=True,
+    )
+
+    assert rows[0].status == "needs_extra"
+    assert rows[0].required_extra == "invarlock[multimodal]"
+    assert rows[0].detail == "Requires transformers>=5.12.0 and torchvision>=0.26.0"
+
+
 def test_build_adapter_inventory_rows_marks_optional_torchao() -> None:
     registry = _FakeRegistry(adapters=["hf_torchao"], edits=[], guards=[])
 

@@ -13,12 +13,12 @@ TRANSFORMERS_LOCKFILES = (
     Path("requirements/workflows/runtime-image-py312.txt"),
     Path("requirements/workflows/runtime-image-py312-aarch64.txt"),
 )
-TRANSFORMERS_550_HASHES = {
-    "821a9ff0961abbb29eb1eb686d78df1c85929fdf213a3fe49dc6bd94f9efa944",
-    "c8db656cf51c600cd8c75f06b20ef85c72e8b8ff9abc880c5d3e8bc70e0ddcbd",
+TRANSFORMERS_512_HASHES = {
+    "500be9eb644ede81c3103eee7687fc36d05dd75d1c76686c3820b26396fe7c7c",
+    "f0cf42ae1464c2eb41e7e0e66d7fd4b66145f48af17093b4cc0b2e9781faa7f4",
 }
-TRANSFORMERS_550_RE = re.compile(
-    r"transformers==5\.5\.0 \\\n"
+TRANSFORMERS_512_RE = re.compile(
+    r"transformers==5\.12\.0 \\\n"
     r"(?P<hash1>\s+--hash=sha256:(?P<digest1>[0-9a-f]{64}) \\\n)"
     r"(?P<hash2>\s+--hash=sha256:(?P<digest2>[0-9a-f]{64}))",
     re.MULTILINE,
@@ -89,9 +89,9 @@ def _iter_pip_install_commands(workflow: dict[str, Any]) -> list[str]:
     return commands
 
 
-def _extract_transformers_550_hashes(path: Path) -> set[str]:
-    match = TRANSFORMERS_550_RE.search(path.read_text(encoding="utf-8"))
-    assert match is not None, f"transformers==5.5.0 stanza missing in {path}"
+def _extract_transformers_512_hashes(path: Path) -> set[str]:
+    match = TRANSFORMERS_512_RE.search(path.read_text(encoding="utf-8"))
+    assert match is not None, f"transformers==5.12.0 stanza missing in {path}"
     return {match.group("digest1"), match.group("digest2")}
 
 

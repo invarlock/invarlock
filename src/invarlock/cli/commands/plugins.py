@@ -7,8 +7,10 @@ Supports a minimal view via INVARLOCK_MINIMAL=1 to hide built‑in adapters.
 """
 
 import importlib
+import importlib.metadata as importlib_metadata
 import os
 import platform
+import re
 from typing import Any
 
 import typer
@@ -42,6 +44,7 @@ _PLUGIN_COMMAND_ERRORS = (
     TypeError,
     ValueError,
 )
+_EXTRA_CHECK_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, ValueError)
 
 # Group: plugins
 plugins_app = typer.Typer(
@@ -180,6 +183,14 @@ def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
         "hf_causal": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
         "hf_mlm": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
         "hf_seq2seq": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
+        "hf_multimodal": {
+            "packages": ["transformers", "torchvision", "PIL"],
+            "extra": "invarlock[multimodal]",
+            "minimum_versions": {
+                "transformers": "5.12.0",
+                "torchvision": "0.26.0",
+            },
+        },
         "hf_auto": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
         # Optional adapter plugins
         "hf_gptq": {"packages": ["gptqmodel"], "extra": "invarlock[gptq]"},
@@ -205,14 +216,16 @@ def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
     # tests can monkeypatch __import__. For GPU-only stacks (bitsandbytes), we
     # probe runtime readiness instead of importing.
     missing_packages: list[str] = []
+    minimum_versions = plugin_info.get("minimum_versions", {})
     for pkg in plugin_info["packages"]:
         try:
-            if pkg == "bitsandbytes":
-                if not bitsandbytes_runtime_available():
-                    raise ImportError("bitsandbytes not importable")
-            else:
-                __import__(pkg)
-        except ImportError:
+            _plugin_package_importable(str(pkg))
+            minimum_version = minimum_versions.get(pkg)
+            if minimum_version and not _package_version_at_least(
+                pkg, str(minimum_version)
+            ):
+                raise ImportError(f"{pkg}>={minimum_version} not available")
+        except _EXTRA_CHECK_ERRORS:
             missing_packages.append(pkg)
 
     # Format the result
@@ -228,6 +241,29 @@ def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
             return f"⚠️ missing {plugin_info['extra']}"
         else:
             return f"⚠️ missing {', '.join(missing_packages)}"
+
+
+def _plugin_package_importable(package_name: str) -> bool:
+    if package_name == "bitsandbytes":
+        if not bitsandbytes_runtime_available():
+            raise ImportError("bitsandbytes not importable")
+        return True
+    __import__(package_name)
+    return True
+
+
+def _package_version_at_least(package_name: str, minimum: str) -> bool:
+    try:
+        installed = importlib_metadata.version(package_name)
+    except importlib_metadata.PackageNotFoundError:
+        return False
+    return _version_key(installed) >= _version_key(minimum)
+
+
+def _version_key(value: str) -> tuple[int, int, int]:
+    parts = [int(match.group(0)) for match in re.finditer(r"\d+", value)]
+    padded = (parts + [0, 0, 0])[:3]
+    return (padded[0], padded[1], padded[2])
 
 
 # Wire subcommands under group

@@ -1062,6 +1062,7 @@ numpy==2.4.4 \
     #   accelerate
     #   datasets
     #   pandas
+    #   torchvision
     #   transformers
 nvidia-cublas-cu12==12.8.4.1 \
     --hash=sha256:47e9b82132fa8d2b4944e708049229601448aaad7e6f296f630f2d1a32de35af \
@@ -1294,7 +1295,9 @@ pillow==12.2.0 \
     --hash=sha256:f490f9368b6fc026f021db16d7ec2fbf7d89e2edb42e8ec09d2c60505f5729c7 \
     --hash=sha256:fb043ee2f06b41473269765c2feae53fc2e2fbf96e5e22ca94fb5ad677856f06 \
     --hash=sha256:fc3d34d4a8fbec3e88a79b92e5465e0f9b842b628675850d860b8bd300b159f5
-    # via -r requirements/workflows/runtime-image.in
+    # via
+    #   -r requirements/workflows/runtime-image.in
+    #   torchvision
 propcache==0.4.1 \
     --hash=sha256:0002004213ee1f36cfb3f9a42b5066100c44276b9b72b4e1504cddd3d692e86e \
     --hash=sha256:0013cb6f8dde4b2a2f66903b8ba740bdfe378c943c4377a200551ceb27f379e4 \
@@ -2186,6 +2189,30 @@ torch==2.11.0+cu128 \
     # via
     #   -r requirements/workflows/runtime-image.in
     #   accelerate
+    #   torchvision
+torchvision==0.26.0+cu128 \
+    --hash=sha256:0232cb219927a52d6c98ff202f32d1cdf4802c2195a85fc1f1a0c1b0b4983a4d \
+    --hash=sha256:2a04bf491eb22e6487defe6cead6ffaabbce13fb5981b8eb3540050f96cb0599 \
+    --hash=sha256:367d42ea703844ecdb516e9d5eb09929012a58705d2622cf4e9e3c37f278cb85 \
+    --hash=sha256:6168abc019803ac9e97efce27eafd2fdb33db04dcc54a86039537729e5047b29 \
+    --hash=sha256:6319e1ba49c6f62ac9902f73d0eab207b8a4dc6b4d3392fe9edd9903fff1be0a \
+    --hash=sha256:63e35234aed13b6edda37056f417b5c281249669db631e706811917af36b21d7 \
+    --hash=sha256:8c0d1c4fbb2c9a4d5d41d0aaa87da20e525bcb2a154ce405725b0be59456804b \
+    --hash=sha256:8f2629d056570c929b0a1d5473d9cb0320b90bda1764bda353553a72cc6b2069 \
+    --hash=sha256:aac647c9130f1f25f5c8f5bca3d95cfd96bdfac93ab54529690b088e64e4fa64 \
+    --hash=sha256:b3865fa227661dd75b7b28c96d3d14e739bd08bf0614132758922fe0e7206f91 \
+    --hash=sha256:b5772c55bfda4377df8f1930d43c4e0231ef231b0228eade4b227c8d3ba6e34e \
+    --hash=sha256:c4a9cacd521f2a4df0bcd9d8e96704771b928f478f1f3067e4085bb53a1da298 \
+    --hash=sha256:cb1f6184a7ba30fba40580e1a01a6604a86c55e79fdda187f40116ee680441ec \
+    --hash=sha256:ccf26b4b659cfce6f2208cb8326071d51c70219a34856dfdf468d1e19af52c0d \
+    --hash=sha256:d26091b15cd6e3c74c148d9b68c9a901ad6fb9b0f66fa3ea3ab09f04132a07d3 \
+    --hash=sha256:e2ee9e16ee4518292694537fcbd20d2d27044e381d92b864f637e82795796a84 \
+    --hash=sha256:e594732552a8c2fee2ace9c6475c6c6904fc44ccca622ee6765a89a045416a44 \
+    --hash=sha256:ed0770e00b96d8aa675718e20db69c740c927f027c9c8b1330251f8a973221b6 \
+    --hash=sha256:ed1324dbbbecb5a0149ed4ce8f9308465a1eef85ca2d2370dbb14805bf1c90aa \
+    --hash=sha256:f160dc552a086244f7102c898f7be8ef46a41b36bce5ea80a4f2493cb30ca1fc \
+    --hash=sha256:f44bfc61b9be80bcf52a762d34da363cea3125d10c01f37e271583803c7bb97b
+    # via -r requirements/workflows/runtime-image.in
 tqdm==4.67.3 \
     --hash=sha256:7d825f03f89244ef73f1d4ce193cb1774a8179fd96f31d7e1dcde62092b960bb \
     --hash=sha256:ee1e4c0e59148062281c49d80b25b67771a127c85fc9676d3be5f243206826bf
@@ -2193,9 +2220,9 @@ tqdm==4.67.3 \
     #   datasets
     #   huggingface-hub
     #   transformers
-transformers==5.5.0 \
-    --hash=sha256:821a9ff0961abbb29eb1eb686d78df1c85929fdf213a3fe49dc6bd94f9efa944 \
-    --hash=sha256:c8db656cf51c600cd8c75f06b20ef85c72e8b8ff9abc880c5d3e8bc70e0ddcbd
+transformers==5.12.0 \
+    --hash=sha256:500be9eb644ede81c3103eee7687fc36d05dd75d1c76686c3820b26396fe7c7c \
+    --hash=sha256:f0cf42ae1464c2eb41e7e0e66d7fd4b66145f48af17093b4cc0b2e9781faa7f4
     # via -r requirements/workflows/runtime-image.in
 triton==3.6.0 \
     --hash=sha256:0075039ff27765480083b1a109999bf27110f3542f1f9fad95f0f9065a36da79 \

@@ -32,10 +32,11 @@
       "platform_support": "all",
       "runtime_constraints": [
         "torch",
-        "transformers",
-        "pillow"
+        "transformers>=5.12.0",
+        "pillow",
+        "torchvision>=0.26.0"
       ],
-      "required_extra": "adapters",
+      "required_extra": "multimodal",
       "degraded_modes": [
         "single_image_only_phase1",
         "batch_size_one_phase1"

@@ -7,7 +7,7 @@
 | **Purpose** | Load models, describe structure, and snapshot/restore state for edits and guards. |
 | **Audience** | CLI users choosing `model.adapter` and Python callers instantiating adapters. |
 | **Supported surface** | Core HF text and image-text adapters, auto-match adapters, platform-dependent BNB, GPTQModel-backed AWQ/GPTQ adapters, torchao runtime quantization, HQQ runtime quantization, Quanto runtime quantization, and compressed-tensors checkpoint loading. |
-| **Requires** | `invarlock[adapters]` or `invarlock[hf]` for core HF adapters; `invarlock[gpu]`, `invarlock[awq]`, `invarlock[gptq]`, `invarlock[torchao]`, `invarlock[hqq]`, `invarlock[quanto]`, or `invarlock[compressed-tensors]` for quantized adapters. |
+| **Requires** | `invarlock[adapters]` or `invarlock[hf]` for core HF text adapters; `invarlock[multimodal]` for image-text adapters such as Gemma 4 unified checkpoints; `invarlock[gpu]`, `invarlock[awq]`, `invarlock[gptq]`, `invarlock[torchao]`, `invarlock[hqq]`, `invarlock[quanto]`, or `invarlock[compressed-tensors]` for quantized adapters. |
 | **Network** | Offline by default; use `evaluate --allow-network` when a run needs model downloads. |
 | **Inputs** | `model.id` (HF repo or local path), adapter name, device. |
 | **Outputs / Artifacts** | Loaded model object; optional snapshots; exported model directories when enabled. |
@@ -18,6 +18,9 @@
 ```bash
 # Install core HF adapters + evaluation stack
 pip install "invarlock[hf]"
+
+# Install HF image-text / multimodal support
+pip install "invarlock[multimodal]"
 
 # Inspect adapter availability
 invarlock advanced plugins adapters
@@ -134,7 +137,7 @@ Machine-readable adapter capability metadata is published at
 | --- | --- | --- | --- | --- |
 | `hf_causal` | Decoder-only causal LMs (dense + MoE + GPT2-like) | `invarlock[adapters]` | All platforms with torch | Default causal LM adapter. |
 | `hf_mlm` | BERT/RoBERTa/DeBERTa MLMs | `invarlock[adapters]` | All platforms with torch | Loads `AutoModelForMaskedLM` when possible. |
-| `hf_multimodal` | Image-text and unified multimodal generation models exposed through HF `AutoModelForImageTextToText` or `AutoModelForMultimodalLM` | `invarlock[adapters]` | All platforms with torch | Single-image `vision_text` evaluation with explicit adapter selection; Gemma 4 unified checkpoints require a Transformers runtime that registers `gemma4_unified`. |
+| `hf_multimodal` | Image-text and unified multimodal generation models exposed through HF `AutoModelForImageTextToText` or `AutoModelForMultimodalLM` | `invarlock[multimodal]` | All platforms with torch | Single-image `vision_text` evaluation with explicit adapter selection; Gemma 4 unified checkpoints require `transformers>=5.12.0` and `torchvision>=0.26.0`. |
 | `hf_seq2seq` | T5/encoder‑decoder models | `invarlock[adapters]` | All platforms with torch | For seq2seq evaluation. |
 | `hf_auto` | Auto-select HF adapter | `invarlock[adapters]` | All platforms with torch | Delegates to a role adapter; prefers quant adapters when detected. |
 | `hf_bnb` | Bitsandbytes quantized LMs | `invarlock[gpu]` | Platform-dependent | Uses `device_map="auto"`; no `.to()`. Latest bitsandbytes wheels can work outside Linux/CUDA when the runtime imports cleanly. |
@@ -233,7 +236,12 @@ finally:
 ## Troubleshooting
 
 - **Adapter missing from `invarlock advanced plugins adapters`**: install the required extra
-  (`invarlock[adapters]`, `invarlock[gpu]`, `invarlock[gptq]`, `invarlock[awq]`).
+  (`invarlock[adapters]`, `invarlock[multimodal]`, `invarlock[gpu]`,
+  `invarlock[gptq]`, `invarlock[awq]`).
+- **Gemma 4 unified or image-text load fails**: use the explicit
+  `hf_multimodal` adapter and install `invarlock[multimodal]`, which pins the
+  Transformers and torchvision floor required by current Gemma 4 unified
+  checkpoints.
 - **GPTQModel-backed adapters unavailable**: `hf_awq` and `hf_gptq` use
   GPTQModel-backed loading; verify the selected GPTQModel wheel supports your
   Python, PyTorch, and accelerator stack.

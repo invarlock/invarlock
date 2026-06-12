@@ -77,6 +77,25 @@ hf = [
   "pillow>=11.3.0",
 ]
 
+# Hugging Face image-text / multimodal workflow.
+multimodal = [
+  "torch>=2.12.0",
+  "accelerate>=0.26.0",
+  "transformers>=5.12.0",
+  "safetensors>=0.4.0",
+  "protobuf>=4.25",
+  "sentencepiece>=0.2.1",
+  "tiktoken>=0.9.0",
+  "datasets>=3.0",
+  "requests>=2.33.0",
+  "numpy>=1.24",
+  "huggingface_hub>=1.0.0",
+  "aiohttp>=3.14.0",
+  "h2>=4.3.0",
+  "pillow>=11.3.0",
+  "torchvision>=0.26.0",
+]
+
 # Full guards functionality
 guards = [
   "torch>=2.12.0",
@@ -163,7 +182,7 @@ gpu = [
 # Convenience install for advanced evidence-pack/policy/plugins/calibration workflows.
 advanced = [
   "torch>=2.12.0",
-  "transformers>=5.5.0",
+  "transformers>=5.12.0",
   "protobuf>=4.25",
   "sentencepiece>=0.2.1",
   "tiktoken>=0.9.0",
@@ -172,7 +191,7 @@ advanced = [
   "numpy>=1.24",
   "scikit-learn>=1.4",
   "huggingface_hub>=1.0.0",
-  "torchvision>=0.23.0",
+  "torchvision>=0.26.0",
   "accelerate>=0.27",
   "bitsandbytes>=0.41",
   "gptqmodel>=7.0.0",
@@ -190,7 +209,7 @@ advanced = [
 # Complete installation with all features
 all = [
   "torch>=2.12.0",
-  "transformers>=5.5.0",
+  "transformers>=5.12.0",
   "protobuf>=4.25",
   "sentencepiece>=0.2.1",
   "tiktoken>=0.9.0",
@@ -199,7 +218,7 @@ all = [
   "numpy>=1.24",
   "scikit-learn>=1.4",
   "huggingface_hub>=1.0.0",
-  "torchvision>=0.23.0",
+  "torchvision>=0.26.0",
   "accelerate>=0.27",
   "bitsandbytes>=0.41",
   "gptqmodel>=7.0.0",

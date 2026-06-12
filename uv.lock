@@ -1540,6 +1540,24 @@ hqq = [
     { name = "torch" },
     { name = "transformers" },
 ]
+multimodal = [
+    { name = "accelerate" },
+    { name = "aiohttp" },
+    { name = "datasets" },
+    { name = "h2" },
+    { name = "huggingface-hub" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
+    { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14'" },
+    { name = "pillow" },
+    { name = "protobuf" },
+    { name = "requests" },
+    { name = "safetensors" },
+    { name = "sentencepiece" },
+    { name = "tiktoken" },
+    { name = "torch" },
+    { name = "torchvision" },
+    { name = "transformers" },
+]
 precommit-ci = [
     { name = "pre-commit" },
 ]
@@ -1580,10 +1598,12 @@ requires-dist = [
     { name = "accelerate", marker = "extra == 'gpu'", specifier = ">=0.27" },
     { name = "accelerate", marker = "extra == 'hf'", specifier = ">=0.26.0" },
     { name = "accelerate", marker = "extra == 'hqq'", specifier = ">=0.27" },
+    { name = "accelerate", marker = "extra == 'multimodal'", specifier = ">=0.26.0" },
     { name = "accelerate", marker = "extra == 'quanto'", specifier = ">=0.27" },
     { name = "aiohttp", marker = "extra == 'advanced'", specifier = ">=3.14.0" },
     { name = "aiohttp", marker = "extra == 'all'", specifier = ">=3.14.0" },
     { name = "aiohttp", marker = "extra == 'hf'", specifier = ">=3.14.0" },
+    { name = "aiohttp", marker = "extra == 'multimodal'", specifier = ">=3.14.0" },
     { name = "bitsandbytes", marker = "extra == 'advanced'", specifier = ">=0.41" },
     { name = "bitsandbytes", marker = "extra == 'all'", specifier = ">=0.41" },
     { name = "bitsandbytes", marker = "extra == 'dev'", specifier = ">=0.41" },
@@ -1603,6 +1623,7 @@ requires-dist = [
     { name = "datasets", marker = "extra == 'all'", specifier = ">=3.0" },
     { name = "datasets", marker = "extra == 'eval'", specifier = ">=3.0" },
     { name = "datasets", marker = "extra == 'hf'", specifier = ">=3.0" },
+    { name = "datasets", marker = "extra == 'multimodal'", specifier = ">=3.0" },
     { name = "gptqmodel", marker = "extra == 'advanced'", specifier = ">=7.0.0" },
     { name = "gptqmodel", marker = "extra == 'all'", specifier = ">=7.0.0" },
     { name = "gptqmodel", marker = "extra == 'awq'", specifier = ">=7.0.0" },
@@ -1610,12 +1631,14 @@ requires-dist = [
     { name = "h2", marker = "extra == 'advanced'", specifier = ">=4.3.0" },
     { name = "h2", marker = "extra == 'all'", specifier = ">=4.3.0" },
     { name = "h2", marker = "extra == 'hf'", specifier = ">=4.3.0" },
+    { name = "h2", marker = "extra == 'multimodal'", specifier = ">=4.3.0" },
     { name = "hqq", marker = "extra == 'advanced'", specifier = ">=0.2.8" },
     { name = "hqq", marker = "extra == 'all'", specifier = ">=0.2.8" },
     { name = "hqq", marker = "extra == 'hqq'", specifier = ">=0.2.8" },
     { name = "huggingface-hub", marker = "extra == 'advanced'", specifier = ">=1.0.0" },
     { name = "huggingface-hub", marker = "extra == 'all'", specifier = ">=1.0.0" },
     { name = "huggingface-hub", marker = "extra == 'hf'", specifier = ">=1.0.0" },
+    { name = "huggingface-hub", marker = "extra == 'multimodal'", specifier = ">=1.0.0" },
     { name = "hypothesis", marker = "extra == 'ci'", specifier = ">=6.98" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.98" },
     { name = "idna", specifier = ">=3.15" },
@@ -1636,6 +1659,7 @@ requires-dist = [
     { name = "numpy", marker = "extra == 'docs-ci'", specifier = ">=1.24" },
     { name = "numpy", marker = "extra == 'guards'", specifier = ">=1.24" },
     { name = "numpy", marker = "extra == 'hf'", specifier = ">=1.24" },
+    { name = "numpy", marker = "extra == 'multimodal'", specifier = ">=1.24" },
     { name = "optimum-quanto", marker = "extra == 'advanced'", specifier = ">=0.2.7" },
     { name = "optimum-quanto", marker = "extra == 'all'", specifier = ">=0.2.7" },
     { name = "optimum-quanto", marker = "extra == 'quanto'", specifier = ">=0.2.7" },
@@ -1643,6 +1667,7 @@ requires-dist = [
     { name = "pillow", marker = "extra == 'advanced'", specifier = ">=11.3.0" },
     { name = "pillow", marker = "extra == 'all'", specifier = ">=11.3.0" },
     { name = "pillow", marker = "extra == 'hf'", specifier = ">=11.3.0" },
+    { name = "pillow", marker = "extra == 'multimodal'", specifier = ">=11.3.0" },
     { name = "pip-audit", marker = "extra == 'security-ci'", specifier = ">=2.8" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.0" },
     { name = "pre-commit", marker = "extra == 'precommit-ci'", specifier = ">=3.0" },
@@ -1650,6 +1675,7 @@ requires-dist = [
     { name = "protobuf", marker = "extra == 'advanced'", specifier = ">=4.25" },
     { name = "protobuf", marker = "extra == 'all'", specifier = ">=4.25" },
     { name = "protobuf", marker = "extra == 'hf'", specifier = ">=4.25" },
+    { name = "protobuf", marker = "extra == 'multimodal'", specifier = ">=4.25" },
     { name = "psutil", specifier = ">=5.9" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pymdown-extensions", marker = "extra == 'ci'", specifier = ">=10.21.3" },
@@ -1666,6 +1692,7 @@ requires-dist = [
     { name = "requests", marker = "extra == 'docs-ci'", specifier = ">=2.33.0" },
     { name = "requests", marker = "extra == 'eval'", specifier = ">=2.33.0" },
     { name = "requests", marker = "extra == 'hf'", specifier = ">=2.33.0" },
+    { name = "requests", marker = "extra == 'multimodal'", specifier = ">=2.33.0" },
     { name = "requests", marker = "extra == 'release-ci'", specifier = ">=2.33.0" },
     { name = "requests", marker = "extra == 'security-ci'", specifier = ">=2.33.0" },
     { name = "rich", specifier = ">=13.0" },
@@ -1678,6 +1705,7 @@ requires-dist = [
     { name = "safetensors", marker = "extra == 'gpu'", specifier = ">=0.4.0" },
     { name = "safetensors", marker = "extra == 'hf'", specifier = ">=0.4.0" },
     { name = "safetensors", marker = "extra == 'hqq'", specifier = ">=0.4.0" },
+    { name = "safetensors", marker = "extra == 'multimodal'", specifier = ">=0.4.0" },
     { name = "safetensors", marker = "extra == 'quanto'", specifier = ">=0.4.0" },
     { name = "safetensors", marker = "extra == 'torchao'", specifier = ">=0.4.0" },
     { name = "scikit-learn", marker = "extra == 'advanced'", specifier = ">=1.4" },
@@ -1687,12 +1715,14 @@ requires-dist = [
     { name = "sentencepiece", marker = "extra == 'advanced'", specifier = ">=0.2.1" },
     { name = "sentencepiece", marker = "extra == 'all'", specifier = ">=0.2.1" },
     { name = "sentencepiece", marker = "extra == 'hf'", specifier = ">=0.2.1" },
+    { name = "sentencepiece", marker = "extra == 'multimodal'", specifier = ">=0.2.1" },
     { name = "shellingham", specifier = ">=1.5.4" },
     { name = "sphinx", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "tiktoken", marker = "extra == 'adapters'", specifier = ">=0.9.0" },
     { name = "tiktoken", marker = "extra == 'advanced'", specifier = ">=0.9.0" },
     { name = "tiktoken", marker = "extra == 'all'", specifier = ">=0.9.0" },
     { name = "tiktoken", marker = "extra == 'hf'", specifier = ">=0.9.0" },
+    { name = "tiktoken", marker = "extra == 'multimodal'", specifier = ">=0.9.0" },
     { name = "torch", marker = "extra == 'adapters'", specifier = ">=2.12.0" },
     { name = "torch", marker = "extra == 'advanced'", specifier = ">=2.12.0" },
     { name = "torch", marker = "extra == 'all'", specifier = ">=2.12.0" },
@@ -1705,23 +1735,26 @@ requires-dist = [
     { name = "torch", marker = "extra == 'guards'", specifier = ">=2.12.0" },
     { name = "torch", marker = "extra == 'hf'", specifier = ">=2.12.0" },
     { name = "torch", marker = "extra == 'hqq'", specifier = ">=2.12.0" },
+    { name = "torch", marker = "extra == 'multimodal'", specifier = ">=2.12.0" },
     { name = "torch", marker = "extra == 'quanto'", specifier = ">=2.12.0" },
     { name = "torch", marker = "extra == 'torchao'", specifier = ">=2.12.0" },
     { name = "torchao", marker = "extra == 'advanced'", specifier = ">=0.17.0" },
     { name = "torchao", marker = "extra == 'all'", specifier = ">=0.17.0" },
     { name = "torchao", marker = "extra == 'torchao'", specifier = ">=0.17.0" },
-    { name = "torchvision", marker = "extra == 'advanced'", specifier = ">=0.23.0" },
-    { name = "torchvision", marker = "extra == 'all'", specifier = ">=0.23.0" },
+    { name = "torchvision", marker = "extra == 'advanced'", specifier = ">=0.26.0" },
+    { name = "torchvision", marker = "extra == 'all'", specifier = ">=0.26.0" },
     { name = "torchvision", marker = "extra == 'awq'", specifier = ">=0.23.0" },
     { name = "torchvision", marker = "extra == 'gptq'", specifier = ">=0.23.0" },
+    { name = "torchvision", marker = "extra == 'multimodal'", specifier = ">=0.26.0" },
     { name = "transformers", marker = "extra == 'adapters'", specifier = ">=5.5.0" },
-    { name = "transformers", marker = "extra == 'advanced'", specifier = ">=5.5.0" },
-    { name = "transformers", marker = "extra == 'all'", specifier = ">=5.5.0" },
+    { name = "transformers", marker = "extra == 'advanced'", specifier = ">=5.12.0" },
+    { name = "transformers", marker = "extra == 'all'", specifier = ">=5.12.0" },
     { name = "transformers", marker = "extra == 'awq'", specifier = ">=5.5.0" },
     { name = "transformers", marker = "extra == 'compressed-tensors'", specifier = ">=5.5.0" },
     { name = "transformers", marker = "extra == 'gptq'", specifier = ">=5.5.0" },
     { name = "transformers", marker = "extra == 'hf'", specifier = ">=5.5.0" },
     { name = "transformers", marker = "extra == 'hqq'", specifier = ">=5.5.0" },
+    { name = "transformers", marker = "extra == 'multimodal'", specifier = ">=5.12.0" },
     { name = "transformers", marker = "extra == 'quanto'", specifier = ">=5.5.0" },
     { name = "transformers", marker = "extra == 'torchao'", specifier = ">=5.5.0" },
     { name = "triton", marker = "sys_platform == 'linux' and extra == 'advanced'", specifier = ">=2.3.0" },
@@ -1734,7 +1767,7 @@ requires-dist = [
     { name = "wheel", marker = "extra == 'ci'", specifier = ">=0.46.0" },
     { name = "wheel", marker = "extra == 'dev'", specifier = ">=0.46.0" },
 ]
-provides-extras = ["adapters", "hf", "guards", "edits", "eval", "probes", "gptq", "awq", "torchao", "hqq", "quanto", "compressed-tensors", "gpu", "advanced", "all", "dev", "ci", "docs-ci", "precommit-ci", "release-ci", "security-ci"]
+provides-extras = ["adapters", "hf", "multimodal", "guards", "edits", "eval", "probes", "gptq", "awq", "torchao", "hqq", "quanto", "compressed-tensors", "gpu", "advanced", "all", "dev", "ci", "docs-ci", "precommit-ci", "release-ci", "security-ci"]
 
 [[package]]
 name = "isoduration"
@@ -4630,7 +4663,7 @@ wheels = [
 
 [[package]]
 name = "transformers"
-version = "5.5.0"
+version = "5.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "huggingface-hub" },
@@ -4644,9 +4677,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ff/9d/fb46e729b461985f41a5740167688b924a4019141e5c164bea77548d3d9e/transformers-5.5.0.tar.gz", hash = "sha256:c8db656cf51c600cd8c75f06b20ef85c72e8b8ff9abc880c5d3e8bc70e0ddcbd", size = 8237745, upload-time = "2026-04-02T16:13:08.113Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0c/f9/4552e2ba55db1c943aea0d4c09a32e9cbe5445b9eabe9856900de503dc8f/transformers-5.12.0.tar.gz", hash = "sha256:f0cf42ae1464c2eb41e7e0e66d7fd4b66145f48af17093b4cc0b2e9781faa7f4", size = 8923020, upload-time = "2026-06-12T14:39:20.43Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e7/28/35f7411ff80a3640c1f4fc907dcbb6a65061ebb82f66950e38bfc9f7f740/transformers-5.5.0-py3-none-any.whl", hash = "sha256:821a9ff0961abbb29eb1eb686d78df1c85929fdf213a3fe49dc6bd94f9efa944", size = 10245591, upload-time = "2026-04-02T16:13:03.462Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/1f/d385913c38e900d23b728a4188fee625f2fccb306aeebc59be9d91404a5a/transformers-5.12.0-py3-none-any.whl", hash = "sha256:500be9eb644ede81c3103eee7687fc36d05dd75d1c76686c3820b26396fe7c7c", size = 11150246, upload-time = "2026-06-12T14:39:17.009Z" },
 ]
 
 [[package]]

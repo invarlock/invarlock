@@ -313,7 +313,9 @@ calibration configs, but still need the remaining promotion artifacts before
 they become release-supported lanes.
 
 Image-text evaluation uses the built-in
-`hf_multimodal` adapter and the `vision_text` provider. Public support remains
+`hf_multimodal` adapter and the `vision_text` provider. Install
+`invarlock[multimodal]` for this path; Gemma 4 unified checkpoints require
+`transformers>=5.12.0` and `torchvision>=0.26.0`. Public support remains
 text-only for the Gemma 4 lane, and audio evaluation is deferred.
 
 Machine-readable support metadata lives in `contracts/support_matrix.json`. It is
@@ -332,9 +334,9 @@ manifest dry-run (`scripts/model_evidence/model_evidence_sweep.py --suite repo-m
 The image-text path also includes an offline demo preset at
 `configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml` and a Gemma
 4 12B pilot at `configs/presets/multimodal/gemma4_12b_vision_text_256.yaml` plus
-`tests/fixtures/vision_text/demo_manifest.jsonl` for provider/config validation;
-live Gemma 4 12B execution also requires a Transformers runtime that registers
-`gemma4_unified` / `Gemma4UnifiedForConditionalGeneration`.
+`tests/fixtures/vision_text/demo_manifest.jsonl` for provider/config validation.
+Gemma 4 12B promotion still needs a public image-text evaluation/calibration
+dataset and clean public evidence rather than the local smoke manifest.
 
 For the broader inventory of declared support, implemented-but-not-public
 coverage, usage-only checkpoint families, and recommended additions, see

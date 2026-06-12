@@ -197,6 +197,39 @@ def test_gather_adapter_inventory_rows_marks_ct_missing_extra() -> None:
     assert item["backend"] == {"name": "compressed-tensors", "present": False}
 
 
+def test_gather_adapter_inventory_rows_marks_multimodal_missing_extra() -> None:
+    class _MultimodalRegistry(_Registry):
+        def __init__(self) -> None:
+            super().__init__()
+            self._adapters = {
+                "hf_multimodal": {
+                    "module": "invarlock.adapters.hf_multimodal",
+                    "entry_point": "hf_multimodal",
+                }
+            }
+
+    rows = gather_adapter_inventory_rows(
+        registry=_MultimodalRegistry(),
+        minimal=False,
+        has_cuda=False,
+        is_linux=True,
+        extras_checker=lambda name, _kind: (
+            "⚠️ missing invarlock[multimodal]" if name == "hf_multimodal" else ""
+        ),
+        provenance_extractor=lambda _name: SimpleNamespace(
+            library="transformers",
+            version="5.5.0",
+        ),
+        bitsandbytes_runtime_available=lambda: True,
+    )
+
+    row = rows[0]
+    assert row["name"] == "hf_multimodal"
+    assert row["support"] == "core"
+    assert row["status"] == "needs_extra"
+    assert row["enable"] == "pip install 'invarlock[multimodal]'"
+
+
 def test_filter_inventory_rows_support_tier_modes() -> None:
     rows = [
         {"name": "spectral", "support_tier": "core_supported", "status": "ready"},

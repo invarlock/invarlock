@@ -2222,9 +2222,9 @@ tqdm==4.67.3 \
     #   datasets
     #   huggingface-hub
     #   transformers
-transformers==5.5.0 \
-    --hash=sha256:821a9ff0961abbb29eb1eb686d78df1c85929fdf213a3fe49dc6bd94f9efa944 \
-    --hash=sha256:c8db656cf51c600cd8c75f06b20ef85c72e8b8ff9abc880c5d3e8bc70e0ddcbd
+transformers==5.12.0 \
+    --hash=sha256:500be9eb644ede81c3103eee7687fc36d05dd75d1c76686c3820b26396fe7c7c \
+    --hash=sha256:f0cf42ae1464c2eb41e7e0e66d7fd4b66145f48af17093b4cc0b2e9781faa7f4
     # via invarlock (pyproject.toml)
 triton==3.7.0 \
     --hash=sha256:18a160de426fd99f92b0baf509045360afbd3bfaa0b4a5171dde800ec9f09684 \
