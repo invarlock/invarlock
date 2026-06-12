@@ -183,9 +183,21 @@ def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
         "rmt": {"packages": [], "extra": ""},
         "demo_hello_guard": {"packages": [], "extra": ""},
         # Adapter plugins (baked-in only)
-        "hf_causal": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
-        "hf_mlm": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
-        "hf_seq2seq": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
+        "hf_causal": {
+            "packages": ["transformers"],
+            "extra": "invarlock[adapters]",
+            "minimum_versions": {"transformers": "5.12.0"},
+        },
+        "hf_mlm": {
+            "packages": ["transformers"],
+            "extra": "invarlock[adapters]",
+            "minimum_versions": {"transformers": "5.12.0"},
+        },
+        "hf_seq2seq": {
+            "packages": ["transformers"],
+            "extra": "invarlock[adapters]",
+            "minimum_versions": {"transformers": "5.12.0"},
+        },
         "hf_multimodal": {
             "packages": ["transformers", "torchvision", "PIL"],
             "extra": "invarlock[multimodal]",
@@ -194,20 +206,46 @@ def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
                 "torchvision": "0.26.0",
             },
         },
-        "hf_auto": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
+        "hf_auto": {
+            "packages": ["transformers"],
+            "extra": "invarlock[adapters]",
+            "minimum_versions": {"transformers": "5.12.0"},
+        },
         # Optional adapter plugins
-        "hf_gptq": {"packages": ["gptqmodel"], "extra": "invarlock[gptq]"},
-        "hf_awq": {"packages": ["gptqmodel"], "extra": "invarlock[awq]"},
-        "hf_bnb": {"packages": ["bitsandbytes"], "extra": "invarlock[gpu]"},
-        "hf_torchao": {"packages": ["torchao"], "extra": "invarlock[torchao]"},
-        "hf_hqq": {"packages": ["hqq"], "extra": "invarlock[hqq]"},
+        "hf_gptq": {
+            "packages": ["gptqmodel", "transformers"],
+            "extra": "invarlock[gptq]",
+            "minimum_versions": {"transformers": "5.12.0"},
+        },
+        "hf_awq": {
+            "packages": ["gptqmodel", "transformers"],
+            "extra": "invarlock[awq]",
+            "minimum_versions": {"transformers": "5.12.0"},
+        },
+        "hf_bnb": {
+            "packages": ["bitsandbytes", "transformers"],
+            "extra": "invarlock[gpu]",
+            "minimum_versions": {"transformers": "5.12.0"},
+        },
+        "hf_torchao": {
+            "packages": ["torchao", "transformers"],
+            "extra": "invarlock[torchao]",
+            "minimum_versions": {"transformers": "5.12.0"},
+        },
+        "hf_hqq": {
+            "packages": ["hqq", "transformers"],
+            "extra": "invarlock[hqq]",
+            "minimum_versions": {"transformers": "5.12.0"},
+        },
         "hf_quanto": {
-            "packages": ["optimum.quanto"],
+            "packages": ["optimum.quanto", "transformers"],
             "extra": "invarlock[quanto]",
+            "minimum_versions": {"transformers": "5.12.0"},
         },
         "hf_ct": {
-            "packages": ["compressed_tensors"],
+            "packages": ["compressed_tensors", "transformers"],
             "extra": "invarlock[compressed-tensors]",
+            "minimum_versions": {"transformers": "5.12.0"},
         },
     }
 

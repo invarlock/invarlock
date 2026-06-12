@@ -21,6 +21,20 @@ _OPTIONAL_DEP_HINTS = {
     "gptqmodel": "gptq,awq",
     "bitsandbytes": "gpu",
 }
+_HF_TRANSFORMERS_EXTRA_HINTS = {
+    "hf_causal": "invarlock[adapters]",
+    "hf_mlm": "invarlock[adapters]",
+    "hf_seq2seq": "invarlock[adapters]",
+    "hf_auto": "invarlock[adapters]",
+    "hf_multimodal": "invarlock[multimodal]",
+    "hf_gptq": "invarlock[gptq]",
+    "hf_awq": "invarlock[awq]",
+    "hf_bnb": "invarlock[gpu]",
+    "hf_torchao": "invarlock[torchao]",
+    "hf_hqq": "invarlock[hqq]",
+    "hf_quanto": "invarlock[quanto]",
+    "hf_ct": "invarlock[compressed-tensors]",
+}
 
 
 @dataclass(frozen=True)
@@ -283,10 +297,16 @@ def build_adapter_inventory_rows(
                 if hint:
                     required_extra = hint
 
+        transformers_ready = _version_at_least(transformers_version, "5.12.0")
+        if name in _HF_TRANSFORMERS_EXTRA_HINTS and not transformers_ready:
+            status = "needs_extra"
+            required_extra = _HF_TRANSFORMERS_EXTRA_HINTS[name]
+            detail = "Requires transformers>=5.12.0"
+
         if name == "hf_multimodal":
             torchvision_version = _package_version("torchvision")
             if (
-                not _version_at_least(transformers_version, "5.12.0")
+                not transformers_ready
                 or find_spec_safe("torchvision") is None
                 or not _version_at_least(torchvision_version, "0.26.0")
             ):

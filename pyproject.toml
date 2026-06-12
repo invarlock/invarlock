@@ -51,7 +51,7 @@ Changelog = "https://github.com/invarlock/invarlock/blob/v0.10.0/CHANGELOG.md"
 # Core torch dependencies for adapters
 adapters = [
   "torch>=2.12.0",
-  "transformers>=5.5.0",
+  "transformers>=5.12.0",
   "safetensors>=0.4.0",
   "protobuf>=4.25",
   "sentencepiece>=0.2.1",
@@ -63,7 +63,7 @@ adapters = [
 hf = [
   "torch>=2.12.0",
   "accelerate>=0.26.0",
-  "transformers>=5.5.0",
+  "transformers>=5.12.0",
   "safetensors>=0.4.0",
   "protobuf>=4.25",
   "sentencepiece>=0.2.1",
@@ -125,7 +125,7 @@ gptq = [
   "torchvision>=0.23.0",
   "gptqmodel>=7.0.0",
   "triton>=2.3.0; platform_system == \"Linux\"",
-  "transformers>=5.5.0",
+  "transformers>=5.12.0",
   "safetensors>=0.4.0",
 ]
 
@@ -134,7 +134,7 @@ awq = [
   "torch>=2.12.0",
   "torchvision>=0.23.0",
   "gptqmodel>=7.0.0",
-  "transformers>=5.5.0",
+  "transformers>=5.12.0",
   "accelerate>=0.27",
   "safetensors>=0.4.0",
   "triton>=2.3.0; platform_system == \"Linux\"",
@@ -142,14 +142,14 @@ awq = [
 
 torchao = [
   "torch>=2.12.0",
-  "transformers>=5.5.0",
+  "transformers>=5.12.0",
   "safetensors>=0.4.0",
   "torchao>=0.17.0",
 ]
 
 hqq = [
   "torch>=2.12.0",
-  "transformers>=5.5.0",
+  "transformers>=5.12.0",
   "safetensors>=0.4.0",
   "accelerate>=0.27",
   "hqq>=0.2.8",
@@ -157,7 +157,7 @@ hqq = [
 
 quanto = [
   "torch>=2.12.0",
-  "transformers>=5.5.0",
+  "transformers>=5.12.0",
   "safetensors>=0.4.0",
   "accelerate>=0.27",
   "optimum-quanto>=0.2.7",
@@ -165,7 +165,7 @@ quanto = [
 
 compressed-tensors = [
   "torch>=2.12.0",
-  "transformers>=5.5.0",
+  "transformers>=5.12.0",
   "safetensors>=0.4.0",
   "accelerate>=0.27",
   "compressed-tensors>=0.10.0",
@@ -175,6 +175,7 @@ compressed-tensors = [
 gpu = [
   "torch>=2.12.0",
   "accelerate>=0.27",
+  "transformers>=5.12.0",
   "bitsandbytes>=0.41",
   "safetensors>=0.4.0",
 ]

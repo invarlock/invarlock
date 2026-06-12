@@ -494,6 +494,23 @@ def test_check_plugin_extras_flags_old_multimodal_stack(monkeypatch):
     assert "invarlock[multimodal]" in result
 
 
+def test_check_plugin_extras_flags_old_core_hf_stack(monkeypatch):
+    monkeypatch.setattr(
+        plugins_mod,
+        "_plugin_package_importable",
+        lambda package_name: package_name == "transformers",
+    )
+    monkeypatch.setattr(
+        plugins_mod,
+        "_package_version_at_least",
+        lambda package_name, _minimum: package_name != "transformers",
+    )
+
+    result = plugins_mod._check_plugin_extras("hf_causal", "adapters")
+
+    assert "invarlock[adapters]" in result
+
+
 def test_plugins_adapters_verbose_console(monkeypatch):
     adapters = {
         "hf_auto": {"module": "invarlock.adapters.hf", "entry_point": "auto"},

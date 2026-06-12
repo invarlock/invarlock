@@ -8,7 +8,7 @@
       "platform_support": "all",
       "runtime_constraints": [
         "torch",
-        "transformers"
+        "transformers>=5.12.0"
       ],
       "required_extra": "adapters",
       "degraded_modes": []
@@ -20,7 +20,7 @@
       "platform_support": "all",
       "runtime_constraints": [
         "torch",
-        "transformers"
+        "transformers>=5.12.0"
       ],
       "required_extra": "adapters",
       "degraded_modes": []
@@ -49,7 +49,7 @@
       "platform_support": "all",
       "runtime_constraints": [
         "torch",
-        "transformers"
+        "transformers>=5.12.0"
       ],
       "required_extra": "adapters",
       "degraded_modes": []
@@ -60,7 +60,7 @@
       "guard_coverage": "delegated",
       "platform_support": "all",
       "runtime_constraints": [
-        "transformers"
+        "transformers>=5.12.0"
       ],
       "required_extra": "adapters",
       "degraded_modes": []
@@ -71,7 +71,8 @@
       "guard_coverage": "full_when_modules_exposed",
       "platform_support": "platform_dependent",
       "runtime_constraints": [
-        "bitsandbytes"
+        "bitsandbytes",
+        "transformers>=5.12.0"
       ],
       "required_extra": "gpu",
       "degraded_modes": [
@@ -85,7 +86,7 @@
       "platform_support": "gptqmodel-supported platforms",
       "runtime_constraints": [
         "gptqmodel",
-        "transformers",
+        "transformers>=5.12.0",
         "triton"
       ],
       "required_extra": "awq",
@@ -100,6 +101,7 @@
       "platform_support": "gptqmodel-supported platforms",
       "runtime_constraints": [
         "gptqmodel",
+        "transformers>=5.12.0",
         "triton"
       ],
       "required_extra": "gptq",
@@ -115,7 +117,7 @@
       "runtime_constraints": [
         "torchao",
         "torch",
-        "transformers"
+        "transformers>=5.12.0"
       ],
       "required_extra": "torchao",
       "degraded_modes": [
@@ -131,7 +133,7 @@
       "runtime_constraints": [
         "hqq",
         "torch",
-        "transformers"
+        "transformers>=5.12.0"
       ],
       "required_extra": "hqq",
       "degraded_modes": [
@@ -147,7 +149,7 @@
       "runtime_constraints": [
         "optimum-quanto",
         "torch",
-        "transformers"
+        "transformers>=5.12.0"
       ],
       "required_extra": "quanto",
       "degraded_modes": [
@@ -163,7 +165,7 @@
       "runtime_constraints": [
         "compressed-tensors",
         "torch",
-        "transformers"
+        "transformers>=5.12.0"
       ],
       "required_extra": "compressed-tensors",
       "degraded_modes": [

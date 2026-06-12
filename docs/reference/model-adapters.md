@@ -7,7 +7,7 @@
 | **Purpose** | Load models, describe structure, and snapshot/restore state for edits and guards. |
 | **Audience** | CLI users choosing `model.adapter` and Python callers instantiating adapters. |
 | **Supported surface** | Core HF text and image-text adapters, auto-match adapters, platform-dependent BNB, GPTQModel-backed AWQ/GPTQ adapters, torchao runtime quantization, HQQ runtime quantization, Quanto runtime quantization, and compressed-tensors checkpoint loading. |
-| **Requires** | `invarlock[adapters]` or `invarlock[hf]` for core HF text adapters; `invarlock[multimodal]` for image-text adapters such as Gemma 4 unified checkpoints; `invarlock[gpu]`, `invarlock[awq]`, `invarlock[gptq]`, `invarlock[torchao]`, `invarlock[hqq]`, `invarlock[quanto]`, or `invarlock[compressed-tensors]` for quantized adapters. |
+| **Requires** | `invarlock[adapters]` or `invarlock[hf]` for core HF text adapters; `invarlock[multimodal]` for image-text adapters such as Gemma 4 unified checkpoints; `invarlock[gpu]`, `invarlock[awq]`, `invarlock[gptq]`, `invarlock[torchao]`, `invarlock[hqq]`, `invarlock[quanto]`, or `invarlock[compressed-tensors]` for quantized adapters. All HF-backed extras require `transformers>=5.12.0`. |
 | **Network** | Offline by default; use `evaluate --allow-network` when a run needs model downloads. |
 | **Inputs** | `model.id` (HF repo or local path), adapter name, device. |
 | **Outputs / Artifacts** | Loaded model object; optional snapshots; exported model directories when enabled. |

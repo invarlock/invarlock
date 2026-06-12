@@ -219,6 +219,9 @@ pip install invarlock
 pip install "invarlock[hf]"
 ```
 
+HF-backed extras require `transformers>=5.12.0`; this covers text, multimodal,
+and quantized adapter loading through one tested HF runtime floor.
+
 Optional extras: `invarlock[probes]`, `invarlock[gpu]`,
 `invarlock[awq,gptq]`, `invarlock[torchao]`, `invarlock[hqq]`,
 `invarlock[quanto]`, and `invarlock[compressed-tensors]`. The `awq` and
