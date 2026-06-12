@@ -1,0 +1,22 @@
+{
+  "artifact_class": "public_evidence_fixture",
+  "fixture_paths": [
+    "public_evidence/published_basis/ministral3_3b/evaluation.report.json",
+    "public_evidence/published_basis/ministral3_3b/runtime.manifest.json"
+  ],
+  "remote_artifacts": {
+    "artifact_manifest": "artifacts/model-evidence/remote/20260612Tministral3bReleaseA/shard-00-gpu-0/artifact_manifest.json",
+    "model_revisions": "artifacts/model-evidence/remote/20260612Tministral3bReleaseA/shard-00-gpu-0/model_revisions.json",
+    "summary": "artifacts/model-evidence/remote/20260612Tministral3bReleaseA/shard-00-gpu-0/summary.json"
+  },
+  "repo": "invarlock-public",
+  "source_ref": "15ef967f91893988fbd1b3676392ae683b7fdcff",
+  "synced_file_hashes": {
+    "configs/calibration/null_sweep_ministral3_3b.yaml": "sha256:a57f49d0a08310952c6694d4afd30467b091b9381d214c5251f72a63198e7788",
+    "configs/presets/causal_lm/ministral3_3b_512.yaml": "sha256:8315fd550c450455be31eac6abfc75d8df4e060a07312427a956d14f3ccdd042",
+    "scripts/model_evidence/model_evidence_lanes.py": "sha256:56db544be91720e6d0df544cdf79e403f24c1d69730f2ec5f006b0a583cc8fff",
+    "src/invarlock/model_profile.py": "sha256:556adae9fc9eacd7838b4f484e444023277d9a8c8184cb1ee65f5faad9fe03df"
+  },
+  "worktree_branch": "work/evidence-sweep-stabilization",
+  "worktree_sync_note": "Remote /root/invarlock-public was manually kept in sync with the listed relevant local file hashes before running with --skip-sync."
+}

@@ -241,15 +241,24 @@
       "family": "Gemma 4 E2B causal LM (text-only eval)",
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
-      "support_tier": "supported_experimental",
-      "evidence_status": "repo_included_pilot_config",
-      "docs_label": "No, repo-included pilot config only",
+      "support_tier": "published_basis",
+      "evidence_status": "canonical_public_fixture",
+      "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
+        "published_modern",
         "small_local",
-        "enterprise_permissive",
-        "current_gpu_sweep"
-      ]
+        "enterprise_permissive"
+      ],
+      "representative_models": [
+        "google/gemma-4-E2B-it"
+      ],
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/gemma4_e2b/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/gemma4_e2b/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/gemma4_e2b/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/gemma4_e2b/evidence_pack"
+      }
     },
     {
       "lane_id": "tinyllama-1-1b-causal-hf",
@@ -276,12 +285,18 @@
       "family": "OLMo 2 7B causal LM",
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
-      "support_tier": "supported_experimental",
-      "evidence_status": "repo_included_pilot_config",
-      "docs_label": "No, repo-included pilot config only",
+      "support_tier": "published_basis",
+      "evidence_status": "canonical_public_fixture",
+      "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/olmo2_7b/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/olmo2_7b/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/olmo2_7b/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/olmo2_7b/evidence_pack"
+      },
       "support_groups": [
-        "current_gpu_sweep"
+        "published_modern"
       ],
       "representative_models": [
         "allenai/OLMo-2-1124-7B"
@@ -331,6 +346,30 @@
       }
     },
     {
+      "lane_id": "granite-4-1-3b-causal-hf",
+      "family": "Granite 4.1 3B causal LM",
+      "runtime": "huggingface-pytorch",
+      "adapter": "hf_causal",
+      "support_tier": "published_basis",
+      "evidence_status": "canonical_public_fixture",
+      "docs_label": "Yes",
+      "provenance_source": "docs/README.md#support-matrix",
+      "support_groups": [
+        "published_modern",
+        "small_local",
+        "enterprise_permissive"
+      ],
+      "representative_models": [
+        "ibm-granite/granite-4.1-3b"
+      ],
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/granite4_1_3b/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/granite4_1_3b/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/granite4_1_3b/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/granite4_1_3b/evidence_pack"
+      }
+    },
+    {
       "lane_id": "seq2seq-local-pairs",
       "family": "Seq2Seq / local pairs",
       "runtime": "mixed",
@@ -349,8 +388,8 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_multimodal",
       "support_tier": "community_experimental",
-      "evidence_status": "candidate_backlog_no_repo_preset",
-      "docs_label": "No",
+      "evidence_status": "repo_included_pilot_config",
+      "docs_label": "No, repo-included pilot config only",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
         "practical_shortlist",
@@ -360,34 +399,40 @@
       "representative_models": [
         "google/gemma-4-12B-it"
       ],
-      "notes": "Added from practical-picks backlog. Public text/runtime evidence, preset, calibration config, and targeted tests are not yet shipped."
+      "notes": "Added from practical-picks backlog with a repo pilot vision_text preset, sweep lane, and Gemma 4 unified loader tests. Live evidence remains blocked on the current CUDA runtime image because transformers 5.5.0 does not register the checkpoint model_type gemma4_unified; a runtime with Gemma4UnifiedForConditionalGeneration support is required before promotion."
     },
     {
       "lane_id": "ministral-3-3b-text-causal-hf",
-      "family": "Ministral 3 3B causal LM (text-only eval candidate)",
+      "family": "Ministral 3 3B causal LM (text-only eval)",
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
-      "support_tier": "community_experimental",
-      "evidence_status": "repo_included_pilot_config",
-      "docs_label": "No, repo-included pilot config only",
+      "support_tier": "published_basis",
+      "evidence_status": "canonical_public_fixture",
+      "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
+        "published_modern",
         "small_local",
         "enterprise_permissive"
       ],
       "representative_models": [
         "mistralai/Ministral-3-3B-Instruct-2512-BF16"
       ],
-      "notes": "Added from practical-picks backlog with repo preset, calibration config, and sweep lane. Tuned edit params and public evidence are still required before supported_experimental or published_basis promotion."
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/ministral3_3b/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/ministral3_3b/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/ministral3_3b/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/ministral3_3b/evidence_pack"
+      }
     },
     {
       "lane_id": "granite-4-1-8b-causal-hf",
       "family": "Granite 4.1 8B causal LM",
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
-      "support_tier": "community_experimental",
-      "evidence_status": "repo_included_pilot_config",
-      "docs_label": "No, repo-included pilot config only",
+      "support_tier": "published_basis",
+      "evidence_status": "published_release_strict",
+      "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
         "practical_shortlist",
@@ -396,25 +441,13 @@
       "representative_models": [
         "ibm-granite/granite-4.1-8b"
       ],
-      "notes": "Added from practical-picks backlog with repo preset, calibration config, and sweep lane. Tuned edit params and public evidence are still required before supported_experimental or published_basis promotion."
-    },
-    {
-      "lane_id": "granite-4-1-3b-causal-hf",
-      "family": "Granite 4.1 3B causal LM",
-      "runtime": "huggingface-pytorch",
-      "adapter": "hf_causal",
-      "support_tier": "community_experimental",
-      "evidence_status": "repo_included_pilot_config",
-      "docs_label": "No, repo-included pilot config only",
-      "provenance_source": "docs/README.md#support-matrix",
-      "support_groups": [
-        "small_local",
-        "enterprise_permissive"
-      ],
-      "representative_models": [
-        "ibm-granite/granite-4.1-3b"
-      ],
-      "notes": "Added from practical-picks backlog with repo preset, calibration config, and sweep lane. Tuned edit params and public evidence are still required before supported_experimental or published_basis promotion."
+      "notes": "Public release-profile container-backed evidence fixture is included from remote run 20260612Tgranite8bPrefetchReleaseA after tokenizer prefetch recovery.",
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/granite4_1_8b/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/granite4_1_8b/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/granite4_1_8b/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/granite4_1_8b/evidence_pack"
+      }
     },
     {
       "lane_id": "smollm3-3b-causal-hf",
@@ -431,7 +464,7 @@
       "representative_models": [
         "HuggingFaceTB/SmolLM3-3B"
       ],
-      "notes": "Added from practical-picks backlog with repo preset, calibration config, and sweep lane. Tuned edit params and public evidence are still required before supported_experimental or published_basis promotion."
+      "notes": "Added from practical-picks backlog with repo preset, calibration config, and sweep lane. Release-profile evidence run 20260612Tsmollm3ReleaseProfileA fails the guard-overhead policy (+1.11% > +1.0%) before report generation, so public evidence remains blocked."
     },
     {
       "lane_id": "phi-4-mini-causal-hf",
@@ -449,41 +482,53 @@
       "representative_models": [
         "microsoft/Phi-4-mini-instruct"
       ],
-      "notes": "Added from practical-picks backlog with repo preset, calibration config, sweep lane, and explicit remote-code policy. Tuned edit params and public evidence are still required before supported_experimental or published_basis promotion."
+      "notes": "Added from practical-picks backlog with repo preset, calibration config, sweep lane, and a built-in Phi3 loader hint for the Phi-4 mini checkpoint. Release-profile run 20260612TphiMiniFalconReleaseA evaluates successfully but fails strict verification because spectral caps exceed the no-op budget, so public evidence remains blocked."
     },
     {
       "lane_id": "deepseek-r1-distill-qwen-14b-causal-hf",
       "family": "DeepSeek-R1-Distill-Qwen 14B causal LM",
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
-      "support_tier": "community_experimental",
-      "evidence_status": "repo_included_pilot_config",
-      "docs_label": "No, repo-included pilot config only",
+      "support_tier": "published_basis",
+      "evidence_status": "canonical_public_fixture",
+      "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
+        "published_modern",
         "reasoning_focused"
       ],
       "representative_models": [
         "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
       ],
-      "notes": "Added from reasoning practical-picks backlog with repo preset, calibration config, and sweep lane. Tuned edit params and public evidence are still required before supported_experimental or published_basis promotion."
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evidence_pack"
+      }
     },
     {
       "lane_id": "deepseek-r1-0528-qwen3-8b-causal-hf",
       "family": "DeepSeek-R1-0528-Qwen3 8B causal LM",
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
-      "support_tier": "community_experimental",
-      "evidence_status": "repo_included_pilot_config",
-      "docs_label": "No, repo-included pilot config only",
+      "support_tier": "published_basis",
+      "evidence_status": "canonical_public_fixture",
+      "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
+        "published_modern",
         "reasoning_focused"
       ],
       "representative_models": [
         "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B"
       ],
-      "notes": "Added from reasoning practical-picks backlog with repo preset, calibration config, and sweep lane. Tuned edit params and public evidence are still required before supported_experimental or published_basis promotion."
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evidence_pack"
+      }
     },
     {
       "lane_id": "falcon-h1r-7b-causal-hf",
@@ -500,7 +545,7 @@
       "representative_models": [
         "tiiuae/Falcon-H1R-7B"
       ],
-      "notes": "Added from reasoning practical-picks backlog with repo preset, calibration config, and sweep lane. Tuned edit params and public evidence are still required before supported_experimental or published_basis promotion."
+      "notes": "Added from reasoning practical-picks backlog with repo preset, calibration config, and sweep lane. Release-profile run 20260612TfalconH1RPrefetchReleaseA fails before report generation with ADAPTER-STRUCTURE-INVALID: no matching HF causal adapter spec, so public evidence remains blocked."
     }
   ]
 }

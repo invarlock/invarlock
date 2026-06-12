@@ -82,7 +82,7 @@ def test_causal_lm_family_presets_load() -> None:
         if name == "phi4_reasoning_plus_512.yaml":
             assert cfg.require_section("model")["trust_remote_code"] is True
         if name == "phi4_mini_512.yaml":
-            assert cfg.require_section("model")["trust_remote_code"] is True
+            assert "trust_remote_code" not in cfg.require_section("model")
         provider = cfg.data["dataset"]["provider"]
         if name in expected_provider_kinds:
             assert provider["kind"] == expected_provider_kinds[name]
@@ -138,9 +138,10 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
         assert data["model"]["id"] == model_id
         if name in {
             "null_sweep_phi4_reasoning_plus.yaml",
-            "null_sweep_phi4_mini.yaml",
         }:
             assert data["model"]["trust_remote_code"] is True
+        if name == "null_sweep_phi4_mini.yaml":
+            assert "trust_remote_code" not in data["model"]
         if name in {
             "null_sweep_deepseek_r1_distill_qwen_7b.yaml",
             "null_sweep_deepseek_r1_distill_qwen_14b.yaml",

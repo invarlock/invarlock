@@ -43,13 +43,14 @@ print(adapter.describe(model)["model_type"])
 
 > Adapter availability is broader than the published assurance basis. GPT-2,
 > BERT, Mistral 7B, Ministral 3 8B, Ministral 3 14B, TinyLlama 1.1B,
-> OLMo 2 13B, Qwen2 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B,
-> DeepSeek-R1-Distill-Qwen 7B, and Phi-4 text-only back the published
+> Gemma 4 E2B text-only, OLMo 2 7B, OLMo 2 13B, Qwen2 7B, Qwen2.5 7B,
+> Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B, DeepSeek-R1-Distill-Qwen 7B,
+> and Phi-4 text-only back the published
 > calibrated basis; current experimental lanes are enumerated in
 > `contracts/support_matrix.json`, with broader inventory in the Model Family
-> Catalog. Current examples include OLMo 2 7B, Gemma 4 E2B text-only, SmolLM3
-> 3B, Granite 4.1, Phi-4 mini, DeepSeek-R1 14B/8B variants, and Falcon-H1R;
-> treat the contract files as authoritative for the complete list.
+> Catalog. Current examples include SmolLM3 3B, Granite 4.1, Phi-4 mini,
+> DeepSeek-R1 14B/8B variants, and Falcon-H1R; treat the contract files as
+> authoritative for the complete list.
 
 ## Support Tiers
 
@@ -132,7 +133,7 @@ Machine-readable adapter capability metadata is published at
 | --- | --- | --- | --- | --- |
 | `hf_causal` | Decoder-only causal LMs (dense + MoE + GPT2-like) | `invarlock[adapters]` | All platforms with torch | Default causal LM adapter. |
 | `hf_mlm` | BERT/RoBERTa/DeBERTa MLMs | `invarlock[adapters]` | All platforms with torch | Loads `AutoModelForMaskedLM` when possible. |
-| `hf_multimodal` | Image-text generation models exposed through HF `AutoModelForImageTextToText` | `invarlock[adapters]` | All platforms with torch | Single-image `vision_text` evaluation with explicit adapter selection. |
+| `hf_multimodal` | Image-text and unified multimodal generation models exposed through HF `AutoModelForImageTextToText` or `AutoModelForMultimodalLM` | `invarlock[adapters]` | All platforms with torch | Single-image `vision_text` evaluation with explicit adapter selection; Gemma 4 unified checkpoints require a Transformers runtime that registers `gemma4_unified`. |
 | `hf_seq2seq` | T5/encoder‑decoder models | `invarlock[adapters]` | All platforms with torch | For seq2seq evaluation. |
 | `hf_auto` | Auto-select HF adapter | `invarlock[adapters]` | All platforms with torch | Delegates to a role adapter; prefers quant adapters when detected. |
 | `hf_bnb` | Bitsandbytes quantized LMs | `invarlock[gpu]` | Platform-dependent | Uses `device_map="auto"`; no `.to()`. Latest bitsandbytes wheels can work outside Linux/CUDA when the runtime imports cleanly. |

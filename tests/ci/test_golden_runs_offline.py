@@ -84,14 +84,21 @@ def test_offline_golden_runs_public_fixtures() -> None:
         "ministral3_8b",
         "ministral3_14b",
         "tinyllama_1_1b",
+        "olmo2_7b",
         "olmo2_13b",
         "qwen2_7b",
         "qwen2_5_7b",
         "qwen2_5_14b",
         "qwen3_8b",
         "qwen3_5_9b",
+        "gemma4_e2b",
+        "granite4_1_3b",
+        "granite4_1_8b",
         "deepseek_r1_distill_qwen_7b",
+        "deepseek_r1_0528_qwen3_8b",
         "phi4_reasoning_plus",
+        "deepseek_r1_distill_qwen_14b",
+        "ministral3_3b",
     ]
 
     for lane in manifest["lanes"]:
@@ -228,7 +235,7 @@ def test_caught_regressions_show_pm_only_passes_but_guard_chain_rejects() -> Non
         assert result.outcome == VerifyOutcome.POLICY_FAIL
 
 
-def test_real_guard_value_demo_records_pm_only_pass_with_spectral_intervention() -> None:
+def test_real_guard_value_demo_marks_fp8_as_historical_sentinel() -> None:
     demo_dir = (
         REPO_ROOT
         / "public_evidence"
@@ -259,6 +266,14 @@ def test_real_guard_value_demo_records_pm_only_pass_with_spectral_intervention()
     assert final_verdict["verdict"] == "PASS"
     assert final_verdict["counts"]["primary_guard_required_hits"] == 1
     assert final_verdict["counts"]["error_injection_detected"] == 2
+    assert (
+        summary["final_verdict"]["contract_scope"]
+        == "historical_subject_only_spectral_cap_detector"
+    )
+    assert (
+        summary["final_verdict"]["current_contract_verdict"]
+        == "not_a_baseline_relative_guard_value_proof"
+    )
     log_entries = [
         entry
         for entry in manifest["files"]
@@ -273,11 +288,15 @@ def test_real_guard_value_demo_records_pm_only_pass_with_spectral_intervention()
     comparison = summary["pm_only_vs_pm_plus_guards"]
     assert comparison["scenario_id"] == "fp8_e5m2_stress"
     assert comparison["pm_only_verdict"] == "accept"
-    assert comparison["pm_plus_guards_verdict"] == "guard_intervention_recorded"
+    assert comparison["pm_plus_guards_verdict"] == "not_proven_baseline_relative"
     assert comparison["primary_metric_acceptable"] is True
     assert comparison["ratio_vs_baseline"] == 1.0248910150012365
     assert comparison["spectral_caps_applied"] == 2
-    assert comparison["primary_guard_hit"] is True
+    assert comparison["historical_primary_guard_hit"] is True
+    assert comparison["primary_guard_hit"] is False
+    assert comparison["baseline_relative_guard_hit"] is False
+    assert comparison["baseline_relative_issue"]["new_caps_applied"] == 0
+    assert comparison["baseline_relative_issue"]["delta_caps_applied"] == 0
     assert comparison["primary_guard_required"] is True
     assert comparison["strictness"] == "must_detect"
 

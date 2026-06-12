@@ -46,6 +46,16 @@ context:
 
 guards:
   order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+  spectral:
+    module_include_patterns:
+      - "model.language_model.layers.*.self_attn.*"
+      - "model.language_model.layers.*.mlp.*"
+  rmt:
+    module_include_patterns:
+      - "model.language_model.layers.*.self_attn.*"
+      - "model.language_model.layers.*.mlp.*"
+    epsilon_by_family:
+      attn: 0.015
 
 output:
   dir: "runs"

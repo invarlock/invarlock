@@ -305,8 +305,8 @@ Detailed derivations are in the calibration appendix (`09-tier-v1-calibration.md
 - Additional supported-experimental lanes are defined in
   `contracts/support_matrix.json`; those lanes are not part of the published
   assurance basis until supporting artifacts are attached. Current examples
-  include OLMo 2 7B and Gemma 4 E2B text-only; the contract file remains
-  authoritative and may include additional lanes.
+  include SmolLM3 3B, Phi-4 mini, and newer DeepSeek variants; the contract
+  file remains authoritative and may include additional lanes.
 - Contributions for additional model families are welcome; attach pilot reports
   and summary CSVs (typically written under `reports/calibration/` when running
   the calibration scripts) to change proposals or release artifacts.

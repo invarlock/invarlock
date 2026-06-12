@@ -59,21 +59,15 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
     }
 
     assert set(specs) == {
-        "mistralai_ministral_3_3b_instruct_2512_bf16",
-        "ibm_granite_granite_4_1_8b",
-        "ibm_granite_granite_4_1_3b",
+        "google_gemma_4_12b_it",
         "huggingfacetb_smollm3_3b",
         "microsoft_phi_4_mini_instruct",
-        "deepseek_ai_deepseek_r1_distill_qwen_14b",
-        "deepseek_ai_deepseek_r1_0528_qwen3_8b",
         "tiiuae_falcon_h1r_7b",
     }
-    assert specs["mistralai_ministral_3_3b_instruct_2512_bf16"].preset_relpath == (
-        "configs/presets/causal_lm/ministral3_3b_512.yaml"
+    assert specs["google_gemma_4_12b_it"].preset_relpath == (
+        "configs/presets/multimodal/gemma4_12b_vision_text_256.yaml"
     )
-    assert specs["ibm_granite_granite_4_1_8b"].preset_relpath == (
-        "configs/presets/causal_lm/granite4_1_8b_512.yaml"
-    )
+    assert specs["google_gemma_4_12b_it"].adapter == "hf_multimodal"
     assert specs["microsoft_phi_4_mini_instruct"].preset_relpath == (
         "configs/presets/causal_lm/phi4_mini_512.yaml"
     )
@@ -122,7 +116,7 @@ def test_promotion_gap_gpu_suite_glm_host_dry_run_uses_lane_preset(
     assert manifest["lanes"][0]["slug"] == "thudm_glm_4_9b_chat"
 
 
-def test_support_matrix_backlog_gpu_suite_phi4_dry_run_uses_remote_code_policy(
+def test_support_matrix_backlog_gpu_suite_phi4_dry_run_uses_builtin_phi3_policy(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
@@ -182,7 +176,7 @@ def test_lane_requires_remote_code_uses_preset_model_flag() -> None:
     )
 
     assert mod.lane_requires_remote_code(phi4) is True
-    assert mod.lane_requires_remote_code(phi4_mini) is True
+    assert mod.lane_requires_remote_code(phi4_mini) is False
     assert mod.lane_requires_remote_code(qwen) is False
 
 

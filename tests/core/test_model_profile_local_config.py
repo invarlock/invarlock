@@ -220,6 +220,42 @@ def test_resolve_tokenizer_uses_model_specific_identifier_for_opt_like_models(
     assert calls == [("facebook/opt-125m", True)]
 
 
+def test_tokenizer_candidates_prefer_deepseek_base_tokenizer_aliases() -> None:
+    assert mp._tokenizer_candidates(
+        "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
+    )[:2] == [
+        "Qwen/Qwen2.5-14B",
+        "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+    ]
+    assert mp._tokenizer_candidates("deepseek-ai/DeepSeek-R1-0528-Qwen3-8B")[:2] == [
+        "Qwen/Qwen3-8B",
+        "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B",
+    ]
+
+
+def test_resolve_tokenizer_uses_deepseek_alias_before_model_id(
+    monkeypatch,
+) -> None:
+    calls: list[tuple[str, bool | None]] = []
+
+    class _Factory:
+        @classmethod
+        def from_pretrained(cls, model_id: str, **kwargs: object) -> _DummyTokenizer:
+            calls.append((model_id, kwargs.get("local_files_only")))
+            return _DummyTokenizer(name_or_path=model_id)
+
+    monkeypatch.setattr(mp, "AutoTokenizer", _Factory, raising=False)
+
+    profile = mp.detect_model_profile(
+        "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+        adapter="hf_causal",
+    )
+    tokenizer, _ = mp.resolve_tokenizer(profile)
+
+    assert tokenizer.name_or_path == "Qwen/Qwen2.5-14B"
+    assert calls == [("Qwen/Qwen2.5-14B", True)]
+
+
 def test_resolve_tokenizer_uses_same_origin_fallback_for_local_checkpoint(
     monkeypatch, tmp_path: Path
 ) -> None:

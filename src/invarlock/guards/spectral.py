@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import math
 from datetime import UTC, datetime
+from fnmatch import fnmatchcase
 from typing import Any
 
 from invarlock.core import INVARLOCK_CORE_ABI as CORE_ABI
@@ -268,6 +269,8 @@ class SpectralGuard(Guard):
         self.pre_edit_z_scores: dict[str, float] = {}
         self.baseline_degeneracy: dict[str, dict[str, float]] = {}
         self._measurement_diagnostics: list[dict[str, Any]] = []
+        self.module_include_patterns: tuple[str, ...] = ()
+        self.module_exclude_patterns: tuple[str, ...] = ()
         self.target_sigma = float(self.sigma_quantile)
         self._run_profile: str | None = None
         self._scoped_modules_model_id: int | None = None
@@ -400,7 +403,22 @@ class SpectralGuard(Guard):
         )
 
     def _should_check_module(self, name: str, module: Any) -> bool:
-        return _spectral_detection.should_check_module(self, name, module)
+        return (
+            self._module_filter_allows(name)
+            and _spectral_detection.should_check_module(self, name, module)
+        )
+
+    def _module_filter_allows(self, name: str) -> bool:
+        include_patterns = self.module_include_patterns
+        if include_patterns and not any(
+            fnmatchcase(name, pattern) for pattern in include_patterns
+        ):
+            return False
+        if self.module_exclude_patterns and any(
+            fnmatchcase(name, pattern) for pattern in self.module_exclude_patterns
+        ):
+            return False
+        return True
 
     def _compute_family_observability(
         self,

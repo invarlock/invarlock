@@ -1,0 +1,22 @@
+{
+  "artifact_paths": {
+    "evaluation_report": "evaluation.report.json",
+    "runtime_manifest": "runtime.manifest.json",
+    "evidence_pack_recipe": "evidence_pack_recipe.json",
+    "evidence_pack": "evidence_pack"
+  },
+  "evidence_class": "strict_pass_fixture",
+  "expected_fingerprint": "sha256:91f8f171fe1e8b06fa3405d148246d6b64c6070516dcec20090414db4d209565",
+  "generated_by": "model evidence remote sweep",
+  "model_revision": "7df9a82518afdecae4e8c026b27adccc8c1f0032",
+  "non_goals": [
+    "Model weights are external Hugging Face references.",
+    "This fixture is a no-op preservation basis, not a fine-tuning or compression benchmark."
+  ],
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "Release-strict verifier fixture for the OLMo 2 7B published-basis lane.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/published_basis/olmo2_7b/evaluation.report.json --profile release --assurance strict",
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/olmo2_7b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:91f8f171fe1e8b06fa3405d148246d6b64c6070516dcec20090414db4d209565"
+  ]
+}

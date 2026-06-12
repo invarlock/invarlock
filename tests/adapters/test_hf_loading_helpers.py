@@ -269,6 +269,61 @@ def test_resolve_core_loader_strategy_supports_multimodal_gemma4(
 
 
 @pytest.mark.unit
+def test_resolve_core_loader_strategy_supports_multimodal_gemma4_unified(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    import invarlock.adapters.hf_loading as hf_loading
+
+    model_dir = _write_local_config(tmp_path / "gemma4-unified", "gemma4_unified")
+    monkeypatch.setattr(
+        hf_loading,
+        "_import_symbol",
+        lambda module_path, symbol_name: f"{module_path}.{symbol_name}",
+    )
+
+    strategy = hf_loading.resolve_core_loader_strategy(
+        task="multimodal",
+        model_id=str(model_dir),
+        allow_direct_submodule=True,
+    )
+
+    assert strategy.strategy == "direct_submodule"
+    assert strategy.model_type == "gemma4_unified"
+    assert (
+        strategy.loader_label
+        == "transformers.models.gemma4_unified.modeling_gemma4_unified.Gemma4UnifiedForConditionalGeneration"
+    )
+
+
+@pytest.mark.unit
+def test_resolve_core_loader_strategy_gemma4_unified_falls_back_to_multimodal_auto(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    import invarlock.adapters.hf_loading as hf_loading
+
+    model_dir = _write_local_config(tmp_path / "gemma4-unified-auto", "gemma4_unified")
+
+    def _fake_import(module_path: str, symbol_name: str) -> str:
+        if module_path == "transformers.models.gemma4_unified.modeling_gemma4_unified":
+            raise ModuleNotFoundError("gemma4_unified unavailable")
+        return f"{module_path}.{symbol_name}"
+
+    monkeypatch.setattr(hf_loading, "_import_symbol", _fake_import)
+
+    strategy = hf_loading.resolve_core_loader_strategy(
+        task="multimodal",
+        model_id=str(model_dir),
+        allow_direct_submodule=True,
+    )
+
+    assert strategy.strategy == "auto"
+    assert strategy.model_type == "gemma4_unified"
+    assert strategy.loader_label == "transformers.AutoModelForMultimodalLM"
+
+
+@pytest.mark.unit
 def test_resolve_core_loader_strategy_supports_multimodal_mistral3(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -346,6 +401,55 @@ def test_resolve_core_loader_strategy_maps_deberta_v3_to_v2_loader_family(
         strategy.loader_label
         == "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2ForMaskedLM"
     )
+
+
+@pytest.mark.unit
+def test_resolve_core_loader_strategy_maps_phi4_mini_to_phi3_loader(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import invarlock.adapters.hf_loading as hf_loading
+
+    monkeypatch.setattr(
+        hf_loading,
+        "_import_symbol",
+        lambda module_path, symbol_name: f"{module_path}.{symbol_name}",
+    )
+
+    strategy = hf_loading.resolve_core_loader_strategy(
+        task="causal",
+        model_id="microsoft/Phi-4-mini-instruct",
+        allow_direct_submodule=True,
+    )
+
+    assert strategy.strategy == "direct_submodule"
+    assert strategy.model_type == "phi3"
+    assert (
+        strategy.loader_label
+        == "transformers.models.phi3.modeling_phi3.Phi3ForCausalLM"
+    )
+
+
+@pytest.mark.unit
+def test_resolve_core_loader_strategy_maps_gemma4_12b_to_unified_auto(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import invarlock.adapters.hf_loading as hf_loading
+
+    monkeypatch.setattr(
+        hf_loading,
+        "_import_symbol",
+        lambda module_path, symbol_name: f"{module_path}.{symbol_name}",
+    )
+
+    strategy = hf_loading.resolve_core_loader_strategy(
+        task="multimodal",
+        model_id="google/gemma-4-12B-it",
+        allow_direct_submodule=False,
+    )
+
+    assert strategy.strategy == "auto"
+    assert strategy.model_type == "gemma4_unified"
+    assert strategy.loader_label == "transformers.AutoModelForMultimodalLM"
 
 
 @pytest.mark.unit

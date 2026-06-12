@@ -30,6 +30,10 @@ _AUTO_LOADER_SPECS: dict[str, tuple[str, str]] = {
     "seq2seq": ("transformers", "AutoModelForSeq2SeqLM"),
 }
 
+_AUTO_LOADER_MODEL_TYPE_SPECS: dict[tuple[str, str], tuple[str, str]] = {
+    ("multimodal", "gemma4_unified"): ("transformers", "AutoModelForMultimodalLM"),
+}
+
 _DIRECT_SUBMODULE_SPECS: dict[str, dict[str, tuple[str, str]]] = {
     "causal": {
         "gpt2": ("transformers.models.gpt2.modeling_gpt2", "GPT2LMHeadModel"),
@@ -117,6 +121,10 @@ _DIRECT_SUBMODULE_SPECS: dict[str, dict[str, tuple[str, str]]] = {
         ),
     },
     "multimodal": {
+        "gemma4_unified": (
+            "transformers.models.gemma4_unified.modeling_gemma4_unified",
+            "Gemma4UnifiedForConditionalGeneration",
+        ),
         "gemma4": (
             "transformers.models.gemma4.modeling_gemma4",
             "Gemma4ForConditionalGeneration",
@@ -136,6 +144,7 @@ _MODEL_ID_TYPE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "qwen2",
         ("qwen2.5", "qwen2-5", "qwen2_5", "qwen1.5", "qwen1-5", "qwen1_5", "qwen2"),
     ),
+    ("gemma4_unified", ("gemma-4-12b", "gemma4-12b", "gemma_4_12b")),
     ("gemma4", ("gemma-4", "gemma4")),
     ("gemma3", ("gemma-3", "gemma3")),
     (
@@ -166,7 +175,7 @@ _MODEL_ID_TYPE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("gpt_neox", ("gpt-neox", "gpt_neox")),
     ("gpt_oss", ("gpt-oss", "gpt_oss")),
     ("opt", ("facebook/opt", "/opt-", " opt-", "opt-")),
-    ("phi3", ("phi-3", "phi3")),
+    ("phi3", ("phi-3", "phi3", "phi-4-mini", "phi4-mini", "phi_4_mini")),
     ("phi", ("phi-",)),
     ("gpt2", ("gpt2",)),
 )
@@ -332,8 +341,13 @@ def _loader_label(module_path: str, symbol_name: str) -> str:
     return f"{module_path}.{symbol_name}"
 
 
-def _resolve_auto_loader(task: str) -> tuple[Any, str]:
-    module_path, symbol_name = _AUTO_LOADER_SPECS[task]
+def _resolve_auto_loader(task: str, model_type: str | None = None) -> tuple[Any, str]:
+    spec = (
+        _AUTO_LOADER_MODEL_TYPE_SPECS.get((task, model_type))
+        if model_type is not None
+        else None
+    )
+    module_path, symbol_name = spec or _AUTO_LOADER_SPECS[task]
     return (
         _import_symbol(module_path, symbol_name),
         _loader_label(module_path, symbol_name),
@@ -389,7 +403,7 @@ def resolve_core_loader_strategy(
                 model_type=model_type,
             )
 
-    loader, loader_label = _resolve_auto_loader(task)
+    loader, loader_label = _resolve_auto_loader(task, model_type)
     return HFLoaderStrategy(
         task=task,
         strategy="auto",

@@ -1,0 +1,66 @@
+{
+  "execution_mode": "container",
+  "files": [
+    {
+      "bytes": 19235947,
+      "path": "eval/deepseek_ai_deepseek_r1_0528_qwen3_8b/report/evaluation.report.json",
+      "sha256": "a4b811f8ed1f6dba100edd8aaf0320c4449400f3cad513ffd803941255822773"
+    },
+    {
+      "bytes": 684,
+      "path": "eval/deepseek_ai_deepseek_r1_0528_qwen3_8b/verify.json",
+      "sha256": "04d75b057a2491a6c692a8b1e7fbe8f8b629ca0883e52c329b75f1b4cafbcc36"
+    },
+    {
+      "bytes": 5090,
+      "path": "logs/deepseek_ai_deepseek_r1_0528_qwen3_8b.log",
+      "sha256": "a010322a4679120b68370540628b68a51462583bbe28a0e8fb07041d7d68041e"
+    },
+    {
+      "bytes": 526,
+      "path": "manifest.json",
+      "sha256": "e5d9ce7da2ecc187a8f3d2fb2123b0d0930451364a7382b83b745262d82acd55"
+    },
+    {
+      "bytes": 728,
+      "path": "model_revisions.json",
+      "sha256": "ad5f561bafc4e577cfcd83f4345e7ffef01d59e52454d6c51c915b900992c5e0"
+    },
+    {
+      "bytes": 287,
+      "path": "status.log",
+      "sha256": "0745bde7e880ddc253649343675b1495d1c80f5eace2e686500acdc3f59b38a6"
+    },
+    {
+      "bytes": 856,
+      "path": "summary.json",
+      "sha256": "40d93a9b261c1e98ac7aee5776f0b7f5d9a8b5293b4657d09012b98c4b1de6c9"
+    },
+    {
+      "bytes": 293,
+      "path": "summary.tsv",
+      "sha256": "7490afdd6c8f911a6e60a5a43a61cfdc36c00461355d2f9b107f97b615a07a6d"
+    }
+  ],
+  "generated_at": "2026-06-12T10:35:24.405257+00:00",
+  "lane_results": [
+    {
+      "detail": null,
+      "evaluate_exit": 0,
+      "lane_id": "deepseek-r1-0528-qwen3-8b-causal-hf",
+      "model_id": "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B",
+      "ok": true,
+      "preset": "configs/presets/causal_lm/deepseek_r1_0528_qwen3_8b_512.yaml",
+      "report_path": "/root/model-evidence/20260612Tdeepseek8bTokenizerAliasReleaseA/shard-00-gpu-0/eval/deepseek_ai_deepseek_r1_0528_qwen3_8b/report/evaluation.report.json",
+      "slug": "deepseek_ai_deepseek_r1_0528_qwen3_8b",
+      "status": "ok",
+      "verify_exit": 0,
+      "verify_path": "/root/model-evidence/20260612Tdeepseek8bTokenizerAliasReleaseA/shard-00-gpu-0/eval/deepseek_ai_deepseek_r1_0528_qwen3_8b/verify.json"
+    }
+  ],
+  "ok": true,
+  "schema": "invarlock/model-evidence-artifact-manifest-v1",
+  "shard_count": 1,
+  "shard_index": 0,
+  "suite": "support-matrix-backlog-gpu"
+}

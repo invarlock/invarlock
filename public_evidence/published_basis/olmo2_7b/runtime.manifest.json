@@ -1,0 +1,31 @@
+{
+  "config": {
+    "path": null,
+    "sha256": "3b57686668c326e89a3338a1871801fb5cb3d570672efda68adcce1438742233",
+    "source": "inline"
+  },
+  "context": {
+    "assurance": "strict",
+    "command": "evaluate",
+    "execution_mode": "container",
+    "profile": "ci",
+    "tier": "balanced"
+  },
+  "execution_mode": "container",
+  "generated_at_utc": "2026-06-12T08:43:39.200171+00:00",
+  "manifest_version": 1,
+  "report": {
+    "filename": "evaluation.report.json",
+    "path": "/workspace/tmp/model_evidence_container/45031e7b95033978/eval/olmo2_7b/report/evaluation.report.json",
+    "sha256": "2f6848dea5b63566445d74930074f954684c9b219c9180830d3755b61793292c"
+  },
+  "runtime": {
+    "allow_network": true,
+    "allow_remote_code": false,
+    "allow_third_party_plugins": false,
+    "container_execution": true,
+    "image_digest": "sha256:dc735a60fad29fc02681bd86dec92c23f4e7388f00414d3ffc97e6c33b3fa773",
+    "image_ref": "invarlock-runtime:cuda-local"
+  },
+  "verifier_contract_version": "runtime-manifest-v1"
+}

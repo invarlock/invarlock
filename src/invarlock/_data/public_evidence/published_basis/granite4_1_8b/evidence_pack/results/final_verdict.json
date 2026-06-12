@@ -1,0 +1,9 @@
+{
+  "assurance": "strict",
+  "basis": "public_evidence/published_basis/granite4_1_8b/evaluation.report.json",
+  "evidence_run": "20260612Tgranite8bPrefetchReleaseA",
+  "model_id": "ibm-granite/granite-4.1-8b",
+  "note": "Container-backed release-profile Granite 4.1 8B published-basis evidence run.",
+  "profile": "release",
+  "verdict": "PASS"
+}

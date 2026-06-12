@@ -19,6 +19,15 @@ PreTrainedTokenizerBase = _tokenizers.PreTrainedTokenizerBase
 TokenizerFactory = Callable[[], tuple[PreTrainedTokenizerBase, str]]
 _LocalFastTokenizer = _tokenizers._LocalFastTokenizer
 
+_TOKENIZER_CANDIDATE_OVERRIDES: dict[str, tuple[str, ...]] = {
+    # These DeepSeek releases publish Qwen-compatible model configs without
+    # tokenizer files in the HF snapshot used by the evidence runner. Loading
+    # the model id directly can produce all-pad samples; prefer the matching
+    # base-family tokenizer before falling back to the model id.
+    "deepseek-ai/deepseek-r1-distill-qwen-14b": ("Qwen/Qwen2.5-14B",),
+    "deepseek-ai/deepseek-r1-0528-qwen3-8b": ("Qwen/Qwen3-8B",),
+}
+
 
 def _sync_tokenizer_state() -> None:
     _tokenizers.AutoTokenizer = AutoTokenizer
@@ -143,7 +152,11 @@ def _resolve_explicit_slow_tokenizer_factory(candidate: str) -> Any | None:
 def _tokenizer_candidates(model_id: str) -> list[str]:
     """Return ordered tokenizer identifiers tied to the requested model."""
 
-    raw_candidates = [str(model_id).strip()]
+    model_id_str = str(model_id).strip()
+    raw_candidates = [
+        *(_TOKENIZER_CANDIDATE_OVERRIDES.get(model_id_str.lower(), ())),
+        model_id_str,
+    ]
     cfg = _read_local_hf_config(model_id)
     if isinstance(cfg, dict):
         for key in (

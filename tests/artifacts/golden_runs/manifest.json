@@ -7,14 +7,21 @@
     "ministral3_8b",
     "ministral3_14b",
     "tinyllama_1_1b",
+    "olmo2_7b",
     "olmo2_13b",
     "qwen2_7b",
     "qwen2_5_7b",
     "qwen2_5_14b",
     "qwen3_8b",
     "qwen3_5_9b",
+    "gemma4_e2b",
+    "granite4_1_3b",
+    "granite4_1_8b",
     "deepseek_r1_distill_qwen_7b",
-    "phi4_reasoning_plus"
+    "deepseek_r1_0528_qwen3_8b",
+    "phi4_reasoning_plus",
+    "deepseek_r1_distill_qwen_14b",
+    "ministral3_3b"
   ],
   "lanes": [
     {
@@ -54,6 +61,12 @@
       "report": "public_evidence/published_basis/tinyllama_1_1b/evaluation.report.json"
     },
     {
+      "id": "olmo2_7b",
+      "model_id": "allenai/OLMo-2-1124-7B",
+      "primary_metric_kind": "ppl_causal",
+      "report": "public_evidence/published_basis/olmo2_7b/evaluation.report.json"
+    },
+    {
       "id": "olmo2_13b",
       "model_id": "allenai/OLMo-2-1124-13B-Instruct",
       "primary_metric_kind": "ppl_causal",
@@ -90,16 +103,52 @@
       "report": "public_evidence/published_basis/qwen3_5_9b/evaluation.report.json"
     },
     {
+      "id": "gemma4_e2b",
+      "model_id": "google/gemma-4-E2B-it",
+      "primary_metric_kind": "ppl_causal",
+      "report": "public_evidence/published_basis/gemma4_e2b/evaluation.report.json"
+    },
+    {
+      "id": "granite4_1_3b",
+      "model_id": "ibm-granite/granite-4.1-3b",
+      "primary_metric_kind": "ppl_causal",
+      "report": "public_evidence/published_basis/granite4_1_3b/evaluation.report.json"
+    },
+    {
+      "id": "granite4_1_8b",
+      "model_id": "ibm-granite/granite-4.1-8b",
+      "primary_metric_kind": "ppl_causal",
+      "report": "public_evidence/published_basis/granite4_1_8b/evaluation.report.json"
+    },
+    {
       "id": "deepseek_r1_distill_qwen_7b",
       "model_id": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
       "primary_metric_kind": "ppl_causal",
       "report": "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evaluation.report.json"
     },
     {
+      "id": "deepseek_r1_0528_qwen3_8b",
+      "model_id": "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B",
+      "primary_metric_kind": "ppl_causal",
+      "report": "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evaluation.report.json"
+    },
+    {
       "id": "phi4_reasoning_plus",
       "model_id": "microsoft/Phi-4-reasoning-plus",
       "primary_metric_kind": "ppl_causal",
       "report": "public_evidence/published_basis/phi4_reasoning_plus/evaluation.report.json"
+    },
+    {
+      "id": "deepseek_r1_distill_qwen_14b",
+      "model_id": "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+      "primary_metric_kind": "ppl_causal",
+      "report": "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evaluation.report.json"
+    },
+    {
+      "id": "ministral3_3b",
+      "model_id": "mistralai/Ministral-3-3B-Instruct-2512-BF16",
+      "primary_metric_kind": "ppl_causal",
+      "report": "public_evidence/published_basis/ministral3_3b/evaluation.report.json"
     }
   ]
 }

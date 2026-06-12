@@ -1,0 +1,50 @@
+# Preset: Gemma 4 12B image-text evaluation on the local vision_text demo fixture.
+
+model:
+  id: "google/gemma-4-12B-it"
+  adapter: "hf_multimodal"
+  device: "auto"
+  attn_implementation: "sdpa"
+
+dataset:
+  provider:
+    kind: "vision_text"
+    path: "tests/fixtures/vision_text/demo_manifest.jsonl"
+  split: "validation"
+  seq_len: 256
+  stride: 256
+  preview_n: 1
+  final_n: 1
+  seed: 42
+
+eval:
+  metric:
+    kind: "accuracy"
+  loss:
+    type: "classification"
+
+primary_metric:
+  drift_band:
+    min: 0.80
+    max: 1.20
+
+edit:
+  name: "noop"
+  plan: {}
+
+auto:
+  enabled: true
+  tier: "balanced"
+  probes: 0
+
+context:
+  run:
+    skip_overhead_check: true
+
+guards:
+  order: ["invariants", "rmt", "variance", "invariants"]
+
+output:
+  dir: "runs"
+  save_model: false
+  save_report: true

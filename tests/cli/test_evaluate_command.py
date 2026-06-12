@@ -131,8 +131,8 @@ def test_evaluate_reuses_baseline_report_skipping_baseline_run(monkeypatch, tmp_
                     "split": "validation",
                     "seq_len": 512,
                     "stride": 512,
-                    "preview_n": 64,
-                    "final_n": 64,
+                    "preview_n": 240,
+                    "final_n": 240,
                     "seed": 43,
                 },
                 "evaluation_windows": {

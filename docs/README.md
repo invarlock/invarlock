@@ -225,6 +225,9 @@ Notes
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | TinyLlama 1.1B causal LM | Yes | Yes | Yes | Yes |
+| Gemma 4 E2B causal LM (text-only eval) | Yes | Yes | Yes | Yes |
+| Ministral 3 3B causal LM (text-only eval) | Yes | Yes | Yes | Yes |
+| Granite 4.1 3B causal LM | Yes | Yes | Yes | Yes |
 
 ### Published 7B-9B Decoder Evidence
 
@@ -237,6 +240,9 @@ Notes
 | Qwen3 causal LM | Yes | Yes | Yes | Yes |
 | Qwen3.5 causal LM | Yes | Yes | Yes | Yes |
 | DeepSeek-R1-Distill-Qwen causal LM | Yes | Yes | Yes | Yes |
+| DeepSeek-R1-0528-Qwen3 8B causal LM | Yes | Yes | Yes | Yes |
+| OLMo 2 7B causal LM | Yes | Yes | Yes | Yes |
+| Granite 4.1 8B causal LM | Yes | Yes | Yes | Yes |
 
 ### Published 13B-14B And Reasoning Decoder Evidence
 
@@ -245,21 +251,13 @@ Notes
 | Ministral 3 14B causal LM (text-only eval) | Yes | Yes | Yes | Yes |
 | OLMo 2 13B causal LM | Yes | Yes | Yes | Yes |
 | Qwen2.5 14B causal LM | Yes | Yes | Yes | Yes |
+| DeepSeek-R1-Distill-Qwen 14B causal LM | Yes | Yes | Yes | Yes |
 | Phi-4 causal LM (text-only eval) | Yes | Yes | Yes | Yes |
-
-### Repo-Maintained Pilot Lanes
-
-| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
-| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| OLMo 2 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
-| Gemma 4 E2B causal LM (text-only eval) | Yes | Yes | Yes | No, repo-included pilot config only |
 
 ### Prepared Small/Local Candidate Backlog
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| Ministral 3 3B causal LM (text-only eval candidate) | Yes | Yes | Yes | No, repo-included pilot config only |
-| Granite 4.1 3B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | SmolLM3 3B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | Phi-4 mini causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 
@@ -267,16 +265,13 @@ Notes
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| Granite 4.1 8B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
-| DeepSeek-R1-Distill-Qwen 14B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
-| DeepSeek-R1-0528-Qwen3 8B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | Falcon-H1R 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 
 ### Multimodal Candidate Backlog
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| Gemma 4 12B any-to-any LM | No | Candidate adapter path | No | No |
+| Gemma 4 12B any-to-any LM | Yes | Yes | No | No, repo-included pilot config only |
 
 ### Generic Seq2Seq And Local Pairs
 
@@ -284,13 +279,15 @@ Notes
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | Seq2Seq / local pairs | Yes | Yes | No | No |
 
-Published assurance basis covers GPT-2, BERT, Mistral 7B, Ministral 3 8B,
-Ministral 3 14B, TinyLlama 1.1B, OLMo 2 13B, Qwen2 7B, Qwen2.5 7B,
-Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B, DeepSeek-R1-Distill-Qwen 7B, and
-Phi-4 text-only profiles. Repo-included presets and pilot calibration configs
-for additional experimental families, including OLMo 2 7B, Gemma 4 E2B
-text-only, and the prepared practical-pick lanes, do not become part of the
-published assurance basis until supporting artifacts are attached.
+Published assurance basis covers GPT-2, BERT, Mistral 7B, Ministral 3 3B,
+Ministral 3 8B, Ministral 3 14B, TinyLlama 1.1B, Gemma 4 E2B text-only,
+Granite 4.1 3B, Granite 4.1 8B, OLMo 2 7B, OLMo 2 13B, Qwen2 7B,
+Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B, DeepSeek-R1-Distill-Qwen 7B,
+DeepSeek-R1-0528-Qwen3 8B, DeepSeek-R1-Distill-Qwen 14B, and Phi-4
+text-only profiles. Repo-included
+presets and pilot calibration configs for prepared practical-pick lanes do not
+become part of the published assurance basis until supporting artifacts are
+attached.
 The empirical guard manifest includes no-op published-basis summaries for the
 modern promoted families. They are null-behavior evidence and calibration
 inputs, but they do not re-derive the packaged spectral/RMT/variance tier
@@ -326,13 +323,14 @@ Model evidence automation lives in
 `.github/workflows/model-evidence-sweep.yml`.
 Repo-prepared-but-not-yet-promoted lanes are tracked in
 `contracts/model_family_catalog.json`.
-For the new Gemma 4 text lane, the repo-maintained local smoke is the included
-manifest dry-run (`scripts/model_evidence/model_evidence_sweep.py --slug gemma4_e2b --dry-run`).
+For the Gemma 4 text lane, the repo-maintained local smoke is the included
+manifest dry-run (`scripts/model_evidence/model_evidence_sweep.py --suite repo-mentioned-gpu --slug gemma4_e2b_public --dry-run`).
 The image-text path also includes an offline demo preset at
-`configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml` plus
+`configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml` and a Gemma
+4 12B pilot at `configs/presets/multimodal/gemma4_12b_vision_text_256.yaml` plus
 `tests/fixtures/vision_text/demo_manifest.jsonl` for provider/config validation;
-live multimodal model execution requires an installed HF stack and model
-weights.
+live Gemma 4 12B execution also requires a Transformers runtime that registers
+`gemma4_unified` / `Gemma4UnifiedForConditionalGeneration`.
 
 For the broader inventory of declared support, implemented-but-not-public
 coverage, usage-only checkpoint families, and recommended additions, see

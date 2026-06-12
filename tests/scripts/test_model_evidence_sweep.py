@@ -38,7 +38,7 @@ def test_repo_mentioned_gpu_suite_includes_basis_canaries_and_experimental() -> 
         shard_count=1,
     )
 
-    assert len(specs) == 19
+    assert len(specs) == 24
     slugs = {lane.slug for lane in specs}
     assert {
         "gpt2_public",
@@ -47,6 +47,7 @@ def test_repo_mentioned_gpu_suite_includes_basis_canaries_and_experimental() -> 
         "tiny_gpt2_canary",
         "bert_tiny_canary",
         "mistral_7b_public",
+        "ministral3_3b_public",
         "ministral3_8b_public",
         "ministral3_14b_public",
         "tinyllama_1_1b_public",
@@ -56,10 +57,14 @@ def test_repo_mentioned_gpu_suite_includes_basis_canaries_and_experimental() -> 
         "qwen2_5_14b_public",
         "qwen3_8b_public",
         "qwen3_5_9b_public",
+        "granite4_1_3b_public",
+        "granite4_1_8b_public",
         "deepseek_r1_distill_qwen_7b_public",
+        "deepseek_r1_0528_qwen3_8b_public",
+        "deepseek_r1_distill_qwen_14b_public",
         "phi4_reasoning_plus_public",
-        "olmo2_7b",
-        "gemma4_e2b",
+        "olmo2_7b_public",
+        "gemma4_e2b_public",
     }.issubset(slugs)
 
 
@@ -75,16 +80,23 @@ def test_repo_mentioned_gpu_basis_lanes_use_lane_specific_profiles_and_presets()
                 "gpt2_public",
                 "bert_base_uncased_public",
                 "mistral_7b_public",
+                "ministral3_3b_public",
                 "ministral3_8b_public",
                 "ministral3_14b_public",
                 "tinyllama_1_1b_public",
+                "olmo2_7b_public",
                 "olmo2_13b_public",
                 "qwen2_7b_public",
                 "qwen2_5_7b_public",
                 "qwen2_5_14b_public",
                 "qwen3_8b_public",
                 "qwen3_5_9b_public",
+                "granite4_1_3b_public",
+                "granite4_1_8b_public",
+                "gemma4_e2b_public",
                 "deepseek_r1_distill_qwen_7b_public",
+                "deepseek_r1_0528_qwen3_8b_public",
+                "deepseek_r1_distill_qwen_14b_public",
                 "phi4_reasoning_plus_public",
             ],
             lane_ids=[],
@@ -108,6 +120,11 @@ def test_repo_mentioned_gpu_basis_lanes_use_lane_specific_profiles_and_presets()
         basis["mistral_7b_public"].preset_relpath
         == "configs/presets/causal_lm/mistral_7b_512.yaml"
     )
+    assert basis["ministral3_3b_public"].verify_profile == "release"
+    assert (
+        basis["ministral3_3b_public"].preset_relpath
+        == "configs/presets/causal_lm/ministral3_3b_512.yaml"
+    )
     assert basis["ministral3_8b_public"].verify_profile == "ci"
     assert (
         basis["ministral3_8b_public"].preset_relpath
@@ -122,6 +139,11 @@ def test_repo_mentioned_gpu_basis_lanes_use_lane_specific_profiles_and_presets()
     assert (
         basis["tinyllama_1_1b_public"].preset_relpath
         == "configs/presets/causal_lm/tinyllama_1_1b_512.yaml"
+    )
+    assert basis["olmo2_7b_public"].verify_profile == "ci"
+    assert (
+        basis["olmo2_7b_public"].preset_relpath
+        == "configs/presets/causal_lm/olmo2_7b_512.yaml"
     )
     assert basis["olmo2_13b_public"].verify_profile == "ci"
     assert (
@@ -153,10 +175,35 @@ def test_repo_mentioned_gpu_basis_lanes_use_lane_specific_profiles_and_presets()
         basis["qwen3_5_9b_public"].preset_relpath
         == "configs/presets/causal_lm/qwen3_5_9b_512.yaml"
     )
+    assert basis["granite4_1_3b_public"].verify_profile == "release"
+    assert (
+        basis["granite4_1_3b_public"].preset_relpath
+        == "configs/presets/causal_lm/granite4_1_3b_512.yaml"
+    )
+    assert basis["granite4_1_8b_public"].verify_profile == "release"
+    assert (
+        basis["granite4_1_8b_public"].preset_relpath
+        == "configs/presets/causal_lm/granite4_1_8b_512.yaml"
+    )
+    assert basis["gemma4_e2b_public"].verify_profile == "release"
+    assert (
+        basis["gemma4_e2b_public"].preset_relpath
+        == "configs/presets/causal_lm/gemma4_e2b_512.yaml"
+    )
     assert basis["deepseek_r1_distill_qwen_7b_public"].verify_profile == "ci"
     assert (
         basis["deepseek_r1_distill_qwen_7b_public"].preset_relpath
         == "configs/presets/causal_lm/deepseek_r1_distill_qwen_7b_512.yaml"
+    )
+    assert basis["deepseek_r1_0528_qwen3_8b_public"].verify_profile == "release"
+    assert (
+        basis["deepseek_r1_0528_qwen3_8b_public"].preset_relpath
+        == "configs/presets/causal_lm/deepseek_r1_0528_qwen3_8b_512.yaml"
+    )
+    assert basis["deepseek_r1_distill_qwen_14b_public"].verify_profile == "release"
+    assert (
+        basis["deepseek_r1_distill_qwen_14b_public"].preset_relpath
+        == "configs/presets/causal_lm/deepseek_r1_distill_qwen_14b_512.yaml"
     )
     assert basis["phi4_reasoning_plus_public"].verify_profile == "ci"
     assert (
@@ -287,17 +334,16 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
     )
 
     assert [lane.slug for lane in specs] == [
-        "mistralai_ministral_3_3b_instruct_2512_bf16",
-        "ibm_granite_granite_4_1_8b",
-        "ibm_granite_granite_4_1_3b",
+        "google_gemma_4_12b_it",
         "huggingfacetb_smollm3_3b",
         "microsoft_phi_4_mini_instruct",
-        "deepseek_ai_deepseek_r1_distill_qwen_14b",
-        "deepseek_ai_deepseek_r1_0528_qwen3_8b",
         "tiiuae_falcon_h1r_7b",
     ]
+    adapters = {lane.slug: lane.adapter for lane in specs}
+    assert adapters["google_gemma_4_12b_it"] == "hf_multimodal"
     for lane in specs:
-        assert lane.adapter == "hf_causal"
+        if lane.slug != "google_gemma_4_12b_it":
+            assert lane.adapter == "hf_causal"
         assert lane.verify_profile == "dev"
         assert lane.preset_path.is_file(), lane.preset_relpath
 
@@ -468,7 +514,14 @@ def test_model_evidence_sweep_container_dev_profile_disables_strict_assurance(
 def test_select_specs_sharding_is_stable() -> None:
     mod = load_script_module("model_evidence_sweep")
 
-    shard = mod.select_specs(
+    first_shard = mod.select_specs(
+        mod.DEFAULT_SUITE,
+        slugs=[],
+        lane_ids=[],
+        shard_index=0,
+        shard_count=3,
+    )
+    second_shard = mod.select_specs(
         mod.DEFAULT_SUITE,
         slugs=[],
         lane_ids=[],
@@ -476,7 +529,8 @@ def test_select_specs_sharding_is_stable() -> None:
         shard_count=3,
     )
 
-    assert [lane.slug for lane in shard] == ["gemma4_e2b"]
+    assert first_shard == []
+    assert second_shard == []
 
 
 def test_model_evidence_sweep_host_mode_emits_explicit_runtime_flags(
@@ -490,8 +544,10 @@ def test_model_evidence_sweep_host_mode_emits_explicit_runtime_flags(
         [
             sys.executable,
             str(script),
+            "--suite",
+            "repo-mentioned-gpu",
             "--slug",
-            "olmo2_7b",
+            "gemma4_e2b_public",
             "--execution-mode",
             "host",
             "--output-root",
@@ -508,7 +564,7 @@ def test_model_evidence_sweep_host_mode_emits_explicit_runtime_flags(
     payload = json.loads(proc.stdout)
     assert len(payload) == 1
     assert payload[0]["execution_mode"] == "host"
-    assert payload[0]["prefetch"][-1] == "allenai/OLMo-2-1124-7B"
+    assert payload[0]["prefetch"][-1] == "google/gemma-4-E2B-it"
     assert payload[0]["prefetch"][1] == "-c"
     assert "--execution-mode" in payload[0]["evaluate"]
     assert (
@@ -527,7 +583,7 @@ def test_model_evidence_sweep_host_mode_emits_explicit_runtime_flags(
     assert payload[0]["verify"][payload[0]["verify"].index("--profile") + 1] == "dev"
     preset_idx = payload[0]["evaluate"].index("--preset") + 1
     assert payload[0]["evaluate"][preset_idx] == str(
-        repo_root / "configs/presets/causal_lm/olmo2_7b_512.yaml"
+        repo_root / "configs/presets/causal_lm/gemma4_e2b_512.yaml"
     )
 
     manifest = json.loads((output_root / "manifest.json").read_text(encoding="utf-8"))
@@ -551,8 +607,10 @@ def test_model_evidence_sweep_host_mode_prefetches_before_evaluate(
         [
             sys.executable,
             str(script),
+            "--suite",
+            "repo-mentioned-gpu",
             "--slug",
-            "olmo2_7b",
+            "gemma4_e2b_public",
             "--execution-mode",
             "host",
             "--output-root",
@@ -569,7 +627,7 @@ def test_model_evidence_sweep_host_mode_prefetches_before_evaluate(
 
     assert proc.returncode == 1, proc.stderr
     invocations = log_path.read_text(encoding="utf-8").splitlines()
-    assert "allenai/OLMo-2-1124-7B" in invocations[0]
+    assert "google/gemma-4-E2B-it" in invocations[0]
     assert "-m invarlock evaluate" in invocations[1]
 
 
@@ -592,8 +650,10 @@ def test_model_evidence_sweep_retries_evaluate_once_after_sigterm(
         [
             sys.executable,
             str(script),
+            "--suite",
+            "repo-mentioned-gpu",
             "--slug",
-            "olmo2_7b",
+            "gemma4_e2b_public",
             "--execution-mode",
             "host",
             "--output-root",
@@ -616,7 +676,9 @@ def test_model_evidence_sweep_retries_evaluate_once_after_sigterm(
     verify_invocations = [line for line in invocations if "-m invarlock verify" in line]
     assert len(evaluate_invocations) == 2
     assert len(verify_invocations) == 1
-    lane_log = (output_root / "logs" / "olmo2_7b.log").read_text(encoding="utf-8")
+    lane_log = (output_root / "logs" / "gemma4_e2b_public.log").read_text(
+        encoding="utf-8"
+    )
     assert "evaluate exited with -15; retrying once." in lane_log
 
 
@@ -674,8 +736,8 @@ def test_build_evaluate_command_uses_container_safe_repo_relative_paths(
     mod = load_script_module("model_evidence_sweep")
     spec = next(
         lane
-        for lane in mod.CURRENT_SUPPORTED_EXPERIMENTAL_LANES
-        if lane.slug == "olmo2_7b"
+        for lane in mod.CURRENT_PUBLISHED_BASIS_LANES
+        if lane.slug == "gemma4_e2b_public"
     )
     external_output_root = tmp_path / "external-container-evidence"
     execution_root = mod._execution_root(
@@ -695,8 +757,8 @@ def test_build_evaluate_command_uses_container_safe_repo_relative_paths(
     out_idx = command.index("--out") + 1
     report_idx = command.index("--report-out") + 1
     base = f"tmp/model_evidence_container/{execution_root.name}"
-    assert command[out_idx] == f"{base}/eval/olmo2_7b/runs"
-    assert command[report_idx] == f"{base}/eval/olmo2_7b/report"
+    assert command[out_idx] == f"{base}/eval/gemma4_e2b_public/runs"
+    assert command[report_idx] == f"{base}/eval/gemma4_e2b_public/report"
 
 
 def test_runtime_env_preserves_container_default_runtime_overrides(
@@ -746,8 +808,10 @@ def test_model_evidence_sweep_returns_failure_when_verify_fails(
         [
             sys.executable,
             str(script),
+            "--suite",
+            "repo-mentioned-gpu",
             "--slug",
-            "olmo2_7b",
+            "gemma4_e2b_public",
             "--output-root",
             str(output_root),
             "--python",
@@ -765,11 +829,11 @@ def test_model_evidence_sweep_returns_failure_when_verify_fails(
     assert summary["ok"] is False
     assert len(summary["results"]) == 1
     result = summary["results"][0]
-    assert result["slug"] == "olmo2_7b"
+    assert result["slug"] == "gemma4_e2b_public"
     assert result["evaluate_exit"] == 0
     assert result["verify_exit"] == 1
     assert result["ok"] is False
-    assert (output_root / "eval" / "olmo2_7b" / "verify.json").is_file()
+    assert (output_root / "eval" / "gemma4_e2b_public" / "verify.json").is_file()
 
 
 def test_model_evidence_sweep_host_mode_rejects_ci_profile(tmp_path: Path) -> None:
@@ -781,8 +845,10 @@ def test_model_evidence_sweep_host_mode_rejects_ci_profile(tmp_path: Path) -> No
         [
             sys.executable,
             str(script),
+            "--suite",
+            "repo-mentioned-gpu",
             "--slug",
-            "olmo2_7b",
+            "gemma4_e2b_public",
             "--execution-mode",
             "host",
             "--profile",
@@ -813,8 +879,10 @@ def test_model_evidence_sweep_container_mode_publishes_external_output_root(
         [
             sys.executable,
             str(script),
+            "--suite",
+            "repo-mentioned-gpu",
             "--slug",
-            "olmo2_7b",
+            "gemma4_e2b_public",
             "--execution-mode",
             "container",
             "--output-root",
@@ -829,6 +897,6 @@ def test_model_evidence_sweep_container_mode_publishes_external_output_root(
     )
 
     assert proc.returncode == 1, proc.stderr
-    published_lane = output_root / "eval" / "olmo2_7b"
+    published_lane = output_root / "eval" / "gemma4_e2b_public"
     assert (published_lane / "report" / "evaluation.report.json").is_file()
     assert (published_lane / "verify.json").is_file()

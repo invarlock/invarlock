@@ -33,8 +33,10 @@ exit 99
         [
             sys.executable,
             str(script),
+            "--suite",
+            "repo-mentioned-gpu",
             "--slug",
-            "olmo2_7b",
+            "gemma4_e2b_public",
             "--output-root",
             str(output_root),
             "--python",
@@ -56,7 +58,7 @@ exit 99
         (output_root / "model_revisions.json").read_text(encoding="utf-8")
     )
     assert revisions["schema"] == "invarlock/model-evidence-model-revisions-v1"
-    assert revisions["models"][0]["model_id"] == "allenai/OLMo-2-1124-7B"
+    assert revisions["models"][0]["model_id"] == "google/gemma-4-E2B-it"
 
     artifact_manifest = json.loads(
         (output_root / "artifact_manifest.json").read_text(encoding="utf-8")
@@ -72,7 +74,7 @@ exit 99
         "summary.tsv",
         "status.log",
         "model_revisions.json",
-        "logs/olmo2_7b.log",
+        "logs/gemma4_e2b_public.log",
     }.issubset(paths)
     assert artifact_manifest["lane_results"][0]["detail"] == (
         "container_image_pull_denied"

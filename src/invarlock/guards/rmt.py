@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from datetime import UTC, datetime
+from fnmatch import fnmatchcase
 from typing import Any, Literal
 
 import torch
@@ -164,6 +165,8 @@ class RMTGuard(Guard):
         self.epsilon_violations: list[dict[str, Any]] = []
         self.baseline_sigmas: dict[str, float] = {}
         self.baseline_mp_stats: dict[str, dict[str, float]] = {}
+        self.module_include_patterns: tuple[str, ...] = ()
+        self.module_exclude_patterns: tuple[str, ...] = ()
 
     def _log_event(
         self, operation: str, level: str = "INFO", message: str = "", **data
@@ -290,10 +293,15 @@ class RMTGuard(Guard):
 
     def _get_linear_modules(self, model: nn.Module) -> list[tuple[str, nn.Module]]:
         """Get linear modules in scope using the canonical analysis owner."""
-        return rmt_analysis.collect_linear_rmt_modules(
+        modules = rmt_analysis.collect_linear_rmt_modules(
             model,
             allowed_suffixes=self.allowed_suffixes,
         )
+        return [
+            (name, module)
+            for name, module in modules
+            if self._module_filter_allows(name)
+        ]
 
     def _collect_calibration_batches(self, calib: Any, max_windows: int) -> list[Any]:
         return rmt_activation_runtime.collect_calibration_batches(
@@ -314,10 +322,27 @@ class RMTGuard(Guard):
         return rmt_activation_runtime.batch_token_weight(input_ids, attention_mask)
 
     def _get_activation_modules(self, model: nn.Module) -> list[tuple[str, nn.Module]]:
-        return rmt_activation_runtime.get_activation_modules(
+        modules = rmt_activation_runtime.get_activation_modules(
             model,
             allowed_suffixes=self.allowed_suffixes,
         )
+        return [
+            (name, module)
+            for name, module in modules
+            if self._module_filter_allows(name)
+        ]
+
+    def _module_filter_allows(self, name: str) -> bool:
+        include_patterns = self.module_include_patterns
+        if include_patterns and not any(
+            fnmatchcase(name, pattern) for pattern in include_patterns
+        ):
+            return False
+        if self.module_exclude_patterns and any(
+            fnmatchcase(name, pattern) for pattern in self.module_exclude_patterns
+        ):
+            return False
+        return True
 
     def _activation_edge_risk(
         self, activations: Any
@@ -340,6 +365,7 @@ class RMTGuard(Guard):
             margin=self.margin,
             classify_family_fn=self._classify_family,
             adapter=self.adapter,
+            module_filter_fn=self._module_filter_allows,
         )
 
     def _activation_svd_outliers(

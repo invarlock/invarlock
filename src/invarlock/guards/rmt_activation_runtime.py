@@ -370,12 +370,17 @@ def compute_activation_edge_risk(
     margin: float,
     classify_family_fn: Callable[[str], str],
     adapter: Any | None = None,
+    module_filter_fn: Callable[[str], bool] | None = None,
 ) -> dict[str, Any] | None:
     """Compute token-weighted activation edge-risk scores per module/family."""
     if not batches:
         return None
 
     modules = get_activation_modules(model, allowed_suffixes=allowed_suffixes)
+    if module_filter_fn is not None:
+        modules = [
+            (name, module) for name, module in modules if module_filter_fn(name)
+        ]
     if not modules:
         return None
 

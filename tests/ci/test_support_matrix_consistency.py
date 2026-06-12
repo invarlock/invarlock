@@ -82,7 +82,7 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         "OLMo 2 13B causal LM",
         "Qwen3.5 causal LM",
         "Gemma 4 12B any-to-any LM",
-        "Ministral 3 3B causal LM (text-only eval candidate)",
+        "Ministral 3 3B causal LM (text-only eval)",
         "Granite 4.1 8B causal LM",
         "Granite 4.1 3B causal LM",
         "SmolLM3 3B causal LM",
@@ -117,23 +117,33 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
     )
     assert (
         families["Gemma 4 E2B causal LM (text-only eval)"]["support_tier"]
-        == "supported_experimental"
+        == "published_basis"
     )
     assert families["TinyLlama 1.1B causal LM"]["support_tier"] == "published_basis"
-    assert families["OLMo 2 7B causal LM"]["support_tier"] == "supported_experimental"
+    assert families["OLMo 2 7B causal LM"]["support_tier"] == "published_basis"
     assert families["OLMo 2 13B causal LM"]["support_tier"] == "published_basis"
     assert families["Qwen3.5 causal LM"]["support_tier"] == "published_basis"
+    assert families["Granite 4.1 3B causal LM"]["support_tier"] == "published_basis"
+    assert families["Granite 4.1 8B causal LM"]["support_tier"] == "published_basis"
+    assert (
+        families["Ministral 3 3B causal LM (text-only eval)"]["support_tier"]
+        == "published_basis"
+    )
+    assert (
+        families["DeepSeek-R1-0528-Qwen3 8B causal LM"]["support_tier"]
+        == "published_basis"
+    )
+    assert (
+        families["DeepSeek-R1-Distill-Qwen 14B causal LM"]["support_tier"]
+        == "published_basis"
+    )
     assert families["Gemma 4 12B any-to-any LM"]["support_tier"] == (
         "community_experimental"
     )
     for family in (
-        "Ministral 3 3B causal LM (text-only eval candidate)",
-        "Granite 4.1 8B causal LM",
-        "Granite 4.1 3B causal LM",
+        "Gemma 4 12B any-to-any LM",
         "SmolLM3 3B causal LM",
         "Phi-4 mini causal LM",
-        "DeepSeek-R1-Distill-Qwen 14B causal LM",
-        "DeepSeek-R1-0528-Qwen3 8B causal LM",
         "Falcon-H1R 7B causal LM",
     ):
         assert families[family]["support_tier"] == "community_experimental"

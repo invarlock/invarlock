@@ -304,6 +304,76 @@ def test_load_validated_baseline_report_accepts_partial_expected_dataset(
     load_validated_baseline_report(report, **kwargs)
 
 
+def test_load_validated_baseline_report_accepts_missing_seed_with_windows(
+    tmp_path: Path,
+) -> None:
+    payload = _baseline_payload()
+    data = payload["data"]
+    assert isinstance(data, dict)
+    payload["data"] = {key: value for key, value in data.items() if key != "seed"}
+    report = _write_json(tmp_path / "baseline.json", payload)
+
+    load_validated_baseline_report(report, **_baseline_validation_kwargs())
+
+
+def test_load_validated_baseline_report_accepts_hf_provider_kind_report(
+    tmp_path: Path,
+) -> None:
+    report = _write_json(
+        tmp_path / "baseline.json",
+        _baseline_payload(
+            data={
+                "dataset": "hf_text",
+                "split": "train",
+                "seq_len": 512,
+                "stride": 512,
+                "preview_n": 400,
+                "final_n": 400,
+                "seed": 42,
+            }
+        ),
+    )
+    kwargs = {
+        **_baseline_validation_kwargs(),
+        "expected_dataset": {
+            "provider": {
+                "kind": "hf_text",
+                "dataset_name": "Salesforce/wikitext",
+                "config_name": "wikitext-103-v1",
+                "text_field": "text",
+                "max_samples": 10000,
+            },
+            "split": "train",
+            "seq_len": 512,
+            "stride": 512,
+            "preview_n": 400,
+            "final_n": 400,
+            "seed": 42,
+        },
+    }
+
+    load_validated_baseline_report(report, **kwargs)
+
+
+def test_load_validated_baseline_report_rejects_hf_provider_kind_mismatch(
+    tmp_path: Path,
+) -> None:
+    report = _write_json(
+        tmp_path / "baseline.json",
+        _baseline_payload(data={**_baseline_payload()["data"], "dataset": "hf_text"}),
+    )
+    kwargs = {
+        **_baseline_validation_kwargs(),
+        "expected_dataset": {
+            **_baseline_validation_kwargs()["expected_dataset"],
+            "provider": {"kind": "hf_image"},
+        },
+    }
+
+    with pytest.raises(ValidationError, match="dataset/window-plan mismatch"):
+        load_validated_baseline_report(report, **kwargs)
+
+
 def test_model_id_equivalence_returns_false_when_resolution_fails(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

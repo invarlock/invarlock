@@ -18,6 +18,26 @@ class _MixedWeightModel(nn.Module):
         self.linear = nn.Linear(4, 4, bias=False)
 
 
+class _TinyGemmaLikeModel(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.model = nn.Module()
+        self.model.language_model = nn.Module()
+        self.model.language_model.layers = nn.ModuleList([nn.Module()])
+        layer = self.model.language_model.layers[0]
+        layer.self_attn = nn.Module()
+        layer.self_attn.q_proj = nn.Linear(4, 4, bias=False)
+        layer.mlp = nn.Module()
+        layer.mlp.down_proj = nn.Linear(4, 4, bias=False)
+        layer.per_layer_projection = nn.Linear(4, 4, bias=False)
+        self.model.audio_tower = nn.Module()
+        self.model.audio_tower.layers = nn.ModuleList([nn.Module()])
+        self.model.audio_tower.layers[0].self_attn = nn.Module()
+        self.model.audio_tower.layers[0].self_attn.relative_k_proj = nn.Linear(
+            4, 4, bias=False
+        )
+
+
 def test_spectral_guard_prepare_skips_modules_without_matrix_weights() -> None:
     model = _MixedWeightModel()
     guard = SpectralGuard()
@@ -29,3 +49,32 @@ def test_spectral_guard_prepare_skips_modules_without_matrix_weights() -> None:
     assert "skip" not in guard.baseline_sigmas
     assert "linear" in guard.module_family_map
     assert "skip" not in guard.module_family_map
+
+
+def test_spectral_guard_module_patterns_scope_gemma_text_blocks() -> None:
+    model = _TinyGemmaLikeModel()
+    guard = SpectralGuard(scope="all")
+
+    result = guard.prepare(
+        model,
+        adapter=None,
+        calib=None,
+        policy={
+            "module_include_patterns": [
+                "model.language_model.layers.*.self_attn.*",
+                "model.language_model.layers.*.mlp.*",
+            ]
+        },
+    )
+
+    assert result["ready"] is True
+    assert set(guard.baseline_sigmas) == {
+        "model.language_model.layers.0.self_attn.q_proj",
+        "model.language_model.layers.0.mlp.down_proj",
+    }
+    assert "model.audio_tower.layers.0.self_attn.relative_k_proj" not in (
+        guard.baseline_sigmas
+    )
+    assert "model.language_model.layers.0.per_layer_projection" not in (
+        guard.baseline_sigmas
+    )

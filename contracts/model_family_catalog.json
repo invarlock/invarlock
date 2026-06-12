@@ -277,20 +277,23 @@
         "text"
       ],
       "task_role": "causal_lm",
-      "state": "supported_experimental",
+      "state": "published_basis",
       "representative_models": [
         "google/gemma-4-E2B-it"
       ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/gemma4_e2b_512.yaml",
-        "configs/calibration/null_sweep_gemma4_e2b.yaml"
+        "configs/calibration/null_sweep_gemma4_e2b.yaml",
+        "public_evidence/published_basis/gemma4_e2b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_e2b/runtime.manifest.json",
+        "public_evidence/published_basis/gemma4_e2b/evidence_pack"
       ],
-      "notes": "Derived from support_matrix lane gemma4-e2b-text-causal-hf. Public support is text-only in phase 1; image-text evaluation is shipped separately via hf_multimodal + vision_text.",
+      "notes": "Promoted from support_matrix lane gemma4-e2b-text-causal-hf with release-profile container-backed public evidence. Public support is text-only; image-text evaluation remains on the explicit hf_multimodal + vision_text path.",
       "support_groups": [
+        "published_modern",
         "small_local",
-        "enterprise_permissive",
-        "current_gpu_sweep"
+        "enterprise_permissive"
       ]
     },
     {
@@ -325,18 +328,21 @@
         "text"
       ],
       "task_role": "causal_lm",
-      "state": "supported_experimental",
+      "state": "published_basis",
       "representative_models": [
         "allenai/OLMo-2-1124-7B"
       ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/olmo2_7b_512.yaml",
-        "configs/calibration/null_sweep_olmo2_7b.yaml"
+        "configs/calibration/null_sweep_olmo2_7b.yaml",
+        "public_evidence/published_basis/olmo2_7b/evaluation.report.json",
+        "public_evidence/published_basis/olmo2_7b/runtime.manifest.json",
+        "public_evidence/published_basis/olmo2_7b/evidence_pack"
       ],
-      "notes": "Maintained pilot lane. The 20260612 GPU sweep exited 137 for this checkpoint, so it remains outside published_basis.",
+      "notes": "Promoted from support_matrix lane olmo-2-7b-causal-hf with container-backed public evidence.",
       "support_groups": [
-        "current_gpu_sweep"
+        "published_modern"
       ]
     },
     {
@@ -404,62 +410,93 @@
       ],
       "repo_evidence": [
         "contracts/support_matrix.json",
-        "docs/README.md"
+        "docs/README.md",
+        "configs/presets/multimodal/gemma4_12b_vision_text_256.yaml",
+        "src/invarlock/adapters/hf_loading.py"
       ],
       "support_groups": [
         "practical_shortlist",
         "enterprise_permissive",
         "multimodal_candidate"
       ],
-      "notes": "Added from practical-picks backlog. No repo preset, calibration config, targeted tests, or public evidence fixture is shipped yet."
+      "notes": "Added from practical-picks backlog with a repo pilot vision_text preset and Gemma 4 unified loader tests. Live evidence remains blocked on the current CUDA runtime image because transformers 5.5.0 does not register model_type gemma4_unified; promotion requires a runtime with Gemma4UnifiedForConditionalGeneration support."
     },
     {
       "family_id": "ministral-3-3b-text-causal-lm",
-      "display_name": "Ministral 3 3B causal LM (text-only eval candidate)",
+      "display_name": "Ministral 3 3B causal LM (text-only eval)",
       "modalities": [
         "text"
       ],
       "task_role": "causal_lm",
-      "state": "community_experimental",
+      "state": "published_basis",
       "representative_models": [
         "mistralai/Ministral-3-3B-Instruct-2512-BF16"
       ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/ministral3_3b_512.yaml",
-        "configs/calibration/null_sweep_ministral3_3b.yaml"
+        "configs/calibration/null_sweep_ministral3_3b.yaml",
+        "public_evidence/published_basis/ministral3_3b/evaluation.report.json",
+        "public_evidence/published_basis/ministral3_3b/runtime.manifest.json",
+        "public_evidence/published_basis/ministral3_3b/evidence_pack"
       ],
       "support_groups": [
+        "published_modern",
         "small_local",
         "enterprise_permissive"
       ],
-      "notes": "Added from practical-picks backlog with repo preset, calibration config, and sweep lane. Tuned edit params and public evidence are still required before supported_experimental or published_basis promotion."
+      "notes": "Promoted from support_matrix lane ministral-3-3b-text-causal-hf with container-backed public evidence."
     },
     {
-      "family_id": "granite-4-1-causal-lm",
-      "display_name": "Granite 4.1 causal LM",
+      "family_id": "granite-4-1-3b-causal-lm",
+      "display_name": "Granite 4.1 3B causal LM",
       "modalities": [
         "text"
       ],
       "task_role": "causal_lm",
-      "state": "community_experimental",
+      "state": "published_basis",
       "representative_models": [
-        "ibm-granite/granite-4.1-3b",
-        "ibm-granite/granite-4.1-8b"
+        "ibm-granite/granite-4.1-3b"
       ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/granite4_1_3b_512.yaml",
-        "configs/presets/causal_lm/granite4_1_8b_512.yaml",
         "configs/calibration/null_sweep_granite4_1_3b.yaml",
-        "configs/calibration/null_sweep_granite4_1_8b.yaml"
+        "public_evidence/published_basis/granite4_1_3b/evaluation.report.json",
+        "public_evidence/published_basis/granite4_1_3b/runtime.manifest.json",
+        "public_evidence/published_basis/granite4_1_3b/evidence_pack"
       ],
       "support_groups": [
+        "published_modern",
         "small_local",
+        "enterprise_permissive"
+      ],
+      "notes": "Promoted from support_matrix lane granite-4-1-3b-causal-hf with container-backed release-profile public evidence."
+    },
+    {
+      "family_id": "granite-4-1-8b-causal-lm",
+      "display_name": "Granite 4.1 8B causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "ibm-granite/granite-4.1-8b"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/granite4_1_8b_512.yaml",
+        "configs/calibration/null_sweep_granite4_1_8b.yaml",
+        "public_evidence/published_basis/granite4_1_8b/evaluation.report.json",
+        "public_evidence/published_basis/granite4_1_8b/runtime.manifest.json",
+        "public_evidence/published_basis/granite4_1_8b/evidence_pack"
+      ],
+      "support_groups": [
         "practical_shortlist",
         "enterprise_permissive"
       ],
-      "notes": "Added from practical-picks backlog with 3B/8B repo presets, calibration configs, and sweep lanes. Tuned edit params and public evidence are still required before supported_experimental or published_basis promotion."
+      "notes": "Public release-profile container-backed evidence fixture is included from remote run 20260612Tgranite8bPrefetchReleaseA after tokenizer prefetch recovery."
     },
     {
       "family_id": "smollm3-3b-causal-lm",
@@ -480,7 +517,7 @@
       "support_groups": [
         "small_local"
       ],
-      "notes": "Added from practical-picks backlog with repo preset, calibration config, and sweep lane. Tuned edit params and public evidence are still required before supported_experimental or published_basis promotion."
+      "notes": "Added from practical-picks backlog with repo preset, calibration config, and sweep lane. Release-profile evidence run 20260612Tsmollm3ReleaseProfileA fails the guard-overhead policy (+1.11% > +1.0%) before report generation, so public evidence remains blocked."
     },
     {
       "family_id": "phi-4-mini-causal-lm",
@@ -502,7 +539,7 @@
         "small_local",
         "reasoning_focused"
       ],
-      "notes": "Added from practical-picks backlog with repo preset, calibration config, sweep lane, and explicit remote-code policy. Tuned edit params and public evidence are still required before supported_experimental or published_basis promotion."
+      "notes": "Added from practical-picks backlog with repo preset, calibration config, sweep lane, and a built-in Phi3 loader hint for the Phi-4 mini checkpoint. Release-profile run 20260612TphiMiniFalconReleaseA evaluates successfully but fails strict verification because spectral caps exceed the no-op budget, so public evidence remains blocked."
     },
     {
       "family_id": "deepseek-r1-distill-qwen-14b-causal-lm",
@@ -511,19 +548,23 @@
         "text"
       ],
       "task_role": "causal_lm",
-      "state": "community_experimental",
+      "state": "published_basis",
       "representative_models": [
         "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
       ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/deepseek_r1_distill_qwen_14b_512.yaml",
-        "configs/calibration/null_sweep_deepseek_r1_distill_qwen_14b.yaml"
+        "configs/calibration/null_sweep_deepseek_r1_distill_qwen_14b.yaml",
+        "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evaluation.report.json",
+        "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/runtime.manifest.json",
+        "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evidence_pack"
       ],
       "support_groups": [
+        "published_modern",
         "reasoning_focused"
       ],
-      "notes": "Added from reasoning practical-picks backlog with repo preset, calibration config, and sweep lane. Tuned edit params and public evidence are still required before supported_experimental or published_basis promotion."
+      "notes": "Promoted from support_matrix lane deepseek-r1-distill-qwen-14b-causal-hf with container-backed public evidence using baseline-report reuse recovery."
     },
     {
       "family_id": "deepseek-r1-0528-qwen3-8b-causal-lm",
@@ -532,19 +573,23 @@
         "text"
       ],
       "task_role": "causal_lm",
-      "state": "community_experimental",
+      "state": "published_basis",
       "representative_models": [
         "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B"
       ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/deepseek_r1_0528_qwen3_8b_512.yaml",
-        "configs/calibration/null_sweep_deepseek_r1_0528_qwen3_8b.yaml"
+        "configs/calibration/null_sweep_deepseek_r1_0528_qwen3_8b.yaml",
+        "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evaluation.report.json",
+        "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/runtime.manifest.json",
+        "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evidence_pack"
       ],
       "support_groups": [
+        "published_modern",
         "reasoning_focused"
       ],
-      "notes": "Added from reasoning practical-picks backlog with repo preset, calibration config, and sweep lane. Tuned edit params and public evidence are still required before supported_experimental or published_basis promotion."
+      "notes": "Promoted from support_matrix lane deepseek-r1-0528-qwen3-8b-causal-hf with container-backed public evidence."
     },
     {
       "family_id": "falcon-h1r-7b-causal-lm",
@@ -565,7 +610,7 @@
       "support_groups": [
         "reasoning_focused"
       ],
-      "notes": "Added from reasoning practical-picks backlog with repo preset, calibration config, and sweep lane. Tuned edit params and public evidence are still required before supported_experimental or published_basis promotion."
+      "notes": "Added from reasoning practical-picks backlog with repo preset, calibration config, and sweep lane. Release-profile run 20260612TfalconH1RPrefetchReleaseA fails before report generation with ADAPTER-STRUCTURE-INVALID: no matching HF causal adapter spec, so public evidence remains blocked."
     },
     {
       "family_id": "seq2seq-local-pairs",

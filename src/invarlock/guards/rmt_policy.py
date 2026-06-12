@@ -29,6 +29,8 @@ class RMTPolicyDict(TypedDict, total=False):
     activation_required: bool
     estimator: dict[str, Any]
     activation: dict[str, Any]
+    module_include_patterns: list[str]
+    module_exclude_patterns: list[str]
 
 
 __all__ = [
@@ -50,7 +52,26 @@ def build_rmt_guard_policy(guard: Any) -> RMTPolicyDict:
         correct=guard.correct,
         epsilon_default=float(guard.epsilon_default),
         epsilon_by_family=dict(guard.epsilon_by_family),
+        module_include_patterns=list(getattr(guard, "module_include_patterns", ())),
+        module_exclude_patterns=list(getattr(guard, "module_exclude_patterns", ())),
     )
+
+
+def _normalize_module_patterns(value: Any | None) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    raw_values = value if isinstance(value, list | tuple) else (value,)
+    patterns: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_values:
+        if not isinstance(raw, str):
+            continue
+        pattern = raw.strip()
+        if not pattern or pattern in seen:
+            continue
+        patterns.append(pattern)
+        seen.add(pattern)
+    return tuple(patterns)
 
 
 def apply_rmt_policy_overrides(guard: Any, policy: dict[str, Any] | None) -> None:
@@ -102,6 +123,15 @@ def apply_rmt_policy_overrides(guard: Any, policy: dict[str, Any] | None) -> Non
 
     if "activation_required" in policy:
         guard._require_activation = bool(policy.get("activation_required"))
+
+    if "module_include_patterns" in policy:
+        guard.module_include_patterns = _normalize_module_patterns(
+            policy.get("module_include_patterns")
+        )
+    if "module_exclude_patterns" in policy:
+        guard.module_exclude_patterns = _normalize_module_patterns(
+            policy.get("module_exclude_patterns")
+        )
 
     estimator_policy = policy.get("estimator")
     if isinstance(estimator_policy, dict):

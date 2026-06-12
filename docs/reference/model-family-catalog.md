@@ -38,24 +38,25 @@ intentionally kept out of included preset inventory.
 | Ministral 3 8B causal LM (text-only eval) | `published_basis` | `mistralai/Ministral-3-8B-Instruct-2512-BF16` | Public container-backed evidence fixture is included. |
 | Ministral 3 14B causal LM (text-only eval) | `published_basis` | `mistralai/Ministral-3-14B-Instruct-2512-BF16` | Public container-backed evidence fixture is included. |
 | TinyLlama 1.1B causal LM | `published_basis` | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Public container-backed evidence fixture is included. |
+| OLMo 2 7B causal LM | `published_basis` | `allenai/OLMo-2-1124-7B` | Public container-backed evidence fixture is included. |
 | OLMo 2 13B causal LM | `published_basis` | `allenai/OLMo-2-1124-13B-Instruct` | Public container-backed evidence fixture is included. |
 | Qwen2 7B causal LM | `published_basis` | `Qwen/Qwen2-7B` | Public container-backed evidence fixture is included. |
 | Qwen2.5 7B causal LM | `published_basis` | `Qwen/Qwen2.5-7B` | Public container-backed evidence fixture is included. |
 | Qwen2.5 14B causal LM | `published_basis` | `Qwen/Qwen2.5-14B` | Public container-backed evidence fixture is included. |
 | Qwen3 causal LM | `published_basis` | `Qwen/Qwen3-8B` | Public container-backed evidence fixture is included. |
 | DeepSeek-R1-Distill-Qwen causal LM | `published_basis` | `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` | Public container-backed evidence fixture is included. |
+| DeepSeek-R1-0528-Qwen3 8B causal LM | `published_basis` | `deepseek-ai/DeepSeek-R1-0528-Qwen3-8B` | Container-backed public report, runtime manifest, and signed evidence pack are included. |
+| DeepSeek-R1-Distill-Qwen 14B causal LM | `published_basis` | `deepseek-ai/DeepSeek-R1-Distill-Qwen-14B` | Public release-profile container-backed evidence fixture is included. |
 | Phi-4 causal LM (text-only eval) | `published_basis` | `microsoft/Phi-4-reasoning-plus` | Public text-only container-backed evidence fixture is included; guard-overhead measurement is skipped by preset policy. |
-| Gemma 4 E2B causal LM (text-only eval) | `supported_experimental` | `google/gemma-4-E2B-it` | Text-only pilot preset and calibration config are included. Image-text evaluation uses the explicit `hf_multimodal` + `vision_text` path. |
-| OLMo 2 7B causal LM | `supported_experimental` | `allenai/OLMo-2-1124-7B` | Pilot preset and calibration config are included; the 20260612 GPU sweep exited 137 for this checkpoint. |
+| Gemma 4 E2B causal LM (text-only eval) | `published_basis` | `google/gemma-4-E2B-it` | Public release-profile container-backed evidence fixture is included. Image-text evaluation uses the explicit `hf_multimodal` + `vision_text` path. |
 | Qwen3.5 causal LM | `published_basis` | `Qwen/Qwen3.5-9B` | Public container-backed evidence fixture is included. |
-| Gemma 4 12B any-to-any LM | `community_experimental` | `google/gemma-4-12B-it` | Candidate row from the practical-picks backlog. No repo preset, calibration config, targeted tests, or public evidence fixture is shipped yet. |
-| Ministral 3 3B causal LM (text-only eval candidate) | `community_experimental` | `mistralai/Ministral-3-3B-Instruct-2512-BF16` | Pilot preset, calibration config, and sweep lane are included; tuned edit params and public evidence are still required before promotion. |
-| Granite 4.1 causal LM | `community_experimental` | `ibm-granite/granite-4.1-3b`, `ibm-granite/granite-4.1-8b` | Pilot presets, calibration configs, and sweep lanes are included for 3B and 8B; tuned edit params and public evidence are still required before promotion. |
-| SmolLM3 3B causal LM | `community_experimental` | `HuggingFaceTB/SmolLM3-3B` | Pilot preset, calibration config, and sweep lane are included; tuned edit params and public evidence are still required before promotion. |
-| Phi-4 mini causal LM | `community_experimental` | `microsoft/Phi-4-mini-instruct` | Pilot preset, calibration config, sweep lane, and explicit remote-code policy are included; tuned edit params and public evidence are still required before promotion. |
-| DeepSeek-R1-Distill-Qwen 14B causal LM | `community_experimental` | `deepseek-ai/DeepSeek-R1-Distill-Qwen-14B` | Pilot preset, calibration config, and sweep lane are included; tuned edit params and public evidence are still required before promotion. |
-| DeepSeek-R1-0528-Qwen3 8B causal LM | `community_experimental` | `deepseek-ai/DeepSeek-R1-0528-Qwen3-8B` | Pilot preset, calibration config, and sweep lane are included; tuned edit params and public evidence are still required before promotion. |
-| Falcon-H1R 7B causal LM | `community_experimental` | `tiiuae/Falcon-H1R-7B` | Pilot preset, calibration config, and sweep lane are included; tuned edit params and public evidence are still required before promotion. |
+| Ministral 3 3B causal LM (text-only eval) | `published_basis` | `mistralai/Ministral-3-3B-Instruct-2512-BF16` | Public release-profile container-backed evidence fixture is included. |
+| Granite 4.1 3B causal LM | `published_basis` | `ibm-granite/granite-4.1-3b` | Public release-profile container-backed evidence fixture is included. |
+| Granite 4.1 8B causal LM | `published_basis` | `ibm-granite/granite-4.1-8b` | Public release-profile container-backed evidence fixture is included. |
+| Gemma 4 12B any-to-any LM | `community_experimental` | `google/gemma-4-12B-it` | Pilot `vision_text` preset, sweep lane, and Gemma 4 unified loader tests are included; live evidence remains blocked until the CUDA runtime supports `gemma4_unified` / `Gemma4UnifiedForConditionalGeneration`. |
+| SmolLM3 3B causal LM | `community_experimental` | `HuggingFaceTB/SmolLM3-3B` | Pilot preset, calibration config, and sweep lane are included; release-profile evidence is blocked by guard overhead (+1.11% > +1.0%). |
+| Phi-4 mini causal LM | `community_experimental` | `microsoft/Phi-4-mini-instruct` | Pilot preset, calibration config, sweep lane, and a built-in Phi3 loader hint are included; release-profile evidence is blocked by no-op spectral cap violations. |
+| Falcon-H1R 7B causal LM | `community_experimental` | `tiiuae/Falcon-H1R-7B` | Pilot preset, calibration config, and sweep lane are included; release-profile evidence is blocked by `ADAPTER-STRUCTURE-INVALID` (`no matching HF causal adapter spec`). |
 | Seq2Seq / local pairs | `community_experimental` | `t5-small`, `facebook/bart-base` | Generic seq2seq lane without a published-basis claim. |
 
 ## Implemented Coverage

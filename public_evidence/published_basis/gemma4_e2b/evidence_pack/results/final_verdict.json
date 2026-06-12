@@ -1,0 +1,9 @@
+{
+  "assurance": "strict",
+  "basis": "public_evidence/published_basis/gemma4_e2b/evaluation.report.json",
+  "evidence_run": "20260612TgemmaTextScopeReleaseB",
+  "model_id": "google/gemma-4-E2B-it",
+  "note": "Container-backed release-profile Gemma 4 E2B text-only published-basis evidence run. The remote checkout was manually synced from the work/evidence-sweep-stabilization worktree before launch; synced file hashes are recorded in source_repo.json.",
+  "profile": "release",
+  "verdict": "PASS"
+}
