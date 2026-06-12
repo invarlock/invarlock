@@ -3,23 +3,25 @@
     "artifact_package": "artifact_package",
     "guard_value_manifest": "guard_value_manifest.json",
     "guard_value_summary": "guard_value_summary.json",
+    "probe_sweep": "artifact_package/reports/guard_value_probe_sweep.json",
     "run_command": "run_command.txt"
   },
   "evidence_class": "real_guard_value_demo",
-  "generated_by": "scripts/evidence_packs/run_pack.sh driving invarlock evaluate scenario tasks",
+  "generated_by": "manual no-calibration guard-value probe sweep using invarlock evaluate via scripts/evidence_packs/python/task_tools.py and task_evaluate_error",
   "model_family": "mistral_7b",
   "model_revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",
   "non_goals": [
     "This is real scenario evidence from Mistral-7B, not a synthetic caught-regression fixture.",
-    "The FP8 stress scenario is retained as a historical sentinel, not a current baseline-relative guard-value proof: its two spectral caps match the noop basis.",
-    "The two fault-injection scenarios are expected failures and are used to demonstrate detection-path behavior, not acceptable model edits.",
+    "The flagship claim is an evidence-pack guard-value claim: PM-only accepts, while a baseline-relative spectral guard-value detector records a new cap.",
+    "The selected report does not mean every spectral cap is a failure under the stock runtime budget; it proves the evidence-pack PM+guard comparison can detect a PM-passing targeted regression relative to noop.",
+    "The FP8 stress report remains historical context because its caps match the noop basis and are not counted as baseline-relative proof.",
     "Reports were generated with report assurance, so verifier commands use --assurance report rather than --assurance strict."
   ],
   "profile": "release/report-assurance",
   "schema": "invarlock.public_evidence.meta.v1",
-  "summary": "Real Mistral-7B scenario pack retaining a PM-accepted FP8 sentinel whose spectral caps match the noop basis; stronger paired fault-injection reports show spectral detection paths but are not PM-passing guard-value proofs.",
+  "summary": "Real Mistral-7B baseline-relative guard-value demo: a near-cap FFN target at scale 1.12 passes PM while adding a new spectral cap relative to the published noop basis.",
   "verifier_commands": [
-    "uv run invarlock verify public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/fp8_e5m2_stress/run_2/evaluation.report.json --profile release --assurance report",
-    "uv run pytest tests/ci/test_golden_runs_offline.py::test_real_guard_value_demo_marks_fp8_as_historical_sentinel"
+    "uv run invarlock verify public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json --profile release --assurance report",
+    "uv run pytest tests/ci/test_golden_runs_offline.py::test_real_guard_value_demo_publishes_baseline_relative_spectral_catch"
   ]
 }

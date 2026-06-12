@@ -1,27 +1,7 @@
-INVARLOCK EVIDENCE PACK — FINAL VERDICT
-Verdict: PASS
-Scenarios manifest: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/state/scenarios.json
-
-COUNTS:
-  Clean: 0/0 PASS
-  Stress: 0/1 FAIL (expected for stress probes)
-  Catastrophic-required stress: 0/0 FAIL
-  Error injection detected: 2/2
-  Informational stress signaled: 0/0
-  Primary-guard-required hits: 1/1
-
-CATEGORY SUMMARY:
-  clean: scenarios=0 reports=0 pm_fail=0 inv_fail/warn=0/0 any_flag=0
-  stress: scenarios=1 reports=1 pm_fail=0 inv_fail/warn=0/0 any_flag=0
-  error_injection: scenarios=2 reports=2 pm_fail=2 inv_fail/warn=0/0 any_flag=2
-
-GUARD SIGNALS (flagged / unique):
-  invariants: 0/0
-  spectral: 0/0
-  rmt: 0/0
-  variance: 0/0
-  primary_metric: 2/2
-
-GUARD INTERVENTIONS (flagged / unique):
-  spectral_caps: 3/3
-  ve_signal: 0/0
+VERDICT: PASS
+Models: 1
+Records: 5
+Primary-guard-required hits: 1/1
+Selected guard-value proof: spectral_moderate_scale_mlp_l31_up_s112
+PM-only accepts: ratio_vs_baseline=1.0076338080085065
+PM+guards detects: new baseline-relative FFN cap model.layers.31.mlp.up_proj

@@ -13,8 +13,8 @@
       "invariants_fail": 0,
       "invariants_warn": 0,
       "primary_metric_fail": 2,
-      "reports": 2,
-      "scenarios": 2
+      "reports": 4,
+      "scenarios": 4
     },
     "stress": {
       "any_flag": 0,
@@ -38,17 +38,17 @@
     "catastrophic_required_total": 0,
     "clean_pass": 0,
     "clean_total": 0,
-    "error_injection_detected": 2,
-    "error_injection_total": 2,
+    "error_injection_detected": 3,
+    "error_injection_total": 4,
     "informational_stress_fail": 0,
     "informational_stress_signaled": 0,
-    "informational_stress_total": 0,
+    "informational_stress_total": 1,
     "models_total": 1,
     "primary_guard_required_hits": 1,
     "primary_guard_required_records": 1,
     "primary_guard_required_scenarios": 1,
     "primary_guard_required_scenarios_hit": 1,
-    "records_total": 3,
+    "records_total": 5,
     "stress_fail": 0,
     "stress_total": 1
   },
@@ -61,11 +61,11 @@
   },
   "failed_requirements": [],
   "guard_intervention_summary": {
-    "records_total": 3,
+    "records_total": 5,
     "signals": {
       "spectral_caps": {
-        "flagged": 3,
-        "unique": 3
+        "flagged": 5,
+        "unique": 5
       },
       "ve_signal": {
         "flagged": 0,
@@ -74,7 +74,7 @@
     }
   },
   "guard_signal_summary": {
-    "records_total": 3,
+    "records_total": 5,
     "signals": {
       "invariants": {
         "flagged": 0,
@@ -99,7 +99,7 @@
     }
   },
   "manifest": {
-    "path": "/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/state/scenarios.json",
+    "path": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d/state/scenarios.json",
     "schema": "evidence_pack_scenarios_v1",
     "schema_version": 1
   },
@@ -108,85 +108,89 @@
   },
   "records": [
     {
-      "any_core_guard_flag": true,
-      "category": "error_injection",
-      "detectors": [
-        {
-          "expected": false,
-          "flag": "spectral_stable",
-          "kind": "validation_flag"
-        },
-        {
-          "expected": false,
-          "flag": "primary_metric_acceptable",
-          "kind": "validation_flag"
-        },
-        {
-          "expected": true,
-          "field": "degraded",
-          "kind": "primary_metric"
-        }
-      ],
+      "any_core_guard_flag": false,
+      "category": "stress",
+      "detectors": [],
       "detectors_all_of": [],
       "detectors_hit": true,
-      "failure_class": "spectral.rank_collapse",
-      "family": "",
+      "failure_class": "stress_edit.fp8_quant",
+      "family": "fp8",
+      "guard_baseline_relative": {
+        "spectral": {
+          "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+          "baseline_spectral_caps_applied": 2,
+          "delta_caps_applied": 0,
+          "matching_capped_modules": [
+            {
+              "family": "attn",
+              "module": "model.layers.0.self_attn.k_proj"
+            },
+            {
+              "family": "attn",
+              "module": "model.layers.0.self_attn.q_proj"
+            }
+          ],
+          "new_capped_modules": [],
+          "new_caps_applied": 0,
+          "subject_spectral_caps_applied": 2
+        }
+      },
       "guard_flags": {
-        "drift": true,
+        "drift": false,
         "invariants": false,
         "invariants_fail": false,
         "invariants_warn": false,
         "overhead": false,
-        "primary_metric": true,
+        "primary_metric": false,
         "rmt": false,
         "spectral": false,
         "variance": false
       },
-      "intent": "fault_detection",
+      "intent": "historical_sentinel",
       "invariants_status": "pass",
       "model": "mistralai__mistral-7b-v01",
-      "name": "rank_collapse",
-      "passed": false,
-      "path": "/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/reports/errors/rank_collapse/evaluation.report.json",
+      "name": "fp8_e5m2_stress",
+      "passed": true,
+      "path": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/fp8_e5m2_stress/run_2/evaluation.report.json",
       "primary_guard": "spectral",
-      "primary_guard_hit": true,
+      "primary_guard_baseline_relative_required": false,
+      "primary_guard_hit": false,
       "primary_guard_required": false,
-      "reasons": [
-        "primary_metric_fail",
-        "drift_fail"
-      ],
-      "run_num": 0,
-      "spectral_caps_applied": 4,
-      "strictness": "must_detect"
+      "reasons": [],
+      "run_num": 2,
+      "spectral_baseline_relative": {
+        "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+        "baseline_spectral_caps_applied": 2,
+        "delta_caps_applied": 0,
+        "matching_capped_modules": [
+          {
+            "family": "attn",
+            "module": "model.layers.0.self_attn.k_proj"
+          },
+          {
+            "family": "attn",
+            "module": "model.layers.0.self_attn.q_proj"
+          }
+        ],
+        "new_capped_modules": [],
+        "new_caps_applied": 0,
+        "subject_spectral_caps_applied": 2
+      },
+      "spectral_baseline_relative_required": false,
+      "spectral_caps_applied": 2,
+      "strictness": "informational"
     },
     {
       "any_core_guard_flag": true,
       "category": "error_injection",
-      "detectors": [
-        {
-          "kind": "spectral_caps_applied",
-          "min": 1
-        },
-        {
-          "expected": false,
-          "flag": "spectral_stable",
-          "kind": "validation_flag"
-        },
-        {
-          "expected": false,
-          "flag": "primary_metric_acceptable",
-          "kind": "validation_flag"
-        },
-        {
-          "expected": true,
-          "field": "degraded",
-          "kind": "primary_metric"
-        }
-      ],
+      "detectors": [],
       "detectors_all_of": [],
       "detectors_hit": true,
       "failure_class": "structural.scale_explosion",
       "family": "",
+      "guard_baseline_relative": {
+        "spectral": null
+      },
       "guard_flags": {
         "drift": false,
         "invariants": false,
@@ -203,35 +207,94 @@
       "model": "mistralai__mistral-7b-v01",
       "name": "scale_explosion",
       "passed": false,
-      "path": "/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/reports/errors/scale_explosion/evaluation.report.json",
+      "path": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/scale_explosion/evaluation.report.json",
       "primary_guard": "spectral",
+      "primary_guard_baseline_relative_required": false,
       "primary_guard_hit": true,
       "primary_guard_required": false,
       "reasons": [
         "primary_metric_fail"
       ],
       "run_num": 0,
+      "spectral_baseline_relative": null,
+      "spectral_baseline_relative_required": false,
       "spectral_caps_applied": 3,
       "strictness": "must_detect"
     },
     {
-      "any_core_guard_flag": false,
-      "category": "stress",
+      "any_core_guard_flag": true,
+      "category": "error_injection",
       "detectors": [],
-      "detectors_all_of": [
-        {
-          "expected": true,
-          "flag": "primary_metric_acceptable",
-          "kind": "validation_flag"
-        },
-        {
-          "kind": "spectral_caps_applied",
-          "min": 1
-        }
-      ],
+      "detectors_all_of": [],
       "detectors_hit": true,
-      "failure_class": "stress_edit.fp8_quant",
-      "family": "fp8",
+      "failure_class": "spectral.rank_collapse",
+      "family": "",
+      "guard_baseline_relative": {
+        "spectral": null
+      },
+      "guard_flags": {
+        "drift": true,
+        "invariants": false,
+        "invariants_fail": false,
+        "invariants_warn": false,
+        "overhead": false,
+        "primary_metric": true,
+        "rmt": false,
+        "spectral": false,
+        "variance": false
+      },
+      "intent": "fault_detection",
+      "invariants_status": "pass",
+      "model": "mistralai__mistral-7b-v01",
+      "name": "rank_collapse",
+      "passed": false,
+      "path": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/rank_collapse/evaluation.report.json",
+      "primary_guard": "spectral",
+      "primary_guard_baseline_relative_required": false,
+      "primary_guard_hit": true,
+      "primary_guard_required": false,
+      "reasons": [
+        "primary_metric_fail"
+      ],
+      "run_num": 0,
+      "spectral_baseline_relative": null,
+      "spectral_baseline_relative_required": false,
+      "spectral_caps_applied": 4,
+      "strictness": "must_detect"
+    },
+    {
+      "any_core_guard_flag": false,
+      "category": "error_injection",
+      "detectors": [],
+      "detectors_all_of": [],
+      "detectors_hit": true,
+      "failure_class": "spectral.targeted_mlp_scale",
+      "family": "",
+      "guard_baseline_relative": {
+        "spectral": {
+          "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+          "baseline_spectral_caps_applied": 2,
+          "delta_caps_applied": 1,
+          "matching_capped_modules": [
+            {
+              "family": "attn",
+              "module": "model.layers.0.self_attn.k_proj"
+            },
+            {
+              "family": "attn",
+              "module": "model.layers.0.self_attn.q_proj"
+            }
+          ],
+          "new_capped_modules": [
+            {
+              "family": "ffn",
+              "module": "model.layers.31.mlp.up_proj"
+            }
+          ],
+          "new_caps_applied": 1,
+          "subject_spectral_caps_applied": 3
+        }
+      },
       "guard_flags": {
         "drift": false,
         "invariants": false,
@@ -246,16 +309,114 @@
       "intent": "subtle_detectable",
       "invariants_status": "pass",
       "model": "mistralai__mistral-7b-v01",
-      "name": "fp8_e5m2_stress",
+      "name": "spectral_moderate_scale_mlp_l31_up_s112",
       "passed": true,
-      "path": "/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/reports/fp8_e5m2_stress/run_2/evaluation.report.json",
+      "path": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json",
       "primary_guard": "spectral",
+      "primary_guard_baseline_relative_required": true,
       "primary_guard_hit": true,
       "primary_guard_required": true,
       "reasons": [],
-      "run_num": 2,
-      "spectral_caps_applied": 2,
+      "run_num": 0,
+      "spectral_baseline_relative": {
+        "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+        "baseline_spectral_caps_applied": 2,
+        "delta_caps_applied": 1,
+        "matching_capped_modules": [
+          {
+            "family": "attn",
+            "module": "model.layers.0.self_attn.k_proj"
+          },
+          {
+            "family": "attn",
+            "module": "model.layers.0.self_attn.q_proj"
+          }
+        ],
+        "new_capped_modules": [
+          {
+            "family": "ffn",
+            "module": "model.layers.31.mlp.up_proj"
+          }
+        ],
+        "new_caps_applied": 1,
+        "subject_spectral_caps_applied": 3
+      },
+      "spectral_baseline_relative_required": true,
+      "spectral_caps_applied": 3,
       "strictness": "must_detect"
+    },
+    {
+      "any_core_guard_flag": false,
+      "category": "error_injection",
+      "detectors": [],
+      "detectors_all_of": [],
+      "detectors_hit": true,
+      "failure_class": "spectral.targeted_attn_scale",
+      "family": "",
+      "guard_baseline_relative": {
+        "spectral": {
+          "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+          "baseline_spectral_caps_applied": 2,
+          "delta_caps_applied": 0,
+          "matching_capped_modules": [
+            {
+              "family": "attn",
+              "module": "model.layers.0.self_attn.k_proj"
+            },
+            {
+              "family": "attn",
+              "module": "model.layers.0.self_attn.q_proj"
+            }
+          ],
+          "new_capped_modules": [],
+          "new_caps_applied": 0,
+          "subject_spectral_caps_applied": 2
+        }
+      },
+      "guard_flags": {
+        "drift": false,
+        "invariants": false,
+        "invariants_fail": false,
+        "invariants_warn": false,
+        "overhead": false,
+        "primary_metric": false,
+        "rmt": false,
+        "spectral": false,
+        "variance": false
+      },
+      "intent": "negative_control",
+      "invariants_status": "pass",
+      "model": "mistralai__mistral-7b-v01",
+      "name": "spectral_moderate_scale_attn_l31_o_s112",
+      "passed": true,
+      "path": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json",
+      "primary_guard": "spectral",
+      "primary_guard_baseline_relative_required": false,
+      "primary_guard_hit": false,
+      "primary_guard_required": false,
+      "reasons": [],
+      "run_num": 0,
+      "spectral_baseline_relative": {
+        "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+        "baseline_spectral_caps_applied": 2,
+        "delta_caps_applied": 0,
+        "matching_capped_modules": [
+          {
+            "family": "attn",
+            "module": "model.layers.0.self_attn.k_proj"
+          },
+          {
+            "family": "attn",
+            "module": "model.layers.0.self_attn.q_proj"
+          }
+        ],
+        "new_capped_modules": [],
+        "new_caps_applied": 0,
+        "subject_spectral_caps_applied": 2
+      },
+      "spectral_baseline_relative_required": false,
+      "spectral_caps_applied": 2,
+      "strictness": "informational"
     }
   ],
   "scenario_signal_summary": [
@@ -264,11 +425,25 @@
       "detector_hits": 1,
       "failed": 0,
       "id": "fp8_e5m2_stress",
-      "intent": "subtle_detectable",
+      "intent": "historical_sentinel",
       "passed": 1,
       "primary_guard": "spectral",
+      "primary_guard_hits": 0,
+      "primary_guard_required": false,
+      "reports": 1,
+      "signaled": 0,
+      "strictness": "informational"
+    },
+    {
+      "category": "error_injection",
+      "detector_hits": 1,
+      "failed": 1,
+      "id": "scale_explosion",
+      "intent": "fault_detection",
+      "passed": 0,
+      "primary_guard": "spectral",
       "primary_guard_hits": 1,
-      "primary_guard_required": true,
+      "primary_guard_required": false,
       "reports": 1,
       "signaled": 1,
       "strictness": "must_detect"
@@ -290,18 +465,32 @@
     {
       "category": "error_injection",
       "detector_hits": 1,
-      "failed": 1,
-      "id": "scale_explosion",
-      "intent": "fault_detection",
-      "passed": 0,
+      "failed": 0,
+      "id": "spectral_moderate_scale_mlp_l31_up_s112",
+      "intent": "subtle_detectable",
+      "passed": 1,
       "primary_guard": "spectral",
       "primary_guard_hits": 1,
-      "primary_guard_required": false,
+      "primary_guard_required": true,
       "reports": 1,
       "signaled": 1,
       "strictness": "must_detect"
+    },
+    {
+      "category": "error_injection",
+      "detector_hits": 1,
+      "failed": 0,
+      "id": "spectral_moderate_scale_attn_l31_o_s112",
+      "intent": "negative_control",
+      "passed": 1,
+      "primary_guard": "spectral",
+      "primary_guard_hits": 0,
+      "primary_guard_required": false,
+      "reports": 1,
+      "signaled": 0,
+      "strictness": "informational"
     }
   ],
-  "timestamp": "2026-06-12T07:25:12.349480",
+  "timestamp": "2026-06-12T15:48:45Z",
   "verdict": "PASS"
 }

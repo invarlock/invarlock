@@ -184,22 +184,26 @@ from the fixture-only caught regressions:
 
 ```bash
 invarlock verify --profile release --assurance report \
-  public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/fp8_e5m2_stress/run_2/evaluation.report.json
+  public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json
 ```
 
-Expected outcome: verification passes for the FP8 report itself. The packaged
-`guard_value_summary.json` now treats this as historical scenario evidence, not
-as current baseline-relative guard-value proof: the primary metric accepts
-`fp8_e5m2_stress` (`ratio_vs_baseline = 1.0248910150012365`), but the two
-spectral caps match the Mistral noop basis. The same artifact includes
-`scale_explosion` and `rank_collapse` expected-failure reports from the same GPU
-run to show stronger spectral detection paths, but those faults also fail the
-primary metric.
+Expected outcome: verification passes for the selected report itself. The
+packaged `guard_value_summary.json` records the guard-value comparison:
+PM-only accepts `spectral_moderate_scale_mlp_l31_up_s112`
+(`ratio_vs_baseline = 1.0076338080085065`), while the evidence-pack PM+guards
+comparison finds one new spectral cap relative to the Mistral noop basis:
+`model.layers.31.mlp.up_proj`.
+
+The same artifact includes `spectral_moderate_scale_attn_l31_o_s112` as a
+negative control: the same 1.12x scale on the closest non-baseline attention
+module passes PM and does not add a new baseline-relative cap. The compact sweep
+summary records adjacent scale points showing that the attention target starts
+triggering at 1.18 and the FFN target remains PM-accepted through 1.20.
 
 This is not a strict spectral-failure example: `validation.spectral_stable`
-remains true because the spectral cap budget is not exceeded. Future
-guard-value evidence-pack scenarios use baseline-relative guard detectors so
-baseline-only guard signals do not count as new guard catches.
+remains true because the spectral cap budget is not exceeded. It is an
+evidence-pack guard-value demonstration: baseline-only guard signals do not count
+as new guard catches, but a PM-passing run that adds a new capped module does.
 
 ## Policy failures
 

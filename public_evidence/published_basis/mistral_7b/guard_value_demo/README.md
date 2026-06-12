@@ -1,7 +1,9 @@
 # Mistral 7B Guard-Value Demo
 
-This artifact packages a real scenario subset run for `mistralai/Mistral-7B-v0.1` on the remote CUDA runner `root@86.38.238.232`.
+This artifact packages a real, no-calibration guard-value probe sweep for `mistralai/Mistral-7B-v0.1` on the remote CUDA runner `root@86.38.238.232`.
 
-The FP8 comparison is retained as historical scenario evidence: the primary metric alone accepts `fp8_e5m2_stress` (`validation.primary_metric_acceptable = true`, `ratio_vs_baseline = 1.0248910150012365`), and the original scenario contract recorded `spectral.caps_applied = 2`. A baseline comparison shows those two caps are the same Mistral attention outliers already present in the noop basis, so this FP8 run is not counted as current baseline-relative guard-value proof.
+The active flagship comparison is `spectral_moderate_scale_mlp_l31_up_s112`: a targeted 1.12x scale of `model.layers.31.mlp.up_proj`, selected because the published noop basis showed it was the closest non-baseline FFN module to its spectral cap. PM-only accepts the run (`validation.primary_metric_acceptable = true`, `ratio_vs_baseline = 1.0076338080085065`), while the evidence-pack PM+guards comparison records one new baseline-relative FFN cap.
 
-Scope note: this is a real scenario pack and a useful sentinel, not a strict report-failure demo and not a current flagship guard-value proof. The same run also includes `scale_explosion` and `rank_collapse` expected-failure reports that show stronger spectral detection paths, but those faults also fail the primary metric.
+The package also includes `spectral_moderate_scale_attn_l31_o_s112` as a negative control: the same 1.12x scale on the closest non-baseline attention module passes PM but does not add a new cap. The compact sweep summary records adjacent scale points showing the attention target starts triggering at 1.18 and the FFN target remains PM-accepted through 1.20.
+
+Scope note: this is an evidence-pack guard-value demonstration, not a claim that every stock runtime spectral cap is an automatic release failure. The older FP8, scale-explosion, and rank-collapse reports remain as historical/detection-path context; the current baseline-relative proof is the lower-dose FFN probe.

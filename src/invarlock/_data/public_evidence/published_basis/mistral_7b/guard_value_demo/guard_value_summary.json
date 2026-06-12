@@ -1,100 +1,153 @@
 {
   "final_verdict": {
-    "contract_scope": "historical_subject_only_spectral_cap_detector",
+    "contract_scope": "baseline_relative_spectral_guard_value_probe",
     "counts": {
-      "catastrophic_required_fail": 0,
-      "catastrophic_required_present": 0,
-      "catastrophic_required_total": 0,
       "clean_pass": 0,
       "clean_total": 0,
-      "error_injection_detected": 2,
-      "error_injection_total": 2,
-      "informational_stress_fail": 0,
-      "informational_stress_signaled": 0,
-      "informational_stress_total": 0,
+      "error_injection_detected": 3,
+      "error_injection_total": 4,
       "models_total": 1,
       "primary_guard_required_hits": 1,
       "primary_guard_required_records": 1,
       "primary_guard_required_scenarios": 1,
       "primary_guard_required_scenarios_hit": 1,
-      "records_total": 3,
+      "records_total": 5,
       "stress_fail": 0,
       "stress_total": 1
     },
-    "current_contract_reason": "The packaged FP8 stress run records the same two attention-family spectral caps as the Mistral noop basis; current guard-value evidence requires a new guard signal relative to baseline.",
-    "current_contract_verdict": "not_a_baseline_relative_guard_value_proof",
+    "current_contract_reason": "The selected FFN 1.12 run adds a new capped module relative to the published Mistral noop basis while validation.primary_metric_acceptable remains true.",
+    "current_contract_verdict": "baseline_relative_guard_value_proof",
     "failed_requirements": [],
     "report": "artifact_package/reports/final_verdict.json",
     "verdict": "PASS"
   },
-  "generated_at_utc": "2026-06-12T07:25:12.349480",
-  "pm_only_vs_pm_plus_guards": {
-    "baseline_relative_guard_hit": false,
-    "baseline_relative_issue": {
+  "generated_at_utc": "2026-06-12T15:48:45Z",
+  "negative_control": {
+    "baseline_relative_evidence": {
       "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
       "baseline_spectral_caps_applied": 2,
       "delta_caps_applied": 0,
       "matching_capped_modules": [
-        "model.layers.0.self_attn.q_proj",
-        "model.layers.0.self_attn.k_proj"
+        {
+          "family": "attn",
+          "module": "model.layers.0.self_attn.k_proj"
+        },
+        {
+          "family": "attn",
+          "module": "model.layers.0.self_attn.q_proj"
+        }
       ],
+      "new_capped_modules": [],
       "new_caps_applied": 0,
       "subject_spectral_caps_applied": 2
     },
-    "drift_band": {
-      "max": 1.086,
-      "min": 0.8878
-    },
-    "historical_primary_guard_hit": true,
-    "pm_only_basis": "validation.primary_metric_acceptable is true and ratio_vs_baseline remains inside the release drift band.",
-    "pm_only_verdict": "accept",
-    "pm_plus_guards_basis": "Not accepted under the current baseline-relative guard-value contract: the two spectral caps in this FP8 report match the Mistral noop basis, with no new capped module or cap-count increase shown by the packaged evidence.",
-    "pm_plus_guards_verdict": "not_proven_baseline_relative",
-    "primary_guard_hit": false,
-    "primary_guard_required": true,
+    "baseline_relative_guard_hit": false,
     "primary_metric_acceptable": true,
     "primary_metric_display_ci": [
-      1.0215452269419114,
-      1.0286202336678327
+      0.9992408037326699,
+      1.0003945872681685
     ],
-    "ratio_vs_baseline": 1.0248910150012365,
-    "report": "artifact_package/reports/fp8_e5m2_stress/run_2/evaluation.report.json",
-    "runtime_manifest": "artifact_package/reports/fp8_e5m2_stress/run_2/runtime.manifest.json",
-    "scenario_id": "fp8_e5m2_stress",
+    "ratio_vs_baseline": 0.9997699255693849,
+    "report": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json",
+    "runtime_manifest": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/runtime.manifest.json",
+    "scenario_id": "spectral_moderate_scale_attn_l31_o_s112",
     "spectral_caps_applied": 2,
     "spectral_caps_applied_by_family": {
       "attn": 2,
       "embed": 0,
       "ffn": 0,
       "other": 0
+    }
+  },
+  "pm_only_vs_pm_plus_guards": {
+    "baseline_relative_evidence": {
+      "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+      "baseline_spectral_caps_applied": 2,
+      "delta_caps_applied": 1,
+      "matching_capped_modules": [
+        {
+          "family": "attn",
+          "module": "model.layers.0.self_attn.k_proj"
+        },
+        {
+          "family": "attn",
+          "module": "model.layers.0.self_attn.q_proj"
+        }
+      ],
+      "new_capped_modules": [
+        {
+          "family": "ffn",
+          "module": "model.layers.31.mlp.up_proj"
+        }
+      ],
+      "new_caps_applied": 1,
+      "subject_spectral_caps_applied": 3
+    },
+    "baseline_relative_guard_hit": true,
+    "drift_band": {
+      "max": 1.086,
+      "min": 0.8878
+    },
+    "pm_only_basis": "validation.primary_metric_acceptable is true and ratio_vs_baseline remains inside the release drift band.",
+    "pm_only_verdict": "accept",
+    "pm_plus_guards_basis": "The evidence-pack guard-value policy checks for a new spectral cap relative to the published noop basis; the selected run adds model.layers.31.mlp.up_proj.",
+    "pm_plus_guards_verdict": "guard_value_detect",
+    "primary_guard_required": true,
+    "primary_metric_acceptable": true,
+    "primary_metric_display_ci": [
+      1.0063709519235169,
+      1.0086911227573168
+    ],
+    "ratio_vs_baseline": 1.0076338080085065,
+    "report": "artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json",
+    "runtime_manifest": "artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/runtime.manifest.json",
+    "scenario_id": "spectral_moderate_scale_mlp_l31_up_s112",
+    "spectral_caps_applied": 3,
+    "spectral_caps_applied_by_family": {
+      "attn": 2,
+      "embed": 0,
+      "ffn": 1,
+      "other": 0
     },
     "spectral_stable": true,
     "strictness": "must_detect"
   },
+  "probe_sweep": {
+    "negative_control": "Attention layer31 o_proj at scale 1.12 passes PM and does not add a new cap; attention triggers at 1.18.",
+    "positive_boundary": "FFN layer31 up_proj triggers at scale 1.12 with PM ratio 1.0076.",
+    "records_total": 6,
+    "report": "artifact_package/reports/guard_value_probe_sweep.json"
+  },
   "scenario_evidence": [
     {
-      "baseline_relative_guard_hit": false,
-      "baseline_relative_issue": {
+      "baseline_relative_evidence": {
         "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
         "baseline_spectral_caps_applied": 2,
         "delta_caps_applied": 0,
         "matching_capped_modules": [
-          "model.layers.0.self_attn.q_proj",
-          "model.layers.0.self_attn.k_proj"
+          {
+            "family": "attn",
+            "module": "model.layers.0.self_attn.k_proj"
+          },
+          {
+            "family": "attn",
+            "module": "model.layers.0.self_attn.q_proj"
+          }
         ],
+        "new_capped_modules": [],
         "new_caps_applied": 0,
         "subject_spectral_caps_applied": 2
       },
+      "baseline_relative_guard_hit": false,
       "category": "stress",
-      "detectors_hit": false,
+      "detectors_hit": true,
       "failure_class": "stress_edit.fp8_quant",
-      "historical_detectors_hit": true,
-      "historical_primary_guard_hit": true,
-      "intent": "subtle_detectable",
+      "intent": "historical_sentinel",
       "invariants_pass": true,
       "passed": true,
       "primary_guard": "spectral",
       "primary_guard_hit": false,
+      "primary_guard_required": false,
       "primary_metric_acceptable": true,
       "primary_metric_display_ci": [
         1.0215452269419114,
@@ -114,9 +167,11 @@
         "other": 0
       },
       "spectral_stable": true,
-      "strictness": "must_detect"
+      "strictness": "informational"
     },
     {
+      "baseline_relative_evidence": null,
+      "baseline_relative_guard_hit": null,
       "category": "error_injection",
       "detectors_hit": true,
       "failure_class": "structural.scale_explosion",
@@ -125,6 +180,7 @@
       "passed": false,
       "primary_guard": "spectral",
       "primary_guard_hit": true,
+      "primary_guard_required": false,
       "primary_metric_acceptable": false,
       "primary_metric_display_ci": [
         229.9131062731975,
@@ -149,6 +205,8 @@
       "strictness": "must_detect"
     },
     {
+      "baseline_relative_evidence": null,
+      "baseline_relative_guard_hit": null,
       "category": "error_injection",
       "detectors_hit": true,
       "failure_class": "spectral.rank_collapse",
@@ -157,6 +215,7 @@
       "passed": false,
       "primary_guard": "spectral",
       "primary_guard_hit": true,
+      "primary_guard_required": false,
       "primary_metric_acceptable": false,
       "primary_metric_display_ci": [
         121.54857952092644,
@@ -164,8 +223,7 @@
       ],
       "ratio_vs_baseline": 134.5008598890587,
       "reasons": [
-        "primary_metric_fail",
-        "drift_fail"
+        "primary_metric_fail"
       ],
       "report": "artifact_package/reports/errors/rank_collapse/evaluation.report.json",
       "rmt_stable": true,
@@ -180,26 +238,135 @@
       },
       "spectral_stable": true,
       "strictness": "must_detect"
+    },
+    {
+      "baseline_relative_evidence": {
+        "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+        "baseline_spectral_caps_applied": 2,
+        "delta_caps_applied": 1,
+        "matching_capped_modules": [
+          {
+            "family": "attn",
+            "module": "model.layers.0.self_attn.k_proj"
+          },
+          {
+            "family": "attn",
+            "module": "model.layers.0.self_attn.q_proj"
+          }
+        ],
+        "new_capped_modules": [
+          {
+            "family": "ffn",
+            "module": "model.layers.31.mlp.up_proj"
+          }
+        ],
+        "new_caps_applied": 1,
+        "subject_spectral_caps_applied": 3
+      },
+      "baseline_relative_guard_hit": true,
+      "category": "error_injection",
+      "detectors_hit": true,
+      "failure_class": "spectral.targeted_mlp_scale",
+      "intent": "subtle_detectable",
+      "invariants_pass": true,
+      "passed": true,
+      "primary_guard": "spectral",
+      "primary_guard_hit": true,
+      "primary_guard_required": true,
+      "primary_metric_acceptable": true,
+      "primary_metric_display_ci": [
+        1.0063709519235169,
+        1.0086911227573168
+      ],
+      "ratio_vs_baseline": 1.0076338080085065,
+      "reasons": [],
+      "report": "artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json",
+      "rmt_stable": true,
+      "runtime_manifest": "artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/runtime.manifest.json",
+      "scenario_id": "spectral_moderate_scale_mlp_l31_up_s112",
+      "spectral_caps_applied": 3,
+      "spectral_caps_applied_by_family": {
+        "attn": 2,
+        "embed": 0,
+        "ffn": 1,
+        "other": 0
+      },
+      "spectral_stable": true,
+      "strictness": "must_detect"
+    },
+    {
+      "baseline_relative_evidence": {
+        "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+        "baseline_spectral_caps_applied": 2,
+        "delta_caps_applied": 0,
+        "matching_capped_modules": [
+          {
+            "family": "attn",
+            "module": "model.layers.0.self_attn.k_proj"
+          },
+          {
+            "family": "attn",
+            "module": "model.layers.0.self_attn.q_proj"
+          }
+        ],
+        "new_capped_modules": [],
+        "new_caps_applied": 0,
+        "subject_spectral_caps_applied": 2
+      },
+      "baseline_relative_guard_hit": false,
+      "category": "error_injection",
+      "detectors_hit": true,
+      "failure_class": "spectral.targeted_attn_scale",
+      "intent": "negative_control",
+      "invariants_pass": true,
+      "passed": true,
+      "primary_guard": "spectral",
+      "primary_guard_hit": false,
+      "primary_guard_required": false,
+      "primary_metric_acceptable": true,
+      "primary_metric_display_ci": [
+        0.9992408037326699,
+        1.0003945872681685
+      ],
+      "ratio_vs_baseline": 0.9997699255693849,
+      "reasons": [],
+      "report": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json",
+      "rmt_stable": true,
+      "runtime_manifest": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/runtime.manifest.json",
+      "scenario_id": "spectral_moderate_scale_attn_l31_o_s112",
+      "spectral_caps_applied": 2,
+      "spectral_caps_applied_by_family": {
+        "attn": 2,
+        "embed": 0,
+        "ffn": 0,
+        "other": 0
+      },
+      "spectral_stable": true,
+      "strictness": "informational"
     }
   ],
-  "schema": "invarlock.public_evidence.guard_value_demo.v1",
+  "schema": "invarlock.public_evidence.guard_value_demo.v2",
   "scope_boundaries": [
     "This is real scenario evidence from Mistral-7B, not a synthetic caught-regression fixture.",
-    "The FP8 stress scenario is retained as a historical sentinel, not a current baseline-relative guard-value proof: its two spectral caps match the noop basis.",
-    "The two fault-injection scenarios are expected failures and are used to demonstrate detection-path behavior, not acceptable model edits.",
+    "The flagship claim is an evidence-pack guard-value claim: PM-only accepts, while a baseline-relative spectral guard-value detector records a new cap.",
+    "The selected report does not mean every spectral cap is a failure under the stock runtime budget; it proves the evidence-pack PM+guard comparison can detect a PM-passing targeted regression relative to noop.",
+    "The FP8 stress report remains historical context because its caps match the noop basis and are not counted as baseline-relative proof.",
     "Reports were generated with report assurance, so verifier commands use --assurance report rather than --assurance strict."
   ],
   "source_run": {
     "host": "root@86.38.238.232",
     "model_id": "mistralai/Mistral-7B-v0.1",
     "model_revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",
-    "remote_output_root": "/root/evidence-pack-runs/mistral_guard_value_pack_20260612j",
+    "remote_output_root": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d",
     "scenario_ids": [
-      "fp8_e5m2_stress",
-      "scale_explosion",
-      "rank_collapse"
+      "spectral_moderate_scale_attn_l31_o_s112",
+      "spectral_moderate_scale_attn_l31_o_s118",
+      "spectral_moderate_scale_attn_l31_o_s125",
+      "spectral_moderate_scale_mlp_l31_up_s112",
+      "spectral_moderate_scale_mlp_l31_up_s116",
+      "spectral_moderate_scale_mlp_l31_up_s120"
     ],
-    "suite": "subset"
+    "suite": "manual_guard_value_probe"
   },
-  "summary": "Real Mistral-7B scenario pack: the FP8 stress lane is a PM-accepted historical sentinel whose spectral caps match the noop basis, while the stronger scale/rank fault injections show spectral detection paths but also fail PM."
+  "summary": "Real Mistral-7B guard-value probe sweep: near-cap spectral targets were selected from the noop basis, then evaluated with the existing 200-window PM baseline. The selected FFN 1.12 run passes PM while adding a new baseline-relative FFN spectral cap."
 }

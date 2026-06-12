@@ -102,9 +102,10 @@ route the run to exploratory/non-assurance review. See
 
 For a real model-run counterpart, inspect
 `public_evidence/published_basis/mistral_7b/guard_value_demo/guard_value_summary.json`.
-That artifact retains a Mistral 7B FP8 stress run where the primary metric
-passes, but the spectral caps match the noop basis. It is a historical
-evidence-pack sentinel, not current baseline-relative guard-value proof.
+That artifact includes a Mistral 7B targeted spectral probe where the primary
+metric passes, but the evidence-pack guard-value comparison records a new FFN
+spectral cap relative to the published noop basis. It also includes a matched
+attention 1.12x negative control that passes PM without adding a new cap.
 
 ## Development Fallback
 

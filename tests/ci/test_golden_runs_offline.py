@@ -235,7 +235,7 @@ def test_caught_regressions_show_pm_only_passes_but_guard_chain_rejects() -> Non
         assert result.outcome == VerifyOutcome.POLICY_FAIL
 
 
-def test_real_guard_value_demo_marks_fp8_as_historical_sentinel() -> None:
+def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> None:
     demo_dir = (
         REPO_ROOT
         / "public_evidence"
@@ -265,53 +265,86 @@ def test_real_guard_value_demo_marks_fp8_as_historical_sentinel() -> None:
     )
     assert final_verdict["verdict"] == "PASS"
     assert final_verdict["counts"]["primary_guard_required_hits"] == 1
-    assert final_verdict["counts"]["error_injection_detected"] == 2
+    assert final_verdict["counts"]["error_injection_detected"] == 3
     assert (
         summary["final_verdict"]["contract_scope"]
-        == "historical_subject_only_spectral_cap_detector"
+        == "baseline_relative_spectral_guard_value_probe"
     )
     assert (
         summary["final_verdict"]["current_contract_verdict"]
-        == "not_a_baseline_relative_guard_value_proof"
+        == "baseline_relative_guard_value_proof"
     )
-    log_entries = [
-        entry
-        for entry in manifest["files"]
-        if entry["path"].startswith("artifact_package/logs/")
-    ]
-    assert len(log_entries) == 19
+    manifest_paths = {entry["path"] for entry in manifest["files"]}
+    assert (
+        "artifact_package/logs/tasks/"
+        "manual_probe_spectral_moderate_scale_mlp_l31_up_s112.log"
+        in manifest_paths
+    )
+    assert (
+        "artifact_package/logs/tasks/"
+        "manual_probe_spectral_moderate_scale_attn_l31_o_s112.log"
+        in manifest_paths
+    )
     for entry in manifest["files"]:
         path = demo_dir / entry["path"]
         assert path.is_file(), entry["path"]
         assert hashlib.sha256(path.read_bytes()).hexdigest() == entry["sha256"]
 
     comparison = summary["pm_only_vs_pm_plus_guards"]
-    assert comparison["scenario_id"] == "fp8_e5m2_stress"
+    assert comparison["scenario_id"] == "spectral_moderate_scale_mlp_l31_up_s112"
     assert comparison["pm_only_verdict"] == "accept"
-    assert comparison["pm_plus_guards_verdict"] == "not_proven_baseline_relative"
+    assert comparison["pm_plus_guards_verdict"] == "guard_value_detect"
     assert comparison["primary_metric_acceptable"] is True
-    assert comparison["ratio_vs_baseline"] == 1.0248910150012365
-    assert comparison["spectral_caps_applied"] == 2
-    assert comparison["historical_primary_guard_hit"] is True
-    assert comparison["primary_guard_hit"] is False
-    assert comparison["baseline_relative_guard_hit"] is False
-    assert comparison["baseline_relative_issue"]["new_caps_applied"] == 0
-    assert comparison["baseline_relative_issue"]["delta_caps_applied"] == 0
+    assert comparison["ratio_vs_baseline"] == 1.0076338080085065
+    assert comparison["spectral_caps_applied"] == 3
+    assert comparison["baseline_relative_guard_hit"] is True
+    assert comparison["baseline_relative_evidence"]["new_caps_applied"] == 1
+    assert comparison["baseline_relative_evidence"]["delta_caps_applied"] == 1
+    assert comparison["baseline_relative_evidence"]["new_capped_modules"] == [
+        {"family": "ffn", "module": "model.layers.31.mlp.up_proj"}
+    ]
     assert comparison["primary_guard_required"] is True
     assert comparison["strictness"] == "must_detect"
 
-    fp8_report_path = demo_dir / comparison["report"]
-    fp8_report = json.loads(fp8_report_path.read_text(encoding="utf-8"))
-    assert validate_report(fp8_report) is True
-    assert fp8_report["validation"]["primary_metric_acceptable"] is True
-    assert fp8_report["spectral"]["caps_applied"] == 2
+    positive_report_path = demo_dir / comparison["report"]
+    positive_report = json.loads(positive_report_path.read_text(encoding="utf-8"))
+    assert validate_report(positive_report) is True
+    assert positive_report["validation"]["primary_metric_acceptable"] is True
+    assert positive_report["spectral"]["caps_applied"] == 3
+    assert positive_report["spectral"]["caps_applied_by_family"]["ffn"] == 1
 
     result = run_verify_reports(
-        [fp8_report_path],
+        [positive_report_path],
         profile="release",
         assurance_mode="report",
     )
     assert result.outcome == VerifyOutcome.OK
+
+    control = summary["negative_control"]
+    assert control["scenario_id"] == "spectral_moderate_scale_attn_l31_o_s112"
+    assert control["primary_metric_acceptable"] is True
+    assert control["baseline_relative_guard_hit"] is False
+    assert control["baseline_relative_evidence"]["new_caps_applied"] == 0
+    assert control["spectral_caps_applied"] == 2
+
+    sweep = json.loads(
+        (
+            demo_dir / "artifact_package" / "reports" / "guard_value_probe_sweep.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert sweep["method"]["calibration_rerun"] is False
+    assert sweep["method"]["baseline_eval_rerun"] is False
+    assert sweep["selected_positive"] == comparison["scenario_id"]
+    records = {record["scenario_id"]: record for record in sweep["records"]}
+    assert records["spectral_moderate_scale_mlp_l31_up_s112"][
+        "baseline_relative_guard"
+    ]["new_caps_applied"] == 1
+    assert records["spectral_moderate_scale_attn_l31_o_s112"][
+        "baseline_relative_guard"
+    ]["new_caps_applied"] == 0
+    assert records["spectral_moderate_scale_attn_l31_o_s118"][
+        "spectral_caps_applied"
+    ] == 3
 
     expected_failures = [
         demo_dir

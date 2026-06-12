@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-12T06:54:58Z",
+  "generated_at": "2026-06-12T14:02:42Z",
   "model_list": [
     "mistralai/Mistral-7B-v0.1"
   ],
@@ -7,7 +7,7 @@
     "mistralai/Mistral-7B-v0.1": {
       "gated": false,
       "private": false,
-      "resolved_at": "2026-06-12T06:54:59Z",
+      "resolved_at": "2026-06-12T14:02:42Z",
       "revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da"
     }
   },

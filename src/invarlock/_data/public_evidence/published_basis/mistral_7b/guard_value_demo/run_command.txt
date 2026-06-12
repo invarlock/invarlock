@@ -1,23 +1,16 @@
-cd /root/invarlock-public
-export PATH=/root/invarlock-public/.venv/bin:$PATH
-export PYTHONPATH=src
-export INVARLOCK_ALLOW_REMOTE_CODE=1
-export INVARLOCK_ALLOW_NETWORK=1
-export INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-local
-export INVARLOCK_CONTAINER_ENGINE=docker
-export HF_HOME=/root/.cache/huggingface
-export HF_HUB_DISABLE_XET=1
-export CUDA_VISIBLE_DEVICES=0,1
-export NUM_GPUS=2
-export GPU_ID_LIST=0,1
-export PACK_TUNED_EDIT_PARAMS_FILE=/root/invarlock-public/scripts/evidence_packs/tuned_edit_params.json
-export PACK_DEFER_REPORT_RENDERING=1
-export PACK_SKIP_HTML=1
-export PACK_SIGN_MANIFEST=0
-export PACK_REQUIRE_PASS=0
-export PACK_REQUIRE_RUNTIME_MANIFESTS=0
-export PACK_VERIFY_PROFILE=dev
-export PACK_REPORT_ASSURANCE=report
-export PACK_EVALUATE_ASSURANCE=off
-export PACK_CLEANUP_MODELS=1
-./scripts/evidence_packs/run_pack.sh --suite subset --models mistralai/Mistral-7B-v0.1 --net 1 --scenario-ids fp8_e5m2_stress,scale_explosion,rank_collapse --out /root/evidence-pack-runs/mistral_guard_value_pack_20260612j --pack-dir /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/evidence_pack
+Remote root: /root/evidence-pack-runs/mistral_guard_value_real_20260612d
+Baseline reused: mistralai__mistral-7b-v01/baseline_reports/ci_balanced_seq512_pv200_fn200/baseline_report.json
+
+Positive probe environment:
+  INVARLOCK_CERT_MIN_WINDOWS=200 PACK_EVALUATE_ASSURANCE=off PACK_DEFER_REPORT_RENDERING=1
+  INVARLOCK_SPECTRAL_SCALE_FACTOR=1.12
+  INVARLOCK_SPECTRAL_TARGET_FAMILY=mlp
+  INVARLOCK_SPECTRAL_TARGET_LAYERS=31
+  INVARLOCK_SPECTRAL_TARGET_PARAMS=up_proj
+  INVARLOCK_SPECTRAL_MAX_PARAMS=1
+  INVARLOCK_SPECTRAL_SEED=11
+
+Command shape:
+  .venv/bin/python scripts/evidence_packs/python/task_tools.py create-error-model "$BASE" "$OUT/$MODEL/models/error_$ERROR_TYPE" "$ERROR_TYPE"
+  source scripts/evidence_packs/lib/tasks/task_functions.sh
+  task_evaluate_error "$MODEL" "$GPU" "$ERROR_TYPE" "$OUT" "$LOG"
