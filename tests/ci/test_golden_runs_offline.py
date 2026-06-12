@@ -258,7 +258,21 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
 
     assert metadata["evidence_class"] == "real_guard_value_demo"
     assert "fixture" not in metadata["summary"].lower()
+    public_narrative = "\n".join(
+        [
+            (demo_dir / "README.md").read_text(encoding="utf-8"),
+            json.dumps(metadata, sort_keys=True),
+            json.dumps(summary, sort_keys=True),
+            json.dumps(manifest["source_run"], sort_keys=True),
+        ]
+    )
+    assert "root@86.38.238.232" not in public_narrative
+    assert "86.38.238.232" not in public_narrative
+    assert "The older FP8" not in public_narrative
+    assert "FP8 stress report remains historical context" not in public_narrative
     assert summary["source_run"]["model_id"] == "mistralai/Mistral-7B-v0.1"
+    assert summary["source_run"]["host"] == "self-hosted CUDA runner"
+    assert manifest["source_run"]["host"] == "self-hosted CUDA runner"
     assert (
         summary["source_run"]["model_revision"]
         == "27d67f1b5f57dc0953326b2601d68371d40ea8da"
@@ -354,6 +368,7 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
         "rmt_norm_noise_l31_ffn_up_b030",
         "ve_mlp_scale_skew_l31_down_s090",
     ]
+    assert all_guard["source_run"]["host"] == "self-hosted CUDA runner"
     assert all_guard["method"]["clean_confirmation_required"] is True
     assert (
         summary["all_guard_probe_sweep"]["guard_status"]["invariants"]

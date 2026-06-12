@@ -3,8 +3,8 @@
   "files": [
     {
       "path": "README.md",
-      "sha256": "4f70c317a8c4eff202dbacfa86736526f05daf8f99eaf0571f47a32c921890fd",
-      "size_bytes": 2014
+      "sha256": "f73399749a1a73e19cc028d803fbfbd6d96957e4c8ddeb9176884bb9025067b3",
+      "size_bytes": 1893
     },
     {
       "path": "artifact_package/logs/run_pack.log",
@@ -338,8 +338,8 @@
     },
     {
       "path": "artifact_package/reports/guard_value_all_guard_probe_sweep.json",
-      "sha256": "e1c13a3df63d2553a3eccd57539f3a34ab4b290d03507762520d580e41119dbe",
-      "size_bytes": 12799
+      "sha256": "dc64a6a9b508f24eed012f57b8252ea58a5405ff1ffb50e24d96726ada6b9d65",
+      "size_bytes": 12622
     },
     {
       "path": "artifact_package/reports/guard_value_probe_sweep.json",
@@ -368,13 +368,13 @@
     },
     {
       "path": "evidence.meta.json",
-      "sha256": "44ecd68c27bf9456992ae0070806a2fc2911ecfc0f83414f691531c9f51defe0",
-      "size_bytes": 2694
+      "sha256": "ca81888a72e771ed3d399f0dcdff94e77028a0473b752bd5c0117fe06f259a55",
+      "size_bytes": 2552
     },
     {
       "path": "guard_value_summary.json",
-      "sha256": "39aae22348d2ce565c297c37930341ab8f91343854fed3ab4dd2cda6833a74cf",
-      "size_bytes": 14751
+      "sha256": "beffbc3556ceb6f53f43dd4f85702b4c32391845cbc64783faf81238237faf65",
+      "size_bytes": 14614
     },
     {
       "path": "run_command.txt",
@@ -384,7 +384,7 @@
   ],
   "schema": "invarlock.public_evidence.guard_value_manifest.v2",
   "source_run": {
-    "host": "root@86.38.238.232",
+    "host": "self-hosted CUDA runner",
     "model_id": "mistralai/Mistral-7B-v0.1",
     "model_revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",
     "remote_output_root": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d",

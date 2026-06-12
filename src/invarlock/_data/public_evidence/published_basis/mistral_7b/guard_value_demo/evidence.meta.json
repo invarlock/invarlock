@@ -16,7 +16,6 @@
     "The all-guard extension publishes PM-pass, baseline-relative evidence for spectral, RMT, and variance/VE sidecar guards.",
     "Invariants are structural checks and are required to pass in these PM-pass guard-value cases; no invariant-fail PM-pass flagship case is claimed here.",
     "The selected reports do not mean every stock runtime cap or sidecar signal is an automatic release failure; they prove the evidence-pack PM+guard comparison can detect targeted regressions relative to noop.",
-    "The FP8 stress report remains historical context because its caps match the noop basis and are not counted as baseline-relative proof.",
     "Reports were generated with report assurance, so verifier commands use --assurance report rather than --assurance strict."
   ],
   "profile": "release/report-assurance",

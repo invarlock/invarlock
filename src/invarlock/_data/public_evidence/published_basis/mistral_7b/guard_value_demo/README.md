@@ -1,6 +1,6 @@
 # Mistral 7B Guard-Value Demo
 
-This artifact packages a real, no-calibration guard-value probe sweep for `mistralai/Mistral-7B-v0.1` on the remote CUDA runner `root@86.38.238.232`.
+This artifact packages a real, no-calibration guard-value probe sweep for `mistralai/Mistral-7B-v0.1` on a self-hosted CUDA runner.
 
 The active all-guard comparison is recorded in `artifact_package/reports/guard_value_all_guard_probe_sweep.json`. It publishes three PM-pass, baseline-relative guard-value cases:
 
@@ -10,4 +10,4 @@ The active all-guard comparison is recorded in `artifact_package/reports/guard_v
 
 The package also includes `spectral_moderate_scale_attn_l31_o_s112` as a negative control: the same 1.12x scale on the closest non-baseline attention module passes PM but does not add a new cap. The compact spectral sweep summary records adjacent scale points showing the attention target starts triggering at 1.18 and the FFN target remains PM-accepted through 1.20.
 
-Scope note: this is an evidence-pack guard-value demonstration, not a claim that every stock runtime cap or sidecar signal is an automatic release failure. Invariants are structural checks rather than near-threshold statistical guards; they are required to pass in these PM-pass guard-value cases, but this package does not claim a PM-pass invariant-fail flagship case. The older FP8, scale-explosion, and rank-collapse reports remain as historical/detection-path context.
+Scope note: this is an evidence-pack guard-value demonstration, not a claim that every stock runtime cap or sidecar signal is an automatic release failure. Invariants are structural checks rather than near-threshold statistical guards; they are required to pass in these PM-pass guard-value cases, but this package does not claim a PM-pass invariant-fail flagship case.

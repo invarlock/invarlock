@@ -367,11 +367,10 @@
     "The all-guard extension publishes PM-pass, baseline-relative evidence for spectral, RMT, and variance/VE sidecar guards.",
     "Invariants are structural checks and are required to pass in these PM-pass guard-value cases; no invariant-fail PM-pass flagship case is claimed here.",
     "The selected reports do not mean every stock runtime cap or sidecar signal is an automatic release failure; they prove the evidence-pack PM+guard comparison can detect targeted regressions relative to noop.",
-    "The FP8 stress report remains historical context because its caps match the noop basis and are not counted as baseline-relative proof.",
     "Reports were generated with report assurance, so verifier commands use --assurance report rather than --assurance strict."
   ],
   "source_run": {
-    "host": "root@86.38.238.232",
+    "host": "self-hosted CUDA runner",
     "model_id": "mistralai/Mistral-7B-v0.1",
     "model_revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",
     "remote_output_root": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d",
