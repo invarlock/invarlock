@@ -334,6 +334,63 @@ class _FalconForCausalLM(nn.Module):
         self.lm_head.weight = self.transformer.word_embeddings.weight
 
 
+class _FalconH1Attention(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.q_proj = nn.Linear(4, 4, bias=False)
+        self.k_proj = nn.Linear(4, 4, bias=False)
+        self.v_proj = nn.Linear(4, 4, bias=False)
+        self.o_proj = nn.Linear(4, 4, bias=False)
+
+
+class _FalconH1FeedForward(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.gate_proj = nn.Linear(4, 8, bias=False)
+        self.up_proj = nn.Linear(4, 8, bias=False)
+        self.down_proj = nn.Linear(8, 4, bias=False)
+
+
+class _FalconH1Mamba(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.in_proj = nn.Linear(4, 16, bias=False)
+        self.out_proj = nn.Linear(4, 4, bias=False)
+        self.conv1d = nn.Conv1d(4, 4, kernel_size=3)
+
+
+class _FalconH1Layer(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.feed_forward = _FalconH1FeedForward()
+        self.mamba = _FalconH1Mamba()
+        self.self_attn = _FalconH1Attention()
+        self.input_layernorm = nn.LayerNorm(4)
+        self.pre_ff_layernorm = nn.LayerNorm(4)
+
+
+class _FalconH1Model(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.layers = nn.ModuleList([_FalconH1Layer(), _FalconH1Layer()])
+        self.embed_tokens = nn.Embedding(16, 4)
+
+
+class _FalconH1ForCausalLM(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.model = _FalconH1Model()
+        self.config = SimpleNamespace(
+            model_type="falcon_h1",
+            num_hidden_layers=2,
+            num_attention_heads=2,
+            hidden_size=4,
+            intermediate_size=8,
+            vocab_size=16,
+        )
+        self.lm_head = nn.Linear(4, 16, bias=False)
+
+
 class _GlmSelfAttention(nn.Module):
     def __init__(self) -> None:
         super().__init__()
@@ -585,6 +642,36 @@ def test_hf_causal_adapter_describes_falcon_decoder_layout() -> None:
     assert description["hf_model_type"] == "falcon"
     assert description["spec"] == "falcon_decoder"
     assert description["mlp_dims"] == [8, 8]
+
+
+def test_hf_causal_adapter_handles_falcon_h1_hybrid_decoder_layout() -> None:
+    adapter = HF_Causal_Adapter()
+
+    assert adapter.can_handle(_FalconH1ForCausalLM()) is True
+
+
+def test_hf_causal_adapter_describes_falcon_h1_hybrid_decoder_layout() -> None:
+    adapter = HF_Causal_Adapter()
+    description = adapter.describe(_FalconH1ForCausalLM())
+
+    assert description["hf_model_type"] == "falcon_h1"
+    assert description["spec"] == "falcon_h1_hybrid_decoder"
+    assert description["mlp_dims"] == [8, 8]
+
+
+def test_hf_causal_adapter_returns_falcon_h1_hybrid_layer_modules() -> None:
+    adapter = HF_Causal_Adapter()
+    model = _FalconH1ForCausalLM()
+
+    modules = adapter.get_layer_modules(model, 0)
+
+    assert modules["self_attn.o_proj"] is model.model.layers[0].self_attn.o_proj
+    assert modules["mamba.in_proj"] is model.model.layers[0].mamba.in_proj
+    assert modules["mamba.out_proj"] is model.model.layers[0].mamba.out_proj
+    assert modules["feed_forward.down_proj"] is (
+        model.model.layers[0].feed_forward.down_proj
+    )
+    assert modules["mlp.down_proj"] is model.model.layers[0].feed_forward.down_proj
 
 
 def test_hf_causal_adapter_handles_glm_decoder_layout() -> None:

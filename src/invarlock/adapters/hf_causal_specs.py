@@ -623,6 +623,72 @@ class _FalconDecoderSpec(_CausalSpec):
         return tying
 
 
+class _FalconH1HybridDecoderSpec(_CausalSpec):
+    spec_name = "falcon_h1_hybrid_decoder"
+
+    def matches(self, model: Any, base: Any, layers: Any) -> bool:
+        layer = _first_item(layers)
+        if layer is None:
+            return False
+        has_attn = (
+            hasattr(layer, "self_attn")
+            and _has_set_attr(layer.self_attn, "q_proj")
+            and _has_set_attr(layer.self_attn, "k_proj")
+            and _has_set_attr(layer.self_attn, "v_proj")
+            and _has_set_attr(layer.self_attn, "o_proj")
+        )
+        has_feed_forward = (
+            hasattr(layer, "feed_forward")
+            and _has_set_attr(layer.feed_forward, "gate_proj")
+            and _has_set_attr(layer.feed_forward, "up_proj")
+            and _has_set_attr(layer.feed_forward, "down_proj")
+        )
+        has_mamba = (
+            hasattr(layer, "mamba")
+            and _has_set_attr(layer.mamba, "in_proj")
+            and _has_set_attr(layer.mamba, "out_proj")
+        )
+        has_norms = _has_set_attr(layer, "input_layernorm") and _has_set_attr(
+            layer, "pre_ff_layernorm"
+        )
+        return bool(has_attn and has_feed_forward and has_mamba and has_norms)
+
+    def infer_mlp_dim(self, layer: Any, config: Any, hidden_size: int) -> int:
+        mlp_dim = int(getattr(config, "intermediate_size", hidden_size * 4) or 0)
+        gate_proj = getattr(getattr(layer, "feed_forward", None), "gate_proj", None)
+        gate_proj_dim = _weight_shape_dim(gate_proj, 0)
+        if gate_proj_dim is not None:
+            mlp_dim = gate_proj_dim
+        return int(mlp_dim)
+
+    def layer_modules(self, model: Any, layer: Any) -> dict[str, Any]:
+        feed_forward = layer.feed_forward
+        return {
+            "self_attn.q_proj": layer.self_attn.q_proj,
+            "self_attn.k_proj": layer.self_attn.k_proj,
+            "self_attn.v_proj": layer.self_attn.v_proj,
+            "self_attn.o_proj": layer.self_attn.o_proj,
+            "mamba.in_proj": layer.mamba.in_proj,
+            "mamba.out_proj": layer.mamba.out_proj,
+            "feed_forward.gate_proj": feed_forward.gate_proj,
+            "feed_forward.up_proj": feed_forward.up_proj,
+            "feed_forward.down_proj": feed_forward.down_proj,
+            "mlp.gate_proj": feed_forward.gate_proj,
+            "mlp.up_proj": feed_forward.up_proj,
+            "mlp.down_proj": feed_forward.down_proj,
+            "input_layernorm": layer.input_layernorm,
+            "pre_ff_layernorm": layer.pre_ff_layernorm,
+        }
+
+    def tying_map(self, model: Any, base: Any) -> dict[str, str]:
+        tying: dict[str, str] = {}
+        lm_head_weight = getattr(getattr(model, "lm_head", None), "weight", None)
+        embed_weight = getattr(getattr(base, "embed_tokens", None), "weight", None)
+        if lm_head_weight is not None and lm_head_weight is embed_weight:
+            tying["lm_head.weight"] = "model.embed_tokens.weight"
+        return tying
+
+
 class _OptDecoderSpec(_CausalSpec):
     spec_name = "opt_decoder"
 
@@ -738,6 +804,7 @@ _SPECS: list[_CausalSpec] = [
     _Qwen35LinearDecoderSpec(),
     _NeoXDecoderSpec(),
     _FalconDecoderSpec(),
+    _FalconH1HybridDecoderSpec(),
     _OptDecoderSpec(),
     _DenseDecoderSpec(),
     _GPT2LikeDecoderSpec(),
