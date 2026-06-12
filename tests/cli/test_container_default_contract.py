@@ -303,11 +303,13 @@ def test_container_launch_forwards_gpu_pinning_env_vars(
     )
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "1")
     monkeypatch.setenv("NVIDIA_VISIBLE_DEVICES", "1")
+    monkeypatch.setenv("HF_HUB_DISABLE_XET", "1")
 
     command = _build_container_command(["evaluate", "--device", "cuda", "--help"])
 
     assert _env_value(command, "CUDA_VISIBLE_DEVICES") == "1"
     assert _env_value(command, "NVIDIA_VISIBLE_DEVICES") == "1"
+    assert _env_value(command, "HF_HUB_DISABLE_XET") == "1"
 
 
 def test_container_launch_skips_gpu_passthrough_for_cpu_model_commands(

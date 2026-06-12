@@ -34,20 +34,40 @@ def test_causal_lm_family_presets_load() -> None:
         "olmo2_7b_512.yaml": "allenai/OLMo-2-1124-7B",
         "olmo2_13b_512.yaml": "allenai/OLMo-2-1124-13B-Instruct",
         "qwen3_5_9b_512.yaml": "Qwen/Qwen3.5-9B",
+        "ministral3_3b_512.yaml": "mistralai/Ministral-3-3B-Instruct-2512-BF16",
+        "granite4_1_8b_512.yaml": "ibm-granite/granite-4.1-8b",
+        "granite4_1_3b_512.yaml": "ibm-granite/granite-4.1-3b",
+        "smollm3_3b_512.yaml": "HuggingFaceTB/SmolLM3-3B",
+        "phi4_mini_512.yaml": "microsoft/Phi-4-mini-instruct",
+        "deepseek_r1_distill_qwen_14b_512.yaml": (
+            "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
+        ),
+        "deepseek_r1_0528_qwen3_8b_512.yaml": (
+            "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B"
+        ),
+        "falcon_h1r_7b_512.yaml": "tiiuae/Falcon-H1R-7B",
     }
     expected_provider_kinds = {
         "deepseek_r1_distill_qwen_7b_512.yaml": "hf_text",
+        "deepseek_r1_distill_qwen_14b_512.yaml": "hf_text",
+        "deepseek_r1_0528_qwen3_8b_512.yaml": "hf_text",
+        "falcon_h1r_7b_512.yaml": "hf_text",
         "gemma4_e2b_512.yaml": "hf_text",
+        "granite4_1_3b_512.yaml": "hf_text",
+        "granite4_1_8b_512.yaml": "hf_text",
+        "ministral3_3b_512.yaml": "hf_text",
         "ministral3_8b_512.yaml": "hf_text",
         "ministral3_14b_512.yaml": "hf_text",
         "olmo2_13b_512.yaml": "hf_text",
         "olmo2_7b_512.yaml": "hf_text",
+        "phi4_mini_512.yaml": "hf_text",
         "phi4_reasoning_plus_512.yaml": "hf_text",
         "qwen2_5_7b_512.yaml": "hf_text",
         "qwen2_5_14b_512.yaml": "hf_text",
         "qwen2_7b_512.yaml": "hf_text",
         "qwen3_5_9b_512.yaml": "hf_text",
         "qwen3_8b_512.yaml": "hf_text",
+        "smollm3_3b_512.yaml": "hf_text",
     }
     expected_skip_overhead = {
         "gemma4_e2b_512.yaml",
@@ -60,6 +80,8 @@ def test_causal_lm_family_presets_load() -> None:
         if name == "gemma4_e2b_512.yaml":
             assert cfg.require_section("model")["attn_implementation"] == "sdpa"
         if name == "phi4_reasoning_plus_512.yaml":
+            assert cfg.require_section("model")["trust_remote_code"] is True
+        if name == "phi4_mini_512.yaml":
             assert cfg.require_section("model")["trust_remote_code"] is True
         provider = cfg.data["dataset"]["provider"]
         if name in expected_provider_kinds:
@@ -94,27 +116,52 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
         "null_sweep_olmo2_7b.yaml": "allenai/OLMo-2-1124-7B",
         "null_sweep_olmo2_13b.yaml": "allenai/OLMo-2-1124-13B-Instruct",
         "null_sweep_qwen3_5_9b.yaml": "Qwen/Qwen3.5-9B",
+        "null_sweep_ministral3_3b.yaml": (
+            "mistralai/Ministral-3-3B-Instruct-2512-BF16"
+        ),
+        "null_sweep_granite4_1_8b.yaml": "ibm-granite/granite-4.1-8b",
+        "null_sweep_granite4_1_3b.yaml": "ibm-granite/granite-4.1-3b",
+        "null_sweep_smollm3_3b.yaml": "HuggingFaceTB/SmolLM3-3B",
+        "null_sweep_phi4_mini.yaml": "microsoft/Phi-4-mini-instruct",
+        "null_sweep_deepseek_r1_distill_qwen_14b.yaml": (
+            "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
+        ),
+        "null_sweep_deepseek_r1_0528_qwen3_8b.yaml": (
+            "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B"
+        ),
+        "null_sweep_falcon_h1r_7b.yaml": "tiiuae/Falcon-H1R-7B",
     }
     for name, model_id in configs.items():
         data = yaml.safe_load(
             (root / "configs/calibration" / name).read_text(encoding="utf-8")
         )
         assert data["model"]["id"] == model_id
-        if name == "null_sweep_phi4_reasoning_plus.yaml":
+        if name in {
+            "null_sweep_phi4_reasoning_plus.yaml",
+            "null_sweep_phi4_mini.yaml",
+        }:
             assert data["model"]["trust_remote_code"] is True
         if name in {
             "null_sweep_deepseek_r1_distill_qwen_7b.yaml",
+            "null_sweep_deepseek_r1_distill_qwen_14b.yaml",
+            "null_sweep_deepseek_r1_0528_qwen3_8b.yaml",
+            "null_sweep_falcon_h1r_7b.yaml",
             "null_sweep_gemma4_e2b.yaml",
+            "null_sweep_granite4_1_3b.yaml",
+            "null_sweep_granite4_1_8b.yaml",
+            "null_sweep_ministral3_3b.yaml",
             "null_sweep_ministral3_8b.yaml",
             "null_sweep_ministral3_14b.yaml",
             "null_sweep_olmo2_13b.yaml",
             "null_sweep_olmo2_7b.yaml",
+            "null_sweep_phi4_mini.yaml",
             "null_sweep_phi4_reasoning_plus.yaml",
             "null_sweep_qwen2_5_7b.yaml",
             "null_sweep_qwen2_5_14b.yaml",
             "null_sweep_qwen2_7b.yaml",
             "null_sweep_qwen3_5_9b.yaml",
             "null_sweep_qwen3_8b.yaml",
+            "null_sweep_smollm3_3b.yaml",
         }:
             assert data["dataset"]["provider"]["kind"] == "hf_text"
         if name == "null_sweep_gemma4_e2b.yaml":

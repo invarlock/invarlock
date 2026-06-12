@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shlex
 import subprocess
 import sys
@@ -21,6 +22,7 @@ DEFAULT_REMOTE_VENV_CANDIDATES = (
     "/root/venvs/invarlock/bin/python",
 )
 EXECUTION_MODES = ("container", "host")
+REMOTE_ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 @dataclass(frozen=True)
@@ -120,6 +122,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Comma-separated GPU ids. One tmux shard is launched per GPU id.",
     )
     parser.add_argument(
+        "--remote-env",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help=(
+            "Repeat to export an extra environment variable inside each remote "
+            "tmux shard, for example HF_HUB_DISABLE_XET=1."
+        ),
+    )
+    parser.add_argument(
         "--session-prefix",
         default="model-evidence",
         help="tmux session name prefix.",
@@ -203,6 +215,18 @@ def _parse_gpus(raw: str) -> list[str]:
     return gpus
 
 
+def _parse_remote_env(raw_items: list[str]) -> list[tuple[str, str]]:
+    parsed: list[tuple[str, str]] = []
+    for raw in raw_items:
+        if "=" not in raw:
+            raise ValueError("--remote-env entries must use KEY=VALUE")
+        key, value = raw.split("=", 1)
+        if not REMOTE_ENV_KEY_RE.fullmatch(key):
+            raise ValueError(f"--remote-env key is not a valid shell name: {key!r}")
+        parsed.append((key, value))
+    return parsed
+
+
 def _shell_join(args: list[str]) -> str:
     return shlex.join(args)
 
@@ -253,6 +277,7 @@ def build_launches(
     device: str,
     execution_mode: str,
     gpus: list[str],
+    remote_env: list[tuple[str, str]],
     session_prefix: str,
     stamp: str,
     repo_setup: list[str],
@@ -288,16 +313,23 @@ def build_launches(
         for lane_id in lane_ids:
             sweep_cmd.extend(["--lane-id", lane_id])
 
+        export_pairs = [
+            ("PYTHONPATH", "src"),
+            ("INVARLOCK_ALLOW_NETWORK", "1"),
+            *remote_env,
+            ("CUDA_VISIBLE_DEVICES", gpu),
+        ]
+        export_command = "export " + " ".join(
+            f"{key}={shlex.quote(value)}" for key, value in export_pairs
+        )
+
         inner_command = " && ".join(
             [
                 *repo_setup,
                 f"cd {_shell_path(remote_repo)}",
                 f"mkdir -p {shlex.quote(shard_output_root)}",
                 *python_setup,
-                (
-                    "export PYTHONPATH=src INVARLOCK_ALLOW_NETWORK=1 "
-                    f"CUDA_VISIBLE_DEVICES={shlex.quote(gpu)}"
-                ),
+                export_command,
                 _shell_command(sweep_cmd),
             ]
         )
@@ -349,6 +381,7 @@ def run_remote(args: argparse.Namespace) -> int:
     )
     remote_output_root = args.remote_output_root or _default_remote_output_root(stamp)
     gpus = _parse_gpus(args.gpus)
+    remote_env = _parse_remote_env(args.remote_env)
 
     sync_command = None
     if not args.skip_sync:
@@ -372,6 +405,7 @@ def run_remote(args: argparse.Namespace) -> int:
         device=args.device,
         execution_mode=args.execution_mode,
         gpus=gpus,
+        remote_env=remote_env,
         session_prefix=args.session_prefix,
         stamp=stamp,
         repo_setup=repo_setup,
@@ -388,6 +422,7 @@ def run_remote(args: argparse.Namespace) -> int:
         "suite": args.suite,
         "execution_mode": args.execution_mode,
         "gpus": gpus,
+        "remote_env": [{"name": key, "value": value} for key, value in remote_env],
         "sync_command": sync_command,
         "launches": [launch.to_payload() for launch in launches],
         "monitor": _monitor_commands(args.host, launches),

@@ -32,6 +32,8 @@ from model_evidence_lanes import (  # noqa: E402
     REPO_MENTIONED_GPU_SUITE,
     REPO_ROOT,
     SUITES,
+    SUPPORT_MATRIX_BACKLOG_GPU_LANES,
+    SUPPORT_MATRIX_BACKLOG_GPU_SUITE,
     EvidenceLane,
     lane_requires_remote_code,
     manifest_lane_ids,
@@ -54,6 +56,8 @@ __all__ = [
     "PROMOTION_GAP_GPU_SUITE",
     "REPO_MENTIONED_GPU_SUITE",
     "SUITES",
+    "SUPPORT_MATRIX_BACKLOG_GPU_LANES",
+    "SUPPORT_MATRIX_BACKLOG_GPU_SUITE",
     "EvidenceLane",
     "manifest_lane_ids",
     "select_specs",
@@ -136,6 +140,157 @@ def write_manifest(
         "lanes": [spec.to_manifest_entry() for spec in specs],
     }
     (output_root / "manifest.json").write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _capture_artifacts(output_root: Path) -> list[dict[str, object]]:
+    relpaths: set[Path] = set()
+    for pattern in (
+        "manifest.json",
+        "summary.json",
+        "summary.tsv",
+        "status.log",
+        "model_revisions.json",
+        "logs/*.log",
+        "eval/*/report/evaluation.report.json",
+        "eval/*/verify.json",
+    ):
+        relpaths.update(
+            path.relative_to(output_root)
+            for path in output_root.glob(pattern)
+            if path.is_file()
+        )
+
+    files: list[dict[str, object]] = []
+    for relpath in sorted(relpaths):
+        path = output_root / relpath
+        files.append(
+            {
+                "path": relpath.as_posix(),
+                "bytes": path.stat().st_size,
+                "sha256": _sha256_file(path),
+            }
+        )
+    return files
+
+
+def _collect_hf_model_revisions(
+    specs: Sequence[EvidenceLane],
+) -> list[dict[str, object]]:
+    try:
+        from huggingface_hub import scan_cache_dir
+    except Exception as exc:  # pragma: no cover - environment-bound.
+        return [
+            {
+                "slug": spec.slug,
+                "model_id": spec.model_id,
+                "status": "unavailable",
+                "reason": f"huggingface_hub_unavailable:{type(exc).__name__}",
+            }
+            for spec in specs
+        ]
+
+    try:
+        cache_info = scan_cache_dir()
+    except Exception as exc:  # pragma: no cover - cache state is host-specific.
+        return [
+            {
+                "slug": spec.slug,
+                "model_id": spec.model_id,
+                "status": "unavailable",
+                "reason": f"cache_scan_failed:{type(exc).__name__}",
+            }
+            for spec in specs
+        ]
+
+    repos = {repo.repo_id: repo for repo in cache_info.repos}
+    revisions: list[dict[str, object]] = []
+    for spec in specs:
+        repo = repos.get(spec.model_id)
+        if repo is None:
+            revisions.append(
+                {
+                    "slug": spec.slug,
+                    "model_id": spec.model_id,
+                    "status": "missing",
+                    "revisions": [],
+                }
+            )
+            continue
+        repo_revisions = sorted(
+            (
+                {
+                    "commit_hash": revision.commit_hash,
+                    "refs": sorted(revision.refs),
+                    "snapshot_path": str(revision.snapshot_path),
+                    "size_on_disk": revision.size_on_disk,
+                }
+                for revision in repo.revisions
+            ),
+            key=lambda item: str(item["commit_hash"]),
+        )
+        revisions.append(
+            {
+                "slug": spec.slug,
+                "model_id": spec.model_id,
+                "status": "observed" if repo_revisions else "missing",
+                "revisions": repo_revisions,
+            }
+        )
+    return revisions
+
+
+def write_model_revisions(
+    output_root: Path,
+    *,
+    suite: str,
+    execution_mode: str,
+    specs: Sequence[EvidenceLane],
+) -> None:
+    payload = {
+        "schema": "invarlock/model-evidence-model-revisions-v1",
+        "generated_at": datetime.now(UTC).isoformat(),
+        "suite": suite,
+        "execution_mode": execution_mode,
+        "models": _collect_hf_model_revisions(specs),
+    }
+    (output_root / "model_revisions.json").write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def write_artifact_manifest(
+    output_root: Path,
+    *,
+    suite: str,
+    execution_mode: str,
+    shard_index: int,
+    shard_count: int,
+    results: Sequence[LaneResult],
+) -> None:
+    payload = {
+        "schema": "invarlock/model-evidence-artifact-manifest-v1",
+        "generated_at": datetime.now(UTC).isoformat(),
+        "suite": suite,
+        "execution_mode": execution_mode,
+        "shard_index": shard_index,
+        "shard_count": shard_count,
+        "ok": all(result.ok for result in results),
+        "lane_results": [result.to_summary_entry() for result in results],
+        "files": _capture_artifacts(output_root),
+    }
+    (output_root / "artifact_manifest.json").write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
@@ -410,6 +565,15 @@ def _classify_failure(
         or "primary metric degraded or non-finite" in text
     ):
         return ("failed", "invalid_primary_metric")
+    if evaluate_exit == 125 and (
+        "docker:" in text
+        and (
+            "error from registry: denied" in text
+            or "unable to find image" in text
+            or "pull access denied" in text
+        )
+    ):
+        return ("failed", "container_image_pull_denied")
     if evaluate_exit != 0:
         return ("failed", f"{phase}_failed")
     if verify_exit not in {None, 0}:
@@ -690,6 +854,20 @@ def run_sweep(args: argparse.Namespace) -> int:
                 break
         handle.write(f"[{datetime.now(UTC).isoformat()}] ALL_TASKS_COMPLETE\n")
     write_summary(
+        output_root,
+        suite=args.suite,
+        execution_mode=args.execution_mode,
+        shard_index=args.shard_index,
+        shard_count=args.shard_count,
+        results=results,
+    )
+    write_model_revisions(
+        output_root,
+        suite=args.suite,
+        execution_mode=args.execution_mode,
+        specs=specs,
+    )
+    write_artifact_manifest(
         output_root,
         suite=args.suite,
         execution_mode=args.execution_mode,

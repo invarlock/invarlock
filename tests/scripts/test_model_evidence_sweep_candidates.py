@@ -44,6 +44,41 @@ def test_promotion_gap_gpu_suite_covers_prepared_deferred_lanes() -> None:
     )
 
 
+def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> None:
+    mod = load_script_module("model_evidence_sweep")
+
+    specs = {
+        lane.slug: lane
+        for lane in mod.select_specs(
+            mod.SUPPORT_MATRIX_BACKLOG_GPU_SUITE,
+            slugs=[],
+            lane_ids=[],
+            shard_index=0,
+            shard_count=1,
+        )
+    }
+
+    assert set(specs) == {
+        "mistralai_ministral_3_3b_instruct_2512_bf16",
+        "ibm_granite_granite_4_1_8b",
+        "ibm_granite_granite_4_1_3b",
+        "huggingfacetb_smollm3_3b",
+        "microsoft_phi_4_mini_instruct",
+        "deepseek_ai_deepseek_r1_distill_qwen_14b",
+        "deepseek_ai_deepseek_r1_0528_qwen3_8b",
+        "tiiuae_falcon_h1r_7b",
+    }
+    assert specs["mistralai_ministral_3_3b_instruct_2512_bf16"].preset_relpath == (
+        "configs/presets/causal_lm/ministral3_3b_512.yaml"
+    )
+    assert specs["ibm_granite_granite_4_1_8b"].preset_relpath == (
+        "configs/presets/causal_lm/granite4_1_8b_512.yaml"
+    )
+    assert specs["microsoft_phi_4_mini_instruct"].preset_relpath == (
+        "configs/presets/causal_lm/phi4_mini_512.yaml"
+    )
+
+
 def test_promotion_gap_gpu_suite_glm_host_dry_run_uses_lane_preset(
     tmp_path: Path,
 ) -> None:
@@ -87,20 +122,67 @@ def test_promotion_gap_gpu_suite_glm_host_dry_run_uses_lane_preset(
     assert manifest["lanes"][0]["slug"] == "thudm_glm_4_9b_chat"
 
 
+def test_support_matrix_backlog_gpu_suite_phi4_dry_run_uses_remote_code_policy(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
+    output_root = tmp_path / "candidate-phi4-mini-host"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--suite",
+            "support-matrix-backlog-gpu",
+            "--slug",
+            "microsoft_phi_4_mini_instruct",
+            "--execution-mode",
+            "host",
+            "--output-root",
+            str(output_root),
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    assert len(payload) == 1
+    assert payload[0]["slug"] == "microsoft_phi_4_mini_instruct"
+    preset_idx = payload[0]["evaluate"].index("--preset") + 1
+    assert payload[0]["evaluate"][preset_idx] == str(
+        repo_root / "configs/presets/causal_lm/phi4_mini_512.yaml"
+    )
+
+    manifest = json.loads((output_root / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["suite"] == "support-matrix-backlog-gpu"
+    assert manifest["lanes"][0]["slug"] == "microsoft_phi_4_mini_instruct"
+
+
 def test_lane_requires_remote_code_uses_preset_model_flag() -> None:
     mod = load_script_module("model_evidence_sweep")
     phi4 = next(
         lane
         for lane in mod.SUITES[mod.REPO_MENTIONED_GPU_SUITE]
-        if lane.slug == "phi4_reasoning_plus"
+        if lane.slug == "phi4_reasoning_plus_public"
     )
     qwen = next(
         lane
         for lane in mod.SUITES[mod.REPO_MENTIONED_GPU_SUITE]
-        if lane.slug == "qwen2_7b"
+        if lane.slug == "qwen2_7b_public"
+    )
+    phi4_mini = next(
+        lane
+        for lane in mod.SUITES[mod.SUPPORT_MATRIX_BACKLOG_GPU_SUITE]
+        if lane.slug == "microsoft_phi_4_mini_instruct"
     )
 
     assert mod.lane_requires_remote_code(phi4) is True
+    assert mod.lane_requires_remote_code(phi4_mini) is True
     assert mod.lane_requires_remote_code(qwen) is False
 
 
@@ -156,7 +238,7 @@ def test_run_lane_sets_remote_code_env_for_matching_preset(tmp_path: Path) -> No
     spec = next(
         lane
         for lane in mod.SUITES[mod.REPO_MENTIONED_GPU_SUITE]
-        if lane.slug == "phi4_reasoning_plus"
+        if lane.slug == "phi4_reasoning_plus_public"
     )
     output_root = tmp_path / "evidence-remote-code"
     calls: list[tuple[list[str], str | None]] = []

@@ -17,6 +17,7 @@ DEFAULT_SUITE = "current-supported-experimental"
 REPO_MENTIONED_GPU_SUITE = "repo-mentioned-gpu"
 MODEL_CATALOG_GPU_SUITE = "model-catalog-gpu"
 PROMOTION_GAP_GPU_SUITE = "promotion-gap-gpu"
+SUPPORT_MATRIX_BACKLOG_GPU_SUITE = "support-matrix-backlog-gpu"
 EXECUTION_MODES = ("container", "host")
 
 
@@ -53,81 +54,11 @@ class EvidenceLane:
 
 CURRENT_SUPPORTED_EXPERIMENTAL_LANES: tuple[EvidenceLane, ...] = (
     EvidenceLane(
-        slug="mistral_7b",
-        lane_id="mistral-7b-causal-hf",
-        family="Mistral 7B causal LM",
-        model_id="mistralai/Mistral-7B-v0.1",
-        preset_relpath="configs/presets/causal_lm/mistral_7b_512.yaml",
-    ),
-    EvidenceLane(
-        slug="qwen2_7b",
-        lane_id="qwen2-7b-causal-hf",
-        family="Qwen2 7B causal LM",
-        model_id="Qwen/Qwen2-7B",
-        preset_relpath="configs/presets/causal_lm/qwen2_7b_512.yaml",
-    ),
-    EvidenceLane(
-        slug="qwen2_5_7b",
-        lane_id="qwen2-5-7b-causal-hf",
-        family="Qwen2.5 7B causal LM",
-        model_id="Qwen/Qwen2.5-7B",
-        preset_relpath="configs/presets/causal_lm/qwen2_5_7b_512.yaml",
-    ),
-    EvidenceLane(
-        slug="qwen2_5_14b",
-        lane_id="qwen2-5-14b-causal-hf",
-        family="Qwen2.5 14B causal LM",
-        model_id="Qwen/Qwen2.5-14B",
-        preset_relpath="configs/presets/causal_lm/qwen2_5_14b_512.yaml",
-    ),
-    EvidenceLane(
-        slug="qwen3_8b",
-        lane_id="qwen3-causal-hf",
-        family="Qwen3 causal LM",
-        model_id="Qwen/Qwen3-8B",
-        preset_relpath="configs/presets/causal_lm/qwen3_8b_512.yaml",
-    ),
-    EvidenceLane(
-        slug="deepseek_r1_distill_qwen_7b",
-        lane_id="deepseek-r1-distill-qwen-causal-hf",
-        family="DeepSeek-R1-Distill-Qwen causal LM",
-        model_id="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
-        preset_relpath="configs/presets/causal_lm/deepseek_r1_distill_qwen_7b_512.yaml",
-    ),
-    EvidenceLane(
-        slug="phi4_reasoning_plus",
-        lane_id="phi-4-text-causal-hf",
-        family="Phi-4 causal LM (text-only eval)",
-        model_id="microsoft/Phi-4-reasoning-plus",
-        preset_relpath="configs/presets/causal_lm/phi4_reasoning_plus_512.yaml",
-    ),
-    EvidenceLane(
-        slug="tinyllama_1_1b",
-        lane_id="tinyllama-1-1b-causal-hf",
-        family="TinyLlama 1.1B causal LM",
-        model_id="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-        preset_relpath="configs/presets/causal_lm/tinyllama_1_1b_512.yaml",
-    ),
-    EvidenceLane(
         slug="olmo2_7b",
-        lane_id="olmo-2-causal-hf",
-        family="OLMo 2 causal LM",
+        lane_id="olmo-2-7b-causal-hf",
+        family="OLMo 2 7B causal LM",
         model_id="allenai/OLMo-2-1124-7B",
         preset_relpath="configs/presets/causal_lm/olmo2_7b_512.yaml",
-    ),
-    EvidenceLane(
-        slug="olmo2_13b",
-        lane_id="olmo-2-causal-hf",
-        family="OLMo 2 causal LM",
-        model_id="allenai/OLMo-2-1124-13B-Instruct",
-        preset_relpath="configs/presets/causal_lm/olmo2_13b_512.yaml",
-    ),
-    EvidenceLane(
-        slug="qwen3_5_9b",
-        lane_id="qwen3-5-causal-hf",
-        family="Qwen3.5 causal LM",
-        model_id="Qwen/Qwen3.5-9B",
-        preset_relpath="configs/presets/causal_lm/qwen3_5_9b_512.yaml",
     ),
     EvidenceLane(
         slug="gemma4_e2b",
@@ -136,20 +67,6 @@ CURRENT_SUPPORTED_EXPERIMENTAL_LANES: tuple[EvidenceLane, ...] = (
         model_id="google/gemma-4-E2B-it",
         preset_relpath="configs/presets/causal_lm/gemma4_e2b_512.yaml",
         adapter="hf_causal",
-    ),
-    EvidenceLane(
-        slug="ministral3_8b",
-        lane_id="ministral-3-text-causal-hf",
-        family="Ministral 3 causal LM (text-only eval)",
-        model_id="mistralai/Ministral-3-8B-Instruct-2512-BF16",
-        preset_relpath="configs/presets/causal_lm/ministral3_8b_512.yaml",
-    ),
-    EvidenceLane(
-        slug="ministral3_14b",
-        lane_id="ministral-3-text-causal-hf",
-        family="Ministral 3 causal LM (text-only eval)",
-        model_id="mistralai/Ministral-3-14B-Instruct-2512-BF16",
-        preset_relpath="configs/presets/causal_lm/ministral3_14b_512.yaml",
     ),
 )
 
@@ -180,6 +97,114 @@ CURRENT_PUBLISHED_BASIS_LANES: tuple[EvidenceLane, ...] = (
         preset_relpath="configs/presets/masked_lm/wikitext2_128.yaml",
         adapter="hf_mlm",
         verify_profile="dev",
+    ),
+    EvidenceLane(
+        slug="mistral_7b_public",
+        lane_id="mistral-7b-causal-hf",
+        family="Mistral 7B causal LM",
+        model_id="mistralai/Mistral-7B-v0.1",
+        preset_relpath="configs/presets/causal_lm/mistral_7b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="ci",
+    ),
+    EvidenceLane(
+        slug="ministral3_8b_public",
+        lane_id="ministral-3-8b-text-causal-hf",
+        family="Ministral 3 8B causal LM (text-only eval)",
+        model_id="mistralai/Ministral-3-8B-Instruct-2512-BF16",
+        preset_relpath="configs/presets/causal_lm/ministral3_8b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="ci",
+    ),
+    EvidenceLane(
+        slug="ministral3_14b_public",
+        lane_id="ministral-3-14b-text-causal-hf",
+        family="Ministral 3 14B causal LM (text-only eval)",
+        model_id="mistralai/Ministral-3-14B-Instruct-2512-BF16",
+        preset_relpath="configs/presets/causal_lm/ministral3_14b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="ci",
+    ),
+    EvidenceLane(
+        slug="tinyllama_1_1b_public",
+        lane_id="tinyllama-1-1b-causal-hf",
+        family="TinyLlama 1.1B causal LM",
+        model_id="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+        preset_relpath="configs/presets/causal_lm/tinyllama_1_1b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="ci",
+    ),
+    EvidenceLane(
+        slug="olmo2_13b_public",
+        lane_id="olmo-2-13b-causal-hf",
+        family="OLMo 2 13B causal LM",
+        model_id="allenai/OLMo-2-1124-13B-Instruct",
+        preset_relpath="configs/presets/causal_lm/olmo2_13b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="ci",
+    ),
+    EvidenceLane(
+        slug="qwen2_7b_public",
+        lane_id="qwen2-7b-causal-hf",
+        family="Qwen2 7B causal LM",
+        model_id="Qwen/Qwen2-7B",
+        preset_relpath="configs/presets/causal_lm/qwen2_7b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="ci",
+    ),
+    EvidenceLane(
+        slug="qwen2_5_7b_public",
+        lane_id="qwen2-5-7b-causal-hf",
+        family="Qwen2.5 7B causal LM",
+        model_id="Qwen/Qwen2.5-7B",
+        preset_relpath="configs/presets/causal_lm/qwen2_5_7b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="ci",
+    ),
+    EvidenceLane(
+        slug="qwen2_5_14b_public",
+        lane_id="qwen2-5-14b-causal-hf",
+        family="Qwen2.5 14B causal LM",
+        model_id="Qwen/Qwen2.5-14B",
+        preset_relpath="configs/presets/causal_lm/qwen2_5_14b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="ci",
+    ),
+    EvidenceLane(
+        slug="qwen3_8b_public",
+        lane_id="qwen3-causal-hf",
+        family="Qwen3 causal LM",
+        model_id="Qwen/Qwen3-8B",
+        preset_relpath="configs/presets/causal_lm/qwen3_8b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="ci",
+    ),
+    EvidenceLane(
+        slug="qwen3_5_9b_public",
+        lane_id="qwen3-5-causal-hf",
+        family="Qwen3.5 causal LM",
+        model_id="Qwen/Qwen3.5-9B",
+        preset_relpath="configs/presets/causal_lm/qwen3_5_9b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="ci",
+    ),
+    EvidenceLane(
+        slug="deepseek_r1_distill_qwen_7b_public",
+        lane_id="deepseek-r1-distill-qwen-causal-hf",
+        family="DeepSeek-R1-Distill-Qwen causal LM",
+        model_id="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+        preset_relpath="configs/presets/causal_lm/deepseek_r1_distill_qwen_7b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="ci",
+    ),
+    EvidenceLane(
+        slug="phi4_reasoning_plus_public",
+        lane_id="phi-4-text-causal-hf",
+        family="Phi-4 causal LM (text-only eval)",
+        model_id="microsoft/Phi-4-reasoning-plus",
+        preset_relpath="configs/presets/causal_lm/phi4_reasoning_plus_512.yaml",
+        adapter="hf_causal",
+        verify_profile="ci",
     ),
 )
 
@@ -232,7 +257,114 @@ CATALOG_PRESET_OVERRIDES: dict[str, tuple[str, str]] = {
         "configs/presets/causal_lm/glm4_9b_chat_512.yaml",
         "hf_causal",
     ),
+    "mistralai/Ministral-3-3B-Instruct-2512-BF16": (
+        "configs/presets/causal_lm/ministral3_3b_512.yaml",
+        "hf_causal",
+    ),
+    "ibm-granite/granite-4.1-8b": (
+        "configs/presets/causal_lm/granite4_1_8b_512.yaml",
+        "hf_causal",
+    ),
+    "ibm-granite/granite-4.1-3b": (
+        "configs/presets/causal_lm/granite4_1_3b_512.yaml",
+        "hf_causal",
+    ),
+    "HuggingFaceTB/SmolLM3-3B": (
+        "configs/presets/causal_lm/smollm3_3b_512.yaml",
+        "hf_causal",
+    ),
+    "microsoft/Phi-4-mini-instruct": (
+        "configs/presets/causal_lm/phi4_mini_512.yaml",
+        "hf_causal",
+    ),
+    "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B": (
+        "configs/presets/causal_lm/deepseek_r1_distill_qwen_14b_512.yaml",
+        "hf_causal",
+    ),
+    "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B": (
+        "configs/presets/causal_lm/deepseek_r1_0528_qwen3_8b_512.yaml",
+        "hf_causal",
+    ),
+    "tiiuae/Falcon-H1R-7B": (
+        "configs/presets/causal_lm/falcon_h1r_7b_512.yaml",
+        "hf_causal",
+    ),
 }
+
+SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
+    EvidenceLane(
+        slug="mistralai_ministral_3_3b_instruct_2512_bf16",
+        lane_id="ministral-3-3b-text-causal-hf",
+        family="Ministral 3 3B causal LM (text-only eval candidate)",
+        model_id="mistralai/Ministral-3-3B-Instruct-2512-BF16",
+        preset_relpath="configs/presets/causal_lm/ministral3_3b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="dev",
+    ),
+    EvidenceLane(
+        slug="ibm_granite_granite_4_1_8b",
+        lane_id="granite-4-1-8b-causal-hf",
+        family="Granite 4.1 8B causal LM",
+        model_id="ibm-granite/granite-4.1-8b",
+        preset_relpath="configs/presets/causal_lm/granite4_1_8b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="dev",
+    ),
+    EvidenceLane(
+        slug="ibm_granite_granite_4_1_3b",
+        lane_id="granite-4-1-3b-causal-hf",
+        family="Granite 4.1 3B causal LM",
+        model_id="ibm-granite/granite-4.1-3b",
+        preset_relpath="configs/presets/causal_lm/granite4_1_3b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="dev",
+    ),
+    EvidenceLane(
+        slug="huggingfacetb_smollm3_3b",
+        lane_id="smollm3-3b-causal-hf",
+        family="SmolLM3 3B causal LM",
+        model_id="HuggingFaceTB/SmolLM3-3B",
+        preset_relpath="configs/presets/causal_lm/smollm3_3b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="dev",
+    ),
+    EvidenceLane(
+        slug="microsoft_phi_4_mini_instruct",
+        lane_id="phi-4-mini-causal-hf",
+        family="Phi-4 mini causal LM",
+        model_id="microsoft/Phi-4-mini-instruct",
+        preset_relpath="configs/presets/causal_lm/phi4_mini_512.yaml",
+        adapter="hf_causal",
+        verify_profile="dev",
+    ),
+    EvidenceLane(
+        slug="deepseek_ai_deepseek_r1_distill_qwen_14b",
+        lane_id="deepseek-r1-distill-qwen-14b-causal-hf",
+        family="DeepSeek-R1-Distill-Qwen 14B causal LM",
+        model_id="deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+        preset_relpath="configs/presets/causal_lm/deepseek_r1_distill_qwen_14b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="dev",
+    ),
+    EvidenceLane(
+        slug="deepseek_ai_deepseek_r1_0528_qwen3_8b",
+        lane_id="deepseek-r1-0528-qwen3-8b-causal-hf",
+        family="DeepSeek-R1-0528-Qwen3 8B causal LM",
+        model_id="deepseek-ai/DeepSeek-R1-0528-Qwen3-8B",
+        preset_relpath="configs/presets/causal_lm/deepseek_r1_0528_qwen3_8b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="dev",
+    ),
+    EvidenceLane(
+        slug="tiiuae_falcon_h1r_7b",
+        lane_id="falcon-h1r-7b-causal-hf",
+        family="Falcon-H1R 7B causal LM",
+        model_id="tiiuae/Falcon-H1R-7B",
+        preset_relpath="configs/presets/causal_lm/falcon_h1r_7b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="dev",
+    ),
+)
 
 
 def _load_model_family_catalog(
@@ -382,6 +514,7 @@ SUITES: dict[str, tuple[EvidenceLane, ...]] = {
     ),
     MODEL_CATALOG_GPU_SUITE: MODEL_CATALOG_GPU_LANES,
     PROMOTION_GAP_GPU_SUITE: PROMOTION_GAP_GPU_LANES,
+    SUPPORT_MATRIX_BACKLOG_GPU_SUITE: SUPPORT_MATRIX_BACKLOG_GPU_LANES,
 }
 
 

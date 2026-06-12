@@ -21,7 +21,7 @@ def test_run_model_evidence_remote_dry_run_emits_tmux_launch_plan(
             "--gpus",
             "0,1",
             "--slug",
-            "qwen3_8b",
+            "olmo2_7b",
             "--stamp",
             "20260319T120000Z",
             "--remote-output-root",
@@ -131,6 +131,66 @@ def test_run_model_evidence_remote_host_mode_is_forwarded() -> None:
     assert payload["execution_mode"] == "host"
     assert "--execution-mode host" in payload["launches"][0]["remote_command"]
     assert "--profile" not in payload["launches"][0]["remote_command"]
+
+
+def test_run_model_evidence_remote_dry_run_exports_remote_env() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence" / "run_model_evidence_remote.py"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--host",
+            "root@example.test",
+            "--gpus",
+            "0",
+            "--remote-env",
+            "HF_HUB_DISABLE_XET=1",
+            "--remote-env",
+            "HF_HOME=/root/.cache/huggingface",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    assert payload["remote_env"] == [
+        {"name": "HF_HUB_DISABLE_XET", "value": "1"},
+        {"name": "HF_HOME", "value": "/root/.cache/huggingface"},
+    ]
+    remote_command = payload["launches"][0]["remote_command"]
+    assert "HF_HUB_DISABLE_XET=1" in remote_command
+    assert "HF_HOME=/root/.cache/huggingface" in remote_command
+    assert "CUDA_VISIBLE_DEVICES=0" in remote_command
+
+
+def test_run_model_evidence_remote_rejects_invalid_remote_env_name() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence" / "run_model_evidence_remote.py"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--host",
+            "root@example.test",
+            "--remote-env",
+            "BAD-NAME=1",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 2
+    assert "valid shell name" in proc.stderr
 
 
 def test_run_model_evidence_remote_dry_run_respects_explicit_remote_repo() -> None:
