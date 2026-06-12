@@ -103,6 +103,7 @@ def test_scenarios_require_direct_primary_guard_hits_for_demo_probes() -> None:
     by_id = {str(item.get("id")): item for item in scenarios}
 
     required = {
+        "fp8_e5m2_stress",
         "nan_injection",
         "extreme_quant",
         "rmt_norm_noise",

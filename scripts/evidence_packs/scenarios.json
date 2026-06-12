@@ -240,7 +240,7 @@
       ],
       "category": "stress",
       "failure_class": "stress_edit.fp8_quant",
-      "strictness": "informational",
+      "strictness": "must_detect",
       "intent": "subtle_detectable",
       "primary_guard": "spectral",
       "generation": {
@@ -249,16 +249,12 @@
         "version": "stress"
       },
       "requirements": {
-        "detectors_any_of": [
+        "primary_guard_required": true,
+        "detectors_all_of": [
           {
             "kind": "validation_flag",
             "flag": "primary_metric_acceptable",
-            "expected": false
-          },
-          {
-            "kind": "validation_flag",
-            "flag": "spectral_stable",
-            "expected": false
+            "expected": true
           },
           {
             "kind": "spectral_caps_applied",

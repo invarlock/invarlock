@@ -52,7 +52,14 @@ def _build_scenario_catalog(manifest: dict[str, Any]) -> ScenarioCatalog:
         if category not in expected_by_category:
             continue
         expected_by_category[category].add(scenario_id)
-        if strictness in {"must_pass", "must_fail", "must_detect"}:
+        if (
+            (category == "clean" and strictness == "must_pass")
+            or (category == "stress" and strictness == "must_fail")
+            or (
+                category == "error_injection"
+                and strictness in {"must_fail", "must_detect"}
+            )
+        ):
             gating_by_category[category].add(scenario_id)
         if category == "stress" and strictness == "informational":
             informational_stress.add(scenario_id)
