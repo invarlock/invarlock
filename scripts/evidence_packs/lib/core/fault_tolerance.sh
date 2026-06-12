@@ -456,7 +456,8 @@ health_check() {
     fi
 
     # Check GPU has enough free memory (at least 1GB)
-    local free_mem=$(get_gpu_available_memory "${gpu_id}" 2>/dev/null)
+    local free_mem
+    free_mem=$(get_gpu_available_memory "${gpu_id}" 2>/dev/null || echo "0")
     if [[ -z "${free_mem}" || ! "${free_mem}" =~ ^[0-9]+$ || "${free_mem}" -lt 1 ]]; then
         echo "GPU ${gpu_id} has insufficient memory (${free_mem:-0} GB free)"
         return 1

@@ -683,8 +683,10 @@ get_scheduling_stats() {
     local gpu_mem_stats=""
     local gpu_id
     for gpu_id in $(list_gpu_ids); do
-        local free=$(get_gpu_available_memory "${gpu_id}")
-        local total=$(get_gpu_total_memory "${gpu_id}")
+        local free
+        local total
+        free=$(get_gpu_available_memory "${gpu_id}" 2>/dev/null || echo "0")
+        total=$(get_gpu_total_memory "${gpu_id}" 2>/dev/null || echo "0")
         local used=$((total - free))
         gpu_mem_stats="${gpu_mem_stats}GPU${gpu_id}:${used}/${total}GB "
     done
@@ -707,9 +709,12 @@ print_scheduling_report() {
     echo "=== GPU MEMORY ==="
     local gpu_id
     for gpu_id in $(list_gpu_ids); do
-        local free=$(get_gpu_available_memory "${gpu_id}")
-        local total=$(get_gpu_total_memory "${gpu_id}")
-        local util=$(get_gpu_utilization "${gpu_id}")
+        local free
+        local total
+        local util
+        free=$(get_gpu_available_memory "${gpu_id}" 2>/dev/null || echo "0")
+        total=$(get_gpu_total_memory "${gpu_id}" 2>/dev/null || echo "0")
+        util=$(get_gpu_utilization "${gpu_id}" 2>/dev/null || echo "0")
         echo "GPU ${gpu_id}: ${free}/${total} GB free, ${util}% utilization"
     done
     echo ""

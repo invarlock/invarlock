@@ -13,3 +13,7 @@ SCHEDULER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [[ -z "${SCHEDULER_RESERVATIONS_LOADED:-}" ]] && source "${SCHEDULER_SCRIPT_DIR}/scheduler_reservations.sh" && export SCHEDULER_RESERVATIONS_LOADED=1
 # shellcheck source=scheduler_selection.sh
 [[ -z "${SCHEDULER_SELECTION_LOADED:-}" ]] && source "${SCHEDULER_SCRIPT_DIR}/scheduler_selection.sh" && export SCHEDULER_SELECTION_LOADED=1
+
+# Keep the facade safe to source from strict callers when the final guarded
+# source is skipped because the module was already loaded.
+true

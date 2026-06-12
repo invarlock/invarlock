@@ -15,3 +15,7 @@ QUEUE_MANAGER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [[ -z "${QUEUE_MEMORY_PLAN_LOADED:-}" ]] && source "${QUEUE_MANAGER_SCRIPT_DIR}/queue_memory_plan.sh" && export QUEUE_MEMORY_PLAN_LOADED=1
 # shellcheck source=queue_generation.sh
 [[ -z "${QUEUE_GENERATION_LOADED:-}" ]] && source "${QUEUE_MANAGER_SCRIPT_DIR}/queue_generation.sh" && export QUEUE_GENERATION_LOADED=1
+
+# Keep the facade safe to source from strict callers when the final guarded
+# source is skipped because the module was already loaded.
+true

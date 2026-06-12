@@ -21,9 +21,11 @@ try:
         _normalize_staged_preset,
         _parse_window_candidate,
         _plan_effective_windows,
+        _stamp_baseline_report_seed,
         _validate_baseline_report,
         normalize_staged_preset,
         schedule_from_baseline_report,
+        stamp_baseline_report_seed,
     )
     from .task_tools_reports import (
         EDIT_ARTIFACT_SUMMARY_SCHEMA,
@@ -49,9 +51,11 @@ except ImportError:  # pragma: no cover - direct script execution
         _normalize_staged_preset,
         _parse_window_candidate,
         _plan_effective_windows,
+        _stamp_baseline_report_seed,
         _validate_baseline_report,
         normalize_staged_preset,
         schedule_from_baseline_report,
+        stamp_baseline_report_seed,
     )
     from task_tools_reports import (
         EDIT_ARTIFACT_SUMMARY_SCHEMA,
@@ -71,6 +75,7 @@ __all__ = [
     "normalize_staged_preset",
     "sanitize_generation_config",
     "schedule_from_baseline_report",
+    "stamp_baseline_report_seed",
     "write_model_profile",
 ]
 
@@ -222,7 +227,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     baseline_parser.add_argument("expected_adapter")
     baseline_parser.add_argument("expected_profile")
     baseline_parser.add_argument("expected_tier")
+    baseline_parser.add_argument("expected_assurance", nargs="?", default="off")
     baseline_parser.set_defaults(func=_validate_baseline_report)
+
+    stamp_seed_parser = subparsers.add_parser(
+        "stamp-baseline-report-seed",
+        help="Stamp data.seed into a generated reusable baseline report.",
+    )
+    stamp_seed_parser.add_argument("--report", required=True)
+    stamp_seed_parser.add_argument("--seed", type=int, required=True)
+    stamp_seed_parser.set_defaults(func=_stamp_baseline_report_seed)
 
     profile_parser = subparsers.add_parser(
         "write-model-profile",
