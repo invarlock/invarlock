@@ -341,6 +341,11 @@ def test_support_matrix_published_basis_evidence_uses_public_evidence_paths() ->
                 "public_evidence/published_basis/"
             )
             assert (REPO_ROOT / evidence["artifact_package"]).is_dir()
+        if "guard_value_demo" in evidence:
+            assert evidence["guard_value_demo"].startswith(
+                "public_evidence/published_basis/"
+            )
+            assert (REPO_ROOT / evidence["guard_value_demo"]).is_dir()
         assert "tests/fixtures/" not in evidence["evaluation_report_fixture"]
         assert "tests/fixtures/" not in evidence["runtime_manifest_fixture"]
         assert "tests/fixtures/" not in evidence["evidence_pack_recipe"]

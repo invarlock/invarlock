@@ -1,0 +1,26 @@
+{
+  "clean": {
+    "any_flag": 0,
+    "invariants_fail": 0,
+    "invariants_warn": 0,
+    "primary_metric_fail": 0,
+    "reports": 0,
+    "scenarios": 0
+  },
+  "error_injection": {
+    "any_flag": 2,
+    "invariants_fail": 0,
+    "invariants_warn": 0,
+    "primary_metric_fail": 2,
+    "reports": 2,
+    "scenarios": 2
+  },
+  "stress": {
+    "any_flag": 0,
+    "invariants_fail": 0,
+    "invariants_warn": 0,
+    "primary_metric_fail": 0,
+    "reports": 1,
+    "scenarios": 1
+  }
+}

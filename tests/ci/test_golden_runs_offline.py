@@ -227,6 +227,82 @@ def test_caught_regressions_show_pm_only_passes_but_guard_chain_rejects() -> Non
         assert result.outcome == VerifyOutcome.POLICY_FAIL
 
 
+def test_real_guard_value_demo_records_pm_only_pass_with_spectral_intervention() -> None:
+    demo_dir = (
+        REPO_ROOT
+        / "public_evidence"
+        / "published_basis"
+        / "mistral_7b"
+        / "guard_value_demo"
+    )
+    summary = json.loads(
+        (demo_dir / "guard_value_summary.json").read_text(encoding="utf-8")
+    )
+    metadata = json.loads((demo_dir / "evidence.meta.json").read_text(encoding="utf-8"))
+    final_verdict = json.loads(
+        (
+            demo_dir / "artifact_package" / "reports" / "final_verdict.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    assert metadata["evidence_class"] == "real_guard_value_demo"
+    assert "fixture" not in metadata["summary"].lower()
+    assert summary["source_run"]["model_id"] == "mistralai/Mistral-7B-v0.1"
+    assert (
+        summary["source_run"]["model_revision"]
+        == "27d67f1b5f57dc0953326b2601d68371d40ea8da"
+    )
+    assert final_verdict["verdict"] == "PASS"
+    assert final_verdict["counts"]["primary_guard_required_hits"] == 1
+    assert final_verdict["counts"]["error_injection_detected"] == 2
+
+    comparison = summary["pm_only_vs_pm_plus_guards"]
+    assert comparison["scenario_id"] == "fp8_e5m2_stress"
+    assert comparison["pm_only_verdict"] == "accept"
+    assert comparison["pm_plus_guards_verdict"] == "guard_intervention_recorded"
+    assert comparison["primary_metric_acceptable"] is True
+    assert comparison["ratio_vs_baseline"] == 1.0248910150012365
+    assert comparison["spectral_caps_applied"] == 2
+    assert comparison["primary_guard_hit"] is True
+    assert comparison["primary_guard_required"] is True
+    assert comparison["strictness"] == "must_detect"
+
+    fp8_report_path = demo_dir / comparison["report"]
+    fp8_report = json.loads(fp8_report_path.read_text(encoding="utf-8"))
+    assert validate_report(fp8_report) is True
+    assert fp8_report["validation"]["primary_metric_acceptable"] is True
+    assert fp8_report["spectral"]["caps_applied"] == 2
+
+    result = run_verify_reports(
+        [fp8_report_path],
+        profile="release",
+        assurance_mode="report",
+    )
+    assert result.outcome == VerifyOutcome.OK
+
+    expected_failures = [
+        demo_dir
+        / "artifact_package"
+        / "reports"
+        / "errors"
+        / "scale_explosion"
+        / "evaluation.report.json",
+        demo_dir
+        / "artifact_package"
+        / "reports"
+        / "errors"
+        / "rank_collapse"
+        / "evaluation.report.json",
+    ]
+    for report_path in expected_failures:
+        result = run_verify_reports(
+            [report_path],
+            profile="release",
+            assurance_mode="report",
+        )
+        assert result.outcome == VerifyOutcome.POLICY_FAIL
+
+
 def test_policy_failure_fixtures_fail_expected_policy_predicate() -> None:
     cases = {
         "invariants_failure": (

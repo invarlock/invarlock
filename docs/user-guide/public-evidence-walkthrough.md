@@ -177,6 +177,27 @@ spectral did not pass
 That is the intended strict-verification behavior: guard stability is required even
 when the summary metric is clean.
 
+## Real guard-value demo
+
+The Mistral 7B published basis also ships a real scenario-pack artifact, separate
+from the fixture-only caught regressions:
+
+```bash
+invarlock verify --profile release --assurance report \
+  public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/fp8_e5m2_stress/run_2/evaluation.report.json
+```
+
+Expected outcome: verification passes, but the packaged
+`guard_value_summary.json` records the guard value: the primary metric accepts
+`fp8_e5m2_stress` (`ratio_vs_baseline = 1.0248910150012365`), while the scenario
+contract records a required spectral intervention (`spectral.caps_applied = 2`).
+The same artifact includes `scale_explosion` and `rank_collapse` expected-failure
+reports from the same GPU run to show the stronger spectral detection path.
+
+This is not a strict spectral-failure example: `validation.spectral_stable`
+remains true because the spectral cap budget is not exceeded. It is the shipped
+real-run counterpart to the synthetic caught-regression fixtures.
+
 ## Policy failures
 
 The policy-failure fixtures show non-guard and provenance predicates that can

@@ -1,0 +1,175 @@
+{
+  "final_verdict": {
+    "counts": {
+      "catastrophic_required_fail": 0,
+      "catastrophic_required_present": 0,
+      "catastrophic_required_total": 0,
+      "clean_pass": 0,
+      "clean_total": 0,
+      "error_injection_detected": 2,
+      "error_injection_total": 2,
+      "informational_stress_fail": 0,
+      "informational_stress_signaled": 0,
+      "informational_stress_total": 0,
+      "models_total": 1,
+      "primary_guard_required_hits": 1,
+      "primary_guard_required_records": 1,
+      "primary_guard_required_scenarios": 1,
+      "primary_guard_required_scenarios_hit": 1,
+      "records_total": 3,
+      "stress_fail": 0,
+      "stress_total": 1
+    },
+    "failed_requirements": [],
+    "report": "artifact_package/reports/final_verdict.json",
+    "verdict": "PASS"
+  },
+  "generated_at_utc": "2026-06-12T07:25:12.349480",
+  "pm_only_vs_pm_plus_guards": {
+    "drift_band": {
+      "max": 1.086,
+      "min": 0.8878
+    },
+    "pm_only_basis": "validation.primary_metric_acceptable is true and ratio_vs_baseline remains inside the release drift band.",
+    "pm_only_verdict": "accept",
+    "pm_plus_guards_basis": "scenario strictness is must_detect and the spectral primary guard hit is recorded through spectral_caps_applied >= 1.",
+    "pm_plus_guards_verdict": "guard_intervention_recorded",
+    "primary_guard_hit": true,
+    "primary_guard_required": true,
+    "primary_metric_acceptable": true,
+    "primary_metric_display_ci": [
+      1.0215452269419114,
+      1.0286202336678327
+    ],
+    "ratio_vs_baseline": 1.0248910150012365,
+    "report": "artifact_package/reports/fp8_e5m2_stress/run_2/evaluation.report.json",
+    "runtime_manifest": "artifact_package/reports/fp8_e5m2_stress/run_2/runtime.manifest.json",
+    "scenario_id": "fp8_e5m2_stress",
+    "spectral_caps_applied": 2,
+    "spectral_caps_applied_by_family": {
+      "attn": 2,
+      "embed": 0,
+      "ffn": 0,
+      "other": 0
+    },
+    "spectral_stable": true,
+    "strictness": "must_detect"
+  },
+  "scenario_evidence": [
+    {
+      "category": "stress",
+      "detectors_hit": true,
+      "failure_class": "stress_edit.fp8_quant",
+      "intent": "subtle_detectable",
+      "invariants_pass": true,
+      "passed": true,
+      "primary_guard": "spectral",
+      "primary_guard_hit": true,
+      "primary_metric_acceptable": true,
+      "primary_metric_display_ci": [
+        1.0215452269419114,
+        1.0286202336678327
+      ],
+      "ratio_vs_baseline": 1.0248910150012365,
+      "reasons": [],
+      "report": "artifact_package/reports/fp8_e5m2_stress/run_2/evaluation.report.json",
+      "rmt_stable": true,
+      "runtime_manifest": "artifact_package/reports/fp8_e5m2_stress/run_2/runtime.manifest.json",
+      "scenario_id": "fp8_e5m2_stress",
+      "spectral_caps_applied": 2,
+      "spectral_caps_applied_by_family": {
+        "attn": 2,
+        "embed": 0,
+        "ffn": 0,
+        "other": 0
+      },
+      "spectral_stable": true,
+      "strictness": "must_detect"
+    },
+    {
+      "category": "error_injection",
+      "detectors_hit": true,
+      "failure_class": "structural.scale_explosion",
+      "intent": "fault_detection",
+      "invariants_pass": true,
+      "passed": false,
+      "primary_guard": "spectral",
+      "primary_guard_hit": true,
+      "primary_metric_acceptable": false,
+      "primary_metric_display_ci": [
+        229.9131062731975,
+        262.880170097312
+      ],
+      "ratio_vs_baseline": 246.28281279363546,
+      "reasons": [
+        "primary_metric_fail"
+      ],
+      "report": "artifact_package/reports/errors/scale_explosion/evaluation.report.json",
+      "rmt_stable": true,
+      "runtime_manifest": "artifact_package/reports/errors/scale_explosion/runtime.manifest.json",
+      "scenario_id": "scale_explosion",
+      "spectral_caps_applied": 3,
+      "spectral_caps_applied_by_family": {
+        "attn": 2,
+        "embed": 0,
+        "ffn": 1,
+        "other": 0
+      },
+      "spectral_stable": true,
+      "strictness": "must_detect"
+    },
+    {
+      "category": "error_injection",
+      "detectors_hit": true,
+      "failure_class": "spectral.rank_collapse",
+      "intent": "fault_detection",
+      "invariants_pass": true,
+      "passed": false,
+      "primary_guard": "spectral",
+      "primary_guard_hit": true,
+      "primary_metric_acceptable": false,
+      "primary_metric_display_ci": [
+        121.54857952092644,
+        150.0257527735145
+      ],
+      "ratio_vs_baseline": 134.5008598890587,
+      "reasons": [
+        "primary_metric_fail",
+        "drift_fail"
+      ],
+      "report": "artifact_package/reports/errors/rank_collapse/evaluation.report.json",
+      "rmt_stable": true,
+      "runtime_manifest": "artifact_package/reports/errors/rank_collapse/runtime.manifest.json",
+      "scenario_id": "rank_collapse",
+      "spectral_caps_applied": 4,
+      "spectral_caps_applied_by_family": {
+        "attn": 4,
+        "embed": 0,
+        "ffn": 0,
+        "other": 0
+      },
+      "spectral_stable": true,
+      "strictness": "must_detect"
+    }
+  ],
+  "schema": "invarlock.public_evidence.guard_value_demo.v1",
+  "scope_boundaries": [
+    "This is real scenario evidence from Mistral-7B, not a synthetic caught-regression fixture.",
+    "The FP8 stress scenario is a guard-intervention demonstration, not a release-strict report failure: validation.spectral_stable remains true because the spectral cap budget is not exceeded.",
+    "The two fault-injection scenarios are expected failures and are used to demonstrate detection-path behavior, not acceptable model edits.",
+    "Reports were generated with report assurance, so verifier commands use --assurance report rather than --assurance strict."
+  ],
+  "source_run": {
+    "host": "root@86.38.238.232",
+    "model_id": "mistralai/Mistral-7B-v0.1",
+    "model_revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",
+    "remote_output_root": "/root/evidence-pack-runs/mistral_guard_value_pack_20260612j",
+    "scenario_ids": [
+      "fp8_e5m2_stress",
+      "scale_explosion",
+      "rank_collapse"
+    ],
+    "suite": "subset"
+  },
+  "summary": "Real Mistral-7B guard-value scenario pack: a PM-only FP8 stress lane passes while the spectral guard records a required intervention, with two spectral fault injections detected in the same run."
+}

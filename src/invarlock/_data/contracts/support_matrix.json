@@ -62,7 +62,8 @@
         "evaluation_report_fixture": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
         "runtime_manifest_fixture": "public_evidence/published_basis/mistral_7b/runtime.manifest.json",
         "evidence_pack_recipe": "public_evidence/published_basis/mistral_7b/evidence_pack_recipe.json",
-        "evidence_pack_fixture": "public_evidence/published_basis/mistral_7b/evidence_pack"
+        "evidence_pack_fixture": "public_evidence/published_basis/mistral_7b/evidence_pack",
+        "guard_value_demo": "public_evidence/published_basis/mistral_7b/guard_value_demo"
       },
       "support_groups": [
         "published_modern",

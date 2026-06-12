@@ -1,0 +1,13 @@
+{
+  "records_total": 3,
+  "signals": {
+    "spectral_caps": {
+      "flagged": 3,
+      "unique": 3
+    },
+    "ve_signal": {
+      "flagged": 0,
+      "unique": 0
+    }
+  }
+}

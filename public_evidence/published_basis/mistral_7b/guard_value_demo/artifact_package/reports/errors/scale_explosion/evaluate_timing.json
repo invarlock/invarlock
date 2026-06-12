@@ -1,0 +1,46 @@
+{
+  "aggregate_run_timings_seconds": {
+    "edit": 0.002356428994971793,
+    "eval": 54.293649550992996,
+    "finalize": 0.00016518899792572483,
+    "guards": 9.94175735799945,
+    "prepare": 0.002720463009609375,
+    "prepare_guards": 13.414816639997298,
+    "total": 78.94701422700018
+  },
+  "baseline": "/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/models/mistralai__mistral-7b-v01/baseline",
+  "baseline_adapter": "hf_causal",
+  "baseline_report_reused": true,
+  "defer_report_rendering": true,
+  "profile": "ci",
+  "run_timings_seconds": {
+    "baseline": {
+      "edit": 0.001175965997390449,
+      "eval": 27.106281935994048,
+      "finalize": 8.867600263329223e-05,
+      "guards": 4.977774282997416,
+      "prepare": 0.0013786570052616298,
+      "prepare_guards": 6.726965357003792,
+      "total": 38.81913557500229
+    },
+    "subject": {
+      "edit": 0.001180462997581344,
+      "eval": 27.187367614998948,
+      "finalize": 7.65129952924326e-05,
+      "guards": 4.963983075002034,
+      "prepare": 0.0013418060043477453,
+      "prepare_guards": 6.687851282993506,
+      "total": 40.12787865199789
+    }
+  },
+  "schema": "invarlock/evaluate-timing-v1",
+  "subject": "/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/models/error_scale_explosion",
+  "subject_adapter": "hf_causal",
+  "tier": "balanced",
+  "timings_seconds": {
+    "evaluation_report": 0.790312120996532,
+    "plan": 0.004228300997056067,
+    "subject": 426.4498776959954,
+    "total": 427.90144793700165
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "artifact_paths": {
+    "artifact_package": "artifact_package",
+    "guard_value_manifest": "guard_value_manifest.json",
+    "guard_value_summary": "guard_value_summary.json",
+    "run_command": "run_command.txt"
+  },
+  "evidence_class": "real_guard_value_demo",
+  "generated_by": "scripts/evidence_packs/run_pack.sh driving invarlock evaluate scenario tasks",
+  "model_family": "mistral_7b",
+  "model_revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",
+  "non_goals": [
+    "This is real scenario evidence from Mistral-7B, not a synthetic caught-regression fixture.",
+    "The FP8 stress scenario is a guard-intervention demonstration, not a release-strict report failure: validation.spectral_stable remains true because the spectral cap budget is not exceeded.",
+    "The two fault-injection scenarios are expected failures and are used to demonstrate detection-path behavior, not acceptable model edits.",
+    "Reports were generated with report assurance, so verifier commands use --assurance report rather than --assurance strict."
+  ],
+  "profile": "release/report-assurance",
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "Real Mistral-7B guard-value demo where a PM-only FP8 stress lane passes while the spectral guard records a required intervention; paired fault-injection reports show spectral detection paths from the same GPU run.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/fp8_e5m2_stress/run_2/evaluation.report.json --profile release --assurance report",
+    "uv run pytest tests/ci/test_golden_runs_offline.py::test_real_guard_value_demo_records_pm_only_pass_with_spectral_intervention"
+  ]
+}

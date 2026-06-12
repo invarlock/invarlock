@@ -1,0 +1,44 @@
+[
+  {
+    "category": "stress",
+    "detector_hits": 1,
+    "failed": 0,
+    "id": "fp8_e5m2_stress",
+    "intent": "subtle_detectable",
+    "passed": 1,
+    "primary_guard": "spectral",
+    "primary_guard_hits": 1,
+    "primary_guard_required": true,
+    "reports": 1,
+    "signaled": 1,
+    "strictness": "must_detect"
+  },
+  {
+    "category": "error_injection",
+    "detector_hits": 1,
+    "failed": 1,
+    "id": "rank_collapse",
+    "intent": "fault_detection",
+    "passed": 0,
+    "primary_guard": "spectral",
+    "primary_guard_hits": 1,
+    "primary_guard_required": false,
+    "reports": 1,
+    "signaled": 1,
+    "strictness": "must_detect"
+  },
+  {
+    "category": "error_injection",
+    "detector_hits": 1,
+    "failed": 1,
+    "id": "scale_explosion",
+    "intent": "fault_detection",
+    "passed": 0,
+    "primary_guard": "spectral",
+    "primary_guard_hits": 1,
+    "primary_guard_required": false,
+    "reports": 1,
+    "signaled": 1,
+    "strictness": "must_detect"
+  }
+]

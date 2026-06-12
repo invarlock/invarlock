@@ -1,0 +1,228 @@
+{
+  "artifact_root": "public_evidence/published_basis/mistral_7b/guard_value_demo",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "79adc7225accb4bc4531caaf80a3faa1dae0f96cec025bffcded568c1a647499",
+      "size_bytes": 891
+    },
+    {
+      "path": "artifact_package/logs/run_pack.log",
+      "sha256": "ee631bde93cbf9622765330cd766a1788a83bc7a4d2410a5bd2628747219b41f",
+      "size_bytes": 9856
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CALIBRATION_RUN_002_48c0.log",
+      "sha256": "5539ba76e12d6cf26c95a7d6497bc7cbc497a16035baba6c0aca63a95caeb56b",
+      "size_bytes": 6140
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CALIBRATION_RUN_003_1f87.log",
+      "sha256": "e44a91118b385a4ebdb5ecbf2bbf2af7b2cdb1655a0c65368bb2778151361efa",
+      "size_bytes": 5710
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CALIBRATION_RUN_004_07f5.log",
+      "sha256": "60b05d36c320d3da60368ef3833c85391c2c70907b909ef6af406c1b0f752ec7",
+      "size_bytes": 6016
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CALIBRATION_RUN_005_61a9.log",
+      "sha256": "7eb799249508bdfc9f8133fccfa81885c1fc80ba7c50c4dc98a02abf55079b00",
+      "size_bytes": 6178
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CALIBRATION_RUN_006_31d4.log",
+      "sha256": "6faff3b45a277316afbd555e3a2dd1964f8c78a3c626b78ada729574c0441e97",
+      "size_bytes": 4918
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CLEANUP_EDIT_012_2db9.log",
+      "sha256": "c11c0a03a04a72be9f5ed85b8a49fadce80f92a28ab1bc8168e84fa64692eef9",
+      "size_bytes": 510
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CLEANUP_ERROR_015_1670.log",
+      "sha256": "44c96ce9cca814a3e0f469f3c1f1e5143fa2203790669396762c1cb7a8b25190",
+      "size_bytes": 514
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CLEANUP_ERROR_018_0821.log",
+      "sha256": "9d3230fea5cb8c573b96f7e260b3ff2312b0c24f745cd3dd6596e39d330ec1f5",
+      "size_bytes": 508
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CREATE_EDIT_009_3114.log",
+      "sha256": "fac80a557aecc6f1dcd6d2e1660fc800a9c41e306df19263be3261d42ea7e941",
+      "size_bytes": 3036
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CREATE_ERROR_013_6a07.log",
+      "sha256": "f89813d4aaf86e283ca79a068700fdfa6040e5d08d779d595434b1a5d6705d7c",
+      "size_bytes": 2567
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CREATE_ERROR_016_4ff0.log",
+      "sha256": "b656b765aa3e439c8506b13a21aed9d3f29ff9c7c618c899b1770e778891d1ac",
+      "size_bytes": 2713
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_GENERATE_PRESET_007_41cd.log",
+      "sha256": "2679358f75cbcf4971517ab73232ef644fca22571b3c53c9d9ebb63bce820986",
+      "size_bytes": 1221
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_SETUP_BASELINE_001_6f25.log",
+      "sha256": "2ad7c5874d8109735c4e792fe69ee9c15618b717e0f22604eaf82b3030d125dc",
+      "size_bytes": 484
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_SETUP_EVALUATE_BASELINE_REPORT_008_21f7.log",
+      "sha256": "a2e89467bb4ed717fb6771821d5b4675708d68d348adbbb8a5f47e4163a1b594",
+      "size_bytes": 5923
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_evaluate_EDIT_010_6a14.log",
+      "sha256": "83b373b95cfac10a3b898a528723cb85c1197a36b5e96402611976cc883994fc",
+      "size_bytes": 5046
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_evaluate_EDIT_011_08e7.log",
+      "sha256": "c542b3c3574f68d1fb1cc11b3dadaead9e7cc9a0ef31c456aa287c9ad9b6b57f",
+      "size_bytes": 4973
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_evaluate_ERROR_014_5c90.log",
+      "sha256": "c712fa6b265f1d95854e2fa0869e428b24a16106f01d98ff9906eaf5109fa78e",
+      "size_bytes": 4894
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_evaluate_ERROR_017_2ab3.log",
+      "sha256": "2e9b64d504a18723f4d04803094726af160d4b57c8a8b81a4fd45f1b7224da73",
+      "size_bytes": 4878
+    },
+    {
+      "path": "artifact_package/reports/category_summary.json",
+      "sha256": "786a4b120875f14d9ec5bda3defa17808230bb8ea09bd8000c60ea5b650d6a9f",
+      "size_bytes": 482
+    },
+    {
+      "path": "artifact_package/reports/errors/rank_collapse/evaluate_timing.json",
+      "sha256": "6c78ab598f3b170cd1d6cfb28c0c890909503cfdf33a6b43639ba744e329106c",
+      "size_bytes": 1541
+    },
+    {
+      "path": "artifact_package/reports/errors/rank_collapse/evaluation.report.json",
+      "sha256": "2bc0449e6593cf70e01d5524e4b05630362c770ec13ff02bc3e27d27d4d8b29d",
+      "size_bytes": 9713450
+    },
+    {
+      "path": "artifact_package/reports/errors/rank_collapse/runtime.manifest.json",
+      "sha256": "12ec8daf39a7298abcbb829d02ec1e6a8d314f0a6ef60c61f9aeb8ef457a07e3",
+      "size_bytes": 1056
+    },
+    {
+      "path": "artifact_package/reports/errors/scale_explosion/evaluate_timing.json",
+      "sha256": "4b89c3cff9eba2c2cb305ec572aa16b900225ddfd1640f46b6af8e367da09532",
+      "size_bytes": 1540
+    },
+    {
+      "path": "artifact_package/reports/errors/scale_explosion/evaluation.report.json",
+      "sha256": "b4ff63b33f007371cef912c7e0addde5c4a22072d30193afcec75709a85824e6",
+      "size_bytes": 9712089
+    },
+    {
+      "path": "artifact_package/reports/errors/scale_explosion/runtime.manifest.json",
+      "sha256": "07da80f363d9927ef61f79c521754461a6d8a5e35b65658ccecdde1ebe0ca850",
+      "size_bytes": 1058
+    },
+    {
+      "path": "artifact_package/reports/final_verdict.json",
+      "sha256": "05f3e9db192e26a45226a0de0d16ce9c74cd53401f11a50afe34cc054d6d983c",
+      "size_bytes": 7960
+    },
+    {
+      "path": "artifact_package/reports/final_verdict.txt",
+      "sha256": "e8f1baa68d1ed65ab8b4726bfb875e770ce4acfa6f8685942fc3c40907675ae3",
+      "size_bytes": 814
+    },
+    {
+      "path": "artifact_package/reports/fp8_e5m2_stress/run_2/edit_metadata.json",
+      "sha256": "b056c5e150a04b4a4694180acb0048ce80ee5103c24c40b91b005ae27c142e63",
+      "size_bytes": 969
+    },
+    {
+      "path": "artifact_package/reports/fp8_e5m2_stress/run_2/evaluate_timing.json",
+      "sha256": "6c0db813a2cb28d86add1e3bc8982aa2021596074b695734e89d9117e233cad3",
+      "size_bytes": 1531
+    },
+    {
+      "path": "artifact_package/reports/fp8_e5m2_stress/run_2/evaluation.report.json",
+      "sha256": "c95711333520911b9b4ae8cd1ae7f3ef0e4c6007031a42efd2cc94b648f81d17",
+      "size_bytes": 9710288
+    },
+    {
+      "path": "artifact_package/reports/fp8_e5m2_stress/run_2/runtime.manifest.json",
+      "sha256": "875af92f55a098ccab40132aa05982c1d26a51f9ca9cbeb2cc1cff455b5acb45",
+      "size_bytes": 1057
+    },
+    {
+      "path": "artifact_package/reports/guard_intervention_summary.json",
+      "sha256": "c791fd408f1aa3ec7fcbf59eb81cfb14cea91b687a7a05439ec8b24ae7ecc417",
+      "size_bytes": 176
+    },
+    {
+      "path": "artifact_package/reports/guard_signal_summary.json",
+      "sha256": "0efc8e1eb2a7e28d2dd5ae0787c0a52c211924f479a24a347ce6c7d586524e21",
+      "size_bytes": 362
+    },
+    {
+      "path": "artifact_package/reports/scenario_signal_summary.json",
+      "sha256": "51fa207a337c8072d748caab472744eda154da58076f75dc280b159ebee9bc3f",
+      "size_bytes": 989
+    },
+    {
+      "path": "artifact_package/state/model_revisions.json",
+      "sha256": "afe5c55d91e7d4cf8b407e26408bd739df83e885cfe4034b1c697beff1d379f2",
+      "size_bytes": 333
+    },
+    {
+      "path": "artifact_package/state/scenarios.json",
+      "sha256": "6561ae15eb4a408ad3df4be82aab5d8cd9157183411c6d08a08fc05fb42736f8",
+      "size_bytes": 4735
+    },
+    {
+      "path": "artifact_package/state/tuned_edit_params.json",
+      "sha256": "13b7f6a365240d2a406859efea0faf5143bd790bf92f6299950e5a6dc2ae781f",
+      "size_bytes": 22749
+    },
+    {
+      "path": "evidence.meta.json",
+      "sha256": "2afacee03e1db076572c9a428c91b1856ec707dd2c5ef5dd4e2e889866250eaa",
+      "size_bytes": 1731
+    },
+    {
+      "path": "guard_value_summary.json",
+      "sha256": "2951b6512f1f6ee5858b50ed80f84e4f2f5de2790ac3e56a68aed9c85cc7ada7",
+      "size_bytes": 6291
+    },
+    {
+      "path": "run_command.txt",
+      "sha256": "5cdbffa9ec41c0fbc9f1bdd173e910111f0290b149773dd5d921d7f84906d8f8",
+      "size_bytes": 1109
+    }
+  ],
+  "schema": "invarlock.public_evidence.guard_value_manifest.v1",
+  "source_run": {
+    "host": "root@86.38.238.232",
+    "model_id": "mistralai/Mistral-7B-v0.1",
+    "model_revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",
+    "remote_output_root": "/root/evidence-pack-runs/mistral_guard_value_pack_20260612j",
+    "scenario_ids": [
+      "fp8_e5m2_stress",
+      "scale_explosion",
+      "rank_collapse"
+    ],
+    "suite": "subset"
+  }
+}

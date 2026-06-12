@@ -100,6 +100,12 @@ but the spectral guard records a release-blocking weight-geometry violation.
 route the run to exploratory/non-assurance review. See
 [Public Evidence Walkthrough](public-evidence-walkthrough.md).
 
+For a real model-run counterpart, inspect
+`public_evidence/published_basis/mistral_7b/guard_value_demo/guard_value_summary.json`.
+That artifact shows a Mistral 7B FP8 stress run where the primary metric passes
+but the evidence-pack scenario records a required spectral intervention. It is a
+guard-intervention example, not a strict spectral-failure example.
+
 ## Development Fallback
 
 **Symptom:**
