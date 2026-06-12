@@ -223,6 +223,13 @@ packaged presets include it by default; remove a guard from the list to skip it.
   blocks (`spectral.*`, `rmt.*`, `variance.*`).
 - Validation flags are recorded under `validation.*` (`invariants_pass`,
   `spectral_stable`, `rmt_stable`).
+- Reports may include `guard_warnings`. These are baseline-relative guard-signal
+  changes that still pass the hard policy, such as a new capped spectral module
+  while `caps_applied <= max_caps`. They are advisory by default and become
+  verification failures only with `invarlock verify --fail-on-warnings`.
+- Evidence packs use the same guard observations but apply stricter scenario
+  semantics. A public guard-value claim requires reproduced baseline-relative
+  scenario evidence; an ordinary warning alone is not enough.
 
 ## Related Documentation
 

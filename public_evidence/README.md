@@ -33,6 +33,11 @@ evaluation: the guard signal itself must be new versus the matching no-op
 baseline. A cap or sidecar signal already present in the no-op basis does not
 count as guard-value evidence for an edit.
 
+Newer reports may include advisory `guard_warnings` for baseline-relative guard
+movement that still passes hard policy. Those warnings are review signals; a
+published guard-value claim still requires reproduced scenario evidence and
+clean confirmation reruns.
+
 ## Evidence Classes
 
 | Class | Meaning |

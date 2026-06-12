@@ -181,6 +181,9 @@ Common options:
 - `--assurance report|strict|off`: `report` enforces strict only for reports
   claiming strict; `strict` requires every input to claim and pass strict;
   `off` skips strict assurance policy checks.
+- `--warning-policy pass|fail`: keep guard warnings advisory (`pass`, default)
+  or fail verification when baseline-relative guard warnings are present (`fail`).
+- `--fail-on-warnings`: alias for `--warning-policy fail`.
 - `--runtime-provenance container|host`: runtime provenance policy for
   the supplied report artifacts
 - `--json`: emit a single JSON envelope
@@ -189,6 +192,13 @@ Example:
 
 ```bash
 invarlock verify --json reports/eval/evaluation.report.json
+```
+
+Use strict warning mode when you want to fail an otherwise policy-passing edit
+because a guard signal changed relative to the baseline:
+
+```bash
+invarlock verify --fail-on-warnings reports/eval/evaluation.report.json
 ```
 
 ## `invarlock report`

@@ -63,6 +63,9 @@ Guard-value publishing rule:
 - This is stricter than ordinary paired evaluation: the primary metric already
   compares baseline and subject, while guard-value publishing also requires the
   guard signal itself to move beyond the no-op basis.
+- Evaluation reports may also carry `guard_warnings`. Evidence-pack summaries
+  preserve those warnings for review, but guard-value publishing still requires
+  reproduced scenario evidence and clean confirmation reruns.
 - Clean confirmation reruns are required before publishing a case as guard-value
   evidence.
 - The current reference package is

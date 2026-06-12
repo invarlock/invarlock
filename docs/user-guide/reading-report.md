@@ -43,6 +43,11 @@ re-checked with `invarlock verify`.
     `validation.primary_metric_tail_acceptable = false`.
 - System Overhead row (when available)
   - Latency and throughput stats appear separate from quality and reflect the guarded run.
+- Guard Warnings (when present)
+  - Shows baseline-relative guard-signal changes that are still inside the hard
+    policy budget. These are warnings by default, not verification failures.
+  - Use `invarlock verify --fail-on-warnings <evaluation.report.json>` when your
+    workflow wants any guard warning to fail the verification step.
 - pPL identity (ppl families)
   - Confirms `exp(mean Δlog)` ≈ `ratio_vs_baseline`; Δlog CI maps to ratio CI
     when reported.
@@ -79,6 +84,9 @@ fixtures may omit those raw run reports while still being valid for
 - **Overall** mirrors the canonical gate allow-list. A FAIL means at least one gate failed.
 - **Primary Metric** shows ratio/Δpp vs baseline; compare to tier thresholds in the gate table.
 - **Drift** is final/preview; large drift usually indicates dataset/device instability.
+- **Guard Warnings** mean the edit moved a guard signal relative to the
+  baseline while remaining within hard policy. They become failures only under
+  strict warning mode.
 - **Overhead** appears only when guard overhead is evaluated; skipped in some profiles.
 
 ## Related Documentation

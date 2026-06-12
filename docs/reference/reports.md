@@ -319,6 +319,8 @@ fields while enforcing a small, stable core:
   - `primary_metric_tail_acceptable`
   - `preview_final_drift_acceptable`
   - `guard_overhead_acceptable`
+  - `guard_warnings_present`
+  - `guard_warning_policy_acceptable`
   - `invariants_pass`
   - `spectral_stable`
   - `rmt_stable`
@@ -327,6 +329,17 @@ fields while enforcing a small, stable core:
   - `moe_identity_ok`
 - The validator rejects reports that contain non‑boolean values under
   any of these keys.
+
+**Guard warnings (optional):**
+
+- `guard_warnings.present`: `true` when the subject has guard-signal movement
+  relative to the baseline while the hard policy may still pass.
+- `guard_warnings.warning_count`: number of warning records.
+- `guard_warnings.warnings[]`: structured warnings with `guard`, `kind`,
+  optional `family`/`module`, `baseline`, `subject`, `policy_gate`, and
+  `message`.
+- Warnings are advisory by default. `invarlock verify --warning-policy fail` or
+  `--fail-on-warnings` treats any warning as a verification failure.
 
 **Policy and structure:**
 
@@ -355,6 +368,7 @@ The full machine‑readable schema is available at runtime via
 | `dataset` / `evaluation_windows` | `report.data`, `report.dataset.windows.stats` | Pairing + count checks. |
 | `primary_metric` | `report.metrics.primary_metric` | Ratio + drift band (CI/Release). |
 | `validation` | `report.metrics` + policy thresholds | Schema allow‑list only. |
+| `guard_warnings` | Baseline/subject guard evidence | Advisory by default; fail only under strict warning policy. |
 | `spectral` / `rmt` / `variance` | `report.guards[]` | Measurement contracts (CI/Release). |
 | `guard_overhead` | `report.guard_overhead` | Required in Release unless skipped. |
 | `provenance.provider_digest` | `report.provenance.provider_digest` | Required in CI/Release. |
