@@ -15,6 +15,7 @@ def _write_cert(
     degraded: bool = False,
     invariants_status: str = "pass",
     spectral_caps_applied: int | None = None,
+    spectral_violations: list[tuple[str, str, float]] | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload: dict[str, Any] = {
@@ -23,8 +24,25 @@ def _write_cert(
         "guard_overhead": {"evaluated": True},
         "invariants": {"status": invariants_status},
     }
-    if spectral_caps_applied is not None:
-        payload["spectral"] = {"caps_applied": int(spectral_caps_applied)}
+    if spectral_caps_applied is not None or spectral_violations is not None:
+        violations = spectral_violations or []
+        payload["spectral"] = {
+            "caps_applied": int(
+                spectral_caps_applied
+                if spectral_caps_applied is not None
+                else len(violations)
+            ),
+            "violations": [
+                {
+                    "module": module,
+                    "family": family,
+                    "z_score": z_score,
+                    "type": "family_z_cap",
+                    "selected": True,
+                }
+                for module, family, z_score in violations
+            ],
+        }
     path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -71,10 +89,76 @@ def _write_ve_probe(
     )
 
 
+def _write_guard_value_manifest(
+    path: Path,
+    *,
+    scenario_id: str,
+    category: str = "stress",
+    primary_guard: str = "spectral",
+    detectors_all_of: list[dict[str, Any]] | None = None,
+) -> None:
+    if detectors_all_of is None:
+        detectors_all_of = [
+            {
+                "kind": "guard_signal_baseline_relative",
+                "guard": primary_guard,
+            }
+        ]
+    path.write_text(
+        json.dumps(
+            {
+                "schema": "evidence_pack_scenarios_v1",
+                "schema_version": 1,
+                "scenarios": [
+                    {
+                        "id": scenario_id,
+                        "category": category,
+                        "failure_class": "test.guard_value",
+                        "strictness": "must_detect",
+                        "intent": "guard_value",
+                        "primary_guard": primary_guard,
+                        "generation": {"kind": "edit", "edit_spec": "noop"},
+                        "requirements": {
+                            "primary_guard_required": True,
+                            "detectors_all_of": detectors_all_of,
+                        },
+                    }
+                ],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def _run_verdict(repo_root: Path, output_dir: Path) -> dict[str, Any]:
     script = repo_root / "scripts/evidence_packs/python/verdict_generator.py"
     subprocess.run(
         ["python3", str(script), "--output-dir", str(output_dir)],
+        check=True,
+        cwd=repo_root,
+    )
+    verdict_path = output_dir / "reports" / "final_verdict.json"
+    return json.loads(verdict_path.read_text(encoding="utf-8"))
+
+
+def _run_verdict_with_manifest(
+    repo_root: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> dict[str, Any]:
+    script = repo_root / "scripts/evidence_packs/python/verdict_generator.py"
+    subprocess.run(
+        [
+            "python3",
+            str(script),
+            "--output-dir",
+            str(output_dir),
+            "--manifest",
+            str(manifest_path),
+        ],
         check=True,
         cwd=repo_root,
     )
@@ -128,6 +212,25 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     repo_root = Path(__file__).resolve().parents[2]
     output_dir = tmp_path / "run"
     model_dir = output_dir / "mistral-7b"
+    shared_validation = {
+        "invariants_pass": True,
+        "primary_metric_acceptable": True,
+        "spectral_stable": True,
+        "rmt_stable": True,
+        "preview_final_drift_acceptable": True,
+        "guard_overhead_acceptable": True,
+    }
+
+    _write_cert(
+        model_dir
+        / "baseline_reports"
+        / "ci_balanced_seq512_pv4_fn4"
+        / "baseline_report.json",
+        validation=shared_validation,
+        invariants_status="pass",
+        spectral_caps_applied=0,
+        spectral_violations=[],
+    )
 
     # Clean edits (4) => must PASS.
     for edit in (
@@ -138,14 +241,7 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     ):
         _write_cert(
             model_dir / "reports" / edit / "run_1" / "evaluation.report.json",
-            validation={
-                "invariants_pass": True,
-                "primary_metric_acceptable": True,
-                "spectral_stable": True,
-                "rmt_stable": True,
-                "preview_final_drift_acceptable": True,
-                "guard_overhead_acceptable": True,
-            },
+            validation=shared_validation,
         )
 
     # Stress edits (4): two catastrophic required to FAIL, one informational,
@@ -175,15 +271,12 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     )
     _write_cert(
         model_dir / "reports" / "fp8_e5m2_stress" / "run_1" / "evaluation.report.json",
-        validation={
-            "invariants_pass": True,
-            "primary_metric_acceptable": True,
-            "spectral_stable": True,
-            "rmt_stable": True,
-            "preview_final_drift_acceptable": True,
-            "guard_overhead_acceptable": True,
-        },
+        validation=shared_validation,
         spectral_caps_applied=2,
+        spectral_violations=[
+            ("model.layers.0.self_attn.q_proj", "attn", 7.7),
+            ("model.layers.0.self_attn.k_proj", "attn", 3.2),
+        ],
     )
 
     # Error injections (9) => must be detected (not PASS).
@@ -639,6 +732,220 @@ def test_verdict_contract_accepts_ve_probe_sidecar_as_primary_guard_signal(
         and req.get("scenario") == "ve_mlp_scale_skew"
         for req in verdict.get("failed_requirements", [])
     )
+
+
+def test_verdict_contract_rejects_baseline_only_spectral_guard_value(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    output_dir = tmp_path / "run"
+    manifest_path = tmp_path / "scenarios.json"
+    _write_guard_value_manifest(
+        manifest_path,
+        scenario_id="fp8_e5m2_stress",
+        primary_guard="spectral",
+        detectors_all_of=[
+            {
+                "kind": "validation_flag",
+                "flag": "primary_metric_acceptable",
+                "expected": True,
+            },
+            {
+                "kind": "guard_signal_baseline_relative",
+                "guard": "spectral",
+                "min_new_modules": 1,
+            },
+        ],
+    )
+
+    model_dir = output_dir / "mistral-7b"
+    baseline_path = (
+        model_dir
+        / "baseline_reports"
+        / "ci_balanced_seq512_pv4_fn4"
+        / "baseline_report.json"
+    )
+    subject_path = (
+        model_dir / "reports" / "fp8_e5m2_stress" / "run_1" / "evaluation.report.json"
+    )
+    shared_violations = [
+        ("model.layers.0.self_attn.q_proj", "attn", 7.7),
+        ("model.layers.0.self_attn.k_proj", "attn", 3.2),
+    ]
+    validation = {
+        "invariants_pass": True,
+        "primary_metric_acceptable": True,
+        "spectral_stable": True,
+        "rmt_stable": True,
+        "preview_final_drift_acceptable": True,
+        "guard_overhead_acceptable": True,
+    }
+    _write_cert(
+        baseline_path,
+        validation=validation,
+        invariants_status="pass",
+        spectral_caps_applied=2,
+        spectral_violations=shared_violations,
+    )
+    _write_cert(
+        subject_path,
+        validation=validation,
+        invariants_status="pass",
+        spectral_caps_applied=2,
+        spectral_violations=shared_violations,
+    )
+
+    verdict = _run_verdict_with_manifest(repo_root, output_dir, manifest_path)
+
+    assert verdict["verdict"] == "FAIL"
+    assert any(
+        req.get("requirement") == "scenario_primary_guard_signal"
+        and req.get("scenario") == "fp8_e5m2_stress"
+        for req in verdict.get("failed_requirements", [])
+    )
+    assert any(
+        req.get("requirement") == "scenario_expected_detectors"
+        and req.get("scenario") == "fp8_e5m2_stress"
+        for req in verdict.get("failed_requirements", [])
+    )
+    [record] = verdict["records"]
+    assert record["detectors_hit"] is False
+    assert record["primary_guard_hit"] is False
+    spectral = record["guard_baseline_relative"]["spectral"]
+    assert spectral["baseline_available"] is True
+    assert spectral["new_caps_applied"] == 0
+    assert spectral["delta_caps_applied"] == 0
+
+
+def test_verdict_contract_accepts_new_spectral_cap_as_guard_value(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    output_dir = tmp_path / "run"
+    manifest_path = tmp_path / "scenarios.json"
+    _write_guard_value_manifest(
+        manifest_path,
+        scenario_id="fp8_e5m2_stress",
+        primary_guard="spectral",
+        detectors_all_of=[
+            {
+                "kind": "validation_flag",
+                "flag": "primary_metric_acceptable",
+                "expected": True,
+            },
+            {
+                "kind": "guard_signal_baseline_relative",
+                "guard": "spectral",
+                "min_new_modules": 1,
+            },
+        ],
+    )
+
+    model_dir = output_dir / "mistral-7b"
+    baseline_path = (
+        model_dir
+        / "baseline_reports"
+        / "ci_balanced_seq512_pv4_fn4"
+        / "baseline_report.json"
+    )
+    subject_path = (
+        model_dir / "reports" / "fp8_e5m2_stress" / "run_1" / "evaluation.report.json"
+    )
+    baseline_violations = [
+        ("model.layers.0.self_attn.q_proj", "attn", 7.7),
+        ("model.layers.0.self_attn.k_proj", "attn", 3.2),
+    ]
+    subject_violations = [
+        *baseline_violations,
+        ("model.layers.4.mlp.gate_proj", "ffn", 9.1),
+    ]
+    validation = {
+        "invariants_pass": True,
+        "primary_metric_acceptable": True,
+        "spectral_stable": True,
+        "rmt_stable": True,
+        "preview_final_drift_acceptable": True,
+        "guard_overhead_acceptable": True,
+    }
+    _write_cert(
+        baseline_path,
+        validation=validation,
+        invariants_status="pass",
+        spectral_caps_applied=2,
+        spectral_violations=baseline_violations,
+    )
+    _write_cert(
+        subject_path,
+        validation=validation,
+        invariants_status="pass",
+        spectral_caps_applied=3,
+        spectral_violations=subject_violations,
+    )
+
+    verdict = _run_verdict_with_manifest(repo_root, output_dir, manifest_path)
+
+    assert verdict["verdict"] == "PASS"
+    [record] = verdict["records"]
+    assert record["detectors_hit"] is True
+    assert record["primary_guard_hit"] is True
+    spectral = record["guard_baseline_relative"]["spectral"]
+    assert spectral["new_caps_applied"] == 1
+    assert spectral["delta_caps_applied"] == 1
+
+
+def test_verdict_contract_rejects_guard_value_when_rmt_signal_is_baseline(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    output_dir = tmp_path / "run"
+    manifest_path = tmp_path / "scenarios.json"
+    _write_guard_value_manifest(
+        manifest_path,
+        scenario_id="rmt_norm_noise",
+        category="error_injection",
+        primary_guard="rmt",
+    )
+
+    model_dir = output_dir / "mistral-7b"
+    baseline_path = (
+        model_dir
+        / "baseline_reports"
+        / "ci_balanced_seq512_pv4_fn4"
+        / "baseline_report.json"
+    )
+    subject_path = (
+        model_dir
+        / "reports"
+        / "errors"
+        / "rmt_norm_noise"
+        / "evaluation.report.json"
+    )
+    validation = {
+        "invariants_pass": True,
+        "primary_metric_acceptable": True,
+        "spectral_stable": True,
+        "rmt_stable": False,
+        "preview_final_drift_acceptable": True,
+        "guard_overhead_acceptable": True,
+    }
+    _write_cert(baseline_path, validation=validation, invariants_status="pass")
+    _write_cert(subject_path, validation=validation, invariants_status="pass")
+
+    verdict = _run_verdict_with_manifest(repo_root, output_dir, manifest_path)
+
+    assert verdict["verdict"] == "FAIL"
+    assert any(
+        req.get("requirement") == "scenario_primary_guard_signal"
+        and req.get("scenario") == "rmt_norm_noise"
+        for req in verdict.get("failed_requirements", [])
+    )
+    [record] = verdict["records"]
+    assert record["detectors_hit"] is False
+    assert record["primary_guard_hit"] is False
+    rmt = record["guard_baseline_relative"]["rmt"]
+    assert rmt["baseline_signal"] is True
+    assert rmt["subject_signal"] is True
+    assert rmt["relative_signal"] is False
 
 
 def test_verdict_contract_supports_detectors_all_of(tmp_path: Path) -> None:

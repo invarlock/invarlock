@@ -187,16 +187,19 @@ invarlock verify --profile release --assurance report \
   public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/fp8_e5m2_stress/run_2/evaluation.report.json
 ```
 
-Expected outcome: verification passes, but the packaged
-`guard_value_summary.json` records the guard value: the primary metric accepts
-`fp8_e5m2_stress` (`ratio_vs_baseline = 1.0248910150012365`), while the scenario
-contract records a required spectral intervention (`spectral.caps_applied = 2`).
-The same artifact includes `scale_explosion` and `rank_collapse` expected-failure
-reports from the same GPU run to show the stronger spectral detection path.
+Expected outcome: verification passes for the FP8 report itself. The packaged
+`guard_value_summary.json` now treats this as historical scenario evidence, not
+as current baseline-relative guard-value proof: the primary metric accepts
+`fp8_e5m2_stress` (`ratio_vs_baseline = 1.0248910150012365`), but the two
+spectral caps match the Mistral noop basis. The same artifact includes
+`scale_explosion` and `rank_collapse` expected-failure reports from the same GPU
+run to show stronger spectral detection paths, but those faults also fail the
+primary metric.
 
 This is not a strict spectral-failure example: `validation.spectral_stable`
-remains true because the spectral cap budget is not exceeded. It is the shipped
-real-run counterpart to the synthetic caught-regression fixtures.
+remains true because the spectral cap budget is not exceeded. Future
+guard-value evidence-pack scenarios use baseline-relative guard detectors so
+baseline-only guard signals do not count as new guard catches.
 
 ## Policy failures
 

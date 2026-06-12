@@ -145,6 +145,25 @@ pack_report_rel_path() {
     printf '%s/%s\n' "${model}" "${remainder}"
 }
 
+pack_baseline_report_rel_path() {
+    local run_dir="$1"
+    local report_path="$2"
+    local rel="${report_path#"${run_dir}/"}"
+    local model="${rel%%/*}"
+    local remainder="${rel#*/baseline_reports/}"
+    if [[ -z "${model}" || "${remainder}" == "${rel}" ]]; then
+        return 1
+    fi
+    printf '%s/%s\n' "${model}" "${remainder}"
+}
+
+pack_collect_baseline_reports() {
+    local run_dir="$1"
+    find "${run_dir}" \
+        -type d -name ".*.tmp.*" -prune \
+        -o -type f -path "*/baseline_reports/*/baseline_report.json" -print | sort
+}
+
 pack_generate_html() {
     local pack_dir="$1"
     local report
@@ -495,6 +514,14 @@ pack_populate_pack_dir() {
     pack_copy_optional "${run_dir}/state/tuned_edit_params.json" "${tuned_edit_params_dest}"
     pack_write_source_repo_metadata "${source_repo_dest}" || return $?
     pack_write_environment_metadata "${run_dir}" "${environment_dest}" || return $?
+
+    local baseline_report
+    while IFS= read -r baseline_report; do
+        [[ -n "${baseline_report}" ]] || continue
+        local baseline_rel
+        baseline_rel="$(pack_baseline_report_rel_path "${run_dir}" "${baseline_report}")" || continue
+        pack_copy_optional "${baseline_report}" "${metadata_dir}/baseline_reports/${baseline_rel}"
+    done < <(pack_collect_baseline_reports "${run_dir}")
 
     local report
     while IFS= read -r report; do

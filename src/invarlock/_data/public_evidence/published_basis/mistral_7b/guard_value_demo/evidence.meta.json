@@ -11,15 +11,15 @@
   "model_revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",
   "non_goals": [
     "This is real scenario evidence from Mistral-7B, not a synthetic caught-regression fixture.",
-    "The FP8 stress scenario is a guard-intervention demonstration, not a release-strict report failure: validation.spectral_stable remains true because the spectral cap budget is not exceeded.",
+    "The FP8 stress scenario is retained as a historical sentinel, not a current baseline-relative guard-value proof: its two spectral caps match the noop basis.",
     "The two fault-injection scenarios are expected failures and are used to demonstrate detection-path behavior, not acceptable model edits.",
     "Reports were generated with report assurance, so verifier commands use --assurance report rather than --assurance strict."
   ],
   "profile": "release/report-assurance",
   "schema": "invarlock.public_evidence.meta.v1",
-  "summary": "Real Mistral-7B guard-value demo where a PM-only FP8 stress lane passes while the spectral guard records a required intervention; paired fault-injection reports show spectral detection paths from the same GPU run.",
+  "summary": "Real Mistral-7B scenario pack retaining a PM-accepted FP8 sentinel whose spectral caps match the noop basis; stronger paired fault-injection reports show spectral detection paths but are not PM-passing guard-value proofs.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/fp8_e5m2_stress/run_2/evaluation.report.json --profile release --assurance report",
-    "uv run pytest tests/ci/test_golden_runs_offline.py::test_real_guard_value_demo_records_pm_only_pass_with_spectral_intervention"
+    "uv run pytest tests/ci/test_golden_runs_offline.py::test_real_guard_value_demo_marks_fp8_as_historical_sentinel"
   ]
 }

@@ -1,5 +1,6 @@
 {
   "final_verdict": {
+    "contract_scope": "historical_subject_only_spectral_cap_detector",
     "counts": {
       "catastrophic_required_fail": 0,
       "catastrophic_required_present": 0,
@@ -20,21 +21,36 @@
       "stress_fail": 0,
       "stress_total": 1
     },
+    "current_contract_reason": "The packaged FP8 stress run records the same two attention-family spectral caps as the Mistral noop basis; current guard-value evidence requires a new guard signal relative to baseline.",
+    "current_contract_verdict": "not_a_baseline_relative_guard_value_proof",
     "failed_requirements": [],
     "report": "artifact_package/reports/final_verdict.json",
     "verdict": "PASS"
   },
   "generated_at_utc": "2026-06-12T07:25:12.349480",
   "pm_only_vs_pm_plus_guards": {
+    "baseline_relative_guard_hit": false,
+    "baseline_relative_issue": {
+      "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+      "baseline_spectral_caps_applied": 2,
+      "delta_caps_applied": 0,
+      "matching_capped_modules": [
+        "model.layers.0.self_attn.q_proj",
+        "model.layers.0.self_attn.k_proj"
+      ],
+      "new_caps_applied": 0,
+      "subject_spectral_caps_applied": 2
+    },
     "drift_band": {
       "max": 1.086,
       "min": 0.8878
     },
+    "historical_primary_guard_hit": true,
     "pm_only_basis": "validation.primary_metric_acceptable is true and ratio_vs_baseline remains inside the release drift band.",
     "pm_only_verdict": "accept",
-    "pm_plus_guards_basis": "scenario strictness is must_detect and the spectral primary guard hit is recorded through spectral_caps_applied >= 1.",
-    "pm_plus_guards_verdict": "guard_intervention_recorded",
-    "primary_guard_hit": true,
+    "pm_plus_guards_basis": "Not accepted under the current baseline-relative guard-value contract: the two spectral caps in this FP8 report match the Mistral noop basis, with no new capped module or cap-count increase shown by the packaged evidence.",
+    "pm_plus_guards_verdict": "not_proven_baseline_relative",
+    "primary_guard_hit": false,
     "primary_guard_required": true,
     "primary_metric_acceptable": true,
     "primary_metric_display_ci": [
@@ -57,14 +73,28 @@
   },
   "scenario_evidence": [
     {
+      "baseline_relative_guard_hit": false,
+      "baseline_relative_issue": {
+        "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+        "baseline_spectral_caps_applied": 2,
+        "delta_caps_applied": 0,
+        "matching_capped_modules": [
+          "model.layers.0.self_attn.q_proj",
+          "model.layers.0.self_attn.k_proj"
+        ],
+        "new_caps_applied": 0,
+        "subject_spectral_caps_applied": 2
+      },
       "category": "stress",
-      "detectors_hit": true,
+      "detectors_hit": false,
       "failure_class": "stress_edit.fp8_quant",
+      "historical_detectors_hit": true,
+      "historical_primary_guard_hit": true,
       "intent": "subtle_detectable",
       "invariants_pass": true,
       "passed": true,
       "primary_guard": "spectral",
-      "primary_guard_hit": true,
+      "primary_guard_hit": false,
       "primary_metric_acceptable": true,
       "primary_metric_display_ci": [
         1.0215452269419114,
@@ -155,7 +185,7 @@
   "schema": "invarlock.public_evidence.guard_value_demo.v1",
   "scope_boundaries": [
     "This is real scenario evidence from Mistral-7B, not a synthetic caught-regression fixture.",
-    "The FP8 stress scenario is a guard-intervention demonstration, not a release-strict report failure: validation.spectral_stable remains true because the spectral cap budget is not exceeded.",
+    "The FP8 stress scenario is retained as a historical sentinel, not a current baseline-relative guard-value proof: its two spectral caps match the noop basis.",
     "The two fault-injection scenarios are expected failures and are used to demonstrate detection-path behavior, not acceptable model edits.",
     "Reports were generated with report assurance, so verifier commands use --assurance report rather than --assurance strict."
   ],
@@ -171,5 +201,5 @@
     ],
     "suite": "subset"
   },
-  "summary": "Real Mistral-7B guard-value scenario pack: a PM-only FP8 stress lane passes while the spectral guard records a required intervention, with two spectral fault injections detected in the same run."
+  "summary": "Real Mistral-7B scenario pack: the FP8 stress lane is a PM-accepted historical sentinel whose spectral caps match the noop basis, while the stronger scale/rank fault injections show spectral detection paths but also fail PM."
 }

@@ -16,8 +16,10 @@ test_run_pack_collect_reports_ignores_hidden_pack_staging_dirs() {
 
     local run_dir="${TEST_TMPDIR}/run"
     mkdir -p "${run_dir}/modelA/reports/edit/run_1"
+    mkdir -p "${run_dir}/modelA/baseline_reports/ci_balanced_seq512_pv4_fn4"
     mkdir -p "${run_dir}/.evidence_pack.tmp.stale/reports/modelA/edit/run_1"
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
+    echo "{}" > "${run_dir}/modelA/baseline_reports/ci_balanced_seq512_pv4_fn4/baseline_report.json"
     echo "{}" > "${run_dir}/.evidence_pack.tmp.stale/reports/modelA/edit/run_1/evaluation.report.json"
 
     local reports
@@ -45,6 +47,7 @@ test_run_pack_build_pack_collects_artifacts() {
     local run_dir="${TEST_TMPDIR}/run"
     mkdir -p "${run_dir}/reports" "${run_dir}/analysis" "${run_dir}/state"
     mkdir -p "${run_dir}/modelA/reports/edit/run_1"
+    mkdir -p "${run_dir}/modelA/baseline_reports/ci_balanced_seq512_pv4_fn4"
 
     echo "verdict" > "${run_dir}/reports/final_verdict.txt"
     echo "{}" > "${run_dir}/reports/final_verdict.json"
@@ -53,6 +56,7 @@ test_run_pack_build_pack_collects_artifacts() {
     echo '{"schema":"evidence_pack_scenarios_v1","schema_version":1,"scenarios":[]}' > "${run_dir}/state/scenarios.json"
     echo '{"org/model":{"quant_rtn":{"bits":4}}}' > "${run_dir}/state/tuned_edit_params.json"
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
+    echo "{}" > "${run_dir}/modelA/baseline_reports/ci_balanced_seq512_pv4_fn4/baseline_report.json"
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/manifest.json"
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/runtime.manifest.json"
     cat > "${run_dir}/modelA/reports/edit/run_1/edit_metadata.json" <<'JSON'
@@ -136,6 +140,7 @@ EOF
     assert_file_exists "${pack_dir}/metadata/model_revisions.json" "revisions copied"
     assert_file_exists "${pack_dir}/metadata/scenarios.json" "scenarios manifest copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/evaluation.report.json" "report copied"
+    assert_file_exists "${pack_dir}/metadata/baseline_reports/modelA/ci_balanced_seq512_pv4_fn4/baseline_report.json" "baseline report copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/manifest.json" "report manifest copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/runtime.manifest.json" "runtime manifest copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/edit_metadata.json" "edit metadata copied"

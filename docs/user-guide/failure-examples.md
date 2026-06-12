@@ -102,9 +102,9 @@ route the run to exploratory/non-assurance review. See
 
 For a real model-run counterpart, inspect
 `public_evidence/published_basis/mistral_7b/guard_value_demo/guard_value_summary.json`.
-That artifact shows a Mistral 7B FP8 stress run where the primary metric passes
-but the evidence-pack scenario records a required spectral intervention. It is a
-guard-intervention example, not a strict spectral-failure example.
+That artifact retains a Mistral 7B FP8 stress run where the primary metric
+passes, but the spectral caps match the noop basis. It is a historical
+evidence-pack sentinel, not current baseline-relative guard-value proof.
 
 ## Development Fallback
 

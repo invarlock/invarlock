@@ -39,6 +39,7 @@ except ImportError:  # pragma: no cover - direct module load under pytest
 try:
     from .verdict.records import (
         _build_scenario_catalog,
+        _collect_baseline_reports,
         _collect_latest_reports,
         _collect_records,
         _scenario_detectors,
@@ -46,6 +47,7 @@ try:
 except ImportError:  # pragma: no cover - direct module load under pytest
     from verdict.records import (
         _build_scenario_catalog,
+        _collect_baseline_reports,
         _collect_latest_reports,
         _collect_records,
         _scenario_detectors,
@@ -466,9 +468,11 @@ def generate_verdict(
     manifest = _load_scenarios_manifest(manifest_path)
     catalog = _build_scenario_catalog(manifest)
     latest = _collect_latest_reports(output_dir)
+    baseline_reports = _collect_baseline_reports(output_dir)
     records, model_names = _collect_records(
         latest,
         scenario_index=catalog.scenario_index,
+        baseline_reports=baseline_reports,
     )
     by_key: dict[tuple[str, str, str], dict[str, Any]] = {
         (record["model"], record["category"], record["name"]): record

@@ -257,8 +257,9 @@
             "expected": true
           },
           {
-            "kind": "spectral_caps_applied",
-            "min": 1
+            "kind": "guard_signal_baseline_relative",
+            "guard": "spectral",
+            "min_new_modules": 1
           }
         ]
       },
