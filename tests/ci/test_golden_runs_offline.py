@@ -285,6 +285,20 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
         "manual_probe_spectral_moderate_scale_attn_l31_o_s112.log"
         in manifest_paths
     )
+    assert (
+        "artifact_package/reports/guard_value_all_guard_probe_sweep.json"
+        in manifest_paths
+    )
+    assert (
+        "artifact_package/logs/tasks/"
+        "manual_confirm_rmt_norm_noise_l31_ffn_up_b030.log"
+        in manifest_paths
+    )
+    assert (
+        "artifact_package/logs/tasks/"
+        "manual_confirm_ve_mlp_scale_skew_l31_down_s090.log"
+        in manifest_paths
+    )
     for entry in manifest["files"]:
         path = demo_dir / entry["path"]
         assert path.is_file(), entry["path"]
@@ -326,6 +340,73 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
     assert control["baseline_relative_guard_hit"] is False
     assert control["baseline_relative_evidence"]["new_caps_applied"] == 0
     assert control["spectral_caps_applied"] == 2
+
+    all_guard = json.loads(
+        (
+            demo_dir
+            / "artifact_package"
+            / "reports"
+            / "guard_value_all_guard_probe_sweep.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert all_guard["published_cases"] == [
+        "spectral_moderate_scale_mlp_l31_up_s112",
+        "rmt_norm_noise_l31_ffn_up_b030",
+        "ve_mlp_scale_skew_l31_down_s090",
+    ]
+    assert all_guard["method"]["clean_confirmation_required"] is True
+    assert (
+        summary["all_guard_probe_sweep"]["guard_status"]["invariants"]
+        == "not_a_statistical_margin_sweep"
+    )
+
+    rmt = all_guard["guard_results"]["rmt"]
+    assert rmt["status"] == "published_reproduced_positive"
+    assert rmt["baseline_relative_guard_hit"] is True
+    assert rmt["clean_confirmation"]["primary_metric_acceptable"] is True
+    assert rmt["clean_confirmation"]["ratio_vs_baseline"] == 1.0027430699936888
+    rmt_probe = rmt["clean_confirmation"]["rmt_probe"]
+    assert rmt_probe["stable"] is False
+    assert rmt_probe["epsilon_violations"] == [
+        {
+            "allowed": 15.266412610841739,
+            "delta": 0.12714696522015934,
+            "edge_base": 15.115260010734394,
+            "edge_cur": 17.037119449612906,
+            "epsilon": 0.01,
+            "family": "ffn",
+            "module": "model.layers.31.mlp.up_proj",
+        }
+    ]
+    rmt_report_path = demo_dir / rmt["clean_confirmation"]["report"]
+    rmt_report = json.loads(rmt_report_path.read_text(encoding="utf-8"))
+    assert validate_report(rmt_report) is True
+    assert rmt_report["validation"]["primary_metric_acceptable"] is True
+    assert run_verify_reports(
+        [rmt_report_path],
+        profile="release",
+        assurance_mode="report",
+    ).outcome == VerifyOutcome.OK
+
+    variance = all_guard["guard_results"]["variance"]
+    assert variance["status"] == "published_reproduced_positive"
+    assert variance["baseline_relative_guard_hit"] is True
+    assert variance["baseline_self_probe"]["signal"] is False
+    assert variance["clean_confirmation"]["primary_metric_acceptable"] is True
+    assert variance["clean_confirmation"]["ratio_vs_baseline"] == 1.0002479838633067
+    ve_probe = variance["clean_confirmation"]["ve_probe"]
+    assert ve_probe["signal"] is True
+    assert ve_probe["ab_gain"] == 0.003181692426797744
+    assert ve_probe["abs_improvement"] == 0.554556828832176
+    ve_report_path = demo_dir / variance["clean_confirmation"]["report"]
+    ve_report = json.loads(ve_report_path.read_text(encoding="utf-8"))
+    assert validate_report(ve_report) is True
+    assert ve_report["validation"]["primary_metric_acceptable"] is True
+    assert run_verify_reports(
+        [ve_report_path],
+        profile="release",
+        assurance_mode="report",
+    ).outcome == VerifyOutcome.OK
 
     sweep = json.loads(
         (

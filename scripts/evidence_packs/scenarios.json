@@ -1016,6 +1016,135 @@
       "run_directory_contains_edit_artifacts": true
     },
     {
+      "id": "rmt_norm_noise_l31_ffn_up_b030",
+      "suites": [
+        "mistral_guard_value"
+      ],
+      "category": "error_injection",
+      "failure_class": "rmt.targeted_ffn_anisotropy",
+      "strictness": "informational",
+      "intent": "subtle_detectable",
+      "primary_guard": "rmt",
+      "generation": {
+        "kind": "error",
+        "error_type": "rmt_norm_noise_l31_ffn_up_b030",
+        "env": {
+          "INVARLOCK_RMT_PROBE_MODE": "anisotropy",
+          "INVARLOCK_RMT_ANISO_BLEND": "0.30",
+          "INVARLOCK_RMT_ANISO_ROW_FRAC": "0.20",
+          "INVARLOCK_RMT_ANISO_MAX_ROWS": "192",
+          "INVARLOCK_RMT_ANISO_MAX_PARAMS": "1",
+          "INVARLOCK_RMT_ANISO_TARGET_FAMILY": "ffn",
+          "INVARLOCK_RMT_ANISO_TARGET_PARAMS": "up_proj",
+          "INVARLOCK_RMT_ANISO_TARGET_LAYERS": "31",
+          "INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS": "1",
+          "INVARLOCK_RMT_ANISO_JITTER": "0.01",
+          "INVARLOCK_RMT_ANISO_ROW_SELECTION": "random",
+          "INVARLOCK_RMT_ANISO_SEED": "42"
+        }
+      },
+      "requirements": {
+        "detectors_all_of": [
+          {
+            "kind": "validation_flag",
+            "flag": "primary_metric_acceptable",
+            "expected": true
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "invariants_pass",
+            "expected": true
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "spectral_stable",
+            "expected": true
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "rmt_stable",
+            "expected": true
+          },
+          {
+            "kind": "rmt_probe",
+            "field": "stable",
+            "expected": false
+          },
+          {
+            "kind": "guard_signal_baseline_relative",
+            "guard": "rmt"
+          }
+        ],
+        "notes": "Model-specific Mistral guard-value probe. The normal compare-mode RMT report remains stable; the sidecar rmt_probe compares the same baseline and subject modules and records the baseline-relative edge-risk movement."
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
+    },
+    {
+      "id": "ve_mlp_scale_skew_l31_down_s090",
+      "suites": [
+        "mistral_guard_value"
+      ],
+      "category": "error_injection",
+      "failure_class": "variance.targeted_mlp_scale_skew",
+      "strictness": "informational",
+      "intent": "subtle_detectable",
+      "primary_guard": "variance",
+      "generation": {
+        "kind": "error",
+        "error_type": "ve_mlp_scale_skew_l31_down_s090",
+        "env": {
+          "INVARLOCK_VE_SCALE_FACTOR": "0.90",
+          "INVARLOCK_VE_MAX_PARAMS": "1",
+          "INVARLOCK_VE_TARGET_LAYERS": "31",
+          "INVARLOCK_VE_TARGET_FAMILY": "mlp",
+          "INVARLOCK_VE_SEED": "42"
+        }
+      },
+      "requirements": {
+        "detectors_all_of": [
+          {
+            "kind": "validation_flag",
+            "flag": "primary_metric_acceptable",
+            "expected": true
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "invariants_pass",
+            "expected": true
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "spectral_stable",
+            "expected": true
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "rmt_stable",
+            "expected": true
+          },
+          {
+            "kind": "ve_probe",
+            "field": "signal",
+            "expected": true
+          },
+          {
+            "kind": "guard_signal_baseline_relative",
+            "guard": "variance"
+          }
+        ],
+        "notes": "Model-specific Mistral guard-value probe. Public evidence also ships a baseline self-probe showing no VE signal, so the positive subject probe is interpreted baseline-relatively."
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
+    },
+    {
       "id": "ve_mlp_scale_skew_up",
       "suites": [
         "showcase",

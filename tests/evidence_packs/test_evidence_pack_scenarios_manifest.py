@@ -223,3 +223,40 @@ def test_missing_tensors_accepts_catastrophic_validation_failure_as_detection() 
         "flag": "primary_metric_acceptable",
         "expected": False,
     } in detectors
+
+
+def test_mistral_guard_value_scenarios_cover_rmt_and_variance_sidecars() -> None:
+    scenarios = _load_scenarios()
+    by_id = {str(item.get("id")): item for item in scenarios}
+
+    rmt = by_id["rmt_norm_noise_l31_ffn_up_b030"]
+    assert rmt["primary_guard"] == "rmt"
+    assert "mistral_guard_value" in rmt["suites"]
+    rmt_requirements = rmt["requirements"]
+    assert isinstance(rmt_requirements, dict)
+    rmt_detectors = rmt_requirements["detectors_all_of"]
+    assert {
+        "kind": "rmt_probe",
+        "field": "stable",
+        "expected": False,
+    } in rmt_detectors
+    assert {
+        "kind": "guard_signal_baseline_relative",
+        "guard": "rmt",
+    } in rmt_detectors
+
+    variance = by_id["ve_mlp_scale_skew_l31_down_s090"]
+    assert variance["primary_guard"] == "variance"
+    assert "mistral_guard_value" in variance["suites"]
+    ve_requirements = variance["requirements"]
+    assert isinstance(ve_requirements, dict)
+    ve_detectors = ve_requirements["detectors_all_of"]
+    assert {
+        "kind": "ve_probe",
+        "field": "signal",
+        "expected": True,
+    } in ve_detectors
+    assert {
+        "kind": "guard_signal_baseline_relative",
+        "guard": "variance",
+    } in ve_detectors
