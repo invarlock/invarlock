@@ -34,7 +34,7 @@ intentionally kept out of included preset inventory.
 | --- | --- | --- | --- |
 | GPT-2 causal LM | `published_basis` | `openai-community/gpt2` | Public lane derived from `gpt2-causal-hf`. |
 | BERT / RoBERTa MLM | `published_basis` | `bert-base-uncased`, `roberta-base` | Public lane derived from `bert-mlm-hf`. |
-| Mistral 7B causal LM | `published_basis` | `mistralai/Mistral-7B-v0.1` | Public container-backed evidence fixture is included. |
+| Mistral 7B causal LM | `published_basis` | `mistralai/Mistral-7B-v0.1` | Public container-backed evidence fixture is included, plus a real guard-value scenario package with PM-pass, baseline-relative spectral/RMT/variance evidence. |
 | Ministral 3 8B causal LM (text-only eval) | `published_basis` | `mistralai/Ministral-3-8B-Instruct-2512-BF16` | Public container-backed evidence fixture is included. |
 | Ministral 3 14B causal LM (text-only eval) | `published_basis` | `mistralai/Ministral-3-14B-Instruct-2512-BF16` | Public container-backed evidence fixture is included. |
 | TinyLlama 1.1B causal LM | `published_basis` | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Public container-backed evidence fixture is included. |

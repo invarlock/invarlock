@@ -53,6 +53,22 @@ Workflow boundaries:
 | Verification | `verify_pack.sh`, Python verification helpers | Offline-first; signing-key pinning is forwarded when supplied. |
 | Remote/GPU campaigns | scenario manifests and model evidence sweep callers | Keep campaign-specific state out of root `scripts/`. |
 
+Guard-value publishing rule:
+
+- PM-only acceptance is necessary but not enough.
+- A public guard-value case must compare against the matching noop baseline and
+  count only baseline-relative guard movement, such as a new capped spectral
+  module, an increased cap count, an RMT epsilon violation relative to baseline,
+  or a VE sidecar signal absent from the baseline self-probe.
+- This is stricter than ordinary paired evaluation: the primary metric already
+  compares baseline and subject, while guard-value publishing also requires the
+  guard signal itself to move beyond the no-op basis.
+- Clean confirmation reruns are required before publishing a case as guard-value
+  evidence.
+- The current reference package is
+  `public_evidence/published_basis/mistral_7b/guard_value_demo/`, especially
+  `artifact_package/reports/guard_value_all_guard_probe_sweep.json`.
+
 Breaking cleanup rule: scripts under `python/` are not public package APIs. If a
 helper is unreferenced or only exists as an internal compatibility shim, remove
 or move it in the same change that updates repo-owned shell callers, docs, and

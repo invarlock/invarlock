@@ -32,7 +32,7 @@
       "stress_total": 1
     },
     "current_contract_reason": "The selected FFN 1.12 run adds a new capped module relative to the published Mistral noop basis while validation.primary_metric_acceptable remains true.",
-    "current_contract_verdict": "baseline_relative_guard_value_proof",
+    "current_contract_verdict": "baseline_relative_guard_value_evidence",
     "failed_requirements": [],
     "report": "artifact_package/reports/final_verdict.json",
     "verdict": "PASS"
@@ -366,7 +366,7 @@
     "This is real scenario evidence from Mistral-7B, not a synthetic caught-regression fixture.",
     "The all-guard extension publishes PM-pass, baseline-relative evidence for spectral, RMT, and variance/VE sidecar guards.",
     "Invariants are structural checks and are required to pass in these PM-pass guard-value cases; no invariant-fail PM-pass flagship case is claimed here.",
-    "The selected reports do not mean every stock runtime cap or sidecar signal is an automatic release failure; they prove the evidence-pack PM+guard comparison can detect targeted regressions relative to noop.",
+    "The selected reports do not mean every stock runtime cap or sidecar signal is an automatic release failure; they demonstrate the evidence-pack PM+guard comparison can detect targeted regressions relative to noop.",
     "Reports were generated with report assurance, so verifier commands use --assurance report rather than --assurance strict."
   ],
   "source_run": {

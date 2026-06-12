@@ -283,8 +283,8 @@ Published assurance basis covers GPT-2, BERT, Mistral 7B, Ministral 3 3B,
 Ministral 3 8B, Ministral 3 14B, TinyLlama 1.1B, Gemma 4 E2B text-only,
 Granite 4.1 3B, Granite 4.1 8B, OLMo 2 7B, OLMo 2 13B, Qwen2 7B,
 Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B, DeepSeek-R1-Distill-Qwen 7B,
-DeepSeek-R1-0528-Qwen3 8B, DeepSeek-R1-Distill-Qwen 14B, and Phi-4
-text-only profiles. Repo-included
+DeepSeek-R1-0528-Qwen3 8B, DeepSeek-R1-Distill-Qwen 14B, and Phi-4 text-only
+profiles. Repo-included
 presets and pilot calibration configs for prepared practical-pick lanes do not
 become part of the published assurance basis until supporting artifacts are
 attached.
@@ -293,6 +293,10 @@ modern promoted families. They are null-behavior evidence and calibration
 inputs, but they do not re-derive the packaged spectral/RMT/variance tier
 constants; transferred attention caps remain budgeted sentinels until a
 family-specific null sweep supports an FPR interpretation.
+Mistral 7B additionally ships the current real guard-value scenario package:
+`public_evidence/published_basis/mistral_7b/guard_value_demo/` records PM-pass,
+baseline-relative spectral, RMT, and variance/VE evidence from clean
+confirmation reruns.
 Practical-pick families without tuned edit params or public evidence fixtures
 are tracked as `community_experimental` rows, even when a repo pilot preset and
 calibration config are already present. Access-gated vendor checkpoints are

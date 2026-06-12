@@ -253,6 +253,10 @@ A suite run writes artifacts under `OUTPUT_DIR` (default: `./evidence_pack_runs/
 - `reports/<model>/<edit>/<run>/edit_metadata.json`
 - `reports/**/rmt_probe.json` (optional sidecar; emitted by some scenarios, e.g. `rmt_norm_noise`)
 - `reports/**/ve_probe.json` (optional sidecar; emitted by VE demo scenarios, e.g. `ve_mlp_scale_skew`)
+- public guard-value packages may also include
+  `reports/guard_value_all_guard_probe_sweep.json`; the Mistral 7B public
+  package uses this file to record PM-pass, baseline-relative spectral, RMT, and
+  variance/VE evidence from clean confirmation reruns
 - `reports/**/deployable_artifact_validation.json`, `backend_inventory.json`, `memory_report.json`, `load_smoke.json`, and `inference_smoke.json` for deployable scenarios
 - `reports/**/evaluation.html` + `reports/**/verify.json`
 - `README.md` (reviewer summary), `manifest.json`, `checksums.sha256`

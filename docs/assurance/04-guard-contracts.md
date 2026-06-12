@@ -294,10 +294,12 @@ Detailed derivations are in the calibration appendix (`09-tier-v1-calibration.md
 - Adversarial robustness and gradient masking require separate evidence.
 - CUDA kernels outside deterministic mode may exceed drift tolerances.
 - Reference mask-based flows are conservative; stronger compression requires plugins.
-- Published assurance basis covers GPT-2, BERT, Mistral 7B, Ministral 3 8B,
-  Ministral 3 14B, TinyLlama 1.1B, OLMo 2 13B, Qwen2 7B, Qwen2.5 7B,
-  Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B, DeepSeek-R1-Distill-Qwen 7B, and
-  Phi-4 text-only profiles.
+- Published assurance basis covers GPT-2, BERT, Mistral 7B, Ministral 3 3B,
+  Ministral 3 8B, Ministral 3 14B, TinyLlama 1.1B, Gemma 4 E2B text-only,
+  Granite 4.1 3B, Granite 4.1 8B, OLMo 2 7B, OLMo 2 13B, Qwen2 7B,
+  Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B,
+  DeepSeek-R1-Distill-Qwen 7B, DeepSeek-R1-0528-Qwen3 8B,
+  DeepSeek-R1-Distill-Qwen 14B, and Phi-4 text-only profiles.
 - Modern published-basis no-op reports are null-behavior evidence for guard
   observations. They do not by themselves re-derive packaged tier constants;
   transferred attention caps are budgeted sentinels until family-specific

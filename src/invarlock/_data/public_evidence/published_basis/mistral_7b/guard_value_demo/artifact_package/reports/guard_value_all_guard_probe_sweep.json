@@ -287,13 +287,13 @@
     "same_mistral_baseline_reused": true,
     "selection_rule": "For statistical guards, target modules or statistics nearest their guard margin, sweep small edits, require PM acceptable, then count only baseline-relative movement reproduced by a clean rerun."
   },
-  "not_counted_as_all_guard_proof": [
+  "not_counted_as_published_all_guard_evidence": [
     {
-      "reason": "PM-pass sidecar-positive exploratory sweep, but not selected as the published proof because the FFN case has larger reproduced movement.",
+      "reason": "PM-pass sidecar-positive exploratory sweep, but not selected as the published evidence case because the FFN case has larger reproduced movement.",
       "scenario_id": "rmt_norm_noise_l31_attn_o_b030"
     },
     {
-      "reason": "PM-pass sidecar-positive exploratory sweep, but not selected as the published proof because the FFN case has larger reproduced movement.",
+      "reason": "PM-pass sidecar-positive exploratory sweep, but not selected as the published evidence case because the FFN case has larger reproduced movement.",
       "scenario_id": "rmt_norm_noise_l31_attn_o_b050"
     }
   ],

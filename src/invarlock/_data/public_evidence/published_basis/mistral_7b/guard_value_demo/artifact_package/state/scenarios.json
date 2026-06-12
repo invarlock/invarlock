@@ -9,7 +9,7 @@
       "Optional sidecar probe artifacts (for example rmt_probe.json) can provide detector evidence when compare-mode guards are delta-internal.",
       "Scenarios can declare suites: [\"subset\", \"showcase\", \"workshop3\", \"full\", ...]; the suite filters to PACK_SUITE and writes the effective manifest to OUTPUT_DIR/state/scenarios.json.",
       "artifact_class labels each scenario as validation_subject_checkpoint, deployable_optimized_subject, fault_injection_fixture, or evidence_only_pack.",
-      "fp8_e5m2_stress is retained as historical context and is informational in this package; spectral_moderate_scale_mlp_l31_up_s112 is the active baseline-relative guard-value proof."
+      "fp8_e5m2_stress is retained as historical context and is informational in this package; spectral_moderate_scale_mlp_l31_up_s112 is the active no-op-baseline guard-value evidence case."
     ],
     "purpose": "Single source of truth for evidence-pack scenarios and their assurance expectations.",
     "scenario_ids_filter": [

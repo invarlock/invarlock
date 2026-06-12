@@ -55,6 +55,11 @@ The `public_evidence/` tree separates verifier fixtures from real runs. Fixtures
 validate report, runtime-manifest, failure-policy, and evidence-pack contracts;
 `public_evidence/real_runs/` contains concrete GPT-2-family `invarlock evaluate`
 runs with signed, fingerprint-pinned evidence packs.
+The strongest public guard-value artifact is the Mistral 7B scenario package at
+`public_evidence/published_basis/mistral_7b/guard_value_demo/`: PM-only accepts
+the selected edits, while the evidence-pack PM+guards comparison records
+baseline-relative spectral, RMT, and variance/VE guard movement from clean
+reruns.
 
 ## Why InvarLock?
 

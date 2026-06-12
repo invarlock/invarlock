@@ -286,7 +286,7 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
     )
     assert (
         summary["final_verdict"]["current_contract_verdict"]
-        == "baseline_relative_guard_value_proof"
+        == "baseline_relative_guard_value_evidence"
     )
     manifest_paths = {entry["path"] for entry in manifest["files"]}
     assert (
@@ -463,6 +463,43 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
             assurance_mode="report",
         )
         assert result.outcome == VerifyOutcome.POLICY_FAIL
+
+
+def test_public_docs_route_to_mistral_guard_value_evidence() -> None:
+    docs = {
+        "README.md": REPO_ROOT / "README.md",
+        "public_evidence/README.md": REPO_ROOT / "public_evidence" / "README.md",
+        "scripts/evidence_packs/README.md": (
+            REPO_ROOT / "scripts" / "evidence_packs" / "README.md"
+        ),
+        "docs/user-guide/evidence-packs-internals.md": (
+            REPO_ROOT / "docs" / "user-guide" / "evidence-packs-internals.md"
+        ),
+        "docs/reference/guards.md": REPO_ROOT / "docs" / "reference" / "guards.md",
+    }
+
+    for label, path in docs.items():
+        text = path.read_text(encoding="utf-8")
+        assert (
+            "public_evidence/published_basis/mistral_7b/guard_value_demo" in text
+        ), label
+        assert "baseline-relative" in text, label
+
+    public_evidence_readme = docs["public_evidence/README.md"].read_text(
+        encoding="utf-8"
+    )
+    assert "PM-only accepts" in public_evidence_readme
+    assert "PM+guards" in public_evidence_readme
+    assert "caught_regressions/` entries remain useful verifier fixtures" in (
+        public_evidence_readme
+    )
+
+    pack_readme = docs["scripts/evidence_packs/README.md"].read_text(
+        encoding="utf-8"
+    )
+    assert "Guard-value publishing rule" in pack_readme
+    assert "Clean confirmation reruns are required" in pack_readme
+    assert "guard_value_all_guard_probe_sweep.json" in pack_readme
 
 
 def test_policy_failure_fixtures_fail_expected_policy_predicate() -> None:
