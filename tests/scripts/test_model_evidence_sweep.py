@@ -401,6 +401,75 @@ def test_select_specs_sharding_is_stable() -> None:
     assert second_shard == []
 
 
+def test_lane_resource_preflight_warns_for_underprovisioned_moe() -> None:
+    mod = load_script_module("model_evidence_sweep")
+    spec = next(
+        lane
+        for lane in mod.SUITES[mod.SUPPORT_MATRIX_BACKLOG_GPU_SUITE]
+        if lane.slug == "mistralai_mixtral_8x7b_v0_1"
+    )
+
+    underprovisioned = mod.lane_resource_preflight(
+        spec,
+        env={"CUDA_VISIBLE_DEVICES": "0"},
+        device="cuda",
+    )
+
+    assert underprovisioned is not None
+    assert underprovisioned["ok"] is False
+    assert underprovisioned["visible_cuda_devices"] == 1
+    assert underprovisioned["recommended_min_gpus_80gb"] >= 3
+    assert "recommended minimum" in underprovisioned["warning"]
+
+    provisioned = mod.lane_resource_preflight(
+        spec,
+        env={"CUDA_VISIBLE_DEVICES": "0,1,2,3"},
+        device="cuda",
+    )
+
+    assert provisioned is not None
+    assert provisioned["ok"] is True
+    assert "warning" not in provisioned
+
+
+def test_model_evidence_sweep_logs_resource_preflight_warning(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
+    fake_python = tmp_path / "fake-python"
+    write_fake_python(fake_python)
+    output_root = tmp_path / "evidence-moe-preflight"
+
+    env = dict(os.environ)
+    env["CUDA_VISIBLE_DEVICES"] = "0"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--suite",
+            "support-matrix-backlog-gpu",
+            "--slug",
+            "mistralai_mixtral_8x7b_v0_1",
+            "--output-root",
+            str(output_root),
+            "--python",
+            str(fake_python),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+        env=env,
+    )
+
+    assert proc.returncode == 1, proc.stderr
+    status_log = (output_root / "status.log").read_text(encoding="utf-8")
+    assert "WARN mistralai_mixtral_8x7b_v0_1 resource_preflight=" in status_log
+    assert "visible CUDA device count 1" in status_log
+
+
 def test_model_evidence_sweep_host_mode_emits_explicit_runtime_flags(
     tmp_path: Path,
 ) -> None:

@@ -38,6 +38,7 @@ from model_evidence_lanes import (  # noqa: E402
     SUPPORT_MATRIX_BACKLOG_GPU_SUITE,
     EvidenceLane,
     lane_requires_remote_code,
+    lane_resource_estimate,
     manifest_lane_ids,
     select_specs,
     supported_experimental_lane_ids,
@@ -617,6 +618,52 @@ def runtime_env() -> dict[str, str]:
     return env
 
 
+def _accelerator_requested(device: str) -> bool:
+    normalized = str(device or "").strip().lower()
+    return normalized in {"auto", "cuda"} or normalized.startswith("cuda:")
+
+
+def visible_cuda_device_count(env: dict[str, str]) -> int | None:
+    raw_value = env.get("CUDA_VISIBLE_DEVICES")
+    if raw_value is None or raw_value.strip() == "":
+        return None
+    normalized = raw_value.strip().lower()
+    if normalized in {"all", "gpu-all"}:
+        return None
+    if normalized in {"-1", "none", "void"}:
+        return 0
+    return len([item for item in raw_value.split(",") if item.strip()])
+
+
+def lane_resource_preflight(
+    spec: EvidenceLane,
+    *,
+    env: dict[str, str],
+    device: str,
+) -> dict[str, object] | None:
+    estimate = lane_resource_estimate(spec.model_id)
+    if estimate is None:
+        return None
+
+    visible_gpus = visible_cuda_device_count(env) if _accelerator_requested(device) else 0
+    recommended = int(estimate["recommended_min_gpus_80gb"])
+    payload: dict[str, object] = {
+        "resource_estimate": estimate,
+        "requested_device": device,
+        "visible_cuda_devices": visible_gpus,
+        "recommended_min_gpus_80gb": recommended,
+        "ok": True,
+    }
+    if visible_gpus is not None and visible_gpus < recommended:
+        payload["ok"] = False
+        payload["warning"] = (
+            f"visible CUDA device count {visible_gpus} is below the "
+            f"recommended minimum {recommended} for {spec.slug}; use --gpu-group "
+            "or CUDA_VISIBLE_DEVICES to expose enough devices for this lane"
+        )
+    return payload
+
+
 def _is_within_repo(path: Path) -> bool:
     try:
         path.resolve().relative_to(REPO_ROOT)
@@ -958,6 +1005,7 @@ def run_sweep(args: argparse.Namespace) -> int:
     execution_root = _execution_root(output_root, execution_mode=args.execution_mode)
     if execution_root != output_root:
         execution_root.mkdir(parents=True, exist_ok=True)
+    env = runtime_env()
     write_manifest(
         output_root,
         suite=args.suite,
@@ -971,6 +1019,11 @@ def run_sweep(args: argparse.Namespace) -> int:
             item = {
                 "slug": spec.slug,
                 "execution_mode": args.execution_mode,
+                "resource_preflight": lane_resource_preflight(
+                    spec,
+                    env=env,
+                    device=args.device,
+                ),
                 "evaluate": build_evaluate_command(
                     spec,
                     python_exe=args.python,
@@ -1024,11 +1077,16 @@ def run_sweep(args: argparse.Namespace) -> int:
         return 0
 
     status_log = output_root / "status.log"
-    env = runtime_env()
     results: list[LaneResult] = []
     with status_log.open("w", encoding="utf-8") as handle:
         handle.write(f"[{datetime.now(UTC).isoformat()}] START\n")
         for spec in specs:
+            preflight = lane_resource_preflight(spec, env=env, device=args.device)
+            if preflight and preflight.get("warning"):
+                handle.write(
+                    f"[{datetime.now(UTC).isoformat()}] WARN {spec.slug} "
+                    f"resource_preflight={preflight['warning']}\n"
+                )
             handle.write(f"[{datetime.now(UTC).isoformat()}] START {spec.slug}\n")
             handle.flush()
             result = run_lane(
