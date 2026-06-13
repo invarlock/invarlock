@@ -24,6 +24,15 @@ _VARIANCE_BATCHING_ERRORS = (
 )
 
 
+def release_batch_memory(device: torch.device | None) -> None:
+    if device is None or device.type != "cuda":
+        return
+    try:
+        torch.cuda.empty_cache()
+    except _VARIANCE_BATCHING_ERRORS:
+        pass
+
+
 @dataclass(frozen=True)
 class CalibrationBatchContext:
     window_ids: list[str]
@@ -265,8 +274,12 @@ def compute_ppl_for_batches(
 
     model_was_training = model.training
     model.eval()
-    with torch.no_grad():
+    with torch.inference_mode():
         for batch in batches:
+            prepared = None
+            inputs = None
+            labels = None
+            outputs = None
             try:
                 adapter_ref = getattr(guard, "_adapter_ref", None)
                 prepare_model_inputs = _resolve_adapter_hook(
@@ -333,6 +346,9 @@ def compute_ppl_for_batches(
                     token_counts.append(int(max(count, 0)))
             except (AttributeError, RuntimeError, TypeError, ValueError):
                 continue
+            finally:
+                del prepared, inputs, labels, outputs
+                release_batch_memory(device)
 
     if model_was_training:
         model.train()

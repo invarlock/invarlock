@@ -78,6 +78,7 @@ class HF_Seq2Seq_Adapter(HFAdapterMixin, ModelAdapter):
                 model = self._load_pretrained_model(
                     strategy.loader,
                     model_id,
+                    load_device=device,
                     **kwargs,
                 )
         except ModelLoadError:
@@ -94,6 +95,7 @@ class HF_Seq2Seq_Adapter(HFAdapterMixin, ModelAdapter):
                 model = self._load_pretrained_model(
                     auto_strategy.loader,
                     model_id,
+                    load_device=device,
                     **kwargs,
                 )
         return self._safe_to_device(model, device)

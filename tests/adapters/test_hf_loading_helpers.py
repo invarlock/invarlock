@@ -114,6 +114,73 @@ def test_resolve_torch_dtype_rejects_removed_aliases(monkeypatch):
         resolve_dtype({"dtype": "fp16"})
 
 
+@pytest.mark.unit
+def test_memory_efficient_load_defaults_apply_cuda_dtype_and_low_cpu(monkeypatch):
+    from invarlock.adapters.hf_loading import apply_memory_efficient_load_defaults
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "is_bf16_supported", lambda: True)
+
+    kwargs = apply_memory_efficient_load_defaults(
+        "Qwen/Qwen2.5-7B-Instruct",
+        {},
+        load_device="cuda",
+    )
+
+    assert kwargs["dtype"] is torch.bfloat16
+    assert kwargs["low_cpu_mem_usage"] is True
+    assert "device_map" not in kwargs
+
+
+@pytest.mark.unit
+def test_memory_efficient_load_defaults_device_map_large_moe(monkeypatch):
+    from invarlock.adapters.hf_loading import apply_memory_efficient_load_defaults
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "is_bf16_supported", lambda: False)
+
+    kwargs = apply_memory_efficient_load_defaults(
+        "mistralai/Mixtral-8x7B-v0.1",
+        {},
+        load_device="cuda",
+    )
+
+    assert kwargs["dtype"] is torch.float16
+    assert kwargs["device_map"] == "auto"
+    assert kwargs["low_cpu_mem_usage"] is True
+
+
+@pytest.mark.unit
+def test_memory_efficient_load_defaults_respect_cpu_and_opt_out(monkeypatch):
+    from invarlock.adapters.hf_loading import apply_memory_efficient_load_defaults
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "is_bf16_supported", lambda: True)
+
+    cpu_kwargs = apply_memory_efficient_load_defaults(
+        "mistralai/Mixtral-8x7B-v0.1",
+        {},
+        load_device="cpu",
+    )
+    assert "dtype" not in cpu_kwargs
+    assert "device_map" not in cpu_kwargs
+    assert cpu_kwargs["low_cpu_mem_usage"] is True
+
+    disabled_kwargs = apply_memory_efficient_load_defaults(
+        "mistralai/Mixtral-8x7B-v0.1",
+        {"memory_efficient_load": False, "dtype": "float16"},
+        load_device="cuda",
+    )
+    assert disabled_kwargs == {"dtype": torch.float16}
+
+    custom_dtype_kwargs = apply_memory_efficient_load_defaults(
+        "demo/model",
+        {"dtype": "float8_e4m3fn"},
+        load_device="cuda",
+    )
+    assert custom_dtype_kwargs["dtype"] == "float8_e4m3fn"
+
+
 def _write_local_config(path: Path, model_type: str) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     (path / "config.json").write_text(

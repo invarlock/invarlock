@@ -81,6 +81,7 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
                     model = self._load_pretrained_model(
                         strategy.loader,
                         model_id,
+                        load_device=device,
                         **kwargs,
                     )
             except ModelLoadError:
@@ -97,6 +98,7 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
                     model = self._load_pretrained_model(
                         auto_strategy.loader,
                         model_id,
+                        load_device=device,
                         **kwargs,
                     )
 

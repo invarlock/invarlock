@@ -296,7 +296,13 @@ def test_hf_multimodal_load_model_uses_resolved_strategy(
     assert adapter._last_model_id == "fake/model"
     assert adapter._last_loader_strategy == "direct_submodule"
     assert adapter._last_loader_label == "direct-loader"
-    assert calls == [("direct-loader", "fake/model", {"trust_remote_code": False})]
+    assert calls == [
+        (
+            "direct-loader",
+            "fake/model",
+            {"load_device": "cpu", "trust_remote_code": False},
+        )
+    ]
 
 
 def test_hf_multimodal_load_model_falls_back_to_auto_loader(

@@ -199,9 +199,16 @@ Adapter loaders pass through standard Hugging Face `from_pretrained` arguments:
 | --- | --- | --- |
 | `dtype` | Force `float16`/`bfloat16` | HF adapters |
 | `device_map` | Sharding/placement | HF adapters |
+| `low_cpu_mem_usage` | Reduce CPU peak during Hugging Face loads | HF adapters |
+| `memory_efficient_load` | Set `false` to opt out of InvarLock's automatic HF memory defaults | HF adapters |
 | `trust_remote_code` | Enable custom model code only with `INVARLOCK_ALLOW_REMOTE_CODE=1` for public `evaluate`; advanced model-loading commands also expose `--allow-remote-code` | HF adapters |
 | `revision` | Pin model revision | HF adapters |
 | `cache_dir` | Cache location | HF adapters |
+
+By default, HF adapters apply safe memory defaults at load time. Accelerated
+loads get a hardware-aware `dtype` when one is not configured, all HF loads use
+`low_cpu_mem_usage=True` unless overridden, and large/MoE model IDs get
+`device_map="auto"` on accelerated devices. Explicit config values always win.
 
 ### Adapter describe fields
 

@@ -191,6 +191,14 @@ class HFAdapterMixin:
         self._pretrained_load_diagnostics = ()
         prefer_local_files_only = bool(kwargs.pop("prefer_local_files_only", False))
         collect_loading_info = bool(kwargs.pop("collect_loading_info", True))
+        load_device = kwargs.pop("load_device", None)
+        from .hf_loading import apply_memory_efficient_load_defaults
+
+        kwargs = apply_memory_efficient_load_defaults(
+            model_id,
+            kwargs,
+            load_device=load_device,
+        )
         try:
             if not collect_loading_info:
                 if prefer_local_files_only:

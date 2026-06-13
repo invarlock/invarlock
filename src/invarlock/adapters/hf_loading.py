@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,9 @@ _torch_module: Any = _TORCH_UNSET
 _MISTRAL3_ARCH = "Mistral3For" + "ConditionalGeneration"
 _COERCE_ERRORS = (TypeError, ValueError, OverflowError)
 _CUDA_CAPABILITY_ERRORS = (AttributeError, RuntimeError, OSError)
+_MEMORY_EFFICIENT_TRUE = {"1", "true", "yes", "on", "auto"}
+_MEMORY_EFFICIENT_FALSE = {"0", "false", "no", "off", "disabled"}
+_AUTO_DEVICE_MAP_PARAM_THRESHOLD_B = 20.0
 
 _AUTO_LOADER_SPECS: dict[str, tuple[str, str]] = {
     "causal": ("transformers", "AutoModelForCausalLM"),
@@ -344,6 +348,133 @@ def resolve_dtype(kwargs: dict[str, Any] | None = None) -> Any:
     return default_dtype()
 
 
+def _estimate_params_b_from_model_id(model_id: str) -> float | None:
+    model_lower = model_id.lower()
+    if "mixtral" in model_lower or "8x7b" in model_lower:
+        return 47.0
+    if "30b-a3b" in model_lower:
+        return 30.0
+    if "26b-a4b" in model_lower:
+        return 26.0
+    if "1b-7b" in model_lower or "olmoe" in model_lower:
+        return 7.0
+
+    matches = [
+        float(match.group(1).replace("_", "."))
+        for match in re.finditer(r"(\d+(?:[._]\d+)?)\s*b\b", model_lower)
+    ]
+    return max(matches) if matches else None
+
+
+def _is_moe_model_id(model_id: str) -> bool:
+    model_lower = model_id.lower()
+    return any(
+        token in model_lower
+        for token in ("moe", "mixtral", "8x7b", "a3b", "a4b", "olmoe")
+    )
+
+
+def _accelerated_device_requested(load_device: Any | None) -> bool:
+    requested = "auto" if load_device is None else str(load_device).strip().lower()
+    if requested.startswith(("cuda", "mps", "xpu")):
+        return True
+    if requested != "auto":
+        return False
+
+    torch = _get_torch()
+    if torch is None:
+        return False
+    try:
+        if torch.cuda.is_available():
+            return True
+    except _CUDA_CAPABILITY_ERRORS:
+        pass
+    try:
+        return bool(
+            hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+        )
+    except _CUDA_CAPABILITY_ERRORS:
+        return False
+
+
+def _memory_efficient_load_enabled(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, bool):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in _MEMORY_EFFICIENT_FALSE:
+            return False
+        if normalized in _MEMORY_EFFICIENT_TRUE:
+            return True
+    return True
+
+
+def _normalize_explicit_load_dtype(value: Any) -> Any:
+    torch = _require_torch()
+    if isinstance(value, torch.dtype):
+        return value
+    if not isinstance(value, str):
+        return value
+
+    normalized = value.strip().lower()
+    known_values = {
+        "auto",
+        "float16",
+        "bfloat16",
+        "float32",
+        "fp16",
+        "half",
+        "bf16",
+        "fp32",
+    }
+    if normalized in known_values:
+        return resolve_dtype({"dtype": normalized})
+    return value
+
+
+def apply_memory_efficient_load_defaults(
+    model_id: str,
+    kwargs: dict[str, Any],
+    *,
+    load_device: Any | None = None,
+) -> dict[str, Any]:
+    """Apply shared HF loading defaults that reduce avoidable peak memory.
+
+    User-provided kwargs always win. The public config key remains `model.dtype`;
+    this helper only normalizes its value before handing kwargs to Hugging Face.
+    """
+    prepared = dict(kwargs)
+    enabled = _memory_efficient_load_enabled(prepared.pop("memory_efficient_load", None))
+
+    if "dtype" in prepared:
+        prepared["dtype"] = _normalize_explicit_load_dtype(prepared["dtype"])
+    elif enabled and _accelerated_device_requested(load_device):
+        prepared["dtype"] = default_dtype()
+
+    if not enabled:
+        return prepared
+
+    prepared.setdefault("low_cpu_mem_usage", True)
+
+    params_b = _estimate_params_b_from_model_id(model_id)
+    if (
+        "device_map" not in prepared
+        and _accelerated_device_requested(load_device)
+        and (
+            _is_moe_model_id(model_id)
+            or (
+                isinstance(params_b, int | float)
+                and params_b >= _AUTO_DEVICE_MAP_PARAM_THRESHOLD_B
+            )
+        )
+    ):
+        prepared["device_map"] = "auto"
+
+    return prepared
+
+
 def _normalize_model_type(value: Any) -> str | None:
     try:
         normalized = str(value or "").strip().lower()
@@ -473,6 +604,7 @@ def resolve_core_loader_strategy(
 
 __all__ = [
     "HFLoaderStrategy",
+    "apply_memory_efficient_load_defaults",
     "default_dtype",
     "resolve_core_loader_strategy",
     "resolve_dtype",

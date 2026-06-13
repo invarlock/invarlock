@@ -106,6 +106,7 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
                 model = self._load_pretrained_model(
                     strategy.loader,
                     model_id,
+                    load_device=device,
                     **kwargs,
                 )
         except ModelLoadError as exc:
@@ -133,6 +134,7 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
                         model = self._load_pretrained_model(
                             direct_strategy.loader,
                             model_id,
+                            load_device=device,
                             **kwargs,
                         )
                 except ModelLoadError as direct_exc:
@@ -153,6 +155,7 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
                         model = self._load_pretrained_model(
                             auto_strategy.loader,
                             model_id,
+                            load_device=device,
                             **kwargs,
                         )
                 except ModelLoadError as auto_exc:
@@ -169,6 +172,7 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
                         model = self._load_pretrained_model(
                             fallback_strategy.loader,
                             model_id,
+                            load_device=device,
                             **kwargs,
                         )
             else:
@@ -183,6 +187,7 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
                     model = self._load_pretrained_model(
                         fallback_strategy.loader,
                         model_id,
+                        load_device=device,
                         **kwargs,
                     )
 
