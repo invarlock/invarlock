@@ -9,6 +9,27 @@ import torch
 from invarlock.runtime_security import runtime_allowances_scope
 
 _MISTRAL3_ARCH = "Mistral3For" + "ConditionalGeneration"
+_MULTIMODAL_AUTO_LOADER_LABELS = [
+    "transformers.AutoModelForImageTextToText",
+    "transformers.AutoModelForMultimodalLM",
+    "transformers.AutoModelForVision2Seq",
+]
+
+
+def _support_matrix_multimodal_model_ids() -> list[str]:
+    root = Path(__file__).resolve().parents[2]
+    support_matrix = json.loads(
+        (root / "contracts/support_matrix.json").read_text(encoding="utf-8")
+    )
+    return sorted(
+        {
+            model_id
+            for lane in support_matrix["lanes"]
+            if lane.get("adapter") == "hf_multimodal"
+            for model_id in lane.get("representative_models", [])
+            if isinstance(model_id, str) and model_id
+        }
+    )
 
 
 @pytest.mark.unit
@@ -388,7 +409,7 @@ def test_resolve_core_loader_strategy_gemma4_unified_falls_back_to_multimodal_au
 
     assert strategy.strategy == "auto"
     assert strategy.model_type == "gemma4_unified"
-    assert strategy.loader_label == "transformers.AutoModelForMultimodalLM"
+    assert strategy.loader_label.split(" -> ") == _MULTIMODAL_AUTO_LOADER_LABELS
 
 
 @pytest.mark.unit
@@ -498,16 +519,8 @@ def test_resolve_core_loader_strategy_maps_phi4_mini_to_phi3_loader(
 
 
 @pytest.mark.unit
-def test_resolve_core_loader_strategy_maps_gemma4_12b_to_unified_auto(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_resolve_core_loader_strategy_maps_gemma4_12b_to_multimodal_fallback() -> None:
     import invarlock.adapters.hf_loading as hf_loading
-
-    monkeypatch.setattr(
-        hf_loading,
-        "_import_symbol",
-        lambda module_path, symbol_name: f"{module_path}.{symbol_name}",
-    )
 
     strategy = hf_loading.resolve_core_loader_strategy(
         task="multimodal",
@@ -517,7 +530,72 @@ def test_resolve_core_loader_strategy_maps_gemma4_12b_to_unified_auto(
 
     assert strategy.strategy == "auto"
     assert strategy.model_type == "gemma4_unified"
-    assert strategy.loader_label == "transformers.AutoModelForMultimodalLM"
+    assert strategy.loader_label.split(" -> ") == _MULTIMODAL_AUTO_LOADER_LABELS
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("model_id", _support_matrix_multimodal_model_ids())
+def test_resolve_core_loader_strategy_uses_multimodal_fallback_for_named_lanes(
+    model_id: str,
+) -> None:
+    import invarlock.adapters.hf_loading as hf_loading
+
+    strategy = hf_loading.resolve_core_loader_strategy(
+        task="multimodal",
+        model_id=model_id,
+        allow_direct_submodule=False,
+    )
+
+    assert strategy.strategy == "auto"
+    assert strategy.loader_label.split(" -> ") == _MULTIMODAL_AUTO_LOADER_LABELS
+
+
+@pytest.mark.unit
+def test_multimodal_auto_fallback_loader_tries_next_compatible_loader(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import invarlock.adapters.hf_loading as hf_loading
+
+    calls: list[str] = []
+
+    class IncompatibleImageTextLoader:
+        @staticmethod
+        def from_pretrained(model_id: str, **kwargs: object) -> object:
+            calls.append("AutoModelForImageTextToText")
+            raise ValueError("unsupported architecture")
+
+    class CompatibleMultimodalLoader:
+        @staticmethod
+        def from_pretrained(model_id: str, **kwargs: object) -> object:
+            calls.append("AutoModelForMultimodalLM")
+            return {"model_id": model_id, "kwargs": kwargs}
+
+    def _fake_import(module_path: str, symbol_name: str) -> object:
+        assert module_path == "transformers"
+        if symbol_name == "AutoModelForImageTextToText":
+            return IncompatibleImageTextLoader
+        if symbol_name == "AutoModelForMultimodalLM":
+            return CompatibleMultimodalLoader
+        raise AssertionError(f"unexpected fallback loader import: {symbol_name}")
+
+    monkeypatch.setattr(hf_loading, "_import_symbol", _fake_import)
+
+    strategy = hf_loading.resolve_core_loader_strategy(
+        task="multimodal",
+        model_id="google/gemma-3n-E4B-it",
+        allow_direct_submodule=False,
+    )
+
+    loaded = strategy.loader.from_pretrained(
+        "google/gemma-3n-E4B-it",
+        dtype="auto",
+    )
+
+    assert calls == ["AutoModelForImageTextToText", "AutoModelForMultimodalLM"]
+    assert loaded == {
+        "model_id": "google/gemma-3n-E4B-it",
+        "kwargs": {"dtype": "auto"},
+    }
 
 
 @pytest.mark.unit

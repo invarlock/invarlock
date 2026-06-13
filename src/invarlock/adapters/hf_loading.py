@@ -30,13 +30,15 @@ _AUTO_LOADER_SPECS: dict[str, tuple[str, str]] = {
     "causal": ("transformers", "AutoModelForCausalLM"),
     "mlm": ("transformers", "AutoModelForMaskedLM"),
     "mlm_base": ("transformers", "AutoModel"),
-    "multimodal": ("transformers", "AutoModelForImageTextToText"),
     "seq2seq": ("transformers", "AutoModelForSeq2SeqLM"),
 }
 
-_AUTO_LOADER_MODEL_TYPE_SPECS: dict[tuple[str, str], tuple[str, str]] = {
-    ("multimodal", "gemma4_unified"): ("transformers", "AutoModelForMultimodalLM"),
-}
+_MULTIMODAL_AUTO_LOADER_SPECS: tuple[tuple[str, str], ...] = (
+    ("transformers", "AutoModelForImageTextToText"),
+    ("transformers", "AutoModelForMultimodalLM"),
+    ("transformers", "AutoModelForVision2Seq"),
+)
+_MULTIMODAL_AUTO_LOAD_FALLBACK_ERRORS = (TypeError, ValueError)
 
 _DIRECT_SUBMODULE_SPECS: dict[str, dict[str, tuple[str, str]]] = {
     "causal": {
@@ -517,13 +519,42 @@ def _loader_label(module_path: str, symbol_name: str) -> str:
     return f"{module_path}.{symbol_name}"
 
 
-def _resolve_auto_loader(task: str, model_type: str | None = None) -> tuple[Any, str]:
-    spec = (
-        _AUTO_LOADER_MODEL_TYPE_SPECS.get((task, model_type))
-        if model_type is not None
-        else None
+def _multimodal_auto_loader_label() -> str:
+    return " -> ".join(
+        _loader_label(module_path, symbol_name)
+        for module_path, symbol_name in _MULTIMODAL_AUTO_LOADER_SPECS
     )
-    module_path, symbol_name = spec or _AUTO_LOADER_SPECS[task]
+
+
+class _MultimodalAutoFallbackLoader:
+    """Try compatible HF multimodal auto loaders in stable preference order."""
+
+    @staticmethod
+    def from_pretrained(model_id: str, **kwargs: Any) -> Any:
+        failures: list[str] = []
+        last_error: BaseException | None = None
+        for module_path, symbol_name in _MULTIMODAL_AUTO_LOADER_SPECS:
+            loader_label = _loader_label(module_path, symbol_name)
+            try:
+                loader = _import_symbol(module_path, symbol_name)
+            except (AttributeError, ImportError, ModuleNotFoundError) as exc:
+                failures.append(f"{loader_label}: unavailable ({type(exc).__name__})")
+                last_error = exc
+                continue
+            try:
+                return loader.from_pretrained(model_id, **kwargs)
+            except _MULTIMODAL_AUTO_LOAD_FALLBACK_ERRORS as exc:
+                failures.append(f"{loader_label}: incompatible ({type(exc).__name__})")
+                last_error = exc
+                continue
+        detail = "; ".join(failures) or "no loaders were attempted"
+        raise ValueError(f"No compatible HF multimodal auto loader succeeded: {detail}") from last_error
+
+
+def _resolve_auto_loader(task: str, model_type: str | None = None) -> tuple[Any, str]:
+    if task == "multimodal":
+        return _MultimodalAutoFallbackLoader, _multimodal_auto_loader_label()
+    module_path, symbol_name = _AUTO_LOADER_SPECS[task]
     return (
         _import_symbol(module_path, symbol_name),
         _loader_label(module_path, symbol_name),
@@ -557,7 +588,7 @@ def resolve_core_loader_strategy(
 ) -> HFLoaderStrategy:
     """Resolve the primary loader strategy for a core HF adapter."""
 
-    if task not in _AUTO_LOADER_SPECS:
+    if task != "multimodal" and task not in _AUTO_LOADER_SPECS:
         raise KeyError(f"Unknown HF loader task: {task}")
 
     model_type = None
