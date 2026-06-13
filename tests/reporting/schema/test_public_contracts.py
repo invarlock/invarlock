@@ -89,6 +89,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "olmo-2-7b-causal-hf",
         "olmo-2-13b-causal-hf",
         "olmoe-1b-7b-0924-causal-hf",
+        "mixtral-8x7b-moe-causal-hf",
         "open-llama-7b-causal-hf",
         "falcon-7b-causal-hf",
         "qwen2-7b-causal-hf",

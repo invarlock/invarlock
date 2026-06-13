@@ -734,7 +734,7 @@
         "text"
       ],
       "task_role": "causal_lm",
-      "state": "prepared_evidence_candidate",
+      "state": "published_basis",
       "representative_models": [
         "Qwen/Qwen3-30B-A3B-Instruct-2507"
       ],
@@ -780,7 +780,7 @@
         "text"
       ],
       "task_role": "causal_lm",
-      "state": "prepared_evidence_candidate",
+      "state": "published_basis",
       "representative_models": [
         "mistralai/Mixtral-8x7B-v0.1"
       ],
@@ -791,12 +791,15 @@
         "src/invarlock/adapters/auto.py",
         "configs/presets/causal_lm/mixtral_8x7b_512.yaml",
         "configs/calibration/null_sweep_mixtral_8x7b.yaml",
+        "public_evidence/published_basis/mixtral_8x7b/evaluation.report.json",
+        "public_evidence/published_basis/mixtral_8x7b/runtime.manifest.json",
+        "public_evidence/published_basis/mixtral_8x7b/evidence_pack",
         "scripts/model_evidence/model_evidence_sweep.py",
         "tests/core/test_model_profiles.py",
         "tests/cli/test_preset_causal_presets.py",
         "tests/scripts/test_model_evidence_sweep_catalog.py"
       ],
-      "notes": "Prepared as a Mixtral MoE causal LM candidate with explicit hf_causal preset and null-sweep config for H100-backed CUDA evidence. The preset keeps the full guard scan surface while using BF16, automatic device placement, low-CPU-memory loading, and disabled optional HF loading-info collection. It is not a published basis until a release-profile CUDA report, runtime manifest, and evidence pack are attached."
+      "notes": "Promoted as a Mixtral MoE causal LM published basis with explicit hf_causal preset, release-profile H100 CUDA report, runtime manifest, and signed evidence pack. The preset keeps the full guard scan surface while using BF16, automatic device placement, low-CPU-memory loading, disabled optional HF loading-info collection, and a skipped optional guard-overhead check for large-model resource discipline."
     },
     {
       "family_id": "llama",

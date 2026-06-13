@@ -470,9 +470,9 @@
       "family": "Mixtral 8x7B MoE causal LM",
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
-      "support_tier": "supported_experimental",
-      "evidence_status": "prepared_evidence_candidate",
-      "docs_label": "No",
+      "support_tier": "published_basis",
+      "evidence_status": "published_release_strict",
+      "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
         "moe_candidate",
@@ -482,10 +482,12 @@
         "mistralai/Mixtral-8x7B-v0.1"
       ],
       "evidence": {
-        "preset": "configs/presets/causal_lm/mixtral_8x7b_512.yaml",
-        "calibration_config": "configs/calibration/null_sweep_mixtral_8x7b.yaml"
+        "evaluation_report_fixture": "public_evidence/published_basis/mixtral_8x7b/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/mixtral_8x7b/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/mixtral_8x7b/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/mixtral_8x7b/evidence_pack"
       },
-      "notes": "Prepared as a full-surface MoE promotion candidate for H100-backed CUDA evidence. It remains outside the published assurance basis until a release-profile report, runtime manifest, and evidence pack are attached."
+      "notes": "Promoted with release-profile container-backed H100 public report, runtime manifest, signed evidence pack, and recorded 64-window no-op preservation run from 20260613Tmixtral8x7bH100F. This is a large MoE preservation basis; it is not a benchmark-quality or routing-quality claim, and the optional guard-overhead check is intentionally skipped by preset policy for this lane."
     },
     {
       "lane_id": "olmoe-1b-7b-0924-causal-hf",

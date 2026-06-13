@@ -113,17 +113,7 @@ class EvidenceLane:
         return entry
 
 
-CURRENT_SUPPORTED_EXPERIMENTAL_LANES: tuple[EvidenceLane, ...] = (
-    EvidenceLane(
-        slug="mistralai_mixtral_8x7b_v0_1",
-        lane_id="mixtral-8x7b-moe-causal-hf",
-        family="Mixtral 8x7B MoE causal LM",
-        model_id="mistralai/Mixtral-8x7B-v0.1",
-        preset_relpath="configs/presets/causal_lm/mixtral_8x7b_512.yaml",
-        adapter="hf_causal",
-        verify_profile="release",
-    ),
-)
+CURRENT_SUPPORTED_EXPERIMENTAL_LANES: tuple[EvidenceLane, ...] = ()
 
 CURRENT_PUBLISHED_BASIS_LANES: tuple[EvidenceLane, ...] = (
     EvidenceLane(
@@ -240,6 +230,15 @@ CURRENT_PUBLISHED_BASIS_LANES: tuple[EvidenceLane, ...] = (
         family="Falcon 7B causal LM",
         model_id="tiiuae/falcon-7b",
         preset_relpath="configs/presets/causal_lm/falcon_7b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="release",
+    ),
+    EvidenceLane(
+        slug="mixtral_8x7b_public",
+        lane_id="mixtral-8x7b-moe-causal-hf",
+        family="Mixtral 8x7B MoE causal LM",
+        model_id="mistralai/Mixtral-8x7B-v0.1",
+        preset_relpath="configs/presets/causal_lm/mixtral_8x7b_512.yaml",
         adapter="hf_causal",
         verify_profile="release",
     ),

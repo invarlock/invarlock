@@ -1,0 +1,66 @@
+{
+  "execution_mode": "container",
+  "files": [
+    {
+      "bytes": 17672361,
+      "path": "eval/mistralai_mixtral_8x7b_v0_1/report/evaluation.report.json",
+      "sha256": "020e0c1b37effaf9a728770d4024ce57173962c4631dc4171fdc6db1a4b14a49"
+    },
+    {
+      "bytes": 735,
+      "path": "eval/mistralai_mixtral_8x7b_v0_1/verify.json",
+      "sha256": "6b204eda70241865115c9d41feedb30fc3422dfe67a63e7cb1e6f639275c9e1d"
+    },
+    {
+      "bytes": 9905,
+      "path": "logs/mistralai_mixtral_8x7b_v0_1.log",
+      "sha256": "fe9cd5bc251f9a81419c8365f07c7182297a3240ab04b73e2b4ee8acf0e22789"
+    },
+    {
+      "bytes": 836,
+      "path": "manifest.json",
+      "sha256": "e468e101d45d4452373620fb38fabd3c3295c77094d15b7e0f37e8e28bd1169b"
+    },
+    {
+      "bytes": 698,
+      "path": "model_revisions.json",
+      "sha256": "d68656569b9eb254f24aea62020a3653f4be271c44f8205bd4568dab2bc75e88"
+    },
+    {
+      "bytes": 267,
+      "path": "status.log",
+      "sha256": "87d61fe61853436fb339cf4e62bf595082fc8f6da33a4f3586accf5c9bffa4a8"
+    },
+    {
+      "bytes": 774,
+      "path": "summary.json",
+      "sha256": "31fc7cba207283c12a6c3fef03552a6c5d8244403cd65db397a533a78d598ec1"
+    },
+    {
+      "bytes": 254,
+      "path": "summary.tsv",
+      "sha256": "035b87c3b9ecf8241d82bc8e432534d5033c6612bae9f6988af9afbf7f3a462c"
+    }
+  ],
+  "generated_at": "2026-06-13T21:04:19.455308+00:00",
+  "lane_results": [
+    {
+      "detail": null,
+      "evaluate_exit": 0,
+      "lane_id": "mixtral-8x7b-moe-causal-hf",
+      "model_id": "mistralai/Mixtral-8x7B-v0.1",
+      "ok": true,
+      "preset": "configs/presets/causal_lm/mixtral_8x7b_512.yaml",
+      "report_path": "/root/model-evidence/20260613Tmixtral8x7bH100F/shard-00-gpu-0-1-2-3/eval/mistralai_mixtral_8x7b_v0_1/report/evaluation.report.json",
+      "slug": "mistralai_mixtral_8x7b_v0_1",
+      "status": "ok",
+      "verify_exit": 0,
+      "verify_path": "/root/model-evidence/20260613Tmixtral8x7bH100F/shard-00-gpu-0-1-2-3/eval/mistralai_mixtral_8x7b_v0_1/verify.json"
+    }
+  ],
+  "ok": true,
+  "schema": "invarlock/model-evidence-artifact-manifest-v1",
+  "shard_count": 1,
+  "shard_index": 0,
+  "suite": "support-matrix-backlog-gpu"
+}

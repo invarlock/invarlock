@@ -280,7 +280,7 @@ Notes
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | OLMoE 1B-active/7B-total causal LM | Yes | Yes | Yes | Yes |
-| Mixtral 8x7B MoE causal LM | Yes | Yes | Yes | No |
+| Mixtral 8x7B MoE causal LM | Yes | Yes | Yes | Yes |
 
 ### Seq2Seq Published Basis
 

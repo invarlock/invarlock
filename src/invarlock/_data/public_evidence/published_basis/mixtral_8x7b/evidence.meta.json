@@ -1,0 +1,24 @@
+{
+  "artifact_paths": {
+    "evaluation_report": "evaluation.report.json",
+    "evidence_pack": "evidence_pack",
+    "evidence_pack_recipe": "evidence_pack_recipe.json",
+    "evidence_run_preset": "evidence_run_preset.yaml",
+    "runtime_manifest": "runtime.manifest.json"
+  },
+  "evidence_class": "strict_pass_fixture",
+  "expected_fingerprint": "sha256:f2438d5fcb2c902e6f2e2efcac484358ac7212eac69f5f9b921d5baa37f6c171",
+  "generated_by": "model evidence remote sweep",
+  "model_revision": "fc7ac94680e38d7348cfa806e51218e6273104b0",
+  "non_goals": [
+    "Model weights and source dataset are external Hugging Face references.",
+    "This fixture is a no-op preservation basis, not a fine-tuning, benchmark-quality, or MoE routing-quality claim.",
+    "The optional guard-overhead check is intentionally skipped by preset policy for this large MoE lane; the report records guard_overhead as not evaluated."
+  ],
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "Release-strict verifier fixture for the Mixtral 8x7B MoE published-basis lane on pinned WikiText-103 text data.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/published_basis/mixtral_8x7b/evaluation.report.json --profile release --assurance strict",
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/mixtral_8x7b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:f2438d5fcb2c902e6f2e2efcac484358ac7212eac69f5f9b921d5baa37f6c171"
+  ]
+}

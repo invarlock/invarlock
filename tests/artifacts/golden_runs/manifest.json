@@ -10,6 +10,7 @@
     "olmo2_7b",
     "olmo2_13b",
     "olmoe_1b_7b",
+    "mixtral_8x7b",
     "open_llama_7b",
     "falcon_7b",
     "qwen2_7b",
@@ -85,6 +86,12 @@
       "model_id": "allenai/OLMoE-1B-7B-0924",
       "primary_metric_kind": "ppl_causal",
       "report": "public_evidence/published_basis/olmoe_1b_7b/evaluation.report.json"
+    },
+    {
+      "id": "mixtral_8x7b",
+      "model_id": "mistralai/Mixtral-8x7B-v0.1",
+      "primary_metric_kind": "ppl_causal",
+      "report": "public_evidence/published_basis/mixtral_8x7b/evaluation.report.json"
     },
     {
       "id": "open_llama_7b",

@@ -69,7 +69,7 @@ def test_repo_mentioned_gpu_suite_includes_basis_canaries_and_experimental() -> 
         "flan_t5_base_public",
         "olmo2_7b_public",
         "gemma4_e2b_public",
-        "mistralai_mixtral_8x7b_v0_1",
+        "mixtral_8x7b_public",
     }.issubset(slugs)
 
 
@@ -100,6 +100,7 @@ def test_repo_mentioned_gpu_basis_lanes_use_lane_specific_profiles_and_presets()
                 "qwen3_5_9b_public",
                 "granite4_1_3b_public",
                 "granite4_1_8b_public",
+                "mixtral_8x7b_public",
                 "gemma4_e2b_public",
                 "deepseek_r1_distill_qwen_7b_public",
                 "deepseek_r1_0528_qwen3_8b_public",
@@ -398,7 +399,7 @@ def test_select_specs_sharding_is_stable() -> None:
         shard_count=3,
     )
 
-    assert [lane.slug for lane in first_shard] == ["mistralai_mixtral_8x7b_v0_1"]
+    assert first_shard == []
     assert second_shard == []
 
 
