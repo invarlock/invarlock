@@ -24,6 +24,12 @@ GUARD_FAULT_INJECTION_SEAMS: tuple[GuardFaultInjectionSeam, ...] = (
         "Injects a deterministic family classifier for activation RMT aggregation without constructing a full guard facade.",
     ),
     GuardFaultInjectionSeam(
+        "rmt_activation_runtime",
+        "compute_activation_edge_risk",
+        "module_filter_fn",
+        "Injects deterministic module scope selection for activation RMT aggregation without constructing a full guard facade.",
+    ),
+    GuardFaultInjectionSeam(
         "spectral_control",
         "apply_weight_rescale",
         "should_process_module_fn",

@@ -157,11 +157,11 @@ def _validate_drift_band(report: dict[str, Any]) -> list[str]:
     if not isinstance(pm, dict) or not pm:
         errors.append("report missing primary_metric block.")
         return errors
-    if bool(pm.get("invalid")):
-        return errors
     try:
+        if bool(pm.get("invalid")):
+            return errors
         pm_kind = normalize_metric_kind(pm.get("kind"))
-    except (MetricKindContractError, ValueError):
+    except (MetricKindContractError, RuntimeError, ValueError):
         pm_kind = None
 
     if pm_kind == "accuracy":
