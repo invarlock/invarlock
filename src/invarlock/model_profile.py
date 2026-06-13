@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -16,7 +17,7 @@ TokenizerImpl: Any = _tokenizers.TokenizerImpl
 _TOKENIZER_LOOKUP_ERRORS = _tokenizers._TOKENIZER_LOOKUP_ERRORS
 _TOKENIZER_LOAD_ERRORS = _tokenizers._TOKENIZER_LOAD_ERRORS
 PreTrainedTokenizerBase = _tokenizers.PreTrainedTokenizerBase
-TokenizerFactory = Callable[[], tuple[PreTrainedTokenizerBase, str]]
+TokenizerFactory = Callable[..., tuple[PreTrainedTokenizerBase, str]]
 _LocalFastTokenizer = _tokenizers._LocalFastTokenizer
 
 _TOKENIZER_CANDIDATE_OVERRIDES: dict[str, tuple[str, ...]] = {
@@ -97,8 +98,9 @@ def _load_tokenizer_with_factory_retry(
     candidate: str,
     *,
     local_files_only: bool,
+    load_kwargs: dict[str, Any] | None = None,
 ) -> PreTrainedTokenizerBase:
-    kwargs: dict[str, Any] = {}
+    kwargs: dict[str, Any] = _resolve_tokenizer_load_kwargs(load_kwargs)
     if local_files_only:
         kwargs["local_files_only"] = True
     try:
@@ -122,6 +124,33 @@ def _load_tokenizer_with_factory_retry(
                 raise
             tokenizer = explicit_factory.from_pretrained(candidate, **kwargs)
             return cast("PreTrainedTokenizerBase", tokenizer)
+
+
+def _resolve_tokenizer_load_kwargs(
+    load_kwargs: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not isinstance(load_kwargs, dict):
+        return {}
+    resolved: dict[str, Any] = {}
+    if "trust_remote_code" in load_kwargs:
+        from invarlock.adapters.hf_loading import resolve_trust_remote_code
+
+        resolved["trust_remote_code"] = resolve_trust_remote_code(
+            {"trust_remote_code": load_kwargs.get("trust_remote_code")}
+        )
+    return resolved
+
+
+def _merge_tokenizer_load_kwargs(
+    base: dict[str, Any] | None,
+    override: dict[str, Any] | None,
+) -> dict[str, Any]:
+    merged: dict[str, Any] = {}
+    if isinstance(base, dict):
+        merged.update(base)
+    if isinstance(override, dict):
+        merged.update(override)
+    return merged
 
 
 def _resolve_explicit_slow_tokenizer_factory(candidate: str) -> Any | None:
@@ -180,7 +209,10 @@ def _tokenizer_candidates(model_id: str) -> list[str]:
 
 
 def _load_tokenizer_for_model(
-    model_id: str, *, family_label: str
+    model_id: str,
+    *,
+    family_label: str,
+    load_kwargs: dict[str, Any] | None = None,
 ) -> PreTrainedTokenizerBase:
     """Load a tokenizer without falling back to unrelated model families."""
 
@@ -203,6 +235,7 @@ def _load_tokenizer_for_model(
                 tokenizer_factory,
                 candidate,
                 local_files_only=True,
+                load_kwargs=load_kwargs,
             )
         except _TOKENIZER_LOAD_ERRORS as exc:
             if not _is_tokenizer_cache_miss(exc):
@@ -227,6 +260,7 @@ def _load_tokenizer_for_model(
                 tokenizer_factory,
                 candidate,
                 local_files_only=False,
+                load_kwargs=load_kwargs,
             )
         except _TOKENIZER_LOAD_ERRORS as exc:
             if not _is_tokenizer_cache_miss(exc):
@@ -273,6 +307,11 @@ class ModelProfile:
     module_selectors: dict[str, list[str]] = field(default_factory=dict)
     invariants: tuple[str, ...] = ()
     cert_lints: tuple[dict[str, str], ...] = ()
+    tokenizer_load_kwargs: dict[str, Any] = field(
+        default_factory=dict,
+        repr=False,
+        compare=False,
+    )
 
 
 def _bert_selectors() -> dict[str, list[str]]:
@@ -362,9 +401,23 @@ def _unknown_selectors() -> dict[str, list[str]]:
     }
 
 
-def _make_bert_tokenizer(model_id: str) -> TokenizerFactory:
-    def factory() -> tuple[PreTrainedTokenizerBase, str]:
-        tokenizer = _load_tokenizer_for_model(model_id, family_label="BERT")
+def _make_bert_tokenizer(
+    model_id: str,
+    *,
+    tokenizer_load_kwargs: dict[str, Any] | None = None,
+) -> TokenizerFactory:
+    def factory(
+        *,
+        tokenizer_load_kwargs: dict[str, Any] | None = None,
+    ) -> tuple[PreTrainedTokenizerBase, str]:
+        tokenizer = _load_tokenizer_for_model(
+            model_id,
+            family_label="BERT",
+            load_kwargs=_merge_tokenizer_load_kwargs(
+                factory.tokenizer_load_kwargs,
+                tokenizer_load_kwargs,
+            ),
+        )
         if getattr(tokenizer, "mask_token", None) is None:
             raise ValueError(
                 f"Tokenizer for '{model_id}' does not expose [MASK]; cannot run MLM evaluation."
@@ -380,23 +433,53 @@ def _make_bert_tokenizer(model_id: str) -> TokenizerFactory:
         hash_value = _hash_tokenizer(tokenizer)
         return tokenizer, hash_value
 
+    factory.tokenizer_load_kwargs = dict(tokenizer_load_kwargs or {})  # type: ignore[attr-defined]
     return factory
 
 
-def _make_gpt2_tokenizer(model_id: str) -> TokenizerFactory:
-    def factory() -> tuple[PreTrainedTokenizerBase, str]:
-        tokenizer = _load_tokenizer_for_model(model_id, family_label="causal")
+def _make_gpt2_tokenizer(
+    model_id: str,
+    *,
+    tokenizer_load_kwargs: dict[str, Any] | None = None,
+) -> TokenizerFactory:
+    def factory(
+        *,
+        tokenizer_load_kwargs: dict[str, Any] | None = None,
+    ) -> tuple[PreTrainedTokenizerBase, str]:
+        tokenizer = _load_tokenizer_for_model(
+            model_id,
+            family_label="causal",
+            load_kwargs=_merge_tokenizer_load_kwargs(
+                factory.tokenizer_load_kwargs,
+                tokenizer_load_kwargs,
+            ),
+        )
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
         hash_value = _hash_tokenizer(tokenizer)
         return tokenizer, hash_value
 
+    factory.tokenizer_load_kwargs = dict(tokenizer_load_kwargs or {})  # type: ignore[attr-defined]
     return factory
 
 
-def _make_causal_auto_tokenizer(model_id: str) -> TokenizerFactory:
-    def factory() -> tuple[PreTrainedTokenizerBase, str]:
-        tokenizer = _load_tokenizer_for_model(model_id, family_label="causal")
+def _make_causal_auto_tokenizer(
+    model_id: str,
+    *,
+    tokenizer_load_kwargs: dict[str, Any] | None = None,
+) -> TokenizerFactory:
+    def factory(
+        *,
+        tokenizer_load_kwargs: dict[str, Any] | None = None,
+    ) -> tuple[PreTrainedTokenizerBase, str]:
+        tokenizer = _load_tokenizer_for_model(
+            model_id,
+            family_label="causal",
+            load_kwargs=_merge_tokenizer_load_kwargs(
+                factory.tokenizer_load_kwargs,
+                tokenizer_load_kwargs,
+            ),
+        )
         if getattr(tokenizer, "pad_token", None) is None:
             eos_token = getattr(tokenizer, "eos_token", None)
             if eos_token is not None:
@@ -410,12 +493,27 @@ def _make_causal_auto_tokenizer(model_id: str) -> TokenizerFactory:
         hash_value = _hash_tokenizer(tokenizer)
         return tokenizer, hash_value
 
+    factory.tokenizer_load_kwargs = dict(tokenizer_load_kwargs or {})  # type: ignore[attr-defined]
     return factory
 
 
-def _make_unknown_tokenizer(model_id: str) -> TokenizerFactory:
-    def factory() -> tuple[PreTrainedTokenizerBase, str]:
-        tokenizer = _load_tokenizer_for_model(model_id, family_label="text")
+def _make_unknown_tokenizer(
+    model_id: str,
+    *,
+    tokenizer_load_kwargs: dict[str, Any] | None = None,
+) -> TokenizerFactory:
+    def factory(
+        *,
+        tokenizer_load_kwargs: dict[str, Any] | None = None,
+    ) -> tuple[PreTrainedTokenizerBase, str]:
+        tokenizer = _load_tokenizer_for_model(
+            model_id,
+            family_label="text",
+            load_kwargs=_merge_tokenizer_load_kwargs(
+                factory.tokenizer_load_kwargs,
+                tokenizer_load_kwargs,
+            ),
+        )
         if getattr(tokenizer, "pad_token", None) is None:
             eos_token = getattr(tokenizer, "eos_token", None)
             if eos_token is not None:
@@ -423,14 +521,20 @@ def _make_unknown_tokenizer(model_id: str) -> TokenizerFactory:
         hash_value = _hash_tokenizer(tokenizer)
         return tokenizer, hash_value
 
+    factory.tokenizer_load_kwargs = dict(tokenizer_load_kwargs or {})  # type: ignore[attr-defined]
     return factory
 
 
-def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProfile:
+def detect_model_profile(
+    model_id: str,
+    adapter: str | None = None,
+    tokenizer_load_kwargs: dict[str, Any] | None = None,
+) -> ModelProfile:
     """Infer the model family and provide profile metadata used for evaluation."""
 
     adapter_lower = (adapter or "").lower()
     model_lower, arch_blob, is_encoder_decoder = _profile_hints(model_id)
+    tokenizer_load_kwargs = dict(tokenizer_load_kwargs or {})
     masked_arch = "maskedlm" in arch_blob
     causal_arch = "causallm" in arch_blob or "forcausallm" in arch_blob
     seq2seq_arch = "conditionalgeneration" in arch_blob or "seq2seqlm" in arch_blob
@@ -446,7 +550,10 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
         return ModelProfile(
             family="bert",
             default_loss="mlm",
-            make_tokenizer=_make_bert_tokenizer(model_id),
+            make_tokenizer=_make_bert_tokenizer(
+                model_id,
+                tokenizer_load_kwargs=tokenizer_load_kwargs,
+            ),
             default_metric="ppl_mlm",
             default_provider="hf_text",
             module_selectors=_bert_selectors(),
@@ -465,6 +572,7 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
                     "message": "BERT evaluation report must report masked tokens.",
                 },
             ),
+            tokenizer_load_kwargs=tokenizer_load_kwargs,
         )
 
     if any(keyword in adapter_lower for keyword in ("hf_seq2seq", "t5", "bart")) or (
@@ -481,12 +589,16 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
         return ModelProfile(
             family="seq2seq",
             default_loss="seq2seq",
-            make_tokenizer=_make_unknown_tokenizer(model_id),
+            make_tokenizer=_make_unknown_tokenizer(
+                model_id,
+                tokenizer_load_kwargs=tokenizer_load_kwargs,
+            ),
             default_metric="ppl_seq2seq",
             default_provider="wikitext2",
             module_selectors=_unknown_selectors(),
             invariants=(),
             cert_lints=(),
+            tokenizer_load_kwargs=tokenizer_load_kwargs,
         )
 
     causal_family_aliases = (
@@ -515,7 +627,10 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
         return ModelProfile(
             family=family,
             default_loss="causal",
-            make_tokenizer=_make_causal_auto_tokenizer(model_id),
+            make_tokenizer=_make_causal_auto_tokenizer(
+                model_id,
+                tokenizer_load_kwargs=tokenizer_load_kwargs,
+            ),
             default_metric="ppl_causal",
             default_provider="wikitext2",
             module_selectors=module_selectors,
@@ -528,6 +643,7 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
                     "message": "Causal evaluation report must use causal ppl metric.",
                 },
             ),
+            tokenizer_load_kwargs=tokenizer_load_kwargs,
         )
 
     if any(keyword in adapter_lower for keyword in ("phi",)) or any(
@@ -541,7 +657,10 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
         return ModelProfile(
             family=family,
             default_loss="causal",
-            make_tokenizer=_make_causal_auto_tokenizer(model_id),
+            make_tokenizer=_make_causal_auto_tokenizer(
+                model_id,
+                tokenizer_load_kwargs=tokenizer_load_kwargs,
+            ),
             default_metric="ppl_causal",
             default_provider="wikitext2",
             module_selectors=_phi_selectors(),
@@ -554,6 +673,7 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
                     "message": "Causal evaluation report must use causal ppl metric.",
                 },
             ),
+            tokenizer_load_kwargs=tokenizer_load_kwargs,
         )
 
     if (
@@ -564,7 +684,10 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
         return ModelProfile(
             family="gpt2",
             default_loss="causal",
-            make_tokenizer=_make_gpt2_tokenizer(model_id),
+            make_tokenizer=_make_gpt2_tokenizer(
+                model_id,
+                tokenizer_load_kwargs=tokenizer_load_kwargs,
+            ),
             default_metric="ppl_causal",
             default_provider="wikitext2",
             module_selectors=_gpt2_selectors(),
@@ -577,17 +700,22 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
                     "message": "GPT-style evaluation report must use causal ppl metric.",
                 },
             ),
+            tokenizer_load_kwargs=tokenizer_load_kwargs,
         )
 
     return ModelProfile(
         family="unknown",
         default_loss="causal",
-        make_tokenizer=_make_unknown_tokenizer(model_id),
+        make_tokenizer=_make_unknown_tokenizer(
+            model_id,
+            tokenizer_load_kwargs=tokenizer_load_kwargs,
+        ),
         default_metric="ppl_causal",
         default_provider="wikitext2",
         module_selectors=_unknown_selectors(),
         invariants=(),
         cert_lints=(),
+        tokenizer_load_kwargs=tokenizer_load_kwargs,
     )
 
 
@@ -596,7 +724,24 @@ def resolve_tokenizer(profile: ModelProfile) -> tuple[PreTrainedTokenizerBase, s
     Instantiate a tokenizer for the given profile and return it with its hash.
     """
 
-    tokenizer, hash_value = profile.make_tokenizer()
+    tokenizer_load_kwargs = getattr(profile, "tokenizer_load_kwargs", None)
+    try:
+        signature = inspect.signature(profile.make_tokenizer)
+    except (TypeError, ValueError):
+        signature = None
+    supports_load_kwargs = False
+    if signature is not None:
+        supports_load_kwargs = any(
+            parameter.kind is inspect.Parameter.VAR_KEYWORD
+            or parameter.name == "tokenizer_load_kwargs"
+            for parameter in signature.parameters.values()
+        )
+    if supports_load_kwargs:
+        tokenizer, hash_value = profile.make_tokenizer(
+            tokenizer_load_kwargs=tokenizer_load_kwargs
+        )
+    else:
+        tokenizer, hash_value = profile.make_tokenizer()
     if not isinstance(hash_value, str) or not hash_value:
         hash_value = _hash_tokenizer(tokenizer)
     return tokenizer, hash_value
