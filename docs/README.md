@@ -275,10 +275,11 @@ Notes
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | Gemma 4 12B any-to-any LM | Yes | Yes | Yes | Yes |
 
-### Prepared Large/MoE Candidate Backlog
+### Large/MoE Published And Candidate Lanes
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
+| OLMoE 1B-active/7B-total causal LM | Yes | Yes | Yes | Yes |
 | Mixtral 8x7B MoE causal LM | Yes | Yes | Yes | No |
 
 ### Seq2Seq Published Basis
@@ -293,12 +294,12 @@ Gemma 4 12B image-text, Granite 4.1 3B, Granite 4.1 8B, OLMo 2 7B,
 OLMo 2 13B, Qwen2 7B, OpenLLaMA 7B, Falcon 7B, Qwen2.5 7B,
 Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B, DeepSeek-R1-Distill-Qwen 7B,
 DeepSeek-R1-0528-Qwen3 8B, DeepSeek-R1-Distill-Qwen 14B, Phi-4 text-only,
-and FLAN-T5 base seq2seq profiles. Repo-included
+OLMoE 1B-active/7B-total MoE, and FLAN-T5 base seq2seq profiles. Repo-included
 presets and pilot calibration configs for prepared practical-pick lanes do not
 become part of the published assurance basis until supporting artifacts are
-attached. Mixtral 8x7B is now a prepared H100-backed MoE promotion candidate,
-but it is not published-basis evidence until its release-profile report,
-runtime manifest, and evidence pack are attached.
+attached. OLMoE is the smaller MoE published-basis validation lane; Mixtral
+8x7B remains a prepared H100-backed larger MoE promotion candidate until its
+release-profile report, runtime manifest, and evidence pack are attached.
 The empirical guard manifest includes no-op published-basis summaries for the
 modern promoted families. They are null-behavior evidence and calibration
 inputs, but they do not re-derive the packaged spectral/RMT/variance tier

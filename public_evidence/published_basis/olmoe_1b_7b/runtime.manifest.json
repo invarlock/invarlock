@@ -1,0 +1,31 @@
+{
+  "config": {
+    "path": null,
+    "sha256": "eb007f93c2972c45c5b403f58fad31e4dcc01ea8d441ff87a48720db5b96523a",
+    "source": "inline"
+  },
+  "context": {
+    "assurance": "strict",
+    "command": "evaluate",
+    "execution_mode": "container",
+    "profile": "release",
+    "tier": "balanced"
+  },
+  "execution_mode": "container",
+  "generated_at_utc": "2026-06-13T19:49:38.941007+00:00",
+  "manifest_version": 1,
+  "report": {
+    "filename": "evaluation.report.json",
+    "path": "/workspace/tmp/model_evidence_container/a527b102dcfe8739/eval/allenai_olmoe_1b_7b_0924/report/evaluation.report.json",
+    "sha256": "6a6bfebdbfed124fba4b76b4b081f0080021355824a79a47907b67508d854f86"
+  },
+  "runtime": {
+    "allow_network": true,
+    "allow_remote_code": false,
+    "allow_third_party_plugins": false,
+    "container_execution": true,
+    "image_digest": "sha256:5edf2d5aa7249fd720bbb6885c0cd70c3a53f35ef969cad6cbc92ad05a5f3a9b",
+    "image_ref": "ghcr.io/invarlock/invarlock-runtime:latest@sha256:5edf2d5aa7249fd720bbb6885c0cd70c3a53f35ef969cad6cbc92ad05a5f3a9b"
+  },
+  "verifier_contract_version": "runtime-manifest-v1"
+}

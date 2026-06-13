@@ -86,6 +86,7 @@ def test_offline_golden_runs_public_fixtures() -> None:
         "tinyllama_1_1b",
         "olmo2_7b",
         "olmo2_13b",
+        "olmoe_1b_7b",
         "open_llama_7b",
         "falcon_7b",
         "qwen2_7b",

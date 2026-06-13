@@ -9,6 +9,7 @@
     "tinyllama_1_1b",
     "olmo2_7b",
     "olmo2_13b",
+    "olmoe_1b_7b",
     "open_llama_7b",
     "falcon_7b",
     "qwen2_7b",
@@ -78,6 +79,12 @@
       "model_id": "allenai/OLMo-2-1124-13B-Instruct",
       "primary_metric_kind": "ppl_causal",
       "report": "public_evidence/published_basis/olmo2_13b/evaluation.report.json"
+    },
+    {
+      "id": "olmoe_1b_7b",
+      "model_id": "allenai/OLMoE-1B-7B-0924",
+      "primary_metric_kind": "ppl_causal",
+      "report": "public_evidence/published_basis/olmoe_1b_7b/evaluation.report.json"
     },
     {
       "id": "open_llama_7b",

@@ -488,6 +488,30 @@
       "notes": "Prepared as a full-surface MoE promotion candidate for H100-backed CUDA evidence. It remains outside the published assurance basis until a release-profile report, runtime manifest, and evidence pack are attached."
     },
     {
+      "lane_id": "olmoe-1b-7b-0924-causal-hf",
+      "family": "OLMoE 1B-active/7B-total causal LM",
+      "runtime": "huggingface-pytorch",
+      "adapter": "hf_causal",
+      "support_tier": "published_basis",
+      "evidence_status": "published_release_strict",
+      "docs_label": "Yes",
+      "provenance_source": "docs/README.md#support-matrix",
+      "support_groups": [
+        "moe_candidate",
+        "small_local"
+      ],
+      "representative_models": [
+        "allenai/OLMoE-1B-7B-0924"
+      ],
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window no-op preservation run from H100 validation run 20260613Tolmoe1b7bH100A. This is the smaller MoE validation basis; larger MoE assurance remains tracked by Mixtral/Qwen/Gemma candidate lanes.",
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/olmoe_1b_7b/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/olmoe_1b_7b/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/olmoe_1b_7b/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/olmoe_1b_7b/evidence_pack"
+      }
+    },
+    {
       "lane_id": "ministral-3-3b-text-causal-hf",
       "family": "Ministral 3 3B causal LM (text-only eval)",
       "runtime": "huggingface-pytorch",

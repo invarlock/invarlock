@@ -40,6 +40,7 @@ intentionally kept out of included preset inventory.
 | TinyLlama 1.1B causal LM | `published_basis` | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Public container-backed evidence fixture is included. |
 | OLMo 2 7B causal LM | `published_basis` | `allenai/OLMo-2-1124-7B` | Public container-backed evidence fixture is included. |
 | OLMo 2 13B causal LM | `published_basis` | `allenai/OLMo-2-1124-13B-Instruct` | Public container-backed evidence fixture is included. |
+| OLMoE 1B-active/7B-total causal LM | `published_basis` | `allenai/OLMoE-1B-7B-0924` | Public release-profile container-backed evidence fixture is included from the smaller MoE H100 validation run. |
 | OpenLLaMA 7B causal LM | `published_basis` | `openlm-research/open_llama_7b` | Public release-profile container-backed evidence fixture is included. |
 | Falcon 7B causal LM | `published_basis` | `tiiuae/falcon-7b` | Public release-profile container-backed evidence fixture is included. |
 | Qwen2 7B causal LM | `published_basis` | `Qwen/Qwen2-7B` | Public container-backed evidence fixture is included. |
@@ -67,7 +68,6 @@ intentionally kept out of included preset inventory.
 | --- | --- | --- | --- |
 | Qwen3 30B-A3B MoE causal LM | `prepared_evidence_candidate` | `Qwen/Qwen3-30B-A3B-Instruct-2507` | Explicit `hf_causal` preset and null-sweep config are included with bfloat16/low-CPU-memory loading, optional HF loading-info collection disabled, and scoped attention/router/shared-expert guard scans; public basis promotion waits for CUDA evidence, and scoped scans are not exhaustive expert-bank assurance. |
 | Gemma 4 26B-A4B MoE image-text LM | `prepared_evidence_candidate` | `google/gemma-4-26B-A4B-it` | Explicit `hf_multimodal` VQAv2 preset and null-sweep config are included; public basis promotion waits for CUDA evidence. |
-| OLMoE 1B-active/7B-total causal LM | `prepared_evidence_candidate` | `allenai/OLMoE-1B-7B-0924` | Explicit `hf_causal` preset and null-sweep config are included with full guard scans and memory-sensitive loader settings; public basis promotion waits for CUDA evidence. |
 | Mixtral 8x7B MoE causal LM | `prepared_evidence_candidate` | `mistralai/Mixtral-8x7B-v0.1` | Explicit `hf_causal` preset and null-sweep config are included for H100-backed CUDA evidence with full guard scans; public basis promotion waits for release-profile evidence. |
 | Llama | `profile_first_class` | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Generic Llama-family profile handling is first-class. OpenLLaMA and TinyLlama provide ungated declared support lanes, while access-gated vendor checkpoints remain omitted. |
 | Qwen family aliases (Qwen1.5/Qwen2.5/Qwen3 naming) | `profile_first_class` | `Qwen/Qwen2.5-14B`, `Qwen/Qwen3.5-9B` | Shared qwen-family heuristics cover aliases beyond the declared Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 lanes, including usage-only Qwen2.5 checkpoints. |

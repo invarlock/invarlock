@@ -699,6 +699,31 @@
         "seq2seq"
       ],
       "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and pinned CNN/DailyMail validation data through hf_seq2seq."
+    },
+    {
+      "family_id": "olmoe-1b-7b-causal-lm",
+      "display_name": "OLMoE 1B-active/7B-total causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "allenai/OLMoE-1B-7B-0924"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/olmoe_1b_7b_0924_512.yaml",
+        "configs/calibration/null_sweep_olmoe_1b_7b_0924.yaml",
+        "public_evidence/published_basis/olmoe_1b_7b/evaluation.report.json",
+        "public_evidence/published_basis/olmoe_1b_7b/runtime.manifest.json",
+        "public_evidence/published_basis/olmoe_1b_7b/evidence_pack"
+      ],
+      "support_groups": [
+        "moe_candidate",
+        "small_local"
+      ],
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack from H100 validation run 20260613Tolmoe1b7bH100A. This fixture is the smaller MoE validation basis; larger MoE assurance remains tracked by Mixtral, Qwen3 30B-A3B, and Gemma 4 26B-A4B candidate lanes."
     }
   ],
   "implemented_coverage": [
@@ -747,29 +772,6 @@
         "tests/scripts/test_model_evidence_sweep_catalog.py"
       ],
       "notes": "Prepared as a recent Gemma 4 multimodal MoE candidate using the public VQAv2 image-text materialization path. It is not a published basis until a CUDA report, runtime manifest, and evidence pack are attached."
-    },
-    {
-      "family_id": "olmoe-1b-7b-causal-lm",
-      "display_name": "OLMoE 1B-active/7B-total causal LM",
-      "modalities": [
-        "text"
-      ],
-      "task_role": "causal_lm",
-      "state": "prepared_evidence_candidate",
-      "representative_models": [
-        "allenai/OLMoE-1B-7B-0924"
-      ],
-      "repo_evidence": [
-        "src/invarlock/model_profile.py",
-        "src/invarlock/adapters/hf_loading.py",
-        "src/invarlock/adapters/auto.py",
-        "configs/presets/causal_lm/olmoe_1b_7b_0924_512.yaml",
-        "configs/calibration/null_sweep_olmoe_1b_7b_0924.yaml",
-        "scripts/model_evidence/model_evidence_sweep.py",
-        "tests/cli/test_preset_causal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py"
-      ],
-      "notes": "Prepared as an Apache-2.0 open MoE causal LM candidate with explicit hf_causal preset and null-sweep config. The preset keeps the full guard scan surface while using BF16, low-CPU-memory loading, and disabled optional HF loading-info collection for memory-sensitive paired evaluation. It is not a published basis until a CUDA report, runtime manifest, and evidence pack are attached."
     },
     {
       "family_id": "mixtral",
