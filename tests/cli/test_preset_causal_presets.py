@@ -92,6 +92,7 @@ def test_causal_lm_family_presets_load() -> None:
             assert model["low_cpu_mem_usage"] is True
             assert model["collect_loading_info"] is False
             guards = cfg.require_section("guards")
+            assert guards["spectral"]["family_caps"]["router"] == 5.0
             for guard_name in ("spectral", "rmt"):
                 guard_cfg = guards[guard_name]
                 assert "model.layers.*.self_attn.*_proj" in guard_cfg[
@@ -113,7 +114,7 @@ def test_causal_lm_family_presets_load() -> None:
             assert model["low_cpu_mem_usage"] is True
             assert model["collect_loading_info"] is False
             guards = cfg.require_section("guards")
-            assert "spectral" not in guards
+            assert guards["spectral"]["family_caps"]["router"] == 5.0
             assert "rmt" not in guards
         if name == "olmoe_1b_7b_0924_512.yaml":
             model = cfg.require_section("model")
@@ -121,7 +122,7 @@ def test_causal_lm_family_presets_load() -> None:
             assert model["low_cpu_mem_usage"] is True
             assert model["collect_loading_info"] is False
             guards = cfg.require_section("guards")
-            assert "spectral" not in guards
+            assert guards["spectral"]["family_caps"]["router"] == 5.0
             assert "rmt" not in guards
         if name in {
             "glm4_9b_chat_512.yaml",
@@ -228,6 +229,7 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
             assert data["model"]["device_map"] == "auto"
             assert data["model"]["low_cpu_mem_usage"] is True
             assert data["model"]["collect_loading_info"] is False
+            assert data["guards"]["spectral"]["family_caps"]["router"] == 5.0
             for guard_name in ("spectral", "rmt"):
                 guard_cfg = data["guards"][guard_name]
                 assert "model.layers.*.self_attn.*_proj" in guard_cfg[
@@ -247,13 +249,13 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
             assert data["model"]["device_map"] == "auto"
             assert data["model"]["low_cpu_mem_usage"] is True
             assert data["model"]["collect_loading_info"] is False
-            assert "spectral" not in data["guards"]
+            assert data["guards"]["spectral"]["family_caps"]["router"] == 5.0
             assert "rmt" not in data["guards"]
         if name == "null_sweep_olmoe_1b_7b_0924.yaml":
             assert data["model"]["dtype"] == "bfloat16"
             assert data["model"]["low_cpu_mem_usage"] is True
             assert data["model"]["collect_loading_info"] is False
-            assert "spectral" not in data["guards"]
+            assert data["guards"]["spectral"]["family_caps"]["router"] == 5.0
             assert "rmt" not in data["guards"]
         assert data["primary_metric"]["drift_band"] == expected_drift_band
 

@@ -44,6 +44,13 @@ auto:
 
 guards:
   order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+  spectral:
+    family_caps:
+      ffn: 3.849
+      attn: 3.018
+      embed: 1.05
+      other: 0.0
+      router: 5.0
 
 output:
   dir: "runs"

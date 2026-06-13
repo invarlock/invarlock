@@ -64,6 +64,46 @@ def test_spectral_same_raw_baseline_guard_cap_does_not_warn() -> None:
     assert guard_warnings == {"present": False, "warning_count": 0, "warnings": []}
 
 
+def test_spectral_same_raw_baseline_guard_cap_survives_normalized_section() -> None:
+    baseline = {
+        "spectral": {"caps_applied": 1, "max_caps": 5},
+        "guards": [
+            {
+                "name": "spectral",
+                "metrics": {"caps_applied": 1, "max_caps": 5},
+                "violations": [
+                    {
+                        "type": "family_z_cap",
+                        "module": "model.layers.0.mlp.gate",
+                        "family": "router",
+                        "z_score": 3.8,
+                        "kappa": 5.0,
+                    }
+                ],
+            }
+        ],
+    }
+    subject = {
+        "spectral": _spectral_report(
+            module="model.layers.0.mlp.gate",
+            z=3.82,
+        )
+    }
+    subject["spectral"]["top_violations"][0]["family"] = "router"
+    subject["spectral"]["top_violations"][0]["kappa"] = 5.0
+    subject["spectral"]["top_z_scores"] = {
+        "router": [{"module": "model.layers.0.mlp.gate", "z": 3.82}]
+    }
+
+    guard_warnings = build_guard_warnings(
+        subject=subject,
+        baseline=baseline,
+        validation={"spectral_stable": True},
+    )
+
+    assert guard_warnings == {"present": False, "warning_count": 0, "warnings": []}
+
+
 def test_spectral_new_capped_module_warns_without_policy_failure() -> None:
     baseline = {"spectral": _spectral_report(module="layers.0.mlp.up_proj")}
     subject = {

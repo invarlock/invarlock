@@ -38,8 +38,6 @@ def _finite_int(value: Any) -> int | None:
 
 def _guard_section(value: dict[str, Any], guard_name: str) -> dict[str, Any]:
     section = _as_dict(value.get(guard_name))
-    if section:
-        return section
 
     metrics = _as_dict(value.get("metrics"))
     metric_section = _as_dict(metrics.get(guard_name))
@@ -48,7 +46,8 @@ def _guard_section(value: dict[str, Any], guard_name: str) -> dict[str, Any]:
         entry = _as_dict(entry_raw)
         if str(entry.get("name") or "").strip().lower() != guard_name:
             continue
-        merged = dict(metric_section)
+        merged = dict(section)
+        merged.update(metric_section)
         merged.update(_as_dict(entry.get("metrics")))
         for key in (
             "violations",
@@ -59,10 +58,25 @@ def _guard_section(value: dict[str, Any], guard_name: str) -> dict[str, Any]:
             "policy",
             "baseline_metrics",
         ):
-            if key in entry and key not in merged:
+            if key not in entry:
+                continue
+            existing = merged.get(key)
+            candidate = entry[key]
+            if (
+                key not in merged
+                or (isinstance(existing, list) and not existing)
+                or (isinstance(existing, dict) and not existing)
+                or existing is None
+            ):
+                merged[key] = candidate
+            elif key in {"violations", "top_violations", "epsilon_violations"} and (
+                not isinstance(existing, list) or not existing
+            ):
                 merged[key] = entry[key]
         return merged
 
+    if section:
+        return section
     return metric_section
 
 

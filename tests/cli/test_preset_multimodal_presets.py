@@ -138,6 +138,7 @@ def test_gemma4_26b_a4b_public_vqav2_preset_declares_moe_candidate() -> None:
     assert eval_section["loss"]["type"] == "classification"
     assert cfg.require_section("context")["run"]["skip_overhead_check"] is True
     assert guards["spectral"]["module_include_patterns"]
+    assert guards["spectral"]["family_caps"]["router"] == 5.0
     assert guards["rmt"]["module_include_patterns"]
 
 
@@ -198,4 +199,5 @@ def test_gemma4_26b_a4b_null_sweep_calibration_config_uses_public_manifest() -> 
     }
     assert cfg.require_section("context")["run"]["skip_overhead_check"] is True
     assert guards["spectral"]["module_include_patterns"]
+    assert guards["spectral"]["family_caps"]["router"] == 5.0
     assert guards["rmt"]["module_include_patterns"]
