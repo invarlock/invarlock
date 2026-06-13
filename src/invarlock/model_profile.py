@@ -507,6 +507,7 @@ def detect_model_profile(
         ("yi", "yi"),
         ("llama", "llama"),
         ("gemma", "gemma"),
+        ("olmoe", "olmoe"),
         ("olmo", "olmo"),
     )
     if any(

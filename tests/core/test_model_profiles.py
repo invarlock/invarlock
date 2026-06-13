@@ -40,6 +40,7 @@ pytest.importorskip("transformers")
             "causal",
         ),
         ("microsoft/Phi-4-reasoning-plus", "hf_causal", "phi4", "causal"),
+        ("allenai/OLMoE-1B-7B-0924", "hf_causal", "olmoe", "causal"),
         ("allenai/OLMo-2-1124-7B", "hf_causal", "olmo", "causal"),
         ("allenai/OLMo-2-1124-13B-Instruct", "hf_causal", "olmo", "causal"),
     ],

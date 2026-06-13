@@ -105,7 +105,7 @@ Do not infer `published_basis` from adapter availability alone. For example,
 
 | `model_type` family | Adapter |
 | --- | --- |
-| llama / mistral / mistral3 / mixtral / qwen / gemma / OLMo / yi | `hf_causal` |
+| llama / mistral / mistral3 / mixtral / qwen / gemma / OLMo / OLMoE / yi | `hf_causal` |
 | gpt2 / gpt_oss / opt / neo-x / phi | `hf_causal` |
 | bert / roberta | `hf_mlm` |
 | t5 / bart | `hf_seq2seq` |

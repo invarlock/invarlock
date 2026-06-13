@@ -58,6 +58,7 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
                 "deepseek_ai_deepseek_r1_0528_qwen3_8b",
                 "tiiuae_falcon_h1r_7b",
                 "qwen_qwen3_30b_a3b_instruct_2507",
+                "allenai_olmoe_1b_7b_0924",
                 "google_gemma_4_26b_a4b_it",
             ],
             lane_ids=[],
@@ -124,6 +125,10 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
         "configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml"
     )
     assert specs["qwen_qwen3_30b_a3b_instruct_2507"].adapter == "hf_causal"
+    assert specs["allenai_olmoe_1b_7b_0924"].preset_relpath == (
+        "configs/presets/causal_lm/olmoe_1b_7b_0924_512.yaml"
+    )
+    assert specs["allenai_olmoe_1b_7b_0924"].adapter == "hf_causal"
     assert specs["google_gemma_4_26b_a4b_it"].preset_relpath == (
         "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml"
     )
@@ -148,12 +153,14 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
         "tiiuae_falcon_h1r_7b",
         "google_flan_t5_base",
         "qwen_qwen3_30b_a3b_instruct_2507",
+        "allenai_olmoe_1b_7b_0924",
         "google_gemma_4_26b_a4b_it",
     ]
     adapters = {lane.slug: lane.adapter for lane in specs}
     assert adapters["google_gemma_4_12b_it"] == "hf_multimodal"
     assert adapters["google_flan_t5_base"] == "hf_seq2seq"
     assert adapters["qwen_qwen3_30b_a3b_instruct_2507"] == "hf_causal"
+    assert adapters["allenai_olmoe_1b_7b_0924"] == "hf_causal"
     assert adapters["google_gemma_4_26b_a4b_it"] == "hf_multimodal"
     for lane in specs:
         if lane.slug in {
@@ -168,6 +175,12 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
             assert lane.verify_profile == "release"
             assert lane.preset_relpath == (
                 "configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml"
+            )
+        elif lane.slug == "allenai_olmoe_1b_7b_0924":
+            assert lane.adapter == "hf_causal"
+            assert lane.verify_profile == "release"
+            assert lane.preset_relpath == (
+                "configs/presets/causal_lm/olmoe_1b_7b_0924_512.yaml"
             )
         elif lane.slug == "google_gemma_4_12b_it":
             assert lane.verify_profile == "release"

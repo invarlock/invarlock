@@ -375,6 +375,10 @@ CATALOG_PRESET_OVERRIDES: dict[str, tuple[str, str]] = {
         "configs/presets/causal_lm/falcon_h1r_7b_512.yaml",
         "hf_causal",
     ),
+    "allenai/OLMoE-1B-7B-0924": (
+        "configs/presets/causal_lm/olmoe_1b_7b_0924_512.yaml",
+        "hf_causal",
+    ),
     "google/gemma-4-26B-A4B-it": (
         "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
         "hf_multimodal",
@@ -450,6 +454,15 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
         family="Qwen3 30B-A3B MoE causal LM",
         model_id="Qwen/Qwen3-30B-A3B-Instruct-2507",
         preset_relpath="configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml",
+        adapter="hf_causal",
+        verify_profile="release",
+    ),
+    EvidenceLane(
+        slug="allenai_olmoe_1b_7b_0924",
+        lane_id="olmoe-1b-7b-0924-causal-hf",
+        family="OLMoE 1B-active/7B-total causal LM",
+        model_id="allenai/OLMoE-1B-7B-0924",
+        preset_relpath="configs/presets/causal_lm/olmoe_1b_7b_0924_512.yaml",
         adapter="hf_causal",
         verify_profile="release",
     ),
