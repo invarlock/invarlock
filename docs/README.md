@@ -242,6 +242,8 @@ Notes
 | DeepSeek-R1-Distill-Qwen causal LM | Yes | Yes | Yes | Yes |
 | DeepSeek-R1-0528-Qwen3 8B causal LM | Yes | Yes | Yes | Yes |
 | OLMo 2 7B causal LM | Yes | Yes | Yes | Yes |
+| OpenLLaMA 7B causal LM | Yes | Yes | Yes | Yes |
+| Falcon 7B causal LM | Yes | Yes | Yes | Yes |
 | Granite 4.1 8B causal LM | Yes | Yes | Yes | Yes |
 
 ### Published 13B-14B And Reasoning Decoder Evidence
@@ -282,9 +284,9 @@ Notes
 Published assurance basis covers GPT-2, BERT, Mistral 7B, Ministral 3 3B,
 Ministral 3 8B, Ministral 3 14B, TinyLlama 1.1B, Gemma 4 E2B text-only,
 Granite 4.1 3B, Granite 4.1 8B, OLMo 2 7B, OLMo 2 13B, Qwen2 7B,
-Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B, DeepSeek-R1-Distill-Qwen 7B,
-DeepSeek-R1-0528-Qwen3 8B, DeepSeek-R1-Distill-Qwen 14B, and Phi-4 text-only
-profiles. Repo-included
+OpenLLaMA 7B, Falcon 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B,
+DeepSeek-R1-Distill-Qwen 7B, DeepSeek-R1-0528-Qwen3 8B,
+DeepSeek-R1-Distill-Qwen 14B, and Phi-4 text-only profiles. Repo-included
 presets and pilot calibration configs for prepared practical-pick lanes do not
 become part of the published assurance basis until supporting artifacts are
 attached.

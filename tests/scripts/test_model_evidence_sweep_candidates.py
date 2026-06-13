@@ -24,19 +24,13 @@ def test_promotion_gap_gpu_suite_covers_prepared_deferred_lanes() -> None:
     }
 
     assert set(specs) == {
-        "openlm_research_open_llama_7b",
         "facebook_opt_1_3b",
-        "tiiuae_falcon_7b",
         "thudm_glm_4_9b_chat",
         "distilbert_base_uncased",
     }
-    assert specs["openlm_research_open_llama_7b"].preset_relpath == (
-        "configs/presets/causal_lm/open_llama_7b_512.yaml"
-    )
     assert specs["facebook_opt_1_3b"].preset_relpath == (
         "configs/presets/causal_lm/opt_1_3b_512.yaml"
     )
-    assert specs["tiiuae_falcon_7b"].adapter == "hf_causal"
     assert specs["thudm_glm_4_9b_chat"].adapter == "hf_causal"
     assert specs["distilbert_base_uncased"].adapter == "hf_mlm"
     assert specs["distilbert_base_uncased"].preset_relpath == (

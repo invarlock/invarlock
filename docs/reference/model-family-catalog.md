@@ -40,6 +40,8 @@ intentionally kept out of included preset inventory.
 | TinyLlama 1.1B causal LM | `published_basis` | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Public container-backed evidence fixture is included. |
 | OLMo 2 7B causal LM | `published_basis` | `allenai/OLMo-2-1124-7B` | Public container-backed evidence fixture is included. |
 | OLMo 2 13B causal LM | `published_basis` | `allenai/OLMo-2-1124-13B-Instruct` | Public container-backed evidence fixture is included. |
+| OpenLLaMA 7B causal LM | `published_basis` | `openlm-research/open_llama_7b` | Public release-profile container-backed evidence fixture is included. |
+| Falcon 7B causal LM | `published_basis` | `tiiuae/falcon-7b` | Public release-profile container-backed evidence fixture is included. |
 | Qwen2 7B causal LM | `published_basis` | `Qwen/Qwen2-7B` | Public container-backed evidence fixture is included. |
 | Qwen2.5 7B causal LM | `published_basis` | `Qwen/Qwen2.5-7B` | Public container-backed evidence fixture is included. |
 | Qwen2.5 14B causal LM | `published_basis` | `Qwen/Qwen2.5-14B` | Public container-backed evidence fixture is included. |
@@ -64,14 +66,14 @@ intentionally kept out of included preset inventory.
 | Family | Coverage state | Representative models | Notes |
 | --- | --- | --- | --- |
 | Mixtral | `profile_first_class` | `mistralai/Mixtral-8x7B-v0.1` | Profile and loader code recognize the family directly. |
-| Llama | `profile_first_class` | `openlm-research/open_llama_7b`, `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Generic Llama-family profile handling is first-class. TinyLlama provides the ungated declared support lane, while access-gated vendor checkpoints remain omitted. |
+| Llama | `profile_first_class` | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Generic Llama-family profile handling is first-class. OpenLLaMA and TinyLlama provide ungated declared support lanes, while access-gated vendor checkpoints remain omitted. |
 | Qwen family aliases (Qwen1.5/Qwen2.5/Qwen3 naming) | `profile_first_class` | `Qwen/Qwen2.5-14B`, `Qwen/Qwen3.5-9B` | Shared qwen-family heuristics cover aliases beyond the declared Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 lanes, including usage-only Qwen2.5 checkpoints. |
 | Yi | `profile_first_class` | `01-ai/Yi-34B` | Treated as a RoPE decoder family in profile logic. |
 | Phi family | `profile_first_class` | `microsoft/Phi-3-mini-4k-instruct`, `microsoft/Phi-4-reasoning-plus` | Dedicated phi-family selectors exist. Phi-4 has a declared published text-only lane, while multimodal Phi-4 remains backlog-only. |
 | Gemma family | `profile_first_class` | `google/gemma-3-4b-it`, `google/gemma-4-E2B-it` | Gemma 3/4 selectors and loaders are first-class. Gemma 4 E2B has a declared text-only lane, image-text evaluation uses `hf_multimodal` + `vision_text`, and audio remains deferred. |
 | OPT / GPT-NeoX / GPT-J | `profile_shared_alias` | `facebook/opt-1.3b`, `EleutherAI/gpt-neox-20b` | Available through shared GPT-style paths. |
 | GPT-OSS | `profile_first_class` | `openai/gpt-oss-20b` | Dedicated profile selectors and HF causal decoder spec now cover the open-weight checkpoint directly. |
-| Falcon | `auto_or_loader_only` | `tiiuae/falcon-7b` | Visible through adapter-auto heuristics only. |
+| Falcon | `profile_shared_alias` | `tiiuae/falcon-7b` | Falcon 7B now has a declared support lane; remaining Falcon-family coverage is available through adapter-auto heuristics and variant-path tests. |
 | GLM | `auto_or_loader_only` | `THUDM/glm-4-9b-chat` | Visible through adapter-auto heuristics only. |
 | DeepSeek | `profile_first_class` | `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` | DeepSeek distill checkpoints share the qwen-family route. DeepSeek-R1-Distill-Qwen 7B has a declared published lane; oversized FP8 checkpoint-specific repo hooks and included configs are omitted because they do not fit the supported hardware/runtime path. |
 | Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA) | `auto_or_loader_only` | `distilbert-base-uncased`, `microsoft/deberta-v3-base` | Loader/auto support exceeds the public BERT / RoBERTa lane. |
@@ -103,11 +105,11 @@ decision codes live under `promotion_candidates_text_le_14b` in
 | Qwen3 8B causal LM | `Qwen/Qwen3-8B` | `promoted_published_basis` | `published_basis` | Promoted with container-backed public report, runtime manifest, and signed evidence pack. |
 | DeepSeek-R1-Distill-Qwen causal LM | `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` | `promoted_published_basis` | `published_basis` | Promoted with container-backed public report, runtime manifest, and signed evidence pack. |
 | Phi-4 reasoning-plus causal LM | `microsoft/Phi-4-reasoning-plus` | `promoted_published_basis` | `published_basis` | Promoted with container-backed public report, runtime manifest, and signed evidence pack; this fixture is text-only and skips guard-overhead measurement by preset policy. |
-| OpenLLaMA 7B causal LM | `openlm-research/open_llama_7b` | `blocked_missing_artifacts` | `implemented_coverage` | Recognition and targeted tests exist, and the repo ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
+| OpenLLaMA 7B causal LM | `openlm-research/open_llama_7b` | `promoted_published_basis` | `published_basis` | Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack. |
 | Phi-3 Mini 4K Instruct causal LM | `microsoft/Phi-3-mini-4k-instruct` | `explicitly_out_of_scope` | `implemented_coverage` | The current declared Phi support surface remains the shipped Phi-4 text-only lane. |
 | Gemma 3 4B IT | `google/gemma-3-4b-it` | `explicitly_out_of_scope` | `implemented_coverage` | The broader Gemma family remains multimodal/audio-capable, so this text-only candidate is not part of the tracked promotion set. |
 | OPT 1.3B causal LM | `facebook/opt-1.3b` | `blocked_missing_artifacts` | `implemented_coverage` | Shared GPT-style recognition exists, and the repo ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
-| Falcon 7B causal LM | `tiiuae/falcon-7b` | `blocked_missing_artifacts` | `implemented_coverage` | Recognition and targeted variant-path tests exist, and the repo ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
+| Falcon 7B causal LM | `tiiuae/falcon-7b` | `promoted_published_basis` | `published_basis` | Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack. |
 | GLM 4 9B Chat | `THUDM/glm-4-9b-chat` | `blocked_missing_artifacts` | `implemented_coverage` | Recognition and targeted variant-path tests exist, and the repo ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
 | Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA) | `distilbert-base-uncased` | `blocked_missing_artifacts` | `implemented_coverage` | Loader and adapter tests exist for DistilBERT and DeBERTa, and the repo ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
 | mBART large 50 seq2seq | `facebook/mbart-large-50` | `explicitly_out_of_scope` | `implemented_coverage` | Generic seq2seq and community lanes remain outside this tracked candidate set. |

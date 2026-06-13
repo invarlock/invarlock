@@ -325,6 +325,52 @@
       ]
     },
     {
+      "lane_id": "open-llama-7b-causal-hf",
+      "family": "OpenLLaMA 7B causal LM",
+      "runtime": "huggingface-pytorch",
+      "adapter": "hf_causal",
+      "support_tier": "published_basis",
+      "evidence_status": "published_release_strict",
+      "docs_label": "Yes",
+      "provenance_source": "docs/README.md#support-matrix",
+      "support_groups": [
+        "published_modern"
+      ],
+      "representative_models": [
+        "openlm-research/open_llama_7b"
+      ],
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/open_llama_7b/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/open_llama_7b/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/open_llama_7b/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/open_llama_7b/evidence_pack"
+      },
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack from corrected promotion-gap CUDA run 20260613TpromotionGapReleasePromoteA."
+    },
+    {
+      "lane_id": "falcon-7b-causal-hf",
+      "family": "Falcon 7B causal LM",
+      "runtime": "huggingface-pytorch",
+      "adapter": "hf_causal",
+      "support_tier": "published_basis",
+      "evidence_status": "published_release_strict",
+      "docs_label": "Yes",
+      "provenance_source": "docs/README.md#support-matrix",
+      "support_groups": [
+        "published_modern"
+      ],
+      "representative_models": [
+        "tiiuae/falcon-7b"
+      ],
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/falcon_7b/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/falcon_7b/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/falcon_7b/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/falcon_7b/evidence_pack"
+      },
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack from corrected promotion-gap CUDA run 20260613TpromotionGapReleasePromoteA."
+    },
+    {
       "lane_id": "qwen3-5-causal-hf",
       "family": "Qwen3.5 causal LM",
       "runtime": "huggingface-pytorch",

@@ -9,6 +9,8 @@
     "tinyllama_1_1b",
     "olmo2_7b",
     "olmo2_13b",
+    "open_llama_7b",
+    "falcon_7b",
     "qwen2_7b",
     "qwen2_5_7b",
     "qwen2_5_14b",
@@ -71,6 +73,18 @@
       "model_id": "allenai/OLMo-2-1124-13B-Instruct",
       "primary_metric_kind": "ppl_causal",
       "report": "public_evidence/published_basis/olmo2_13b/evaluation.report.json"
+    },
+    {
+      "id": "open_llama_7b",
+      "model_id": "openlm-research/open_llama_7b",
+      "primary_metric_kind": "ppl_causal",
+      "report": "public_evidence/published_basis/open_llama_7b/evaluation.report.json"
+    },
+    {
+      "id": "falcon_7b",
+      "model_id": "tiiuae/falcon-7b",
+      "primary_metric_kind": "ppl_causal",
+      "report": "public_evidence/published_basis/falcon_7b/evaluation.report.json"
     },
     {
       "id": "qwen2_7b",

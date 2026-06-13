@@ -80,6 +80,8 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         "TinyLlama 1.1B causal LM",
         "OLMo 2 7B causal LM",
         "OLMo 2 13B causal LM",
+        "OpenLLaMA 7B causal LM",
+        "Falcon 7B causal LM",
         "Qwen3.5 causal LM",
         "Gemma 4 12B any-to-any LM",
         "Ministral 3 3B causal LM (text-only eval)",
@@ -122,6 +124,8 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
     assert families["TinyLlama 1.1B causal LM"]["support_tier"] == "published_basis"
     assert families["OLMo 2 7B causal LM"]["support_tier"] == "published_basis"
     assert families["OLMo 2 13B causal LM"]["support_tier"] == "published_basis"
+    assert families["OpenLLaMA 7B causal LM"]["support_tier"] == "published_basis"
+    assert families["Falcon 7B causal LM"]["support_tier"] == "published_basis"
     assert families["Qwen3.5 causal LM"]["support_tier"] == "published_basis"
     assert families["Granite 4.1 3B causal LM"]["support_tier"] == "published_basis"
     assert families["Granite 4.1 8B causal LM"]["support_tier"] == "published_basis"

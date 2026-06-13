@@ -88,6 +88,8 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "tinyllama-1-1b-causal-hf",
         "olmo-2-7b-causal-hf",
         "olmo-2-13b-causal-hf",
+        "open-llama-7b-causal-hf",
+        "falcon-7b-causal-hf",
         "qwen2-7b-causal-hf",
         "qwen2-5-7b-causal-hf",
         "qwen2-5-14b-causal-hf",
@@ -123,6 +125,8 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "TinyLlama 1.1B causal LM",
         "OLMo 2 7B causal LM",
         "OLMo 2 13B causal LM",
+        "OpenLLaMA 7B causal LM",
+        "Falcon 7B causal LM",
         "Qwen3.5 causal LM",
         "Gemma 4 12B any-to-any LM",
         "Ministral 3 3B causal LM (text-only eval)",
@@ -178,11 +182,21 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         candidates["Phi-4 reasoning-plus causal LM"]["current_catalog_state"]
         == "published_basis"
     )
-    assert candidates["Falcon 7B causal LM"]["decision"] == "blocked_missing_artifacts"
+    assert (
+        candidates["OpenLLaMA 7B causal LM"]["decision"]
+        == "promoted_published_basis"
+    )
+    assert (
+        candidates["OpenLLaMA 7B causal LM"]["current_catalog_state"]
+        == "published_basis"
+    )
+    assert candidates["Falcon 7B causal LM"]["decision"] == "promoted_published_basis"
+    assert (
+        candidates["Falcon 7B causal LM"]["current_catalog_state"]
+        == "published_basis"
+    )
     for display_name in (
-        "OpenLLaMA 7B causal LM",
         "OPT 1.3B causal LM",
-        "Falcon 7B causal LM",
         "GLM 4 9B Chat",
     ):
         assert candidates[display_name]["criteria_status"]["included_preset"] == "pass"

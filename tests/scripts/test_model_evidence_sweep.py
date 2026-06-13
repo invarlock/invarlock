@@ -38,7 +38,7 @@ def test_repo_mentioned_gpu_suite_includes_basis_canaries_and_experimental() -> 
         shard_count=1,
     )
 
-    assert len(specs) == 24
+    assert len(specs) == 26
     slugs = {lane.slug for lane in specs}
     assert {
         "gpt2_public",
@@ -52,6 +52,8 @@ def test_repo_mentioned_gpu_suite_includes_basis_canaries_and_experimental() -> 
         "ministral3_14b_public",
         "tinyllama_1_1b_public",
         "olmo2_13b_public",
+        "open_llama_7b_public",
+        "falcon_7b_public",
         "qwen2_7b_public",
         "qwen2_5_7b_public",
         "qwen2_5_14b_public",
@@ -86,6 +88,8 @@ def test_repo_mentioned_gpu_basis_lanes_use_lane_specific_profiles_and_presets()
                 "tinyllama_1_1b_public",
                 "olmo2_7b_public",
                 "olmo2_13b_public",
+                "open_llama_7b_public",
+                "falcon_7b_public",
                 "qwen2_7b_public",
                 "qwen2_5_7b_public",
                 "qwen2_5_14b_public",
@@ -149,6 +153,16 @@ def test_repo_mentioned_gpu_basis_lanes_use_lane_specific_profiles_and_presets()
     assert (
         basis["olmo2_13b_public"].preset_relpath
         == "configs/presets/causal_lm/olmo2_13b_512.yaml"
+    )
+    assert basis["open_llama_7b_public"].verify_profile == "release"
+    assert (
+        basis["open_llama_7b_public"].preset_relpath
+        == "configs/presets/causal_lm/open_llama_7b_512.yaml"
+    )
+    assert basis["falcon_7b_public"].verify_profile == "release"
+    assert (
+        basis["falcon_7b_public"].preset_relpath
+        == "configs/presets/causal_lm/falcon_7b_512.yaml"
     )
     assert basis["qwen2_7b_public"].verify_profile == "ci"
     assert (
@@ -360,9 +374,7 @@ def test_promotion_gap_gpu_suite_targets_repo_prepared_blocked_lanes() -> None:
     )
 
     assert [lane.slug for lane in specs] == [
-        "openlm_research_open_llama_7b",
         "facebook_opt_1_3b",
-        "tiiuae_falcon_7b",
         "thudm_glm_4_9b_chat",
         "distilbert_base_uncased",
     ]
@@ -405,9 +417,7 @@ def test_model_evidence_sweep_dry_run_supports_promotion_gap_suite_candidates(
     payload = json.loads(proc.stdout)
     slugs = [entry["slug"] for entry in payload]
     assert slugs == [
-        "openlm_research_open_llama_7b",
         "facebook_opt_1_3b",
-        "tiiuae_falcon_7b",
         "thudm_glm_4_9b_chat",
         "distilbert_base_uncased",
     ]

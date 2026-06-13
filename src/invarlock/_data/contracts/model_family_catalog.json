@@ -370,6 +370,54 @@
       ]
     },
     {
+      "family_id": "openllama-7b-causal-lm",
+      "display_name": "OpenLLaMA 7B causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "openlm-research/open_llama_7b"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/open_llama_7b_512.yaml",
+        "configs/calibration/null_sweep_open_llama_7b.yaml",
+        "public_evidence/published_basis/open_llama_7b/evaluation.report.json",
+        "public_evidence/published_basis/open_llama_7b/runtime.manifest.json",
+        "public_evidence/published_basis/open_llama_7b/evidence_pack"
+      ],
+      "notes": "Promoted from support_matrix lane open-llama-7b-causal-hf with release-profile container-backed public evidence.",
+      "support_groups": [
+        "published_modern"
+      ]
+    },
+    {
+      "family_id": "falcon-7b-causal-lm",
+      "display_name": "Falcon 7B causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "tiiuae/falcon-7b"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/falcon_7b_512.yaml",
+        "configs/calibration/null_sweep_falcon_7b.yaml",
+        "public_evidence/published_basis/falcon_7b/evaluation.report.json",
+        "public_evidence/published_basis/falcon_7b/runtime.manifest.json",
+        "public_evidence/published_basis/falcon_7b/evidence_pack"
+      ],
+      "notes": "Promoted from support_matrix lane falcon-7b-causal-hf with release-profile container-backed public evidence.",
+      "support_groups": [
+        "published_modern"
+      ]
+    },
+    {
       "family_id": "qwen3-5-causal-lm",
       "display_name": "Qwen3.5 causal LM",
       "modalities": [
@@ -663,7 +711,6 @@
       "task_role": "causal_lm",
       "state": "profile_first_class",
       "representative_models": [
-        "openlm-research/open_llama_7b",
         "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
       ],
       "repo_evidence": [
@@ -671,7 +718,7 @@
         "src/invarlock/adapters/hf_loading.py",
         "src/invarlock/adapters/auto.py"
       ],
-      "notes": "Generic Llama-family profile handling is first-class. TinyLlama now provides the ungated declared support lane, while access-gated vendor checkpoints remain omitted."
+      "notes": "Generic Llama-family profile handling is first-class. OpenLLaMA and TinyLlama now provide ungated declared support lanes, while access-gated vendor checkpoints remain omitted."
     },
     {
       "family_id": "qwen-family-aliases",
@@ -796,14 +843,15 @@
         "text"
       ],
       "task_role": "causal_lm",
-      "state": "auto_or_loader_only",
+      "state": "profile_shared_alias",
       "representative_models": [
         "tiiuae/falcon-7b"
       ],
       "repo_evidence": [
-        "src/invarlock/adapters/auto.py"
+        "src/invarlock/adapters/auto.py",
+        "tests/adapters/test_hf_causal_variant_paths.py"
       ],
-      "notes": "Family visibility currently comes from adapter-auto heuristics only."
+      "notes": "Falcon 7B now has a declared support lane; remaining Falcon-family coverage is available through adapter-auto heuristics and variant-path tests."
     },
     {
       "family_id": "glm",
@@ -1107,15 +1155,15 @@
         "candidate_id": "openllama-7b-causal-lm",
         "display_name": "OpenLLaMA 7B causal LM",
         "representative_model": "openlm-research/open_llama_7b",
-        "current_catalog_state": "implemented_coverage",
-        "decision": "blocked_missing_artifacts",
+        "current_catalog_state": "published_basis",
+        "decision": "promoted_published_basis",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
           "included_preset": "pass",
           "included_calibration_config": "pass",
           "targeted_tests": "pass",
           "cli_smoke_evidence": "pass",
-          "approved_calibration_or_evaluation_evidence": "fail"
+          "approved_calibration_or_evaluation_evidence": "pass"
         },
         "repo_evidence": [
           "configs/presets/causal_lm/open_llama_7b_512.yaml",
@@ -1124,12 +1172,12 @@
           "src/invarlock/adapters/hf_loading.py",
           "src/invarlock/adapters/auto.py",
           "tests/core/test_model_profiles.py",
-          "tests/cli/test_preset_causal_presets.py"
+          "tests/cli/test_preset_causal_presets.py",
+          "public_evidence/published_basis/open_llama_7b/evaluation.report.json",
+          "public_evidence/published_basis/open_llama_7b/evidence_pack"
         ],
-        "missing_artifacts": [
-          "approved calibration/evaluation evidence"
-        ],
-        "notes": "The family is recognized and now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing."
+        "missing_artifacts": [],
+        "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack from corrected promotion-gap CUDA run 20260613TpromotionGapReleasePromoteA."
       },
       {
         "candidate_id": "phi-3-mini-4k-instruct-causal-lm",
@@ -1210,27 +1258,27 @@
         "candidate_id": "falcon-7b-causal-lm",
         "display_name": "Falcon 7B causal LM",
         "representative_model": "tiiuae/falcon-7b",
-        "current_catalog_state": "implemented_coverage",
-        "decision": "blocked_missing_artifacts",
+        "current_catalog_state": "published_basis",
+        "decision": "promoted_published_basis",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
           "included_preset": "pass",
           "included_calibration_config": "pass",
           "targeted_tests": "pass",
           "cli_smoke_evidence": "pass",
-          "approved_calibration_or_evaluation_evidence": "fail"
+          "approved_calibration_or_evaluation_evidence": "pass"
         },
         "repo_evidence": [
           "configs/presets/causal_lm/falcon_7b_512.yaml",
           "configs/calibration/null_sweep_falcon_7b.yaml",
           "src/invarlock/adapters/auto.py",
           "tests/adapters/test_hf_causal_variant_paths.py",
-          "tests/cli/test_preset_causal_presets.py"
+          "tests/cli/test_preset_causal_presets.py",
+          "public_evidence/published_basis/falcon_7b/evaluation.report.json",
+          "public_evidence/published_basis/falcon_7b/evidence_pack"
         ],
-        "missing_artifacts": [
-          "approved calibration/evaluation evidence"
-        ],
-        "notes": "Recognition and targeted variant-path tests exist, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing."
+        "missing_artifacts": [],
+        "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack from corrected promotion-gap CUDA run 20260613TpromotionGapReleasePromoteA."
       },
       {
         "candidate_id": "glm-4-9b-chat-causal-lm",
