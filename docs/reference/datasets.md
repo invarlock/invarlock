@@ -83,7 +83,7 @@ Counts mismatches are enforced via `coverage.preview.used`,
 | `hf_text` | text | Cache/Net | `dataset_name`, `text_field` | Generic HF dataset loader; uses first N rows. |
 | `local_jsonl` | text | Offline | `file`/`path`/`data_files`, `text_field` | Reads JSONL from disk; default `text_field: text`. |
 | `vision_text` | image-text | Offline | `file`/`path`/`data_files` | Local JSONL manifest of single-image VQA-style examples; `stride` is ignored. |
-| `hf_seq2seq` | seq2seq | Cache/Net | `dataset_name`, `src_field`, `tgt_field` | Provides encoder ids + decoder labels. |
+| `hf_seq2seq` | seq2seq | Cache/Net | `dataset_name`, `src_field`, `tgt_field` | Provides encoder ids + decoder labels; supports pinned dataset `revision` and source/target prefixes. |
 | `local_jsonl_pairs` | seq2seq | Offline | `file`/`path`/`data_files`, `src_field`, `tgt_field` | Paired JSONL for seq2seq. |
 | `seq2seq` | seq2seq | Offline | optional `n`, `src_len`, `tgt_len` | Synthetic seq2seq generator. |
 
@@ -175,13 +175,24 @@ the run artifacts.
 
 ```yaml
 dataset:
-  provider: hf_seq2seq
-  dataset_name: wmt14
-  src_field: translation.en
-  tgt_field: translation.de
+  provider:
+    kind: hf_seq2seq
+    dataset_name: abisee/cnn_dailymail
+    config_name: 3.0.0
+    revision: 96df5e686bee6baa90b8bee7c28b81fa3fa6223d
+    src_field: article
+    tgt_field: highlights
+    src_prefix: "summarize: "
+    max_samples: 1024
+  split: validation
+  seq_len: 256
   preview_n: 32
   final_n: 32
 ```
+
+The FLAN-T5 public seq2seq basis uses this provider shape with
+`google/flan-t5-base` pinned to model revision
+`7bcac572ce56db69c1ea7c8af255c5d7c9672fc2`.
 
 ### Environment variables
 

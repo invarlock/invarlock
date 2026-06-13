@@ -95,17 +95,18 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "qwen2-5-14b-causal-hf",
         "qwen3-causal-hf",
         "qwen3-5-causal-hf",
-            "granite-4-1-3b-causal-hf",
-            "granite-4-1-8b-causal-hf",
-            "gemma4-e2b-text-causal-hf",
-            "gemma4-12b-any-to-any-hf",
-            "deepseek-r1-distill-qwen-causal-hf",
+        "granite-4-1-3b-causal-hf",
+        "granite-4-1-8b-causal-hf",
+        "gemma4-e2b-text-causal-hf",
+        "gemma4-12b-any-to-any-hf",
+        "deepseek-r1-distill-qwen-causal-hf",
         "deepseek-r1-0528-qwen3-8b-causal-hf",
         "deepseek-r1-distill-qwen-14b-causal-hf",
         "phi-4-text-causal-hf",
         "smollm3-3b-causal-hf",
         "phi-4-mini-causal-hf",
         "falcon-h1r-7b-causal-hf",
+        "flan-t5-base-seq2seq-hf",
     }
 
     family_catalog = contracts.load_model_family_catalog()
@@ -141,7 +142,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "DeepSeek-R1-Distill-Qwen 14B causal LM",
         "DeepSeek-R1-0528-Qwen3 8B causal LM",
         "Falcon-H1R 7B causal LM",
-        "Seq2Seq / local pairs",
+        "FLAN-T5 base seq2seq LM",
     }
     assert all(item["support_groups"] for item in family_catalog["declared_support"])
     usage_only = {item["display_name"] for item in family_catalog["usage_only"]}
@@ -187,8 +188,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         == "published_basis"
     )
     assert (
-        candidates["OpenLLaMA 7B causal LM"]["decision"]
-        == "promoted_published_basis"
+        candidates["OpenLLaMA 7B causal LM"]["decision"] == "promoted_published_basis"
     )
     assert (
         candidates["OpenLLaMA 7B causal LM"]["current_catalog_state"]
@@ -196,8 +196,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     )
     assert candidates["Falcon 7B causal LM"]["decision"] == "promoted_published_basis"
     assert (
-        candidates["Falcon 7B causal LM"]["current_catalog_state"]
-        == "published_basis"
+        candidates["Falcon 7B causal LM"]["current_catalog_state"] == "published_basis"
     )
     for display_name in (
         "OPT 1.3B causal LM",

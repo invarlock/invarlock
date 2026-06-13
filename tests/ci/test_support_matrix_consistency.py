@@ -92,7 +92,7 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         "DeepSeek-R1-Distill-Qwen 14B causal LM",
         "DeepSeek-R1-0528-Qwen3 8B causal LM",
         "Falcon-H1R 7B causal LM",
-        "Seq2Seq / local pairs",
+        "FLAN-T5 base seq2seq LM",
     }
     assert families["GPT-2 causal LM"]["support_tier"] == "published_basis"
     assert families["BERT / RoBERTa MLM"]["support_tier"] == "published_basis"
@@ -127,9 +127,7 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
     assert families["OpenLLaMA 7B causal LM"]["support_tier"] == "published_basis"
     assert families["Falcon 7B causal LM"]["support_tier"] == "published_basis"
     assert families["Qwen3.5 causal LM"]["support_tier"] == "published_basis"
-    assert families["Gemma 4 12B any-to-any LM"]["support_tier"] == (
-        "published_basis"
-    )
+    assert families["Gemma 4 12B any-to-any LM"]["support_tier"] == ("published_basis")
     assert families["Granite 4.1 3B causal LM"]["support_tier"] == "published_basis"
     assert families["Granite 4.1 8B causal LM"]["support_tier"] == "published_basis"
     assert (
@@ -154,6 +152,10 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
     )
     assert families["Falcon-H1R 7B causal LM"]["support_tier"] == "published_basis"
     assert families["Falcon-H1R 7B causal LM"]["evidence_status"] == (
+        "published_release_strict"
+    )
+    assert families["FLAN-T5 base seq2seq LM"]["support_tier"] == "published_basis"
+    assert families["FLAN-T5 base seq2seq LM"]["evidence_status"] == (
         "published_release_strict"
     )
 

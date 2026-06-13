@@ -105,6 +105,7 @@ def test_offline_golden_runs_public_fixtures() -> None:
         "smollm3_3b",
         "phi4_mini",
         "falcon_h1r_7b",
+        "flan_t5_base",
     ]
 
     for lane in manifest["lanes"]:
@@ -257,9 +258,9 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
         (demo_dir / "guard_value_manifest.json").read_text(encoding="utf-8")
     )
     final_verdict = json.loads(
-        (
-            demo_dir / "artifact_package" / "reports" / "final_verdict.json"
-        ).read_text(encoding="utf-8")
+        (demo_dir / "artifact_package" / "reports" / "final_verdict.json").read_text(
+            encoding="utf-8"
+        )
     )
 
     assert metadata["evidence_class"] == "real_guard_value_demo"
@@ -297,13 +298,11 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
     manifest_paths = {entry["path"] for entry in manifest["files"]}
     assert (
         "artifact_package/logs/tasks/"
-        "manual_probe_spectral_moderate_scale_mlp_l31_up_s112.log"
-        in manifest_paths
+        "manual_probe_spectral_moderate_scale_mlp_l31_up_s112.log" in manifest_paths
     )
     assert (
         "artifact_package/logs/tasks/"
-        "manual_probe_spectral_moderate_scale_attn_l31_o_s112.log"
-        in manifest_paths
+        "manual_probe_spectral_moderate_scale_attn_l31_o_s112.log" in manifest_paths
     )
     assert (
         "artifact_package/reports/guard_value_all_guard_probe_sweep.json"
@@ -311,13 +310,11 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
     )
     assert (
         "artifact_package/logs/tasks/"
-        "manual_confirm_rmt_norm_noise_l31_ffn_up_b030.log"
-        in manifest_paths
+        "manual_confirm_rmt_norm_noise_l31_ffn_up_b030.log" in manifest_paths
     )
     assert (
         "artifact_package/logs/tasks/"
-        "manual_confirm_ve_mlp_scale_skew_l31_down_s090.log"
-        in manifest_paths
+        "manual_confirm_ve_mlp_scale_skew_l31_down_s090.log" in manifest_paths
     )
     for entry in manifest["files"]:
         path = demo_dir / entry["path"]
@@ -403,11 +400,14 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
     rmt_report = json.loads(rmt_report_path.read_text(encoding="utf-8"))
     assert validate_report(rmt_report) is True
     assert rmt_report["validation"]["primary_metric_acceptable"] is True
-    assert run_verify_reports(
-        [rmt_report_path],
-        profile="release",
-        assurance_mode="report",
-    ).outcome == VerifyOutcome.OK
+    assert (
+        run_verify_reports(
+            [rmt_report_path],
+            profile="release",
+            assurance_mode="report",
+        ).outcome
+        == VerifyOutcome.OK
+    )
 
     variance = all_guard["guard_results"]["variance"]
     assert variance["status"] == "published_reproduced_positive"
@@ -423,11 +423,14 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
     ve_report = json.loads(ve_report_path.read_text(encoding="utf-8"))
     assert validate_report(ve_report) is True
     assert ve_report["validation"]["primary_metric_acceptable"] is True
-    assert run_verify_reports(
-        [ve_report_path],
-        profile="release",
-        assurance_mode="report",
-    ).outcome == VerifyOutcome.OK
+    assert (
+        run_verify_reports(
+            [ve_report_path],
+            profile="release",
+            assurance_mode="report",
+        ).outcome
+        == VerifyOutcome.OK
+    )
 
     sweep = json.loads(
         (
@@ -438,15 +441,21 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
     assert sweep["method"]["baseline_eval_rerun"] is False
     assert sweep["selected_positive"] == comparison["scenario_id"]
     records = {record["scenario_id"]: record for record in sweep["records"]}
-    assert records["spectral_moderate_scale_mlp_l31_up_s112"][
-        "baseline_relative_guard"
-    ]["new_caps_applied"] == 1
-    assert records["spectral_moderate_scale_attn_l31_o_s112"][
-        "baseline_relative_guard"
-    ]["new_caps_applied"] == 0
-    assert records["spectral_moderate_scale_attn_l31_o_s118"][
-        "spectral_caps_applied"
-    ] == 3
+    assert (
+        records["spectral_moderate_scale_mlp_l31_up_s112"]["baseline_relative_guard"][
+            "new_caps_applied"
+        ]
+        == 1
+    )
+    assert (
+        records["spectral_moderate_scale_attn_l31_o_s112"]["baseline_relative_guard"][
+            "new_caps_applied"
+        ]
+        == 0
+    )
+    assert (
+        records["spectral_moderate_scale_attn_l31_o_s118"]["spectral_caps_applied"] == 3
+    )
 
     expected_failures = [
         demo_dir
@@ -486,9 +495,9 @@ def test_public_docs_route_to_mistral_guard_value_evidence() -> None:
 
     for label, path in docs.items():
         text = path.read_text(encoding="utf-8")
-        assert (
-            "public_evidence/published_basis/mistral_7b/guard_value_demo" in text
-        ), label
+        assert "public_evidence/published_basis/mistral_7b/guard_value_demo" in text, (
+            label
+        )
         assert "baseline-relative" in text, label
 
     public_evidence_readme = docs["public_evidence/README.md"].read_text(
@@ -500,9 +509,7 @@ def test_public_docs_route_to_mistral_guard_value_evidence() -> None:
         public_evidence_readme
     )
 
-    pack_readme = docs["scripts/evidence_packs/README.md"].read_text(
-        encoding="utf-8"
-    )
+    pack_readme = docs["scripts/evidence_packs/README.md"].read_text(encoding="utf-8")
     assert "Guard-value publishing rule" in pack_readme
     assert "Clean confirmation reruns are required" in pack_readme
     assert "guard_value_all_guard_probe_sweep.json" in pack_readme

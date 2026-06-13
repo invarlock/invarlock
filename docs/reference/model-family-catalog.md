@@ -23,8 +23,8 @@ The support matrix remains strict. The model family catalog is broader by
 design and records code-level visibility, usage-only checkpoints, and
 recommended additions. The support matrix is ordered by evidence readiness:
 baseline fixtures, published modern decoder evidence, repo-maintained
-experimental lanes, community candidate backlog, and generic seq2seq/local
-pairs. Within those sections, related families and scale points stay adjacent
+experimental lanes, community candidate backlog, and concrete task-family
+bases. Within those sections, related families and scale points stay adjacent
 without adding another visible column. Access-gated vendor checkpoints are
 intentionally kept out of included preset inventory.
 
@@ -59,7 +59,7 @@ intentionally kept out of included preset inventory.
 | SmolLM3 3B causal LM | `published_basis` | `HuggingFaceTB/SmolLM3-3B` | Public release-profile container-backed evidence fixture is included; guard-overhead measurement is skipped by preset policy. |
 | Phi-4 mini causal LM | `published_basis` | `microsoft/Phi-4-mini-instruct` | Public release-profile container-backed evidence fixture is included after the FFN projection family-classification fix. |
 | Falcon-H1R 7B causal LM | `published_basis` | `tiiuae/Falcon-H1R-7B` | Public release-profile container-backed evidence fixture is included after Mamba projection spectral-family classification and Falcon embedding spectral exclusion. |
-| Seq2Seq / local pairs | `community_experimental` | `t5-small`, `facebook/bart-base` | Generic seq2seq lane without a published-basis claim. |
+| FLAN-T5 base seq2seq LM | `published_basis` | `google/flan-t5-base` | Public release-profile container-backed evidence fixture is included on pinned CNN/DailyMail validation data through `hf_seq2seq`. |
 
 ## Implemented Coverage
 
@@ -77,7 +77,7 @@ intentionally kept out of included preset inventory.
 | GLM | `auto_or_loader_only` | `THUDM/glm-4-9b-chat` | Visible through adapter-auto heuristics only. |
 | DeepSeek | `profile_first_class` | `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` | DeepSeek distill checkpoints share the qwen-family route. DeepSeek-R1-Distill-Qwen 7B has a declared published lane; oversized FP8 checkpoint-specific repo hooks and included configs are omitted because they do not fit the supported hardware/runtime path. |
 | Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA) | `auto_or_loader_only` | `distilbert-base-uncased`, `microsoft/deberta-v3-base` | Loader/auto support exceeds the public BERT / RoBERTa lane. |
-| Broader seq2seq families (mBART/PEGASUS/Marian) | `auto_or_loader_only` | `facebook/mbart-large-50`, `Helsinki-NLP/opus-mt-en-de` | Loader support is broader than the generic seq2seq public lane. |
+| Broader seq2seq families (mBART/PEGASUS/Marian) | `auto_or_loader_only` | `facebook/mbart-large-50`, `Helsinki-NLP/opus-mt-en-de` | Loader support is broader than the FLAN-T5 public seq2seq basis. |
 
 ## Usage Only
 
@@ -112,7 +112,7 @@ decision codes live under `promotion_candidates_text_le_14b` in
 | Falcon 7B causal LM | `tiiuae/falcon-7b` | `promoted_published_basis` | `published_basis` | Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack. |
 | GLM 4 9B Chat | `THUDM/glm-4-9b-chat` | `blocked_missing_artifacts` | `implemented_coverage` | Recognition and targeted variant-path tests exist, and the repo ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
 | Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA) | `distilbert-base-uncased` | `blocked_missing_artifacts` | `implemented_coverage` | Loader and adapter tests exist for DistilBERT and DeBERTa, and the repo ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
-| mBART large 50 seq2seq | `facebook/mbart-large-50` | `explicitly_out_of_scope` | `implemented_coverage` | Generic seq2seq and community lanes remain outside this tracked candidate set. |
+| mBART large 50 seq2seq | `facebook/mbart-large-50` | `explicitly_out_of_scope` | `implemented_coverage` | FLAN-T5 base now supplies the concrete public seq2seq basis; mBART still needs its own evidence. |
 
 The machine-readable criterion-by-criterion ledger for this candidate set lives
 under `promotion_candidates_text_le_14b` in

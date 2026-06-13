@@ -27,7 +27,8 @@
     "ministral3_3b",
     "smollm3_3b",
     "phi4_mini",
-    "falcon_h1r_7b"
+    "falcon_h1r_7b",
+    "flan_t5_base"
   ],
   "lanes": [
     {
@@ -191,6 +192,12 @@
       "model_id": "tiiuae/Falcon-H1R-7B",
       "primary_metric_kind": "ppl_causal",
       "report": "public_evidence/published_basis/falcon_h1r_7b/evaluation.report.json"
+    },
+    {
+      "id": "flan_t5_base",
+      "model_id": "google/flan-t5-base",
+      "primary_metric_kind": "ppl_seq2seq",
+      "report": "public_evidence/published_basis/flan_t5_base/evaluation.report.json"
     }
   ]
 }

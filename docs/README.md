@@ -275,19 +275,19 @@ Notes
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | Gemma 4 12B any-to-any LM | Yes | Yes | No | Yes |
 
-### Generic Seq2Seq And Local Pairs
+### Seq2Seq Published Basis
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| Seq2Seq / local pairs | Yes | Yes | No | No |
+| FLAN-T5 base seq2seq LM | Yes | Yes | Yes | Yes |
 
 Published assurance basis covers GPT-2, BERT, Mistral 7B, Ministral 3 3B,
 Ministral 3 8B, Ministral 3 14B, TinyLlama 1.1B, Gemma 4 E2B text-only,
 Gemma 4 12B image-text, Granite 4.1 3B, Granite 4.1 8B, OLMo 2 7B,
 OLMo 2 13B, Qwen2 7B, OpenLLaMA 7B, Falcon 7B, Qwen2.5 7B,
 Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B, DeepSeek-R1-Distill-Qwen 7B,
-DeepSeek-R1-0528-Qwen3 8B, DeepSeek-R1-Distill-Qwen 14B, and Phi-4 text-only
-profiles. Repo-included
+DeepSeek-R1-0528-Qwen3 8B, DeepSeek-R1-Distill-Qwen 14B, Phi-4 text-only,
+and FLAN-T5 base seq2seq profiles. Repo-included
 presets and pilot calibration configs for prepared practical-pick lanes do not
 become part of the published assurance basis until supporting artifacts are
 attached.
@@ -306,6 +306,9 @@ calibration config are already present. Access-gated vendor checkpoints are
 intentionally excluded from the included preset inventory.
 The Phi-4 public fixture is text-only and skips guard-overhead measurement by
 preset policy; strict release verification accepts that declared skip.
+The FLAN-T5 base public fixture uses pinned CNN/DailyMail validation data via
+`hf_seq2seq`; strict release verification accepts one advisory guard warning
+while the hard policy gates pass.
 
 `published_basis` remains the narrow public evidence floor, while
 `supported_experimental` means the repo ships the preset, calibration config,

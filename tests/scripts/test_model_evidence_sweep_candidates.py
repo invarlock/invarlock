@@ -57,6 +57,7 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
         "huggingfacetb_smollm3_3b",
         "microsoft_phi_4_mini_instruct",
         "tiiuae_falcon_h1r_7b",
+        "google_flan_t5_base",
     }
     assert specs["google_gemma_4_12b_it"].preset_relpath == (
         "configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml"
@@ -67,10 +68,17 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
     assert specs["google_gemma_4_12b_it"].vision_text_materialization["dataset"] == (
         "Multimodal-Fatima/VQAv2_sample_validation"
     )
-    assert specs["google_gemma_4_12b_it"].vision_text_materialization["max_samples"] == 800
+    assert (
+        specs["google_gemma_4_12b_it"].vision_text_materialization["max_samples"] == 800
+    )
     assert specs["microsoft_phi_4_mini_instruct"].preset_relpath == (
         "configs/presets/causal_lm/phi4_mini_512.yaml"
     )
+    assert specs["google_flan_t5_base"].preset_relpath == (
+        "configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml"
+    )
+    assert specs["google_flan_t5_base"].adapter == "hf_seq2seq"
+    assert specs["google_flan_t5_base"].verify_profile == "release"
 
 
 def test_promotion_gap_gpu_suite_glm_host_dry_run_uses_lane_preset(
@@ -190,9 +198,7 @@ def test_support_matrix_backlog_gemma_dry_run_materializes_public_vqav2(
     assert item["slug"] == "google_gemma_4_12b_it"
     assert item["materialize_dataset"][0] == sys.executable
     assert "Multimodal-Fatima/VQAv2_sample_validation" in item["materialize_dataset"]
-    assert "99487d2651df3799002b2fb3e455741744514a02" in item[
-        "materialize_dataset"
-    ]
+    assert "99487d2651df3799002b2fb3e455741744514a02" in item["materialize_dataset"]
     preset_idx = item["evaluate"].index("--preset") + 1
     assert item["evaluate"][preset_idx].endswith("prepared_preset.yaml")
     assert item["evaluate"][item["evaluate"].index("--profile") + 1] == "release"

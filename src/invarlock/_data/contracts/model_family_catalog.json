@@ -676,26 +676,28 @@
       "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window run preset after Mamba projection spectral-family classification and Falcon embedding spectral exclusion."
     },
     {
-      "family_id": "seq2seq-local-pairs",
-      "display_name": "Seq2Seq / local pairs",
+      "family_id": "flan-t5-base-seq2seq-lm",
+      "display_name": "FLAN-T5 base seq2seq LM",
       "modalities": [
         "text"
       ],
       "task_role": "seq2seq",
-      "state": "community_experimental",
+      "state": "published_basis",
       "representative_models": [
-        "t5-small",
-        "facebook/bart-base"
+        "google/flan-t5-base"
       ],
       "repo_evidence": [
         "contracts/support_matrix.json",
-        "docs/README.md",
-        "docs/reference/model-adapters.md"
+        "configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml",
+        "configs/calibration/null_sweep_flan_t5_base.yaml",
+        "public_evidence/published_basis/flan_t5_base/evaluation.report.json",
+        "public_evidence/published_basis/flan_t5_base/runtime.manifest.json",
+        "public_evidence/published_basis/flan_t5_base/evidence_pack"
       ],
-      "notes": "Derived from support_matrix lane seq2seq-local-pairs.",
       "support_groups": [
-        "community_seq2seq"
-      ]
+        "seq2seq"
+      ],
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and pinned CNN/DailyMail validation data through hf_seq2seq."
     }
   ],
   "implemented_coverage": [
@@ -938,7 +940,7 @@
         "src/invarlock/adapters/auto.py",
         "docs/reference/model-adapters.md"
       ],
-      "notes": "Concrete loader families exist even though the public support matrix keeps seq2seq at a generic local-pairs lane."
+      "notes": "Concrete loader families exist beyond the public FLAN-T5 base seq2seq basis; mBART/PEGASUS/Marian still need dedicated presets and public evidence before they become declared support lanes."
     }
   ],
   "usage_only": [
@@ -1371,7 +1373,7 @@
           "docs/reference/model-adapters.md"
         ],
         "missing_artifacts": [],
-        "notes": "Generic seq2seq/community lanes are intentionally excluded from this text-only promotion wave."
+        "notes": "FLAN-T5 base now supplies the concrete public seq2seq basis; this broader mBART candidate remains intentionally out of scope until it has its own preset, calibration config, smoke evidence, and public run."
       }
     ]
   },

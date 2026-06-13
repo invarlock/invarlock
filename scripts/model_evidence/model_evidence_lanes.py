@@ -275,6 +275,15 @@ CURRENT_PUBLISHED_BASIS_LANES: tuple[EvidenceLane, ...] = (
         adapter="hf_causal",
         verify_profile="ci",
     ),
+    EvidenceLane(
+        slug="flan_t5_base_public",
+        lane_id="flan-t5-base-seq2seq-hf",
+        family="FLAN-T5 base seq2seq LM",
+        model_id="google/flan-t5-base",
+        preset_relpath="configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml",
+        adapter="hf_seq2seq",
+        verify_profile="release",
+    ),
 )
 
 DOCUMENTED_SMOKE_CANARY_LANES: tuple[EvidenceLane, ...] = (
@@ -361,6 +370,10 @@ CATALOG_PRESET_OVERRIDES: dict[str, tuple[str, str]] = {
     "tiiuae/Falcon-H1R-7B": (
         "configs/presets/causal_lm/falcon_h1r_7b_512.yaml",
         "hf_causal",
+    ),
+    "google/flan-t5-base": (
+        "configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml",
+        "hf_seq2seq",
     ),
 }
 
