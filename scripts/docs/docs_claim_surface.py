@@ -96,11 +96,13 @@ CLAIM_REQUIRED_BY_FILE = {
         "published assurance basis",
     ],
     "docs/reference/model-adapters.md": [
-        "Adapter availability is broader than the published assurance basis.",
-        "GPT-2",
-        "BERT",
-        "Mistral 7B",
-        *PUBLISHED_BASIS_NAMES,
+        "Adapter availability is broader than the published evidence basis.",
+        "`published_basis` lanes span GPT-2/BERT fixtures",
+        "FLAN-T5 through `hf_seq2seq`",
+        "Gemma 4 image-text through `hf_multimodal` plus `vision_text`",
+        "lanes such as OLMoE, Mixtral, and Qwen3 30B-A3B",
+        "`contracts/support_matrix.json` as authoritative",
+        "Model Family Catalog",
     ],
     "docs/user-guide/evidence-packs.md": [
         "signed manifest",

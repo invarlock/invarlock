@@ -44,17 +44,14 @@ model = adapter.load_model("gpt2", device="auto")
 print(adapter.describe(model)["model_type"])
 ```
 
-> Adapter availability is broader than the published assurance basis. GPT-2,
-> BERT, Mistral 7B, Ministral 3 3B, Ministral 3 8B, Ministral 3 14B,
-> TinyLlama 1.1B, Gemma 4 E2B text-only, Granite 4.1 3B, Granite 4.1 8B,
-> OLMo 2 7B, OLMo 2 13B, Qwen2 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B,
-> Qwen3.5 9B, DeepSeek-R1-Distill-Qwen 7B, DeepSeek-R1-0528-Qwen3 8B,
-> DeepSeek-R1-Distill-Qwen 14B, and Phi-4 text-only back the published
-> calibrated basis; current experimental lanes are enumerated in
-> `contracts/support_matrix.json`, with broader inventory in the Model Family
-> Catalog. Current examples include SmolLM3 3B, Granite 4.1, Phi-4 mini,
-> DeepSeek-R1 14B/8B variants, and Falcon-H1R; treat the contract files as
-> authoritative for the complete list.
+> Adapter availability is broader than the published evidence basis. Current
+> `published_basis` lanes span GPT-2/BERT fixtures, dense decoder families
+> (Mistral, Ministral, TinyLlama, Granite, OLMo, OpenLLaMA, Falcon, Qwen,
+> DeepSeek, Phi, Gemma text-only, and SmolLM), FLAN-T5 through `hf_seq2seq`,
+> Gemma 4 image-text through `hf_multimodal` plus `vision_text`, and MoE causal
+> lanes such as OLMoE, Mixtral, and Qwen3 30B-A3B. Treat
+> `contracts/support_matrix.json` as authoritative for model-lane status and the
+> Model Family Catalog as the broader inventory of adapter/profile coverage.
 
 ## Support Tiers
 
@@ -180,6 +177,55 @@ model:
   adapter: hf_causal
   device: auto
 ```
+
+```yaml
+# Seq2seq text-to-text run
+model:
+  id: google/flan-t5-base
+  adapter: hf_seq2seq
+  device: auto
+
+dataset:
+  provider:
+    kind: hf_seq2seq
+    dataset_name: abisee/cnn_dailymail
+    config_name: 3.0.0
+    src_field: article
+    tgt_field: highlights
+    src_prefix: "summarize: "
+  split: validation
+```
+
+```yaml
+# Gemma 4 image-text run; use explicit hf_multimodal, not adapter auto
+model:
+  id: google/gemma-4-12B-it
+  adapter: hf_multimodal
+  device: auto
+  dtype: bfloat16
+  device_map: auto
+  low_cpu_mem_usage: true
+
+dataset:
+  provider:
+    kind: vision_text
+    path: tests/fixtures/vision_text/demo_manifest.jsonl
+```
+
+```yaml
+# Large/MoE causal LM load; shard across the visible accelerator set
+model:
+  id: Qwen/Qwen3-30B-A3B-Instruct-2507
+  adapter: hf_causal
+  device: cuda
+  dtype: bfloat16
+  device_map: auto
+  low_cpu_mem_usage: true
+```
+
+The `vision_text` path above is a local smoke fixture. Public promotion evidence
+uses materialized, pinned public datasets with dataset materialization summaries
+stored alongside the run artifacts.
 
 ```yaml
 # Bitsandbytes quantized load (Linux + gpu extra)
