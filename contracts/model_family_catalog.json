@@ -1,6 +1,6 @@
 {
   "format_version": "model-family-catalog-v1",
-  "as_of": "2026-06-12",
+  "as_of": "2026-06-13",
   "declared_support": [
     {
       "family_id": "gpt2-causal-lm",
@@ -773,21 +773,28 @@
     },
     {
       "family_id": "mixtral",
-      "display_name": "Mixtral",
+      "display_name": "Mixtral 8x7B MoE causal LM",
       "modalities": [
         "text"
       ],
       "task_role": "causal_lm",
-      "state": "profile_first_class",
+      "state": "prepared_evidence_candidate",
       "representative_models": [
         "mistralai/Mixtral-8x7B-v0.1"
       ],
       "repo_evidence": [
+        "contracts/support_matrix.json",
         "src/invarlock/model_profile.py",
         "src/invarlock/adapters/hf_loading.py",
-        "tests/core/test_model_profiles.py"
+        "src/invarlock/adapters/auto.py",
+        "configs/presets/causal_lm/mixtral_8x7b_512.yaml",
+        "configs/calibration/null_sweep_mixtral_8x7b.yaml",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/core/test_model_profiles.py",
+        "tests/cli/test_preset_causal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
       ],
-      "notes": "Recognized directly by model profile and causal loader helpers, but not listed as a public support lane."
+      "notes": "Prepared as a Mixtral MoE causal LM candidate with explicit hf_causal preset and null-sweep config for H100-backed CUDA evidence. The preset keeps the full guard scan surface while using BF16, automatic device placement, low-CPU-memory loading, and disabled optional HF loading-info collection. It is not a published basis until a release-profile CUDA report, runtime manifest, and evidence pack are attached."
     },
     {
       "family_id": "llama",
@@ -1067,24 +1074,6 @@
         "scripts/evidence_packs/tuned_edit_params.json"
       ],
       "notes": "Used in workshop and full evidence-pack suites without a public support lane."
-    },
-    {
-      "family_id": "mixtral-8x7b",
-      "display_name": "Mixtral 8x7B",
-      "modalities": [
-        "text"
-      ],
-      "task_role": "causal_lm",
-      "state": "usage_only",
-      "representative_models": [
-        "mistralai/Mixtral-8x7B-v0.1"
-      ],
-      "repo_evidence": [
-        "docs/user-guide/evidence-packs-internals.md",
-        "scripts/evidence_packs/run_suite.sh",
-        "scripts/evidence_packs/tuned_edit_params.json"
-      ],
-      "notes": "Used concretely in evidence-pack flows while remaining outside the public support matrix."
     }
   ],
   "promotion_candidates_text_le_14b": {

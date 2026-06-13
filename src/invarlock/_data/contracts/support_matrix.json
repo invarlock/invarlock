@@ -466,6 +466,28 @@
       "notes": "Promoted from practical-picks backlog with release-profile container-backed public VQAv2 image-text evidence, runtime manifest, and signed evidence pack. Gemma 4 12B uses the explicit hf_multimodal path and requires the multimodal runtime stack (transformers>=5.12.0 and torchvision>=0.26.0); audio evaluation remains deferred."
     },
     {
+      "lane_id": "mixtral-8x7b-moe-causal-hf",
+      "family": "Mixtral 8x7B MoE causal LM",
+      "runtime": "huggingface-pytorch",
+      "adapter": "hf_causal",
+      "support_tier": "supported_experimental",
+      "evidence_status": "prepared_evidence_candidate",
+      "docs_label": "No",
+      "provenance_source": "docs/README.md#support-matrix",
+      "support_groups": [
+        "moe_candidate",
+        "large_model_candidate"
+      ],
+      "representative_models": [
+        "mistralai/Mixtral-8x7B-v0.1"
+      ],
+      "evidence": {
+        "preset": "configs/presets/causal_lm/mixtral_8x7b_512.yaml",
+        "calibration_config": "configs/calibration/null_sweep_mixtral_8x7b.yaml"
+      },
+      "notes": "Prepared as a full-surface MoE promotion candidate for H100-backed CUDA evidence. It remains outside the published assurance basis until a release-profile report, runtime manifest, and evidence pack are attached."
+    },
+    {
       "lane_id": "ministral-3-3b-text-causal-hf",
       "family": "Ministral 3 3B causal LM (text-only eval)",
       "runtime": "huggingface-pytorch",

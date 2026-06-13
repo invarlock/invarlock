@@ -56,7 +56,17 @@ class EvidenceLane:
         return entry
 
 
-CURRENT_SUPPORTED_EXPERIMENTAL_LANES: tuple[EvidenceLane, ...] = ()
+CURRENT_SUPPORTED_EXPERIMENTAL_LANES: tuple[EvidenceLane, ...] = (
+    EvidenceLane(
+        slug="mistralai_mixtral_8x7b_v0_1",
+        lane_id="mixtral-8x7b-moe-causal-hf",
+        family="Mixtral 8x7B MoE causal LM",
+        model_id="mistralai/Mixtral-8x7B-v0.1",
+        preset_relpath="configs/presets/causal_lm/mixtral_8x7b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="release",
+    ),
+)
 
 CURRENT_PUBLISHED_BASIS_LANES: tuple[EvidenceLane, ...] = (
     EvidenceLane(
@@ -371,6 +381,10 @@ CATALOG_PRESET_OVERRIDES: dict[str, tuple[str, str]] = {
         "configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml",
         "hf_causal",
     ),
+    "mistralai/Mixtral-8x7B-v0.1": (
+        "configs/presets/causal_lm/mixtral_8x7b_512.yaml",
+        "hf_causal",
+    ),
     "tiiuae/Falcon-H1R-7B": (
         "configs/presets/causal_lm/falcon_h1r_7b_512.yaml",
         "hf_causal",
@@ -454,6 +468,15 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
         family="Qwen3 30B-A3B MoE causal LM",
         model_id="Qwen/Qwen3-30B-A3B-Instruct-2507",
         preset_relpath="configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml",
+        adapter="hf_causal",
+        verify_profile="release",
+    ),
+    EvidenceLane(
+        slug="mistralai_mixtral_8x7b_v0_1",
+        lane_id="mixtral-8x7b-moe-causal-hf",
+        family="Mixtral 8x7B MoE causal LM",
+        model_id="mistralai/Mixtral-8x7B-v0.1",
+        preset_relpath="configs/presets/causal_lm/mixtral_8x7b_512.yaml",
         adapter="hf_causal",
         verify_profile="release",
     ),

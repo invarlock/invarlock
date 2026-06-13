@@ -68,7 +68,7 @@ intentionally kept out of included preset inventory.
 | Qwen3 30B-A3B MoE causal LM | `prepared_evidence_candidate` | `Qwen/Qwen3-30B-A3B-Instruct-2507` | Explicit `hf_causal` preset and null-sweep config are included with bfloat16/low-CPU-memory loading, optional HF loading-info collection disabled, and scoped attention/router/shared-expert guard scans; public basis promotion waits for CUDA evidence, and scoped scans are not exhaustive expert-bank assurance. |
 | Gemma 4 26B-A4B MoE image-text LM | `prepared_evidence_candidate` | `google/gemma-4-26B-A4B-it` | Explicit `hf_multimodal` VQAv2 preset and null-sweep config are included; public basis promotion waits for CUDA evidence. |
 | OLMoE 1B-active/7B-total causal LM | `prepared_evidence_candidate` | `allenai/OLMoE-1B-7B-0924` | Explicit `hf_causal` preset and null-sweep config are included with full guard scans and memory-sensitive loader settings; public basis promotion waits for CUDA evidence. |
-| Mixtral | `profile_first_class` | `mistralai/Mixtral-8x7B-v0.1` | Profile and loader code recognize the family directly. |
+| Mixtral 8x7B MoE causal LM | `prepared_evidence_candidate` | `mistralai/Mixtral-8x7B-v0.1` | Explicit `hf_causal` preset and null-sweep config are included for H100-backed CUDA evidence with full guard scans; public basis promotion waits for release-profile evidence. |
 | Llama | `profile_first_class` | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Generic Llama-family profile handling is first-class. OpenLLaMA and TinyLlama provide ungated declared support lanes, while access-gated vendor checkpoints remain omitted. |
 | Qwen family aliases (Qwen1.5/Qwen2.5/Qwen3 naming) | `profile_first_class` | `Qwen/Qwen2.5-14B`, `Qwen/Qwen3.5-9B` | Shared qwen-family heuristics cover aliases beyond the declared Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 lanes, including usage-only Qwen2.5 checkpoints. |
 | Yi | `profile_first_class` | `01-ai/Yi-34B` | Treated as a RoPE decoder family in profile logic. |
@@ -89,7 +89,6 @@ intentionally kept out of included preset inventory.
 | Qwen2.5 32B | `usage_only` | `Qwen/Qwen2.5-32B` | Used in evidence-pack suites and validation defaults outside the declared Qwen2.5 14B support lane. |
 | Qwen1.5 72B | `usage_only` | `Qwen/Qwen1.5-72B` | Used concretely in evidence-pack suites. |
 | Yi 34B | `usage_only` | `01-ai/Yi-34B` | Used in workshop and full evidence-pack suites. |
-| Mixtral 8x7B | `usage_only` | `mistralai/Mixtral-8x7B-v0.1` | Used in evidence-pack flows without a public support lane. |
 
 ## <=14B Text Candidate Inventory
 

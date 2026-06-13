@@ -275,6 +275,12 @@ Notes
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | Gemma 4 12B any-to-any LM | Yes | Yes | Yes | Yes |
 
+### Prepared Large/MoE Candidate Backlog
+
+| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
+| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
+| Mixtral 8x7B MoE causal LM | Yes | Yes | Yes | No |
+
 ### Seq2Seq Published Basis
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
@@ -290,7 +296,9 @@ DeepSeek-R1-0528-Qwen3 8B, DeepSeek-R1-Distill-Qwen 14B, Phi-4 text-only,
 and FLAN-T5 base seq2seq profiles. Repo-included
 presets and pilot calibration configs for prepared practical-pick lanes do not
 become part of the published assurance basis until supporting artifacts are
-attached.
+attached. Mixtral 8x7B is now a prepared H100-backed MoE promotion candidate,
+but it is not published-basis evidence until its release-profile report,
+runtime manifest, and evidence pack are attached.
 The empirical guard manifest includes no-op published-basis summaries for the
 modern promoted families. They are null-behavior evidence and calibration
 inputs, but they do not re-derive the packaged spectral/RMT/variance tier

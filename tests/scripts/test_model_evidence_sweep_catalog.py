@@ -80,9 +80,9 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
     )
     assert specs["google_gemma_4_e4b_it"].adapter == "hf_multimodal"
     assert specs["mistralai_mixtral_8x7b_v0_1"].preset_relpath == (
-        "configs/presets/causal_lm/wikitext2_512.yaml"
+        "configs/presets/causal_lm/mixtral_8x7b_512.yaml"
     )
-    assert specs["mistralai_mixtral_8x7b_v0_1"].adapter == "auto"
+    assert specs["mistralai_mixtral_8x7b_v0_1"].adapter == "hf_causal"
     assert specs["openlm_research_open_llama_7b"].preset_relpath == (
         "configs/presets/causal_lm/open_llama_7b_512.yaml"
     )
@@ -153,6 +153,7 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
         "tiiuae_falcon_h1r_7b",
         "google_flan_t5_base",
         "qwen_qwen3_30b_a3b_instruct_2507",
+        "mistralai_mixtral_8x7b_v0_1",
         "allenai_olmoe_1b_7b_0924",
         "google_gemma_4_26b_a4b_it",
     ]
@@ -160,6 +161,7 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
     assert adapters["google_gemma_4_12b_it"] == "hf_multimodal"
     assert adapters["google_flan_t5_base"] == "hf_seq2seq"
     assert adapters["qwen_qwen3_30b_a3b_instruct_2507"] == "hf_causal"
+    assert adapters["mistralai_mixtral_8x7b_v0_1"] == "hf_causal"
     assert adapters["allenai_olmoe_1b_7b_0924"] == "hf_causal"
     assert adapters["google_gemma_4_26b_a4b_it"] == "hf_multimodal"
     for lane in specs:
@@ -175,6 +177,12 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
             assert lane.verify_profile == "release"
             assert lane.preset_relpath == (
                 "configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml"
+            )
+        elif lane.slug == "mistralai_mixtral_8x7b_v0_1":
+            assert lane.adapter == "hf_causal"
+            assert lane.verify_profile == "release"
+            assert lane.preset_relpath == (
+                "configs/presets/causal_lm/mixtral_8x7b_512.yaml"
             )
         elif lane.slug == "allenai_olmoe_1b_7b_0924":
             assert lane.adapter == "hf_causal"

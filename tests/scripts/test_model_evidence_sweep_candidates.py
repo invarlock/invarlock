@@ -58,6 +58,10 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
         "microsoft_phi_4_mini_instruct",
         "tiiuae_falcon_h1r_7b",
         "google_flan_t5_base",
+        "qwen_qwen3_30b_a3b_instruct_2507",
+        "mistralai_mixtral_8x7b_v0_1",
+        "allenai_olmoe_1b_7b_0924",
+        "google_gemma_4_26b_a4b_it",
     }
     assert specs["google_gemma_4_12b_it"].preset_relpath == (
         "configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml"
@@ -79,6 +83,11 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
     )
     assert specs["google_flan_t5_base"].adapter == "hf_seq2seq"
     assert specs["google_flan_t5_base"].verify_profile == "release"
+    assert specs["mistralai_mixtral_8x7b_v0_1"].preset_relpath == (
+        "configs/presets/causal_lm/mixtral_8x7b_512.yaml"
+    )
+    assert specs["mistralai_mixtral_8x7b_v0_1"].adapter == "hf_causal"
+    assert specs["mistralai_mixtral_8x7b_v0_1"].verify_profile == "release"
 
 
 def test_promotion_gap_gpu_suite_glm_host_dry_run_uses_lane_preset(

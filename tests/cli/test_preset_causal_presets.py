@@ -30,6 +30,7 @@ def test_causal_lm_family_presets_load() -> None:
         "qwen3_30b_a3b_instruct_2507_512.yaml": (
             "Qwen/Qwen3-30B-A3B-Instruct-2507"
         ),
+        "mixtral_8x7b_512.yaml": "mistralai/Mixtral-8x7B-v0.1",
         "olmoe_1b_7b_0924_512.yaml": "allenai/OLMoE-1B-7B-0924",
         "deepseek_r1_distill_qwen_7b_512.yaml": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
         "phi4_reasoning_plus_512.yaml": "microsoft/Phi-4-reasoning-plus",
@@ -60,6 +61,7 @@ def test_causal_lm_family_presets_load() -> None:
         "ministral3_3b_512.yaml": "hf_text",
         "ministral3_8b_512.yaml": "hf_text",
         "ministral3_14b_512.yaml": "hf_text",
+        "mixtral_8x7b_512.yaml": "hf_text",
         "olmo2_13b_512.yaml": "hf_text",
         "olmo2_7b_512.yaml": "hf_text",
         "olmoe_1b_7b_0924_512.yaml": "hf_text",
@@ -104,6 +106,15 @@ def test_causal_lm_family_presets_load() -> None:
                 assert guard_cfg["module_exclude_patterns"] == [
                     "model.layers.*.mlp.experts.*"
                 ]
+        if name == "mixtral_8x7b_512.yaml":
+            model = cfg.require_section("model")
+            assert model["dtype"] == "bfloat16"
+            assert model["device_map"] == "auto"
+            assert model["low_cpu_mem_usage"] is True
+            assert model["collect_loading_info"] is False
+            guards = cfg.require_section("guards")
+            assert "spectral" not in guards
+            assert "rmt" not in guards
         if name == "olmoe_1b_7b_0924_512.yaml":
             model = cfg.require_section("model")
             assert model["dtype"] == "bfloat16"
@@ -148,6 +159,7 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
         "null_sweep_qwen3_30b_a3b_instruct_2507.yaml": (
             "Qwen/Qwen3-30B-A3B-Instruct-2507"
         ),
+        "null_sweep_mixtral_8x7b.yaml": "mistralai/Mixtral-8x7B-v0.1",
         "null_sweep_olmoe_1b_7b_0924.yaml": "allenai/OLMoE-1B-7B-0924",
         "null_sweep_deepseek_r1_distill_qwen_7b.yaml": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
         "null_sweep_phi4_reasoning_plus.yaml": "microsoft/Phi-4-reasoning-plus",
@@ -194,6 +206,7 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
             "null_sweep_ministral3_3b.yaml",
             "null_sweep_ministral3_8b.yaml",
             "null_sweep_ministral3_14b.yaml",
+            "null_sweep_mixtral_8x7b.yaml",
             "null_sweep_olmo2_13b.yaml",
             "null_sweep_olmo2_7b.yaml",
             "null_sweep_olmoe_1b_7b_0924.yaml",
@@ -229,6 +242,13 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
                 assert guard_cfg["module_exclude_patterns"] == [
                     "model.layers.*.mlp.experts.*"
                 ]
+        if name == "null_sweep_mixtral_8x7b.yaml":
+            assert data["model"]["dtype"] == "bfloat16"
+            assert data["model"]["device_map"] == "auto"
+            assert data["model"]["low_cpu_mem_usage"] is True
+            assert data["model"]["collect_loading_info"] is False
+            assert "spectral" not in data["guards"]
+            assert "rmt" not in data["guards"]
         if name == "null_sweep_olmoe_1b_7b_0924.yaml":
             assert data["model"]["dtype"] == "bfloat16"
             assert data["model"]["low_cpu_mem_usage"] is True
