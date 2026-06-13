@@ -336,12 +336,12 @@ class HFSeq2SeqProvider:
                     "NO-PAIRS: hf_seq2seq produced no pairs; check src_field/tgt_field"
                 ),
             )
-        prev_pairs = pairs[:preview_n]
-        fin_pairs = pairs[preview_n : preview_n + final_n]
-        combined_pairs = prev_pairs + fin_pairs
-        combined_positions = list(range(len(prev_pairs))) + list(
-            range(preview_n, preview_n + len(fin_pairs))
-        )
+        indexed_pairs = list(enumerate(pairs))
+        random.Random(int(seed)).shuffle(indexed_pairs)
+        prev_pairs = indexed_pairs[:preview_n]
+        fin_pairs = indexed_pairs[preview_n : preview_n + final_n]
+        combined_pairs = [pair for _, pair in prev_pairs + fin_pairs]
+        combined_positions = [position for position, _pair in prev_pairs + fin_pairs]
         combined_window, combined_labels = tokenize_combined_pairs(
             combined_pairs,
             tokenizer=tokenizer,

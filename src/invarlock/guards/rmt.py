@@ -259,7 +259,10 @@ class RMTGuard(Guard):
             tok in lower for tok in ("experts", "expert", "moe", "mixture_of_experts")
         ):
             return "ffn"
-        if any(tok in lower for tok in ("mlp", "ffn", "c_fc", "feed_forward")):
+        if any(
+            tok in lower
+            for tok in ("mlp", "ffn", "c_fc", "feed_forward", "densereludense")
+        ):
             return "ffn"
         if "embed" in lower or "wte" in lower or "wpe" in lower:
             return "embed"

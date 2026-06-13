@@ -176,6 +176,34 @@ class HF_Seq2Seq_Adapter(HFAdapterMixin, ModelAdapter):
             "device": str(device),
         }
 
+    def prepare_generation_inputs(
+        self, batch: dict[str, Any], device: torch.device
+    ) -> dict[str, torch.Tensor]:
+        input_ids = batch.get("input_ids", batch.get("inputs"))
+        if input_ids is None:
+            return {}
+
+        prepared: dict[str, torch.Tensor] = {
+            "input_ids": self._batch_tensor(input_ids, device=device)
+        }
+        attention_mask = batch.get("attention_mask")
+        if attention_mask is not None:
+            prepared["attention_mask"] = self._batch_tensor(
+                attention_mask,
+                device=device,
+            )
+        labels = batch.get("labels")
+        if labels is not None:
+            prepared["labels"] = self._batch_tensor(labels, device=device)
+        return prepared
+
+    @staticmethod
+    def _batch_tensor(value: Any, *, device: torch.device) -> torch.Tensor:
+        tensor = value if isinstance(value, torch.Tensor) else torch.as_tensor(value)
+        if tensor.dim() == 1:
+            tensor = tensor.unsqueeze(0)
+        return tensor.to(device)
+
     # snapshot/restore provided by HFAdapterMixin
     def snapshot(self, model: ModuleType) -> bytes:
         return super().snapshot(model)

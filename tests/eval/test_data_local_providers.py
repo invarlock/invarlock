@@ -241,6 +241,42 @@ def test_hf_seq2seq_provider_windows_and_capacity(monkeypatch):
     assert cap["available_unique"] == 2
 
 
+def test_hf_seq2seq_provider_uses_seeded_pair_shuffle(monkeypatch):
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True, raising=False)
+
+    def fake_load_dataset(path, name=None, split=None, cache_dir=None, **kwargs):
+        return [
+            {"source": "src zero", "target": "tgt zero"},
+            {"source": "src one", "target": "tgt one"},
+            {"source": "src two", "target": "tgt two"},
+            {"source": "src three", "target": "tgt three"},
+        ]
+
+    monkeypatch.setattr(
+        data_support_mod, "load_dataset", fake_load_dataset, raising=False
+    )
+    provider = HFSeq2SeqProvider("dummy")
+
+    first_preview, first_final = provider.windows(
+        _EncodeTokenizer(),
+        preview_n=2,
+        final_n=2,
+        seq_len=6,
+        seed=7,
+    )
+    second_preview, second_final = provider.windows(
+        _EncodeTokenizer(),
+        preview_n=2,
+        final_n=2,
+        seq_len=6,
+        seed=7,
+    )
+
+    assert first_preview.indices == second_preview.indices
+    assert first_final.indices == second_final.indices
+    assert first_preview.indices != [0, 1]
+
+
 def test_hf_seq2seq_provider_supports_revision_prefix_and_nested_fields(monkeypatch):
     monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True, raising=False)
     captured = {}

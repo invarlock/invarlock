@@ -378,6 +378,37 @@ def _gpt_oss_selectors() -> dict[str, list[str]]:
     }
 
 
+def _seq2seq_selectors() -> dict[str, list[str]]:
+    return {
+        "attention": [
+            "SelfAttention.q",
+            "SelfAttention.k",
+            "SelfAttention.v",
+            "SelfAttention.o",
+            "EncDecAttention.q",
+            "EncDecAttention.k",
+            "EncDecAttention.v",
+            "EncDecAttention.o",
+            "self_attn.q_proj",
+            "self_attn.k_proj",
+            "self_attn.v_proj",
+            "self_attn.out_proj",
+            "encoder_attn.q_proj",
+            "encoder_attn.k_proj",
+            "encoder_attn.v_proj",
+            "encoder_attn.out_proj",
+        ],
+        "ffn": [
+            "DenseReluDense.wi",
+            "DenseReluDense.wi_0",
+            "DenseReluDense.wi_1",
+            "DenseReluDense.wo",
+            "fc1",
+            "fc2",
+        ],
+    }
+
+
 def _phi_selectors() -> dict[str, list[str]]:
     return {
         "attention": [
@@ -598,7 +629,7 @@ def detect_model_profile(
             ),
             default_metric="ppl_seq2seq",
             default_provider="wikitext2",
-            module_selectors=_unknown_selectors(),
+            module_selectors=_seq2seq_selectors(),
             invariants=(),
             cert_lints=(),
             tokenizer_load_kwargs=tokenizer_load_kwargs,

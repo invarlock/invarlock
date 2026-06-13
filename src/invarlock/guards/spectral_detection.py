@@ -36,7 +36,14 @@ def should_process_module(name: str, module: Any, scope: str) -> bool:
     if scope == "ffn":
         return any(
             keyword in name.lower()
-            for keyword in ["mlp", "ffn", "feed_forward", "fc", "c_fc"]
+            for keyword in [
+                "mlp",
+                "ffn",
+                "feed_forward",
+                "fc",
+                "c_fc",
+                "densereludense",
+            ]
         )
     if scope == "ffn+proj":
         lname = name.lower()
@@ -48,6 +55,7 @@ def should_process_module(name: str, module: Any, scope: str) -> bool:
                 "feed_forward",
                 "fc",
                 "c_fc",
+                "densereludense",
                 "c_proj",
                 "projection",
             ]
@@ -68,6 +76,7 @@ def classify_module_family(name: str, module: Any) -> str:
             "c_fc",
             "fc1",
             "fc2",
+            "densereludense",
         )
     ):
         return "ffn"
@@ -82,7 +91,12 @@ def classify_module_family(name: str, module: Any) -> str:
         return "router"
     if any(tok in lname for tok in ("experts", "expert", "moe", "mixture_of_experts")):
         return "expert_ffn"
-    if "mlp" in lname or "ffn" in lname or "feed_forward" in lname:
+    if (
+        "mlp" in lname
+        or "ffn" in lname
+        or "feed_forward" in lname
+        or "densereludense" in lname
+    ):
         return "ffn"
     if (
         "attn" in lname

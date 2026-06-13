@@ -197,6 +197,7 @@ def get_activation_modules(
                     "attention",
                     "mlp",
                     "ffn",
+                    "densereludense",
                     "router",
                     "expert",
                     "moe",

@@ -89,6 +89,19 @@ def test_collect_calibration_batches_handles_non_mapping_policy_and_len_failure(
     ) == [0, 4]
 
 
+def test_get_activation_modules_includes_t5_dense_relu_dense_projections() -> None:
+    model = nn.Module()
+    model.encoder = nn.Module()
+    model.encoder.block = nn.ModuleList([nn.Module()])
+    model.encoder.block[0].layer = nn.ModuleList([nn.Module(), nn.Module()])
+    model.encoder.block[0].layer[1].DenseReluDense = nn.Module()
+    model.encoder.block[0].layer[1].DenseReluDense.wo = nn.Linear(2, 2)
+
+    modules = dict(runtime.get_activation_modules(model, allowed_suffixes=()))
+
+    assert "encoder.block.0.layer.1.DenseReluDense.wo" in modules
+
+
 def test_prepare_activation_inputs_normalizes_and_falls_back_to_clone(
     monkeypatch,
 ) -> None:

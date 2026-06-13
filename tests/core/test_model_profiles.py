@@ -215,6 +215,18 @@ def test_qwen35_profile_exposes_linear_attention_selectors():
     assert "linear_attn.out_proj" in profile.module_selectors["attention"]
 
 
+def test_seq2seq_profile_exposes_t5_attention_and_ffn_selectors():
+    profile = detect_model_profile(
+        model_id="google/flan-t5-base",
+        adapter="hf_seq2seq",
+    )
+
+    assert profile.family == "seq2seq"
+    assert profile.default_loss == "seq2seq"
+    assert "SelfAttention.q" in profile.module_selectors["attention"]
+    assert "DenseReluDense.wo" in profile.module_selectors["ffn"]
+
+
 def test_gpt_oss_profile_exposes_moe_attention_and_ffn_selectors():
     profile = detect_model_profile(
         model_id="openai/gpt-oss-20b",

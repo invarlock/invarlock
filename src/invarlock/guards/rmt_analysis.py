@@ -306,6 +306,17 @@ def _iter_transformer_layers(model: nn.Module):
                     yield layer
             except (TypeError, AttributeError):
                 pass
+    elif hasattr(model, "encoder") and hasattr(model.encoder, "block"):
+        for container in (
+            getattr(model.encoder, "block", None),
+            getattr(getattr(model, "decoder", None), "block", None),
+        ):
+            if hasattr(container, "__iter__") and hasattr(container, "__len__"):
+                try:
+                    for layer in container:
+                        yield layer
+                except (TypeError, AttributeError):
+                    pass
     else:
         for module in model.modules():
             if hasattr(module, "attn") and hasattr(module, "mlp"):
