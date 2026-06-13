@@ -356,7 +356,7 @@ def _compose_container_run_args(
     argv: tuple[str, ...],
 ) -> list[str]:
     helpers = _helpers()
-    command = [context.engine, "run", "--rm", *entrypoint]
+    command = [context.engine, "run", "--rm", "--init", *entrypoint]
     if plan.gpu_passthrough:
         command.extend(["--gpus", "all"])
     if not helpers.network_allowed():

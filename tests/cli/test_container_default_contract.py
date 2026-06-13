@@ -288,7 +288,7 @@ def test_container_launch_adds_gpu_passthrough_for_cuda_model_commands(
 
     command = _build_container_command(["evaluate", "--device", "cuda", "--help"])
 
-    assert command[:5] == [engine, "run", "--rm", "--gpus", "all"]
+    assert command[:6] == [engine, "run", "--rm", "--init", "--gpus", "all"]
 
 
 def test_container_launch_forwards_gpu_pinning_env_vars(
