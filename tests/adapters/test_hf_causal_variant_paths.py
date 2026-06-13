@@ -439,6 +439,64 @@ class _GlmForCausalLM(nn.Module):
         self.lm_head.weight = self.model.embed_tokens.weight
 
 
+class _ChatGlmSelfAttention(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.query_key_value = nn.Linear(4, 12, bias=False)
+        self.dense = nn.Linear(4, 4, bias=False)
+
+
+class _ChatGlmMLP(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.dense_h_to_4h = nn.Linear(4, 16, bias=False)
+        self.dense_4h_to_h = nn.Linear(8, 4, bias=False)
+
+
+class _ChatGlmLayer(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.self_attention = _ChatGlmSelfAttention()
+        self.mlp = _ChatGlmMLP()
+        self.input_layernorm = nn.LayerNorm(4)
+        self.post_attention_layernorm = nn.LayerNorm(4)
+
+
+class _ChatGlmEncoder(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.layers = nn.ModuleList([_ChatGlmLayer(), _ChatGlmLayer()])
+
+
+class _ChatGlmEmbedding(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.word_embeddings = nn.Embedding(16, 4)
+
+
+class _ChatGlmTransformer(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.encoder = _ChatGlmEncoder()
+        self.embedding = _ChatGlmEmbedding()
+        self.output_layer = nn.Linear(4, 16, bias=False)
+        self.output_layer.weight = self.embedding.word_embeddings.weight
+
+
+class _ChatGlmForConditionalGeneration(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.transformer = _ChatGlmTransformer()
+        self.config = SimpleNamespace(
+            model_type="chatglm",
+            num_layers=2,
+            num_attention_heads=2,
+            hidden_size=4,
+            ffn_hidden_size=8,
+            padded_vocab_size=16,
+        )
+
+
 class _NestedModelForCausalLM(nn.Module):
     def __init__(self) -> None:
         super().__init__()
@@ -687,6 +745,32 @@ def test_hf_causal_adapter_describes_glm_decoder_layout() -> None:
     assert description["hf_model_type"] == "glm"
     assert description["spec"] == "glm_decoder"
     assert description["mlp_dims"] == [8, 8]
+
+
+def test_hf_causal_adapter_describes_chatglm_remote_layout() -> None:
+    adapter = HF_Causal_Adapter()
+    model = _ChatGlmForConditionalGeneration()
+
+    assert adapter.can_handle(model) is True
+    description = adapter.describe(model)
+    modules = adapter.get_layer_modules(model, 0)
+
+    assert description["hf_model_type"] == "chatglm"
+    assert description["spec"] == "chatglm_decoder"
+    assert description["mlp_dims"] == [8, 8]
+    assert description["vocab_size"] == 16
+    assert description["tying"] == {
+        "transformer.output_layer.weight": (
+            "transformer.embedding.word_embeddings.weight"
+        )
+    }
+    assert (
+        modules["self_attention.query_key_value"]
+        is model.transformer.encoder.layers[0].self_attention.query_key_value
+    )
+    assert modules["mlp.down_proj"] is (
+        model.transformer.encoder.layers[0].mlp.dense_4h_to_h
+    )
 
 
 def test_hf_causal_adapter_handles_nested_model_model_layout() -> None:
