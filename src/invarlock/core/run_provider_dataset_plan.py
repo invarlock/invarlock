@@ -164,6 +164,47 @@ def _hash_texts(values: Sequence[str]) -> str:
     ).hexdigest()
 
 
+def _split_vision_text_counts(
+    *,
+    available: int,
+    requested_preview: int,
+    requested_final: int,
+    effective_preview: int,
+    effective_final: int,
+) -> tuple[int, int]:
+    if available <= 0:
+        return 0, 0
+    desired_preview = max(int(effective_preview), 0)
+    desired_final = max(int(effective_final), 0)
+    if desired_preview == 0 and desired_final == 0:
+        return 0, 0
+    if desired_preview + desired_final <= available:
+        return desired_preview, desired_final
+    if desired_preview <= 0:
+        return 0, min(desired_final, available)
+    if desired_final <= 0:
+        return min(desired_preview, available), 0
+    if available == 1:
+        return (0, 1) if requested_final > 0 else (1, 0)
+
+    desired_total = desired_preview + desired_final
+    preview_count = int(round(available * (desired_preview / desired_total)))
+    preview_count = max(1, min(preview_count, available - 1, desired_preview))
+    final_count = min(desired_final, available - preview_count)
+    if final_count <= 0 and requested_final > 0:
+        final_count = 1
+        preview_count = max(available - 1, 0)
+    unused = available - preview_count - final_count
+    if unused > 0:
+        preview_room = max(desired_preview - preview_count, 0)
+        preview_extra = min(unused, preview_room)
+        preview_count += preview_extra
+        unused -= preview_extra
+        if unused > 0:
+            final_count += min(unused, max(desired_final - final_count, 0))
+    return preview_count, final_count
+
+
 def _vision_text_dataset_plan(
     *,
     data_provider: Any,
@@ -182,15 +223,13 @@ def _vision_text_dataset_plan(
         raise TypeError("vision_text provider must expose examples()")
 
     raw_examples = list(examples_fn(split=resolved_split))
-    preview_count = min(int(effective_preview), len(raw_examples))
-    remaining = max(len(raw_examples) - preview_count, 0)
-    final_count = min(int(effective_final), remaining)
-    if final_count <= 0 and requested_final > 0:
-        final_count = min(int(requested_final), len(raw_examples))
-        preview_count = min(
-            int(requested_preview),
-            max(len(raw_examples) - final_count, 0),
-        )
+    preview_count, final_count = _split_vision_text_counts(
+        available=len(raw_examples),
+        requested_preview=requested_preview,
+        requested_final=requested_final,
+        effective_preview=effective_preview,
+        effective_final=effective_final,
+    )
 
     preview_records = [dict(item) for item in raw_examples[:preview_count]]
     final_records = [

@@ -339,6 +339,36 @@ def test_vision_text_dataset_plan_rebalances_when_final_arm_would_be_empty() -> 
     assert result.window_plan["coverage_ok"] is True
 
 
+def test_vision_text_dataset_plan_splits_release_shortage_across_arms() -> None:
+    provider = SimpleNamespace(
+        examples=lambda split="validation": [
+            {"id": f"ex-{index}", "image_path": f"/tmp/{index}.png", "answers": ["cat"]}
+            for index in range(64)
+        ],
+        digest=lambda: {"provider": "vision_text"},
+    )
+
+    result = _vision_text_dataset_plan(
+        data_provider=provider,
+        resolved_split="validation",
+        used_fallback_split=False,
+        cfg_dataset=SimpleNamespace(seq_len=256),
+        requested_preview=400,
+        requested_final=400,
+        effective_preview=400,
+        effective_final=400,
+        resolved_loss_type="classification",
+        diagnostics=[],
+    )
+
+    assert result.preview_count == 32
+    assert result.final_count == 32
+    assert result.preview_records[0]["example_id"] == "ex-0"
+    assert result.final_records[0]["example_id"] == "ex-32"
+    assert result.window_plan is not None
+    assert result.window_plan["capacity"] == {"available_examples": 64}
+
+
 def test_vision_text_dataset_plan_normal_path_handles_noncallable_digest() -> None:
     provider = SimpleNamespace(
         examples=lambda split="validation": [

@@ -242,6 +242,14 @@ def _select_eval_windows(
     )
 
 
+def _has_multimodal_batches(*batch_groups: Any) -> bool:
+    for batch_group in batch_groups:
+        for batch in list(batch_group or []):
+            if _is_multimodal_batch(batch):
+                return True
+    return False
+
+
 def _resolve_eval_runtime_context(
     runner: Any,
     model: Any,
@@ -303,7 +311,7 @@ def _resolve_eval_runtime_context(
         loss_cfg.get("resolved_type") or loss_cfg.get("type") or ""
     ).lower()
 
-    if preview_data and _is_multimodal_batch(preview_data[0]):
+    if _has_multimodal_batches(preview_data, final_data):
         return _build_multimodal_eval_result(
             model,
             list(preview_data),
@@ -776,6 +784,7 @@ __all__ = [
     "samples_to_dataloader",
     "_raise_latency_error",
     "_evaluate_vision_text_arm",
+    "_has_multimodal_batches",
     "_is_multimodal_batch",
     "_model_kwargs",
     "_normalize_answer_text",
