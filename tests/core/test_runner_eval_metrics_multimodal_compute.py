@@ -89,6 +89,14 @@ def test_compute_real_metrics_supports_vision_text_classification() -> None:
     assert metrics["classification"]["preview"]["correct_total"] == 1
     assert metrics["classification"]["final"]["correct_total"] == 0
     assert metrics["classification"]["counts_source"] == "measured"
+    assert metrics["paired_windows"] == 1
+    assert metrics["window_match_fraction"] == 1.0
+    assert metrics["window_pairing_reason"] is None
+    assert metrics["window_pairing_preview"] == {
+        "matched": 1,
+        "expected": 1,
+        "reason": None,
+    }
     assert eval_windows["preview"]["example_ids"] == ["ex-1"]
     assert eval_windows["final"]["records"][0]["correct"] is False
     assert eval_windows["preview"]["input_records"][0]["image_path"] == "/tmp/a.png"

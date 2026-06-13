@@ -250,6 +250,10 @@ def _build_multimodal_eval_result(
     metric_kind = _resolve_metric_kind(config, fallback="accuracy")
     preview_accuracy = float(preview_payload.get("accuracy", float("nan")))
     final_accuracy = float(final_payload.get("accuracy", float("nan")))
+    preview_total = int(preview_payload.get("total", 0))
+    final_total = int(final_payload.get("total", 0))
+    paired_windows = min(preview_total, final_total)
+    pairing_reason = None if paired_windows > 0 else "no_pairs"
     primary_metric = {
         "kind": metric_kind,
         "preview": preview_accuracy if math.isfinite(preview_accuracy) else None,
@@ -260,8 +264,8 @@ def _build_multimodal_eval_result(
         "degraded": False,
         "counts_source": "measured",
         "estimated": False,
-        "n_preview": int(preview_payload.get("total", 0)),
-        "n_final": int(final_payload.get("total", 0)),
+        "n_preview": preview_total,
+        "n_final": final_total,
     }
     metrics = {
         "primary_metric": primary_metric,
@@ -297,6 +301,18 @@ def _build_multimodal_eval_result(
         "final_total_tokens": int(final_payload["total_tokens"]),
         "window_overlap_fraction": 0.0,
         "window_match_fraction": 1.0,
+        "window_pairing_reason": pairing_reason,
+        "window_pairing_preview": {
+            "matched": preview_total,
+            "expected": preview_total,
+            "reason": pairing_reason,
+        },
+        "window_pairing_final": {
+            "matched": final_total,
+            "expected": final_total,
+            "reason": pairing_reason,
+        },
+        "paired_windows": paired_windows,
     }
     eval_windows = {
         "preview": {
