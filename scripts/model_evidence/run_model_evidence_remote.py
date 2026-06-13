@@ -167,7 +167,7 @@ def _remote_repo(remote_repo: str) -> tuple[str, list[str], list[str]]:
         'REPO_DIR=""',
         "for candidate in "
         + " ".join(shlex.quote(path) for path in candidate_paths)
-        + '; do if [ -d "$candidate/.git" ]; then REPO_DIR="$candidate"; break; fi; done',
+        + '; do if [ -d "$candidate/.git" ] || [ -f "$candidate/.git" ]; then REPO_DIR="$candidate"; break; fi; done',
         f'if [ -z "$REPO_DIR" ]; then REPO_DIR={shlex.quote(remote_repo)}; fi',
     ]
     return "$REPO_DIR", setup, candidate_paths
