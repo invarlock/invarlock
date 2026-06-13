@@ -422,14 +422,23 @@ def compute_validation_flags(
             pm_preview = _coerce_finite_float(primary_metric.get("preview"))
             pm_final = _coerce_finite_float(primary_metric.get("final"))
             if pm_preview is not None and pm_final is not None:
-                same_accuracy = math.isclose(
-                    pm_preview,
-                    pm_final,
-                    rel_tol=0.0,
-                    abs_tol=1e-12,
+                acc_policy = (
+                    metrics_policy.get("accuracy", {})
+                    if isinstance(metrics_policy, dict)
+                    else {}
                 )
-                if same_accuracy:
-                    preview_final_drift_acceptable = True
+                accuracy_delta_limit = _coerce_finite_float(
+                    acc_policy.get("preview_final_delta_pp_max")
+                )
+                if accuracy_delta_limit is None:
+                    accuracy_delta_limit = _coerce_finite_float(
+                        acc_policy.get("hysteresis_delta_pp")
+                    )
+                if accuracy_delta_limit is None:
+                    accuracy_delta_limit = 0.1
+                preview_final_drift_acceptable = (
+                    abs(pm_final - pm_preview) <= max(0.0, accuracy_delta_limit)
+                )
     if tiny_relax:
         # Treat drift identity as informational in tiny dev demos
         preview_final_drift_acceptable = True
