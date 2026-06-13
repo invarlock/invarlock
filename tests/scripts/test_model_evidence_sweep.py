@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import stat
@@ -837,3 +838,8 @@ def test_model_evidence_sweep_container_mode_publishes_external_output_root(
     published_lane = output_root / "eval" / "gemma4_e2b_public"
     assert (published_lane / "report" / "evaluation.report.json").is_file()
     assert (published_lane / "verify.json").is_file()
+    scratch_hash = hashlib.sha256(
+        output_root.resolve().as_posix().encode("utf-8")
+    ).hexdigest()[:16]
+    scratch_root = repo_root / "tmp" / "model_evidence_container" / scratch_hash
+    assert not scratch_root.exists()

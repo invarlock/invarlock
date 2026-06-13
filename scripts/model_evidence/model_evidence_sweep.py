@@ -699,6 +699,43 @@ def _publish_lane_artifacts(source: Path, destination: Path) -> None:
     shutil.copytree(source, destination)
 
 
+def _cleanup_execution_lane(
+    lane_root: Path,
+    *,
+    execution_root: Path,
+    output_root: Path,
+) -> None:
+    if execution_root == output_root:
+        return
+    scratch_root = REPO_ROOT / "tmp" / "model_evidence_container"
+    try:
+        lane_resolved = lane_root.resolve()
+        lane_resolved.relative_to(scratch_root.resolve())
+    except ValueError:
+        return
+    shutil.rmtree(lane_resolved, ignore_errors=True)
+    for candidate in (lane_resolved.parent, execution_root):
+        try:
+            candidate.rmdir()
+        except OSError:
+            pass
+
+
+def _publish_and_cleanup_lane_artifacts(
+    *,
+    lane_root: Path,
+    published_lane_root: Path,
+    execution_root: Path,
+    output_root: Path,
+) -> None:
+    _publish_lane_artifacts(lane_root, published_lane_root)
+    _cleanup_execution_lane(
+        lane_root,
+        execution_root=execution_root,
+        output_root=output_root,
+    )
+
+
 def _classify_failure(
     *,
     log_path: Path,
@@ -799,7 +836,12 @@ def run_lane(
             )
         log_mode = "a"
         if materialize_proc.returncode != 0:
-            _publish_lane_artifacts(lane_root, published_lane_root)
+            _publish_and_cleanup_lane_artifacts(
+                lane_root=lane_root,
+                published_lane_root=published_lane_root,
+                execution_root=execution_root,
+                output_root=output_root,
+            )
             published_report_path = (
                 published_lane_root / "report" / "evaluation.report.json"
             )
@@ -846,8 +888,12 @@ def run_lane(
                 verify_exit=None,
                 phase="prefetch",
             )
-            _publish_lane_artifacts(
-                lane_root, published_lane_root := output_root / "eval" / spec.slug
+            published_lane_root = output_root / "eval" / spec.slug
+            _publish_and_cleanup_lane_artifacts(
+                lane_root=lane_root,
+                published_lane_root=published_lane_root,
+                execution_root=execution_root,
+                output_root=output_root,
             )
             published_report_path = (
                 published_lane_root / "report" / "evaluation.report.json"
@@ -940,7 +986,12 @@ def run_lane(
             )
             verify_exit = verify_proc.returncode
 
-    _publish_lane_artifacts(lane_root, published_lane_root)
+    _publish_and_cleanup_lane_artifacts(
+        lane_root=lane_root,
+        published_lane_root=published_lane_root,
+        execution_root=execution_root,
+        output_root=output_root,
+    )
     published_report_path = published_lane_root / "report" / "evaluation.report.json"
     published_verify_path = published_lane_root / "verify.json"
     status, detail = _classify_failure(
