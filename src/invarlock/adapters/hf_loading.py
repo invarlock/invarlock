@@ -211,6 +211,8 @@ class _ChatGLMRemoteCodeCausalLoader:
             seq_length = getattr(config, "seq_length", None)
             if seq_length is not None:
                 config.max_length = seq_length
+        if not hasattr(config, "use_cache"):
+            config.use_cache = True
         loader_kwargs["config"] = config
 
         auto_map = getattr(config, "auto_map", None)

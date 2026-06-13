@@ -552,6 +552,7 @@ def test_chatglm_remote_loader_patches_transformers5_expectations(
 
     assert loaded is not None
     assert config.max_length == 131072
+    assert config.use_cache is True
     assert FakeRemoteClass.all_tied_weights_keys == {}
     assert FakeRemoteClass.calls == [
         {
