@@ -195,6 +195,52 @@ def test_attach_primary_metric_classification_without_baseline(monkeypatch):
     assert "ratio_vs_baseline" not in pm
 
 
+def test_attach_accuracy_primary_metric_uses_classification_count_ci(monkeypatch):
+    evaluation_report: dict[str, object] = {}
+    report = {
+        "metrics": {
+            "primary_metric": {
+                "kind": "accuracy",
+                "final": 0.55,
+                "ratio_vs_baseline": 0.0,
+            },
+            "classification": {
+                "final": {"correct_total": 55, "total": 100},
+            },
+        },
+        "meta": {"model_id": "invarlock"},
+    }
+
+    import invarlock.eval.primary_metric as pm_mod
+
+    monkeypatch.setattr(
+        pm_mod,
+        "compute_primary_metric_from_report",
+        lambda *_, **__: None,
+        raising=False,
+    )
+
+    attach_primary_metric(
+        evaluation_report,
+        report,
+        baseline_raw={},
+        baseline_ref={},
+        ppl_analysis=None,
+    )
+
+    pm = evaluation_report["primary_metric"]
+    assert pm["kind"] == "accuracy"
+    assert pm["ci"][0] < 0.55 < pm["ci"][1]
+    assert pm["display_ci"] == pm["ci"]
+    assert evaluation_report["report_build"]["synthesized_fields"] == [
+        {
+            "field": "primary_metric.display_ci",
+            "reason": "computed_from_primary_metric_ci",
+            "source": "primary_metric_utils._attach_primary_metric_from_report",
+        }
+    ]
+
+
 def test_attach_primary_metric_classification_bad_final_and_bad_baseline(
     monkeypatch,
 ) -> None:

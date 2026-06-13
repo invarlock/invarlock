@@ -139,6 +139,50 @@ def _attach_ppl_analysis_fields(
         pass
 
 
+def _classification_final_counts(metrics_map: dict[str, Any]) -> tuple[int, int] | None:
+    try:
+        classification = metrics_map.get("classification")
+        if not isinstance(classification, dict):
+            return None
+        final = classification.get("final")
+        if not isinstance(final, dict):
+            return None
+
+        total_value = _coerce_finite_float(final.get("total"))
+        correct_value = _coerce_finite_float(final.get("correct_total"))
+        if correct_value is None:
+            examples = final.get("example_correct")
+            if isinstance(examples, list):
+                correct_value = float(sum(1 for item in examples if bool(item)))
+                if total_value is None:
+                    total_value = float(len(examples))
+        if correct_value is None or total_value is None:
+            return None
+        total = int(total_value)
+        correct = int(correct_value)
+        if total <= 0 or correct < 0 or correct > total:
+            return None
+        return correct, total
+    except _NON_FATAL_EXCEPTIONS:
+        return None
+
+
+def _wilson_accuracy_ci(correct: int, total: int) -> list[float] | None:
+    try:
+        if total <= 0 or correct < 0 or correct > total:
+            return None
+        z = 1.959963984540054
+        n = float(total)
+        p_hat = float(correct) / n
+        z2 = z * z
+        denom = 1.0 + z2 / n
+        center = (p_hat + z2 / (2.0 * n)) / denom
+        half = (z * math.sqrt((p_hat * (1.0 - p_hat) + z2 / (4.0 * n)) / n)) / denom
+        return [max(0.0, center - half), min(1.0, center + half)]
+    except _NON_FATAL_EXCEPTIONS:
+        return None
+
+
 def _finalize_primary_metric_snapshot(
     pm_copy: dict[str, Any],
     *,
@@ -199,6 +243,13 @@ def _finalize_primary_metric_snapshot(
                     pm_copy["display_ci"] = [math.exp(lo), math.exp(hi)]
             except _NON_FATAL_EXCEPTIONS:
                 pass
+        if kind == "accuracy":
+            counts = _classification_final_counts(metrics_map)
+            if counts is not None:
+                acc_ci = _wilson_accuracy_ci(*counts)
+                if acc_ci is not None:
+                    pm_copy.setdefault("ci", list(acc_ci))
+                    pm_copy["display_ci"] = list(acc_ci)
         try:
             display_candidate = pm_copy.get("display_ci")
         except _NON_FATAL_EXCEPTIONS:
