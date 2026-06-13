@@ -4,6 +4,7 @@ model:
   id: "THUDM/glm-4-9b-chat"
   adapter: "hf_causal"
   device: "auto"
+  trust_remote_code: true
 
 dataset:
   provider: "wikitext2"

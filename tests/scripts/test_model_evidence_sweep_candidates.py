@@ -174,8 +174,14 @@ def test_lane_requires_remote_code_uses_preset_model_flag() -> None:
         for lane in mod.SUITES[mod.SUPPORT_MATRIX_BACKLOG_GPU_SUITE]
         if lane.slug == "microsoft_phi_4_mini_instruct"
     )
+    glm4 = next(
+        lane
+        for lane in mod.SUITES[mod.PROMOTION_GAP_GPU_SUITE]
+        if lane.slug == "thudm_glm_4_9b_chat"
+    )
 
     assert mod.lane_requires_remote_code(phi4) is True
+    assert mod.lane_requires_remote_code(glm4) is True
     assert mod.lane_requires_remote_code(phi4_mini) is False
     assert mod.lane_requires_remote_code(qwen) is False
 

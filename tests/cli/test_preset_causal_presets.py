@@ -79,7 +79,10 @@ def test_causal_lm_family_presets_load() -> None:
         assert cfg.require_section("model")["adapter"] == "hf_causal"
         if name == "gemma4_e2b_512.yaml":
             assert cfg.require_section("model")["attn_implementation"] == "sdpa"
-        if name == "phi4_reasoning_plus_512.yaml":
+        if name in {
+            "glm4_9b_chat_512.yaml",
+            "phi4_reasoning_plus_512.yaml",
+        }:
             assert cfg.require_section("model")["trust_remote_code"] is True
         if name == "phi4_mini_512.yaml":
             assert "trust_remote_code" not in cfg.require_section("model")
@@ -137,6 +140,7 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
         )
         assert data["model"]["id"] == model_id
         if name in {
+            "null_sweep_glm4_9b_chat.yaml",
             "null_sweep_phi4_reasoning_plus.yaml",
         }:
             assert data["model"]["trust_remote_code"] is True
@@ -195,6 +199,8 @@ def test_candidate_causal_lm_presets_load() -> None:
         cfg = load_config(root / "configs/presets/causal_lm" / name)
         assert cfg.require_section("model")["id"] == model_id
         assert cfg.require_section("model")["adapter"] == adapter
+        if name == "glm4_9b_chat_512.yaml":
+            assert cfg.require_section("model")["trust_remote_code"] is True
         assert cfg.data["dataset"]["provider"] == "wikitext2"
         assert cfg.data["primary_metric"]["drift_band"] == expected_drift_band
 
@@ -226,5 +232,7 @@ def test_candidate_null_sweep_calibration_configs_reference_models() -> None:
         )
         assert data["model"]["id"] == model_id
         assert data["model"]["adapter"] == adapter
+        if name == "null_sweep_glm4_9b_chat.yaml":
+            assert data["model"]["trust_remote_code"] is True
         assert data["dataset"]["provider"] == "wikitext2"
         assert data["primary_metric"]["drift_band"] == expected_drift_band
