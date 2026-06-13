@@ -137,6 +137,7 @@ _DIRECT_SUBMODULE_SPECS: dict[str, dict[str, tuple[str, str]]] = {
 }
 
 _MODEL_ID_TYPE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("chatglm", ("chatglm", "glm-4", "glm4")),
     ("mistral3", ("ministral-3", "ministral3", "mistral3")),
     ("qwen3_moe", ("qwen3_moe", "qwen3-moe")),
     ("qwen3", ("qwen3",)),
@@ -188,6 +189,46 @@ class HFLoaderStrategy:
     loader: Any
     loader_label: str
     model_type: str | None = None
+
+
+class _ChatGLMRemoteCodeCausalLoader:
+    """Compatibility loader for ChatGLM remote code on newer Transformers."""
+
+    @staticmethod
+    def from_pretrained(model_id: str, **kwargs: Any) -> Any:
+        from transformers import AutoConfig
+        from transformers.dynamic_module_utils import get_class_from_dynamic_module
+
+        loader_kwargs = dict(kwargs)
+        trust_remote_code = resolve_trust_remote_code(loader_kwargs)
+        config = loader_kwargs.get("config")
+        if config is None:
+            config = AutoConfig.from_pretrained(
+                model_id,
+                trust_remote_code=trust_remote_code,
+            )
+        if not hasattr(config, "max_length"):
+            seq_length = getattr(config, "seq_length", None)
+            if seq_length is not None:
+                config.max_length = seq_length
+        loader_kwargs["config"] = config
+
+        auto_map = getattr(config, "auto_map", None)
+        class_ref = (
+            auto_map.get("AutoModelForCausalLM") if isinstance(auto_map, dict) else None
+        )
+        if not isinstance(class_ref, str) or not class_ref:
+            auto_model = _resolve_auto_loader("causal")[0]
+            return auto_model.from_pretrained(model_id, **loader_kwargs)
+
+        model_cls = get_class_from_dynamic_module(
+            class_ref,
+            model_id,
+            trust_remote_code=trust_remote_code,
+        )
+        if not hasattr(model_cls, "all_tied_weights_keys"):
+            model_cls.all_tied_weights_keys = {}
+        return model_cls.from_pretrained(model_id, **loader_kwargs)
 
 
 def _get_torch() -> Any:
@@ -390,6 +431,19 @@ def resolve_core_loader_strategy(
         model_type = _normalize_model_type(config_data.get("model_type"))
     if model_type is None:
         model_type = _infer_model_type_from_model_id(model_id)
+
+    if (
+        task == "causal"
+        and model_type == "chatglm"
+        and resolve_trust_remote_code(kwargs)
+    ):
+        return HFLoaderStrategy(
+            task=task,
+            strategy="remote_code",
+            loader=_ChatGLMRemoteCodeCausalLoader,
+            loader_label="invarlock.adapters.hf_loading._ChatGLMRemoteCodeCausalLoader",
+            model_type=model_type,
+        )
 
     if allow_direct_submodule and not resolve_trust_remote_code(kwargs):
         direct = _resolve_direct_submodule_loader(task, model_type)

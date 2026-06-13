@@ -478,6 +478,92 @@ def test_resolve_core_loader_strategy_trust_remote_code_forces_auto(
 
 
 @pytest.mark.unit
+def test_resolve_core_loader_strategy_uses_chatglm_remote_loader() -> None:
+    import invarlock.adapters.hf_loading as hf_loading
+
+    with runtime_allowances_scope(allow_remote_code=True):
+        strategy = hf_loading.resolve_core_loader_strategy(
+            task="causal",
+            model_id="THUDM/glm-4-9b-chat",
+            kwargs={"trust_remote_code": True},
+            allow_direct_submodule=True,
+        )
+
+    assert strategy.strategy == "remote_code"
+    assert strategy.model_type == "chatglm"
+    assert strategy.loader_label.endswith("_ChatGLMRemoteCodeCausalLoader")
+
+
+@pytest.mark.unit
+def test_chatglm_remote_loader_patches_transformers5_expectations(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import transformers
+    import transformers.dynamic_module_utils as dynamic_module_utils
+
+    from invarlock.adapters.hf_loading import _ChatGLMRemoteCodeCausalLoader
+
+    class FakeConfig:
+        seq_length = 131072
+        auto_map = {"AutoModelForCausalLM": "modeling_chatglm.ChatGLM"}
+
+    class FakeRemoteClass:
+        calls: list[dict[str, object]] = []
+
+        @classmethod
+        def from_pretrained(cls, model_id: str, **kwargs: object) -> object:
+            cls.calls.append({"model_id": model_id, **dict(kwargs)})
+            return object()
+
+    config = FakeConfig()
+
+    def fake_config_from_pretrained(model_id: str, **kwargs: object) -> FakeConfig:
+        assert model_id == "THUDM/glm-4-9b-chat"
+        assert kwargs["trust_remote_code"] is True
+        return config
+
+    def fake_get_class_from_dynamic_module(
+        class_ref: str,
+        model_id: str,
+        **kwargs: object,
+    ) -> type[FakeRemoteClass]:
+        assert class_ref == "modeling_chatglm.ChatGLM"
+        assert model_id == "THUDM/glm-4-9b-chat"
+        assert kwargs["trust_remote_code"] is True
+        return FakeRemoteClass
+
+    monkeypatch.setattr(
+        transformers.AutoConfig,
+        "from_pretrained",
+        fake_config_from_pretrained,
+    )
+    monkeypatch.setattr(
+        dynamic_module_utils,
+        "get_class_from_dynamic_module",
+        fake_get_class_from_dynamic_module,
+    )
+
+    with runtime_allowances_scope(allow_remote_code=True):
+        loaded = _ChatGLMRemoteCodeCausalLoader.from_pretrained(
+            "THUDM/glm-4-9b-chat",
+            trust_remote_code=True,
+            output_loading_info=True,
+        )
+
+    assert loaded is not None
+    assert config.max_length == 131072
+    assert FakeRemoteClass.all_tied_weights_keys == {}
+    assert FakeRemoteClass.calls == [
+        {
+            "model_id": "THUDM/glm-4-9b-chat",
+            "trust_remote_code": True,
+            "output_loading_info": True,
+            "config": config,
+        }
+    ]
+
+
+@pytest.mark.unit
 def test_resolve_core_loader_strategy_unknown_model_type_falls_back_to_auto(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
