@@ -7,6 +7,10 @@ model:
   id: "google/gemma-4-26B-A4B-it"
   adapter: "hf_multimodal"
   device: "auto"
+  dtype: "bfloat16"
+  device_map: "auto"
+  low_cpu_mem_usage: true
+  collect_loading_info: false
   attn_implementation: "sdpa"
 
 dataset:

@@ -9,6 +9,13 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def _assert_large_gemma_memory_controls(model: dict[str, object]) -> None:
+    assert model["dtype"] == "bfloat16"
+    assert model["device_map"] == "auto"
+    assert model["low_cpu_mem_usage"] is True
+    assert model["collect_loading_info"] is False
+
+
 def test_multimodal_preset_loads_and_points_at_demo_fixture() -> None:
     root = _repo_root()
     preset_path = root / "configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml"
@@ -55,6 +62,7 @@ def test_gemma4_12b_multimodal_preset_declares_unified_candidate() -> None:
     assert model["id"] == "google/gemma-4-12B-it"
     assert model["adapter"] == "hf_multimodal"
     assert model["attn_implementation"] == "sdpa"
+    _assert_large_gemma_memory_controls(model)
     assert dataset["provider"]["kind"] == "vision_text"
     assert (
         dataset["provider"]["path"] == "tests/fixtures/vision_text/demo_manifest.jsonl"
@@ -87,6 +95,8 @@ def test_gemma4_12b_public_vqav2_preset_uses_materialized_manifest_path() -> Non
 
     assert model["id"] == "google/gemma-4-12B-it"
     assert model["adapter"] == "hf_multimodal"
+    assert model["attn_implementation"] == "sdpa"
+    _assert_large_gemma_memory_controls(model)
     assert dataset["provider"]["kind"] == "vision_text"
     assert dataset["provider"]["path"].endswith(
         "public_datasets/vqav2_sample_validation_800/manifest.jsonl"
@@ -117,6 +127,7 @@ def test_gemma4_26b_a4b_public_vqav2_preset_declares_moe_candidate() -> None:
     assert model["id"] == "google/gemma-4-26B-A4B-it"
     assert model["adapter"] == "hf_multimodal"
     assert model["attn_implementation"] == "sdpa"
+    _assert_large_gemma_memory_controls(model)
     assert dataset["provider"]["kind"] == "vision_text"
     assert dataset["provider"]["path"].endswith(
         "public_datasets/vqav2_sample_validation_800/manifest.jsonl"
@@ -142,6 +153,7 @@ def test_gemma4_12b_null_sweep_calibration_config_uses_public_manifest() -> None
     assert model["id"] == "google/gemma-4-12B-it"
     assert model["adapter"] == "hf_multimodal"
     assert model["attn_implementation"] == "sdpa"
+    _assert_large_gemma_memory_controls(model)
     assert dataset["provider"]["kind"] == "vision_text"
     assert dataset["provider"]["path"].endswith(
         "public_datasets/vqav2_sample_validation_800/manifest.jsonl"
@@ -171,6 +183,7 @@ def test_gemma4_26b_a4b_null_sweep_calibration_config_uses_public_manifest() -> 
     assert model["id"] == "google/gemma-4-26B-A4B-it"
     assert model["adapter"] == "hf_multimodal"
     assert model["attn_implementation"] == "sdpa"
+    _assert_large_gemma_memory_controls(model)
     assert dataset["provider"]["kind"] == "vision_text"
     assert dataset["provider"]["path"].endswith(
         "public_datasets/vqav2_sample_validation_800/manifest.jsonl"

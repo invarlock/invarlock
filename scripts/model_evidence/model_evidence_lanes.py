@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import math
+import re
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
@@ -19,6 +21,58 @@ MODEL_CATALOG_GPU_SUITE = "model-catalog-gpu"
 PROMOTION_GAP_GPU_SUITE = "promotion-gap-gpu"
 SUPPORT_MATRIX_BACKLOG_GPU_SUITE = "support-matrix-backlog-gpu"
 EXECUTION_MODES = ("container", "host")
+GPU_80GB_USABLE_MEMORY_GB = 72.0
+DEFAULT_DENSE_RUNTIME_MULTIPLIER = 1.35
+DEFAULT_MOE_RUNTIME_MULTIPLIER = 2.0
+
+
+def estimate_model_weight_gb(model_id: str) -> float | None:
+    """Return an approximate BF16 checkpoint footprint for planning GPU groups."""
+    model_lower = model_id.lower()
+    if "mixtral" in model_lower or "8x7b" in model_lower:
+        return 90.0
+    if "qwen3-30b-a3b" in model_lower or "30b-a3b" in model_lower:
+        return 60.0
+    if "gemma-4-26b-a4b" in model_lower or "26b-a4b" in model_lower:
+        return 52.0
+    if "olmoe-1b-7b" in model_lower or "1b-7b" in model_lower:
+        return 14.0
+
+    params_b = [
+        float(match.group(1).replace("_", "."))
+        for match in re.finditer(r"(\d+(?:[._]\d+)?)\s*b\b", model_lower)
+    ]
+    if not params_b:
+        return None
+    return max(params_b) * 2.0
+
+
+def _is_moe_model(model_id: str) -> bool:
+    model_lower = model_id.lower()
+    return any(token in model_lower for token in ("moe", "mixtral", "8x7b", "a3b", "a4b", "olmoe"))
+
+
+def lane_resource_estimate(model_id: str) -> dict[str, object] | None:
+    """Build an approximate memory planning hint for evidence sweeps."""
+    weights_gb = estimate_model_weight_gb(model_id)
+    if weights_gb is None:
+        return None
+    is_moe = _is_moe_model(model_id)
+    multiplier = (
+        DEFAULT_MOE_RUNTIME_MULTIPLIER if is_moe else DEFAULT_DENSE_RUNTIME_MULTIPLIER
+    )
+    recommended = max(
+        1, math.ceil((weights_gb * multiplier) / GPU_80GB_USABLE_MEMORY_GB)
+    )
+    return {
+        "schema": "invarlock/model-evidence-resource-estimate-v1",
+        "estimated_weight_gb_bf16": round(weights_gb, 2),
+        "runtime_multiplier": multiplier,
+        "recommended_min_gpus_80gb": recommended,
+        "gpu_80gb_usable_memory_gb": GPU_80GB_USABLE_MEMORY_GB,
+        "moe_model": is_moe,
+        "basis": "heuristic_from_model_name_for_launch_planning",
+    }
 
 
 @dataclass(frozen=True)
@@ -53,6 +107,9 @@ class EvidenceLane:
         }
         if self.vision_text_materialization:
             entry["vision_text_materialization"] = self.vision_text_materialization
+        resource_estimate = lane_resource_estimate(self.model_id)
+        if resource_estimate is not None:
+            entry["resource_estimate"] = resource_estimate
         return entry
 
 

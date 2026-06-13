@@ -83,6 +83,12 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
         "configs/presets/causal_lm/mixtral_8x7b_512.yaml"
     )
     assert specs["mistralai_mixtral_8x7b_v0_1"].adapter == "hf_causal"
+    mixtral_estimate = specs["mistralai_mixtral_8x7b_v0_1"].to_manifest_entry()[
+        "resource_estimate"
+    ]
+    assert mixtral_estimate["estimated_weight_gb_bf16"] == 90.0
+    assert mixtral_estimate["recommended_min_gpus_80gb"] >= 3
+    assert mixtral_estimate["moe_model"] is True
     assert specs["openlm_research_open_llama_7b"].preset_relpath == (
         "configs/presets/causal_lm/open_llama_7b_512.yaml"
     )
@@ -202,6 +208,10 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
                 "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml"
             )
             assert lane.vision_text_materialization is not None
+            estimate = lane.to_manifest_entry()["resource_estimate"]
+            assert estimate["estimated_weight_gb_bf16"] == 52.0
+            assert estimate["recommended_min_gpus_80gb"] >= 2
+            assert estimate["moe_model"] is True
         else:
             assert lane.slug == "google_flan_t5_base"
             assert lane.verify_profile == "release"

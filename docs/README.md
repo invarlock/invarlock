@@ -342,6 +342,10 @@ Model evidence automation lives in
 `scripts/model_evidence/model_evidence_sweep.py`, with tmux-based remote launch support in
 `scripts/model_evidence/run_model_evidence_remote.py` and a nightly/manual runner workflow in
 `.github/workflows/model-evidence-sweep.yml`.
+For large MoE lanes that do not fit comfortably on one GPU, the remote helper
+supports grouped CUDA visibility, for example
+`--gpu-group 0,1,2,3` to launch one sweep shard with all four GPUs exposed
+instead of one shard per GPU.
 Repo-prepared-but-not-yet-promoted lanes are tracked in
 `contracts/model_family_catalog.json`.
 For the Gemma 4 text lane, the repo-maintained local smoke is the included

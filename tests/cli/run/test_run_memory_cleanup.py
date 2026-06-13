@@ -87,3 +87,37 @@ def test_release_process_memory_swallows_malloc_trim_exceptions(monkeypatch):
     monkeypatch.setattr(run_runtime, "_malloc_trim", _boom)
 
     run_runtime.release_process_memory()
+
+
+def test_execute_guarded_run_releases_process_memory_after_runner(monkeypatch):
+    calls = []
+    report = object()
+    model = object()
+
+    monkeypatch.setattr(
+        run_runtime,
+        "release_process_memory",
+        lambda: calls.append("release"),
+    )
+
+    returned_report, returned_model = run_runtime.execute_guarded_run(
+        runner=SimpleNamespace(execute=lambda **_kwargs: report),
+        adapter=SimpleNamespace(),
+        model=model,
+        cfg=SimpleNamespace(model=SimpleNamespace(id="demo")),
+        edit_op=None,
+        run_config=SimpleNamespace(event_path=None, context={}),
+        guards=[],
+        calibration_data=[],
+        auto_config=None,
+        edit_config={},
+        preview_count=1,
+        final_count=1,
+        restore_fn=None,
+        resolved_device="cpu",
+        skip_model_load=True,
+    )
+
+    assert returned_report is report
+    assert returned_model is model
+    assert calls == ["release"]
