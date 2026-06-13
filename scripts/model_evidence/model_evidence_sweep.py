@@ -333,6 +333,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Restrict to one or more support_matrix lane_ids.",
     )
     parser.add_argument(
+        "--preset-override",
+        action="append",
+        default=[],
+        metavar="SLUG=PATH",
+        help=(
+            "Use PATH instead of the lane preset for one manifest slug. "
+            "Repeat for multiple lanes."
+        ),
+    )
+    parser.add_argument(
         "--output-root",
         default=None,
         help="Destination root for logs, reports, and summaries.",
@@ -435,6 +445,22 @@ def build_evaluate_command(
     if profile == "dev":
         command.extend(["--assurance", "off"])
     return command
+
+
+def parse_preset_overrides(raw_items: Sequence[str]) -> dict[str, str]:
+    overrides: dict[str, str] = {}
+    for raw in raw_items:
+        if "=" not in raw:
+            raise ValueError("--preset-override entries must use SLUG=PATH")
+        slug, path = raw.split("=", 1)
+        slug = slug.strip()
+        path = path.strip()
+        if not slug or not path:
+            raise ValueError("--preset-override entries must use non-empty SLUG=PATH")
+        if slug in overrides:
+            raise ValueError(f"duplicate --preset-override for slug: {slug}")
+        overrides[slug] = path
+    return overrides
 
 
 def build_vision_text_materialize_command(
@@ -682,6 +708,7 @@ def run_lane(
     device: str,
     execution_mode: str,
     env: dict[str, str],
+    preset_overrides: dict[str, str] | None = None,
 ) -> LaneResult:
     lane_root = execution_root / "eval" / spec.slug
     lane_root.mkdir(parents=True, exist_ok=True)
@@ -794,6 +821,14 @@ def run_lane(
                 detail=detail,
             )
 
+    preset_arg_override: str | None = None
+    if prepared_preset is not None:
+        preset_arg_override = _command_path(
+            prepared_preset, execution_mode=execution_mode
+        )
+    elif preset_overrides:
+        preset_arg_override = preset_overrides.get(spec.slug)
+
     evaluate_cmd = build_evaluate_command(
         spec,
         python_exe=python_exe,
@@ -801,11 +836,7 @@ def run_lane(
         device=device,
         execution_mode=execution_mode,
         lane_root=lane_root,
-        preset_arg_override=(
-            _command_path(prepared_preset, execution_mode=execution_mode)
-            if prepared_preset is not None
-            else None
-        ),
+        preset_arg_override=preset_arg_override,
     )
     with log_path.open(log_mode, encoding="utf-8") as log_file:
         log_file.write("$ " + " ".join(evaluate_cmd) + "\n")
@@ -896,6 +927,11 @@ def run_sweep(args: argparse.Namespace) -> int:
         return 2
 
     validate_manifest_coverage(CURRENT_SUPPORTED_EXPERIMENTAL_LANES)
+    try:
+        preset_overrides = parse_preset_overrides(args.preset_override)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     specs = select_specs(
         args.suite,
         slugs=args.slug,
@@ -950,7 +986,7 @@ def run_sweep(args: argparse.Namespace) -> int:
                             execution_mode=args.execution_mode,
                         )
                         if spec.vision_text_materialization
-                        else None
+                        else preset_overrides.get(spec.slug)
                     ),
                 ),
                 "verify": build_verify_command(
@@ -1002,6 +1038,7 @@ def run_sweep(args: argparse.Namespace) -> int:
                 device=args.device,
                 execution_mode=args.execution_mode,
                 env=env,
+                preset_overrides=preset_overrides,
             )
             results.append(result)
             verify_repr = (

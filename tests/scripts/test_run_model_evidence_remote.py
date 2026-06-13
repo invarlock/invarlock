@@ -79,6 +79,38 @@ def test_run_model_evidence_remote_dry_run_emits_tmux_launch_plan(
     assert "tmux list-sessions" in " ".join(payload["monitor"]["tmux_list"])
 
 
+def test_run_model_evidence_remote_dry_run_forwards_preset_overrides() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence" / "run_model_evidence_remote.py"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--host",
+            "root@example.test",
+            "--gpus",
+            "0",
+            "--preset-override",
+            "huggingfacetb_smollm3_3b=tmp/smollm3_release.yaml",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    assert payload["preset_overrides"] == [
+        "huggingfacetb_smollm3_3b=tmp/smollm3_release.yaml"
+    ]
+    remote_command = payload["launches"][0]["remote_command"]
+    assert "--preset-override" in remote_command
+    assert "huggingfacetb_smollm3_3b=tmp/smollm3_release.yaml" in remote_command
+
+
 def test_run_model_evidence_remote_dry_run_respects_skip_sync() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     script = repo_root / "scripts" / "model_evidence" / "run_model_evidence_remote.py"

@@ -94,6 +94,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Repeat to restrict the sweep to specific support_matrix lane_ids.",
     )
     parser.add_argument(
+        "--preset-override",
+        action="append",
+        default=[],
+        metavar="SLUG=PATH",
+        help=(
+            "Pass a SLUG=PATH preset override through to the remote sweep. "
+            "Repeat for multiple lanes."
+        ),
+    )
+    parser.add_argument(
         "--profile",
         default=None,
         help=(
@@ -273,6 +283,7 @@ def build_launches(
     suite: str,
     slugs: list[str],
     lane_ids: list[str],
+    preset_overrides: list[str],
     profile: str | None,
     device: str,
     execution_mode: str,
@@ -312,6 +323,8 @@ def build_launches(
             sweep_cmd.extend(["--slug", slug])
         for lane_id in lane_ids:
             sweep_cmd.extend(["--lane-id", lane_id])
+        for preset_override in preset_overrides:
+            sweep_cmd.extend(["--preset-override", preset_override])
 
         export_pairs = [
             ("PYTHONPATH", "src"),
@@ -401,6 +414,7 @@ def run_remote(args: argparse.Namespace) -> int:
         suite=args.suite,
         slugs=args.slug,
         lane_ids=args.lane_id,
+        preset_overrides=args.preset_override,
         profile=args.profile,
         device=args.device,
         execution_mode=args.execution_mode,
@@ -423,6 +437,7 @@ def run_remote(args: argparse.Namespace) -> int:
         "execution_mode": args.execution_mode,
         "gpus": gpus,
         "remote_env": [{"name": key, "value": value} for key, value in remote_env],
+        "preset_overrides": args.preset_override,
         "sync_command": sync_command,
         "launches": [launch.to_payload() for launch in launches],
         "monitor": _monitor_commands(args.host, launches),

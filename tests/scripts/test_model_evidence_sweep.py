@@ -441,6 +441,64 @@ def test_model_evidence_sweep_dry_run_supports_promotion_gap_suite_candidates(
     )
 
 
+def test_model_evidence_sweep_dry_run_uses_preset_override(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
+    output_root = tmp_path / "override-dry-run"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--suite",
+            "support-matrix-backlog-gpu",
+            "--slug",
+            "huggingfacetb_smollm3_3b",
+            "--output-root",
+            str(output_root),
+            "--preset-override",
+            "huggingfacetb_smollm3_3b=tmp/smollm3_release.yaml",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    assert len(payload) == 1
+    evaluate = payload[0]["evaluate"]
+    assert evaluate[evaluate.index("--preset") + 1] == "tmp/smollm3_release.yaml"
+
+
+def test_model_evidence_sweep_rejects_invalid_preset_override(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--suite",
+            "support-matrix-backlog-gpu",
+            "--output-root",
+            str(tmp_path / "bad-override"),
+            "--preset-override",
+            "missing_separator",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 2
+    assert "SLUG=PATH" in proc.stderr
+
+
 def test_build_prefetch_command_uses_model_profile_tokenizer_resolution() -> None:
     mod = load_script_module("model_evidence_sweep")
     spec = next(
