@@ -445,7 +445,7 @@
       "representative_models": [
         "google/gemma-4-12B-it"
       ],
-      "notes": "Added from practical-picks backlog with a repo pilot vision_text preset, sweep lane, and Gemma 4 unified loader tests. Gemma 4 12B uses the explicit hf_multimodal path and requires the multimodal runtime stack (transformers>=5.12.0 and torchvision>=0.26.0). Promotion still requires a public image-text evaluation/calibration dataset and clean public evidence rather than the local smoke manifest."
+      "notes": "Added from practical-picks backlog with a repo pilot vision_text preset, a pinned public VQAv2 materialization lane, and Gemma 4 unified loader tests. Gemma 4 12B uses the explicit hf_multimodal path and requires the multimodal runtime stack (transformers>=5.12.0 and torchvision>=0.26.0). Promotion still requires a clean public release evidence run and evidence pack rather than the local smoke manifest."
     },
     {
       "lane_id": "ministral-3-3b-text-causal-hf",

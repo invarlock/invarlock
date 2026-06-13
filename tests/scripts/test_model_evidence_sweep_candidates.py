@@ -59,9 +59,14 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
         "tiiuae_falcon_h1r_7b",
     }
     assert specs["google_gemma_4_12b_it"].preset_relpath == (
-        "configs/presets/multimodal/gemma4_12b_vision_text_256.yaml"
+        "configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml"
     )
     assert specs["google_gemma_4_12b_it"].adapter == "hf_multimodal"
+    assert specs["google_gemma_4_12b_it"].verify_profile == "release"
+    assert specs["google_gemma_4_12b_it"].vision_text_materialization is not None
+    assert specs["google_gemma_4_12b_it"].vision_text_materialization["dataset"] == (
+        "Multimodal-Fatima/VQAv2_sample_validation"
+    )
     assert specs["microsoft_phi_4_mini_instruct"].preset_relpath == (
         "configs/presets/causal_lm/phi4_mini_512.yaml"
     )
@@ -150,6 +155,52 @@ def test_support_matrix_backlog_gpu_suite_phi4_dry_run_uses_builtin_phi3_policy(
     manifest = json.loads((output_root / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["suite"] == "support-matrix-backlog-gpu"
     assert manifest["lanes"][0]["slug"] == "microsoft_phi_4_mini_instruct"
+
+
+def test_support_matrix_backlog_gemma_dry_run_materializes_public_vqav2(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
+    output_root = tmp_path / "candidate-gemma-vqav2"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--suite",
+            "support-matrix-backlog-gpu",
+            "--slug",
+            "google_gemma_4_12b_it",
+            "--output-root",
+            str(output_root),
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    assert len(payload) == 1
+    item = payload[0]
+    assert item["slug"] == "google_gemma_4_12b_it"
+    assert item["materialize_dataset"][0] == sys.executable
+    assert "Multimodal-Fatima/VQAv2_sample_validation" in item["materialize_dataset"]
+    assert "99487d2651df3799002b2fb3e455741744514a02" in item[
+        "materialize_dataset"
+    ]
+    preset_idx = item["evaluate"].index("--preset") + 1
+    assert item["evaluate"][preset_idx].endswith("prepared_preset.yaml")
+    assert item["evaluate"][item["evaluate"].index("--profile") + 1] == "release"
+
+    manifest = json.loads((output_root / "manifest.json").read_text(encoding="utf-8"))
+    lane = manifest["lanes"][0]
+    assert lane["vision_text_materialization"]["dataset"] == (
+        "Multimodal-Fatima/VQAv2_sample_validation"
+    )
 
 
 def test_lane_requires_remote_code_uses_preset_model_flag() -> None:

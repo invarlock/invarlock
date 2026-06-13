@@ -41,6 +41,11 @@ For Compare & evaluate, reuse the same `dataset` block in baseline and subject r
   expects JSONL records with `id`, `image_path`, `prompt`, and either `answer`
   or `answers`. Records are single-image examples; provider batching can still
   group multiple records when callers request `batch_size > 1`.
+- **Public image-text datasets**: public Hugging Face datasets can be used by
+  materializing them first into a local `vision_text` manifest. The model
+  evidence workflow uses
+  `scripts/model_evidence/materialize_vision_text_dataset.py` for this pattern,
+  so evaluation remains offline/hashable after the download step.
 - **Tokenizer contract**: dataset providers expect either a callable tokenizer
   that returns `input_ids` plus optional `attention_mask`, or an `encode(...)`
   method that accepts `truncation=True`, `max_length=...`, and
@@ -143,6 +148,28 @@ dataset:
   preview_n: 1
   final_n: 1
 ```
+
+### Public VQA materialization example
+
+```bash
+python scripts/model_evidence/materialize_vision_text_dataset.py \
+  --dataset Multimodal-Fatima/VQAv2_sample_validation \
+  --split validation \
+  --revision 99487d2651df3799002b2fb3e455741744514a02 \
+  --output-dir artifacts/model-evidence/public_datasets/vqav2_sample_validation_64 \
+  --max-samples 64 \
+  --image-field image \
+  --prompt-field question \
+  --answer-field multiple_choice_answer \
+  --answers-field answers \
+  --id-field question_id \
+  --overwrite
+```
+
+The generated `manifest.jsonl`, `images/`, and
+`materialization_summary.json` are then consumed by `vision_text`. For evidence
+promotion, pin the dataset revision and keep the materialization summary with
+the run artifacts.
 
 ### Seq2seq provider example (HF)
 

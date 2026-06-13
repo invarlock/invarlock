@@ -337,8 +337,10 @@ The image-text path also includes an offline demo preset at
 `configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml` and a Gemma
 4 12B pilot at `configs/presets/multimodal/gemma4_12b_vision_text_256.yaml` plus
 `tests/fixtures/vision_text/demo_manifest.jsonl` for provider/config validation.
-Gemma 4 12B promotion still needs a public image-text evaluation/calibration
-dataset and clean public evidence rather than the local smoke manifest.
+Gemma 4 12B promotion uses
+`configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml` together with the
+model-evidence materializer for pinned public VQAv2 sample-validation data; the
+local smoke manifest remains provider/config validation only.
 
 For the broader inventory of declared support, implemented-but-not-public
 coverage, usage-only checkpoint families, and recommended additions, see

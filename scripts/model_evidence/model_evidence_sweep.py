@@ -15,6 +15,8 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+import yaml
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
@@ -162,6 +164,10 @@ def _capture_artifacts(output_root: Path) -> list[dict[str, object]]:
         "status.log",
         "model_revisions.json",
         "logs/*.log",
+        "eval/*/dataset/manifest.jsonl",
+        "eval/*/dataset/materialization_summary.json",
+        "eval/*/dataset/images/*",
+        "eval/*/prepared_preset.yaml",
         "eval/*/report/evaluation.report.json",
         "eval/*/verify.json",
     ):
@@ -394,7 +400,9 @@ def build_evaluate_command(
     device: str,
     execution_mode: str,
     lane_root: Path,
+    preset_arg_override: str | None = None,
 ) -> list[str]:
+    preset_arg = preset_arg_override or spec.preset_arg(execution_mode=execution_mode)
     command = [
         python_exe,
         "-m",
@@ -409,7 +417,7 @@ def build_evaluate_command(
         "--subject-adapter",
         spec.adapter,
         "--preset",
-        spec.preset_arg(execution_mode=execution_mode),
+        preset_arg,
         "--profile",
         profile,
         "--allow-network",
@@ -427,6 +435,87 @@ def build_evaluate_command(
     if profile == "dev":
         command.extend(["--assurance", "off"])
     return command
+
+
+def build_vision_text_materialize_command(
+    spec: EvidenceLane,
+    *,
+    python_exe: str,
+    lane_root: Path,
+    execution_mode: str,
+) -> list[str] | None:
+    materialization = spec.vision_text_materialization
+    if not materialization:
+        return None
+    output_dir = lane_root / "dataset"
+    command = [
+        python_exe,
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "--dataset",
+        str(materialization["dataset"]),
+        "--split",
+        str(materialization.get("split", "validation")),
+        "--output-dir",
+        _command_path(output_dir, execution_mode=execution_mode),
+        "--max-samples",
+        str(materialization.get("max_samples", 64)),
+        "--image-field",
+        str(materialization.get("image_field", "image")),
+        "--prompt-field",
+        str(materialization.get("prompt_field", "question")),
+        "--image-format",
+        str(materialization.get("image_format", "png")),
+        "--overwrite",
+    ]
+    optional_flags = (
+        ("revision", "--revision"),
+        ("config_name", "--config-name"),
+        ("answer_field", "--answer-field"),
+        ("answers_field", "--answers-field"),
+        ("id_field", "--id-field"),
+        ("prompt_template", "--prompt-template"),
+    )
+    for key, flag in optional_flags:
+        value = materialization.get(key)
+        if value is not None and str(value) != "":
+            command.extend([flag, str(value)])
+    if bool(materialization.get("shuffle", False)):
+        command.append("--shuffle")
+    if "seed" in materialization:
+        command.extend(["--seed", str(materialization["seed"])])
+    return command
+
+
+def write_prepared_preset(
+    spec: EvidenceLane,
+    *,
+    lane_root: Path,
+    execution_mode: str,
+) -> Path | None:
+    if not spec.vision_text_materialization:
+        return None
+    preset_data = yaml.safe_load(spec.preset_path.read_text(encoding="utf-8"))
+    if not isinstance(preset_data, dict):
+        raise ValueError(f"Preset must be a mapping: {spec.preset_relpath}")
+    dataset = preset_data.setdefault("dataset", {})
+    if not isinstance(dataset, dict):
+        raise ValueError(f"Preset dataset section must be a mapping: {spec.preset_relpath}")
+    provider = dataset.setdefault("provider", {})
+    if not isinstance(provider, dict):
+        raise ValueError(
+            f"Preset dataset.provider section must be a mapping: {spec.preset_relpath}"
+        )
+    provider["kind"] = "vision_text"
+    provider["path"] = _command_path(
+        lane_root / "dataset" / "manifest.jsonl",
+        execution_mode=execution_mode,
+    )
+    prepared_path = lane_root / "prepared_preset.yaml"
+    prepared_path.write_text(
+        yaml.safe_dump(preset_data, sort_keys=False),
+        encoding="utf-8",
+    )
+    return prepared_path
 
 
 def _prefetch_adapter_name(spec: EvidenceLane) -> str:
@@ -613,6 +702,53 @@ def run_lane(
         execution_mode=execution_mode,
         spec=spec,
     )
+    prepared_preset = None
+    materialize_cmd = build_vision_text_materialize_command(
+        spec,
+        python_exe=python_exe,
+        lane_root=lane_root,
+        execution_mode=execution_mode,
+    )
+    if materialize_cmd is not None:
+        with log_path.open(log_mode, encoding="utf-8") as log_file:
+            log_file.write("$ " + " ".join(materialize_cmd) + "\n")
+            materialize_proc = subprocess.run(
+                materialize_cmd,
+                cwd=REPO_ROOT,
+                env=lane_env,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
+            )
+        log_mode = "a"
+        if materialize_proc.returncode != 0:
+            _publish_lane_artifacts(lane_root, published_lane_root)
+            published_report_path = (
+                published_lane_root / "report" / "evaluation.report.json"
+            )
+            published_verify_path = published_lane_root / "verify.json"
+            return LaneResult(
+                slug=spec.slug,
+                lane_id=spec.lane_id,
+                model_id=spec.model_id,
+                preset=spec.preset_relpath,
+                evaluate_exit=materialize_proc.returncode,
+                verify_exit=None,
+                report_path=str(published_report_path),
+                verify_path=(
+                    str(published_verify_path)
+                    if published_verify_path.is_file()
+                    else None
+                ),
+                status="failed",
+                detail="dataset_materialize_failed",
+            )
+        prepared_preset = write_prepared_preset(
+            spec,
+            lane_root=lane_root,
+            execution_mode=execution_mode,
+        )
     if execution_mode == "host":
         prefetch_cmd = build_prefetch_command(spec, python_exe=python_exe)
         with log_path.open(log_mode, encoding="utf-8") as log_file:
@@ -665,6 +801,11 @@ def run_lane(
         device=device,
         execution_mode=execution_mode,
         lane_root=lane_root,
+        preset_arg_override=(
+            _command_path(prepared_preset, execution_mode=execution_mode)
+            if prepared_preset is not None
+            else None
+        ),
     )
     with log_path.open(log_mode, encoding="utf-8") as log_file:
         log_file.write("$ " + " ".join(evaluate_cmd) + "\n")
@@ -803,6 +944,14 @@ def run_sweep(args: argparse.Namespace) -> int:
                     device=args.device,
                     execution_mode=args.execution_mode,
                     lane_root=lane_root,
+                    preset_arg_override=(
+                        _command_path(
+                            lane_root / "prepared_preset.yaml",
+                            execution_mode=args.execution_mode,
+                        )
+                        if spec.vision_text_materialization
+                        else None
+                    ),
                 ),
                 "verify": build_verify_command(
                     python_exe=args.python,
@@ -819,6 +968,18 @@ def run_sweep(args: argparse.Namespace) -> int:
                 item["prefetch"] = build_prefetch_command(
                     spec,
                     python_exe=args.python,
+                )
+            materialize = build_vision_text_materialize_command(
+                spec,
+                python_exe=args.python,
+                lane_root=lane_root,
+                execution_mode=args.execution_mode,
+            )
+            if materialize is not None:
+                item["materialize_dataset"] = materialize
+                item["prepared_preset"] = _command_path(
+                    lane_root / "prepared_preset.yaml",
+                    execution_mode=args.execution_mode,
                 )
             payload.append(item)
         print(json.dumps(payload, indent=2))

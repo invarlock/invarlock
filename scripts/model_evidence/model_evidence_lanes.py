@@ -30,6 +30,7 @@ class EvidenceLane:
     preset_relpath: str
     adapter: str = "auto"
     verify_profile: str = "ci"
+    vision_text_materialization: dict[str, object] | None = None
 
     @property
     def preset_path(self) -> Path:
@@ -40,8 +41,8 @@ class EvidenceLane:
             return self.preset_relpath
         return str(self.preset_path)
 
-    def to_manifest_entry(self) -> dict[str, str]:
-        return {
+    def to_manifest_entry(self) -> dict[str, object]:
+        entry = {
             "slug": self.slug,
             "lane_id": self.lane_id,
             "family": self.family,
@@ -50,6 +51,9 @@ class EvidenceLane:
             "adapter": self.adapter,
             "verify_profile": self.verify_profile,
         }
+        if self.vision_text_materialization:
+            entry["vision_text_materialization"] = self.vision_text_materialization
+        return entry
 
 
 CURRENT_SUPPORTED_EXPERIMENTAL_LANES: tuple[EvidenceLane, ...] = ()
@@ -366,9 +370,22 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
         lane_id="gemma4-12b-any-to-any-hf",
         family="Gemma 4 12B any-to-any LM",
         model_id="google/gemma-4-12B-it",
-        preset_relpath="configs/presets/multimodal/gemma4_12b_vision_text_256.yaml",
+        preset_relpath="configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml",
         adapter="hf_multimodal",
-        verify_profile="dev",
+        verify_profile="release",
+        vision_text_materialization={
+            "dataset": "Multimodal-Fatima/VQAv2_sample_validation",
+            "split": "validation",
+            "revision": "99487d2651df3799002b2fb3e455741744514a02",
+            "max_samples": 64,
+            "image_field": "image",
+            "prompt_field": "question",
+            "answer_field": "multiple_choice_answer",
+            "answers_field": "answers",
+            "id_field": "question_id",
+            "prompt_template": "{question}\nAnswer with a short phrase.",
+            "image_format": "png",
+        },
     ),
     EvidenceLane(
         slug="huggingfacetb_smollm3_3b",

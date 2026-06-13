@@ -358,7 +358,13 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
     for lane in specs:
         if lane.slug != "google_gemma_4_12b_it":
             assert lane.adapter == "hf_causal"
-        assert lane.verify_profile == "dev"
+            assert lane.verify_profile == "dev"
+        else:
+            assert lane.verify_profile == "release"
+            assert lane.preset_relpath == (
+                "configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml"
+            )
+            assert lane.vision_text_materialization is not None
         assert lane.preset_path.is_file(), lane.preset_relpath
 
 
