@@ -276,12 +276,13 @@ Notes
 | Gemma 4 12B any-to-any LM | Yes | Yes | Yes | Yes |
 | Gemma 4 26B-A4B MoE image-text LM | Yes | Yes | Yes | Yes |
 
-### Large/MoE Published And Candidate Lanes
+### Large/MoE Published Lanes
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | OLMoE 1B-active/7B-total causal LM | Yes | Yes | Yes | Yes |
 | Mixtral 8x7B MoE causal LM | Yes | Yes | Yes | Yes |
+| Qwen3 30B-A3B MoE causal LM | Yes | Yes | Yes | Yes |
 
 ### Seq2Seq Published Basis
 
@@ -296,13 +297,14 @@ Granite 4.1 8B, OLMo 2 7B, OLMo 2 13B, Qwen2 7B, OpenLLaMA 7B,
 Falcon 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B,
 DeepSeek-R1-Distill-Qwen 7B, DeepSeek-R1-0528-Qwen3 8B,
 DeepSeek-R1-Distill-Qwen 14B, Phi-4 text-only, OLMoE 1B-active/7B-total
-MoE, Mixtral 8x7B MoE, and FLAN-T5 base seq2seq profiles. Repo-included
-presets and pilot calibration configs for prepared practical-pick lanes do not
-become part of the published assurance basis until supporting artifacts are
-attached. OLMoE is the smaller MoE published-basis validation lane; Mixtral
-8x7B and Gemma 4 26B-A4B are larger H100-backed no-op preservation bases.
-Qwen3 30B-A3B remains a prepared MoE promotion candidate until strict-assurance
-CUDA evidence, runtime manifest, and evidence pack are attached.
+MoE, Mixtral 8x7B MoE, Qwen3 30B-A3B MoE, and FLAN-T5 base seq2seq profiles.
+Repo-included presets and pilot calibration configs for prepared practical-pick
+lanes do not become part of the published assurance basis until supporting
+artifacts are attached. OLMoE is the smaller MoE published-basis validation
+lane; Mixtral 8x7B, Gemma 4 26B-A4B, and Qwen3 30B-A3B are larger H100-backed
+no-op preservation bases. The Qwen3 30B-A3B fixture requires all-8 H100
+sharding and uses scoped attention/router/shared-expert guard scans; it is not
+an exhaustive expert-bank or MoE routing-quality claim.
 The empirical guard manifest includes no-op published-basis summaries for the
 modern promoted families. They are null-behavior evidence and calibration
 inputs, but they do not re-derive the packaged spectral/RMT/variance tier

@@ -66,7 +66,7 @@ intentionally kept out of included preset inventory.
 
 | Family | Coverage state | Representative models | Notes |
 | --- | --- | --- | --- |
-| Qwen3 30B-A3B MoE causal LM | `prepared_evidence_candidate` | `Qwen/Qwen3-30B-A3B-Instruct-2507` | Explicit `hf_causal` preset and null-sweep config are included with bfloat16/low-CPU-memory loading, optional HF loading-info collection disabled, and scoped attention/router/shared-expert guard scans; public basis promotion waits for CUDA evidence, and scoped scans are not exhaustive expert-bank assurance. |
+| Qwen3 30B-A3B MoE causal LM | `published_basis` | `Qwen/Qwen3-30B-A3B-Instruct-2507` | Public release-profile H100 evidence fixture is included on public WikiText-103 with all-8 H100 sharding and scoped attention/router/shared-expert guard scans; it is no-op preservation evidence, not benchmark-quality, exhaustive expert-bank, or MoE routing-quality assurance. |
 | Gemma 4 26B-A4B MoE image-text LM | `published_basis` | `google/gemma-4-26B-A4B-it` | Public release-profile H100 image-text evidence fixture is included on pinned VQAv2 materialization; it is no-op preservation evidence, not benchmark-quality, audio, or MoE routing-quality evidence. |
 | Mixtral 8x7B MoE causal LM | `published_basis` | `mistralai/Mixtral-8x7B-v0.1` | Public release-profile H100 evidence fixture is included as a no-op preservation basis with full guard scans; it is not a benchmark-quality or MoE routing-quality claim, and guard-overhead measurement is skipped by preset policy. |
 | Llama | `profile_first_class` | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Generic Llama-family profile handling is first-class. OpenLLaMA and TinyLlama provide ungated declared support lanes, while access-gated vendor checkpoints remain omitted. |

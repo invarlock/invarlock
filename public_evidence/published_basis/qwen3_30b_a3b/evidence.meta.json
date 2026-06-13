@@ -1,0 +1,25 @@
+{
+  "artifact_paths": {
+    "evaluation_report": "evaluation.report.json",
+    "evidence_pack": "evidence_pack",
+    "evidence_pack_recipe": "evidence_pack_recipe.json",
+    "evidence_run_preset": "evidence_run_preset.yaml",
+    "runtime_manifest": "runtime.manifest.json"
+  },
+  "dataset_revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
+  "evidence_class": "strict_pass_fixture",
+  "expected_fingerprint": "sha256:7eef24102ac12ea58dd011eb25029fbd3ea52e1064782f97bda5a87327ed2224",
+  "generated_by": "direct H100 all-8 strict model evidence run",
+  "model_revision": "0d7cf23991f47feeb3a57ecb4c9cee8ea4a17bfe",
+  "non_goals": [
+    "Model weights are external Hugging Face references.",
+    "This fixture is a no-op preservation basis, not a fine-tuning, compression, benchmark-quality, deployment, or MoE routing-quality claim.",
+    "The passing fixture requires all-8 H100 sharding; the earlier four-GPU diagnostic lane is recorded as non-publishable operational evidence."
+  ],
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "Release-strict verifier fixture for the Qwen3 30B-A3B MoE published-basis lane on public WikiText-103.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/published_basis/qwen3_30b_a3b/evaluation.report.json --profile release --assurance strict",
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/qwen3_30b_a3b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:7eef24102ac12ea58dd011eb25029fbd3ea52e1064782f97bda5a87327ed2224"
+  ]
+}

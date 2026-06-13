@@ -734,7 +734,7 @@
         "text"
       ],
       "task_role": "causal_lm",
-      "state": "prepared_evidence_candidate",
+      "state": "published_basis",
       "representative_models": [
         "Qwen/Qwen3-30B-A3B-Instruct-2507"
       ],
@@ -745,9 +745,13 @@
         "configs/calibration/null_sweep_qwen3_30b_a3b_instruct_2507.yaml",
         "scripts/model_evidence/model_evidence_sweep.py",
         "tests/cli/test_preset_causal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py"
+        "tests/scripts/test_model_evidence_sweep_catalog.py",
+        "contracts/support_matrix.json",
+        "public_evidence/published_basis/qwen3_30b_a3b/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_30b_a3b/runtime.manifest.json",
+        "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack"
       ],
-      "notes": "Prepared as a recent Qwen3 MoE candidate with explicit hf_causal preset and null-sweep config. The preset uses bfloat16/low-CPU-memory loading, disables optional Hugging Face loading-info collection for memory-sensitive runs, and scopes guard scans to attention, router, and shared-expert surfaces rather than every per-layer expert bank. It is not a published basis until a CUDA report, runtime manifest, and evidence pack are attached; scoped scans cannot be claimed as exhaustive expert-bank assurance."
+      "notes": "Promoted as a recent Qwen3 MoE causal LM published basis with explicit hf_causal preset, public WikiText-103 release-profile H100 CUDA report, runtime manifest, and signed evidence pack from run 20260613Tqwen330ba3bH100All8. The fixture uses bfloat16/low-CPU-memory loading, disabled optional Hugging Face loading-info collection, automatic device placement across all eight H100 80GB GPUs, and scoped attention/router/shared-expert guard scans. This is no-op preservation evidence; it is not a benchmark-quality, fine-tuning, deployment, exhaustive expert-bank, or MoE routing-quality claim. A restricted four-GPU diagnostic lane failed and is intentionally not used as publication evidence."
     },
     {
       "family_id": "gemma-4-26b-a4b-moe-image-text-lm",

@@ -90,6 +90,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "olmo-2-13b-causal-hf",
         "olmoe-1b-7b-0924-causal-hf",
         "mixtral-8x7b-moe-causal-hf",
+        "qwen3-30b-a3b-moe-causal-hf",
         "open-llama-7b-causal-hf",
         "falcon-7b-causal-hf",
         "qwen2-7b-causal-hf",
@@ -153,12 +154,13 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         item["display_name"]: item for item in family_catalog["implemented_coverage"]
     }
     qwen3_moe = implemented["Qwen3 30B-A3B MoE causal LM"]
-    assert qwen3_moe["state"] == "prepared_evidence_candidate"
-    assert not any(
-        evidence.startswith("public_evidence/published_basis/")
+    assert qwen3_moe["state"] == "published_basis"
+    assert any(
+        evidence == "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack"
         for evidence in qwen3_moe["repo_evidence"]
     )
-    assert "not a published basis" in qwen3_moe["notes"]
+    assert "not a benchmark-quality" in qwen3_moe["notes"]
+    assert "four-GPU diagnostic lane failed" in qwen3_moe["notes"]
     gemma4_26b = implemented["Gemma 4 26B-A4B MoE image-text LM"]
     assert gemma4_26b["state"] == "published_basis"
     assert any(

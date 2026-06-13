@@ -1,0 +1,19 @@
+{
+  "assurance": "strict",
+  "dataset": {
+    "config": "wikitext-103-v1",
+    "id": "Salesforce/wikitext",
+    "revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
+    "split": "train"
+  },
+  "device": "cuda",
+  "execution_mode": "container",
+  "gpu_group": "0,1,2,3,4,5,6,7",
+  "host": "root@31.56.109.46",
+  "model_revision": "0d7cf23991f47feeb3a57ecb4c9cee8ea4a17bfe",
+  "profile": "release",
+  "runner": "NVIDIA H100 80GB HBM3 x8",
+  "runtime_image": "ghcr.io/invarlock/invarlock-runtime:latest@sha256:5edf2d5aa7249fd720bbb6885c0cd70c3a53f35ef969cad6cbc92ad05a5f3a9b",
+  "runtime_image_digest": "sha256:5edf2d5aa7249fd720bbb6885c0cd70c3a53f35ef969cad6cbc92ad05a5f3a9b",
+  "stamp": "20260613Tqwen330ba3bH100All8"
+}

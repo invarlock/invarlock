@@ -517,6 +517,30 @@
       "notes": "Promoted with release-profile container-backed H100 public report, runtime manifest, signed evidence pack, and recorded 64-window no-op preservation run from 20260613Tmixtral8x7bH100F. This is a large MoE preservation basis; it is not a benchmark-quality or routing-quality claim, and the optional guard-overhead check is intentionally skipped by preset policy for this lane."
     },
     {
+      "lane_id": "qwen3-30b-a3b-moe-causal-hf",
+      "family": "Qwen3 30B-A3B MoE causal LM",
+      "runtime": "huggingface-pytorch",
+      "adapter": "hf_causal",
+      "support_tier": "published_basis",
+      "evidence_status": "published_release_strict",
+      "docs_label": "Yes",
+      "provenance_source": "docs/README.md#support-matrix",
+      "support_groups": [
+        "moe_candidate",
+        "large_model_candidate"
+      ],
+      "representative_models": [
+        "Qwen/Qwen3-30B-A3B-Instruct-2507"
+      ],
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/qwen3_30b_a3b/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/qwen3_30b_a3b/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack"
+      },
+      "notes": "Promoted with release-profile container-backed H100 public report, runtime manifest, signed evidence pack, and recorded 400-window no-op preservation run from 20260613Tqwen330ba3bH100All8. This is a large MoE preservation basis using scoped attention/router/shared-expert guard scans under all-8 H100 sharding; it is not a benchmark-quality, fine-tuning, deployment, exhaustive expert-bank, or MoE routing-quality claim."
+    },
+    {
       "lane_id": "olmoe-1b-7b-0924-causal-hf",
       "family": "OLMoE 1B-active/7B-total causal LM",
       "runtime": "huggingface-pytorch",

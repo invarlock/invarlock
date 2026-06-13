@@ -1,0 +1,35 @@
+{
+  "artifact_class": "public_evidence_fixture",
+  "evidence_run_preset": "public_evidence/published_basis/qwen3_30b_a3b/evidence_run_preset.yaml",
+  "fixture_paths": [
+    "public_evidence/published_basis/qwen3_30b_a3b/evaluation.report.json",
+    "public_evidence/published_basis/qwen3_30b_a3b/runtime.manifest.json",
+    "public_evidence/published_basis/qwen3_30b_a3b/evidence_run_preset.yaml"
+  ],
+  "preset_override": null,
+  "remote_artifacts": {
+    "artifact_manifest": "artifacts/model-evidence/remote/20260613Tqwen330ba3bH100All8/shard-00-gpu-0-1-2-3-4-5-6-7/artifact_manifest.json",
+    "edited_events": "artifacts/model-evidence/remote/20260613Tqwen330ba3bH100All8/shard-00-gpu-0-1-2-3-4-5-6-7/edited.events.jsonl",
+    "model_revisions": "artifacts/model-evidence/remote/20260613Tqwen330ba3bH100All8/shard-00-gpu-0-1-2-3-4-5-6-7/model_revisions.json",
+    "source_events": "artifacts/model-evidence/remote/20260613Tqwen330ba3bH100All8/shard-00-gpu-0-1-2-3-4-5-6-7/source.events.jsonl"
+  },
+  "repo": "invarlock-public",
+  "source_ref": "ee5180cd12d4ddeeb24081d05aea8e837df7339f",
+  "synced_file_hashes": {
+    "configs/calibration/null_sweep_qwen3_30b_a3b_instruct_2507.yaml": "sha256:1051893e17a53ef73b89667c861a9eadb69542250bd8cf894676e4c417e333ae",
+    "configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml": "sha256:2e6d9b69e1338a28031d096cb744173b6f7d007f2e0aff1f33f074fa7a2ae429",
+    "scripts/model_evidence/model_evidence_lanes.py": "sha256:91100ac06fb9d631b7117b590002c37dc48edb3a5e1c5814bfcd97a1bd7f5729",
+    "scripts/model_evidence/model_evidence_sweep.py": "sha256:8937af6715baf6084a7e9c24b72c70a882920a104b1372daef53b7d298dfd87d",
+    "scripts/model_evidence/run_model_evidence_remote.py": "sha256:50aafaede8fe6eeecb00d51924c5caa6c971426152983a36aeb02b144a23b2bb",
+    "src/invarlock/adapters/hf_causal.py": "sha256:b9b1018ea9d0fd45600d91820c58bfdc1272a8028d40c0e7b1a5585d2a5925c7",
+    "src/invarlock/adapters/hf_loading.py": "sha256:1cb3ebea654616c9b72c94ac83290a5064f0a1c912ad66a827fede003d8dfc50",
+    "src/invarlock/guards/rmt_activation_runtime.py": "sha256:ba573362c5eeb49df6408247b7e8fc62492c3365dc1f6c91b9e58d4fb3ef2ca5",
+    "src/invarlock/guards/rmt_runtime.py": "sha256:7ace524d3c66d0317c81edaacb281b70474c263d2800c42f6e3729084002cd85",
+    "src/invarlock/guards/variance_batching.py": "sha256:c5deda9206d000e55f0d654627962e955cf3f19c4ccb6f386b3bb681d6a4c0b9",
+    "src/invarlock/guards/variance_targets.py": "sha256:4cbd1a19b3cf9e074068a6d396ce8913f965a9145b2e5fb09d63b745fbb5a797",
+    "src/invarlock/model_profile.py": "sha256:2a40c9bb4e3f4c72caec337c5870b0487217c538a0d3110c6fabe1e5ec930e5e",
+    "src/invarlock/reporting/guard_warnings.py": "sha256:c2a358316971889cd48a8d5a13cbce5e127ed1b64d4973e477fb686fda393a47"
+  },
+  "worktree_branch": "work/promote-gemma-deepseek",
+  "worktree_sync_note": "Qwen3 30B-A3B strict validation was run from /root/invarlock-public-promote-qwen3 at source ref ee5180cd12d4ddeeb24081d05aea8e837df7339f. The 4-GPU lane failed during RMT/forward execution; the published fixture uses the successful canonical strict all-8 H100 run and records that GPU requirement as an operational constraint, not a model-quality claim."
+}

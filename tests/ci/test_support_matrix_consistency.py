@@ -86,6 +86,7 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         "Gemma 4 12B any-to-any LM",
         "Gemma 4 26B-A4B MoE image-text LM",
         "Mixtral 8x7B MoE causal LM",
+        "Qwen3 30B-A3B MoE causal LM",
         "OLMoE 1B-active/7B-total causal LM",
         "Ministral 3 3B causal LM (text-only eval)",
         "Granite 4.1 8B causal LM",
@@ -140,6 +141,13 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
     )
     assert families["Mixtral 8x7B MoE causal LM"]["support_tier"] == "published_basis"
     assert families["Mixtral 8x7B MoE causal LM"]["evidence_status"] == (
+        "published_release_strict"
+    )
+    assert (
+        families["Qwen3 30B-A3B MoE causal LM"]["support_tier"]
+        == "published_basis"
+    )
+    assert families["Qwen3 30B-A3B MoE causal LM"]["evidence_status"] == (
         "published_release_strict"
     )
     assert (
