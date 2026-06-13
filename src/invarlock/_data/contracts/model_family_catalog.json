@@ -723,7 +723,7 @@
         "moe_candidate",
         "small_local"
       ],
-      "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack from H100 validation run 20260613Tolmoe1b7bH100A. This fixture is the smaller MoE validation basis; larger MoE assurance remains tracked by Mixtral, Qwen3 30B-A3B, and Gemma 4 26B-A4B candidate lanes."
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack from H100 validation run 20260613Tolmoe1b7bH100A. This fixture is the smaller MoE validation basis; larger MoE assurance is now covered by Mixtral and Gemma 4 26B-A4B published bases, while Qwen3 30B-A3B remains a candidate lane."
     }
   ],
   "implemented_coverage": [
@@ -757,21 +757,25 @@
         "image"
       ],
       "task_role": "any_to_any",
-      "state": "prepared_evidence_candidate",
+      "state": "published_basis",
       "representative_models": [
         "google/gemma-4-26B-A4B-it"
       ],
       "repo_evidence": [
+        "contracts/support_matrix.json",
         "src/invarlock/model_profile.py",
         "src/invarlock/adapters/hf_loading.py",
         "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
         "configs/calibration/null_sweep_gemma4_26b_a4b.yaml",
+        "public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_26b_a4b/runtime.manifest.json",
+        "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
         "scripts/model_evidence/model_evidence_sweep.py",
         "tests/cli/test_preset_multimodal_presets.py",
         "tests/scripts/test_model_evidence_sweep_catalog.py"
       ],
-      "notes": "Prepared as a recent Gemma 4 multimodal MoE candidate using the public VQAv2 image-text materialization path. It is not a published basis until a CUDA report, runtime manifest, and evidence pack are attached."
+      "notes": "Promoted as a recent Gemma 4 multimodal MoE published basis using the explicit hf_multimodal path, pinned public VQAv2 image-text materialization, release-profile H100 CUDA report, runtime manifest, and signed evidence pack from run 20260613Tgemma426ba4bH100A. This is no-op preservation evidence; it is not a benchmark-quality, fine-tuning, audio, or MoE routing-quality claim."
     },
     {
       "family_id": "mixtral",
@@ -896,7 +900,7 @@
         "src/invarlock/adapters/hf_multimodal.py",
         "src/invarlock/eval/data.py"
       ],
-      "notes": "Gemma 3/4 selectors and loaders are first-class. Gemma 4 E2B now has a declared text-only lane, image-text evaluation is shipped through hf_multimodal + vision_text, and audio remains deferred."
+      "notes": "Gemma 3/4 selectors and loaders are first-class. Gemma 4 E2B now has a declared text-only lane, Gemma 4 12B and 26B-A4B have public image-text bases through hf_multimodal + vision_text, and audio remains deferred."
     },
     {
       "family_id": "opt-neox-gptj",

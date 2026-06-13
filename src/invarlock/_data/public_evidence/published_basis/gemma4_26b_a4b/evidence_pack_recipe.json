@@ -1,0 +1,20 @@
+{
+  "artifacts": [
+    "public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json",
+    "public_evidence/published_basis/gemma4_26b_a4b/runtime.manifest.json",
+    "public_evidence/published_basis/gemma4_26b_a4b/evidence_run_preset.yaml",
+    "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack/manifest.json",
+    "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack/manifest.signature.json",
+    "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack/checksums.sha256",
+    "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack/results/final_verdict.json"
+  ],
+  "commands": [
+    "make runtime-image-cuda",
+    "uv run python scripts/model_evidence/run_model_evidence_remote.py --host root@31.56.109.46 --remote-repo /root/invarlock-public-promote --branch work/promote-gemma-deepseek --suite support-matrix-backlog-gpu --slug google_gemma_4_26b_a4b_it --gpu-group 0,1,2,3 --remote-output-root /root/model-evidence/20260613Tgemma426ba4bH100A --session-prefix model-evidence-gemma26 --stamp 20260613Tgemma426ba4bH100A --remote-env HF_HUB_DISABLE_XET=1 --remote-env HF_HOME=/root/.cache/huggingface --remote-env HF_HUB_DOWNLOAD_TIMEOUT=300 --remote-env HF_HUB_ETAG_TIMEOUT=300",
+    "uv run invarlock advanced evidence-pack build public_evidence/published_basis/gemma4_26b_a4b/evidence_pack --final-verdict tmp/gemma4_26b_a4b_pack_inputs/final_verdict.json --report public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json --source-repo tmp/gemma4_26b_a4b_pack_inputs/source_repo.json --environment tmp/gemma4_26b_a4b_pack_inputs/environment.json --material model_revisions=artifacts/model-evidence/remote/20260613Tgemma426ba4bH100A/shard-00-gpu-0-1-2-3/model_revisions.json --material artifact_manifest=artifacts/model-evidence/remote/20260613Tgemma426ba4bH100A/shard-00-gpu-0-1-2-3/artifact_manifest.json --material dataset_materialization=artifacts/model-evidence/remote/20260613Tgemma426ba4bH100A/shard-00-gpu-0-1-2-3/eval/google_gemma_4_26b_a4b_it/dataset/materialization_summary.json --signing-key tmp/gemma4_26b_a4b_pack_inputs/evidence-pack-signing-key.pem --profile release --report-assurance strict --release-review"
+  ],
+  "format_version": "published-basis-evidence-pack-recipe-v1",
+  "lane_id": "gemma4-26b-a4b-moe-image-text-hf",
+  "network_mode": "online_first_then_offline",
+  "suite": "support-matrix-backlog-gpu"
+}
