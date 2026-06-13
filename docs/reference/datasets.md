@@ -156,8 +156,8 @@ python scripts/model_evidence/materialize_vision_text_dataset.py \
   --dataset Multimodal-Fatima/VQAv2_sample_validation \
   --split validation \
   --revision 99487d2651df3799002b2fb3e455741744514a02 \
-  --output-dir artifacts/model-evidence/public_datasets/vqav2_sample_validation_64 \
-  --max-samples 64 \
+  --output-dir artifacts/model-evidence/public_datasets/vqav2_sample_validation_800 \
+  --max-samples 800 \
   --image-field image \
   --prompt-field question \
   --answer-field multiple_choice_answer \

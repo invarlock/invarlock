@@ -91,7 +91,7 @@ def test_gemma4_12b_public_vqav2_preset_uses_materialized_manifest_path() -> Non
     assert model["adapter"] == "hf_multimodal"
     assert dataset["provider"]["kind"] == "vision_text"
     assert dataset["provider"]["path"].endswith(
-        "public_datasets/vqav2_sample_validation_64/manifest.jsonl"
+        "public_datasets/vqav2_sample_validation_800/manifest.jsonl"
     )
     assert dataset["preview_n"] == 16
     assert dataset["final_n"] == 16

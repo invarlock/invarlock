@@ -413,6 +413,23 @@ def compute_validation_flags(
     preview_final_drift_acceptable = (
         drift_ratio is not None and drift_min <= drift_ratio <= drift_max
     )
+    if isinstance(primary_metric, dict):
+        try:
+            pm_kind = normalize_metric_kind(primary_metric.get("kind"))
+        except (MetricKindContractError, ValueError):
+            pm_kind = None
+        if pm_kind == "accuracy":
+            pm_preview = _coerce_finite_float(primary_metric.get("preview"))
+            pm_final = _coerce_finite_float(primary_metric.get("final"))
+            if pm_preview is not None and pm_final is not None:
+                same_accuracy = math.isclose(
+                    pm_preview,
+                    pm_final,
+                    rel_tol=0.0,
+                    abs_tol=1e-12,
+                )
+                if same_accuracy:
+                    preview_final_drift_acceptable = True
     if tiny_relax:
         # Treat drift identity as informational in tiny dev demos
         preview_final_drift_acceptable = True

@@ -12,7 +12,7 @@ model:
 dataset:
   provider:
     kind: "vision_text"
-    path: "artifacts/model-evidence/public_datasets/vqav2_sample_validation_64/manifest.jsonl"
+    path: "artifacts/model-evidence/public_datasets/vqav2_sample_validation_800/manifest.jsonl"
   split: "validation"
   seq_len: 256
   stride: 256

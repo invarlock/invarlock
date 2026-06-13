@@ -67,6 +67,7 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
     assert specs["google_gemma_4_12b_it"].vision_text_materialization["dataset"] == (
         "Multimodal-Fatima/VQAv2_sample_validation"
     )
+    assert specs["google_gemma_4_12b_it"].vision_text_materialization["max_samples"] == 800
     assert specs["microsoft_phi_4_mini_instruct"].preset_relpath == (
         "configs/presets/causal_lm/phi4_mini_512.yaml"
     )
@@ -201,6 +202,7 @@ def test_support_matrix_backlog_gemma_dry_run_materializes_public_vqav2(
     assert lane["vision_text_materialization"]["dataset"] == (
         "Multimodal-Fatima/VQAv2_sample_validation"
     )
+    assert lane["vision_text_materialization"]["max_samples"] == 800
 
 
 def test_lane_requires_remote_code_uses_preset_model_flag() -> None:

@@ -377,7 +377,7 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
             "dataset": "Multimodal-Fatima/VQAv2_sample_validation",
             "split": "validation",
             "revision": "99487d2651df3799002b2fb3e455741744514a02",
-            "max_samples": 64,
+            "max_samples": 800,
             "image_field": "image",
             "prompt_field": "question",
             "answer_field": "multiple_choice_answer",
