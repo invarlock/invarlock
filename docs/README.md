@@ -267,7 +267,7 @@ Notes
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| Falcon-H1R 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+| Falcon-H1R 7B causal LM | Yes | Yes | Yes | Yes |
 
 ### Multimodal Published Basis
 

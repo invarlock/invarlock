@@ -26,7 +26,8 @@
     "deepseek_r1_distill_qwen_14b",
     "ministral3_3b",
     "smollm3_3b",
-    "phi4_mini"
+    "phi4_mini",
+    "falcon_h1r_7b"
   ],
   "lanes": [
     {
@@ -184,6 +185,12 @@
       "model_id": "microsoft/Phi-4-mini-instruct",
       "primary_metric_kind": "ppl_causal",
       "report": "public_evidence/published_basis/phi4_mini/evaluation.report.json"
+    },
+    {
+      "id": "falcon_h1r_7b",
+      "model_id": "tiiuae/Falcon-H1R-7B",
+      "primary_metric_kind": "ppl_causal",
+      "report": "public_evidence/published_basis/falcon_h1r_7b/evaluation.report.json"
     }
   ]
 }

@@ -104,6 +104,7 @@ def test_offline_golden_runs_public_fixtures() -> None:
         "ministral3_3b",
         "smollm3_3b",
         "phi4_mini",
+        "falcon_h1r_7b",
     ]
 
     for lane in manifest["lanes"]:

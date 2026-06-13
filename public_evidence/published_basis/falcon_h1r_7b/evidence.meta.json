@@ -1,0 +1,24 @@
+{
+  "artifact_paths": {
+    "evaluation_report": "evaluation.report.json",
+    "evidence_pack": "evidence_pack",
+    "evidence_pack_recipe": "evidence_pack_recipe.json",
+    "evidence_run_preset": "evidence_run_preset.yaml",
+    "runtime_manifest": "runtime.manifest.json"
+  },
+  "evidence_class": "strict_pass_fixture",
+  "expected_fingerprint": "sha256:76adbfd1e4924a54dd76e8add9e0e4bf5bc2807f9b0c7f97c3bdb92e2e87b9c6",
+  "generated_by": "model evidence remote sweep",
+  "model_revision": "a6f74bf181389908efd6970878d7ee2b42f5d417",
+  "non_goals": [
+    "Model weights are external Hugging Face references.",
+    "This fixture is a no-op preservation basis, not a fine-tuning or compression benchmark.",
+    "The Falcon-H1R spectral preset excludes model.embed_tokens after no-op embedding degeneracy failed under the generic balanced tier."
+  ],
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "Release-strict verifier fixture for the Falcon-H1R 7B published-basis lane.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/published_basis/falcon_h1r_7b/evaluation.report.json --profile release --assurance strict",
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/falcon_h1r_7b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:76adbfd1e4924a54dd76e8add9e0e4bf5bc2807f9b0c7f97c3bdb92e2e87b9c6"
+  ]
+}

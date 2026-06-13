@@ -1,0 +1,23 @@
+{
+  "execution_mode": "container",
+  "generated_at": "2026-06-13T10:01:39.064143+00:00",
+  "models": [
+    {
+      "model_id": "tiiuae/Falcon-H1R-7B",
+      "revisions": [
+        {
+          "commit_hash": "a6f74bf181389908efd6970878d7ee2b42f5d417",
+          "refs": [
+            "main"
+          ],
+          "size_on_disk": 15182180456,
+          "snapshot_path": "/root/.cache/huggingface/hub/models--tiiuae--Falcon-H1R-7B/snapshots/a6f74bf181389908efd6970878d7ee2b42f5d417"
+        }
+      ],
+      "slug": "tiiuae_falcon_h1r_7b",
+      "status": "observed"
+    }
+  ],
+  "schema": "invarlock/model-evidence-model-revisions-v1",
+  "suite": "support-matrix-backlog-gpu"
+}

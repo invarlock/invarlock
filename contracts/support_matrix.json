@@ -600,9 +600,9 @@
       "family": "Falcon-H1R 7B causal LM",
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
-      "support_tier": "community_experimental",
-      "evidence_status": "repo_included_pilot_config",
-      "docs_label": "No, repo-included pilot config only",
+      "support_tier": "published_basis",
+      "evidence_status": "published_release_strict",
+      "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
         "reasoning_focused"
@@ -610,7 +610,13 @@
       "representative_models": [
         "tiiuae/Falcon-H1R-7B"
       ],
-      "notes": "Added from reasoning practical-picks backlog with repo preset, calibration config, and sweep lane. Release-profile run 20260612TfalconH1RPrefetchReleaseA fails before report generation with ADAPTER-STRUCTURE-INVALID: no matching HF causal adapter spec, so public evidence remains blocked."
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window run preset from 20260613TfalconH1rSpectralFixA. The fix classifies Mamba projections as FFN-family and excludes model.embed_tokens from the Falcon-H1R spectral preset after no-op embedding degeneracy failed under the generic balanced tier.",
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/falcon_h1r_7b/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/falcon_h1r_7b/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/falcon_h1r_7b/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/falcon_h1r_7b/evidence_pack"
+      }
     }
   ]
 }

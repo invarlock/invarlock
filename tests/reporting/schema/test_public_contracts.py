@@ -105,6 +105,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "phi-4-text-causal-hf",
         "smollm3-3b-causal-hf",
         "phi-4-mini-causal-hf",
+        "falcon-h1r-7b-causal-hf",
     }
 
     family_catalog = contracts.load_model_family_catalog()

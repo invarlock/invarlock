@@ -58,7 +58,7 @@ intentionally kept out of included preset inventory.
 | Gemma 4 12B any-to-any LM | `published_basis` | `google/gemma-4-12B-it` | Public release-profile container-backed image-text evidence fixture is included on pinned public VQAv2 materialization; audio evaluation remains deferred. |
 | SmolLM3 3B causal LM | `published_basis` | `HuggingFaceTB/SmolLM3-3B` | Public release-profile container-backed evidence fixture is included; guard-overhead measurement is skipped by preset policy. |
 | Phi-4 mini causal LM | `published_basis` | `microsoft/Phi-4-mini-instruct` | Public release-profile container-backed evidence fixture is included after the FFN projection family-classification fix. |
-| Falcon-H1R 7B causal LM | `community_experimental` | `tiiuae/Falcon-H1R-7B` | Pilot preset, calibration config, and sweep lane are included; release-profile evidence is blocked by `ADAPTER-STRUCTURE-INVALID` (`no matching HF causal adapter spec`). |
+| Falcon-H1R 7B causal LM | `published_basis` | `tiiuae/Falcon-H1R-7B` | Public release-profile container-backed evidence fixture is included after Mamba projection spectral-family classification and Falcon embedding spectral exclusion. |
 | Seq2Seq / local pairs | `community_experimental` | `t5-small`, `facebook/bart-base` | Generic seq2seq lane without a published-basis claim. |
 
 ## Implemented Coverage
