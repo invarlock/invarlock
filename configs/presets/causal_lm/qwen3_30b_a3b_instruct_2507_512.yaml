@@ -4,6 +4,9 @@ model:
   id: "Qwen/Qwen3-30B-A3B-Instruct-2507"
   adapter: "hf_causal"
   device: "auto"
+  dtype: "bfloat16"
+  device_map: "auto"
+  low_cpu_mem_usage: true
 
 dataset:
   provider:
@@ -41,6 +44,20 @@ auto:
 
 guards:
   order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+  spectral:
+    module_include_patterns:
+      - "model.layers.*.self_attn.*_proj"
+      - "model.layers.*.mlp.gate"
+      - "model.layers.*.mlp.shared_expert*"
+    module_exclude_patterns:
+      - "model.layers.*.mlp.experts.*"
+  rmt:
+    module_include_patterns:
+      - "model.layers.*.self_attn.*_proj"
+      - "model.layers.*.mlp.gate"
+      - "model.layers.*.mlp.shared_expert*"
+    module_exclude_patterns:
+      - "model.layers.*.mlp.experts.*"
 
 output:
   dir: "runs"

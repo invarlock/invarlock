@@ -81,6 +81,26 @@ def test_causal_lm_family_presets_load() -> None:
         assert cfg.require_section("model")["adapter"] == "hf_causal"
         if name == "gemma4_e2b_512.yaml":
             assert cfg.require_section("model")["attn_implementation"] == "sdpa"
+        if name == "qwen3_30b_a3b_instruct_2507_512.yaml":
+            model = cfg.require_section("model")
+            assert model["dtype"] == "bfloat16"
+            assert model["device_map"] == "auto"
+            assert model["low_cpu_mem_usage"] is True
+            guards = cfg.require_section("guards")
+            for guard_name in ("spectral", "rmt"):
+                guard_cfg = guards[guard_name]
+                assert "model.layers.*.self_attn.*_proj" in guard_cfg[
+                    "module_include_patterns"
+                ]
+                assert "model.layers.*.mlp.gate" in guard_cfg[
+                    "module_include_patterns"
+                ]
+                assert "model.layers.*.mlp.shared_expert*" in guard_cfg[
+                    "module_include_patterns"
+                ]
+                assert guard_cfg["module_exclude_patterns"] == [
+                    "model.layers.*.mlp.experts.*"
+                ]
         if name in {
             "glm4_9b_chat_512.yaml",
             "phi4_reasoning_plus_512.yaml",
@@ -177,6 +197,24 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
             assert data["dataset"]["provider"]["kind"] == "hf_text"
         if name == "null_sweep_gemma4_e2b.yaml":
             assert data["model"]["attn_implementation"] == "sdpa"
+        if name == "null_sweep_qwen3_30b_a3b_instruct_2507.yaml":
+            assert data["model"]["dtype"] == "bfloat16"
+            assert data["model"]["device_map"] == "auto"
+            assert data["model"]["low_cpu_mem_usage"] is True
+            for guard_name in ("spectral", "rmt"):
+                guard_cfg = data["guards"][guard_name]
+                assert "model.layers.*.self_attn.*_proj" in guard_cfg[
+                    "module_include_patterns"
+                ]
+                assert "model.layers.*.mlp.gate" in guard_cfg[
+                    "module_include_patterns"
+                ]
+                assert "model.layers.*.mlp.shared_expert*" in guard_cfg[
+                    "module_include_patterns"
+                ]
+                assert guard_cfg["module_exclude_patterns"] == [
+                    "model.layers.*.mlp.experts.*"
+                ]
         assert data["primary_metric"]["drift_band"] == expected_drift_band
 
 

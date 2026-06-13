@@ -65,7 +65,7 @@ intentionally kept out of included preset inventory.
 
 | Family | Coverage state | Representative models | Notes |
 | --- | --- | --- | --- |
-| Qwen3 30B-A3B MoE causal LM | `prepared_evidence_candidate` | `Qwen/Qwen3-30B-A3B-Instruct-2507` | Explicit `hf_causal` preset and null-sweep config are included; public basis promotion waits for CUDA evidence. |
+| Qwen3 30B-A3B MoE causal LM | `prepared_evidence_candidate` | `Qwen/Qwen3-30B-A3B-Instruct-2507` | Explicit `hf_causal` preset and null-sweep config are included with bfloat16/low-CPU-memory loading and scoped attention/router/shared-expert guard scans; public basis promotion waits for CUDA evidence. |
 | Gemma 4 26B-A4B MoE image-text LM | `prepared_evidence_candidate` | `google/gemma-4-26B-A4B-it` | Explicit `hf_multimodal` VQAv2 preset and null-sweep config are included; public basis promotion waits for CUDA evidence. |
 | Mixtral | `profile_first_class` | `mistralai/Mixtral-8x7B-v0.1` | Profile and loader code recognize the family directly. |
 | Llama | `profile_first_class` | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Generic Llama-family profile handling is first-class. OpenLLaMA and TinyLlama provide ungated declared support lanes, while access-gated vendor checkpoints remain omitted. |
