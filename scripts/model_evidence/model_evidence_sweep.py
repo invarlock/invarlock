@@ -422,6 +422,8 @@ def build_evaluate_command(
     ]
     if execution_mode == "host":
         command.extend(["--execution-mode", "host"])
+    if lane_requires_remote_code(spec):
+        command.append("--allow-remote-code")
     if profile == "dev":
         command.extend(["--assurance", "off"])
     return command

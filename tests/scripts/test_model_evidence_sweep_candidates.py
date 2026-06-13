@@ -105,6 +105,7 @@ def test_promotion_gap_gpu_suite_glm_host_dry_run_uses_lane_preset(
     assert len(payload) == 1
     assert payload[0]["slug"] == "thudm_glm_4_9b_chat"
     assert payload[0]["prefetch"][-1] == "THUDM/glm-4-9b-chat"
+    assert "--allow-remote-code" in payload[0]["evaluate"]
     preset_idx = payload[0]["evaluate"].index("--preset") + 1
     assert payload[0]["evaluate"][preset_idx] == str(
         repo_root / "configs/presets/causal_lm/glm4_9b_chat_512.yaml"
