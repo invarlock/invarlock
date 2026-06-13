@@ -1,0 +1,9 @@
+{
+  "assurance": "strict",
+  "basis": "public_evidence/published_basis/phi4_mini/evaluation.report.json",
+  "evidence_run": "20260613Tphi4MiniRelease400FixA",
+  "model_id": "microsoft/Phi-4-mini-instruct",
+  "note": "Container-backed release-profile Phi-4 mini no-op preservation evidence run after FFN projection family classification fix.",
+  "profile": "release",
+  "verdict": "PASS"
+}

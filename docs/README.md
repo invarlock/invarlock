@@ -260,8 +260,8 @@ Notes
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| SmolLM3 3B causal LM | Yes | Yes | Yes | No, release-profile guard-overhead blocker |
-| Phi-4 mini causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+| SmolLM3 3B causal LM | Yes | Yes | Yes | Yes |
+| Phi-4 mini causal LM | Yes | Yes | Yes | Yes |
 
 ### Prepared 7B-14B Candidate Backlog
 

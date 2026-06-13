@@ -103,6 +103,8 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "deepseek-r1-0528-qwen3-8b-causal-hf",
         "deepseek-r1-distill-qwen-14b-causal-hf",
         "phi-4-text-causal-hf",
+        "smollm3-3b-causal-hf",
+        "phi-4-mini-causal-hf",
     }
 
     family_catalog = contracts.load_model_family_catalog()

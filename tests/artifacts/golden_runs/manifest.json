@@ -24,7 +24,9 @@
     "deepseek_r1_0528_qwen3_8b",
     "phi4_reasoning_plus",
     "deepseek_r1_distill_qwen_14b",
-    "ministral3_3b"
+    "ministral3_3b",
+    "smollm3_3b",
+    "phi4_mini"
   ],
   "lanes": [
     {
@@ -170,6 +172,18 @@
       "model_id": "mistralai/Ministral-3-3B-Instruct-2512-BF16",
       "primary_metric_kind": "ppl_causal",
       "report": "public_evidence/published_basis/ministral3_3b/evaluation.report.json"
+    },
+    {
+      "id": "smollm3_3b",
+      "model_id": "HuggingFaceTB/SmolLM3-3B",
+      "primary_metric_kind": "ppl_causal",
+      "report": "public_evidence/published_basis/smollm3_3b/evaluation.report.json"
+    },
+    {
+      "id": "phi4_mini",
+      "model_id": "microsoft/Phi-4-mini-instruct",
+      "primary_metric_kind": "ppl_causal",
+      "report": "public_evidence/published_basis/phi4_mini/evaluation.report.json"
     }
   ]
 }

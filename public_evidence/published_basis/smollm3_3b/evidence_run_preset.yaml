@@ -1,4 +1,4 @@
-# Preset: SmolLM3 3B in text-only evaluation mode on WikiText-103 via hf_text.
+# Preset used for the SmolLM3 release-profile public evidence run.
 
 model:
   id: "HuggingFaceTB/SmolLM3-3B"
@@ -15,8 +15,8 @@ dataset:
   split: "train"
   seq_len: 512
   stride: 512
-  preview_n: 64
-  final_n: 64
+  preview_n: 400
+  final_n: 400
   seed: 42
 
 eval:

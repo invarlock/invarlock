@@ -507,9 +507,9 @@
       "family": "SmolLM3 3B causal LM",
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
-      "support_tier": "community_experimental",
-      "evidence_status": "repo_included_pilot_config",
-      "docs_label": "No, release-profile guard-overhead blocker",
+      "support_tier": "published_basis",
+      "evidence_status": "published_release_strict",
+      "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
         "small_local"
@@ -517,16 +517,22 @@
       "representative_models": [
         "HuggingFaceTB/SmolLM3-3B"
       ],
-      "notes": "Added from practical-picks backlog with repo preset, calibration config, and sweep lane. Release-profile evidence recheck 20260613Tsmollm3ReleaseRecheckA fails the guard-overhead policy (+1.11% > +1.0%) before report generation, so public evidence remains blocked."
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window run preset from 20260613Tsmollm3Release400SkipA. The SmolLM3 preset explicitly skips guard-overhead measurement, so this is preservation evidence and not guard-overhead evidence.",
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/smollm3_3b/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/smollm3_3b/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/smollm3_3b/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/smollm3_3b/evidence_pack"
+      }
     },
     {
       "lane_id": "phi-4-mini-causal-hf",
       "family": "Phi-4 mini causal LM",
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
-      "support_tier": "community_experimental",
-      "evidence_status": "repo_included_pilot_config",
-      "docs_label": "No, repo-included pilot config only",
+      "support_tier": "published_basis",
+      "evidence_status": "published_release_strict",
+      "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
         "small_local",
@@ -535,7 +541,13 @@
       "representative_models": [
         "microsoft/Phi-4-mini-instruct"
       ],
-      "notes": "Added from practical-picks backlog with repo preset, calibration config, sweep lane, and a built-in Phi3 loader hint for the Phi-4 mini checkpoint. Release-profile run 20260612TphiMiniFalconReleaseA evaluates successfully but fails strict verification because spectral caps exceed the no-op budget, so public evidence remains blocked."
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window run preset from 20260613Tphi4MiniRelease400FixA after FFN projection family classification was fixed.",
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/phi4_mini/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/phi4_mini/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/phi4_mini/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/phi4_mini/evidence_pack"
+      }
     },
     {
       "lane_id": "deepseek-r1-distill-qwen-14b-causal-hf",

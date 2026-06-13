@@ -1,0 +1,24 @@
+{
+  "artifact_paths": {
+    "evaluation_report": "evaluation.report.json",
+    "evidence_pack": "evidence_pack",
+    "evidence_pack_recipe": "evidence_pack_recipe.json",
+    "evidence_run_preset": "evidence_run_preset.yaml",
+    "runtime_manifest": "runtime.manifest.json"
+  },
+  "evidence_class": "strict_pass_fixture",
+  "expected_fingerprint": "sha256:01d1ddb42924677a3dab8e899eb99dc5bf44eea4a00a2a70a2362505c24b87cb",
+  "generated_by": "model evidence remote sweep",
+  "model_revision": "a07cc9a04f16550a088caea529712d1d335b0ac1",
+  "non_goals": [
+    "Model weights are external Hugging Face references.",
+    "This fixture is a no-op preservation basis, not a fine-tuning or compression benchmark.",
+    "The preset skips guard-overhead measurement by policy, so this fixture should not be used as guard-overhead evidence."
+  ],
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "Release-strict verifier fixture for the SmolLM3 3B published-basis lane.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/published_basis/smollm3_3b/evaluation.report.json --profile release --assurance strict",
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/smollm3_3b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:01d1ddb42924677a3dab8e899eb99dc5bf44eea4a00a2a70a2362505c24b87cb"
+  ]
+}

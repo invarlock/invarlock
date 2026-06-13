@@ -102,6 +102,8 @@ def test_offline_golden_runs_public_fixtures() -> None:
         "phi4_reasoning_plus",
         "deepseek_r1_distill_qwen_14b",
         "ministral3_3b",
+        "smollm3_3b",
+        "phi4_mini",
     ]
 
     for lane in manifest["lanes"]:

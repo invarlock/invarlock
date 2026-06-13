@@ -144,16 +144,15 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         families["DeepSeek-R1-Distill-Qwen 14B causal LM"]["support_tier"]
         == "published_basis"
     )
-    assert families["SmolLM3 3B causal LM"]["support_tier"] == (
-        "community_experimental"
-    )
+    assert families["SmolLM3 3B causal LM"]["support_tier"] == "published_basis"
     assert families["SmolLM3 3B causal LM"]["evidence_status"] == (
-        "repo_included_pilot_config"
+        "published_release_strict"
     )
-    assert families["SmolLM3 3B causal LM"]["docs_label"] == (
-        "No, release-profile guard-overhead blocker"
+    assert families["Phi-4 mini causal LM"]["support_tier"] == "published_basis"
+    assert families["Phi-4 mini causal LM"]["evidence_status"] == (
+        "published_release_strict"
     )
-    for family in ("Phi-4 mini causal LM", "Falcon-H1R 7B causal LM"):
+    for family in ("Falcon-H1R 7B causal LM",):
         assert families[family]["support_tier"] == "community_experimental"
         assert families[family]["evidence_status"] == "repo_included_pilot_config"
         assert families[family]["docs_label"] == (

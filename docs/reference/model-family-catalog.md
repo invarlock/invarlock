@@ -56,8 +56,8 @@ intentionally kept out of included preset inventory.
 | Granite 4.1 3B causal LM | `published_basis` | `ibm-granite/granite-4.1-3b` | Public release-profile container-backed evidence fixture is included. |
 | Granite 4.1 8B causal LM | `published_basis` | `ibm-granite/granite-4.1-8b` | Public release-profile container-backed evidence fixture is included. |
 | Gemma 4 12B any-to-any LM | `published_basis` | `google/gemma-4-12B-it` | Public release-profile container-backed image-text evidence fixture is included on pinned public VQAv2 materialization; audio evaluation remains deferred. |
-| SmolLM3 3B causal LM | `community_experimental` | `HuggingFaceTB/SmolLM3-3B` | Pilot preset, calibration config, and sweep lane are included; release-profile recheck `20260613Tsmollm3ReleaseRecheckA` is blocked by guard overhead (+1.11% > +1.0%). |
-| Phi-4 mini causal LM | `community_experimental` | `microsoft/Phi-4-mini-instruct` | Pilot preset, calibration config, sweep lane, and a built-in Phi3 loader hint are included; release-profile evidence is blocked by no-op spectral cap violations. |
+| SmolLM3 3B causal LM | `published_basis` | `HuggingFaceTB/SmolLM3-3B` | Public release-profile container-backed evidence fixture is included; guard-overhead measurement is skipped by preset policy. |
+| Phi-4 mini causal LM | `published_basis` | `microsoft/Phi-4-mini-instruct` | Public release-profile container-backed evidence fixture is included after the FFN projection family-classification fix. |
 | Falcon-H1R 7B causal LM | `community_experimental` | `tiiuae/Falcon-H1R-7B` | Pilot preset, calibration config, and sweep lane are included; release-profile evidence is blocked by `ADAPTER-STRUCTURE-INVALID` (`no matching HF causal adapter spec`). |
 | Seq2Seq / local pairs | `community_experimental` | `t5-small`, `facebook/bart-base` | Generic seq2seq lane without a published-basis claim. |
 
