@@ -14,8 +14,6 @@ from .data_support import (
     EvaluationWindow,
     _require_load_dataset,
     load_dataset_with_cache_fallback,
-    split_labels_by_index,
-    split_window_by_index,
 )
 from .data_tokenization import tokenize_combined_pairs, tokenize_texts_padded
 
@@ -281,6 +279,48 @@ class HFSeq2SeqProvider:
         self.last_final_labels: list[list[int]] | None = None
         self._pairs_cache: dict[str, list[tuple[str, str]]] = {}
 
+    def _split_by_preview_positions(
+        self,
+        window: EvaluationWindow,
+        labels: list[list[int]],
+        *,
+        preview_positions: Sequence[int],
+    ) -> tuple[EvaluationWindow, EvaluationWindow, list[list[int]], list[list[int]]]:
+        preview_lookup = {int(position) for position in preview_positions}
+        preview_input_ids: list[list[int]] = []
+        preview_attention_masks: list[list[int]] = []
+        preview_indices: list[int] = []
+        preview_labels: list[list[int]] = []
+        final_input_ids: list[list[int]] = []
+        final_attention_masks: list[list[int]] = []
+        final_indices: list[int] = []
+        final_labels: list[list[int]] = []
+
+        for input_ids, attention_mask, index, label in zip(
+            window.input_ids,
+            window.attention_masks,
+            window.indices,
+            labels,
+            strict=False,
+        ):
+            if int(index) in preview_lookup:
+                preview_input_ids.append(input_ids)
+                preview_attention_masks.append(attention_mask)
+                preview_indices.append(int(index))
+                preview_labels.append(label)
+            else:
+                final_input_ids.append(input_ids)
+                final_attention_masks.append(attention_mask)
+                final_indices.append(int(index))
+                final_labels.append(label)
+
+        return (
+            EvaluationWindow(preview_input_ids, preview_attention_masks, preview_indices),
+            EvaluationWindow(final_input_ids, final_attention_masks, final_indices),
+            preview_labels,
+            final_labels,
+        )
+
     def _load_pairs(self, split: str) -> list[tuple[str, str]]:
         cached = self._pairs_cache.get(split)
         if cached is not None:
@@ -348,13 +388,15 @@ class HFSeq2SeqProvider:
             seq_len=seq_len,
             positions=combined_positions,
         )
-        preview_window, final_window = split_window_by_index(
-            combined_window, split_index=preview_n
-        )
-        self.last_preview_labels, self.last_final_labels = split_labels_by_index(
+        (
+            preview_window,
+            final_window,
+            self.last_preview_labels,
+            self.last_final_labels,
+        ) = self._split_by_preview_positions(
+            combined_window,
             combined_labels,
-            combined_window.indices,
-            split_index=preview_n,
+            preview_positions=[position for position, _pair in prev_pairs],
         )
         return preview_window, final_window
 

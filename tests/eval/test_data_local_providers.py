@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import random
 from pathlib import Path
 
 import pytest
@@ -275,6 +276,40 @@ def test_hf_seq2seq_provider_uses_seeded_pair_shuffle(monkeypatch):
     assert first_preview.indices == second_preview.indices
     assert first_final.indices == second_final.indices
     assert first_preview.indices != [0, 1]
+
+
+def test_hf_seq2seq_provider_splits_shuffled_rows_by_selected_preview(
+    monkeypatch,
+):
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True, raising=False)
+
+    def fake_load_dataset(path, name=None, split=None, cache_dir=None, **kwargs):
+        return [
+            {"source": f"src {idx}", "target": f"tgt {idx}"}
+            for idx in range(10)
+        ]
+
+    monkeypatch.setattr(
+        data_support_mod, "load_dataset", fake_load_dataset, raising=False
+    )
+    provider = HFSeq2SeqProvider("dummy")
+
+    preview, final = provider.windows(
+        _EncodeTokenizer(),
+        preview_n=4,
+        final_n=4,
+        seq_len=6,
+        seed=1,
+    )
+
+    expected_order = list(range(10))
+    random.Random(1).shuffle(expected_order)
+    assert preview.indices == expected_order[:4]
+    assert final.indices == expected_order[4:8]
+    assert len(preview.input_ids) == 4
+    assert len(final.input_ids) == 4
+    assert any(index >= 4 for index in preview.indices)
+    assert any(index < 4 for index in final.indices)
 
 
 def test_hf_seq2seq_provider_supports_revision_prefix_and_nested_fields(monkeypatch):
