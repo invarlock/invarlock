@@ -266,6 +266,15 @@ Notes
 | Gemma 4 12B any-to-any LM | Yes | Yes | Yes | Yes |
 | Gemma 4 26B-A4B MoE image-text LM | Yes | Yes | Yes | Yes |
 
+### Prepared Small/Multimodal Candidate Lanes
+
+| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
+| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
+| Qwen3.5 4B image-text LM | Yes | Yes | Yes | No |
+| Qwen3.5 2B image-text LM | Yes | Yes | Yes | No |
+| Gemma 3n E4B image-text LM | Yes | Yes | Yes | No |
+| Gemma 3 4B IT image-text LM | Yes | Yes | Yes | No |
+
 ### Large/MoE Published Evidence
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
@@ -313,6 +322,10 @@ preset policy; strict release verification accepts that declared skip.
 The FLAN-T5 base public fixture uses pinned CNN/DailyMail validation data via
 `hf_seq2seq`; strict release verification accepts one advisory guard warning
 while the hard policy gates pass.
+The prepared small/multimodal candidate lanes for Qwen3.5 4B, Qwen3.5 2B,
+Gemma 3n E4B, and Gemma 3 4B IT include public VQAv2 presets and null-sweep
+configs, but they are not published assurance bases until public report,
+runtime-manifest, and evidence-pack artifacts are attached and audited.
 
 `published_basis` remains the narrow public evidence floor, while
 `supported_experimental` means the repo ships the preset, calibration config,
@@ -327,7 +340,9 @@ Image-text evaluation uses the built-in
 `invarlock[multimodal]` for this path; Gemma 4 unified checkpoints require
 `transformers>=5.12.0` and `torchvision>=0.26.0`. The Gemma 4 E2B public lane
 remains text-only, Gemma 4 12B and Gemma 4 26B-A4B now have public image-text
-bases on pinned VQAv2 materialization, and audio evaluation is deferred.
+bases on pinned VQAv2 materialization, Qwen3.5 4B/2B and Gemma 3n E4B/Gemma
+3 4B IT have prepared image-text candidate lanes, and audio evaluation is
+deferred.
 
 Machine-readable support metadata lives in `contracts/support_matrix.json`. It is
 the canonical source of truth for normalized support tiers
@@ -359,7 +374,11 @@ evidence fixture lives under
 remains provider/config validation only. Gemma 4 26B-A4B uses the analogous
 `configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml` and
 `configs/calibration/null_sweep_gemma4_26b_a4b.yaml` promotion path; its public
-fixture lives under `public_evidence/published_basis/gemma4_26b_a4b/`.
+fixture lives under `public_evidence/published_basis/gemma4_26b_a4b/`. The
+prepared Qwen3.5 4B, Qwen3.5 2B, Gemma 3n E4B, and Gemma 3 4B IT image-text
+candidates use the same pinned VQAv2 materialization pattern through
+`configs/presets/multimodal/*_public_vqav2_256.yaml` and matching
+`configs/calibration/null_sweep_*.yaml` files.
 
 For the broader inventory of declared support, implemented-but-not-public
 coverage, usage-only checkpoint families, and recommended additions, see

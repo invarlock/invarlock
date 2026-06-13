@@ -409,6 +409,22 @@ CATALOG_PRESET_OVERRIDES: dict[str, tuple[str, str]] = {
         "configs/presets/multimodal/gemma4_12b_vision_text_256.yaml",
         "hf_multimodal",
     ),
+    "Qwen/Qwen3.5-4B": (
+        "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
+        "hf_multimodal",
+    ),
+    "Qwen/Qwen3.5-2B": (
+        "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
+        "hf_multimodal",
+    ),
+    "google/gemma-3n-E4B-it": (
+        "configs/presets/multimodal/gemma3n_e4b_public_vqav2_256.yaml",
+        "hf_multimodal",
+    ),
+    "google/gemma-3-4b-it": (
+        "configs/presets/multimodal/gemma3_4b_it_public_vqav2_256.yaml",
+        "hf_multimodal",
+    ),
     "ibm-granite/granite-4.1-8b": (
         "configs/presets/causal_lm/granite4_1_8b_512.yaml",
         "hf_causal",
@@ -459,6 +475,23 @@ CATALOG_PRESET_OVERRIDES: dict[str, tuple[str, str]] = {
     ),
 }
 
+
+def _public_vqav2_materialization() -> dict[str, object]:
+    return {
+        "dataset": "Multimodal-Fatima/VQAv2_sample_validation",
+        "split": "validation",
+        "revision": "99487d2651df3799002b2fb3e455741744514a02",
+        "max_samples": 800,
+        "image_field": "image",
+        "prompt_field": "question",
+        "answer_field": "multiple_choice_answer",
+        "answers_field": "answers",
+        "id_field": "question_id",
+        "prompt_template": "{question}\nAnswer with a short phrase.",
+        "image_format": "png",
+    }
+
+
 SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
     EvidenceLane(
         slug="google_gemma_4_12b_it",
@@ -468,19 +501,47 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
         preset_relpath="configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml",
         adapter="hf_multimodal",
         verify_profile="release",
-        vision_text_materialization={
-            "dataset": "Multimodal-Fatima/VQAv2_sample_validation",
-            "split": "validation",
-            "revision": "99487d2651df3799002b2fb3e455741744514a02",
-            "max_samples": 800,
-            "image_field": "image",
-            "prompt_field": "question",
-            "answer_field": "multiple_choice_answer",
-            "answers_field": "answers",
-            "id_field": "question_id",
-            "prompt_template": "{question}\nAnswer with a short phrase.",
-            "image_format": "png",
-        },
+        vision_text_materialization=_public_vqav2_materialization(),
+    ),
+    EvidenceLane(
+        slug="qwen_qwen3_5_4b",
+        lane_id="qwen3-5-4b-image-text-hf",
+        family="Qwen3.5 4B image-text LM",
+        model_id="Qwen/Qwen3.5-4B",
+        preset_relpath="configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
+        adapter="hf_multimodal",
+        verify_profile="release",
+        vision_text_materialization=_public_vqav2_materialization(),
+    ),
+    EvidenceLane(
+        slug="qwen_qwen3_5_2b",
+        lane_id="qwen3-5-2b-image-text-hf",
+        family="Qwen3.5 2B image-text LM",
+        model_id="Qwen/Qwen3.5-2B",
+        preset_relpath="configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
+        adapter="hf_multimodal",
+        verify_profile="release",
+        vision_text_materialization=_public_vqav2_materialization(),
+    ),
+    EvidenceLane(
+        slug="google_gemma_3n_e4b_it",
+        lane_id="gemma3n-e4b-image-text-hf",
+        family="Gemma 3n E4B image-text LM",
+        model_id="google/gemma-3n-E4B-it",
+        preset_relpath="configs/presets/multimodal/gemma3n_e4b_public_vqav2_256.yaml",
+        adapter="hf_multimodal",
+        verify_profile="release",
+        vision_text_materialization=_public_vqav2_materialization(),
+    ),
+    EvidenceLane(
+        slug="google_gemma_3_4b_it",
+        lane_id="gemma3-4b-it-image-text-hf",
+        family="Gemma 3 4B IT image-text LM",
+        model_id="google/gemma-3-4b-it",
+        preset_relpath="configs/presets/multimodal/gemma3_4b_it_public_vqav2_256.yaml",
+        adapter="hf_multimodal",
+        verify_profile="release",
+        vision_text_materialization=_public_vqav2_materialization(),
     ),
     EvidenceLane(
         slug="huggingfacetb_smollm3_3b",
@@ -553,19 +614,7 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
         preset_relpath="configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
         adapter="hf_multimodal",
         verify_profile="release",
-        vision_text_materialization={
-            "dataset": "Multimodal-Fatima/VQAv2_sample_validation",
-            "split": "validation",
-            "revision": "99487d2651df3799002b2fb3e455741744514a02",
-            "max_samples": 800,
-            "image_field": "image",
-            "prompt_field": "question",
-            "answer_field": "multiple_choice_answer",
-            "answers_field": "answers",
-            "id_field": "question_id",
-            "prompt_template": "{question}\nAnswer with a short phrase.",
-            "image_format": "png",
-        },
+        vision_text_materialization=_public_vqav2_materialization(),
     ),
 )
 

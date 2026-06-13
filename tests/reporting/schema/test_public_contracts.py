@@ -139,6 +139,10 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "Falcon 7B causal LM",
         "Qwen3.5 causal LM",
         "Gemma 4 12B any-to-any LM",
+        "Qwen3.5 4B image-text LM",
+        "Qwen3.5 2B image-text LM",
+        "Gemma 3n E4B image-text LM",
+        "Gemma 3 4B IT image-text LM",
         "Ministral 3 3B causal LM (text-only eval)",
         "Granite 4.1 3B causal LM",
         "Granite 4.1 8B causal LM",
@@ -233,7 +237,20 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         assert (
             candidates[display_name]["criteria_status"]["cli_smoke_evidence"] == "pass"
         )
-    assert candidates["Gemma 3 4B IT"]["decision"] == "explicitly_out_of_scope"
+    assert candidates["Gemma 3 4B IT"]["decision"] == (
+        "redirected_to_image_text_candidate"
+    )
+    assert (
+        candidates["Gemma 3 4B IT"]["current_catalog_state"]
+        == "community_experimental"
+    )
+    assert candidates["Gemma 3 4B IT"]["criteria_status"]["included_preset"] == "pass"
+    assert (
+        candidates["Gemma 3 4B IT"]["criteria_status"][
+            "included_calibration_config"
+        ]
+        == "pass"
+    )
     assert (
         candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
             "decision"

@@ -466,6 +466,83 @@
       "notes": "Promoted from practical-picks backlog with release-profile container-backed public VQAv2 image-text evidence, runtime manifest, and signed evidence pack. Gemma 4 12B uses the explicit hf_multimodal path and requires the multimodal runtime stack (transformers>=5.12.0 and torchvision>=0.26.0); audio evaluation remains deferred."
     },
     {
+      "lane_id": "qwen3-5-4b-image-text-hf",
+      "family": "Qwen3.5 4B image-text LM",
+      "runtime": "huggingface-pytorch",
+      "adapter": "hf_multimodal",
+      "support_tier": "community_experimental",
+      "evidence_status": "prepared_candidate",
+      "docs_label": "No",
+      "provenance_source": "docs/README.md#support-matrix",
+      "support_groups": [
+        "small_local",
+        "multimodal_candidate",
+        "practical_shortlist",
+        "enterprise_permissive"
+      ],
+      "representative_models": [
+        "Qwen/Qwen3.5-4B"
+      ],
+      "notes": "Prepared image-text candidate lane with explicit hf_multimodal preset, public VQAv2 materialization recipe, and null-sweep calibration config. It is not a published assurance basis until public report, runtime manifest, and evidence pack artifacts are attached."
+    },
+    {
+      "lane_id": "qwen3-5-2b-image-text-hf",
+      "family": "Qwen3.5 2B image-text LM",
+      "runtime": "huggingface-pytorch",
+      "adapter": "hf_multimodal",
+      "support_tier": "community_experimental",
+      "evidence_status": "prepared_candidate",
+      "docs_label": "No",
+      "provenance_source": "docs/README.md#support-matrix",
+      "support_groups": [
+        "small_local",
+        "multimodal_candidate",
+        "enterprise_permissive"
+      ],
+      "representative_models": [
+        "Qwen/Qwen3.5-2B"
+      ],
+      "notes": "Prepared smaller image-text candidate lane with explicit hf_multimodal preset, public VQAv2 materialization recipe, and null-sweep calibration config. It remains outside the published assurance basis until validated artifacts are attached."
+    },
+    {
+      "lane_id": "gemma3n-e4b-image-text-hf",
+      "family": "Gemma 3n E4B image-text LM",
+      "runtime": "huggingface-pytorch",
+      "adapter": "hf_multimodal",
+      "support_tier": "community_experimental",
+      "evidence_status": "prepared_candidate",
+      "docs_label": "No",
+      "provenance_source": "docs/README.md#support-matrix",
+      "support_groups": [
+        "small_local",
+        "multimodal_candidate",
+        "practical_shortlist"
+      ],
+      "representative_models": [
+        "google/gemma-3n-E4B-it"
+      ],
+      "notes": "Prepared Gemma 3n image-text candidate lane on pinned public VQAv2 materialization. Audio/video capabilities remain deferred; this row is not a published assurance basis until public evidence artifacts are attached."
+    },
+    {
+      "lane_id": "gemma3-4b-it-image-text-hf",
+      "family": "Gemma 3 4B IT image-text LM",
+      "runtime": "huggingface-pytorch",
+      "adapter": "hf_multimodal",
+      "support_tier": "community_experimental",
+      "evidence_status": "prepared_candidate",
+      "docs_label": "No",
+      "provenance_source": "docs/README.md#support-matrix",
+      "support_groups": [
+        "small_local",
+        "multimodal_candidate",
+        "practical_shortlist"
+      ],
+      "representative_models": [
+        "google/gemma-3-4b-it"
+      ],
+      "notes": "Reopened as an image-text candidate through hf_multimodal and public VQAv2 rather than a text-only promotion lane. It remains outside the published assurance basis until public evidence artifacts are attached."
+    },
+    {
       "lane_id": "gemma4-26b-a4b-moe-image-text-hf",
       "family": "Gemma 4 26B-A4B MoE image-text LM",
       "runtime": "huggingface-pytorch",

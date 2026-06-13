@@ -1,0 +1,72 @@
+# Calibration config: Null sweep for Qwen3.5 2B image-text calibration on materialized public VQAv2 data.
+#
+# Run scripts/model_evidence/materialize_vision_text_dataset.py first, or use
+# the model-evidence sweep lane that materializes this manifest per run.
+
+model:
+  id: "Qwen/Qwen3.5-2B"
+  adapter: "hf_multimodal"
+  device: "auto"
+  dtype: "bfloat16"
+  device_map: "auto"
+  low_cpu_mem_usage: true
+  collect_loading_info: false
+
+dataset:
+  provider:
+    kind: "vision_text"
+    path: "artifacts/model-evidence/public_datasets/vqav2_sample_validation_800/manifest.jsonl"
+  split: "validation"
+  seq_len: 256
+  stride: 256
+  preview_n: 16
+  final_n: 16
+  seed: 42
+
+eval:
+  metric:
+    kind: "accuracy"
+  loss:
+    type: "classification"
+
+primary_metric:
+  drift_band:
+    min: 0.80
+    max: 1.20
+
+edit:
+  name: "noop"
+  plan: {}
+
+auto:
+  enabled: true
+  tier: "balanced"
+  probes: 0
+
+context:
+  run:
+    skip_overhead_check: true
+
+guards:
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+  spectral:
+    module_include_patterns:
+      - "adapter.layers.*.self_attn.*"
+      - "adapter.layers.*.linear_attn.*"
+      - "adapter.layers.*.mlp.*"
+      - "model.language_model.layers.*.self_attn.*"
+      - "model.language_model.layers.*.linear_attn.*"
+      - "model.language_model.layers.*.mlp.*"
+  rmt:
+    module_include_patterns:
+      - "adapter.layers.*.self_attn.*"
+      - "adapter.layers.*.linear_attn.*"
+      - "adapter.layers.*.mlp.*"
+      - "model.language_model.layers.*.self_attn.*"
+      - "model.language_model.layers.*.linear_attn.*"
+      - "model.language_model.layers.*.mlp.*"
+
+output:
+  dir: "runs/null_sweeps/qwen3_5_2b"
+  save_model: false
+  save_report: true

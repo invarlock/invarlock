@@ -477,6 +477,119 @@
       "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence, runtime manifest, and signed evidence pack. Gemma 4 12B uses the explicit hf_multimodal path and requires the multimodal runtime stack (transformers>=5.12.0 and torchvision>=0.26.0); audio evaluation remains deferred."
     },
     {
+      "family_id": "qwen3-5-4b-image-text-lm",
+      "display_name": "Qwen3.5 4B image-text LM",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "task_role": "image_text",
+      "state": "community_experimental",
+      "representative_models": [
+        "Qwen/Qwen3.5-4B"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_qwen3_5_4b.yaml",
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_multimodal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
+      ],
+      "notes": "Prepared from support_matrix lane qwen3-5-4b-image-text-hf and awaiting public evidence artifacts.",
+      "support_groups": [
+        "small_local",
+        "multimodal_candidate",
+        "practical_shortlist",
+        "enterprise_permissive"
+      ]
+    },
+    {
+      "family_id": "qwen3-5-2b-image-text-lm",
+      "display_name": "Qwen3.5 2B image-text LM",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "task_role": "image_text",
+      "state": "community_experimental",
+      "representative_models": [
+        "Qwen/Qwen3.5-2B"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_qwen3_5_2b.yaml",
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_multimodal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
+      ],
+      "notes": "Prepared from support_matrix lane qwen3-5-2b-image-text-hf and awaiting public evidence artifacts.",
+      "support_groups": [
+        "small_local",
+        "multimodal_candidate",
+        "enterprise_permissive"
+      ]
+    },
+    {
+      "family_id": "gemma3n-e4b-image-text-lm",
+      "display_name": "Gemma 3n E4B image-text LM",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "task_role": "image_text",
+      "state": "community_experimental",
+      "representative_models": [
+        "google/gemma-3n-E4B-it"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/multimodal/gemma3n_e4b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_gemma3n_e4b.yaml",
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_multimodal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
+      ],
+      "notes": "Prepared as an image-text Gemma 3n candidate on public VQAv2. Audio/video evaluation is intentionally deferred until the evaluation provider exists.",
+      "support_groups": [
+        "small_local",
+        "multimodal_candidate",
+        "practical_shortlist"
+      ]
+    },
+    {
+      "family_id": "gemma3-4b-it-image-text-lm",
+      "display_name": "Gemma 3 4B IT image-text LM",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "task_role": "image_text",
+      "state": "community_experimental",
+      "representative_models": [
+        "google/gemma-3-4b-it"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/multimodal/gemma3_4b_it_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_gemma3_4b_it.yaml",
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_multimodal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
+      ],
+      "notes": "Reclassified from a text-only out-of-scope candidate into an explicit image-text candidate lane using hf_multimodal and pinned public VQAv2 materialization.",
+      "support_groups": [
+        "small_local",
+        "multimodal_candidate",
+        "practical_shortlist"
+      ]
+    },
+    {
       "family_id": "ministral-3-3b-text-causal-lm",
       "display_name": "Ministral 3 3B causal LM (text-only eval)",
       "modalities": [
@@ -837,14 +950,19 @@
       "state": "profile_first_class",
       "representative_models": [
         "Qwen/Qwen2.5-14B",
-        "Qwen/Qwen3.5-9B"
+        "Qwen/Qwen3.5-9B",
+        "Qwen/Qwen3.5-4B"
       ],
       "repo_evidence": [
         "src/invarlock/model_profile.py",
         "src/invarlock/adapters/auto.py",
-        "docs/reference/model-adapters.md"
+        "docs/reference/model-adapters.md",
+        "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
+        "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_qwen3_5_4b.yaml",
+        "configs/calibration/null_sweep_qwen3_5_2b.yaml"
       ],
-      "notes": "Shared qwen-family heuristics still cover aliases beyond the declared Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 public lanes, including usage-only Qwen2.5 checkpoints."
+      "notes": "Shared qwen-family heuristics cover aliases beyond the declared text-only Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 9B public lanes. Qwen3.5 4B and 2B now have prepared image-text candidate lanes through hf_multimodal and pinned public VQAv2 materialization."
     },
     {
       "family_id": "yi",
@@ -896,15 +1014,20 @@
       "state": "profile_first_class",
       "representative_models": [
         "google/gemma-3-4b-it",
+        "google/gemma-3n-E4B-it",
         "google/gemma-4-E2B-it"
       ],
       "repo_evidence": [
         "src/invarlock/model_profile.py",
         "src/invarlock/adapters/hf_loading.py",
         "src/invarlock/adapters/hf_multimodal.py",
-        "src/invarlock/eval/data.py"
+        "src/invarlock/eval/data.py",
+        "configs/presets/multimodal/gemma3_4b_it_public_vqav2_256.yaml",
+        "configs/presets/multimodal/gemma3n_e4b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_gemma3_4b_it.yaml",
+        "configs/calibration/null_sweep_gemma3n_e4b.yaml"
       ],
-      "notes": "Gemma 3/4 selectors and loaders are first-class. Gemma 4 E2B now has a declared text-only lane, Gemma 4 12B and 26B-A4B have public image-text bases through hf_multimodal + vision_text, and audio remains deferred."
+      "notes": "Gemma 3/4 selectors and loaders are first-class. Gemma 4 E2B has a declared text-only lane, Gemma 4 12B and 26B-A4B have public image-text bases, and Gemma 3 4B IT plus Gemma 3n E4B now have prepared image-text candidate lanes through hf_multimodal and pinned public VQAv2 materialization. Audio/video evaluation remains deferred."
     },
     {
       "family_id": "opt-neox-gptj",
@@ -1293,26 +1416,33 @@
         "notes": "The public Phi surface is intentionally held at the shipped Phi-4 text-only lane in this wave rather than widening to another family-specific lane."
       },
       {
-        "candidate_id": "gemma-3-4b-it-causal-lm",
+        "candidate_id": "gemma-3-4b-it-image-text-lm",
         "display_name": "Gemma 3 4B IT",
         "representative_model": "google/gemma-3-4b-it",
-        "current_catalog_state": "implemented_coverage",
-        "decision": "explicitly_out_of_scope",
+        "current_catalog_state": "community_experimental",
+        "decision": "redirected_to_image_text_candidate",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
-          "included_preset": "fail",
-          "included_calibration_config": "fail",
+          "included_preset": "pass",
+          "included_calibration_config": "pass",
           "targeted_tests": "pass",
-          "cli_smoke_evidence": "fail",
+          "cli_smoke_evidence": "pass",
           "approved_calibration_or_evaluation_evidence": "fail"
         },
         "repo_evidence": [
           "src/invarlock/model_profile.py",
           "src/invarlock/adapters/hf_loading.py",
-          "src/invarlock/adapters/hf_multimodal.py"
+          "src/invarlock/adapters/hf_multimodal.py",
+          "configs/presets/multimodal/gemma3_4b_it_public_vqav2_256.yaml",
+          "configs/calibration/null_sweep_gemma3_4b_it.yaml",
+          "tests/cli/test_preset_multimodal_presets.py",
+          "tests/scripts/test_model_evidence_sweep_catalog.py",
+          "scripts/model_evidence/model_evidence_sweep.py"
         ],
-        "missing_artifacts": [],
-        "notes": "Gemma-family expansion beyond the existing text-only Gemma 4 E2B lane stays out of this wave because the broader family remains multimodal/audio-capable."
+        "missing_artifacts": [
+          "approved calibration/evaluation evidence"
+        ],
+        "notes": "This checkpoint is no longer treated as a text-only out-of-scope row. It is tracked as an image-text candidate through hf_multimodal and public VQAv2, pending public evidence artifacts."
       },
       {
         "candidate_id": "opt-1-3b-causal-lm",

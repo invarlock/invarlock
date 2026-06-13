@@ -54,6 +54,10 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
 
     assert set(specs) == {
         "google_gemma_4_12b_it",
+        "qwen_qwen3_5_4b",
+        "qwen_qwen3_5_2b",
+        "google_gemma_3n_e4b_it",
+        "google_gemma_3_4b_it",
         "huggingfacetb_smollm3_3b",
         "microsoft_phi_4_mini_instruct",
         "tiiuae_falcon_h1r_7b",
@@ -75,6 +79,19 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
     assert (
         specs["google_gemma_4_12b_it"].vision_text_materialization["max_samples"] == 800
     )
+    for slug, preset in {
+        "qwen_qwen3_5_4b": "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
+        "qwen_qwen3_5_2b": "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
+        "google_gemma_3n_e4b_it": "configs/presets/multimodal/gemma3n_e4b_public_vqav2_256.yaml",
+        "google_gemma_3_4b_it": "configs/presets/multimodal/gemma3_4b_it_public_vqav2_256.yaml",
+    }.items():
+        assert specs[slug].preset_relpath == preset
+        assert specs[slug].adapter == "hf_multimodal"
+        assert specs[slug].verify_profile == "release"
+        assert specs[slug].vision_text_materialization is not None
+        assert specs[slug].vision_text_materialization["dataset"] == (
+            "Multimodal-Fatima/VQAv2_sample_validation"
+        )
     assert specs["microsoft_phi_4_mini_instruct"].preset_relpath == (
         "configs/presets/causal_lm/phi4_mini_512.yaml"
     )

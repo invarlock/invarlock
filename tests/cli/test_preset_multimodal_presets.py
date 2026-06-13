@@ -16,6 +16,52 @@ def _assert_large_gemma_memory_controls(model: dict[str, object]) -> None:
     assert model["collect_loading_info"] is False
 
 
+def _assert_public_vqav2_image_text_config(
+    *,
+    rel_path: str,
+    model_id: str,
+    output_dir: str | None = None,
+    requires_sdpa: bool = False,
+) -> None:
+    root = _repo_root()
+    cfg = load_config(root / rel_path)
+
+    model = cfg.require_section("model")
+    dataset = cfg.require_section("dataset")
+    eval_section = cfg.require_section("eval")
+    guards = cfg.require_section("guards")
+
+    assert model["id"] == model_id
+    assert model["adapter"] == "hf_multimodal"
+    _assert_large_gemma_memory_controls(model)
+    if requires_sdpa:
+        assert model["attn_implementation"] == "sdpa"
+    assert dataset["provider"]["kind"] == "vision_text"
+    assert dataset["provider"]["path"].endswith(
+        "public_datasets/vqav2_sample_validation_800/manifest.jsonl"
+    )
+    assert dataset["preview_n"] == 16
+    assert dataset["final_n"] == 16
+    assert eval_section["metric"]["kind"] == "accuracy"
+    assert eval_section["loss"]["type"] == "classification"
+    assert cfg.require_section("primary_metric")["drift_band"] == {
+        "min": 0.8,
+        "max": 1.2,
+    }
+    assert cfg.require_section("context")["run"]["skip_overhead_check"] is True
+    assert guards["order"] == [
+        "invariants",
+        "spectral",
+        "rmt",
+        "variance",
+        "invariants",
+    ]
+    assert guards["spectral"]["module_include_patterns"]
+    assert guards["rmt"]["module_include_patterns"]
+    if output_dir is not None:
+        assert str(cfg.require_section("output")["dir"]) == output_dir
+
+
 def test_multimodal_preset_loads_and_points_at_demo_fixture() -> None:
     root = _repo_root()
     preset_path = root / "configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml"
@@ -142,6 +188,36 @@ def test_gemma4_26b_a4b_public_vqav2_preset_declares_moe_candidate() -> None:
     assert guards["rmt"]["module_include_patterns"]
 
 
+def test_small_multimodal_candidate_public_vqav2_presets_load() -> None:
+    for rel_path, model_id, requires_sdpa in (
+        (
+            "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
+            "Qwen/Qwen3.5-4B",
+            False,
+        ),
+        (
+            "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
+            "Qwen/Qwen3.5-2B",
+            False,
+        ),
+        (
+            "configs/presets/multimodal/gemma3n_e4b_public_vqav2_256.yaml",
+            "google/gemma-3n-E4B-it",
+            True,
+        ),
+        (
+            "configs/presets/multimodal/gemma3_4b_it_public_vqav2_256.yaml",
+            "google/gemma-3-4b-it",
+            True,
+        ),
+    ):
+        _assert_public_vqav2_image_text_config(
+            rel_path=rel_path,
+            model_id=model_id,
+            requires_sdpa=requires_sdpa,
+        )
+
+
 def test_gemma4_12b_null_sweep_calibration_config_uses_public_manifest() -> None:
     root = _repo_root()
     cfg = load_config(root / "configs/calibration/null_sweep_gemma4_12b.yaml")
@@ -201,3 +277,38 @@ def test_gemma4_26b_a4b_null_sweep_calibration_config_uses_public_manifest() -> 
     assert guards["spectral"]["module_include_patterns"]
     assert guards["spectral"]["family_caps"]["router"] == 5.0
     assert guards["rmt"]["module_include_patterns"]
+
+
+def test_small_multimodal_candidate_null_sweeps_use_public_manifest() -> None:
+    for rel_path, model_id, output_dir, requires_sdpa in (
+        (
+            "configs/calibration/null_sweep_qwen3_5_4b.yaml",
+            "Qwen/Qwen3.5-4B",
+            "runs/null_sweeps/qwen3_5_4b",
+            False,
+        ),
+        (
+            "configs/calibration/null_sweep_qwen3_5_2b.yaml",
+            "Qwen/Qwen3.5-2B",
+            "runs/null_sweeps/qwen3_5_2b",
+            False,
+        ),
+        (
+            "configs/calibration/null_sweep_gemma3n_e4b.yaml",
+            "google/gemma-3n-E4B-it",
+            "runs/null_sweeps/gemma3n_e4b",
+            True,
+        ),
+        (
+            "configs/calibration/null_sweep_gemma3_4b_it.yaml",
+            "google/gemma-3-4b-it",
+            "runs/null_sweeps/gemma3_4b_it",
+            True,
+        ),
+    ):
+        _assert_public_vqav2_image_text_config(
+            rel_path=rel_path,
+            model_id=model_id,
+            output_dir=output_dir,
+            requires_sdpa=requires_sdpa,
+        )
