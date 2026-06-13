@@ -114,12 +114,21 @@ def choose_snapshot_mode(
         frac = _parse_float(env_ram_fraction, frac)
     frac = max(0.0, min(frac, 1.0))
 
-    if available_ram_mb > 0:
-        threshold_mb = float(available_ram_mb) * frac
-    elif cfg_snapshot.get("threshold_mb") is not None:
-        threshold_mb = _parse_float(cfg_snapshot.get("threshold_mb"), 768.0)
+    if cfg_snapshot.get("threshold_mb") is not None:
+        absolute_threshold_mb = _parse_float(cfg_snapshot.get("threshold_mb"), 768.0)
     else:
-        threshold_mb = _parse_float(env_threshold_mb, 768.0)
+        absolute_threshold_mb = _parse_float(env_threshold_mb, 768.0)
+    absolute_threshold_mb = max(0.0, float(absolute_threshold_mb))
+
+    if available_ram_mb > 0:
+        ram_threshold_mb = float(available_ram_mb) * frac
+        threshold_mb = (
+            min(ram_threshold_mb, absolute_threshold_mb)
+            if absolute_threshold_mb > 0
+            else ram_threshold_mb
+        )
+    else:
+        threshold_mb = absolute_threshold_mb
 
     margin = 1.2
     if cfg_snapshot.get("disk_free_margin_ratio") is not None:

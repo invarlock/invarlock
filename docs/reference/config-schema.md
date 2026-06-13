@@ -201,8 +201,8 @@ context:
     tiny_relax: false
   snapshot:
     mode: auto
-    ram_fraction: 0.4
-    threshold_mb: 768
+    ram_fraction: 0.4        # chunk when model exceeds this RAM fraction
+    threshold_mb: 768        # absolute chunked-snapshot threshold
     disk_free_margin_ratio: 1.2
     temp_dir: /tmp
 ```

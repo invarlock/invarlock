@@ -43,6 +43,10 @@ auto:
   tier: balanced
   probes: 0
 
+context:
+  run:
+    skip_overhead_check: true
+
 guards:
   order: ["invariants", "spectral", "rmt", "variance", "invariants"]
   spectral:

@@ -77,7 +77,10 @@ def test_causal_lm_family_presets_load() -> None:
     }
     expected_skip_overhead = {
         "gemma4_e2b_512.yaml",
+        "mixtral_8x7b_512.yaml",
+        "olmoe_1b_7b_0924_512.yaml",
         "phi4_reasoning_plus_512.yaml",
+        "qwen3_30b_a3b_instruct_2507_512.yaml",
     }
     for name, model_id in presets.items():
         cfg = load_config(root / "configs/presets/causal_lm" / name)
@@ -145,6 +148,11 @@ def test_causal_lm_family_presets_load() -> None:
 def test_null_sweep_calibration_configs_reference_models() -> None:
     root = _repo_root()
     expected_drift_band = {"min": 0.9, "max": 1.2}
+    expected_null_sweep_skip_overhead = {
+        "null_sweep_mixtral_8x7b.yaml",
+        "null_sweep_olmoe_1b_7b_0924.yaml",
+        "null_sweep_qwen3_30b_a3b_instruct_2507.yaml",
+    }
     configs = {
         "null_sweep_mistral_7b.yaml": "mistralai/Mistral-7B-v0.1",
         "null_sweep_open_llama_7b.yaml": "openlm-research/open_llama_7b",
@@ -257,6 +265,8 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
             assert data["model"]["collect_loading_info"] is False
             assert data["guards"]["spectral"]["family_caps"]["router"] == 5.0
             assert "rmt" not in data["guards"]
+        if name in expected_null_sweep_skip_overhead:
+            assert data["context"]["run"]["skip_overhead_check"] is True
         assert data["primary_metric"]["drift_band"] == expected_drift_band
 
 
