@@ -273,7 +273,7 @@ Notes
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| Gemma 4 12B any-to-any LM | Yes | Yes | No | Yes |
+| Gemma 4 12B any-to-any LM | Yes | Yes | Yes | Yes |
 
 ### Seq2Seq Published Basis
 
@@ -343,9 +343,10 @@ The image-text path also includes an offline demo preset at
 4 12B pilot at `configs/presets/multimodal/gemma4_12b_vision_text_256.yaml` plus
 `tests/fixtures/vision_text/demo_manifest.jsonl` for provider/config validation.
 Gemma 4 12B promotion uses
-`configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml` together with the
-model-evidence materializer for pinned public VQAv2 sample-validation data; the
-published evidence fixture lives under
+`configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml` and
+`configs/calibration/null_sweep_gemma4_12b.yaml` together with the model-evidence
+materializer for pinned public VQAv2 sample-validation data; the published
+evidence fixture lives under
 `public_evidence/published_basis/gemma4_12b/`, and the local smoke manifest
 remains provider/config validation only.
 

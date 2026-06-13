@@ -461,6 +461,7 @@
         "docs/README.md",
         "configs/presets/multimodal/gemma4_12b_vision_text_256.yaml",
         "configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_gemma4_12b.yaml",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
         "src/invarlock/adapters/hf_loading.py",
         "public_evidence/published_basis/gemma4_12b/evaluation.report.json",
