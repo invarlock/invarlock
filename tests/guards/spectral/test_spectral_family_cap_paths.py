@@ -272,6 +272,18 @@ def test_classify_module_family_moe_and_module_type_branches() -> None:
     )
     assert (
         spectral_detection.classify_module_family(
+            "model.layers.0.mamba.in_proj", linear
+        )
+        == "ffn"
+    )
+    assert (
+        spectral_detection.classify_module_family(
+            "model.layers.0.mamba.out_proj", linear
+        )
+        == "ffn"
+    )
+    assert (
+        spectral_detection.classify_module_family(
             "model.layers.0.block_sparse_moe.gate", linear
         )
         == "router"

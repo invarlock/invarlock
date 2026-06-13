@@ -71,6 +71,10 @@ def classify_module_family(name: str, module: Any) -> str:
         )
     ):
         return "ffn"
+    if "mamba" in lname and any(
+        tok in lname for tok in ("in_proj", "out_proj", "x_proj", "dt_proj")
+    ):
+        return "ffn"
     if any(
         tok in lname
         for tok in ("router", "routing", "gate", "gating", "dispatch", "switch")

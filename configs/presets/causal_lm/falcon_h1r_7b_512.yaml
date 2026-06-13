@@ -41,6 +41,9 @@ auto:
 
 guards:
   order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+  spectral:
+    module_exclude_patterns:
+      - "model.embed_tokens"
 
 output:
   dir: "runs"
