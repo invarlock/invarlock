@@ -213,7 +213,7 @@ Notes
 
 ## Support Matrix
 
-### Baseline Fixtures
+### Baseline Fixture Evidence
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
@@ -225,8 +225,10 @@ Notes
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | TinyLlama 1.1B causal LM | Yes | Yes | Yes | Yes |
+| SmolLM3 3B causal LM | Yes | Yes | Yes | Yes |
 | Gemma 4 E2B causal LM (text-only eval) | Yes | Yes | Yes | Yes |
 | Ministral 3 3B causal LM (text-only eval) | Yes | Yes | Yes | Yes |
+| Phi-4 mini causal LM | Yes | Yes | Yes | Yes |
 | Granite 4.1 3B causal LM | Yes | Yes | Yes | Yes |
 
 ### Published 7B-9B Decoder Evidence
@@ -244,6 +246,7 @@ Notes
 | OLMo 2 7B causal LM | Yes | Yes | Yes | Yes |
 | OpenLLaMA 7B causal LM | Yes | Yes | Yes | Yes |
 | Falcon 7B causal LM | Yes | Yes | Yes | Yes |
+| Falcon-H1R 7B causal LM | Yes | Yes | Yes | Yes |
 | Granite 4.1 8B causal LM | Yes | Yes | Yes | Yes |
 
 ### Published 13B-14B And Reasoning Decoder Evidence
@@ -256,27 +259,14 @@ Notes
 | DeepSeek-R1-Distill-Qwen 14B causal LM | Yes | Yes | Yes | Yes |
 | Phi-4 causal LM (text-only eval) | Yes | Yes | Yes | Yes |
 
-### Prepared Small/Local Candidate Backlog
-
-| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
-| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| SmolLM3 3B causal LM | Yes | Yes | Yes | Yes |
-| Phi-4 mini causal LM | Yes | Yes | Yes | Yes |
-
-### Prepared 7B-14B Candidate Backlog
-
-| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
-| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| Falcon-H1R 7B causal LM | Yes | Yes | Yes | Yes |
-
-### Multimodal Published Basis
+### Multimodal Published Evidence
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | Gemma 4 12B any-to-any LM | Yes | Yes | Yes | Yes |
 | Gemma 4 26B-A4B MoE image-text LM | Yes | Yes | Yes | Yes |
 
-### Large/MoE Published Lanes
+### Large/MoE Published Evidence
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
@@ -284,7 +274,7 @@ Notes
 | Mixtral 8x7B MoE causal LM | Yes | Yes | Yes | Yes |
 | Qwen3 30B-A3B MoE causal LM | Yes | Yes | Yes | Yes |
 
-### Seq2Seq Published Basis
+### Seq2Seq Published Evidence
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
