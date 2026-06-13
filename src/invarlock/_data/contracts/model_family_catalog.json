@@ -703,6 +703,52 @@
   ],
   "implemented_coverage": [
     {
+      "family_id": "qwen3-30b-a3b-moe-causal-lm",
+      "display_name": "Qwen3 30B-A3B MoE causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "prepared_evidence_candidate",
+      "representative_models": [
+        "Qwen/Qwen3-30B-A3B-Instruct-2507"
+      ],
+      "repo_evidence": [
+        "src/invarlock/model_profile.py",
+        "src/invarlock/adapters/hf_loading.py",
+        "configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml",
+        "configs/calibration/null_sweep_qwen3_30b_a3b_instruct_2507.yaml",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_causal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
+      ],
+      "notes": "Prepared as a recent Qwen3 MoE candidate with explicit hf_causal preset and null-sweep config. It is not a published basis until a CUDA report, runtime manifest, and evidence pack are attached."
+    },
+    {
+      "family_id": "gemma-4-26b-a4b-moe-image-text-lm",
+      "display_name": "Gemma 4 26B-A4B MoE image-text LM",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "task_role": "any_to_any",
+      "state": "prepared_evidence_candidate",
+      "representative_models": [
+        "google/gemma-4-26B-A4B-it"
+      ],
+      "repo_evidence": [
+        "src/invarlock/model_profile.py",
+        "src/invarlock/adapters/hf_loading.py",
+        "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_gemma4_26b_a4b.yaml",
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_multimodal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
+      ],
+      "notes": "Prepared as a recent Gemma 4 multimodal MoE candidate using the public VQAv2 image-text materialization path. It is not a published basis until a CUDA report, runtime manifest, and evidence pack are attached."
+    },
+    {
       "family_id": "mixtral",
       "display_name": "Mixtral",
       "modalities": [

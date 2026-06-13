@@ -104,6 +104,32 @@ def test_gemma4_12b_public_vqav2_preset_uses_materialized_manifest_path() -> Non
     ]
 
 
+def test_gemma4_26b_a4b_public_vqav2_preset_declares_moe_candidate() -> None:
+    root = _repo_root()
+    preset_path = root / "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml"
+    cfg = load_config(preset_path)
+
+    model = cfg.require_section("model")
+    dataset = cfg.require_section("dataset")
+    eval_section = cfg.require_section("eval")
+    guards = cfg.require_section("guards")
+
+    assert model["id"] == "google/gemma-4-26B-A4B-it"
+    assert model["adapter"] == "hf_multimodal"
+    assert model["attn_implementation"] == "sdpa"
+    assert dataset["provider"]["kind"] == "vision_text"
+    assert dataset["provider"]["path"].endswith(
+        "public_datasets/vqav2_sample_validation_800/manifest.jsonl"
+    )
+    assert dataset["preview_n"] == 16
+    assert dataset["final_n"] == 16
+    assert eval_section["metric"]["kind"] == "accuracy"
+    assert eval_section["loss"]["type"] == "classification"
+    assert cfg.require_section("context")["run"]["skip_overhead_check"] is True
+    assert guards["spectral"]["module_include_patterns"]
+    assert guards["rmt"]["module_include_patterns"]
+
+
 def test_gemma4_12b_null_sweep_calibration_config_uses_public_manifest() -> None:
     root = _repo_root()
     cfg = load_config(root / "configs/calibration/null_sweep_gemma4_12b.yaml")
@@ -114,6 +140,35 @@ def test_gemma4_12b_null_sweep_calibration_config_uses_public_manifest() -> None
     guards = cfg.require_section("guards")
 
     assert model["id"] == "google/gemma-4-12B-it"
+    assert model["adapter"] == "hf_multimodal"
+    assert model["attn_implementation"] == "sdpa"
+    assert dataset["provider"]["kind"] == "vision_text"
+    assert dataset["provider"]["path"].endswith(
+        "public_datasets/vqav2_sample_validation_800/manifest.jsonl"
+    )
+    assert dataset["preview_n"] == 16
+    assert dataset["final_n"] == 16
+    assert eval_section["metric"]["kind"] == "accuracy"
+    assert eval_section["loss"]["type"] == "classification"
+    assert cfg.require_section("primary_metric")["drift_band"] == {
+        "min": 0.8,
+        "max": 1.2,
+    }
+    assert cfg.require_section("context")["run"]["skip_overhead_check"] is True
+    assert guards["spectral"]["module_include_patterns"]
+    assert guards["rmt"]["module_include_patterns"]
+
+
+def test_gemma4_26b_a4b_null_sweep_calibration_config_uses_public_manifest() -> None:
+    root = _repo_root()
+    cfg = load_config(root / "configs/calibration/null_sweep_gemma4_26b_a4b.yaml")
+
+    model = cfg.require_section("model")
+    dataset = cfg.require_section("dataset")
+    eval_section = cfg.require_section("eval")
+    guards = cfg.require_section("guards")
+
+    assert model["id"] == "google/gemma-4-26B-A4B-it"
     assert model["adapter"] == "hf_multimodal"
     assert model["attn_implementation"] == "sdpa"
     assert dataset["provider"]["kind"] == "vision_text"

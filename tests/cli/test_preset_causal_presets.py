@@ -27,6 +27,9 @@ def test_causal_lm_family_presets_load() -> None:
         "qwen2_5_7b_512.yaml": "Qwen/Qwen2.5-7B",
         "qwen2_5_14b_512.yaml": "Qwen/Qwen2.5-14B",
         "qwen3_8b_512.yaml": "Qwen/Qwen3-8B",
+        "qwen3_30b_a3b_instruct_2507_512.yaml": (
+            "Qwen/Qwen3-30B-A3B-Instruct-2507"
+        ),
         "deepseek_r1_distill_qwen_7b_512.yaml": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
         "phi4_reasoning_plus_512.yaml": "microsoft/Phi-4-reasoning-plus",
         "gemma4_e2b_512.yaml": "google/gemma-4-E2B-it",
@@ -63,6 +66,7 @@ def test_causal_lm_family_presets_load() -> None:
         "qwen2_5_7b_512.yaml": "hf_text",
         "qwen2_5_14b_512.yaml": "hf_text",
         "qwen2_7b_512.yaml": "hf_text",
+        "qwen3_30b_a3b_instruct_2507_512.yaml": "hf_text",
         "qwen3_5_9b_512.yaml": "hf_text",
         "qwen3_8b_512.yaml": "hf_text",
         "smollm3_3b_512.yaml": "hf_text",
@@ -110,6 +114,9 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
         "null_sweep_qwen2_5_7b.yaml": "Qwen/Qwen2.5-7B",
         "null_sweep_qwen2_5_14b.yaml": "Qwen/Qwen2.5-14B",
         "null_sweep_qwen3_8b.yaml": "Qwen/Qwen3-8B",
+        "null_sweep_qwen3_30b_a3b_instruct_2507.yaml": (
+            "Qwen/Qwen3-30B-A3B-Instruct-2507"
+        ),
         "null_sweep_deepseek_r1_distill_qwen_7b.yaml": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
         "null_sweep_phi4_reasoning_plus.yaml": "microsoft/Phi-4-reasoning-plus",
         "null_sweep_gemma4_e2b.yaml": "google/gemma-4-E2B-it",
@@ -162,6 +169,7 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
             "null_sweep_qwen2_5_7b.yaml",
             "null_sweep_qwen2_5_14b.yaml",
             "null_sweep_qwen2_7b.yaml",
+            "null_sweep_qwen3_30b_a3b_instruct_2507.yaml",
             "null_sweep_qwen3_5_9b.yaml",
             "null_sweep_qwen3_8b.yaml",
             "null_sweep_smollm3_3b.yaml",

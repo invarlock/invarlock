@@ -367,9 +367,17 @@ CATALOG_PRESET_OVERRIDES: dict[str, tuple[str, str]] = {
         "configs/presets/causal_lm/deepseek_r1_0528_qwen3_8b_512.yaml",
         "hf_causal",
     ),
+    "Qwen/Qwen3-30B-A3B-Instruct-2507": (
+        "configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml",
+        "hf_causal",
+    ),
     "tiiuae/Falcon-H1R-7B": (
         "configs/presets/causal_lm/falcon_h1r_7b_512.yaml",
         "hf_causal",
+    ),
+    "google/gemma-4-26B-A4B-it": (
+        "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
+        "hf_multimodal",
     ),
     "google/flan-t5-base": (
         "configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml",
@@ -435,6 +443,37 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
         preset_relpath="configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml",
         adapter="hf_seq2seq",
         verify_profile="release",
+    ),
+    EvidenceLane(
+        slug="qwen_qwen3_30b_a3b_instruct_2507",
+        lane_id="qwen3-30b-a3b-moe-causal-hf",
+        family="Qwen3 30B-A3B MoE causal LM",
+        model_id="Qwen/Qwen3-30B-A3B-Instruct-2507",
+        preset_relpath="configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml",
+        adapter="hf_causal",
+        verify_profile="release",
+    ),
+    EvidenceLane(
+        slug="google_gemma_4_26b_a4b_it",
+        lane_id="gemma4-26b-a4b-moe-image-text-hf",
+        family="Gemma 4 26B-A4B MoE image-text LM",
+        model_id="google/gemma-4-26B-A4B-it",
+        preset_relpath="configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
+        adapter="hf_multimodal",
+        verify_profile="release",
+        vision_text_materialization={
+            "dataset": "Multimodal-Fatima/VQAv2_sample_validation",
+            "split": "validation",
+            "revision": "99487d2651df3799002b2fb3e455741744514a02",
+            "max_samples": 800,
+            "image_field": "image",
+            "prompt_field": "question",
+            "answer_field": "multiple_choice_answer",
+            "answers_field": "answers",
+            "id_field": "question_id",
+            "prompt_template": "{question}\nAnswer with a short phrase.",
+            "image_format": "png",
+        },
     ),
 )
 

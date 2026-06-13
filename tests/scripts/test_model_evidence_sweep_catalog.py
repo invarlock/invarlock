@@ -57,6 +57,8 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
                 "deepseek_ai_deepseek_r1_distill_qwen_14b",
                 "deepseek_ai_deepseek_r1_0528_qwen3_8b",
                 "tiiuae_falcon_h1r_7b",
+                "qwen_qwen3_30b_a3b_instruct_2507",
+                "google_gemma_4_26b_a4b_it",
             ],
             lane_ids=[],
             shard_index=0,
@@ -118,6 +120,14 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
     assert specs["tiiuae_falcon_h1r_7b"].preset_relpath == (
         "configs/presets/causal_lm/falcon_h1r_7b_512.yaml"
     )
+    assert specs["qwen_qwen3_30b_a3b_instruct_2507"].preset_relpath == (
+        "configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml"
+    )
+    assert specs["qwen_qwen3_30b_a3b_instruct_2507"].adapter == "hf_causal"
+    assert specs["google_gemma_4_26b_a4b_it"].preset_relpath == (
+        "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml"
+    )
+    assert specs["google_gemma_4_26b_a4b_it"].adapter == "hf_multimodal"
 
 
 def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> None:
@@ -137,10 +147,14 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
         "microsoft_phi_4_mini_instruct",
         "tiiuae_falcon_h1r_7b",
         "google_flan_t5_base",
+        "qwen_qwen3_30b_a3b_instruct_2507",
+        "google_gemma_4_26b_a4b_it",
     ]
     adapters = {lane.slug: lane.adapter for lane in specs}
     assert adapters["google_gemma_4_12b_it"] == "hf_multimodal"
     assert adapters["google_flan_t5_base"] == "hf_seq2seq"
+    assert adapters["qwen_qwen3_30b_a3b_instruct_2507"] == "hf_causal"
+    assert adapters["google_gemma_4_26b_a4b_it"] == "hf_multimodal"
     for lane in specs:
         if lane.slug in {
             "huggingfacetb_smollm3_3b",
@@ -149,10 +163,22 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
         }:
             assert lane.adapter == "hf_causal"
             assert lane.verify_profile == "dev"
+        elif lane.slug == "qwen_qwen3_30b_a3b_instruct_2507":
+            assert lane.adapter == "hf_causal"
+            assert lane.verify_profile == "release"
+            assert lane.preset_relpath == (
+                "configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml"
+            )
         elif lane.slug == "google_gemma_4_12b_it":
             assert lane.verify_profile == "release"
             assert lane.preset_relpath == (
                 "configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml"
+            )
+            assert lane.vision_text_materialization is not None
+        elif lane.slug == "google_gemma_4_26b_a4b_it":
+            assert lane.verify_profile == "release"
+            assert lane.preset_relpath == (
+                "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml"
             )
             assert lane.vision_text_materialization is not None
         else:
