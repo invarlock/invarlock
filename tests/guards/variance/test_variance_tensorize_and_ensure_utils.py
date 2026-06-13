@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import numpy as np
 import torch
 
@@ -72,3 +74,50 @@ def test_tensorize_calibration_batches_honors_max_seq_len() -> None:
     assert guard._stats["calibration"]["max_seq_len"] == 4
     assert guard._stats["calibration"]["max_observed_seq_len"] == 12
     assert guard._stats["calibration"]["truncation_applied"] is True
+
+
+def test_calibration_max_seq_len_legacy_policy_noop_truncation_records_stats() -> None:
+    guard = SimpleNamespace(
+        _policy={"calibration": "legacy", "calibration_max_seq_len": "4"},
+        _stats={"calibration": {"max_observed_seq_len": "bad"}},
+    )
+
+    tensorized = VarianceGuard._tensorize_calibration_batches(
+        guard,
+        [{"input_ids": torch.arange(3), "metadata": {"source": "unit"}}],
+    )
+
+    assert tensorized[0]["input_ids"].tolist() == [0, 1, 2]
+    assert tensorized[0]["metadata"] == {"source": "unit"}
+    assert guard._stats["calibration"]["max_seq_len"] == 4
+    assert guard._stats["calibration"]["max_observed_seq_len"] == 3
+    assert "truncation_applied" not in guard._stats["calibration"]
+
+
+def test_calibration_seq_cap_without_observed_tensor_records_only_config() -> None:
+    guard = SimpleNamespace(
+        _policy={"calibration": {"max_seq_len": 4}},
+        _stats={},
+    )
+
+    tensorized = VarianceGuard._tensorize_calibration_batches(
+        guard,
+        [{"window_id": "w0", "metadata": {"source": "unit"}}],
+    )
+
+    assert tensorized == [{"window_id": "w0", "metadata": {"source": "unit"}}]
+    assert guard._stats["calibration"] == {"max_seq_len": 4}
+
+
+def test_calibration_truncation_skips_stats_when_guard_stats_unavailable() -> None:
+    guard = SimpleNamespace(
+        _policy={"calibration": {"max_seq_len": 2}},
+        _stats=None,
+    )
+
+    tensorized = VarianceGuard._tensorize_calibration_batches(
+        guard,
+        [{"input_ids": torch.arange(5)}],
+    )
+
+    assert tensorized[0]["input_ids"].tolist() == [0, 1]
