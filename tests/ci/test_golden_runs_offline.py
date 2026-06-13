@@ -296,30 +296,36 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
         == "baseline_relative_guard_value_evidence"
     )
     manifest_paths = {entry["path"] for entry in manifest["files"]}
+    assert "artifact_package/logs/run_pack.log" in manifest_paths
     assert (
-        "artifact_package/logs/tasks/"
-        "manual_probe_spectral_moderate_scale_mlp_l31_up_s112.log" in manifest_paths
+        "artifact_package/reports/errors/"
+        "spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json"
+        in manifest_paths
     )
     assert (
-        "artifact_package/logs/tasks/"
-        "manual_probe_spectral_moderate_scale_attn_l31_o_s112.log" in manifest_paths
+        "artifact_package/reports/errors/"
+        "spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json"
+        in manifest_paths
     )
     assert (
         "artifact_package/reports/guard_value_all_guard_probe_sweep.json"
         in manifest_paths
     )
     assert (
-        "artifact_package/logs/tasks/"
-        "manual_confirm_rmt_norm_noise_l31_ffn_up_b030.log" in manifest_paths
+        "artifact_package/reports/errors/"
+        "rmt_norm_noise_l31_ffn_up_b030/evaluation.report.json"
+        in manifest_paths
     )
     assert (
-        "artifact_package/logs/tasks/"
-        "manual_confirm_ve_mlp_scale_skew_l31_down_s090.log" in manifest_paths
+        "artifact_package/reports/errors/"
+        "ve_mlp_scale_skew_l31_down_s090/evaluation.report.json"
+        in manifest_paths
     )
     for entry in manifest["files"]:
         path = demo_dir / entry["path"]
         assert path.is_file(), entry["path"]
         assert hashlib.sha256(path.read_bytes()).hexdigest() == entry["sha256"]
+        assert path.stat().st_size == entry["size_bytes"]
 
     comparison = summary["pm_only_vs_pm_plus_guards"]
     assert comparison["scenario_id"] == "spectral_moderate_scale_mlp_l31_up_s112"
@@ -440,6 +446,12 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
     assert sweep["method"]["calibration_rerun"] is False
     assert sweep["method"]["baseline_eval_rerun"] is False
     assert sweep["selected_positive"] == comparison["scenario_id"]
+    for record in sweep["records"]:
+        log = record.get("log")
+        if isinstance(log, str):
+            assert (demo_dir / log).is_file(), log
+        if record.get("log_packaged") is False:
+            assert "not retained" in record["log_note"]
     records = {record["scenario_id"]: record for record in sweep["records"]}
     assert (
         records["spectral_moderate_scale_mlp_l31_up_s112"]["baseline_relative_guard"][

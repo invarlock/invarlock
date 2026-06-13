@@ -48,7 +48,6 @@
         "new_caps_applied": 0,
         "subject_spectral_caps_applied": 2
       },
-      "log": "artifact_package/logs/tasks/manual_probe_spectral_moderate_scale_attn_l31_o_s112.log",
       "packaged_full_report": true,
       "primary_metric_acceptable": true,
       "primary_metric_display_ci": [
@@ -90,10 +89,11 @@
           "severity": "budgeted",
           "z_score": 3.256644426424538
         }
-      ]
+      ],
+      "log_packaged": false,
+      "log_note": "Manual task log was not retained in this published artifact; the packaged evaluation report, runtime manifest, sidecar probe, and run_pack.log are the audited shipped evidence."
     },
     {
-      "log": "artifact_package/logs/tasks/manual_probe_spectral_moderate_scale_attn_l31_o_s118.log",
       "packaged_full_report": false,
       "primary_metric_acceptable": true,
       "primary_metric_display_ci": [
@@ -139,10 +139,11 @@
           "severity": "budgeted",
           "z_score": 3.230467141244887
         }
-      ]
+      ],
+      "log_packaged": false,
+      "log_note": "Manual task log was not retained in this published artifact; the packaged evaluation report, runtime manifest, sidecar probe, and run_pack.log are the audited shipped evidence."
     },
     {
-      "log": "artifact_package/logs/tasks/manual_probe_spectral_moderate_scale_attn_l31_o_s125.log",
       "packaged_full_report": false,
       "primary_metric_acceptable": true,
       "primary_metric_display_ci": [
@@ -188,7 +189,9 @@
           "severity": "budgeted",
           "z_score": 3.4747745692919496
         }
-      ]
+      ],
+      "log_packaged": false,
+      "log_note": "Manual task log was not retained in this published artifact; the packaged evaluation report, runtime manifest, sidecar probe, and run_pack.log are the audited shipped evidence."
     },
     {
       "baseline_relative_guard": {
@@ -214,7 +217,6 @@
         "new_caps_applied": 1,
         "subject_spectral_caps_applied": 3
       },
-      "log": "artifact_package/logs/tasks/manual_probe_spectral_moderate_scale_mlp_l31_up_s112.log",
       "packaged_full_report": true,
       "primary_metric_acceptable": true,
       "primary_metric_display_ci": [
@@ -263,10 +265,11 @@
           "severity": "budgeted",
           "z_score": 3.9550346434455226
         }
-      ]
+      ],
+      "log_packaged": false,
+      "log_note": "Manual task log was not retained in this published artifact; the packaged evaluation report, runtime manifest, sidecar probe, and run_pack.log are the audited shipped evidence."
     },
     {
-      "log": "artifact_package/logs/tasks/manual_probe_spectral_moderate_scale_mlp_l31_up_s116.log",
       "packaged_full_report": false,
       "primary_metric_acceptable": true,
       "primary_metric_display_ci": [
@@ -312,10 +315,11 @@
           "severity": "budgeted",
           "z_score": 4.10369960488883
         }
-      ]
+      ],
+      "log_packaged": false,
+      "log_note": "Manual task log was not retained in this published artifact; the packaged evaluation report, runtime manifest, sidecar probe, and run_pack.log are the audited shipped evidence."
     },
     {
-      "log": "artifact_package/logs/tasks/manual_probe_spectral_moderate_scale_mlp_l31_up_s120.log",
       "packaged_full_report": false,
       "primary_metric_acceptable": true,
       "primary_metric_display_ci": [
@@ -361,7 +365,9 @@
           "severity": "budgeted",
           "z_score": 4.281035316032115
         }
-      ]
+      ],
+      "log_packaged": false,
+      "log_note": "Manual task log was not retained in this published artifact; the packaged evaluation report, runtime manifest, sidecar probe, and run_pack.log are the audited shipped evidence."
     }
   ],
   "remote_output_root": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d",

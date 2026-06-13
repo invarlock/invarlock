@@ -10,4 +10,6 @@ The active all-guard comparison is recorded in `artifact_package/reports/guard_v
 
 The package also includes `spectral_moderate_scale_attn_l31_o_s112` as a negative control: the same 1.12x scale on the closest non-baseline attention module passes PM but does not add a new cap. The compact spectral sweep summary records adjacent scale points showing the attention target starts triggering at 1.18 and the FFN target remains PM-accepted through 1.20.
 
+Provenance note: manual task logs from probe selection were not retained in this published artifact. The shipped evidence consists of the full evaluation reports, runtime manifests, sidecar probe outputs, compact summaries, manifest hashes, and `artifact_package/logs/run_pack.log`.
+
 Scope note: this is an evidence-pack guard-value demonstration, not a claim that every stock runtime cap or sidecar signal is an automatic release failure. Invariants are structural checks rather than near-threshold statistical guards; they are required to pass in these PM-pass guard-value cases, but this package does not claim a PM-pass invariant-fail flagship case.

@@ -3,68 +3,13 @@
   "files": [
     {
       "path": "README.md",
-      "sha256": "f73399749a1a73e19cc028d803fbfbd6d96957e4c8ddeb9176884bb9025067b3",
-      "size_bytes": 1893
+      "sha256": "6604eda2b2fb9c2118673f17100289a6ba6f6be1bca2c4646c56bf54c7c4ff22",
+      "size_bytes": 2177
     },
     {
       "path": "artifact_package/logs/run_pack.log",
       "sha256": "fa09da5e27a924c798dc0f1c8ac1a372ff91d0e85ce1265d62222dd35acb0302",
       "size_bytes": 9855
-    },
-    {
-      "path": "artifact_package/logs/tasks/manual_confirm_rmt_norm_noise_l31_ffn_up_b030.log",
-      "sha256": "5ea0e50aabcb143c24579693e7b7c317314ee9186651f06a9256ad6def4b8639",
-      "size_bytes": 12510
-    },
-    {
-      "path": "artifact_package/logs/tasks/manual_confirm_ve_mlp_scale_skew_l31_down_s090.log",
-      "sha256": "051332f327ba1464380adeddf3d0113e552a646b1539344ba021cf853584a137",
-      "size_bytes": 9616
-    },
-    {
-      "path": "artifact_package/logs/tasks/manual_probe_rmt_norm_noise_l31_ffn_up_b030.log",
-      "sha256": "a1516c639d92ab59288ac6aede0a3134a4c40b7210fdf01e1d546ba86d3b4d42",
-      "size_bytes": 12564
-    },
-    {
-      "path": "artifact_package/logs/tasks/manual_probe_spectral_moderate_scale_attn_l31_o_s112.log",
-      "sha256": "19834ed6aab458d34b4c2924b63d8643f9709df3fba840abf2090f14c37a43b9",
-      "size_bytes": 7630
-    },
-    {
-      "path": "artifact_package/logs/tasks/manual_probe_spectral_moderate_scale_attn_l31_o_s118.log",
-      "sha256": "5ae1493803c11b8c9084578ccf84705d19487fc09574d452177d8f06e82bcfd8",
-      "size_bytes": 15702
-    },
-    {
-      "path": "artifact_package/logs/tasks/manual_probe_spectral_moderate_scale_attn_l31_o_s125.log",
-      "sha256": "fbeaa75401ecc2bd14127ed45a3a2bb5c5ff0921fb5d84a64089a4f0be66e39f",
-      "size_bytes": 8973
-    },
-    {
-      "path": "artifact_package/logs/tasks/manual_probe_spectral_moderate_scale_mlp_l31_up_s112.log",
-      "sha256": "94a831e58190db00cfe473007e44de1b94a88c40db21c3a37bc709e711e7ecdc",
-      "size_bytes": 7833
-    },
-    {
-      "path": "artifact_package/logs/tasks/manual_probe_spectral_moderate_scale_mlp_l31_up_s116.log",
-      "sha256": "40f1dd4e1ed176b5e1bcaca2a71e93ddc9dd13b43445a363b50e9b0dd3b60dc9",
-      "size_bytes": 15685
-    },
-    {
-      "path": "artifact_package/logs/tasks/manual_probe_spectral_moderate_scale_mlp_l31_up_s120.log",
-      "sha256": "ac8dbe4cc66ca3e61e92655640a1b8f3a0378109e929385526056c2142ef983c",
-      "size_bytes": 8745
-    },
-    {
-      "path": "artifact_package/logs/tasks/manual_probe_ve_baseline.log",
-      "sha256": "58f20a1b3348baa4fdc454e262bbb734a3553d2e3acf622076dcfd1e2c085716",
-      "size_bytes": 2970
-    },
-    {
-      "path": "artifact_package/logs/tasks/manual_probe_ve_mlp_scale_skew_l31_down_s090.log",
-      "sha256": "e8777c73e2786218596e7d369ef3541865acb29760b69730a710b20addb5a296",
-      "size_bytes": 9727
     },
     {
       "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CALIBRATION_RUN_002_48c0.log",
@@ -338,13 +283,13 @@
     },
     {
       "path": "artifact_package/reports/guard_value_all_guard_probe_sweep.json",
-      "sha256": "48933f69d2f2c2c3e1563b1ff1c6a4372c6eb04d061492a07a718cccdbef4c4b",
-      "size_bytes": 12651
+      "sha256": "17575486a0ec029c509918f217b03aad3f44c5924bda93a3c2272e0a8426f043",
+      "size_bytes": 12940
     },
     {
       "path": "artifact_package/reports/guard_value_probe_sweep.json",
-      "sha256": "606b177ded1c3f96736446f50a04b5175c16de7a1388c887816662feea4fee22",
-      "size_bytes": 12980
+      "sha256": "289c89d311c1f36d2a6aa02aa173d9fa3b59b4b3a0b62d8c8cc1df44715e87bb",
+      "size_bytes": 13736
     },
     {
       "path": "artifact_package/reports/scenario_signal_summary.json",

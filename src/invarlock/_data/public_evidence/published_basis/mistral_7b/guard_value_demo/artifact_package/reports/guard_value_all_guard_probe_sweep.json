@@ -88,7 +88,8 @@
       "guard_statistic": "sidecar activation edge-risk epsilon by module",
       "initial_run": {
         "remote_output_root": "/root/evidence-pack-runs/mistral_guard_all_guards_20260612a",
-        "summary_log": "artifact_package/logs/tasks/manual_probe_rmt_norm_noise_l31_ffn_up_b030.log"
+        "summary_log_packaged": false,
+        "summary_log_note": "Manual task log was not retained in this published artifact; the packaged evaluation report, runtime manifest, sidecar probe, and run_pack.log are the audited shipped evidence."
       },
       "nearest_margin_target": "model.layers.31.mlp.up_proj",
       "pm_only_verdict": "accept",
@@ -270,7 +271,8 @@
       "guard_statistic": "sidecar VE A/B gain signal",
       "initial_run": {
         "remote_output_root": "/root/evidence-pack-runs/mistral_guard_all_guards_20260612a",
-        "summary_log": "artifact_package/logs/tasks/manual_probe_ve_mlp_scale_skew_l31_down_s090.log"
+        "summary_log_packaged": false,
+        "summary_log_note": "Manual task log was not retained in this published artifact; the packaged evaluation report, runtime manifest, sidecar probe, and run_pack.log are the audited shipped evidence."
       },
       "nearest_margin_target": "model.layers.31.mlp.down_proj",
       "pm_only_verdict": "accept",
