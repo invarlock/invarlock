@@ -127,6 +127,9 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
     assert families["OpenLLaMA 7B causal LM"]["support_tier"] == "published_basis"
     assert families["Falcon 7B causal LM"]["support_tier"] == "published_basis"
     assert families["Qwen3.5 causal LM"]["support_tier"] == "published_basis"
+    assert families["Gemma 4 12B any-to-any LM"]["support_tier"] == (
+        "published_basis"
+    )
     assert families["Granite 4.1 3B causal LM"]["support_tier"] == "published_basis"
     assert families["Granite 4.1 8B causal LM"]["support_tier"] == "published_basis"
     assert (
@@ -141,15 +144,16 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         families["DeepSeek-R1-Distill-Qwen 14B causal LM"]["support_tier"]
         == "published_basis"
     )
-    assert families["Gemma 4 12B any-to-any LM"]["support_tier"] == (
+    assert families["SmolLM3 3B causal LM"]["support_tier"] == (
         "community_experimental"
     )
-    for family in (
-        "Gemma 4 12B any-to-any LM",
-        "SmolLM3 3B causal LM",
-        "Phi-4 mini causal LM",
-        "Falcon-H1R 7B causal LM",
-    ):
+    assert families["SmolLM3 3B causal LM"]["evidence_status"] == (
+        "repo_included_pilot_config"
+    )
+    assert families["SmolLM3 3B causal LM"]["docs_label"] == (
+        "No, release-profile guard-overhead blocker"
+    )
+    for family in ("Phi-4 mini causal LM", "Falcon-H1R 7B causal LM"):
         assert families[family]["support_tier"] == "community_experimental"
         assert families[family]["evidence_status"] == "repo_included_pilot_config"
         assert families[family]["docs_label"] == (

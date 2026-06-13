@@ -452,7 +452,7 @@
         "audio"
       ],
       "task_role": "any_to_any",
-      "state": "community_experimental",
+      "state": "published_basis",
       "representative_models": [
         "google/gemma-4-12B-it"
       ],
@@ -462,14 +462,18 @@
         "configs/presets/multimodal/gemma4_12b_vision_text_256.yaml",
         "configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
-        "src/invarlock/adapters/hf_loading.py"
+        "src/invarlock/adapters/hf_loading.py",
+        "public_evidence/published_basis/gemma4_12b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_12b/runtime.manifest.json",
+        "public_evidence/published_basis/gemma4_12b/evidence_pack"
       ],
       "support_groups": [
+        "published_modern",
         "practical_shortlist",
         "enterprise_permissive",
         "multimodal_candidate"
       ],
-      "notes": "Added from practical-picks backlog with a repo pilot vision_text preset, a pinned public VQAv2 materialization lane, and Gemma 4 unified loader tests. Gemma 4 12B uses the explicit hf_multimodal path and requires the multimodal runtime stack (transformers>=5.12.0 and torchvision>=0.26.0). Promotion still requires a clean public release evidence run and evidence pack rather than the local smoke manifest."
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence, runtime manifest, and signed evidence pack. Gemma 4 12B uses the explicit hf_multimodal path and requires the multimodal runtime stack (transformers>=5.12.0 and torchvision>=0.26.0); audio evaluation remains deferred."
     },
     {
       "family_id": "ministral-3-3b-text-causal-lm",
@@ -567,7 +571,7 @@
       "support_groups": [
         "small_local"
       ],
-      "notes": "Added from practical-picks backlog with repo preset, calibration config, and sweep lane. Release-profile evidence run 20260612Tsmollm3ReleaseProfileA fails the guard-overhead policy (+1.11% > +1.0%) before report generation, so public evidence remains blocked."
+      "notes": "Added from practical-picks backlog with repo preset, calibration config, and sweep lane. Release-profile evidence recheck 20260613Tsmollm3ReleaseRecheckA fails the guard-overhead policy (+1.11% > +1.0%) before report generation, so public evidence remains blocked."
     },
     {
       "family_id": "phi-4-mini-causal-lm",

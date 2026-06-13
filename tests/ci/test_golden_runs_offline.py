@@ -94,6 +94,7 @@ def test_offline_golden_runs_public_fixtures() -> None:
         "qwen3_8b",
         "qwen3_5_9b",
         "gemma4_e2b",
+        "gemma4_12b",
         "granite4_1_3b",
         "granite4_1_8b",
         "deepseek_r1_distill_qwen_7b",

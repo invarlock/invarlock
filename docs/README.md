@@ -260,7 +260,7 @@ Notes
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| SmolLM3 3B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+| SmolLM3 3B causal LM | Yes | Yes | Yes | No, release-profile guard-overhead blocker |
 | Phi-4 mini causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 
 ### Prepared 7B-14B Candidate Backlog
@@ -269,11 +269,11 @@ Notes
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | Falcon-H1R 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 
-### Multimodal Candidate Backlog
+### Multimodal Published Basis
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| Gemma 4 12B any-to-any LM | Yes | Yes | No | No, repo-included pilot config only |
+| Gemma 4 12B any-to-any LM | Yes | Yes | No | Yes |
 
 ### Generic Seq2Seq And Local Pairs
 
@@ -283,10 +283,11 @@ Notes
 
 Published assurance basis covers GPT-2, BERT, Mistral 7B, Ministral 3 3B,
 Ministral 3 8B, Ministral 3 14B, TinyLlama 1.1B, Gemma 4 E2B text-only,
-Granite 4.1 3B, Granite 4.1 8B, OLMo 2 7B, OLMo 2 13B, Qwen2 7B,
-OpenLLaMA 7B, Falcon 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B,
-DeepSeek-R1-Distill-Qwen 7B, DeepSeek-R1-0528-Qwen3 8B,
-DeepSeek-R1-Distill-Qwen 14B, and Phi-4 text-only profiles. Repo-included
+Gemma 4 12B image-text, Granite 4.1 3B, Granite 4.1 8B, OLMo 2 7B,
+OLMo 2 13B, Qwen2 7B, OpenLLaMA 7B, Falcon 7B, Qwen2.5 7B,
+Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B, DeepSeek-R1-Distill-Qwen 7B,
+DeepSeek-R1-0528-Qwen3 8B, DeepSeek-R1-Distill-Qwen 14B, and Phi-4 text-only
+profiles. Repo-included
 presets and pilot calibration configs for prepared practical-pick lanes do not
 become part of the published assurance basis until supporting artifacts are
 attached.
@@ -317,8 +318,9 @@ they become release-supported lanes.
 Image-text evaluation uses the built-in
 `hf_multimodal` adapter and the `vision_text` provider. Install
 `invarlock[multimodal]` for this path; Gemma 4 unified checkpoints require
-`transformers>=5.12.0` and `torchvision>=0.26.0`. Public support remains
-text-only for the Gemma 4 lane, and audio evaluation is deferred.
+`transformers>=5.12.0` and `torchvision>=0.26.0`. The Gemma 4 E2B public lane
+remains text-only, Gemma 4 12B now has a public image-text basis on pinned VQAv2
+materialization, and audio evaluation is deferred.
 
 Machine-readable support metadata lives in `contracts/support_matrix.json`. It is
 the canonical source of truth for normalized support tiers
@@ -340,7 +342,9 @@ The image-text path also includes an offline demo preset at
 Gemma 4 12B promotion uses
 `configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml` together with the
 model-evidence materializer for pinned public VQAv2 sample-validation data; the
-local smoke manifest remains provider/config validation only.
+published evidence fixture lives under
+`public_evidence/published_basis/gemma4_12b/`, and the local smoke manifest
+remains provider/config validation only.
 
 For the broader inventory of declared support, implemented-but-not-public
 coverage, usage-only checkpoint families, and recommended additions, see

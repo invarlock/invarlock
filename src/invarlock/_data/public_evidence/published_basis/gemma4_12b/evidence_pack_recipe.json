@@ -1,0 +1,19 @@
+{
+  "artifacts": [
+    "public_evidence/published_basis/gemma4_12b/evaluation.report.json",
+    "public_evidence/published_basis/gemma4_12b/runtime.manifest.json",
+    "public_evidence/published_basis/gemma4_12b/evidence_pack/manifest.json",
+    "public_evidence/published_basis/gemma4_12b/evidence_pack/manifest.signature.json",
+    "public_evidence/published_basis/gemma4_12b/evidence_pack/checksums.sha256",
+    "public_evidence/published_basis/gemma4_12b/evidence_pack/results/final_verdict.json"
+  ],
+  "commands": [
+    "make runtime-image-cuda",
+    "uv run python scripts/model_evidence/run_model_evidence_remote.py --host root@86.38.238.232 --remote-repo /root/invarlock-public-promote --remote-python /root/invarlock-public/.venv/bin/python --branch work/promote-gemma-deepseek --gpus 1 --suite support-matrix-backlog-gpu --slug google_gemma_4_12b_it --profile release --execution-mode container --remote-env HF_HUB_DISABLE_XET=1 --remote-env HF_HOME=/root/.cache/huggingface --skip-sync --stamp 20260613Tgemma12bPublicVqaH",
+    "uv run invarlock advanced evidence-pack build public_evidence/published_basis/gemma4_12b/evidence_pack --final-verdict tmp/gemma4_12b_pack_inputs/final_verdict.json --report public_evidence/published_basis/gemma4_12b/evaluation.report.json --source-repo tmp/gemma4_12b_pack_inputs/source_repo.json --environment tmp/gemma4_12b_pack_inputs/environment.json --material model_revisions=artifacts/model-evidence/remote/20260613Tgemma12bPublicVqaH/shard-00-gpu-1/model_revisions.json --material artifact_manifest=artifacts/model-evidence/remote/20260613Tgemma12bPublicVqaH/shard-00-gpu-1/artifact_manifest.json --material dataset_materialization=artifacts/model-evidence/remote/20260613Tgemma12bPublicVqaH/shard-00-gpu-1/eval/google_gemma_4_12b_it/dataset/materialization_summary.json --signing-key tmp/gemma4_12b_pack_inputs/evidence-pack-signing-key.pem --profile release --report-assurance strict --release-review"
+  ],
+  "format_version": "published-basis-evidence-pack-recipe-v1",
+  "lane_id": "gemma4-12b-any-to-any-hf",
+  "network_mode": "online_first_then_offline",
+  "suite": "support-matrix-backlog-gpu"
+}

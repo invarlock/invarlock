@@ -433,11 +433,12 @@
       "family": "Gemma 4 12B any-to-any LM",
       "runtime": "huggingface-pytorch",
       "adapter": "hf_multimodal",
-      "support_tier": "community_experimental",
-      "evidence_status": "repo_included_pilot_config",
-      "docs_label": "No, repo-included pilot config only",
+      "support_tier": "published_basis",
+      "evidence_status": "published_release_strict",
+      "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
+        "published_modern",
         "practical_shortlist",
         "enterprise_permissive",
         "multimodal_candidate"
@@ -445,7 +446,13 @@
       "representative_models": [
         "google/gemma-4-12B-it"
       ],
-      "notes": "Added from practical-picks backlog with a repo pilot vision_text preset, a pinned public VQAv2 materialization lane, and Gemma 4 unified loader tests. Gemma 4 12B uses the explicit hf_multimodal path and requires the multimodal runtime stack (transformers>=5.12.0 and torchvision>=0.26.0). Promotion still requires a clean public release evidence run and evidence pack rather than the local smoke manifest."
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/gemma4_12b/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/gemma4_12b/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/gemma4_12b/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/gemma4_12b/evidence_pack"
+      },
+      "notes": "Promoted from practical-picks backlog with release-profile container-backed public VQAv2 image-text evidence, runtime manifest, and signed evidence pack. Gemma 4 12B uses the explicit hf_multimodal path and requires the multimodal runtime stack (transformers>=5.12.0 and torchvision>=0.26.0); audio evaluation remains deferred."
     },
     {
       "lane_id": "ministral-3-3b-text-causal-hf",
@@ -502,7 +509,7 @@
       "adapter": "hf_causal",
       "support_tier": "community_experimental",
       "evidence_status": "repo_included_pilot_config",
-      "docs_label": "No, repo-included pilot config only",
+      "docs_label": "No, release-profile guard-overhead blocker",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
         "small_local"
@@ -510,7 +517,7 @@
       "representative_models": [
         "HuggingFaceTB/SmolLM3-3B"
       ],
-      "notes": "Added from practical-picks backlog with repo preset, calibration config, and sweep lane. Release-profile evidence run 20260612Tsmollm3ReleaseProfileA fails the guard-overhead policy (+1.11% > +1.0%) before report generation, so public evidence remains blocked."
+      "notes": "Added from practical-picks backlog with repo preset, calibration config, and sweep lane. Release-profile evidence recheck 20260613Tsmollm3ReleaseRecheckA fails the guard-overhead policy (+1.11% > +1.0%) before report generation, so public evidence remains blocked."
     },
     {
       "lane_id": "phi-4-mini-causal-hf",

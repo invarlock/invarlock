@@ -17,6 +17,7 @@
     "qwen3_8b",
     "qwen3_5_9b",
     "gemma4_e2b",
+    "gemma4_12b",
     "granite4_1_3b",
     "granite4_1_8b",
     "deepseek_r1_distill_qwen_7b",
@@ -121,6 +122,12 @@
       "model_id": "google/gemma-4-E2B-it",
       "primary_metric_kind": "ppl_causal",
       "report": "public_evidence/published_basis/gemma4_e2b/evaluation.report.json"
+    },
+    {
+      "id": "gemma4_12b",
+      "model_id": "google/gemma-4-12B-it",
+      "primary_metric_kind": "accuracy",
+      "report": "public_evidence/published_basis/gemma4_12b/evaluation.report.json"
     },
     {
       "id": "granite4_1_3b",

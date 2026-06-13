@@ -1,0 +1,23 @@
+{
+  "artifact_paths": {
+    "evaluation_report": "evaluation.report.json",
+    "evidence_pack": "evidence_pack",
+    "evidence_pack_recipe": "evidence_pack_recipe.json",
+    "runtime_manifest": "runtime.manifest.json"
+  },
+  "evidence_class": "strict_pass_fixture",
+  "expected_fingerprint": "sha256:e482b7bbdb14a23adea1388dc23ea5bb73e7254144667edb4fcb770685600b9c",
+  "generated_by": "model evidence remote sweep",
+  "model_revision": "5926caa4ec0cac5cbfadaf4077420520de1d5205",
+  "non_goals": [
+    "Model weights are external Hugging Face references.",
+    "The dataset image cache is not committed; public dataset revision, manifest hash, and materialization hashes are recorded instead.",
+    "This fixture is a no-op preservation basis, not a fine-tuning, compression, or visual question answering benchmark claim."
+  ],
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "Release-strict verifier fixture for the Gemma 4 12B image-text published-basis lane on pinned public VQAv2 materialization.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/published_basis/gemma4_12b/evaluation.report.json --profile release --assurance strict",
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/gemma4_12b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:e482b7bbdb14a23adea1388dc23ea5bb73e7254144667edb4fcb770685600b9c"
+  ]
+}
