@@ -17,6 +17,7 @@ def test_cli_evaluate_help():
     assert "--baseline-report" in stdout
     assert "--edit-label" in stdout
     assert "--execution-mode" in stdout
+    assert "--allow-remote-code" in stdout
 
 
 def test_cli_verify_help_shows_runtime_provenance_choices():

@@ -305,6 +305,11 @@ def _evaluate_lazy(
         "--allow-network",
         help="Allow network access, including runtime-image pulls and model fetches.",
     ),
+    allow_remote_code: bool = typer.Option(
+        False,
+        "--allow-remote-code",
+        help="Allow trust_remote_code-style model loading for this command.",
+    ),
 ):
     from .commands.evaluate import evaluate_command as _eval
 
@@ -334,6 +339,7 @@ def _evaluate_lazy(
         assurance=assurance,
         no_color=no_color,
         allow_network=allow_network,
+        allow_remote_code=allow_remote_code,
     )
 
 
