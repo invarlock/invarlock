@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 from invarlock.guards.variance import VarianceGuard
 
@@ -43,3 +44,31 @@ def test_tensorize_and_ensure_tensor_value_paths():
     assert hasattr(tb[0]["input_ids"], "shape")
     assert hasattr(tb[1][0], "shape")
     assert hasattr(tb[2][0], "shape")
+
+
+def test_tensorize_calibration_batches_honors_max_seq_len() -> None:
+    guard = VarianceGuard(policy={"calibration": {"max_seq_len": 4}})
+
+    batches = [
+        {
+            "input_ids": torch.arange(10),
+            "attention_mask": [1] * 10,
+            "labels": torch.arange(10),
+            "window_id": "w0",
+            "meta": "kept",
+        },
+        (torch.arange(12).reshape(1, 12), torch.ones(1, 12, dtype=torch.long)),
+    ]
+
+    tensorized = guard._tensorize_calibration_batches(batches)
+
+    assert tensorized[0]["input_ids"].tolist() == [0, 1, 2, 3]
+    assert tensorized[0]["attention_mask"].tolist() == [1, 1, 1, 1]
+    assert tensorized[0]["labels"].tolist() == [0, 1, 2, 3]
+    assert tensorized[0]["window_id"] == "w0"
+    assert tensorized[0]["meta"] == "kept"
+    assert tuple(tensorized[1][0].shape) == (1, 4)
+    assert tuple(tensorized[1][1].shape) == (1, 4)
+    assert guard._stats["calibration"]["max_seq_len"] == 4
+    assert guard._stats["calibration"]["max_observed_seq_len"] == 12
+    assert guard._stats["calibration"]["truncation_applied"] is True

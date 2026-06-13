@@ -734,7 +734,7 @@
         "text"
       ],
       "task_role": "causal_lm",
-      "state": "published_basis",
+      "state": "prepared_evidence_candidate",
       "representative_models": [
         "Qwen/Qwen3-30B-A3B-Instruct-2507"
       ],

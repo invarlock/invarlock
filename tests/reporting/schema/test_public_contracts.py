@@ -148,6 +148,17 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "FLAN-T5 base seq2seq LM",
     }
     assert all(item["support_groups"] for item in family_catalog["declared_support"])
+    implemented = {
+        item["display_name"]: item for item in family_catalog["implemented_coverage"]
+    }
+    qwen3_moe = implemented["Qwen3 30B-A3B MoE causal LM"]
+    assert qwen3_moe["state"] == "prepared_evidence_candidate"
+    assert not any(
+        evidence.startswith("public_evidence/published_basis/")
+        for evidence in qwen3_moe["repo_evidence"]
+    )
+    assert "not a published basis" in qwen3_moe["notes"]
+
     usage_only = {item["display_name"] for item in family_catalog["usage_only"]}
     assert "QwQ 32B reasoning" not in usage_only
     assert "Qwen2.5 7B" not in usage_only

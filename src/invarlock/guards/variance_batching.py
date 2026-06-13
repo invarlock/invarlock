@@ -102,23 +102,106 @@ def ensure_tensor_value(value: Any) -> Any:
     return value
 
 
+def resolve_calibration_max_seq_len(guard: Any) -> int | None:
+    """Resolve an optional sequence cap for variance calibration batches."""
+    policy = getattr(guard, "_policy", {}) or {}
+    calibration = policy.get("calibration", {})
+    raw = None
+    if isinstance(calibration, dict):
+        raw = calibration.get("max_seq_len")
+    if raw is None:
+        raw = policy.get("calibration_max_seq_len")
+    try:
+        resolved = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return resolved if resolved > 0 else None
+
+
+def truncate_calibration_tensor(
+    guard: Any, value: Any
+) -> tuple[Any, bool, int | None]:
+    """Truncate calibration tensors on the sequence axis when configured."""
+    max_seq_len = resolve_calibration_max_seq_len(guard)
+    if max_seq_len is None or not isinstance(value, torch.Tensor) or value.dim() == 0:
+        return value, False, None
+
+    seq_len = int(value.shape[-1])
+    if seq_len <= max_seq_len:
+        return value, False, seq_len
+    return value[..., :max_seq_len].clone(), True, seq_len
+
+
+def _record_calibration_truncation(
+    guard: Any,
+    *,
+    max_seq_len: int | None,
+    truncated: int,
+    max_observed_seq_len: int | None,
+) -> None:
+    if max_seq_len is None:
+        return
+    stats = getattr(guard, "_stats", None)
+    if not isinstance(stats, dict):
+        return
+    calibration_stats = stats.setdefault("calibration", {})
+    calibration_stats["max_seq_len"] = int(max_seq_len)
+    if max_observed_seq_len is not None:
+        previous_max = calibration_stats.get("max_observed_seq_len")
+        try:
+            previous_max_int = int(previous_max)
+        except (TypeError, ValueError):
+            previous_max_int = 0
+        calibration_stats["max_observed_seq_len"] = max(
+            previous_max_int,
+            int(max_observed_seq_len),
+        )
+    if truncated:
+        calibration_stats["truncation_applied"] = True
+        calibration_stats["truncated_values"] = int(
+            calibration_stats.get("truncated_values", 0) or 0
+        ) + int(truncated)
+
+
 def tensorize_calibration_batches(guard: Any, batches: list[Any]) -> list[Any]:
     """Ensure calibration batches contain tensor payloads for model execution."""
     tensor_batches: list[Any] = []
+    max_seq_len = resolve_calibration_max_seq_len(guard)
+    truncated_values = 0
+    max_observed_seq_len: int | None = None
+
+    def normalize_calibration_value(value: Any) -> Any:
+        nonlocal truncated_values, max_observed_seq_len
+        tensor_value = ensure_tensor_value(value)
+        truncated, did_truncate, seq_len = truncate_calibration_tensor(
+            guard, tensor_value
+        )
+        if seq_len is not None:
+            max_observed_seq_len = max(max_observed_seq_len or 0, seq_len)
+        if did_truncate:
+            truncated_values += 1
+        return truncated
+
     for batch in batches:
         if isinstance(batch, dict):
             converted: dict[str, Any] = {}
             for key, value in batch.items():
                 if key in {"input_ids", "inputs", "attention_mask", "labels"}:
-                    converted[key] = ensure_tensor_value(value)
+                    converted[key] = normalize_calibration_value(value)
                 else:
                     converted[key] = value
             tensor_batches.append(converted)
         elif isinstance(batch, list | tuple):
-            converted_list = [ensure_tensor_value(value) for value in batch]
+            converted_list = [normalize_calibration_value(value) for value in batch]
             tensor_batches.append(type(batch)(converted_list))
         else:
-            tensor_batches.append(ensure_tensor_value(batch))
+            tensor_batches.append(normalize_calibration_value(batch))
+    _record_calibration_truncation(
+        guard,
+        max_seq_len=max_seq_len,
+        truncated=truncated_values,
+        max_observed_seq_len=max_observed_seq_len,
+    )
     return tensor_batches
 
 
@@ -233,6 +316,7 @@ def prepare_batch_tensors(
         input_ids = torch.as_tensor(input_ids)
     if input_ids.dim() == 1:
         input_ids = input_ids.unsqueeze(0)
+    input_ids, _, _ = truncate_calibration_tensor(guard, input_ids)
     try:
         input_ids = input_ids.to(device)
     except (AttributeError, RuntimeError, TypeError, ValueError):
@@ -244,6 +328,7 @@ def prepare_batch_tensors(
             attention_mask = torch.as_tensor(attention_mask)
         if attention_mask.dim() == 1:
             attention_mask = attention_mask.unsqueeze(0)
+        attention_mask, _, _ = truncate_calibration_tensor(guard, attention_mask)
         try:
             attention_mask = attention_mask.to(device)
         except (AttributeError, RuntimeError, TypeError, ValueError):
@@ -386,7 +471,9 @@ __all__ = [
     "extract_window_ids",
     "materialize_batch",
     "prepare_batch_tensors",
+    "resolve_calibration_max_seq_len",
     "safe_mean",
     "store_calibration_batches",
     "tensorize_calibration_batches",
+    "truncate_calibration_tensor",
 ]

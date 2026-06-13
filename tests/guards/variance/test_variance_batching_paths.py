@@ -42,6 +42,23 @@ def test_prepare_batch_tensors_handles_none_and_attention_mask_lists() -> None:
     assert labels.tolist() == [[1, 2, -100]]
 
 
+def test_prepare_batch_tensors_honors_calibration_max_seq_len() -> None:
+    guard = SimpleNamespace(
+        _policy={"calibration": {"max_seq_len": 2}},
+        _stats={},
+    )
+    device = torch.device("cpu")
+
+    input_ids, labels = prepare_batch_tensors(
+        guard,
+        {"input_ids": [1, 2, 3, 4], "attention_mask": [1, 0, 1, 1]},
+        device,
+    )
+
+    assert input_ids.tolist() == [[1, 2]]
+    assert labels.tolist() == [[1, -100]]
+
+
 def test_release_batch_memory_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
     monkeypatch.setattr(torch.cuda, "empty_cache", lambda: calls.append("empty"))
