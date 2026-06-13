@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -343,6 +344,31 @@ def test_evaluate_vision_text_arm_skips_zero_answer_tokens_and_blank_processor_s
     assert payload["records"][0]["references"] == []
     assert payload["records"][0]["correct"] is False
     assert "processor_sha256" not in payload
+
+
+def test_evaluate_vision_text_arm_empty_batches_omit_input_records() -> None:
+    class _Adapter:
+        def prepare_model_inputs(self, batch, device, include_labels):  # noqa: ANN001
+            raise AssertionError("empty arm should not prepare inputs")
+
+        def prepare_generation_inputs(self, batch, device):  # noqa: ANN001
+            raise AssertionError("empty arm should not prepare generation")
+
+        def decode_generated(self, generated_ids, generation_inputs):  # noqa: ANN001
+            raise AssertionError("empty arm should not decode")
+
+    payload, latency_ms = rem._evaluate_vision_text_arm(
+        _FakeModel(),
+        [],
+        adapter=_Adapter(),
+        device="cpu",
+    )
+
+    assert latency_ms == 0.0
+    assert payload["total"] == 0
+    assert math.isnan(payload["accuracy"])
+    assert math.isnan(payload["mean_logloss"])
+    assert "input_records" not in payload
 
 
 def test_evaluate_vision_text_arm_keeps_first_processor_sha_across_multiple_batches() -> (

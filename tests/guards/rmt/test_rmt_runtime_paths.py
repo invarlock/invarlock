@@ -75,6 +75,16 @@ def test_rmt_activation_modules_honor_gemma_text_pattern_filter() -> None:
     ]
 
 
+def test_rmt_activation_module_filter_excludes_matching_patterns() -> None:
+    guard = runtime_rmt.RMTGuard(correct=False)
+    guard.module_include_patterns = ("model.*",)
+    guard.module_exclude_patterns = ("*.audio_tower.*",)
+
+    assert guard._module_filter_allows("model.language_model.layers.0.mlp") is True
+    assert guard._module_filter_allows("model.audio_tower.layers.0.attn") is False
+    assert guard._module_filter_allows("other.layers.0.mlp") is False
+
+
 def test_capture_baseline_mp_stats_svd_failure_is_skipped(monkeypatch) -> None:
     monkeypatch.setattr(
         torch.linalg,

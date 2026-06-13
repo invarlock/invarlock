@@ -78,3 +78,13 @@ def test_spectral_guard_module_patterns_scope_gemma_text_blocks() -> None:
     assert "model.language_model.layers.0.per_layer_projection" not in (
         guard.baseline_sigmas
     )
+
+
+def test_spectral_guard_module_filter_excludes_matching_patterns() -> None:
+    guard = SpectralGuard(scope="all")
+    guard.module_include_patterns = ("model.*",)
+    guard.module_exclude_patterns = ("*.audio_tower.*",)
+
+    assert guard._module_filter_allows("model.language_model.layers.0.mlp") is True
+    assert guard._module_filter_allows("model.audio_tower.layers.0.attn") is False
+    assert guard._module_filter_allows("other.layers.0.mlp") is False

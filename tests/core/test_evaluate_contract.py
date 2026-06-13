@@ -111,6 +111,16 @@ def test_load_validated_baseline_report_accepts_valid_explicit_file(
     assert payload["edit"] == {"name": "noop"}
 
 
+def test_expected_baseline_value_matches_provider_kind_edge_cases() -> None:
+    matcher = evaluate_contract_mod._baseline_dataset_value_matches  # noqa: SLF001
+
+    assert matcher("provider", {"kind": "hf"}, {"provider": "hf"}) is True
+    assert matcher("provider", {"provider": "hf"}, {"dataset": "hf"}) is True
+    assert matcher("provider", {"kind": ""}, {"provider": "hf"}) is False
+    assert matcher("provider", {"unexpected": "hf"}, {"provider": "hf"}) is False
+    assert matcher("provider", object(), {"provider": "hf"}) is False
+
+
 def test_load_validated_baseline_report_accepts_multimodal_baseline_windows(
     tmp_path: Path,
 ) -> None:

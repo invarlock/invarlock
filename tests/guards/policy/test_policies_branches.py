@@ -310,6 +310,48 @@ def test_apply_rmt_policy_overrides_handles_invalid_and_partial_activation_confi
     }
 
 
+def test_apply_rmt_policy_overrides_normalizes_module_patterns() -> None:
+    class _Guard:
+        def __init__(self) -> None:
+            self.q = 0.5
+            self.deadband = 0.1
+            self.margin = 1.5
+            self.correct = True
+            self.epsilon_default = 0.08
+            self.epsilon_by_family = {}
+            self.module_include_patterns = ()
+            self.module_exclude_patterns = ()
+
+        def _set_epsilon_by_family(self, value) -> None:  # noqa: ANN001
+            if isinstance(value, dict):
+                self.epsilon_by_family.update(value)
+
+        def _set_epsilon_default(self, value) -> None:  # noqa: ANN001
+            self.epsilon_default = float(value)
+
+    guard = _Guard()
+
+    apply_rmt_policy_overrides(
+        guard,
+        {
+            "module_include_patterns": [" model.* ", "", "model.*", 7],
+            "module_exclude_patterns": " *.audio_tower.* ",
+        },
+    )
+
+    assert guard.module_include_patterns == ("model.*",)
+    assert guard.module_exclude_patterns == ("*.audio_tower.*",)
+    assert guard.epsilon_by_family == {
+        "attn": 0.08,
+        "ffn": 0.08,
+        "embed": 0.08,
+        "other": 0.08,
+    }
+
+    apply_rmt_policy_overrides(guard, {"module_include_patterns": None})
+    assert guard.module_include_patterns == ()
+
+
 def test_get_rmt_policy_overlay_and_fallback(monkeypatch: pytest.MonkeyPatch):
     """Exercise RMT policy overlay and fallback branches."""
 

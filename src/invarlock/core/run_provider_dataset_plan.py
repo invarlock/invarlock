@@ -191,17 +191,6 @@ def _split_vision_text_counts(
     preview_count = int(round(available * (desired_preview / desired_total)))
     preview_count = max(1, min(preview_count, available - 1, desired_preview))
     final_count = min(desired_final, available - preview_count)
-    if final_count <= 0 and requested_final > 0:
-        final_count = 1
-        preview_count = max(available - 1, 0)
-    unused = available - preview_count - final_count
-    if unused > 0:
-        preview_room = max(desired_preview - preview_count, 0)
-        preview_extra = min(unused, preview_room)
-        preview_count += preview_extra
-        unused -= preview_extra
-        if unused > 0:
-            final_count += min(unused, max(desired_final - final_count, 0))
     return preview_count, final_count
 
 

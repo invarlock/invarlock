@@ -5,6 +5,7 @@ import torch.nn as nn
 from invarlock.guards.variance import VarianceGuard
 from invarlock.guards.variance_scaling import (
     _emit_progress,
+    _t5_dense_relu_dense,
     equalise_residual_variance,
 )
 
@@ -693,3 +694,128 @@ def test_equalise_residual_variance_raises_on_non_iterable_dataloader():
             apply=False,
             allow_empty=False,
         )
+
+
+def test_t5_dense_relu_dense_falls_back_when_layer_iteration_fails() -> None:
+    dense = nn.Linear(2, 2)
+
+    class _BrokenLayers:
+        def __iter__(self):
+            raise TypeError("broken")
+
+    block = nn.Module()
+    block.layer = _BrokenLayers()
+    block.DenseReluDense = dense
+
+    assert _t5_dense_relu_dense(block) is dense
+
+
+def test_t5_dense_relu_dense_finds_dense_inside_layer_iterable() -> None:
+    dense = nn.Linear(2, 2)
+    block = nn.Module()
+    block.layer = [nn.Module()]
+    block.layer[0].DenseReluDense = dense
+
+    assert _t5_dense_relu_dense(block) is dense
+
+
+def test_t5_dense_relu_dense_uses_fallback_after_empty_or_nonmatching_layers() -> None:
+    dense = nn.Linear(2, 2)
+
+    empty_block = nn.Module()
+    empty_block.layer = []
+    empty_block.DenseReluDense = dense
+    assert _t5_dense_relu_dense(empty_block) is dense
+
+    nonmatching_block = nn.Module()
+    nonmatching_block.layer = [nn.Module()]
+    nonmatching_block.DenseReluDense = dense
+    assert _t5_dense_relu_dense(nonmatching_block) is dense
+
+
+def test_equalise_residual_variance_normalizes_dict_batches_with_labels_and_masks() -> (
+    None
+):
+    class _Model(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.proj = nn.Linear(2, 2, bias=False)
+            with torch.no_grad():
+                self.proj.weight.fill_(2.0)
+            self.calls: list[tuple[torch.Size, torch.Size | None, torch.Size | None]] = []
+
+        def forward(
+            self,
+            input_ids: torch.Tensor,
+            attention_mask: torch.Tensor | None = None,
+            labels: torch.Tensor | None = None,
+        ) -> torch.Tensor:
+            self.calls.append(
+                (
+                    input_ids.shape,
+                    None if attention_mask is None else attention_mask.shape,
+                    None if labels is None else labels.shape,
+                )
+            )
+            return self.proj(torch.ones(1, 2, device=input_ids.device))
+
+    model = _Model()
+    out = equalise_residual_variance(
+        model,
+        dataloader=[
+            {"input_ids": [1, 2], "attention_mask": [1, 1], "labels": [1, 2]},
+            {"inputs": [3, 4], "attention_mask": [1, 0]},
+            {
+                "input_ids": torch.tensor([[5, 6]]),
+                "attention_mask": torch.tensor([[1, 1]]),
+                "labels": torch.tensor([[5, 6]]),
+            },
+        ],
+        windows=3,
+        tol=0.0,
+        clamp_range=None,
+        apply=False,
+        allow_empty=False,
+        target_modules={"proj": model.proj},
+    )
+
+    assert model.calls == [
+        (torch.Size([1, 2]), torch.Size([1, 2]), torch.Size([1, 2])),
+        (torch.Size([1, 2]), torch.Size([1, 2]), None),
+        (torch.Size([1, 2]), torch.Size([1, 2]), torch.Size([1, 2])),
+    ]
+    assert set(out) == {"proj"}
+
+
+def test_equalise_residual_variance_falls_back_to_positional_call_after_typeerror() -> (
+    None
+):
+    class _Model(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.proj = nn.Linear(2, 2, bias=False)
+            with torch.no_grad():
+                self.proj.weight.fill_(2.0)
+            self.positional_calls = 0
+
+        def forward(self, *args, **kwargs):  # noqa: ANN002,ANN003
+            if kwargs:
+                raise TypeError("keyword path unavailable")
+            self.positional_calls += 1
+            input_ids = args[0]
+            return self.proj(torch.ones(1, 2, device=input_ids.device))
+
+    model = _Model()
+    out = equalise_residual_variance(
+        model,
+        dataloader=[{"input_ids": [1, 2], "attention_mask": [1, 1]}],
+        windows=1,
+        tol=0.0,
+        clamp_range=None,
+        apply=False,
+        allow_empty=False,
+        target_modules={"proj": model.proj},
+    )
+
+    assert model.positional_calls == 1
+    assert set(out) == {"proj"}

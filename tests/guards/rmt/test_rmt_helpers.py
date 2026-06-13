@@ -177,3 +177,48 @@ def test_iter_transformer_layers_bert_style_handles_iteration_error() -> None:
 
     layers = list(_iter_transformer_layers(_Model()))
     assert layers == []
+
+
+def test_iter_transformer_layers_encoder_decoder_block_style_yields_layers() -> None:
+    class _Model(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.encoder = nn.Module()
+            self.encoder.block = nn.ModuleList([nn.Linear(1, 1)])
+            self.decoder = nn.Module()
+            self.decoder.block = nn.ModuleList([nn.Linear(1, 1)])
+
+    layers = list(_iter_transformer_layers(_Model()))
+    assert len(layers) == 2
+
+
+def test_iter_transformer_layers_encoder_decoder_block_style_handles_errors() -> None:
+    class _BadIterable:
+        def __len__(self) -> int:
+            return 1
+
+        def __iter__(self):
+            raise TypeError("boom")
+
+    class _Model(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.encoder = nn.Module()
+            self.encoder.block = _BadIterable()
+            self.decoder = nn.Module()
+            self.decoder.block = _BadIterable()
+
+    layers = list(_iter_transformer_layers(_Model()))
+    assert layers == []
+
+
+def test_iter_transformer_layers_encoder_block_without_decoder_block() -> None:
+    class _Model(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.encoder = nn.Module()
+            self.encoder.block = nn.ModuleList([nn.Linear(1, 1)])
+            self.decoder = nn.Module()
+
+    layers = list(_iter_transformer_layers(_Model()))
+    assert len(layers) == 1

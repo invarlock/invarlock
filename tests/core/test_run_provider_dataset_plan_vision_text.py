@@ -6,6 +6,7 @@ import pytest
 
 from invarlock.core.run_provider_dataset_plan import (
     _materialize_text_provider_dataset_plan,
+    _split_vision_text_counts,
     _vision_text_dataset_plan,
     build_provider_dataset_plan,
 )
@@ -309,6 +310,54 @@ def test_vision_text_dataset_plan_requires_examples_and_keeps_window_capacity() 
         "min_tokens_target": 4,
         "tokens_floor_met": True,
     }
+
+
+def test_split_vision_text_counts_covers_capacity_edges() -> None:
+    assert _split_vision_text_counts(
+        available=0,
+        requested_preview=1,
+        requested_final=1,
+        effective_preview=1,
+        effective_final=1,
+    ) == (0, 0)
+    assert _split_vision_text_counts(
+        available=4,
+        requested_preview=1,
+        requested_final=1,
+        effective_preview=0,
+        effective_final=0,
+    ) == (0, 0)
+    assert _split_vision_text_counts(
+        available=2,
+        requested_preview=0,
+        requested_final=3,
+        effective_preview=0,
+        effective_final=3,
+    ) == (0, 2)
+    assert _split_vision_text_counts(
+        available=2,
+        requested_preview=3,
+        requested_final=0,
+        effective_preview=3,
+        effective_final=0,
+    ) == (2, 0)
+
+
+def test_split_vision_text_counts_distributes_remaining_capacity() -> None:
+    assert _split_vision_text_counts(
+        available=7,
+        requested_preview=5,
+        requested_final=5,
+        effective_preview=5,
+        effective_final=5,
+    ) == (4, 3)
+    assert _split_vision_text_counts(
+        available=3,
+        requested_preview=3,
+        requested_final=1,
+        effective_preview=3,
+        effective_final=1,
+    ) == (2, 1)
 
 
 def test_vision_text_dataset_plan_rebalances_when_final_arm_would_be_empty() -> None:

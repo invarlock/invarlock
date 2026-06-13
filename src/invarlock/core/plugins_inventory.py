@@ -230,7 +230,10 @@ def gather_adapter_inventory_rows(
 
         if backend_name == "bitsandbytes" and present:
             backend_present = bitsandbytes_runtime_available()
-            if not backend_present:
+            if backend_present:
+                status = "ready"
+                enable = ""
+            else:
                 status = "unsupported"
                 if has_cuda:
                     enable = "bitsandbytes unavailable on this host"
