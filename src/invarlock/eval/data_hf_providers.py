@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from invarlock.core.exceptions import DataError as _DataErr
@@ -37,6 +37,17 @@ def _load_dataset_with_cache_fallback(*args: Any, **kwargs: Any) -> Any:
         "load_dataset_with_cache_fallback", load_dataset_with_cache_fallback
     )
     return load_fn(*args, **kwargs)
+
+
+def _field_value(row: Mapping[str, Any], field: str) -> Any:
+    if not field:
+        return None
+    current: Any = row
+    for part in field.split("."):
+        if not isinstance(current, Mapping):
+            return None
+        current = current.get(part)
+    return current
 
 
 class HFTextProvider:
@@ -249,6 +260,9 @@ class HFSeq2SeqProvider:
         src_field: str = "source",
         tgt_field: str = "target",
         cache_dir: str | None = None,
+        revision: str | None = None,
+        src_prefix: str = "",
+        tgt_prefix: str = "",
         max_samples: int = 2000,
     ) -> None:
         _require_dataset(
@@ -259,6 +273,9 @@ class HFSeq2SeqProvider:
         self.src_field = src_field
         self.tgt_field = tgt_field
         self.cache_dir = cache_dir
+        self.revision = revision or None
+        self.src_prefix = str(src_prefix or "")
+        self.tgt_prefix = str(tgt_prefix or "")
         self.max_samples = int(max_samples)
         self.last_preview_labels: list[list[int]] | None = None
         self.last_final_labels: list[list[int]] | None = None
@@ -273,19 +290,27 @@ class HFSeq2SeqProvider:
             name=self.config_name,
             split=split,
             cache_dir=self.cache_dir,
+            revision=self.revision,
         )
         out: list[tuple[str, str]] = []
         count = 0
         for row in ds:
-            src = row.get(self.src_field)
-            tgt = row.get(self.tgt_field)
+            if not isinstance(row, Mapping):
+                continue
+            src = _field_value(row, self.src_field)
+            tgt = _field_value(row, self.tgt_field)
             if (
                 isinstance(src, str)
                 and src.strip()
                 and isinstance(tgt, str)
                 and tgt.strip()
             ):
-                out.append((src, tgt))
+                out.append(
+                    (
+                        f"{self.src_prefix}{src.strip()}",
+                        f"{self.tgt_prefix}{tgt.strip()}",
+                    )
+                )
                 count += 1
                 if count >= self.max_samples:
                     break

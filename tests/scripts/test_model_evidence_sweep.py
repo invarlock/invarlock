@@ -352,19 +352,31 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
         "huggingfacetb_smollm3_3b",
         "microsoft_phi_4_mini_instruct",
         "tiiuae_falcon_h1r_7b",
+        "google_flan_t5_base",
     ]
     adapters = {lane.slug: lane.adapter for lane in specs}
     assert adapters["google_gemma_4_12b_it"] == "hf_multimodal"
+    assert adapters["google_flan_t5_base"] == "hf_seq2seq"
     for lane in specs:
-        if lane.slug != "google_gemma_4_12b_it":
+        if lane.slug in {
+            "huggingfacetb_smollm3_3b",
+            "microsoft_phi_4_mini_instruct",
+            "tiiuae_falcon_h1r_7b",
+        }:
             assert lane.adapter == "hf_causal"
             assert lane.verify_profile == "dev"
-        else:
+        elif lane.slug == "google_gemma_4_12b_it":
             assert lane.verify_profile == "release"
             assert lane.preset_relpath == (
                 "configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml"
             )
             assert lane.vision_text_materialization is not None
+        else:
+            assert lane.slug == "google_flan_t5_base"
+            assert lane.verify_profile == "release"
+            assert lane.preset_relpath == (
+                "configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml"
+            )
         assert lane.preset_path.is_file(), lane.preset_relpath
 
 

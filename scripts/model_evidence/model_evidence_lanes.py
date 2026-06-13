@@ -414,6 +414,15 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
         adapter="hf_causal",
         verify_profile="dev",
     ),
+    EvidenceLane(
+        slug="google_flan_t5_base",
+        lane_id="flan-t5-base-seq2seq-hf",
+        family="FLAN-T5 base seq2seq LM",
+        model_id="google/flan-t5-base",
+        preset_relpath="configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml",
+        adapter="hf_seq2seq",
+        verify_profile="release",
+    ),
 )
 
 

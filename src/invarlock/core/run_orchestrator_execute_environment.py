@@ -90,17 +90,26 @@ def _extract_tokenizer_load_kwargs_from_cfg(cfg: Any) -> dict[str, Any]:
             model_section = None
 
     trust_remote_code: Any = None
+    revision: Any = None
     if isinstance(model_section, dict):
         trust_remote_code = model_section.get("trust_remote_code")
+        revision = model_section.get("revision")
     elif model_section is not None:
         try:
             trust_remote_code = getattr(model_section, "trust_remote_code", None)
         except (AttributeError, TypeError, ValueError):
             trust_remote_code = None
+        try:
+            revision = getattr(model_section, "revision", None)
+        except (AttributeError, TypeError, ValueError):
+            revision = None
 
+    kwargs: dict[str, Any] = {}
     if isinstance(trust_remote_code, bool):
-        return {"trust_remote_code": trust_remote_code}
-    return {}
+        kwargs["trust_remote_code"] = trust_remote_code
+    if isinstance(revision, str) and revision:
+        kwargs["revision"] = revision
+    return kwargs
 
 
 def _attach_tokenizer_load_kwargs(

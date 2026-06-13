@@ -138,6 +138,9 @@ def _resolve_tokenizer_load_kwargs(
         resolved["trust_remote_code"] = resolve_trust_remote_code(
             {"trust_remote_code": load_kwargs.get("trust_remote_code")}
         )
+    revision = load_kwargs.get("revision")
+    if isinstance(revision, str) and revision:
+        resolved["revision"] = revision
     return resolved
 
 

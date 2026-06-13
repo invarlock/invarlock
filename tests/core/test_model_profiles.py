@@ -148,10 +148,13 @@ def test_run_environment_attaches_config_remote_code_to_profile() -> None:
 
     cfg = SimpleNamespace(
         model=SimpleNamespace(trust_remote_code=False),
-        model_dump=lambda: {"model": {"trust_remote_code": True}},
+        model_dump=lambda: {
+            "model": {"trust_remote_code": True, "revision": "abc123"}
+        },
     )
     assert _extract_tokenizer_load_kwargs_from_cfg(cfg) == {
-        "trust_remote_code": True
+        "trust_remote_code": True,
+        "revision": "abc123",
     }
 
     seen: dict[str, object] = {}
@@ -164,10 +167,13 @@ def test_run_environment_attaches_config_remote_code_to_profile() -> None:
         detector,
         model_id="THUDM/glm-4-9b-chat",
         adapter="hf_causal",
-        tokenizer_load_kwargs={"trust_remote_code": True},
+        tokenizer_load_kwargs={"trust_remote_code": True, "revision": "abc123"},
     )
 
-    assert seen["tokenizer_load_kwargs"] == {"trust_remote_code": True}
+    assert seen["tokenizer_load_kwargs"] == {
+        "trust_remote_code": True,
+        "revision": "abc123",
+    }
     assert not hasattr(profile, "tokenizer_load_kwargs")
 
     def legacy_detector(model_id: str, adapter: str) -> SimpleNamespace:
@@ -179,10 +185,13 @@ def test_run_environment_attaches_config_remote_code_to_profile() -> None:
         legacy_detector,
         model_id="THUDM/glm-4-9b-chat",
         adapter="hf_causal",
-        tokenizer_load_kwargs={"trust_remote_code": True},
+        tokenizer_load_kwargs={"trust_remote_code": True, "revision": "abc123"},
     )
 
-    assert legacy_profile.tokenizer_load_kwargs == {"trust_remote_code": True}
+    assert legacy_profile.tokenizer_load_kwargs == {
+        "trust_remote_code": True,
+        "revision": "abc123",
+    }
 
 
 def test_unknown_profile_falls_back_to_conservative_defaults():

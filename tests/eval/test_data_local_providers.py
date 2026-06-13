@@ -241,6 +241,54 @@ def test_hf_seq2seq_provider_windows_and_capacity(monkeypatch):
     assert cap["available_unique"] == 2
 
 
+def test_hf_seq2seq_provider_supports_revision_prefix_and_nested_fields(monkeypatch):
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True, raising=False)
+    captured = {}
+
+    def fake_load_dataset(path, name=None, split=None, cache_dir=None, **kwargs):
+        captured.update(
+            {
+                "path": path,
+                "name": name,
+                "split": split,
+                "cache_dir": cache_dir,
+                "kwargs": kwargs,
+            }
+        )
+        return [
+            {"translation": {"en": "How old are you?", "de": "Wie alt bist du?"}},
+            {"translation": {"en": "That is good.", "de": "Das ist gut."}},
+        ]
+
+    monkeypatch.setattr(
+        data_support_mod, "load_dataset", fake_load_dataset, raising=False
+    )
+    provider = HFSeq2SeqProvider(
+        "wmt14",
+        config_name="de-en",
+        revision="abc123",
+        src_field="translation.en",
+        tgt_field="translation.de",
+        src_prefix="translate English to German: ",
+    )
+
+    prev, fin = provider.windows(_EncodeTokenizer(), preview_n=1, final_n=1, seq_len=8)
+
+    assert len(prev.input_ids) == 1
+    assert len(fin.input_ids) == 1
+    assert provider._pairs_cache["validation"][0] == (
+        "translate English to German: How old are you?",
+        "Wie alt bist du?",
+    )
+    assert captured == {
+        "path": "wmt14",
+        "name": "de-en",
+        "split": "validation",
+        "cache_dir": None,
+        "kwargs": {"revision": "abc123"},
+    }
+
+
 def test_compute_window_hash_include_data():
     window = EvaluationWindow(
         input_ids=[[1, 2], [3, 4]],
