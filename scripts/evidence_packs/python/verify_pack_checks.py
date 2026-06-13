@@ -252,7 +252,8 @@ def _expected_failure_signal(report: Path) -> bool:
 
     primary_metric = payload.get("primary_metric")
     if isinstance(primary_metric, dict) and (
-        _truthy(primary_metric.get("invalid")) or _truthy(primary_metric.get("degraded"))
+        _truthy(primary_metric.get("invalid"))
+        or _truthy(primary_metric.get("degraded"))
     ):
         return True
 

@@ -284,10 +284,7 @@ def test_hf_seq2seq_provider_splits_shuffled_rows_by_selected_preview(
     monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True, raising=False)
 
     def fake_load_dataset(path, name=None, split=None, cache_dir=None, **kwargs):
-        return [
-            {"source": f"src {idx}", "target": f"tgt {idx}"}
-            for idx in range(10)
-        ]
+        return [{"source": f"src {idx}", "target": f"tgt {idx}"} for idx in range(10)]
 
     monkeypatch.setattr(
         data_support_mod, "load_dataset", fake_load_dataset, raising=False

@@ -403,10 +403,9 @@ class SpectralGuard(Guard):
         )
 
     def _should_check_module(self, name: str, module: Any) -> bool:
-        return (
-            self._module_filter_allows(name)
-            and _spectral_detection.should_check_module(self, name, module)
-        )
+        return self._module_filter_allows(
+            name
+        ) and _spectral_detection.should_check_module(self, name, module)
 
     def _module_filter_allows(self, name: str) -> bool:
         include_patterns = self.module_include_patterns

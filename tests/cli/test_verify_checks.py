@@ -126,9 +126,7 @@ def test_accuracy_drift_band_uses_delta_not_ratio():
             "ratio_vs_baseline": 1.0,
         }
     )
-    cert["resolved_policy"] = {
-        "metrics": {"accuracy": {"hysteresis_delta_pp": 0.1}}
-    }
+    cert["resolved_policy"] = {"metrics": {"accuracy": {"hysteresis_delta_pp": 0.1}}}
 
     assert v._validate_drift_band(cert) == []
 

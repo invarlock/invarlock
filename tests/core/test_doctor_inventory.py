@@ -120,9 +120,7 @@ def test_build_adapter_inventory_rows_marks_old_transformers_for_hf_adapters(
     monkeypatch.setattr(
         mod.importlib_metadata,
         "version",
-        lambda package_name: "5.5.0"
-        if package_name == "transformers"
-        else "7.0.0",
+        lambda package_name: "5.5.0" if package_name == "transformers" else "7.0.0",
     )
 
     rows = build_adapter_inventory_rows(
@@ -149,9 +147,7 @@ def test_build_adapter_inventory_rows_marks_multimodal_stack_requirement(
     monkeypatch.setattr(
         mod.importlib_metadata,
         "version",
-        lambda package_name: "5.5.0"
-        if package_name == "transformers"
-        else "0.26.0",
+        lambda package_name: "5.5.0" if package_name == "transformers" else "0.26.0",
     )
 
     rows = build_adapter_inventory_rows(

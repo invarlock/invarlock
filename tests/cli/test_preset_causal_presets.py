@@ -42,9 +42,7 @@ def test_causal_lm_family_presets_load() -> None:
         "deepseek_r1_distill_qwen_14b_512.yaml": (
             "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
         ),
-        "deepseek_r1_0528_qwen3_8b_512.yaml": (
-            "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B"
-        ),
+        "deepseek_r1_0528_qwen3_8b_512.yaml": ("deepseek-ai/DeepSeek-R1-0528-Qwen3-8B"),
         "falcon_h1r_7b_512.yaml": "tiiuae/Falcon-H1R-7B",
     }
     expected_provider_kinds = {

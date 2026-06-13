@@ -309,9 +309,7 @@ def test_extract_pairing_schedule_prefers_multimodal_input_records() -> None:
         "evaluation_windows": {
             "preview": {
                 "example_ids": ["ex-1"],
-                "records": [
-                    {"id": "ex-1", "prediction": "red", "references": ["red"]}
-                ],
+                "records": [{"id": "ex-1", "prediction": "red", "references": ["red"]}],
                 "input_records": [
                     {
                         "id": "ex-1",

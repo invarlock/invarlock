@@ -6,9 +6,7 @@ from pathlib import Path
 
 REMOVED_README_GUARANTEE_LABEL = "Statistical " + "guarantees"
 REMOVED_REPORT_GUARANTEE_LABEL = "What the report " + "guarantees"
-PUBLISHED_BASIS_INTRO = (
-    "Published assurance basis covers GPT-2, BERT, Mistral 7B"
-)
+PUBLISHED_BASIS_INTRO = "Published assurance basis covers GPT-2, BERT, Mistral 7B"
 PUBLISHED_BASIS_NAMES = [
     "Ministral 3 3B",
     "Ministral 3 8B",

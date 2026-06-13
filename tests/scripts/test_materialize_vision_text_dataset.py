@@ -11,7 +11,9 @@ class _FakeImage:
         handle.write(f"fake-image-{format}".encode())
 
 
-def test_materialize_rows_writes_vision_text_manifest_and_summary(tmp_path: Path) -> None:
+def test_materialize_rows_writes_vision_text_manifest_and_summary(
+    tmp_path: Path,
+) -> None:
     mod = load_script_module("materialize_vision_text_dataset")
     config = mod.MaterializeConfig(
         dataset="public/vqa",

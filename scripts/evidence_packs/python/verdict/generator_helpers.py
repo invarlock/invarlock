@@ -244,7 +244,9 @@ def _guard_baseline_relative_summary(
         "baseline_available": baseline_available,
         "subject_signal": subject_signal,
         "baseline_signal": baseline_signal if baseline_available else None,
-        "relative_signal": baseline_available and subject_signal and not baseline_signal,
+        "relative_signal": baseline_available
+        and subject_signal
+        and not baseline_signal,
     }
     if guard_name == "spectral":
         spectral = _spectral_baseline_relative_summary(cert, baseline_cert)

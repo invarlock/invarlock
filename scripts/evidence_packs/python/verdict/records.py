@@ -136,7 +136,9 @@ def _collect_baseline_reports(output_dir: Path) -> dict[str, dict[str, Any]]:
 
     # Older runs may only retain calibration reports. Use them as a fallback so
     # baseline-relative detectors still fail/diagnose deterministically.
-    for path in sorted(output_dir.glob("*/reports/calibration/run_*/evaluation.report.json")):
+    for path in sorted(
+        output_dir.glob("*/reports/calibration/run_*/evaluation.report.json")
+    ):
         try:
             rel = path.relative_to(output_dir)
         except ValueError:

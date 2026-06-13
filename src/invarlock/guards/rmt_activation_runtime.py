@@ -379,9 +379,7 @@ def compute_activation_edge_risk(
 
     modules = get_activation_modules(model, allowed_suffixes=allowed_suffixes)
     if module_filter_fn is not None:
-        modules = [
-            (name, module) for name, module in modules if module_filter_fn(name)
-        ]
+        modules = [(name, module) for name, module in modules if module_filter_fn(name)]
     if not modules:
         return None
 

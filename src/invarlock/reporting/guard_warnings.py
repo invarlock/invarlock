@@ -260,7 +260,9 @@ def _spectral_warnings(
     return warnings
 
 
-def _epsilon_violation_keys(rmt: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]]:
+def _epsilon_violation_keys(
+    rmt: dict[str, Any],
+) -> dict[tuple[str, str], dict[str, Any]]:
     out: dict[tuple[str, str], dict[str, Any]] = {}
     for entry_raw in _as_list(rmt.get("epsilon_violations")):
         entry = _as_dict(entry_raw)
@@ -328,11 +330,15 @@ def _variance_signal(value: dict[str, Any]) -> dict[str, Any]:
         "mean_delta": mean_delta,
         "has_delta_ci": has_ci,
         "has_ab_test": has_ab,
-        "active": bool(enabled and (evaluated or mean_delta is not None or has_ci or has_ab)),
+        "active": bool(
+            enabled and (evaluated or mean_delta is not None or has_ci or has_ab)
+        ),
     }
 
 
-def _variance_warnings(*, subject: dict[str, Any], baseline: dict[str, Any]) -> list[dict[str, Any]]:
+def _variance_warnings(
+    *, subject: dict[str, Any], baseline: dict[str, Any]
+) -> list[dict[str, Any]]:
     subject_signal = _variance_signal(subject)
     baseline_signal = _variance_signal(baseline)
     if not subject_signal["active"] or baseline_signal["active"]:

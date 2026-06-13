@@ -525,7 +525,9 @@ def write_prepared_preset(
         raise ValueError(f"Preset must be a mapping: {spec.preset_relpath}")
     dataset = preset_data.setdefault("dataset", {})
     if not isinstance(dataset, dict):
-        raise ValueError(f"Preset dataset section must be a mapping: {spec.preset_relpath}")
+        raise ValueError(
+            f"Preset dataset section must be a mapping: {spec.preset_relpath}"
+        )
     provider = dataset.setdefault("provider", {})
     if not isinstance(provider, dict):
         raise ValueError(

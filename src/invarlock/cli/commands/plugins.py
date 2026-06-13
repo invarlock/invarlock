@@ -7,18 +7,14 @@ Supports a minimal view via INVARLOCK_MINIMAL=1 to hide built‑in adapters.
 """
 
 import importlib
-import importlib.metadata as importlib_metadata
-import io
 import os
 import platform
-import re
-import warnings
-from contextlib import redirect_stderr, redirect_stdout
 from typing import Any
 
 import typer
 from rich.console import Console
 
+from invarlock.cli.commands import plugins_extras as _plugins_extras
 from invarlock.core.plugins_inventory import (
     bitsandbytes_runtime_available,
     detect_cuda_available,
@@ -47,12 +43,25 @@ _PLUGIN_COMMAND_ERRORS = (
     TypeError,
     ValueError,
 )
-_EXTRA_CHECK_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, ValueError)
 
 # Group: plugins
 plugins_app = typer.Typer(
     help="Inspect available adapters, guards, edits, and datasets.",
 )
+_plugin_package_importable = _plugins_extras._plugin_package_importable
+_package_version_at_least = _plugins_extras._package_version_at_least
+
+
+def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
+    original_importable = _plugins_extras._plugin_package_importable
+    original_version_check = _plugins_extras._package_version_at_least
+    try:
+        _plugins_extras._plugin_package_importable = _plugin_package_importable
+        _plugins_extras._package_version_at_least = _package_version_at_least
+        return _plugins_extras.check_plugin_extras(plugin_name, plugin_type)
+    finally:
+        _plugins_extras._plugin_package_importable = original_importable
+        _plugins_extras._package_version_at_least = original_version_check
 
 
 def _load_provider_registry_map() -> dict[str, Any]:
@@ -167,154 +176,6 @@ def plugins_command(
     except _PLUGIN_COMMAND_ERRORS as e:
         console.print(f"[red]❌ Plugin listing failed: {e}[/red]")
         raise typer.Exit(1) from e
-
-
-def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
-    """Check if plugin requires missing optional extras."""
-    # Enhanced extras checking without importing heavy modules (avoid noisy warnings)
-    # Only include baked-in plugins that are available through entry points
-    extras_map = {
-        # Edit plugins (baked-in only)
-        "quant_rtn": {"packages": [], "extra": ""},
-        # Guard plugins (no extra deps typically)
-        "invariants": {"packages": [], "extra": ""},
-        "spectral": {"packages": [], "extra": ""},
-        "variance": {"packages": [], "extra": ""},
-        "rmt": {"packages": [], "extra": ""},
-        "demo_hello_guard": {"packages": [], "extra": ""},
-        # Adapter plugins (baked-in only)
-        "hf_causal": {
-            "packages": ["transformers"],
-            "extra": "invarlock[adapters]",
-            "minimum_versions": {"transformers": "5.12.0"},
-        },
-        "hf_mlm": {
-            "packages": ["transformers"],
-            "extra": "invarlock[adapters]",
-            "minimum_versions": {"transformers": "5.12.0"},
-        },
-        "hf_seq2seq": {
-            "packages": ["transformers"],
-            "extra": "invarlock[adapters]",
-            "minimum_versions": {"transformers": "5.12.0"},
-        },
-        "hf_multimodal": {
-            "packages": ["transformers", "torchvision", "PIL"],
-            "extra": "invarlock[multimodal]",
-            "minimum_versions": {
-                "transformers": "5.12.0",
-                "torchvision": "0.26.0",
-            },
-        },
-        "hf_auto": {
-            "packages": ["transformers"],
-            "extra": "invarlock[adapters]",
-            "minimum_versions": {"transformers": "5.12.0"},
-        },
-        # Optional adapter plugins
-        "hf_gptq": {
-            "packages": ["gptqmodel", "transformers"],
-            "extra": "invarlock[gptq]",
-            "minimum_versions": {"transformers": "5.12.0"},
-        },
-        "hf_awq": {
-            "packages": ["gptqmodel", "transformers"],
-            "extra": "invarlock[awq]",
-            "minimum_versions": {"transformers": "5.12.0"},
-        },
-        "hf_bnb": {
-            "packages": ["bitsandbytes", "transformers"],
-            "extra": "invarlock[gpu]",
-            "minimum_versions": {"transformers": "5.12.0"},
-        },
-        "hf_torchao": {
-            "packages": ["torchao", "transformers"],
-            "extra": "invarlock[torchao]",
-            "minimum_versions": {"transformers": "5.12.0"},
-        },
-        "hf_hqq": {
-            "packages": ["hqq", "transformers"],
-            "extra": "invarlock[hqq]",
-            "minimum_versions": {"transformers": "5.12.0"},
-        },
-        "hf_quanto": {
-            "packages": ["optimum.quanto", "transformers"],
-            "extra": "invarlock[quanto]",
-            "minimum_versions": {"transformers": "5.12.0"},
-        },
-        "hf_ct": {
-            "packages": ["compressed_tensors", "transformers"],
-            "extra": "invarlock[compressed-tensors]",
-            "minimum_versions": {"transformers": "5.12.0"},
-        },
-    }
-
-    plugin_info = extras_map.get(plugin_name)
-    if not plugin_info or not plugin_info["packages"]:
-        return ""  # No extra dependencies needed
-
-    # Check each required package. For most packages we use a light import so
-    # tests can monkeypatch __import__. For GPU-only stacks (bitsandbytes), we
-    # probe runtime readiness instead of importing.
-    missing_packages: list[str] = []
-    minimum_versions = plugin_info.get("minimum_versions", {})
-    for pkg in plugin_info["packages"]:
-        try:
-            _plugin_package_importable(str(pkg))
-            minimum_version = minimum_versions.get(pkg)
-            if minimum_version and not _package_version_at_least(
-                pkg, str(minimum_version)
-            ):
-                raise ImportError(f"{pkg}>={minimum_version} not available")
-        except _EXTRA_CHECK_ERRORS:
-            missing_packages.append(pkg)
-
-    # Format the result
-    if not missing_packages:
-        # All dependencies available
-        if plugin_info["extra"]:
-            return f"✓ {plugin_info['extra']}"
-        else:
-            return "✓ Available"
-    else:
-        # Some dependencies missing
-        if plugin_info["extra"]:
-            return f"⚠️ missing {plugin_info['extra']}"
-        else:
-            return f"⚠️ missing {', '.join(missing_packages)}"
-
-
-def _plugin_package_importable(package_name: str) -> bool:
-    if package_name == "bitsandbytes":
-        if not bitsandbytes_runtime_available():
-            raise ImportError("bitsandbytes not importable")
-        return True
-    if package_name == "gptqmodel":
-        from invarlock.plugins import _patch_gptqmodel_transformers_hub_compat
-
-        _patch_gptqmodel_transformers_hub_compat()
-    with (
-        warnings.catch_warnings(),
-        redirect_stdout(io.StringIO()),
-        redirect_stderr(io.StringIO()),
-    ):
-        warnings.simplefilter("ignore")
-        __import__(package_name)
-    return True
-
-
-def _package_version_at_least(package_name: str, minimum: str) -> bool:
-    try:
-        installed = importlib_metadata.version(package_name)
-    except importlib_metadata.PackageNotFoundError:
-        return False
-    return _version_key(installed) >= _version_key(minimum)
-
-
-def _version_key(value: str) -> tuple[int, int, int]:
-    parts = [int(match.group(0)) for match in re.finditer(r"\d+", value)]
-    padded = (parts + [0, 0, 0])[:3]
-    return (padded[0], padded[1], padded[2])
 
 
 # Wire subcommands under group

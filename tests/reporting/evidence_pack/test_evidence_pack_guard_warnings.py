@@ -44,4 +44,3 @@ def test_evidence_pack_record_surfaces_guard_warnings(tmp_path: Path) -> None:
     assert record["guard_warnings"]["present"] is True
     assert record["guard_warnings"]["warning_count"] == 1
     assert record["guard_warnings"]["warnings"][0]["kind"] == "new_capped_module"
-

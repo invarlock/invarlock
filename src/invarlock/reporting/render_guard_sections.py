@@ -63,9 +63,7 @@ def append_guard_check_details_section(
         if isinstance(spectral_summary, dict)
         else None
     )
-    caps_measure = (
-        f"{caps_applied} caps applied" if caps_applied is not None else "N/A"
-    )
+    caps_measure = f"{caps_applied} caps applied" if caps_applied is not None else "N/A"
     spectral_threshold = (
         f"<= {spectral_summary.get('max_caps')}"
         if isinstance(spectral_summary, dict)
@@ -308,9 +306,7 @@ def _append_spectral_observability(
                 max_z = stats.get("max")
         q95_str = f"{q95:.3f}" if isinstance(q95, (int, float)) else "-"
         max_str = f"{max_z:.3f}" if isinstance(max_z, (int, float)) else "-"
-        caps = (
-            caps_by_family.get(family) if isinstance(caps_by_family, dict) else None
-        )
+        caps = caps_by_family.get(family) if isinstance(caps_by_family, dict) else None
         v_str = str(int(caps)) if isinstance(caps, (int, float)) else "0"
         lines.append(f"| {family} | {kappa_str} | {q95_str} | {max_str} | {v_str} |")
 
@@ -542,6 +538,8 @@ def append_guard_warnings_section(
             location_parts.append(str(module))
         location = " / ".join(location_parts) if location_parts else "-"
         policy = entry_raw.get("policy_gate", "unknown")
-        message = str(entry_raw.get("message") or "Guard signal changed versus baseline.")
+        message = str(
+            entry_raw.get("message") or "Guard signal changed versus baseline."
+        )
         lines.append(f"| {guard} | {kind} | {location} | {policy} | {message} |")
     lines.append("")

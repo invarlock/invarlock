@@ -221,9 +221,7 @@ def test_resolve_tokenizer_uses_model_specific_identifier_for_opt_like_models(
 
 
 def test_tokenizer_candidates_prefer_deepseek_base_tokenizer_aliases() -> None:
-    assert mp._tokenizer_candidates(
-        "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
-    )[:2] == [
+    assert mp._tokenizer_candidates("deepseek-ai/DeepSeek-R1-Distill-Qwen-14B")[:2] == [
         "Qwen/Qwen2.5-14B",
         "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
     ]

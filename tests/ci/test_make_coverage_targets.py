@@ -67,7 +67,7 @@ def test_coverage_target_includes_probe_suite_for_plain_coverage_run() -> None:
         "tests/eval/test_post_attention_probe_paths.py",
     ):
         assert pattern in text
-    assert "$(COVERAGE) run --append -m pytest -q -p no:cov" in text
+    assert "$(COVERAGE) run --branch --append -m pytest -q -p no:cov" in text
 
 
 def test_coverage_target_includes_core_cli_surface_and_runtime_security_tests() -> None:

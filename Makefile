@@ -218,11 +218,11 @@ coverage:  ## Run tests with coverage and generate XML
 		$(COVERAGE_MODULES) \
 		--cov-branch \
 		--cov-report=term --cov-report=xml:reports/cov.xml --cov-fail-under=90
-	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
+	PYTHONPATH=src $(COVERAGE) run --branch --append -m pytest -q -p no:cov \
 		$(COVERAGE_TESTS_EVAL_PROBES)
-	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
+	PYTHONPATH=src $(COVERAGE) run --branch --append -m pytest -q -p no:cov \
 		$(COVERAGE_TESTS_RUNTIME)
-	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
+	PYTHONPATH=src $(COVERAGE) run --branch --append -m pytest -q -p no:cov \
 		$(COVERAGE_TESTS_ADAPTERS)
 	$(COVERAGE) report --include="$(COVERAGE_INCLUDE)" --fail-under=90
 	$(COVERAGE) xml --include="$(COVERAGE_INCLUDE)" -o reports/cov.xml

@@ -204,12 +204,8 @@ def serialize_policy(guard: Any) -> dict[str, Any]:
         "degeneracy": guard.degeneracy,
         "correction_enabled": bool(guard.correction_enabled),
         "ignore_preview_inflation": bool(guard.ignore_preview_inflation),
-        "module_include_patterns": list(
-            getattr(guard, "module_include_patterns", ())
-        ),
-        "module_exclude_patterns": list(
-            getattr(guard, "module_exclude_patterns", ())
-        ),
+        "module_include_patterns": list(getattr(guard, "module_include_patterns", ())),
+        "module_exclude_patterns": list(getattr(guard, "module_exclude_patterns", ())),
     }
 
 

@@ -148,9 +148,7 @@ def test_run_environment_attaches_config_remote_code_to_profile() -> None:
 
     cfg = SimpleNamespace(
         model=SimpleNamespace(trust_remote_code=False),
-        model_dump=lambda: {
-            "model": {"trust_remote_code": True, "revision": "abc123"}
-        },
+        model_dump=lambda: {"model": {"trust_remote_code": True, "revision": "abc123"}},
     )
     assert _extract_tokenizer_load_kwargs_from_cfg(cfg) == {
         "trust_remote_code": True,

@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Callable
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
 from invarlock.runtime_security import network_allowed
 
+from . import model_profile_selectors as _selectors
 from . import model_profile_tokenizers as _tokenizers
+from .model_profile_types import ModelProfile, TokenizerFactory
 
 _TRANSFORMERS_UNSET = _tokenizers._TRANSFORMERS_UNSET
 AutoTokenizer: Any = _tokenizers.AutoTokenizer
@@ -17,7 +17,6 @@ TokenizerImpl: Any = _tokenizers.TokenizerImpl
 _TOKENIZER_LOOKUP_ERRORS = _tokenizers._TOKENIZER_LOOKUP_ERRORS
 _TOKENIZER_LOAD_ERRORS = _tokenizers._TOKENIZER_LOAD_ERRORS
 PreTrainedTokenizerBase = _tokenizers.PreTrainedTokenizerBase
-TokenizerFactory = Callable[..., tuple[PreTrainedTokenizerBase, str]]
 _LocalFastTokenizer = _tokenizers._LocalFastTokenizer
 
 _TOKENIZER_CANDIDATE_OVERRIDES: dict[str, tuple[str, ...]] = {
@@ -298,143 +297,6 @@ def _profile_hints(model_id: str) -> tuple[str, str, bool]:
     return " ".join(parts), arch_blob, is_encoder_decoder
 
 
-@dataclass(frozen=True)
-class ModelProfile:
-    """Captured capabilities for a recognised model family."""
-
-    family: str
-    default_loss: str
-    make_tokenizer: TokenizerFactory
-    default_metric: str = "ppl_causal"
-    default_provider: str = "wikitext2"
-    module_selectors: dict[str, list[str]] = field(default_factory=dict)
-    invariants: tuple[str, ...] = ()
-    cert_lints: tuple[dict[str, str], ...] = ()
-    tokenizer_load_kwargs: dict[str, Any] = field(
-        default_factory=dict,
-        repr=False,
-        compare=False,
-    )
-
-
-def _bert_selectors() -> dict[str, list[str]]:
-    return {
-        "attention": [
-            "attention.self.query",
-            "attention.self.key",
-            "attention.self.value",
-            "attention.output.dense",
-        ],
-        "ffn": [
-            "intermediate.dense",
-            "output.dense",
-        ],
-    }
-
-
-def _gpt2_selectors() -> dict[str, list[str]]:
-    return {
-        "attention": [
-            "attn.c_attn",
-            "attn.c_proj",
-        ],
-        "ffn": [
-            "mlp.c_fc",
-            "mlp.c_proj",
-        ],
-    }
-
-
-def _rope_decoder_selectors() -> dict[str, list[str]]:
-    return {
-        "attention": [
-            "self_attn.q_proj",
-            "self_attn.k_proj",
-            "self_attn.v_proj",
-            "self_attn.o_proj",
-            "linear_attn.in_proj_qkv",
-            "linear_attn.out_proj",
-        ],
-        "ffn": [
-            "mlp.up_proj",
-            "mlp.down_proj",
-            "mlp.gate_proj",
-        ],
-    }
-
-
-def _gpt_oss_selectors() -> dict[str, list[str]]:
-    return {
-        "attention": [
-            "self_attn.q_proj",
-            "self_attn.k_proj",
-            "self_attn.v_proj",
-            "self_attn.o_proj",
-        ],
-        "ffn": [
-            "mlp.router",
-            "mlp.experts",
-        ],
-    }
-
-
-def _seq2seq_selectors() -> dict[str, list[str]]:
-    return {
-        "attention": [
-            "SelfAttention.q",
-            "SelfAttention.k",
-            "SelfAttention.v",
-            "SelfAttention.o",
-            "EncDecAttention.q",
-            "EncDecAttention.k",
-            "EncDecAttention.v",
-            "EncDecAttention.o",
-            "self_attn.q_proj",
-            "self_attn.k_proj",
-            "self_attn.v_proj",
-            "self_attn.out_proj",
-            "encoder_attn.q_proj",
-            "encoder_attn.k_proj",
-            "encoder_attn.v_proj",
-            "encoder_attn.out_proj",
-        ],
-        "ffn": [
-            "DenseReluDense.wi",
-            "DenseReluDense.wi_0",
-            "DenseReluDense.wi_1",
-            "DenseReluDense.wo",
-            "fc1",
-            "fc2",
-        ],
-    }
-
-
-def _phi_selectors() -> dict[str, list[str]]:
-    return {
-        "attention": [
-            "self_attn.q_proj",
-            "self_attn.k_proj",
-            "self_attn.v_proj",
-            "self_attn.dense",
-            "self_attn.o_proj",
-            "self_attn.qkv_proj",
-        ],
-        "ffn": [
-            "mlp.fc1",
-            "mlp.fc2",
-            "mlp.gate_up_proj",
-            "mlp.down_proj",
-        ],
-    }
-
-
-def _unknown_selectors() -> dict[str, list[str]]:
-    return {
-        "attention": ["attention"],
-        "ffn": [],
-    }
-
-
 def _make_bert_tokenizer(
     model_id: str,
     *,
@@ -590,7 +452,7 @@ def detect_model_profile(
             ),
             default_metric="ppl_mlm",
             default_provider="hf_text",
-            module_selectors=_bert_selectors(),
+            module_selectors=_selectors.bert_selectors(),
             invariants=("mlm_mask_alignment",),
             cert_lints=(
                 {
@@ -629,7 +491,7 @@ def detect_model_profile(
             ),
             default_metric="ppl_seq2seq",
             default_provider="wikitext2",
-            module_selectors=_seq2seq_selectors(),
+            module_selectors=_selectors.seq2seq_selectors(),
             invariants=(),
             cert_lints=(),
             tokenizer_load_kwargs=tokenizer_load_kwargs,
@@ -656,7 +518,9 @@ def detect_model_profile(
                 family = mapped_family
                 break
         module_selectors = (
-            _gpt_oss_selectors() if family == "gpt_oss" else _rope_decoder_selectors()
+            _selectors.gpt_oss_selectors()
+            if family == "gpt_oss"
+            else _selectors.rope_decoder_selectors()
         )
         return ModelProfile(
             family=family,
@@ -697,7 +561,7 @@ def detect_model_profile(
             ),
             default_metric="ppl_causal",
             default_provider="wikitext2",
-            module_selectors=_phi_selectors(),
+            module_selectors=_selectors.phi_selectors(),
             invariants=("causal_masking",),
             cert_lints=(
                 {
@@ -724,7 +588,7 @@ def detect_model_profile(
             ),
             default_metric="ppl_causal",
             default_provider="wikitext2",
-            module_selectors=_gpt2_selectors(),
+            module_selectors=_selectors.gpt2_selectors(),
             invariants=("causal_masking",),
             cert_lints=(
                 {
@@ -746,7 +610,7 @@ def detect_model_profile(
         ),
         default_metric="ppl_causal",
         default_provider="wikitext2",
-        module_selectors=_unknown_selectors(),
+        module_selectors=_selectors.unknown_selectors(),
         invariants=(),
         cert_lints=(),
         tokenizer_load_kwargs=tokenizer_load_kwargs,
