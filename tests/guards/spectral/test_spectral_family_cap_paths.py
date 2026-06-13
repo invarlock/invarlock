@@ -264,6 +264,18 @@ def test_classify_module_family_moe_and_module_type_branches() -> None:
         spectral_detection.classify_module_family("layer.mlp.gate_proj", linear)
         == "ffn"
     )
+    assert (
+        spectral_detection.classify_module_family(
+            "model.layers.0.mlp.gate_up_proj", linear
+        )
+        == "ffn"
+    )
+    assert (
+        spectral_detection.classify_module_family(
+            "model.layers.0.block_sparse_moe.gate", linear
+        )
+        == "router"
+    )
 
     # module type based embedding classification
     assert (

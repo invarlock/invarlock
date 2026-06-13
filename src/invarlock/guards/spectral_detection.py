@@ -58,7 +58,18 @@ def should_process_module(name: str, module: Any, scope: str) -> bool:
 def classify_module_family(name: str, module: Any) -> str:
     """Classify module into a spectral family for policy purposes."""
     lname = name.lower()
-    if "gate_proj" in lname:
+    if any(
+        tok in lname
+        for tok in (
+            "gate_up_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+            "c_fc",
+            "fc1",
+            "fc2",
+        )
+    ):
         return "ffn"
     if any(
         tok in lname
