@@ -343,6 +343,32 @@ class TestFilteredLoadingInfo:
         assert "output_loading_info" not in DummyLoader.calls[1]
         assert mixin.pretrained_load_diagnostics == ()
 
+    def test_can_skip_optional_loading_info_collection(self):
+        mixin = SimpleMixin()
+
+        class DummyModel:
+            pass
+
+        class DummyLoader:
+            calls: list[dict[str, object]] = []
+
+            @classmethod
+            def from_pretrained(cls, model_id: str, **kwargs: object):
+                cls.calls.append({"model_id": model_id, **kwargs})
+                return DummyModel()
+
+        model = mixin._load_pretrained_model(
+            DummyLoader,
+            "demo/model",
+            collect_loading_info=False,
+        )
+
+        assert isinstance(model, DummyModel)
+        assert len(DummyLoader.calls) == 1
+        assert "output_loading_info" not in DummyLoader.calls[0]
+        assert "collect_loading_info" not in DummyLoader.calls[0]
+        assert mixin.pretrained_load_diagnostics == ()
+
     def test_prefers_local_files_only_before_online_retry(self):
         mixin = SimpleMixin()
 

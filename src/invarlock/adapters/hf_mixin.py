@@ -190,8 +190,23 @@ class HFAdapterMixin:
 
         self._pretrained_load_diagnostics = ()
         prefer_local_files_only = bool(kwargs.pop("prefer_local_files_only", False))
+        collect_loading_info = bool(kwargs.pop("collect_loading_info", True))
         try:
-            if prefer_local_files_only:
+            if not collect_loading_info:
+                if prefer_local_files_only:
+                    try:
+                        loaded = loader.from_pretrained(
+                            model_id,
+                            local_files_only=True,
+                            **kwargs,
+                        )
+                    except OSError as local_error:
+                        if not _is_local_loader_cache_miss(local_error):
+                            raise
+                        loaded = loader.from_pretrained(model_id, **kwargs)
+                else:
+                    loaded = loader.from_pretrained(model_id, **kwargs)
+            elif prefer_local_files_only:
                 loaded = loader.from_pretrained(
                     model_id,
                     output_loading_info=True,

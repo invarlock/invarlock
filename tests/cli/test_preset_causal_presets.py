@@ -86,6 +86,7 @@ def test_causal_lm_family_presets_load() -> None:
             assert model["dtype"] == "bfloat16"
             assert model["device_map"] == "auto"
             assert model["low_cpu_mem_usage"] is True
+            assert model["collect_loading_info"] is False
             guards = cfg.require_section("guards")
             for guard_name in ("spectral", "rmt"):
                 guard_cfg = guards[guard_name]
@@ -201,6 +202,7 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
             assert data["model"]["dtype"] == "bfloat16"
             assert data["model"]["device_map"] == "auto"
             assert data["model"]["low_cpu_mem_usage"] is True
+            assert data["model"]["collect_loading_info"] is False
             for guard_name in ("spectral", "rmt"):
                 guard_cfg = data["guards"][guard_name]
                 assert "model.layers.*.self_attn.*_proj" in guard_cfg[

@@ -722,7 +722,7 @@
         "tests/cli/test_preset_causal_presets.py",
         "tests/scripts/test_model_evidence_sweep_catalog.py"
       ],
-      "notes": "Prepared as a recent Qwen3 MoE candidate with explicit hf_causal preset and null-sweep config. The preset uses bfloat16/low-CPU-memory loading and scopes guard scans to attention, router, and shared-expert surfaces rather than every per-layer expert bank. It is not a published basis until a CUDA report, runtime manifest, and evidence pack are attached."
+      "notes": "Prepared as a recent Qwen3 MoE candidate with explicit hf_causal preset and null-sweep config. The preset uses bfloat16/low-CPU-memory loading, disables optional Hugging Face loading-info collection for memory-sensitive runs, and scopes guard scans to attention, router, and shared-expert surfaces rather than every per-layer expert bank. It is not a published basis until a CUDA report, runtime manifest, and evidence pack are attached; scoped scans cannot be claimed as exhaustive expert-bank assurance."
     },
     {
       "family_id": "gemma-4-26b-a4b-moe-image-text-lm",
