@@ -130,23 +130,29 @@ def _render_source_chips(section: ReportSection) -> str:
 
 
 def _render_fact_table(section: ReportSection) -> str:
+    include_detail = any(bool(fact.detail) for fact in section.facts)
     rows: list[str] = []
     for fact in section.facts:
         value = _render_status(fact.value, fact.status)
-        detail = escape(fact.detail) if fact.detail else ""
         source = f"<code>{escape(fact.source)}</code>" if fact.source else ""
+        detail_cell = (
+            f"<td>{escape(fact.detail) if fact.detail else ''}</td>"
+            if include_detail
+            else ""
+        )
         rows.append(
             "<tr>"
             f"<th scope=\"row\">{escape(fact.label)}</th>"
             f"<td>{value}</td>"
-            f"<td>{detail}</td>"
+            f"{detail_cell}"
             f"<td>{source}</td>"
             "</tr>"
         )
+    detail_header = "<th>Detail</th>" if include_detail else ""
     return (
         '<div class="table-wrap">'
         "<table>"
-        "<thead><tr><th>Field</th><th>Value</th><th>Detail</th><th>Source</th></tr></thead>"
+        f"<thead><tr><th>Field</th><th>Value</th>{detail_header}<th>Source</th></tr></thead>"
         f"<tbody>{''.join(rows)}</tbody>"
         "</table>"
         "</div>"

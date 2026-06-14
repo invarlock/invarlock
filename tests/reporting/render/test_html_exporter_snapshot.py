@@ -4,6 +4,14 @@ from invarlock import __version__
 from invarlock.reporting.report_make import make_report
 
 
+def _section_html(html: str, section_id: str) -> str:
+    start = html.index(f'<section id="{section_id}"')
+    next_section = html.find("<section id=", start + 1)
+    if next_section == -1:
+        return html[start:]
+    return html[start:next_section]
+
+
 def _mk_report() -> dict:
     return {
         "meta": {
@@ -91,6 +99,21 @@ def test_html_exporter_renders_report_outline_sections():
     assert "❌" not in html
     assert "Auditable verification for edited model checkpoints." in html
     assert f"InvarLock {__version__}" in html
+
+
+def test_html_fact_tables_omit_detail_column_when_section_has_no_details():
+    from invarlock.reporting.html import render_report_html
+
+    cert = make_report(_mk_report(), _mk_report())
+    html = render_report_html(cert)
+
+    decision = _section_html(html, "decision")
+    policy_gates = _section_html(html, "policy_gates")
+
+    assert "<th>Detail</th>" not in decision
+    assert "<th>Field</th><th>Value</th><th>Source</th>" in decision
+    assert "<th>Detail</th>" in policy_gates
+    assert "Ratio vs baseline; basis=" in policy_gates
 
 
 def test_html_summary_uses_computed_validation_status():
