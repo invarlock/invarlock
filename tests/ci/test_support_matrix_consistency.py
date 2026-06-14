@@ -156,10 +156,7 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
     assert families["Mixtral 8x7B MoE causal LM"]["evidence_status"] == (
         "published_release_strict"
     )
-    assert (
-        families["Qwen3 30B-A3B MoE causal LM"]["support_tier"]
-        == "published_basis"
-    )
+    assert families["Qwen3 30B-A3B MoE causal LM"]["support_tier"] == "published_basis"
     assert families["Qwen3 30B-A3B MoE causal LM"]["evidence_status"] == (
         "published_release_strict"
     )

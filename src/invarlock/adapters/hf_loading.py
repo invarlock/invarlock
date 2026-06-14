@@ -448,7 +448,9 @@ def apply_memory_efficient_load_defaults(
     this helper only normalizes its value before handing kwargs to Hugging Face.
     """
     prepared = dict(kwargs)
-    enabled = _memory_efficient_load_enabled(prepared.pop("memory_efficient_load", None))
+    enabled = _memory_efficient_load_enabled(
+        prepared.pop("memory_efficient_load", None)
+    )
 
     if "dtype" in prepared:
         prepared["dtype"] = _normalize_explicit_load_dtype(prepared["dtype"])
@@ -548,7 +550,9 @@ class _MultimodalAutoFallbackLoader:
                 last_error = exc
                 continue
         detail = "; ".join(failures) or "no loaders were attempted"
-        raise ValueError(f"No compatible HF multimodal auto loader succeeded: {detail}") from last_error
+        raise ValueError(
+            f"No compatible HF multimodal auto loader succeeded: {detail}"
+        ) from last_error
 
 
 def _resolve_auto_loader(task: str, model_type: str | None = None) -> tuple[Any, str]:

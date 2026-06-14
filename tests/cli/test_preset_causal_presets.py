@@ -27,9 +27,7 @@ def test_causal_lm_family_presets_load() -> None:
         "qwen2_5_7b_512.yaml": "Qwen/Qwen2.5-7B",
         "qwen2_5_14b_512.yaml": "Qwen/Qwen2.5-14B",
         "qwen3_8b_512.yaml": "Qwen/Qwen3-8B",
-        "qwen3_30b_a3b_instruct_2507_512.yaml": (
-            "Qwen/Qwen3-30B-A3B-Instruct-2507"
-        ),
+        "qwen3_30b_a3b_instruct_2507_512.yaml": ("Qwen/Qwen3-30B-A3B-Instruct-2507"),
         "mixtral_8x7b_512.yaml": "mistralai/Mixtral-8x7B-v0.1",
         "olmoe_1b_7b_0924_512.yaml": "allenai/OLMoE-1B-7B-0924",
         "deepseek_r1_distill_qwen_7b_512.yaml": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
@@ -98,15 +96,15 @@ def test_causal_lm_family_presets_load() -> None:
             assert guards["spectral"]["family_caps"]["router"] == 5.0
             for guard_name in ("spectral", "rmt"):
                 guard_cfg = guards[guard_name]
-                assert "model.layers.*.self_attn.*_proj" in guard_cfg[
-                    "module_include_patterns"
-                ]
-                assert "model.layers.*.mlp.gate" in guard_cfg[
-                    "module_include_patterns"
-                ]
-                assert "model.layers.*.mlp.shared_expert*" in guard_cfg[
-                    "module_include_patterns"
-                ]
+                assert (
+                    "model.layers.*.self_attn.*_proj"
+                    in guard_cfg["module_include_patterns"]
+                )
+                assert "model.layers.*.mlp.gate" in guard_cfg["module_include_patterns"]
+                assert (
+                    "model.layers.*.mlp.shared_expert*"
+                    in guard_cfg["module_include_patterns"]
+                )
                 assert guard_cfg["module_exclude_patterns"] == [
                     "model.layers.*.mlp.experts.*"
                 ]
@@ -240,15 +238,15 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
             assert data["guards"]["spectral"]["family_caps"]["router"] == 5.0
             for guard_name in ("spectral", "rmt"):
                 guard_cfg = data["guards"][guard_name]
-                assert "model.layers.*.self_attn.*_proj" in guard_cfg[
-                    "module_include_patterns"
-                ]
-                assert "model.layers.*.mlp.gate" in guard_cfg[
-                    "module_include_patterns"
-                ]
-                assert "model.layers.*.mlp.shared_expert*" in guard_cfg[
-                    "module_include_patterns"
-                ]
+                assert (
+                    "model.layers.*.self_attn.*_proj"
+                    in guard_cfg["module_include_patterns"]
+                )
+                assert "model.layers.*.mlp.gate" in guard_cfg["module_include_patterns"]
+                assert (
+                    "model.layers.*.mlp.shared_expert*"
+                    in guard_cfg["module_include_patterns"]
+                )
                 assert guard_cfg["module_exclude_patterns"] == [
                     "model.layers.*.mlp.experts.*"
                 ]

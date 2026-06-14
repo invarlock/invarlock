@@ -241,14 +241,11 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "redirected_to_image_text_candidate"
     )
     assert (
-        candidates["Gemma 3 4B IT"]["current_catalog_state"]
-        == "community_experimental"
+        candidates["Gemma 3 4B IT"]["current_catalog_state"] == "community_experimental"
     )
     assert candidates["Gemma 3 4B IT"]["criteria_status"]["included_preset"] == "pass"
     assert (
-        candidates["Gemma 3 4B IT"]["criteria_status"][
-            "included_calibration_config"
-        ]
+        candidates["Gemma 3 4B IT"]["criteria_status"]["included_calibration_config"]
         == "pass"
     )
     assert (
@@ -282,7 +279,6 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         item["display_name"] for item in family_catalog["recommended_additions"]
     }
     assert recommended == {"Audio-text evaluation pipeline"}
-
     gpt2_lane = contracts.support_lane_by_id("gpt2-causal-hf")
     assert gpt2_lane is not None
     assert gpt2_lane["support_tier"] == "published_basis"

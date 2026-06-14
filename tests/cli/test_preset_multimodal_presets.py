@@ -162,7 +162,9 @@ def test_gemma4_12b_public_vqav2_preset_uses_materialized_manifest_path() -> Non
 
 def test_gemma4_26b_a4b_public_vqav2_preset_declares_moe_candidate() -> None:
     root = _repo_root()
-    preset_path = root / "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml"
+    preset_path = (
+        root / "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml"
+    )
     cfg = load_config(preset_path)
 
     model = cfg.require_section("model")

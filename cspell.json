@@ -30,6 +30,7 @@
     "Docstrings",
     "cuda",
     "CUDA",
+    "dtype",
     "pyproject",
     "isort",
     "exponentiated",

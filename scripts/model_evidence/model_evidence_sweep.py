@@ -645,7 +645,9 @@ def lane_resource_preflight(
     if estimate is None:
         return None
 
-    visible_gpus = visible_cuda_device_count(env) if _accelerator_requested(device) else 0
+    visible_gpus = (
+        visible_cuda_device_count(env) if _accelerator_requested(device) else 0
+    )
     recommended = int(estimate["recommended_min_gpus_80gb"])
     payload: dict[str, object] = {
         "resource_estimate": estimate,

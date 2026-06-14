@@ -49,7 +49,10 @@ def estimate_model_weight_gb(model_id: str) -> float | None:
 
 def _is_moe_model(model_id: str) -> bool:
     model_lower = model_id.lower()
-    return any(token in model_lower for token in ("moe", "mixtral", "8x7b", "a3b", "a4b", "olmoe"))
+    return any(
+        token in model_lower
+        for token in ("moe", "mixtral", "8x7b", "a3b", "a4b", "olmoe")
+    )
 
 
 def lane_resource_estimate(model_id: str) -> dict[str, object] | None:

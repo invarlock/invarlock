@@ -482,21 +482,27 @@ def test_verify_helpers_cover_report_loading_primary_metric_and_validation_edges
             "resolved_policy": {"metrics": {"accuracy": "not-a-dict"}},
         }
     )
-    assert verify_helpers_mod._validate_drift_band(  # noqa: SLF001
-        {
-            "primary_metric": {
-                "kind": "accuracy",
-                "preview": 0.9,
-                "final": 0.75,
-            },
-            "resolved_policy": {
-                "metrics": {"accuracy": {"preview_final_delta_pp_max": 0.2}}
-            },
-        }
-    ) == []
-    assert verify_helpers_mod._validate_drift_band(  # noqa: SLF001
-        {"primary_metric": {"kind": "bleu"}}
-    ) == []
+    assert (
+        verify_helpers_mod._validate_drift_band(  # noqa: SLF001
+            {
+                "primary_metric": {
+                    "kind": "accuracy",
+                    "preview": 0.9,
+                    "final": 0.75,
+                },
+                "resolved_policy": {
+                    "metrics": {"accuracy": {"preview_final_delta_pp_max": 0.2}}
+                },
+            }
+        )
+        == []
+    )
+    assert (
+        verify_helpers_mod._validate_drift_band(  # noqa: SLF001
+            {"primary_metric": {"kind": "bleu"}}
+        )
+        == []
+    )
 
 
 def test_verify_contract_profile_resolution_and_baseline_digest_fallbacks(

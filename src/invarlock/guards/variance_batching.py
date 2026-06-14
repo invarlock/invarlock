@@ -118,9 +118,7 @@ def resolve_calibration_max_seq_len(guard: Any) -> int | None:
     return resolved if resolved > 0 else None
 
 
-def truncate_calibration_tensor(
-    guard: Any, value: Any
-) -> tuple[Any, bool, int | None]:
+def truncate_calibration_tensor(guard: Any, value: Any) -> tuple[Any, bool, int | None]:
     """Truncate calibration tensors on the sequence axis when configured."""
     max_seq_len = resolve_calibration_max_seq_len(guard)
     if max_seq_len is None or not isinstance(value, torch.Tensor) or value.dim() == 0:

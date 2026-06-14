@@ -118,10 +118,10 @@ def _attach_tokenizer_load_kwargs(
 ) -> Any:
     if not tokenizer_load_kwargs:
         return model_profile
-    if is_dataclass(model_profile):
+    if is_dataclass(model_profile) and not isinstance(model_profile, type):
         try:
             return replace(
-                model_profile,
+                cast(Any, model_profile),
                 tokenizer_load_kwargs=dict(tokenizer_load_kwargs),
             )
         except (TypeError, ValueError):

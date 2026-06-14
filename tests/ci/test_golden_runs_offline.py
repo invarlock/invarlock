@@ -317,13 +317,11 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
     )
     assert (
         "artifact_package/reports/errors/"
-        "rmt_norm_noise_l31_ffn_up_b030/evaluation.report.json"
-        in manifest_paths
+        "rmt_norm_noise_l31_ffn_up_b030/evaluation.report.json" in manifest_paths
     )
     assert (
         "artifact_package/reports/errors/"
-        "ve_mlp_scale_skew_l31_down_s090/evaluation.report.json"
-        in manifest_paths
+        "ve_mlp_scale_skew_l31_down_s090/evaluation.report.json" in manifest_paths
     )
     for entry in manifest["files"]:
         path = demo_dir / entry["path"]

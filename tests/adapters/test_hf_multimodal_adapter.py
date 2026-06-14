@@ -515,7 +515,9 @@ def test_hf_multimodal_processor_digest_normalizes_processor_metadata() -> None:
     assert len(digest) == 64
 
 
-def test_hf_multimodal_processor_digest_normalizes_mapping_and_fallback_values() -> None:
+def test_hf_multimodal_processor_digest_normalizes_mapping_and_fallback_values() -> (
+    None
+):
     adapter = HF_Multimodal_Adapter()
 
     class _BrokenToDict:
