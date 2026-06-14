@@ -71,6 +71,10 @@ _DIRECT_SUBMODULE_SPECS: dict[str, dict[str, tuple[str, str]]] = {
             "transformers.models.gemma3.modeling_gemma3",
             "Gemma3ForConditionalGeneration",
         ),
+        "gemma3n": (
+            "transformers.models.gemma3n.modeling_gemma3n",
+            "Gemma3nForConditionalGeneration",
+        ),
         "gemma4": (
             "transformers.models.gemma4.modeling_gemma4",
             "Gemma4ForConditionalGeneration",
@@ -128,6 +132,14 @@ _DIRECT_SUBMODULE_SPECS: dict[str, dict[str, tuple[str, str]]] = {
         ),
     },
     "multimodal": {
+        "gemma3n": (
+            "transformers.models.gemma3n.modeling_gemma3n",
+            "Gemma3nForConditionalGeneration",
+        ),
+        "gemma3": (
+            "transformers.models.gemma3.modeling_gemma3",
+            "Gemma3ForConditionalGeneration",
+        ),
         "gemma4_unified": (
             "transformers.models.gemma4_unified.modeling_gemma4_unified",
             "Gemma4UnifiedForConditionalGeneration",
@@ -154,6 +166,7 @@ _MODEL_ID_TYPE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ),
     ("gemma4_unified", ("gemma-4-12b", "gemma4-12b", "gemma_4_12b")),
     ("gemma4", ("gemma-4", "gemma4")),
+    ("gemma3n", ("gemma-3n", "gemma3n")),
     ("gemma3", ("gemma-3", "gemma3")),
     (
         "deberta-v2",
