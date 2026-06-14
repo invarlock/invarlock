@@ -94,6 +94,18 @@ def test_html_exporter_prefers_markdown_when_available():
     assert f"InvarLock {__version__}" in html
 
 
+def test_html_summary_uses_computed_validation_status():
+    from invarlock.reporting.html import render_report_html
+
+    cert = make_report(_mk_report(), _mk_report())
+    cert.get("validation", {}).pop("overall_pass", None)
+
+    html = render_report_html(cert)
+
+    assert '<article class="summary-chip summary-chip-pass"><p>Overall</p><strong>PASS</strong></article>' in html
+    assert '<article class="summary-chip summary-chip-fail"><p>Overall</p><strong>FAIL</strong></article>' not in html
+
+
 def test_html_exporter_escapes_report_controlled_html_payloads():
     from invarlock.reporting.html import render_report_html
 

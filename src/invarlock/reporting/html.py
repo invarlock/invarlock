@@ -15,6 +15,7 @@ from typing import Any
 from .branding import BRAND_TAGLINE
 from .render_markdown import render_report_markdown
 from .report_schema import validate_report
+from .report_summary import compute_console_validation_block
 
 markdown_module: Any | None = None
 try:
@@ -92,7 +93,13 @@ def _summary_items(evaluation_report: dict[str, Any]) -> list[tuple[str, str, st
         linked_runs_ready = bool(edited.get("report_path")) and bool(
             baseline.get("report_path")
         )
-    overall_status = "PASS" if bool(validation_map.get("overall_pass")) else "FAIL"
+    if "overall_pass" in validation_map:
+        overall_pass = bool(validation_map.get("overall_pass"))
+    else:
+        overall_pass = bool(
+            compute_console_validation_block(evaluation_report).get("overall_pass")
+        )
+    overall_status = "PASS" if overall_pass else "FAIL"
     metric_kind = str(metric_map.get("kind") or "primary metric")
     return [
         ("Overall", overall_status, overall_status.lower()),
