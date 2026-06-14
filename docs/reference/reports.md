@@ -17,6 +17,7 @@ telemetry fields, and HTML export.
 - [Quick Start](#quick-start)
 - [report Layout](#report-layout)
   - [Executive Summary Interpretation](#executive-summary-interpretation)
+- [Report Outline](report-outline.md)
 - [Schema](#schema)
   - [Minimal v1 report Example](#minimal-v1-report-example)
   - [Schema Summary](#schema-summary-validator-view)
@@ -69,6 +70,12 @@ run reports are also available.
 ## report Layout
 
 The markdown report is structured to highlight evaluation outcomes first:
+
+New renderers should use the shared renderer-neutral
+[Report Outline](report-outline.md) rather than deriving their own section
+order from the historical Markdown body. The outline groups modern report
+evidence as Decision, Primary Metric, Policy Gates, Guard Signals, optional
+Benchmark Comparison, Evidence And Provenance, and Technical Appendix.
 
 Container-backed evaluations emit `runtime.manifest.json` next to
 `evaluation.report.json`. Archive and verify them together.

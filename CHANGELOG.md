@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added JSON-answer extraction for `vision_text` evaluation so public VQA runs
   can prompt models for `{"answer": "..."}` structured output without breaking
   exact-answer scoring.
+- Added a renderer-neutral report outline view model that groups modern
+  evaluation evidence into decision, primary-metric, policy-gate, guard-signal,
+  benchmark-comparison, provenance, and appendix sections before renderer work.
 - Added seq2seq evidence-run support for FLAN-T5, including label preservation,
   shuffled split handling, T5 guard targets, and calibration preview labels.
 - Added model-evidence GPU backlog lanes, preset overrides, remote-code
