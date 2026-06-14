@@ -404,6 +404,10 @@ CATALOG_PRESET_OVERRIDES: dict[str, tuple[str, str]] = {
         "configs/presets/multimodal/gemma4_12b_vision_text_256.yaml",
         "hf_multimodal",
     ),
+    "google/gemma-4-E4B-it": (
+        "configs/presets/multimodal/gemma4_e4b_public_vqav2_256.yaml",
+        "hf_multimodal",
+    ),
     "Qwen/Qwen3.5-4B": (
         "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
         "hf_multimodal",
@@ -496,6 +500,26 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
         family="Gemma 4 12B any-to-any LM",
         model_id="google/gemma-4-12B-it",
         preset_relpath="configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml",
+        adapter="hf_multimodal",
+        verify_profile="release",
+        vision_text_materialization=_public_vqav2_materialization(),
+    ),
+    EvidenceLane(
+        slug="google_gemma_4_e4b_it",
+        lane_id="gemma4-e4b-image-text-hf",
+        family="Gemma 4 E4B image-text LM",
+        model_id="google/gemma-4-E4B-it",
+        preset_relpath="configs/presets/multimodal/gemma4_e4b_public_vqav2_256.yaml",
+        adapter="hf_multimodal",
+        verify_profile="release",
+        vision_text_materialization=_public_vqav2_materialization(),
+    ),
+    EvidenceLane(
+        slug="google_gemma_4_e2b_it_image_text",
+        lane_id="gemma4-e2b-image-text-hf",
+        family="Gemma 4 E2B image-text LM",
+        model_id="google/gemma-4-E2B-it",
+        preset_relpath="configs/presets/multimodal/gemma4_e2b_public_vqav2_256.yaml",
         adapter="hf_multimodal",
         verify_profile="release",
         vision_text_materialization=_public_vqav2_materialization(),
@@ -625,11 +649,6 @@ def _catalog_lane_defaults(model_id: str) -> tuple[str, str]:
         for keyword in ("t5", "bart", "mbart", "pegasus", "marian", "opus-mt")
     ):
         return ("configs/presets/seq2seq/synth_128.yaml", "hf_seq2seq")
-    if model_lower == "google/gemma-4-e4b-it":
-        return (
-            "configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml",
-            "hf_multimodal",
-        )
     return ("configs/presets/causal_lm/wikitext2_512.yaml", "auto")
 
 

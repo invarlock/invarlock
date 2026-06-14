@@ -75,7 +75,7 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
     )
     assert specs["google_flan_t5_base"].adapter == "hf_seq2seq"
     assert specs["google_gemma_4_e4b_it"].preset_relpath == (
-        "configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml"
+        "configs/presets/multimodal/gemma4_e4b_public_vqav2_256.yaml"
     )
     assert specs["google_gemma_4_e4b_it"].adapter == "hf_multimodal"
     assert specs["mistralai_mixtral_8x7b_v0_1"].preset_relpath == (
@@ -148,6 +148,8 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
 
     assert [lane.slug for lane in specs] == [
         "google_gemma_4_12b_it",
+        "google_gemma_4_e4b_it",
+        "google_gemma_4_e2b_it_image_text",
         "qwen_qwen3_5_4b",
         "qwen_qwen3_5_2b",
         "huggingfacetb_smollm3_3b",
@@ -160,6 +162,8 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
     ]
     adapters = {lane.slug: lane.adapter for lane in specs}
     assert adapters["google_gemma_4_12b_it"] == "hf_multimodal"
+    assert adapters["google_gemma_4_e4b_it"] == "hf_multimodal"
+    assert adapters["google_gemma_4_e2b_it_image_text"] == "hf_multimodal"
     assert adapters["google_flan_t5_base"] == "hf_seq2seq"
     assert adapters["qwen_qwen3_30b_a3b_instruct_2507"] == "hf_causal"
     assert adapters["mistralai_mixtral_8x7b_v0_1"] == "hf_causal"
@@ -197,6 +201,17 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
             assert lane.preset_relpath == (
                 "configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml"
             )
+            assert lane.vision_text_materialization is not None
+        elif lane.slug in {
+            "google_gemma_4_e4b_it",
+            "google_gemma_4_e2b_it_image_text",
+        }:
+            assert lane.verify_profile == "release"
+            assert lane.adapter == "hf_multimodal"
+            assert lane.preset_relpath in {
+                "configs/presets/multimodal/gemma4_e4b_public_vqav2_256.yaml",
+                "configs/presets/multimodal/gemma4_e2b_public_vqav2_256.yaml",
+            }
             assert lane.vision_text_materialization is not None
         elif lane.slug in {
             "qwen_qwen3_5_4b",

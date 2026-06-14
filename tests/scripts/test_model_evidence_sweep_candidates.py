@@ -48,6 +48,8 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
 
     assert set(specs) == {
         "google_gemma_4_12b_it",
+        "google_gemma_4_e4b_it",
+        "google_gemma_4_e2b_it_image_text",
         "qwen_qwen3_5_4b",
         "qwen_qwen3_5_2b",
         "huggingfacetb_smollm3_3b",
@@ -71,6 +73,8 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
         specs["google_gemma_4_12b_it"].vision_text_materialization["max_samples"] == 800
     )
     for slug, preset in {
+        "google_gemma_4_e4b_it": "configs/presets/multimodal/gemma4_e4b_public_vqav2_256.yaml",
+        "google_gemma_4_e2b_it_image_text": "configs/presets/multimodal/gemma4_e2b_public_vqav2_256.yaml",
         "qwen_qwen3_5_4b": "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
         "qwen_qwen3_5_2b": "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
     }.items():
@@ -99,6 +103,12 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
     )
     assert specs["mistralai_mixtral_8x7b_v0_1"].adapter == "hf_causal"
     assert specs["mistralai_mixtral_8x7b_v0_1"].verify_profile == "release"
+
+    assert specs["google_gemma_4_e4b_it"].lane_id == "gemma4-e4b-image-text-hf"
+    assert (
+        specs["google_gemma_4_e2b_it_image_text"].lane_id
+        == "gemma4-e2b-image-text-hf"
+    )
 
 
 def test_repo_mentioned_gpu_suite_phi4_host_dry_run_uses_lane_preset(

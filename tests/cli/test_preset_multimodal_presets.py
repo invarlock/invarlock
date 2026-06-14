@@ -193,6 +193,16 @@ def test_gemma4_26b_a4b_public_vqav2_preset_declares_moe_candidate() -> None:
 def test_small_multimodal_candidate_public_vqav2_presets_load() -> None:
     for rel_path, model_id, requires_sdpa in (
         (
+            "configs/presets/multimodal/gemma4_e4b_public_vqav2_256.yaml",
+            "google/gemma-4-E4B-it",
+            True,
+        ),
+        (
+            "configs/presets/multimodal/gemma4_e2b_public_vqav2_256.yaml",
+            "google/gemma-4-E2B-it",
+            True,
+        ),
+        (
             "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
             "Qwen/Qwen3.5-4B",
             False,
@@ -273,6 +283,18 @@ def test_gemma4_26b_a4b_null_sweep_calibration_config_uses_public_manifest() -> 
 
 def test_small_multimodal_candidate_null_sweeps_use_public_manifest() -> None:
     for rel_path, model_id, output_dir, requires_sdpa in (
+        (
+            "configs/calibration/null_sweep_gemma4_e4b.yaml",
+            "google/gemma-4-E4B-it",
+            "runs/null_sweeps/gemma4_e4b",
+            True,
+        ),
+        (
+            "configs/calibration/null_sweep_gemma4_e2b_image_text.yaml",
+            "google/gemma-4-E2B-it",
+            "runs/null_sweeps/gemma4_e2b_image_text",
+            True,
+        ),
         (
             "configs/calibration/null_sweep_qwen3_5_4b.yaml",
             "Qwen/Qwen3.5-4B",
