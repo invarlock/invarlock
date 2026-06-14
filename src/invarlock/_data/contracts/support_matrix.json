@@ -521,7 +521,7 @@
       "representative_models": [
         "google/gemma-3n-E4B-it"
       ],
-      "notes": "Prepared Gemma 3n image-text candidate lane on pinned public VQAv2 materialization. Audio/video capabilities remain deferred; this row is not a published assurance basis until public evidence artifacts are attached."
+      "notes": "Prepared Gemma 3n image-text candidate lane on pinned public VQAv2 materialization. Audio/video capabilities remain deferred; this row is not a published assurance basis until public evidence artifacts are attached. Evidence execution requires a Hugging Face token with accepted Gemma access terms."
     },
     {
       "lane_id": "gemma3-4b-it-image-text-hf",
@@ -540,7 +540,7 @@
       "representative_models": [
         "google/gemma-3-4b-it"
       ],
-      "notes": "Reopened as an image-text candidate through hf_multimodal and public VQAv2 rather than a text-only promotion lane. It remains outside the published assurance basis until public evidence artifacts are attached."
+      "notes": "Reopened as an image-text candidate through hf_multimodal and public VQAv2 rather than a text-only promotion lane. It remains outside the published assurance basis until public evidence artifacts are attached. Evidence execution requires a Hugging Face token with accepted Gemma access terms."
     },
     {
       "lane_id": "gemma4-26b-a4b-moe-image-text-hf",

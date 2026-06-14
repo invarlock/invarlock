@@ -275,6 +275,9 @@ Notes
 | Gemma 3n E4B image-text LM | Yes | Yes | Yes | No |
 | Gemma 3 4B IT image-text LM | Yes | Yes | Yes | No |
 
+Gemma 3n E4B and Gemma 3 4B IT evidence execution requires an authenticated
+Hugging Face token with accepted Gemma access terms.
+
 ### Large/MoE Published Evidence
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |

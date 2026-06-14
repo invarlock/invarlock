@@ -554,7 +554,7 @@
         "tests/cli/test_preset_multimodal_presets.py",
         "tests/scripts/test_model_evidence_sweep_catalog.py"
       ],
-      "notes": "Prepared as an image-text Gemma 3n candidate on public VQAv2. Audio/video evaluation is intentionally deferred until the evaluation provider exists.",
+      "notes": "Prepared as an image-text Gemma 3n candidate on public VQAv2. Audio/video evaluation is intentionally deferred until the evaluation provider exists. Evidence execution requires a Hugging Face token with accepted Gemma access terms.",
       "support_groups": [
         "small_local",
         "multimodal_candidate",
@@ -582,7 +582,7 @@
         "tests/cli/test_preset_multimodal_presets.py",
         "tests/scripts/test_model_evidence_sweep_catalog.py"
       ],
-      "notes": "Reclassified from a text-only out-of-scope candidate into an explicit image-text candidate lane using hf_multimodal and pinned public VQAv2 materialization.",
+      "notes": "Reclassified from a text-only out-of-scope candidate into an explicit image-text candidate lane using hf_multimodal and pinned public VQAv2 materialization. Evidence execution requires a Hugging Face token with accepted Gemma access terms.",
       "support_groups": [
         "small_local",
         "multimodal_candidate",
