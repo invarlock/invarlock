@@ -292,6 +292,13 @@ def test_to_markdown_and_to_html_cover_top_level_single_and_comparison_paths() -
     assert "**Violations:**" in markdown
     assert "<style>" in single_html
     assert "brand-lockup" in single_html
+    assert "brand-mark-svg" in single_html
+    assert "--color-background: #fcfbf7" in single_html
+    assert "--color-accent: #1f3a7a" in single_html
+    assert "--color-signal: #8d2433" in single_html
+    assert "--color-background: #11130f" in single_html
+    assert "--color-accent: #9fb7ff" in single_html
+    assert ">IL<" not in single_html
     assert f"InvarLock {__version__}" in single_html
     assert "Auditable verification for edited model checkpoints." in single_html
     assert "<h1>HTML Title</h1>" in single_html

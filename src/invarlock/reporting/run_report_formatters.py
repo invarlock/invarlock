@@ -15,7 +15,13 @@ from typing import Any, cast
 
 from invarlock.public_contracts import REPORT_SCHEMA_VERSION
 
-from .branding import BRAND_NAME, BRAND_TAGLINE, markdown_brand_line, version_label
+from .branding import (
+    BRAND_NAME,
+    BRAND_TAGLINE,
+    html_brand_mark,
+    markdown_brand_line,
+    version_label,
+)
 from .normalizer import normalize_run_report
 from .report_types import RunReport, validate_report
 
@@ -147,7 +153,8 @@ def to_html(
             "    <div class='container'>",
             (
                 "        <div class='brand-lockup'>"
-                f"<span class='brand-mark'>IL</span><span>{html.escape(BRAND_NAME)}</span>"
+                f"<span class='brand-mark'>{html_brand_mark()}</span>"
+                f"<span>{html.escape(BRAND_NAME)}</span>"
                 "</div>"
             ),
             f"        <h1>{html_title}</h1>",
@@ -666,26 +673,50 @@ def _generate_comparison_html(report1: RunReport, report2: RunReport) -> list[st
 def _get_default_css() -> str:
     """Get default CSS styling for HTML reports."""
     return """    <style>
+        :root {
+            --color-background: #fcfbf7;
+            --color-surface: #f4f2eb;
+            --color-surface-hover: #ebe8df;
+            --color-border: #d8d3c5;
+            --color-text-primary: #18150f;
+            --color-text-secondary: #5c5950;
+            --color-accent: #1f3a7a;
+            --color-accent-hover: #172c5e;
+            --color-signal: #8d2433;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --color-background: #11130f;
+                --color-surface: #191c16;
+                --color-surface-hover: #23271e;
+                --color-border: #3f4235;
+                --color-text-primary: #f4efe3;
+                --color-text-secondary: #c9c0aa;
+                --color-accent: #9fb7ff;
+                --color-accent-hover: #c0ccff;
+                --color-signal: #eda1ac;
+            }
+        }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            font-family: 'Sora', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
             line-height: 1.6;
-            color: #333;
+            color: var(--color-text-primary);
             max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #f8f9fa;
+            background-color: var(--color-background);
         }
         .container {
-            background: white;
+            background: var(--color-surface);
             padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 1px solid var(--color-border);
+            border-radius: 2px;
         }
         .brand-lockup {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            color: #2c3e50;
+            color: var(--color-text-primary);
             font-weight: 700;
             margin-bottom: 8px;
         }
@@ -695,51 +726,57 @@ def _get_default_css() -> str:
             justify-content: center;
             width: 28px;
             height: 28px;
-            border-radius: 6px;
-            background: #3498db;
-            color: white;
-            font-size: 0.8rem;
-            letter-spacing: 0;
+            color: var(--color-text-primary);
+        }
+        .brand-mark-svg {
+            display: block;
+            width: 28px;
+            height: 28px;
         }
         .brand-tagline {
-            color: #52606d;
+            color: var(--color-text-secondary);
             margin-top: -4px;
         }
         .brand-meta {
-            color: #52606d;
+            color: var(--color-text-secondary);
             font-size: 0.92rem;
             margin-top: -6px;
         }
-        h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
-        h2 { color: #34495e; border-bottom: 1px solid #bdc3c7; padding-bottom: 5px; margin-top: 30px; }
-        h3 { color: #7f8c8d; margin-top: 25px; }
-        .timestamp { color: #95a5a6; font-style: italic; margin-bottom: 30px; }
+        h1, h2, h3 {
+            font-family: 'Newsreader', Georgia, ui-serif, serif;
+            font-weight: 600;
+            color: var(--color-text-primary);
+        }
+        h1 { border-bottom: 2px solid var(--color-accent); padding-bottom: 10px; }
+        h2 { border-bottom: 1px solid var(--color-border); padding-bottom: 5px; margin-top: 30px; }
+        h3 { color: var(--color-text-secondary); margin-top: 25px; }
+        .timestamp { color: var(--color-text-secondary); font-style: italic; margin-bottom: 30px; }
         .metrics-table, .comparison-table {
             width: 100%;
             border-collapse: collapse;
             margin: 20px 0;
-            background: white;
+            background: var(--color-surface);
         }
         .metrics-table th, .metrics-table td,
         .comparison-table th, .comparison-table td {
             padding: 12px;
             text-align: left;
-            border-bottom: 1px solid #ecf0f1;
+            border-bottom: 1px solid var(--color-border);
         }
         .metrics-table th, .comparison-table th {
-            background-color: #3498db;
-            color: white;
+            background-color: var(--color-surface-hover);
+            color: var(--color-text-primary);
             font-weight: 600;
         }
         .metrics-table tr:hover, .comparison-table tr:hover {
-            background-color: #f8f9fa;
+            background-color: var(--color-surface-hover);
         }
         li { margin: 5px 0; }
         code {
-            background: #f1f2f6;
+            background: var(--color-surface-hover);
             padding: 2px 6px;
-            border-radius: 3px;
-            font-family: 'Monaco', 'Consolas', monospace;
+            border-radius: 2px;
+            font-family: 'JetBrains Mono', 'Monaco', 'Consolas', monospace;
         }
         .comparison-content { display: block; }
         @media (max-width: 768px) {

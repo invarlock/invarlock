@@ -22,7 +22,7 @@ def html_brand_mark(*, class_name: str = "brand-mark-svg") -> str:
         'stroke-width="34" stroke-linecap="round" stroke-linejoin="round" '
         'opacity="0.72"/>'
         '<path d="M156 292 C 198 212, 230 212, 256 252 S 314 332, 356 242" '
-        'fill="none" stroke="var(--brand-mark-accent,currentColor)" '
+        'fill="none" stroke="var(--color-accent,var(--brand-mark-accent,currentColor))" '
         'stroke-width="32" stroke-linecap="round" opacity="0.62"/>'
         '<path d="M156 292 C 198 212, 230 212, 256 252 S 314 332, 356 242" '
         'fill="none" stroke="currentColor" stroke-width="14" '

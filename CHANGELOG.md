@@ -62,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated guard-value claim wording across evidence-pack docs, public evidence,
   and support-matrix surfaces to distinguish policy failures, guard warnings,
   and published guard-value proof.
+- Updated evaluation-report HTML export to render directly from the shared
+  report outline, including benchmark-comparison and guard-warning sections,
+  instead of converting the historical Markdown body, and aligned report HTML
+  colors with the site Ledger ink branding tokens.
 - Updated support-matrix organization and evidence grouping so published-basis,
   experimental, multimodal, seq2seq, MoE, and blocked/access-gated lanes are
   easier to scan without adding a redundant grouping column.

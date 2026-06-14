@@ -61,6 +61,13 @@ def _status_bool(value: Any, *, default: bool | None = None) -> tuple[str, str]:
     return ("PASS", "pass") if ok else ("FAIL", "fail")
 
 
+def _plain_gate_status(value: str) -> str:
+    status = value.strip()
+    for prefix in ("✅", "❌", "⚠️", "⚠"):
+        status = status.replace(prefix, "")
+    return " ".join(status.split())
+
+
 def _format_percent_range(values: list[float]) -> str:
     if not values:
         return "N/A"
@@ -221,7 +228,7 @@ def _build_policy_gates_section(evaluation_report: dict[str, Any]) -> ReportSect
     facts = tuple(
         ReportFact(
             row.label,
-            f"{row.status} | {row.measured} vs {row.threshold}",
+            f"{_plain_gate_status(row.status)} | {row.measured} vs {row.threshold}",
             "pass" if "PASS" in row.status else "fail" if "FAIL" in row.status else "info",
             detail=f"{row.description}; basis={row.basis}",
             source="validation",

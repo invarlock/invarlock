@@ -1,129 +1,255 @@
 """
 Structured HTML exporter for evaluation reports.
 
-The canonical content still comes from the Markdown renderer, but the HTML shell
-adds summary cues and quick links so reviewers can orient faster in a browser.
+The visible structure comes from the renderer-neutral report outline. Markdown
+remains available as a separate export, while this path focuses on a browser
+review surface for evaluation.report.json.
 """
 
 from __future__ import annotations
 
-import re
+import json
 from html import escape
-from importlib import import_module
 from typing import Any
 
-from .branding import BRAND_TAGLINE, html_brand_mark
-from .render_markdown import render_report_markdown
+from invarlock.public_contracts import REPORT_SCHEMA_VERSION
+
+from .branding import BRAND_NAME, BRAND_TAGLINE, html_brand_mark, version_label
+from .report_outline import (
+    EvaluationReportOutline,
+    ReportFact,
+    ReportSection,
+    build_evaluation_report_outline,
+)
 from .report_schema import validate_report
-from .report_summary import compute_console_validation_block
 
-markdown_module: Any | None = None
-try:
-    markdown_module = import_module("markdown")
-except ImportError:  # pragma: no cover - optional dependency
-    markdown_module = None
-
-
-_STATUS_BADGES = {
-    "\u2705 PASS": '<span class="badge pass">PASS</span>',
-    "\u2705 OK": '<span class="badge pass">OK</span>',
-    "\u274c FAIL": '<span class="badge fail">FAIL</span>',
-    "\u26a0\ufe0f WARN": '<span class="badge warn">WARN</span>',
-    "\u26a0 WARN": '<span class="badge warn">WARN</span>',
+_TONE_CLASS = {
+    "pass": "tone-pass",
+    "fail": "tone-fail",
+    "warn": "tone-warn",
+    "warning": "tone-warn",
+    "info": "tone-info",
 }
-_HEADING_RE = re.compile(r"<h([23]) id=\"([^\"]+)\">(.*?)</h\1>", re.DOTALL)
-_TAG_RE = re.compile(r"<[^>]+>")
+_APPENDIX_PREVIEW_LIMIT = 1600
 
 
-def _apply_status_badges(html_body: str) -> str:
-    updated = html_body
-    for token, replacement in _STATUS_BADGES.items():
-        updated = updated.replace(token, replacement)
-    return updated
+def _mapping(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
 
 
-def _escape_raw_html(md: str) -> str:
-    """Disable raw HTML passthrough while preserving normal Markdown syntax."""
-
-    return escape(md, quote=False)
+def _tone(value: str) -> str:
+    return _TONE_CLASS.get(value.lower(), "tone-info")
 
 
-def _strip_tags(value: str) -> str:
-    text = _TAG_RE.sub(" ", value)
-    return " ".join(text.split()).strip()
+def _summary_fact(section: ReportSection, label: str) -> ReportFact | None:
+    return section.facts_by_label.get(label)
 
 
-def _extract_outline_entries(html_body: str) -> list[tuple[str, str]]:
-    entries: list[tuple[str, str]] = []
-    for _level, anchor, inner_html in _HEADING_RE.findall(html_body):
-        label = _strip_tags(inner_html)
-        if label:
-            entries.append((anchor, label))
-    return entries
+def _fact_value(section: ReportSection, label: str, default: str = "N/A") -> str:
+    fact = _summary_fact(section, label)
+    return fact.value if fact is not None else default
 
 
-def _render_outline(entries: list[tuple[str, str]]) -> str:
-    if not entries:
+def _section(outline: EvaluationReportOutline, key: str) -> ReportSection | None:
+    for section in outline.sections:
+        if section.key == key:
+            return section
+    return None
+
+
+def _render_status(value: str, status: str) -> str:
+    return (
+        f'<span class="status-pill {_tone(status)}">'
+        f"{escape(value)}</span>"
+    )
+
+
+def _render_summary_strip(outline: EvaluationReportOutline) -> str:
+    decision = _section(outline, "decision")
+    primary = _section(outline, "primary_metric")
+    if decision is None or primary is None:
         return ""
+    warning_count = _fact_value(decision, "Guard Warnings", "0")
+    chips = (
+        (
+            "Overall",
+            outline.overall_status,
+            "pass" if outline.overall_status == "PASS" else "fail",
+        ),
+        ("Model", _fact_value(decision, "Model"), "info"),
+        ("Primary Metric", _fact_value(primary, "Metric"), "info"),
+        (
+            "Guard Warnings",
+            warning_count,
+            "warn" if warning_count not in {"0", "N/A"} else "pass",
+        ),
+    )
     items = "".join(
-        f'<li><a href="#{escape(anchor)}">{escape(label)}</a></li>'
-        for anchor, label in entries
+        '<article class="summary-chip">'
+        f"<p>{escape(label)}</p>"
+        f'<strong class="{_tone(tone)}">{escape(value)}</strong>'
+        "</article>"
+        for label, value, tone in chips
+    )
+    return f'<section class="summary-strip" aria-label="Report summary">{items}</section>'
+
+
+def _render_nav(outline: EvaluationReportOutline) -> str:
+    items = "".join(
+        f'<li><a href="#{escape(section.key)}">{escape(section.title)}</a></li>'
+        for section in outline.sections
     )
     return (
-        '<aside class="report-outline" aria-label="Report quick links">'
-        '<p class="outline-eyebrow">Quick Links</p>'
-        "<ul>"
-        f"{items}"
-        "</ul>"
-        "</aside>"
+        '<nav class="report-outline" aria-label="Report sections">'
+        '<p class="outline-eyebrow">Sections</p>'
+        f"<ol>{items}</ol>"
+        "</nav>"
     )
 
 
-def _summary_items(evaluation_report: dict[str, Any]) -> list[tuple[str, str, str]]:
-    validation = evaluation_report.get("validation")
-    validation_map = validation if isinstance(validation, dict) else {}
-    primary_metric = evaluation_report.get("primary_metric")
-    metric_map = primary_metric if isinstance(primary_metric, dict) else {}
-    provenance = evaluation_report.get("provenance")
-    provenance_map = provenance if isinstance(provenance, dict) else {}
-    linked_runs_ready = False
-    edited = provenance_map.get("edited")
-    baseline = provenance_map.get("baseline")
-    if isinstance(edited, dict) and isinstance(baseline, dict):
-        linked_runs_ready = bool(edited.get("report_path")) and bool(
-            baseline.get("report_path")
-        )
-    if "overall_pass" in validation_map:
-        overall_pass = bool(validation_map.get("overall_pass"))
-    else:
-        overall_pass = bool(
-            compute_console_validation_block(evaluation_report).get("overall_pass")
-        )
-    overall_status = "PASS" if overall_pass else "FAIL"
-    metric_kind = str(metric_map.get("kind") or "primary metric")
-    return [
-        ("Overall", overall_status, overall_status.lower()),
-        ("Primary Metric", metric_kind, "plain"),
-        (
-            "Linked Run Reports",
-            "Ready" if linked_runs_ready else "Unavailable",
-            "plain",
-        ),
-        ("Workflow", "Verify -> Review -> Share", "plain"),
-    ]
+def _render_source_chips(section: ReportSection) -> str:
+    if not section.source_blocks:
+        return ""
+    chips = "".join(
+        f"<code>{escape(source)}</code>" for source in section.source_blocks
+    )
+    return f'<div class="source-chips" aria-label="JSON source blocks">{chips}</div>'
 
 
-def _render_summary_strip(evaluation_report: dict[str, Any]) -> str:
-    cards: list[str] = []
-    for label, value, tone in _summary_items(evaluation_report):
-        badge = ""
-        if tone in {"pass", "fail", "warn"}:
-            badge = f" summary-chip-{tone}"
-        cards.append(
-            f'<article class="summary-chip{badge}"><p>{escape(label)}</p>'
-            f"<strong>{escape(value)}</strong></article>"
+def _render_fact_table(section: ReportSection) -> str:
+    rows: list[str] = []
+    for fact in section.facts:
+        value = _render_status(fact.value, fact.status)
+        detail = escape(fact.detail) if fact.detail else ""
+        source = f"<code>{escape(fact.source)}</code>" if fact.source else ""
+        rows.append(
+            "<tr>"
+            f"<th scope=\"row\">{escape(fact.label)}</th>"
+            f"<td>{value}</td>"
+            f"<td>{detail}</td>"
+            f"<td>{source}</td>"
+            "</tr>"
         )
-    return f'<section class="summary-strip">{"".join(cards)}</section>'
+    return (
+        '<div class="table-wrap">'
+        "<table>"
+        "<thead><tr><th>Field</th><th>Value</th><th>Detail</th><th>Source</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody>"
+        "</table>"
+        "</div>"
+    )
+
+
+def _render_guard_warnings(evaluation_report: dict[str, Any]) -> str:
+    block = _mapping(evaluation_report.get("guard_warnings"))
+    warnings = block.get("warnings")
+    if not isinstance(warnings, list) or not warnings:
+        return ""
+    rows: list[str] = []
+    for warning in warnings:
+        if not isinstance(warning, dict):
+            continue
+        location = warning.get("module") or warning.get("family") or "N/A"
+        baseline = warning.get("baseline", "N/A")
+        subject = warning.get("subject", "N/A")
+        if not isinstance(baseline, str):
+            baseline = json.dumps(baseline, sort_keys=True)
+        if not isinstance(subject, str):
+            subject = json.dumps(subject, sort_keys=True)
+        rows.append(
+            "<tr>"
+            f"<td>{escape(str(warning.get('guard') or 'unknown'))}</td>"
+            f"<td>{escape(str(warning.get('kind') or 'warning'))}</td>"
+            f"<td>{escape(str(location))}</td>"
+            f"<td>{escape(str(baseline))}</td>"
+            f"<td>{escape(str(subject))}</td>"
+            f"<td>{escape(str(warning.get('policy_gate') or 'N/A'))}</td>"
+            f"<td>{escape(str(warning.get('message') or ''))}</td>"
+            "</tr>"
+        )
+    if not rows:
+        return ""
+    return (
+        '<div class="detail-block">'
+        "<h3>Guard Warnings</h3>"
+        "<p>Warnings describe baseline-relative guard movement. They do not change "
+        "the policy verdict unless verification is run with a strict warning policy.</p>"
+        '<div class="table-wrap">'
+        "<table>"
+        "<thead><tr>"
+        "<th>Guard</th><th>Kind</th><th>Location</th><th>Baseline</th>"
+        "<th>Subject</th><th>Policy Gate</th><th>Message</th>"
+        "</tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody>"
+        "</table>"
+        "</div></div>"
+    )
+
+
+def _preview_json(value: Any) -> str:
+    text = json.dumps(value, indent=2, sort_keys=True, default=str)
+    if len(text) <= _APPENDIX_PREVIEW_LIMIT:
+        return text
+    return (
+        text[:_APPENDIX_PREVIEW_LIMIT].rstrip()
+        + "\n...\n[truncated in HTML preview; use evaluation.report.json for full data]"
+    )
+
+
+def _render_appendix_previews(
+    evaluation_report: dict[str, Any], section: ReportSection
+) -> str:
+    if section.key != "technical_appendix":
+        return ""
+    blocks: list[str] = []
+    for source in section.source_blocks:
+        value = evaluation_report.get(source)
+        if value in ({}, [], None):
+            continue
+        blocks.append(
+            "<details>"
+            f"<summary>{escape(source)}</summary>"
+            f"<pre>{escape(_preview_json(value))}</pre>"
+            "</details>"
+        )
+    if not blocks:
+        return ""
+    return (
+        '<div class="appendix-previews">'
+        "<p>Appendix previews are intentionally capped. The JSON report remains "
+        "the complete audit artifact.</p>"
+        f"{''.join(blocks)}"
+        "</div>"
+    )
+
+
+def _render_section(
+    evaluation_report: dict[str, Any], section: ReportSection
+) -> str:
+    extras = ""
+    if section.key == "guard_signals":
+        extras = _render_guard_warnings(evaluation_report)
+    elif section.key == "technical_appendix":
+        extras = _render_appendix_previews(evaluation_report, section)
+    return (
+        f'<section id="{escape(section.key)}" class="report-section priority-{escape(section.priority)}">'
+        "<header>"
+        f"<h2>{escape(section.title)}</h2>"
+        f"<p>{escape(section.summary)}</p>"
+        f"{_render_source_chips(section)}"
+        "</header>"
+        f"{_render_fact_table(section)}"
+        f"{extras}"
+        "</section>"
+    )
+
+
+def _render_sections(
+    evaluation_report: dict[str, Any], outline: EvaluationReportOutline
+) -> str:
+    return "".join(
+        _render_section(evaluation_report, section) for section in outline.sections
+    )
 
 
 def render_report_html(evaluation_report: dict[str, Any]) -> str:
@@ -131,115 +257,108 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
 
     if not validate_report(evaluation_report):
         raise ValueError("Invalid evaluation report structure")
-    md = render_report_markdown(evaluation_report)
-    outline = ""
-    if markdown_module is None:
-        body = f'<div class="report-body"><pre class="invarlock-md">{escape(md)}</pre></div>'
-    else:
-        html_body = markdown_module.markdown(
-            _escape_raw_html(md),
-            extensions=["tables", "fenced_code", "toc"],
-            extension_configs={"toc": {"permalink": False}},
-        )
-        html_body = _apply_status_badges(html_body)
-        outline = _render_outline(_extract_outline_entries(html_body))
-        body = f'<div class="report-body"><div class="invarlock-md">{html_body}</div></div>'
-    summary_strip = _render_summary_strip(evaluation_report)
+    outline = build_evaluation_report_outline(evaluation_report)
+    summary_strip = _render_summary_strip(outline)
+    nav = _render_nav(outline)
+    sections = _render_sections(evaluation_report, outline)
     shell = (
-        '<!DOCTYPE html><html><head><meta charset="utf-8">'
+        '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        "<title>InvarLock Evaluation Report</title>"
+        f"<title>{escape(outline.title)}</title>"
         "<style>"
-        ":root{--pass:#1f7a46;--fail:#b42318;--warn:#a15c07;--ink:#17212b;"
-        "--muted:#52606d;--bg:#eef3f8;--bg-accent:#dfe9f3;--panel:#f7fafc;"
-        "--panel-strong:#ffffff;--border:#cbd5e1;--shadow:rgba(15,23,42,0.12);"
-        "--accent:#0f5f8c;--accent-soft:#d8ebf7;--brand-mark-accent:#1f3a7a}"
+        ":root{--pass:#2f6b4f;--fail:#a02c24;--warn:#95671c;--info:#5c5950;"
+        "--ink:#18150f;--muted:#5c5950;--bg:#fcfbf7;--panel:#f4f2eb;"
+        "--panel-soft:#ebe8df;--border:#d8d3c5;--shadow:none;"
+        "--accent:#1f3a7a;--accent-hover:#172c5e;--accent-soft:#ebe8df;"
+        "--signal:#8d2433;--color-accent:var(--accent);--brand-mark-accent:var(--accent)}"
         "@media (prefers-color-scheme: dark){"
-        ":root{--pass:#3fb36b;--fail:#ff7b72;--warn:#f2b44f;--ink:#e6edf3;"
-        "--muted:#9fb0c0;--bg:#0f1722;--bg-accent:#162334;--panel:#111c2a;"
-        "--panel-strong:#162334;--border:#2c3e50;--shadow:rgba(0,0,0,0.35);"
-        "--accent:#7cc7ff;--accent-soft:#1b3044;--brand-mark-accent:#9fb7ff}}"
-        "body{margin:0;min-height:100vh;padding:30px;color:var(--ink);"
-        'font-family:"Avenir Next","Segoe UI Variable","Segoe UI",sans-serif;'
-        "line-height:1.65;background:"
-        "radial-gradient(circle at top right,var(--bg-accent),transparent 26%),"
-        "linear-gradient(180deg,var(--bg),var(--panel))}"
+        ":root{--pass:#9ad0a9;--fail:#f19a92;--warn:#e6ba72;--info:#c9c0aa;"
+        "--ink:#f4efe3;--muted:#c9c0aa;--bg:#11130f;--panel:#191c16;"
+        "--panel-soft:#23271e;--border:#3f4235;--shadow:none;"
+        "--accent:#9fb7ff;--accent-hover:#c0ccff;--accent-soft:#23271e;"
+        "--signal:#eda1ac;--color-accent:var(--accent);--brand-mark-accent:var(--accent)}}"
+        "*{box-sizing:border-box}"
+        "body{margin:0;min-height:100vh;padding:28px;color:var(--ink);"
+        'font-family:"Sora","Avenir Next","Segoe UI Variable","Segoe UI",ui-sans-serif,system-ui,sans-serif;'
+        "line-height:1.55;background:var(--bg)}"
         ".report-shell{max-width:1180px;margin:0 auto}"
-        ".report-header{margin:0 auto 18px;padding:24px 26px;border:1px solid var(--border);"
-        "border-radius:20px;background:linear-gradient(135deg,var(--panel-strong),var(--panel));"
-        "box-shadow:0 18px 48px var(--shadow)}"
-        ".eyebrow{margin:0 0 8px 0;font-size:0.78rem;font-weight:700;letter-spacing:0.12em;"
-        "text-transform:uppercase;color:var(--accent)}"
-        ".report-header h1{margin:0;font-size:2rem;line-height:1.1;"
-        'font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif}'
-        ".report-header p{margin:10px 0 0 0;max-width:52rem;color:var(--muted)}"
-        ".brand-lockup{display:flex;align-items:center;gap:10px;margin-bottom:8px}"
-        ".brand-mark{display:inline-grid;place-items:center;width:42px;height:42px;"
+        ".report-header{margin:0 0 16px 0;padding:22px 24px;border:1px solid var(--border);"
+        "border-radius:2px;background:var(--panel);box-shadow:var(--shadow)}"
+        ".eyebrow{margin:0;font-size:0.78rem;font-weight:700;letter-spacing:0.08em;"
+        "text-transform:uppercase;color:var(--signal)}"
+        '.report-header h1{margin:10px 0 6px 0;font-family:"Newsreader",ui-serif,Georgia,serif;'
+        "font-size:2rem;line-height:1.15;font-weight:600}"
+        ".report-header p{margin:0;max-width:58rem;color:var(--muted)}"
+        ".brand-lockup{display:flex;align-items:center;gap:12px}"
+        ".brand-mark{display:inline-grid;place-items:center;width:38px;height:38px;"
         "color:var(--ink)}"
-        ".brand-mark-svg{display:block;width:42px;height:42px}"
+        ".brand-mark-svg{display:block;width:38px;height:38px}"
+        ".brand-meta{margin-top:10px!important;font-size:0.9rem}"
         ".summary-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;"
-        "margin:0 0 18px 0}"
-        ".summary-chip{padding:14px 16px;border-radius:18px;border:1px solid var(--border);"
-        "background:var(--panel-strong);box-shadow:0 10px 24px var(--shadow)}"
+        "margin:0 0 16px 0}"
+        ".summary-chip{padding:13px 14px;border-radius:2px;border:1px solid var(--border);"
+        "background:var(--panel);box-shadow:var(--shadow)}"
         ".summary-chip p{margin:0 0 6px 0;font-size:0.78rem;font-weight:700;"
         "letter-spacing:0.06em;text-transform:uppercase;color:var(--muted)}"
-        ".summary-chip strong{font-size:1rem;line-height:1.3}"
-        ".summary-chip-pass strong{color:var(--pass)}"
-        ".summary-chip-fail strong{color:var(--fail)}"
-        ".summary-chip-warn strong{color:var(--warn)}"
+        ".summary-chip strong{font-size:1rem;line-height:1.3;overflow-wrap:anywhere}"
         ".report-grid{display:grid;grid-template-columns:minmax(220px,260px) minmax(0,1fr);gap:18px;align-items:start}"
-        ".report-outline{position:sticky;top:24px;padding:18px;border-radius:20px;"
-        "border:1px solid var(--border);background:var(--panel-strong);box-shadow:0 18px 48px var(--shadow)}"
+        ".report-outline{position:sticky;top:24px;padding:16px;border-radius:2px;"
+        "border:1px solid var(--border);background:var(--panel);box-shadow:var(--shadow)}"
         ".outline-eyebrow{margin:0 0 10px 0;font-size:0.78rem;font-weight:700;"
-        "letter-spacing:0.08em;text-transform:uppercase;color:var(--accent)}"
-        ".report-outline ul{list-style:none;padding:0;margin:0;display:grid;gap:8px}"
-        ".report-outline a{display:block;padding:8px 10px;border-radius:12px;text-decoration:none;"
+        "letter-spacing:0.08em;text-transform:uppercase;color:var(--signal)}"
+        ".report-outline ol{list-style:none;padding:0;margin:0;display:grid;gap:6px}"
+        ".report-outline a{display:block;padding:7px 8px;border-radius:6px;text-decoration:none;"
         "color:var(--ink);background:transparent}"
-        ".report-outline a:hover{background:var(--accent-soft)}"
-        ".report-body{padding:28px;background:var(--panel-strong);border:1px solid var(--border);"
-        "border-radius:24px;box-shadow:0 18px 48px var(--shadow)}"
-        ".invarlock-md{max-width:960px;margin:0 auto}"
-        ".invarlock-md>:first-child{margin-top:0}"
-        'h1,h2,h3{line-height:1.2;font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif;scroll-margin-top:24px}'
-        "h1{margin-top:0}h2,h3{margin-top:1.5em}"
-        "p,li{color:var(--ink)}"
+        ".report-outline a:hover{background:var(--accent-soft);color:var(--accent-hover)}"
+        ".report-sections{display:grid;gap:16px}"
+        ".report-section{padding:20px;border:1px solid var(--border);border-radius:2px;"
+        "background:var(--panel);box-shadow:var(--shadow);scroll-margin-top:24px}"
+        ".report-section header{margin-bottom:14px}"
+        '.report-section h2{margin:0 0 6px 0;font-family:"Newsreader",ui-serif,Georgia,serif;'
+        "font-size:1.35rem;line-height:1.2;font-weight:600}"
+        ".report-section h3{margin:18px 0 6px 0;font-size:1rem}"
+        ".report-section p{margin:0;color:var(--muted)}"
+        ".source-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}"
         "a{color:var(--accent)}"
-        "table{border-collapse:collapse;width:100%;margin:14px 0;background:var(--panel-strong)}"
-        "th,td{border:1px solid var(--border);padding:8px 10px;text-align:left;vertical-align:top}"
-        "th{background:var(--panel);font-weight:700}"
-        "code,pre{background:var(--panel);border-radius:10px}"
-        "code{padding:0.12rem 0.35rem}"
-        "pre{padding:14px;overflow:auto;border:1px solid var(--border)}"
-        "blockquote{margin:16px 0;padding:0 0 0 16px;border-left:4px solid var(--border);"
-        "color:var(--muted)}"
-        "hr{border:none;border-top:1px solid var(--border);margin:24px 0}"
-        ".badge{display:inline-block;padding:2px 8px;border-radius:999px;"
-        "font-size:0.75rem;font-weight:700;letter-spacing:0.02em;color:#fff}"
-        ".badge.pass{background:var(--pass)}"
-        ".badge.fail{background:var(--fail)}"
-        ".badge.warn{background:var(--warn)}"
-        "@media (max-width:940px){.summary-strip{grid-template-columns:repeat(2,minmax(0,1fr))}"
+        ".table-wrap{width:100%;overflow:auto}"
+        "table{border-collapse:collapse;width:100%;margin:0;background:var(--panel);font-size:0.94rem}"
+        "th,td{border-top:1px solid var(--border);padding:9px 10px;text-align:left;vertical-align:top}"
+        "thead th{border-top:0;color:var(--muted);font-size:0.78rem;letter-spacing:0.05em;text-transform:uppercase}"
+        "tbody th{width:22%;font-weight:700}"
+        "td{overflow-wrap:anywhere}"
+        'code,pre{background:var(--panel-soft);border-radius:2px;font-family:"JetBrains Mono",ui-monospace,monospace}'
+        "code{padding:0.12rem 0.32rem;font-size:0.86em}"
+        "pre{padding:12px;overflow:auto;border:1px solid var(--border);font-size:0.84rem;line-height:1.45}"
+        ".status-pill{display:inline-block;padding:2px 7px;border-radius:999px;font-weight:750}"
+        ".tone-pass{color:var(--pass)}.tone-fail{color:var(--fail)}"
+        ".tone-warn{color:var(--warn)}.tone-info{color:var(--info)}"
+        ".detail-block{margin-top:18px;padding-top:16px;border-top:1px solid var(--border)}"
+        ".appendix-previews{display:grid;gap:10px;margin-top:16px}"
+        "details{border:1px solid var(--border);border-radius:2px;background:var(--panel-soft)}"
+        "summary{cursor:pointer;padding:10px 12px;font-weight:700}"
+        "details pre{margin:0;border:0;border-top:1px solid var(--border);border-radius:0}"
+        "@media (max-width:980px){.summary-strip{grid-template-columns:repeat(2,minmax(0,1fr))}"
         ".report-grid{grid-template-columns:1fr}.report-outline{position:static}}"
-        "@media (max-width:720px){body{padding:18px}.report-header{padding:18px}"
+        "@media (max-width:720px){body{padding:16px}.report-header{padding:18px}"
         ".report-header h1{font-size:1.7rem}.summary-strip{grid-template-columns:1fr}"
-        ".report-body{padding:18px}th,td{padding:7px 8px}}"
-        "@media print{body{background:#fff;padding:0}.report-header,.summary-chip,.report-outline,.report-body{"
+        ".report-section{padding:16px}th,td{padding:8px}tbody th{width:auto}}"
+        "@media print{body{background:#fff;padding:0}.report-header,.summary-chip,.report-outline,.report-section{"
         "box-shadow:none;border-color:#d0d7de}.report-grid{grid-template-columns:1fr}"
-        ".report-outline{display:none}.report-body{border-radius:0;padding:0}a{color:inherit;text-decoration:none}"
-        ".badge{color:#000;border:1px solid #000;background:transparent}}"
+        ".report-outline{display:none}a{color:inherit;text-decoration:none}}"
         "</style>"
         '</head><body><div class="report-shell">'
         '<header class="report-header">'
         f'<div class="brand-lockup"><span class="brand-mark">{html_brand_mark()}</span>'
         '<p class="eyebrow">InvarLock</p></div>'
-        "<h1>Evaluation Report</h1>"
-        f"<p>{escape(BRAND_TAGLINE)} Browser-first rendering of the canonical evaluation bundle, with quick links for faster reviewer navigation.</p>"
+        f"<h1>{escape(outline.title)}</h1>"
+        f"<p>{escape(BRAND_TAGLINE)}</p>"
+        f'<p class="brand-meta">{escape(BRAND_NAME)} {escape(version_label())} · schema {escape(REPORT_SCHEMA_VERSION)} · renderer outline</p>'
         "</header>"
         f"{summary_strip}"
-        '<section class="report-grid">'
-        f"{outline}"
-        f"{body}"
-        "</section>"
+        '<div class="report-grid">'
+        f"{nav}"
+        f'<main class="report-sections">{sections}</main>'
+        "</div>"
         "</div></body></html>"
     )
     return shell
