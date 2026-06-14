@@ -56,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Raised the Hugging Face adapter Transformers floor for modern model support
   and refreshed optional Torch requirements to avoid `torch==2.12.0` while the
   current supply-chain advisory has no fixed upstream version.
+- Added a time-boxed, issue-tracked `pip-audit` allowlist entry for the
+  unfixed Torch `CVE-2025-3000` advisory affecting optional HF and advanced
+  install surfaces.
 - Updated adapter examples to reflect the newly published dense, multimodal,
   seq2seq, and MoE model shapes.
 - Updated ordinary CI expectations so long GPU evidence sweeps are treated as

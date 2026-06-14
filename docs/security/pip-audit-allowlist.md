@@ -5,11 +5,11 @@ The CI supply-chain jobs run `pip-audit` through
 enforcement. The JSON source of truth is
 `scripts/security/pip_audit_allowlist.json`.
 
-There are no active exceptions.
+Active exceptions are time-boxed and owned by `security-maintainers`.
 
 | Vulnerability ID      | Package | Expires      | Tracking Issue | Reason |
 | --------------------- | ------- | ------------ | -------------- | ------ |
-| _None_ | _None_ | _N/A_ | _N/A_ | _N/A_ |
+| `CVE-2025-3000` | `torch` | 2026-07-13 | [invarlock/invarlock#72](https://github.com/invarlock/invarlock/issues/72) | `pip-audit` reports the advisory against `torch==2.11.0` in optional HF and advanced install surfaces and currently lists no fixed Torch release; remove when upstream publishes a fixed version. |
 
 All other findings must be remediated prior to release. Update this table and
 the JSON allowlist entry whenever the allowlist changes.
