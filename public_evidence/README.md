@@ -28,13 +28,13 @@ are not substitutes for this real-model scenario evidence. No-op
 `published_basis/*` reports remain preservation/null-behavior evidence unless a
 lane explicitly links a guard-value package.
 
-`preservation_fixtures/*` contains archived real-model preservation artifacts
-that remain useful for provenance review but no longer satisfy the current
-published-basis criteria. For image-text lanes, a no-op preservation pass is not
-enough: direct `published_basis/*` image-text accuracy reports must use measured
-counts, include enough final examples, and clear the minimum final-accuracy
-floor. When embedded prediction records are present, the audit also checks that
-the generated answers have a concise answer shape.
+Older `preservation_fixtures/*` image-text artifacts that no longer satisfied
+the current published-basis criteria are removed once superseded by audited
+`published_basis/*` evidence. For image-text lanes, a no-op preservation pass is
+not enough: direct `published_basis/*` image-text accuracy reports must use
+measured counts, include enough final examples, and clear the minimum
+final-accuracy floor. When embedded prediction records are present, the audit
+also checks that the generated answers have a concise answer shape.
 
 Here, baseline-relative means more than ordinary paired baseline-vs-subject
 evaluation: the guard signal itself must be new versus the matching no-op

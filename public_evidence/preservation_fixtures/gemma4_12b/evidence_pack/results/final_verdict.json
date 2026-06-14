@@ -1,9 +1,0 @@
-{
-  "assurance": "strict",
-  "basis": "public_evidence/published_basis/gemma4_12b/evaluation.report.json",
-  "evidence_run": "20260613Tgemma12bPublicVqaH",
-  "model_id": "google/gemma-4-12B-it",
-  "note": "Container-backed release-profile Gemma 4 12B image-text published-basis no-op preservation evidence run on pinned public VQAv2 materialization. This run reproduced the prior clean run 20260613Tgemma12bPublicVqaG with the same dataset manifest hash and verification outcome.",
-  "profile": "release",
-  "verdict": "PASS"
-}

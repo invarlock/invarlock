@@ -20,9 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Granite 4.1, DeepSeek R1 Qwen variants, Phi-4, SmolLM3, TinyLlama,
   OLMo 2, OpenLLaMA, and Falcon lanes.
 - Added published-basis coverage for additional architecture families,
-  including FLAN-T5 seq2seq, OLMoE, Mixtral, and Qwen3 30B-A3B MoE evidence
-  lanes; Gemma 4 multimodal/image-text lanes remain prepared with archived
-  preservation fixtures until they pass the image-text quality floor.
+  including FLAN-T5 seq2seq, OLMoE, Mixtral, Qwen3 30B-A3B MoE, Qwen3.5 4B
+  image-text, Gemma 4 12B image-text, and Gemma 4 26B-A4B image-text MoE
+  evidence lanes.
 - Added public VQAv2 materialization support, scarce vision-text evidence
   window splitting, multimodal replay preservation, and processor digest
   evidence for image-text model runs.
@@ -76,9 +76,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated public evidence packaging to use compact evaluation reports for large
   published-basis artifacts while retaining the evidence manifests, runtime
   manifests, model revisions, and provenance needed for audit.
-- Updated Gemma 4 12B and Gemma 4 26B-A4B image-text evidence status from
-  published basis to archived preservation fixtures after their VQAv2 exact
-  answer accuracy fell below the new published-basis floor.
+- Updated Qwen3.5 4B, Gemma 4 12B, and Gemma 4 26B-A4B image-text evidence
+  status to published basis after structured JSON-answer H100 reruns passed the
+  public VQAv2 quality floor with strict verification and no guard warnings.
 - Updated model-evidence sweeps to use an explicit repo-visible Hugging Face
   cache by default so container GPU runs and revision capture inspect the same
   downloaded model snapshots.
@@ -98,6 +98,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed evidence-pack queue and GPU-runner stability issues, including memory
   helper resolution, container scratch cleanup, retry handling after interrupted
   evaluate phases, and host/container output publication paths.
+- Fixed remote model-evidence branch sync for `work/...` branches by fetching
+  the current branch ref explicitly before fast-forwarding the remote checkout.
 - Fixed Mistral guard-demo manifests and public evidence scope notes so the
   published demo no longer overclaims non-baseline-relative FP8 guard signals.
 - Fixed Gemma/Qwen multimodal evaluation gates by using classification-count

@@ -274,34 +274,26 @@
     },
     {
       "id": "gemma4-12b-any-to-any-hf",
-      "classification": "blocked",
-      "eligibility": "blocked",
+      "classification": "published",
+      "eligibility": "eligible",
       "support_matrix_lane_id": "gemma4-12b-any-to-any-hf",
       "catalog_family_ids": [
         "gemma-4-12b-any-to-any-lm"
       ],
       "suite_roles": [
         "support-matrix-backlog-gpu"
-      ],
-      "blockers": [
-        "published image-text basis quality floor",
-        "meaningful primary metric evidence"
       ]
     },
     {
       "id": "qwen3-5-4b-image-text-hf",
-      "classification": "blocked",
-      "eligibility": "blocked",
+      "classification": "published",
+      "eligibility": "eligible",
       "support_matrix_lane_id": "qwen3-5-4b-image-text-hf",
       "catalog_family_ids": [
         "qwen3-5-4b-image-text-lm"
       ],
       "suite_roles": [
         "support-matrix-backlog-gpu"
-      ],
-      "blockers": [
-        "meaningful primary metric evidence",
-        "answer-only VQA behavior under strict prompt"
       ]
     },
     {
@@ -318,18 +310,14 @@
     },
     {
       "id": "gemma4-26b-a4b-moe-image-text-hf",
-      "classification": "blocked",
-      "eligibility": "blocked",
+      "classification": "published",
+      "eligibility": "eligible",
       "support_matrix_lane_id": "gemma4-26b-a4b-moe-image-text-hf",
       "catalog_family_ids": [
         "gemma-4-26b-a4b-moe-image-text-lm"
       ],
       "suite_roles": [
         "support-matrix-backlog-gpu"
-      ],
-      "blockers": [
-        "published image-text basis quality floor",
-        "meaningful primary metric evidence"
       ]
     },
     {

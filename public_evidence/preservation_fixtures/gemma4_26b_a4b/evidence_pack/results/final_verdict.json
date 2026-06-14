@@ -1,9 +1,0 @@
-{
-  "assurance": "strict",
-  "basis": "public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json",
-  "evidence_run": "20260613Tgemma426ba4bH100A",
-  "model_id": "google/gemma-4-26B-A4B-it",
-  "note": "Container-backed release-profile Gemma 4 26B-A4B image-text no-op preservation evidence run on pinned public VQAv2 materialization. The committed image cache is intentionally omitted; materialization hashes, manifest hash, and model revision are recorded.",
-  "profile": "release",
-  "verdict": "PASS"
-}

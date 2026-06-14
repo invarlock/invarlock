@@ -1,0 +1,24 @@
+{
+  "artifact_paths": {
+    "evaluation_report": "evaluation.report.json",
+    "evidence_pack": "evidence_pack",
+    "evidence_pack_recipe": "evidence_pack_recipe.json",
+    "evidence_run_preset": "evidence_run_preset.yaml",
+    "runtime_manifest": "runtime.manifest.json"
+  },
+  "evidence_class": "strict_pass_fixture",
+  "expected_fingerprint": "sha256:af9ea464b796dd4df5b62d1e06e5330d61b13f5c0b62eb62c55f375ff9467360",
+  "generated_by": "model evidence remote sweep",
+  "model_revision": "20da991ab4afab98e8f910c4a2e8f4fbefc404ad",
+  "non_goals": [
+    "Model weights and source dataset are external Hugging Face references.",
+    "This fixture is a no-op preservation/null-behavior basis, not a fine-tuning, benchmark-quality, or guard-value claim.",
+    "The run validates image-text VQA preservation only; audio, exhaustive expert-bank coverage, and MoE routing quality remain out of scope."
+  ],
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "Release-strict verifier fixture for the Gemma 4 26B-A4B MoE image-text published-basis lane. Final accuracy 0.555 over 400 examples; ratio_vs_baseline 1.009; no guard warnings.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json --profile release --assurance strict",
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/gemma4_26b_a4b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:af9ea464b796dd4df5b62d1e06e5330d61b13f5c0b62eb62c55f375ff9467360"
+  ]
+}

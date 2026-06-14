@@ -1,6 +1,6 @@
 {
   "format_version": "model-family-catalog-v1",
-  "as_of": "2026-06-13",
+  "as_of": "2026-06-14",
   "declared_support": [
     {
       "family_id": "gpt2-causal-lm",
@@ -452,7 +452,7 @@
         "audio"
       ],
       "task_role": "any_to_any",
-      "state": "community_experimental",
+      "state": "published_basis",
       "representative_models": [
         "google/gemma-4-12B-it"
       ],
@@ -464,16 +464,17 @@
         "configs/calibration/null_sweep_gemma4_12b.yaml",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
         "src/invarlock/adapters/hf_loading.py",
-        "public_evidence/preservation_fixtures/gemma4_12b/evaluation.report.json",
-        "public_evidence/preservation_fixtures/gemma4_12b/runtime.manifest.json",
-        "public_evidence/preservation_fixtures/gemma4_12b/evidence_pack"
+        "public_evidence/published_basis/gemma4_12b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_12b/runtime.manifest.json",
+        "public_evidence/published_basis/gemma4_12b/evidence_pack"
       ],
       "support_groups": [
+        "published_modern",
         "practical_shortlist",
         "enterprise_permissive",
         "multimodal_candidate"
       ],
-      "notes": "Prepared Gemma 4 multimodal lane with release-profile preservation artifacts archived under public_evidence/preservation_fixtures/gemma4_12b. The archived no-op run passed preservation policy but produced 0.035 final exact-answer VQA accuracy, below the published image-text basis floor; promotion is blocked until a rerun with a suitable prompt/dataset/scorer yields a meaningful primary metric. Gemma 4 12B uses the explicit hf_multimodal path and requires the multimodal runtime stack (transformers>=5.12.0 and torchvision>=0.26.0); audio evaluation remains deferred."
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence from the 2026-06-14 H100 runner. The no-op report passes strict policy with 0.565 final accuracy over 400 examples, ratio_vs_baseline 1.009, and no guard warnings. Gemma 4 12B uses the explicit hf_multimodal path and requires the multimodal runtime stack (transformers>=5.12.0 and torchvision>=0.26.0). This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof."
     },
     {
       "family_id": "qwen3-5-4b-image-text-lm",
@@ -483,7 +484,7 @@
         "image"
       ],
       "task_role": "image_text",
-      "state": "community_experimental",
+      "state": "published_basis",
       "representative_models": [
         "Qwen/Qwen3.5-4B"
       ],
@@ -494,10 +495,14 @@
         "scripts/model_evidence/materialize_vision_text_dataset.py",
         "scripts/model_evidence/model_evidence_sweep.py",
         "tests/cli/test_preset_multimodal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py"
+        "tests/scripts/test_model_evidence_sweep_catalog.py",
+        "public_evidence/published_basis/qwen3_5_4b/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_5_4b/runtime.manifest.json",
+        "public_evidence/published_basis/qwen3_5_4b/evidence_pack"
       ],
-      "notes": "Prepared from support_matrix lane qwen3-5-4b-image-text-hf. A 2026-06-14 H100 no-op run passed mechanically but produced 0/400 baseline and subject accuracy. After the multimodal chat-template argument-forwarding fix and a strict answer-only prompt rerun, a 16/16 H100 sanity still produced 0/32 exact-answer VQA accuracy with instruction-analysis outputs, so public-basis promotion is blocked until the preset/model choice yields a meaningful primary metric.",
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence from the 2026-06-14 H100 runner after the structured JSON answer prompt fix. The no-op report passes strict policy with 0.855 final accuracy over 400 examples, ratio_vs_baseline 1.036, and no guard warnings. This is no-op preservation/null-behavior evidence; it is not guard-value proof.",
       "support_groups": [
+        "published_modern",
         "small_local",
         "multimodal_candidate",
         "practical_shortlist",
@@ -759,7 +764,7 @@
         "moe_candidate",
         "small_local"
       ],
-      "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack from H100 validation run 20260613Tolmoe1b7bH100A. This fixture is the smaller MoE validation basis; larger MoE assurance is now covered by Mixtral and Qwen3 30B-A3B published bases. Gemma 4 26B-A4B remains a prepared multimodal MoE lane with archived preservation artifacts but is quality-blocked from published-basis status."
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack from H100 validation run 20260613Tolmoe1b7bH100A. This fixture is the smaller MoE validation basis; larger MoE assurance is covered by Mixtral, Qwen3 30B-A3B, and Gemma 4 26B-A4B published bases. Gemma 4 26B-A4B is image-text preservation/null-behavior evidence, not audio, exhaustive expert-bank, or MoE routing-quality evidence."
     }
   ],
   "implemented_coverage": [
@@ -797,7 +802,7 @@
         "image"
       ],
       "task_role": "any_to_any",
-      "state": "community_experimental",
+      "state": "published_basis",
       "representative_models": [
         "google/gemma-4-26B-A4B-it"
       ],
@@ -807,15 +812,21 @@
         "src/invarlock/adapters/hf_loading.py",
         "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
         "configs/calibration/null_sweep_gemma4_26b_a4b.yaml",
-        "public_evidence/preservation_fixtures/gemma4_26b_a4b/evaluation.report.json",
-        "public_evidence/preservation_fixtures/gemma4_26b_a4b/runtime.manifest.json",
-        "public_evidence/preservation_fixtures/gemma4_26b_a4b/evidence_pack",
+        "public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_26b_a4b/runtime.manifest.json",
+        "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
         "scripts/model_evidence/model_evidence_sweep.py",
         "tests/cli/test_preset_multimodal_presets.py",
         "tests/scripts/test_model_evidence_sweep_catalog.py"
       ],
-      "notes": "Prepared recent Gemma 4 multimodal MoE lane with release-profile preservation artifacts archived under public_evidence/preservation_fixtures/gemma4_26b_a4b. The archived no-op run passed preservation policy but produced 0.045 final exact-answer VQA accuracy, below the published image-text basis floor; promotion is blocked until a rerun with a suitable prompt/dataset/scorer yields a meaningful primary metric. This is not an audio or MoE routing-quality claim."
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence from the 2026-06-14 H100 runner. The no-op report passes strict policy with 0.555 final accuracy over 400 examples, ratio_vs_baseline 1.009, and no guard warnings. This is no-op preservation/null-behavior evidence; audio, exhaustive expert-bank behavior, and MoE routing quality remain out of scope, and it is not guard-value proof.",
+      "support_groups": [
+        "published_modern",
+        "enterprise_permissive",
+        "multimodal_candidate",
+        "moe_candidate"
+      ]
     },
     {
       "family_id": "mixtral",
@@ -885,9 +896,11 @@
         "configs/calibration/null_sweep_qwen3_5_4b.yaml",
         "configs/calibration/null_sweep_qwen3_5_2b.yaml",
         "public_evidence/published_basis/qwen3_5_2b/evaluation.report.json",
-        "public_evidence/published_basis/qwen3_5_2b/evidence_pack"
+        "public_evidence/published_basis/qwen3_5_2b/evidence_pack",
+        "public_evidence/published_basis/qwen3_5_4b/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_5_4b/evidence_pack"
       ],
-      "notes": "Shared qwen-family heuristics cover aliases beyond the declared text-only Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 9B public lanes. Qwen3.5 2B now has published image-text evidence through hf_multimodal and pinned public VQAv2 materialization; Qwen3.5 4B remains prepared but blocked after strict-prompt H100 sanity reproduced zero exact-answer VQA accuracy."
+      "notes": "Shared qwen-family heuristics cover aliases beyond the declared text-only Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 9B public lanes. Qwen3.5 2B and Qwen3.5 4B have published image-text evidence through hf_multimodal and pinned public VQAv2 materialization."
     },
     {
       "family_id": "yi",
@@ -950,9 +963,13 @@
         "configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml",
         "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
         "configs/calibration/null_sweep_gemma4_12b.yaml",
-        "configs/calibration/null_sweep_gemma4_26b_a4b.yaml"
+        "configs/calibration/null_sweep_gemma4_26b_a4b.yaml",
+        "public_evidence/published_basis/gemma4_12b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_12b/evidence_pack",
+        "public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack"
       ],
-      "notes": "Gemma-family selectors and loaders are first-class for compatible local or user-supplied checkpoints. Repo-declared published Gemma support is currently Gemma 4 E2B text-only. Gemma 4 12B and 26B-A4B image-text preservation fixtures are archived but quality-blocked from published-basis status until reruns pass the image-text primary-metric floor. Gemma 3 and Gemma 3n hosted checkpoints are omitted from the repo support/promotion inventory because their Hugging Face pages are access-gated under Gemma terms."
+      "notes": "Gemma-family selectors and loaders are first-class for compatible local or user-supplied checkpoints. Repo-declared published Gemma support now includes Gemma 4 E2B text-only plus Gemma 4 12B and Gemma 4 26B-A4B image-text published-basis evidence."
     },
     {
       "family_id": "opt-neox-gptj",

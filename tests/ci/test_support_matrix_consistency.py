@@ -137,25 +137,21 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         families["Qwen3.5 2B image-text LM"]["evidence_status"]
         == "published_release_strict"
     )
-    assert families["Qwen3.5 4B image-text LM"]["support_tier"] == (
-        "community_experimental"
-    )
+    assert families["Qwen3.5 4B image-text LM"]["support_tier"] == ("published_basis")
     assert families["Qwen3.5 4B image-text LM"]["evidence_status"] == (
-        "prepared_candidate"
+        "published_release_strict"
     )
-    assert families["Qwen3.5 4B image-text LM"]["docs_label"] == "No"
-    assert families["Gemma 4 12B any-to-any LM"]["support_tier"] == (
-        "community_experimental"
-    )
+    assert families["Qwen3.5 4B image-text LM"]["docs_label"] == "Yes"
+    assert families["Gemma 4 12B any-to-any LM"]["support_tier"] == ("published_basis")
     assert families["Gemma 4 12B any-to-any LM"]["evidence_status"] == (
-        "quality_blocked_preservation_fixture"
+        "published_release_strict"
     )
     assert (
         families["Gemma 4 26B-A4B MoE image-text LM"]["support_tier"]
-        == "community_experimental"
+        == "published_basis"
     )
     assert families["Gemma 4 26B-A4B MoE image-text LM"]["evidence_status"] == (
-        "quality_blocked_preservation_fixture"
+        "published_release_strict"
     )
     assert families["Mixtral 8x7B MoE causal LM"]["support_tier"] == "published_basis"
     assert families["Mixtral 8x7B MoE causal LM"]["evidence_status"] == (

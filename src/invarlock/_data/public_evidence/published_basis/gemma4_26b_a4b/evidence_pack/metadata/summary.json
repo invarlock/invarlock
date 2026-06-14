@@ -1,0 +1,22 @@
+{
+  "execution_mode": "container",
+  "ok": true,
+  "results": [
+    {
+      "detail": null,
+      "evaluate_exit": 0,
+      "lane_id": "gemma4-26b-a4b-moe-image-text-hf",
+      "model_id": "google/gemma-4-26B-A4B-it",
+      "ok": true,
+      "preset": "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
+      "report_path": "/root/model-evidence/20260614Tgemma4_26b_a4b_json_sanity/shard-00-gpu-2-3-4-5/eval/google_gemma_4_26b_a4b_it/report/evaluation.report.json",
+      "slug": "google_gemma_4_26b_a4b_it",
+      "status": "ok",
+      "verify_exit": 0,
+      "verify_path": "/root/model-evidence/20260614Tgemma4_26b_a4b_json_sanity/shard-00-gpu-2-3-4-5/eval/google_gemma_4_26b_a4b_it/verify.json"
+    }
+  ],
+  "shard_count": 1,
+  "shard_index": 0,
+  "suite": "support-matrix-backlog-gpu"
+}

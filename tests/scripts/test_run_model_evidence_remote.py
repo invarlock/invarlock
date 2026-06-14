@@ -115,9 +115,9 @@ def test_run_model_evidence_remote_sync_handles_work_branch_names() -> None:
         "refs/remotes/origin/work/purge-non-apache-qwen35-4b-sanity"
         in payload["sync_command"]
     )
-    assert "git checkout work/purge-non-apache-qwen35-4b-sanity" in payload[
-        "sync_command"
-    ]
+    assert (
+        "git checkout work/purge-non-apache-qwen35-4b-sanity" in payload["sync_command"]
+    )
     assert (
         "git merge --ff-only origin/work/purge-non-apache-qwen35-4b-sanity"
         in payload["sync_command"]

@@ -1,0 +1,12 @@
+{
+  "branch": "work/purge-non-apache-qwen35-4b-sanity",
+  "device": "cuda",
+  "execution_mode": "container",
+  "gpu": "NVIDIA H100 80GB HBM3",
+  "gpu_id": "0",
+  "host": "root@31.56.109.46",
+  "profile": "release",
+  "runtime_image": "ghcr.io/invarlock/invarlock-runtime:latest",
+  "source_ref": "730949e0349d61842ff3ed57b94c4df10ecea713",
+  "stamp": "20260614Tqwen35_4b_json_sanity"
+}

@@ -302,9 +302,7 @@ def build_sync_command(
     quoted_branch = shlex.quote(branch)
     origin_ref = f"origin/{branch}"
     quoted_origin_ref = shlex.quote(origin_ref)
-    quoted_fetch_refspec = shlex.quote(
-        f"refs/heads/{branch}:refs/remotes/{origin_ref}"
-    )
+    quoted_fetch_refspec = shlex.quote(f"refs/heads/{branch}:refs/remotes/{origin_ref}")
     return " && ".join(
         [
             *repo_setup,

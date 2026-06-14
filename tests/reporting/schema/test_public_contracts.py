@@ -99,9 +99,12 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "qwen3-causal-hf",
         "qwen3-5-causal-hf",
         "qwen3-5-2b-image-text-hf",
+        "qwen3-5-4b-image-text-hf",
         "granite-4-1-3b-causal-hf",
         "granite-4-1-8b-causal-hf",
         "gemma4-e2b-text-causal-hf",
+        "gemma4-12b-any-to-any-hf",
+        "gemma4-26b-a4b-moe-image-text-hf",
         "deepseek-r1-distill-qwen-causal-hf",
         "deepseek-r1-0528-qwen3-8b-causal-hf",
         "deepseek-r1-distill-qwen-14b-causal-hf",
@@ -113,7 +116,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
 
     family_catalog = contracts.load_model_family_catalog()
     assert family_catalog["format_version"] == "model-family-catalog-v1"
-    assert family_catalog["as_of"] == "2026-06-13"
+    assert family_catalog["as_of"] == "2026-06-14"
     assert family_catalog["declared_support"][0]["display_name"] == "GPT-2 causal LM"
     declared = {item["display_name"] for item in family_catalog["declared_support"]}
     assert declared == {
@@ -161,12 +164,12 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     assert "not a benchmark-quality" in qwen3_moe["notes"]
     assert "four-GPU diagnostic lane failed" in qwen3_moe["notes"]
     gemma4_26b = implemented["Gemma 4 26B-A4B MoE image-text LM"]
-    assert gemma4_26b["state"] == "community_experimental"
+    assert gemma4_26b["state"] == "published_basis"
     assert any(
-        evidence == "public_evidence/preservation_fixtures/gemma4_26b_a4b/evidence_pack"
+        evidence == "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack"
         for evidence in gemma4_26b["repo_evidence"]
     )
-    assert "below the published image-text basis floor" in gemma4_26b["notes"]
+    assert "0.555 final accuracy over 400 examples" in gemma4_26b["notes"]
 
     usage_only = {item["display_name"] for item in family_catalog["usage_only"]}
     assert "QwQ 32B reasoning" not in usage_only
