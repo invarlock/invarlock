@@ -13,6 +13,9 @@ import json
 from datetime import datetime
 from typing import Any, cast
 
+from invarlock.public_contracts import REPORT_SCHEMA_VERSION
+
+from .branding import BRAND_NAME, BRAND_TAGLINE, markdown_brand_line, version_label
 from .normalizer import normalize_run_report
 from .report_types import RunReport, validate_report
 
@@ -87,6 +90,8 @@ def to_markdown(
         lines.append("# InvarLock Evaluation Report")
 
     lines.append("")
+    lines.append(markdown_brand_line())
+    lines.append("")
     lines.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}*")
     lines.append("")
 
@@ -140,7 +145,14 @@ def to_html(
             "</head>",
             "<body>",
             "    <div class='container'>",
+            (
+                "        <div class='brand-lockup'>"
+                f"<span class='brand-mark'>IL</span><span>{html.escape(BRAND_NAME)}</span>"
+                "</div>"
+            ),
             f"        <h1>{html_title}</h1>",
+            f"        <p class='brand-tagline'>{html.escape(BRAND_TAGLINE)}</p>",
+            f"        <p class='brand-meta'>{html.escape(BRAND_NAME)} {html.escape(version_label())} · schema {html.escape(REPORT_SCHEMA_VERSION)}</p>",
             f"        <p class='timestamp'>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</p>",
         ]
     )
@@ -668,6 +680,35 @@ def _get_default_css() -> str:
             padding: 30px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .brand-lockup {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #2c3e50;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .brand-mark {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            background: #3498db;
+            color: white;
+            font-size: 0.8rem;
+            letter-spacing: 0;
+        }
+        .brand-tagline {
+            color: #52606d;
+            margin-top: -4px;
+        }
+        .brand-meta {
+            color: #52606d;
+            font-size: 0.92rem;
+            margin-top: -6px;
         }
         h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
         h2 { color: #34495e; border-bottom: 1px solid #bdc3c7; padding-bottom: 5px; margin-top: 30px; }

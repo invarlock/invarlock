@@ -12,6 +12,7 @@ from html import escape
 from importlib import import_module
 from typing import Any
 
+from .branding import BRAND_TAGLINE
 from .render_markdown import render_report_markdown
 from .report_schema import validate_report
 
@@ -165,6 +166,9 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
         ".report-header h1{margin:0;font-size:2rem;line-height:1.1;"
         'font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif}'
         ".report-header p{margin:10px 0 0 0;max-width:52rem;color:var(--muted)}"
+        ".brand-lockup{display:flex;align-items:center;gap:10px;margin-bottom:8px}"
+        ".brand-mark{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:8px;"
+        "background:var(--accent);color:var(--panel-strong);font-weight:800;letter-spacing:0}"
         ".summary-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;"
         "margin:0 0 18px 0}"
         ".summary-chip{padding:14px 16px;border-radius:18px;border:1px solid var(--border);"
@@ -218,9 +222,10 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
         "</style>"
         '</head><body><div class="report-shell">'
         '<header class="report-header">'
-        '<p class="eyebrow">InvarLock</p>'
+        '<div class="brand-lockup"><span class="brand-mark" aria-hidden="true">IL</span>'
+        '<p class="eyebrow">InvarLock</p></div>'
         "<h1>Evaluation Report</h1>"
-        "<p>Browser-first rendering of the canonical evaluation bundle, with quick links for faster reviewer navigation.</p>"
+        f"<p>{escape(BRAND_TAGLINE)} Browser-first rendering of the canonical evaluation bundle, with quick links for faster reviewer navigation.</p>"
         "</header>"
         f"{summary_strip}"
         '<section class="report-grid">'

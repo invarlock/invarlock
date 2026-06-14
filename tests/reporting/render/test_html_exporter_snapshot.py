@@ -5,6 +5,7 @@ import re
 
 from invarlock.reporting.render import render_report_markdown
 
+from invarlock import __version__
 from invarlock.reporting.report_make import make_report
 
 
@@ -88,6 +89,9 @@ def test_html_exporter_prefers_markdown_when_available():
         assert "badge" in html
         assert "report-outline" in html
         assert "summary-strip" in html
+    assert "brand-lockup" in html
+    assert "Auditable verification for edited model checkpoints." in html
+    assert f"InvarLock {__version__}" in html
 
 
 def test_html_exporter_escapes_report_controlled_html_payloads():
