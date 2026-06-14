@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,25 @@ def _hash_json(payload: dict[str, Any]) -> str:
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
+
+
+def _json_safe_processor_value(value: Any) -> Any:
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    if isinstance(value, Mapping):
+        return {
+            str(key): _json_safe_processor_value(item)
+            for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
+        }
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        try:
+            return _json_safe_processor_value(to_dict())
+        except (TypeError, ValueError, RuntimeError):
+            pass
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe_processor_value(item) for item in value]
+    return str(value)
 
 
 class HF_Multimodal_Adapter(HF_Causal_Adapter):
@@ -156,9 +176,9 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
             image_std = getattr(image_processor, "image_std", None)
             payload["image_processor"] = {
                 "class": image_processor.__class__.__name__,
-                "size": size,
-                "image_mean": image_mean,
-                "image_std": image_std,
+                "size": _json_safe_processor_value(size),
+                "image_mean": _json_safe_processor_value(image_mean),
+                "image_std": _json_safe_processor_value(image_std),
             }
         return _hash_json(payload)
 
