@@ -48,6 +48,40 @@ _MLM_MODEL_TYPES = {
     "distilbert",
     "roberta",
 }
+_MULTIMODAL_CONDITIONAL_MODEL_TYPES = {
+    "gemma3",
+    "gemma4",
+    "gemma4_unified",
+    "qwen3_5",
+    "qwen3_5_vl",
+}
+_MULTIMODAL_ARCH_HINTS = (
+    "ImageTextToText",
+    "Multimodal",
+    "Vision2Seq",
+    "VisionText",
+)
+_MULTIMODAL_MODEL_ID_HINTS = (
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3-5-2b",
+    "qwen3-5-4b",
+    "qwen3_5_2b",
+    "qwen3_5_4b",
+    "gemma-3-4b",
+    "gemma3-4b",
+    "gemma-3n",
+    "gemma3n",
+    "gemma-4-12b",
+    "gemma-4-e4b",
+    "gemma4-12b",
+    "gemma4-e4b",
+    "gemma_4_12b",
+    "gemma_4_e4b",
+    "gemma-4-26b-a4b",
+    "gemma4-26b-a4b",
+    "gemma_4_26b_a4b",
+)
 _MODEL_CONFIG_ERRORS = (AttributeError, TypeError, ValueError)
 
 
@@ -100,6 +134,16 @@ def _detect_quant_family_from_cfg(cfg: dict[str, Any]) -> str | None:
     return None
 
 
+def _is_multimodal_cfg(model_type: str, archs: list[str]) -> bool:
+    arch_blob = " ".join(archs)
+    if any(hint in arch_blob for hint in _MULTIMODAL_ARCH_HINTS):
+        return True
+    return (
+        model_type in _MULTIMODAL_CONDITIONAL_MODEL_TYPES
+        and "ConditionalGeneration" in arch_blob
+    )
+
+
 def resolve_auto_adapter(
     model_id: str | os.PathLike[str], default: str = "hf_causal"
 ) -> str:
@@ -112,15 +156,17 @@ def resolve_auto_adapter(
         if family:
             return family
         model_type = str(config.get("model_type", "")).lower()
-        if model_type in _CAUSAL_MODEL_TYPES:
-            return "hf_causal"
-        if bool(config.get("is_encoder_decoder", False)):
-            return "hf_seq2seq"
         archs = [
             str(arch)
             for arch in config.get("architectures", [])
             if isinstance(arch, str)
         ]
+        if _is_multimodal_cfg(model_type, archs):
+            return "hf_multimodal"
+        if model_type in _CAUSAL_MODEL_TYPES:
+            return "hf_causal"
+        if bool(config.get("is_encoder_decoder", False)):
+            return "hf_seq2seq"
         arch_blob = " ".join(archs)
         if "ConditionalGeneration" in arch_blob or "Seq2SeqLM" in arch_blob:
             return "hf_seq2seq"
@@ -161,10 +207,15 @@ def resolve_auto_adapter(
         for key in ["bnb", "bitsandbytes", "-4bit", "-8bit", "4bit", "8bit"]
     ):
         return "hf_bnb"
-    if any(key in lower_id for key in ["t5", "bart"]):
+    if any(
+        key in lower_id
+        for key in ["t5", "bart", "mbart", "pegasus", "marian", "opus-mt"]
+    ):
         return "hf_seq2seq"
     if any(key in lower_id for key in ["bert", "roberta", "albert", "deberta"]):
         return "hf_mlm"
+    if any(key in lower_id for key in _MULTIMODAL_MODEL_ID_HINTS):
+        return "hf_multimodal"
     return default
 
 

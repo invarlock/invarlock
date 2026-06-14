@@ -33,6 +33,7 @@ description = "Repository consistency checks and shared helpers outside the cons
 paths = [
   "scripts/checks/check_config_integrity.py",
   "scripts/checks/check_guard_fallback_diagnostics.py",
+  "scripts/checks/check_model_candidate_compatibility.py",
   "scripts/checks/sync_packaged_contracts.py",
 ]
 
