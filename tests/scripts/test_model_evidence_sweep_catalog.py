@@ -47,23 +47,18 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
                 "google_gemma_4_e4b_it",
                 "mistralai_mixtral_8x7b_v0_1",
                 "openlm_research_open_llama_7b",
-                "facebook_opt_1_3b",
                 "tiiuae_falcon_7b",
-                "thudm_glm_4_9b_chat",
                 "ibm_granite_granite_4_1_8b",
                 "ibm_granite_granite_4_1_3b",
                 "huggingfacetb_smollm3_3b",
                 "microsoft_phi_4_mini_instruct",
                 "deepseek_ai_deepseek_r1_distill_qwen_14b",
                 "deepseek_ai_deepseek_r1_0528_qwen3_8b",
-                "tiiuae_falcon_h1r_7b",
                 "qwen_qwen3_30b_a3b_instruct_2507",
                 "allenai_olmoe_1b_7b_0924",
                 "google_gemma_4_26b_a4b_it",
                 "qwen_qwen3_5_4b",
                 "qwen_qwen3_5_2b",
-                "google_gemma_3n_e4b_it",
-                "google_gemma_3_4b_it",
             ],
             lane_ids=[],
             shard_index=0,
@@ -97,18 +92,10 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
         "configs/presets/causal_lm/open_llama_7b_512.yaml"
     )
     assert specs["openlm_research_open_llama_7b"].adapter == "hf_causal"
-    assert specs["facebook_opt_1_3b"].preset_relpath == (
-        "configs/presets/causal_lm/opt_1_3b_512.yaml"
-    )
-    assert specs["facebook_opt_1_3b"].adapter == "hf_causal"
     assert specs["tiiuae_falcon_7b"].preset_relpath == (
         "configs/presets/causal_lm/falcon_7b_512.yaml"
     )
     assert specs["tiiuae_falcon_7b"].adapter == "hf_causal"
-    assert specs["thudm_glm_4_9b_chat"].preset_relpath == (
-        "configs/presets/causal_lm/glm4_9b_chat_512.yaml"
-    )
-    assert specs["thudm_glm_4_9b_chat"].adapter == "hf_causal"
     assert specs["ibm_granite_granite_4_1_8b"].preset_relpath == (
         "configs/presets/causal_lm/granite4_1_8b_512.yaml"
     )
@@ -128,9 +115,6 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
     assert specs["deepseek_ai_deepseek_r1_0528_qwen3_8b"].preset_relpath == (
         "configs/presets/causal_lm/deepseek_r1_0528_qwen3_8b_512.yaml"
     )
-    assert specs["tiiuae_falcon_h1r_7b"].preset_relpath == (
-        "configs/presets/causal_lm/falcon_h1r_7b_512.yaml"
-    )
     assert specs["qwen_qwen3_30b_a3b_instruct_2507"].preset_relpath == (
         "configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml"
     )
@@ -146,8 +130,6 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
     for slug, preset in {
         "qwen_qwen3_5_4b": "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
         "qwen_qwen3_5_2b": "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
-        "google_gemma_3n_e4b_it": "configs/presets/multimodal/gemma3n_e4b_public_vqav2_256.yaml",
-        "google_gemma_3_4b_it": "configs/presets/multimodal/gemma3_4b_it_public_vqav2_256.yaml",
     }.items():
         assert specs[slug].preset_relpath == preset
         assert specs[slug].adapter == "hf_multimodal"
@@ -168,11 +150,8 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
         "google_gemma_4_12b_it",
         "qwen_qwen3_5_4b",
         "qwen_qwen3_5_2b",
-        "google_gemma_3n_e4b_it",
-        "google_gemma_3_4b_it",
         "huggingfacetb_smollm3_3b",
         "microsoft_phi_4_mini_instruct",
-        "tiiuae_falcon_h1r_7b",
         "google_flan_t5_base",
         "qwen_qwen3_30b_a3b_instruct_2507",
         "mistralai_mixtral_8x7b_v0_1",
@@ -188,13 +167,10 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
     assert adapters["google_gemma_4_26b_a4b_it"] == "hf_multimodal"
     assert adapters["qwen_qwen3_5_4b"] == "hf_multimodal"
     assert adapters["qwen_qwen3_5_2b"] == "hf_multimodal"
-    assert adapters["google_gemma_3n_e4b_it"] == "hf_multimodal"
-    assert adapters["google_gemma_3_4b_it"] == "hf_multimodal"
     for lane in specs:
         if lane.slug in {
             "huggingfacetb_smollm3_3b",
             "microsoft_phi_4_mini_instruct",
-            "tiiuae_falcon_h1r_7b",
         }:
             assert lane.adapter == "hf_causal"
             assert lane.verify_profile == "dev"
@@ -225,8 +201,6 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
         elif lane.slug in {
             "qwen_qwen3_5_4b",
             "qwen_qwen3_5_2b",
-            "google_gemma_3n_e4b_it",
-            "google_gemma_3_4b_it",
         }:
             assert lane.adapter == "hf_multimodal"
             assert lane.verify_profile == "release"
@@ -265,8 +239,6 @@ def test_promotion_gap_gpu_suite_targets_repo_prepared_blocked_lanes() -> None:
     )
 
     assert [lane.slug for lane in specs] == [
-        "facebook_opt_1_3b",
-        "thudm_glm_4_9b_chat",
         "distilbert_base_uncased",
     ]
     distilbert = specs[-1]
@@ -308,8 +280,6 @@ def test_model_evidence_sweep_dry_run_supports_promotion_gap_suite_candidates(
     payload = json.loads(proc.stdout)
     slugs = [entry["slug"] for entry in payload]
     assert slugs == [
-        "facebook_opt_1_3b",
-        "thudm_glm_4_9b_chat",
         "distilbert_base_uncased",
     ]
     distilbert = payload[-1]

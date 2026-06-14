@@ -24,14 +24,8 @@ def test_promotion_gap_gpu_suite_covers_prepared_deferred_lanes() -> None:
     }
 
     assert set(specs) == {
-        "facebook_opt_1_3b",
-        "thudm_glm_4_9b_chat",
         "distilbert_base_uncased",
     }
-    assert specs["facebook_opt_1_3b"].preset_relpath == (
-        "configs/presets/causal_lm/opt_1_3b_512.yaml"
-    )
-    assert specs["thudm_glm_4_9b_chat"].adapter == "hf_causal"
     assert specs["distilbert_base_uncased"].adapter == "hf_mlm"
     assert specs["distilbert_base_uncased"].preset_relpath == (
         "configs/presets/masked_lm/distilbert_base_uncased_128.yaml"
@@ -56,11 +50,8 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
         "google_gemma_4_12b_it",
         "qwen_qwen3_5_4b",
         "qwen_qwen3_5_2b",
-        "google_gemma_3n_e4b_it",
-        "google_gemma_3_4b_it",
         "huggingfacetb_smollm3_3b",
         "microsoft_phi_4_mini_instruct",
-        "tiiuae_falcon_h1r_7b",
         "google_flan_t5_base",
         "qwen_qwen3_30b_a3b_instruct_2507",
         "mistralai_mixtral_8x7b_v0_1",
@@ -82,8 +73,6 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
     for slug, preset in {
         "qwen_qwen3_5_4b": "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
         "qwen_qwen3_5_2b": "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
-        "google_gemma_3n_e4b_it": "configs/presets/multimodal/gemma3n_e4b_public_vqav2_256.yaml",
-        "google_gemma_3_4b_it": "configs/presets/multimodal/gemma3_4b_it_public_vqav2_256.yaml",
     }.items():
         assert specs[slug].preset_relpath == preset
         assert specs[slug].adapter == "hf_multimodal"
@@ -107,21 +96,21 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
     assert specs["mistralai_mixtral_8x7b_v0_1"].verify_profile == "release"
 
 
-def test_promotion_gap_gpu_suite_glm_host_dry_run_uses_lane_preset(
+def test_repo_mentioned_gpu_suite_phi4_host_dry_run_uses_lane_preset(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
-    output_root = tmp_path / "candidate-glm-host"
+    output_root = tmp_path / "candidate-phi4-reasoning-host"
 
     proc = subprocess.run(
         [
             sys.executable,
             str(script),
             "--suite",
-            "promotion-gap-gpu",
+            "repo-mentioned-gpu",
             "--slug",
-            "thudm_glm_4_9b_chat",
+            "phi4_reasoning_plus_public",
             "--execution-mode",
             "host",
             "--output-root",
@@ -137,18 +126,18 @@ def test_promotion_gap_gpu_suite_glm_host_dry_run_uses_lane_preset(
     assert proc.returncode == 0, proc.stderr
     payload = json.loads(proc.stdout)
     assert len(payload) == 1
-    assert payload[0]["slug"] == "thudm_glm_4_9b_chat"
-    assert payload[0]["prefetch"][-1] == "THUDM/glm-4-9b-chat"
+    assert payload[0]["slug"] == "phi4_reasoning_plus_public"
+    assert payload[0]["prefetch"][-1] == "microsoft/Phi-4-reasoning-plus"
     assert "--allow-remote-code" in payload[0]["evaluate"]
     preset_idx = payload[0]["evaluate"].index("--preset") + 1
     assert payload[0]["evaluate"][preset_idx] == str(
-        repo_root / "configs/presets/causal_lm/glm4_9b_chat_512.yaml"
+        repo_root / "configs/presets/causal_lm/phi4_reasoning_plus_512.yaml"
     )
     assert "--runtime-provenance" in payload[0]["verify"]
 
     manifest = json.loads((output_root / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["suite"] == "promotion-gap-gpu"
-    assert manifest["lanes"][0]["slug"] == "thudm_glm_4_9b_chat"
+    assert manifest["suite"] == "repo-mentioned-gpu"
+    assert manifest["lanes"][0]["slug"] == "phi4_reasoning_plus_public"
 
 
 def test_support_matrix_backlog_gpu_suite_phi4_dry_run_uses_builtin_phi3_policy(
@@ -254,14 +243,8 @@ def test_lane_requires_remote_code_uses_preset_model_flag() -> None:
         for lane in mod.SUITES[mod.SUPPORT_MATRIX_BACKLOG_GPU_SUITE]
         if lane.slug == "microsoft_phi_4_mini_instruct"
     )
-    glm4 = next(
-        lane
-        for lane in mod.SUITES[mod.PROMOTION_GAP_GPU_SUITE]
-        if lane.slug == "thudm_glm_4_9b_chat"
-    )
 
     assert mod.lane_requires_remote_code(phi4) is True
-    assert mod.lane_requires_remote_code(glm4) is True
     assert mod.lane_requires_remote_code(phi4_mini) is False
     assert mod.lane_requires_remote_code(qwen) is False
 
@@ -292,9 +275,9 @@ exit 99
             sys.executable,
             str(script),
             "--suite",
-            "model-catalog-gpu",
+            "repo-mentioned-gpu",
             "--slug",
-            "thudm_glm_4_9b_chat",
+            "phi4_reasoning_plus_public",
             "--execution-mode",
             "host",
             "--output-root",

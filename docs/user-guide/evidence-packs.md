@@ -145,7 +145,7 @@ models via `MODEL_1`–`MODEL_8`.
 | `subset` | `mistralai/Mistral-7B-v0.1` | Single-GPU friendly |
 | `showcase` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B` | Multi-GPU recommended; adds guard-focused scenarios |
 | `workshop3` | `mistralai/Mistral-7B-v0.1`, `mistralai/Mixtral-8x7B-v0.1`, `01-ai/Yi-34B` | Workshop-friendly 3-model suite (architecture diversity) |
-| `full` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B`, `01-ai/Yi-34B`, `mistralai/Mixtral-8x7B-v0.1`, `Qwen/Qwen1.5-72B` | Multi-GPU recommended |
+| `full` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B`, `01-ai/Yi-34B`, `mistralai/Mixtral-8x7B-v0.1`, `Qwen/Qwen3-8B` | Multi-GPU recommended |
 
 Storage note: a default `subset` run on Mistral-7B typically needs about 56 GB
 of model-weight space on the output filesystem with the wrapper default

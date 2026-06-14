@@ -110,7 +110,6 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "phi-4-text-causal-hf",
         "smollm3-3b-causal-hf",
         "phi-4-mini-causal-hf",
-        "falcon-h1r-7b-causal-hf",
         "flan-t5-base-seq2seq-hf",
     }
 
@@ -142,8 +141,6 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "Gemma 4 12B any-to-any LM",
         "Qwen3.5 4B image-text LM",
         "Qwen3.5 2B image-text LM",
-        "Gemma 3n E4B image-text LM",
-        "Gemma 3 4B IT image-text LM",
         "Ministral 3 3B causal LM (text-only eval)",
         "Granite 4.1 3B causal LM",
         "Granite 4.1 8B causal LM",
@@ -151,7 +148,6 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "Phi-4 mini causal LM",
         "DeepSeek-R1-Distill-Qwen 14B causal LM",
         "DeepSeek-R1-0528-Qwen3 8B causal LM",
-        "Falcon-H1R 7B causal LM",
         "FLAN-T5 base seq2seq LM",
     }
     assert all(item["support_groups"] for item in family_catalog["declared_support"])
@@ -226,29 +222,6 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     assert (
         candidates["Falcon 7B causal LM"]["current_catalog_state"] == "published_basis"
     )
-    for display_name in (
-        "OPT 1.3B causal LM",
-        "GLM 4 9B Chat",
-    ):
-        assert candidates[display_name]["criteria_status"]["included_preset"] == "pass"
-        assert (
-            candidates[display_name]["criteria_status"]["included_calibration_config"]
-            == "pass"
-        )
-        assert (
-            candidates[display_name]["criteria_status"]["cli_smoke_evidence"] == "pass"
-        )
-    assert candidates["Gemma 3 4B IT"]["decision"] == (
-        "redirected_to_image_text_candidate"
-    )
-    assert (
-        candidates["Gemma 3 4B IT"]["current_catalog_state"] == "community_experimental"
-    )
-    assert candidates["Gemma 3 4B IT"]["criteria_status"]["included_preset"] == "pass"
-    assert (
-        candidates["Gemma 3 4B IT"]["criteria_status"]["included_calibration_config"]
-        == "pass"
-    )
     assert (
         candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
             "decision"
@@ -272,9 +245,6 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
             "criteria_status"
         ]["cli_smoke_evidence"]
         == "pass"
-    )
-    assert (
-        candidates["OPT 1.3B causal LM"]["criteria_status"]["targeted_tests"] == "pass"
     )
     recommended = {
         item["display_name"] for item in family_catalog["recommended_additions"]

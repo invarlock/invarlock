@@ -595,12 +595,12 @@ print_queue_summary() {
 # Estimate GPU memory requirement for a model (in GB)
 # Usage: estimate_model_memory <model_id_or_path> [task_type]
 #
-# CRITICAL: At task generation time, model_id is a HuggingFace ID like "Qwen/Qwen1.5-72B"
+# CRITICAL: At task generation time, model_id is usually a HuggingFace ID like "Qwen/Qwen3-8B"
 # The model hasn't been downloaded yet, so we CANNOT use estimate_model_params (needs config.json)
 # We MUST parse the model name to estimate size.
 #
 # This function handles both:
-# - HuggingFace model IDs (e.g., "Qwen/Qwen1.5-72B", "mistralai/Mixtral-8x7B-v0.1")
+# - HuggingFace model IDs (e.g., "Qwen/Qwen3-8B", "mistralai/Mixtral-8x7B-v0.1")
 # - Local paths (e.g., "/path/to/model") - can use config.json if available
 estimate_model_memory() {
     local model_id="$1"

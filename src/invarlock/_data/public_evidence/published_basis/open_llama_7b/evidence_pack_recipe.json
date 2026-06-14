@@ -9,11 +9,11 @@
   ],
   "commands": [
     "make runtime-image-cuda",
-    "uv run python scripts/model_evidence/run_model_evidence_remote.py --host root@86.38.238.232 --remote-repo /root/invarlock-public-promote --remote-python /root/invarlock-public/.venv/bin/python --branch work/promote-gemma-deepseek --gpus 0,1 --suite promotion-gap-gpu --slug distilbert_base_uncased --slug facebook_opt_1_3b --slug openlm_research_open_llama_7b --slug tiiuae_falcon_7b --slug thudm_glm_4_9b_chat --profile release --execution-mode container --remote-env HF_HUB_DISABLE_XET=1 --remote-env HF_HOME=/root/.cache/huggingface --remote-env INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-local --skip-sync --stamp 20260613TpromotionGapReleasePromoteA",
+    "uv run python scripts/model_evidence/run_model_evidence_remote.py --host root@86.38.238.232 --remote-repo /root/invarlock-public-promote --remote-python /root/invarlock-public/.venv/bin/python --branch work/promote-gemma-deepseek --gpus 1 --suite model-catalog-gpu --slug openlm_research_open_llama_7b --profile release --execution-mode container --remote-env HF_HUB_DISABLE_XET=1 --remote-env HF_HOME=/root/.cache/huggingface --remote-env INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-local --skip-sync --stamp 20260613TpromotionGapReleasePromoteA",
     "uv run invarlock advanced evidence-pack build public_evidence/published_basis/open_llama_7b/evidence_pack --final-verdict tmp/open_llama_7b_pack_inputs/final_verdict.json --report public_evidence/published_basis/open_llama_7b/evaluation.report.json --source-repo tmp/open_llama_7b_pack_inputs/source_repo.json --environment tmp/open_llama_7b_pack_inputs/environment.json --material model_revisions=artifacts/model-evidence/remote/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/model_revisions.json --material artifact_manifest=artifacts/model-evidence/remote/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/artifact_manifest.json --signing-key tmp/open_llama_7b_pack_inputs/evidence-pack-signing-key.pem --profile release --report-assurance strict --release-review"
   ],
   "format_version": "published-basis-evidence-pack-recipe-v1",
   "lane_id": "open-llama-7b-causal-hf",
   "network_mode": "online_first_then_offline",
-  "suite": "promotion-gap-gpu"
+  "suite": "model-catalog-gpu"
 }

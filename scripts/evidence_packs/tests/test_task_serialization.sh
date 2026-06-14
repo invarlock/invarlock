@@ -576,7 +576,7 @@ test_estimate_model_memory_name_buckets() {
     source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     local v
-    v="$(estimate_model_memory "Qwen/Qwen1.5-72B" "EVAL_BASELINE")"
+    v="$(estimate_model_memory "org/Thing-72B" "EVAL_BASELINE")"
     assert_match '^[0-9]+$' "${v}" "returns integer"
     [[ "${v}" -ge 100 ]] || t_fail "expected large model memory >= 100, got ${v}"
 
@@ -607,7 +607,7 @@ test_estimate_model_memory_multiplier_case_arms_large_and_small() {
     # shellcheck source=../task_serialization.sh
     source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
-    local large="Qwen/Qwen1.5-72B"
+    local large="org/Thing-72B"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "SETUP_BASELINE")" "large SETUP_BASELINE"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "CALIBRATION_RUN")" "large CALIBRATION_RUN"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "SETUP_EVALUATE_BASELINE_REPORT")" "large SETUP_EVALUATE_BASELINE_REPORT"

@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added modern published-basis evidence for expanded dense causal model
   families, including Mistral/Ministral, Qwen2/Qwen2.5/Qwen3/Qwen3.5,
   Granite 4.1, DeepSeek R1 Qwen variants, Phi-4, SmolLM3, TinyLlama,
-  OLMo 2, OpenLLaMA, Falcon, and Falcon-H1R lanes.
+  OLMo 2, OpenLLaMA, and Falcon lanes.
 - Added published-basis coverage for additional architecture families,
   including FLAN-T5 seq2seq, Gemma 4 multimodal/image-text lanes, OLMoE,
   Mixtral, Gemma 4 26B-A4B MoE, and Qwen3 30B-A3B MoE evidence lanes.
@@ -80,6 +80,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed the stale `tests/fuzzing` owner expectation from the active test-tree
   contract after the fuzzing surface was retired from the repo layout.
+- Removed confirmed non-Apache-2.0/MIT hosted model checkpoints from active
+  support, calibration, and public-evidence surfaces.
 
 ### Fixed
 

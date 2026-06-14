@@ -165,7 +165,7 @@ Model suites are defined and applied by
 | `subset` | `mistralai/Mistral-7B-v0.1` | Single-GPU friendly |
 | `showcase` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B` | Multi-GPU recommended; guard-focused scenarios |
 | `workshop3` | `mistralai/Mistral-7B-v0.1`, `mistralai/Mixtral-8x7B-v0.1`, `01-ai/Yi-34B` | Workshop-friendly 3-model suite (architecture diversity) |
-| `full` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B`, `01-ai/Yi-34B`, `mistralai/Mixtral-8x7B-v0.1`, `Qwen/Qwen1.5-72B` | Multi-GPU recommended |
+| `full` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B`, `01-ai/Yi-34B`, `mistralai/Mixtral-8x7B-v0.1`, `Qwen/Qwen3-8B` | Multi-GPU recommended |
 
 Default full-suite model sizes (weights-only, approximate):
 
@@ -176,7 +176,7 @@ Default full-suite model sizes (weights-only, approximate):
 | `Qwen/Qwen2.5-32B` | ~64 GB | Medium | Flash Attention 2 compatible |
 | `01-ai/Yi-34B` | ~68 GB | Medium | Flash Attention 2 compatible |
 | `mistralai/Mixtral-8x7B-v0.1` | ~90 GB | MoE | MoE architecture |
-| `Qwen/Qwen1.5-72B` | ~144 GB | Large | Flash Attention 2 compatible |
+| `Qwen/Qwen3-8B` | ~16 GB | Small | Flash Attention 2 compatible |
 
 Notes:
 

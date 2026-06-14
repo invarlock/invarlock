@@ -246,7 +246,6 @@ Notes
 | OLMo 2 7B causal LM | Yes | Yes | Yes | Yes |
 | OpenLLaMA 7B causal LM | Yes | Yes | Yes | Yes |
 | Falcon 7B causal LM | Yes | Yes | Yes | Yes |
-| Falcon-H1R 7B causal LM | Yes | Yes | Yes | Yes |
 | Granite 4.1 8B causal LM | Yes | Yes | Yes | Yes |
 
 ### Published 13B-14B And Reasoning Decoder Evidence
@@ -272,13 +271,12 @@ Notes
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | Qwen3.5 4B image-text LM | Yes | Yes | Yes | No |
-| Gemma 3n E4B image-text LM | Yes | Yes | Yes | No |
-| Gemma 3 4B IT image-text LM | Yes | Yes | Yes | No |
 
 Qwen3.5 4B is prepared but not promoted because the 2026-06-14 H100 no-op run
 passed mechanically while producing 0/400 baseline and subject VQA accuracy.
-Gemma 3n E4B and Gemma 3 4B IT evidence execution requires an authenticated
-Hugging Face token with accepted Gemma access terms.
+Gemma 3 and Gemma 3n hosted checkpoints are not included in the repo-prepared
+candidate inventory because their Hugging Face pages are gated under Gemma
+terms.
 
 ### Large/MoE Published Evidence
 
@@ -328,10 +326,10 @@ preset policy; strict release verification accepts that declared skip.
 The FLAN-T5 base public fixture uses pinned CNN/DailyMail validation data via
 `hf_seq2seq`; strict release verification accepts one advisory guard warning
 while the hard policy gates pass.
-The prepared small/multimodal candidate lanes for Qwen3.5 4B, Gemma 3n E4B,
-and Gemma 3 4B IT include public VQAv2 presets and null-sweep configs, but
-they are not published assurance bases until public report,
-runtime-manifest, and evidence-pack artifacts are attached and audited.
+The prepared small/multimodal candidate lane for Qwen3.5 4B includes a public
+VQAv2 preset and null-sweep config, but it is not a published assurance basis
+until public report, runtime-manifest, and evidence-pack artifacts are attached
+and audited.
 
 `published_basis` remains the narrow public evidence floor, while
 `supported_experimental` means the repo ships the preset, calibration config,
@@ -347,8 +345,8 @@ Image-text evaluation uses the built-in
 `transformers>=5.12.0` and `torchvision>=0.26.0`. The Gemma 4 E2B public lane
 remains text-only, Gemma 4 12B and Gemma 4 26B-A4B now have public image-text
 bases on pinned VQAv2 materialization, Qwen3.5 2B now has a public image-text
-basis, Qwen3.5 4B and Gemma 3n E4B/Gemma 3 4B IT have prepared image-text
-candidate lanes, and audio evaluation is deferred.
+basis, Qwen3.5 4B has a prepared image-text candidate lane, and audio
+evaluation is deferred.
 
 Machine-readable support metadata lives in `contracts/support_matrix.json`. It is
 the canonical source of truth for normalized support tiers
@@ -381,9 +379,8 @@ remains provider/config validation only. Gemma 4 26B-A4B uses the analogous
 `configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml` and
 `configs/calibration/null_sweep_gemma4_26b_a4b.yaml` promotion path; its public
 fixture lives under `public_evidence/published_basis/gemma4_26b_a4b/`. The
-Qwen3.5 2B public image-text basis and the prepared Qwen3.5 4B, Gemma 3n E4B,
-and Gemma 3 4B IT image-text candidates use the same pinned VQAv2
-materialization pattern through
+Qwen3.5 2B public image-text basis and the prepared Qwen3.5 4B image-text
+candidate use the same pinned VQAv2 materialization pattern through
 `configs/presets/multimodal/*_public_vqav2_256.yaml` and matching
 `configs/calibration/null_sweep_*.yaml` files.
 

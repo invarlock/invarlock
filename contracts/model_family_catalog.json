@@ -538,62 +538,6 @@
       ]
     },
     {
-      "family_id": "gemma3n-e4b-image-text-lm",
-      "display_name": "Gemma 3n E4B image-text LM",
-      "modalities": [
-        "text",
-        "image"
-      ],
-      "task_role": "image_text",
-      "state": "community_experimental",
-      "representative_models": [
-        "google/gemma-3n-E4B-it"
-      ],
-      "repo_evidence": [
-        "contracts/support_matrix.json",
-        "configs/presets/multimodal/gemma3n_e4b_public_vqav2_256.yaml",
-        "configs/calibration/null_sweep_gemma3n_e4b.yaml",
-        "scripts/model_evidence/materialize_vision_text_dataset.py",
-        "scripts/model_evidence/model_evidence_sweep.py",
-        "tests/cli/test_preset_multimodal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py"
-      ],
-      "notes": "Prepared from support_matrix lane gemma3n-e4b-image-text-hf. A 2026-06-14 H100 probe reached the direct Gemma3n loader but Hugging Face returned 401 gated-repo access without an authenticated token and accepted Gemma terms; audio/video capabilities remain deferred.",
-      "support_groups": [
-        "small_local",
-        "multimodal_candidate",
-        "practical_shortlist"
-      ]
-    },
-    {
-      "family_id": "gemma3-4b-it-image-text-lm",
-      "display_name": "Gemma 3 4B IT image-text LM",
-      "modalities": [
-        "text",
-        "image"
-      ],
-      "task_role": "image_text",
-      "state": "community_experimental",
-      "representative_models": [
-        "google/gemma-3-4b-it"
-      ],
-      "repo_evidence": [
-        "contracts/support_matrix.json",
-        "configs/presets/multimodal/gemma3_4b_it_public_vqav2_256.yaml",
-        "configs/calibration/null_sweep_gemma3_4b_it.yaml",
-        "scripts/model_evidence/materialize_vision_text_dataset.py",
-        "scripts/model_evidence/model_evidence_sweep.py",
-        "tests/cli/test_preset_multimodal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py"
-      ],
-      "notes": "Prepared from support_matrix lane gemma3-4b-it-image-text-hf. A 2026-06-14 H100 probe reached the direct Gemma3 loader but Hugging Face returned 401 gated-repo access without an authenticated token and accepted Gemma terms.",
-      "support_groups": [
-        "small_local",
-        "multimodal_candidate",
-        "practical_shortlist"
-      ]
-    },
-    {
       "family_id": "ministral-3-3b-text-causal-lm",
       "display_name": "Ministral 3 3B causal LM (text-only eval)",
       "modalities": [
@@ -768,30 +712,6 @@
         "reasoning_focused"
       ],
       "notes": "Promoted from support_matrix lane deepseek-r1-0528-qwen3-8b-causal-hf with container-backed public evidence."
-    },
-    {
-      "family_id": "falcon-h1r-7b-causal-lm",
-      "display_name": "Falcon-H1R 7B causal LM",
-      "modalities": [
-        "text"
-      ],
-      "task_role": "causal_lm",
-      "state": "published_basis",
-      "representative_models": [
-        "tiiuae/Falcon-H1R-7B"
-      ],
-      "repo_evidence": [
-        "contracts/support_matrix.json",
-        "configs/presets/causal_lm/falcon_h1r_7b_512.yaml",
-        "configs/calibration/null_sweep_falcon_h1r_7b.yaml",
-        "public_evidence/published_basis/falcon_h1r_7b/evaluation.report.json",
-        "public_evidence/published_basis/falcon_h1r_7b/runtime.manifest.json",
-        "public_evidence/published_basis/falcon_h1r_7b/evidence_pack"
-      ],
-      "support_groups": [
-        "reasoning_focused"
-      ],
-      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window run preset after Mamba projection spectral-family classification and Falcon embedding spectral exclusion."
     },
     {
       "family_id": "flan-t5-base-seq2seq-lm",
@@ -1019,21 +939,21 @@
       "task_role": "causal_lm",
       "state": "profile_first_class",
       "representative_models": [
-        "google/gemma-3-4b-it",
-        "google/gemma-3n-E4B-it",
-        "google/gemma-4-E2B-it"
+        "google/gemma-4-E2B-it",
+        "google/gemma-4-12B-it",
+        "google/gemma-4-26B-A4B-it"
       ],
       "repo_evidence": [
         "src/invarlock/model_profile.py",
         "src/invarlock/adapters/hf_loading.py",
         "src/invarlock/adapters/hf_multimodal.py",
         "src/invarlock/eval/data.py",
-        "configs/presets/multimodal/gemma3_4b_it_public_vqav2_256.yaml",
-        "configs/presets/multimodal/gemma3n_e4b_public_vqav2_256.yaml",
-        "configs/calibration/null_sweep_gemma3_4b_it.yaml",
-        "configs/calibration/null_sweep_gemma3n_e4b.yaml"
+        "configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml",
+        "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_gemma4_12b.yaml",
+        "configs/calibration/null_sweep_gemma4_26b_a4b.yaml"
       ],
-      "notes": "Gemma 3/4 selectors and loaders are first-class. Gemma 4 E2B has a declared text-only lane, Gemma 4 12B and 26B-A4B have public image-text bases, and Gemma 3 4B IT plus Gemma 3n E4B now have prepared image-text candidate lanes through hf_multimodal and pinned public VQAv2 materialization. Audio/video evaluation remains deferred."
+      "notes": "Gemma-family selectors and loaders are first-class for compatible local or user-supplied checkpoints. Repo-declared Gemma support is limited to Gemma 4 lanes with public evidence: Gemma 4 E2B text-only plus Gemma 4 12B and 26B-A4B image-text public bases. Gemma 3 and Gemma 3n hosted checkpoints are omitted from the repo support/promotion inventory because their Hugging Face pages are access-gated under Gemma terms."
     },
     {
       "family_id": "opt-neox-gptj",
@@ -1044,7 +964,6 @@
       "task_role": "causal_lm",
       "state": "profile_shared_alias",
       "representative_models": [
-        "facebook/opt-1.3b",
         "EleutherAI/gpt-neox-20b"
       ],
       "repo_evidence": [
@@ -1052,7 +971,7 @@
         "src/invarlock/adapters/hf_loading.py",
         "src/invarlock/adapters/auto.py"
       ],
-      "notes": "These families are available through shared GPT-style loader and profile paths rather than dedicated public support lanes."
+      "notes": "These families are available through shared GPT-style loader and profile paths rather than dedicated public support lanes. The catalog intentionally avoids naming the common OPT-1.3B hosted checkpoint because it is not Apache-2.0 or MIT licensed."
     },
     {
       "family_id": "gpt-oss",
@@ -1098,12 +1017,12 @@
       "task_role": "causal_lm",
       "state": "auto_or_loader_only",
       "representative_models": [
-        "THUDM/glm-4-9b-chat"
+        "local-glm-compatible-checkpoint"
       ],
       "repo_evidence": [
         "src/invarlock/adapters/auto.py"
       ],
-      "notes": "Family visibility currently comes from adapter-auto heuristics only."
+      "notes": "Family visibility currently comes from adapter-auto heuristics only. The catalog intentionally avoids naming the hosted GLM-4 9B Chat checkpoint because its public license is custom/restricted rather than Apache-2.0 or MIT."
     },
     {
       "family_id": "deepseek",
@@ -1151,15 +1070,14 @@
       "task_role": "seq2seq",
       "state": "auto_or_loader_only",
       "representative_models": [
-        "facebook/mbart-large-50",
-        "Helsinki-NLP/opus-mt-en-de"
+        "facebook/mbart-large-50"
       ],
       "repo_evidence": [
         "src/invarlock/adapters/hf_loading.py",
         "src/invarlock/adapters/auto.py",
         "docs/reference/model-adapters.md"
       ],
-      "notes": "Concrete loader families exist beyond the public FLAN-T5 base seq2seq basis; mBART/PEGASUS/Marian still need dedicated presets and public evidence before they become declared support lanes."
+      "notes": "Concrete loader families exist beyond the public FLAN-T5 base seq2seq basis; mBART/PEGASUS/Marian still need dedicated presets and public evidence before they become declared support lanes. The catalog intentionally avoids naming CC-BY-4.0-only hosted checkpoints because they are outside the repo's strict Apache-2.0/MIT named-checkpoint policy."
     }
   ],
   "usage_only": [
@@ -1180,24 +1098,6 @@
         "scripts/evidence_packs/lib/validation/validation_suite.sh"
       ],
       "notes": "Used in evidence-pack suites and validation defaults outside the declared Qwen2.5 14B support lane."
-    },
-    {
-      "family_id": "qwen1-5-72b",
-      "display_name": "Qwen1.5 72B",
-      "modalities": [
-        "text"
-      ],
-      "task_role": "causal_lm",
-      "state": "usage_only",
-      "representative_models": [
-        "Qwen/Qwen1.5-72B"
-      ],
-      "repo_evidence": [
-        "docs/user-guide/evidence-packs-internals.md",
-        "scripts/evidence_packs/run_suite.sh",
-        "scripts/evidence_packs/lib/validation/validation_suite.sh"
-      ],
-      "notes": "Used as a concrete evidence-pack checkpoint, but not declared as a public support lane."
     },
     {
       "family_id": "yi-34b",
@@ -1422,64 +1322,6 @@
         "notes": "The public Phi surface is intentionally held at the shipped Phi-4 text-only lane in this wave rather than widening to another family-specific lane."
       },
       {
-        "candidate_id": "gemma-3-4b-it-image-text-lm",
-        "display_name": "Gemma 3 4B IT",
-        "representative_model": "google/gemma-3-4b-it",
-        "current_catalog_state": "community_experimental",
-        "decision": "redirected_to_image_text_candidate",
-        "criteria_status": {
-          "explicit_adapter_or_profile_recognition": "pass",
-          "included_preset": "pass",
-          "included_calibration_config": "pass",
-          "targeted_tests": "pass",
-          "cli_smoke_evidence": "pass",
-          "approved_calibration_or_evaluation_evidence": "fail"
-        },
-        "repo_evidence": [
-          "src/invarlock/model_profile.py",
-          "src/invarlock/adapters/hf_loading.py",
-          "src/invarlock/adapters/hf_multimodal.py",
-          "configs/presets/multimodal/gemma3_4b_it_public_vqav2_256.yaml",
-          "configs/calibration/null_sweep_gemma3_4b_it.yaml",
-          "tests/cli/test_preset_multimodal_presets.py",
-          "tests/scripts/test_model_evidence_sweep_catalog.py",
-          "scripts/model_evidence/model_evidence_sweep.py"
-        ],
-        "missing_artifacts": [
-          "approved calibration/evaluation evidence"
-        ],
-        "notes": "This checkpoint is no longer treated as a text-only out-of-scope row. It is tracked as an image-text candidate through hf_multimodal and public VQAv2, pending public evidence artifacts."
-      },
-      {
-        "candidate_id": "opt-1-3b-causal-lm",
-        "display_name": "OPT 1.3B causal LM",
-        "representative_model": "facebook/opt-1.3b",
-        "current_catalog_state": "implemented_coverage",
-        "decision": "blocked_missing_artifacts",
-        "criteria_status": {
-          "explicit_adapter_or_profile_recognition": "pass",
-          "included_preset": "pass",
-          "included_calibration_config": "pass",
-          "targeted_tests": "pass",
-          "cli_smoke_evidence": "pass",
-          "approved_calibration_or_evaluation_evidence": "fail"
-        },
-        "repo_evidence": [
-          "configs/presets/causal_lm/opt_1_3b_512.yaml",
-          "configs/calibration/null_sweep_opt_1_3b.yaml",
-          "src/invarlock/model_profile.py",
-          "src/invarlock/adapters/hf_loading.py",
-          "src/invarlock/adapters/auto.py",
-          "tests/adapters/test_hf_causal_variant_paths.py",
-          "tests/core/test_model_profile_local_config.py",
-          "tests/cli/test_preset_causal_presets.py"
-        ],
-        "missing_artifacts": [
-          "approved calibration/evaluation evidence"
-        ],
-        "notes": "Shared GPT-style recognition and targeted tests exist, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing."
-      },
-      {
         "candidate_id": "falcon-7b-causal-lm",
         "display_name": "Falcon 7B causal LM",
         "representative_model": "tiiuae/falcon-7b",
@@ -1504,32 +1346,6 @@
         ],
         "missing_artifacts": [],
         "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack from corrected promotion-gap CUDA run 20260613TpromotionGapReleasePromoteA."
-      },
-      {
-        "candidate_id": "glm-4-9b-chat-causal-lm",
-        "display_name": "GLM 4 9B Chat",
-        "representative_model": "THUDM/glm-4-9b-chat",
-        "current_catalog_state": "implemented_coverage",
-        "decision": "blocked_missing_artifacts",
-        "criteria_status": {
-          "explicit_adapter_or_profile_recognition": "pass",
-          "included_preset": "pass",
-          "included_calibration_config": "pass",
-          "targeted_tests": "pass",
-          "cli_smoke_evidence": "pass",
-          "approved_calibration_or_evaluation_evidence": "fail"
-        },
-        "repo_evidence": [
-          "configs/presets/causal_lm/glm4_9b_chat_512.yaml",
-          "configs/calibration/null_sweep_glm4_9b_chat.yaml",
-          "src/invarlock/adapters/auto.py",
-          "tests/adapters/test_hf_causal_variant_paths.py",
-          "tests/cli/test_preset_causal_presets.py"
-        ],
-        "missing_artifacts": [
-          "approved calibration/evaluation evidence"
-        ],
-        "notes": "Recognition and targeted variant-path tests exist, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing."
       },
       {
         "candidate_id": "broader-bert-like-mlms",

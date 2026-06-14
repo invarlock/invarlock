@@ -27,9 +27,7 @@ def _supported_experimental_models() -> list[str]:
 def _deferred_candidate_models() -> list[str]:
     return [
         "openlm-research/open_llama_7b",
-        "facebook/opt-1.3b",
         "tiiuae/falcon-7b",
-        "THUDM/glm-4-9b-chat",
         "distilbert-base-uncased",
     ]
 

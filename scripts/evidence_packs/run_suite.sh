@@ -46,7 +46,7 @@ pack_apply_suite() {
             MODEL_3="Qwen/Qwen2.5-32B"
             MODEL_4="01-ai/Yi-34B"
             MODEL_5="mistralai/Mixtral-8x7B-v0.1"
-            MODEL_6="Qwen/Qwen1.5-72B"
+            MODEL_6="Qwen/Qwen3-8B"
             MODEL_7=""
             MODEL_8=""
             ;;

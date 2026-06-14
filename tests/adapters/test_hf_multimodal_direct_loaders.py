@@ -8,12 +8,12 @@ import pytest
     ("model_id", "model_type", "loader_label"),
     [
         (
-            "google/gemma-3n-E4B-it",
+            "demo/gemma3n-compatible-checkpoint",
             "gemma3n",
             "transformers.models.gemma3n.modeling_gemma3n.Gemma3nForConditionalGeneration",
         ),
         (
-            "google/gemma-3-4b-it",
+            "demo/gemma3-compatible-checkpoint",
             "gemma3",
             "transformers.models.gemma3.modeling_gemma3.Gemma3ForConditionalGeneration",
         ),

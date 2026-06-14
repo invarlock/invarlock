@@ -202,16 +202,6 @@ def test_small_multimodal_candidate_public_vqav2_presets_load() -> None:
             "Qwen/Qwen3.5-2B",
             False,
         ),
-        (
-            "configs/presets/multimodal/gemma3n_e4b_public_vqav2_256.yaml",
-            "google/gemma-3n-E4B-it",
-            True,
-        ),
-        (
-            "configs/presets/multimodal/gemma3_4b_it_public_vqav2_256.yaml",
-            "google/gemma-3-4b-it",
-            True,
-        ),
     ):
         _assert_public_vqav2_image_text_config(
             rel_path=rel_path,
@@ -294,18 +284,6 @@ def test_small_multimodal_candidate_null_sweeps_use_public_manifest() -> None:
             "Qwen/Qwen3.5-2B",
             "runs/null_sweeps/qwen3_5_2b",
             False,
-        ),
-        (
-            "configs/calibration/null_sweep_gemma3n_e4b.yaml",
-            "google/gemma-3n-E4B-it",
-            "runs/null_sweeps/gemma3n_e4b",
-            True,
-        ),
-        (
-            "configs/calibration/null_sweep_gemma3_4b_it.yaml",
-            "google/gemma-3-4b-it",
-            "runs/null_sweeps/gemma3_4b_it",
-            True,
         ),
     ):
         _assert_public_vqav2_image_text_config(
