@@ -96,9 +96,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed local verification hygiene after the published-basis expansion by
   keeping test files under the repository size guideline and restoring coverage
   enforcement edge-path tests.
-- Fixed the PR-time supply-chain scan to run `gitleaks` over the pull request
-  commit range instead of timing out on a full repository-history scan; release
-  and scheduled backstop scans still cover full history.
+- Fixed the PR-time supply-chain scan to run `gitleaks` over pull request
+  changed-file contents instead of timing out on repository-history scans;
+  release and scheduled backstop scans still cover full history.
 
 ## [0.10.0] - 2026-06-03
 

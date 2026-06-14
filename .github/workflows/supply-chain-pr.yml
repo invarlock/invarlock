@@ -119,7 +119,7 @@ jobs:
       - name: Run advanced surface pip-audit
         run: python scripts/security/run_pip_audit.py --path "${{ steps.advanced_surface.outputs.site_packages }}"
 
-      - name: Run gitleaks PR range scan
+      - name: Run gitleaks PR file scan
         id: gitleaks_scan
         shell: bash
         env:
@@ -128,24 +128,51 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/supply-chain
+          changed_files="artifacts/supply-chain/gitleaks.changed-files"
+          scan_root="artifacts/supply-chain/pr-files"
+          rm -rf "${scan_root}"
+          mkdir -p "${scan_root}"
           if [ -n "${PR_BASE_SHA}" ] && [ -n "${PR_HEAD_SHA}" ] \
             && git cat-file -e "${PR_BASE_SHA}^{commit}" \
             && git cat-file -e "${PR_HEAD_SHA}^{commit}"; then
             scan_range="${PR_BASE_SHA}..${PR_HEAD_SHA}"
+            git diff --name-only --diff-filter=ACMRT "${PR_BASE_SHA}" "${PR_HEAD_SHA}" > "${changed_files}"
           else
             scan_range="-1 HEAD"
+            git show --pretty="" --name-only --diff-filter=ACMRT HEAD > "${changed_files}"
           fi
           echo "scan_range=${scan_range}" >> "$GITHUB_OUTPUT"
+          changed_file_count="$(grep -cve '^[[:space:]]*$' "${changed_files}" || true)"
+          echo "changed_file_count=${changed_file_count}" >> "$GITHUB_OUTPUT"
+          copied=0
+          while IFS= read -r path; do
+            if [ -z "${path}" ] || [ ! -f "${path}" ]; then
+              continue
+            fi
+            case "${path}" in
+              .git/*|artifacts/supply-chain/*)
+                continue
+                ;;
+            esac
+            mkdir -p "${scan_root}/$(dirname "${path}")"
+            cp -- "${path}" "${scan_root}/${path}"
+            copied=$((copied + 1))
+          done < "${changed_files}"
+          echo "scanned_file_count=${copied}" >> "$GITHUB_OUTPUT"
+          if [ "${copied}" = "0" ]; then
+            printf '[]\n' > artifacts/supply-chain/gitleaks.json
+            printf '{"version":"2.1.0","runs":[]}\n' > artifacts/supply-chain/gitleaks.sarif
+            echo "exit_code=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           set +e
-          gitleaks git . \
-            --log-opts="${scan_range}" \
+          gitleaks dir "${scan_root}" \
             --redact \
             --no-banner \
             --report-format json \
             --report-path artifacts/supply-chain/gitleaks.json
           json_exit=$?
-          gitleaks git . \
-            --log-opts="${scan_range}" \
+          gitleaks dir "${scan_root}" \
             --redact \
             --no-banner \
             --report-format sarif \
@@ -165,6 +192,7 @@ jobs:
           name: supply-chain-pr-artifacts
           path: |
             artifacts/supply-chain/sbom.json
+            artifacts/supply-chain/gitleaks.changed-files
             artifacts/supply-chain/gitleaks.json
             artifacts/supply-chain/gitleaks.sarif
           if-no-files-found: error
@@ -174,7 +202,12 @@ jobs:
         if: ${{ always() && steps.gitleaks_scan.outcome != 'skipped' }}
         shell: bash
         run: |
-          if [ "${{ steps.gitleaks_scan.outputs.exit_code }}" != "0" ]; then
+          exit_code="${{ steps.gitleaks_scan.outputs.exit_code }}"
+          if [ -z "${exit_code}" ]; then
+            echo "gitleaks scan did not publish an exit code" >&2
+            exit 1
+          fi
+          if [ "${exit_code}" != "0" ]; then
             echo "gitleaks detected secrets; see uploaded artifact for details" >&2
             exit 1
           fi

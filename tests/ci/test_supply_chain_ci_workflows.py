@@ -186,7 +186,7 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
         "Remove HF surface venv",
         "Create advanced surface venv",
         "Run advanced surface pip-audit",
-        "Run gitleaks PR range scan",
+        "Run gitleaks PR file scan",
         "Upload supply-chain artifacts",
         "Fail on secret findings",
     ]
@@ -275,7 +275,7 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
         in advanced_audit_step["run"]
     )
 
-    secret_scan_step = _find_step_by_name(steps, "Run gitleaks PR range scan")
+    secret_scan_step = _find_step_by_name(steps, "Run gitleaks PR file scan")
     assert (
         secret_scan_step["env"]["PR_BASE_SHA"]
         == "${{ github.event.pull_request.base.sha }}"
@@ -284,12 +284,18 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
         secret_scan_step["env"]["PR_HEAD_SHA"]
         == "${{ github.event.pull_request.head.sha }}"
     )
-    assert "gitleaks git ." in secret_scan_step["run"]
-    assert '--log-opts="${scan_range}"' in secret_scan_step["run"]
+    assert (
+        'git diff --name-only --diff-filter=ACMRT "${PR_BASE_SHA}" "${PR_HEAD_SHA}"'
+        in secret_scan_step["run"]
+    )
+    assert 'scan_root="artifacts/supply-chain/pr-files"' in secret_scan_step["run"]
+    assert 'gitleaks dir "${scan_root}"' in secret_scan_step["run"]
     assert 'scan_range="${PR_BASE_SHA}..${PR_HEAD_SHA}"' in secret_scan_step["run"]
     assert 'scan_range="-1 HEAD"' in secret_scan_step["run"]
+    assert "scanned_file_count=" in secret_scan_step["run"]
     assert "--report-format json" in secret_scan_step["run"]
     assert "--report-format sarif" in secret_scan_step["run"]
+    assert "artifacts/supply-chain/gitleaks.changed-files" in secret_scan_step["run"]
     assert "artifacts/supply-chain/gitleaks.json" in secret_scan_step["run"]
     assert "artifacts/supply-chain/gitleaks.sarif" in secret_scan_step["run"]
 
@@ -297,10 +303,14 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
     assert upload_step["uses"].startswith("actions/upload-artifact@")
     assert upload_step["with"]["name"] == "supply-chain-pr-artifacts"
     assert "artifacts/supply-chain/sbom.json" in upload_step["with"]["path"]
+    assert (
+        "artifacts/supply-chain/gitleaks.changed-files" in upload_step["with"]["path"]
+    )
     assert "artifacts/supply-chain/gitleaks.json" in upload_step["with"]["path"]
     assert "artifacts/supply-chain/gitleaks.sarif" in upload_step["with"]["path"]
 
     fail_step = _find_step_by_name(steps, "Fail on secret findings")
+    assert "gitleaks scan did not publish an exit code" in fail_step["run"]
     assert "gitleaks detected secrets" in fail_step["run"]
 
 
