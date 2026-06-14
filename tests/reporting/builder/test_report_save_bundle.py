@@ -103,14 +103,19 @@ def test_save_report_bundle_writes_manifest_and_evidence(tmp_path: Path, monkeyp
     base = _baseline_v1()
     # Gate small debug evidence emission via env
     monkeypatch.setenv("INVARLOCK_EVIDENCE_DEBUG", "1")
+    evaluation_report = make_report(rep, base)
 
     out = save_evaluation_bundle(
         run_report=rep,
         output_dir=tmp_path,
-        evaluation_report=make_report(rep, base),
+        evaluation_report=evaluation_report,
     )
     assert out["report"].exists()
     assert out["report_md"].exists()
+    report_text = out["report"].read_text(encoding="utf-8")
+    assert report_text.endswith("\n")
+    assert "\n  " not in report_text
+    assert json.loads(report_text) == json.loads(json.dumps(evaluation_report))
     # Manifest is best-effort but should exist in this path
     assert (tmp_path / "manifest.json").exists()
     # Evidence file gets created when env is set (even when payload is tiny)
