@@ -483,7 +483,7 @@
       "representative_models": [
         "Qwen/Qwen3.5-4B"
       ],
-      "notes": "Prepared image-text candidate lane with explicit hf_multimodal preset, public VQAv2 materialization recipe, and null-sweep calibration config. A 2026-06-14 H100 no-op run passed mechanically but produced 0/400 baseline and subject accuracy, so it is held out of the published assurance basis until the preset/model choice yields a meaningful primary metric."
+      "notes": "Prepared image-text candidate lane with explicit hf_multimodal preset, public VQAv2 materialization recipe, and null-sweep calibration config. A 2026-06-14 H100 no-op run passed mechanically but produced 0/400 baseline and subject accuracy. After the multimodal chat-template argument-forwarding fix and a strict answer-only prompt rerun, a 16/16 H100 sanity still produced 0/32 exact-answer VQA accuracy with instruction-analysis outputs, so it is held out of the published assurance basis until the preset/model choice yields a meaningful primary metric."
     },
     {
       "lane_id": "qwen3-5-2b-image-text-hf",

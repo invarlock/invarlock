@@ -245,14 +245,11 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
         self, processor: Any, *, prompt: str, answer: str | None = None
     ) -> str:
         if hasattr(processor, "apply_chat_template"):
-            extra_kwargs: dict[str, Any] = {}
-            if self._chat_template_kwargs:
-                extra_kwargs["chat_template_kwargs"] = dict(self._chat_template_kwargs)
             return processor.apply_chat_template(
                 self._chat_messages(prompt=prompt, answer=answer),
                 tokenize=False,
                 add_generation_prompt=answer is None,
-                **extra_kwargs,
+                **self._chat_template_kwargs,
             )
         if answer is None:
             return prompt

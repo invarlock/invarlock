@@ -296,7 +296,8 @@
         "support-matrix-backlog-gpu"
       ],
       "blockers": [
-        "meaningful primary metric evidence"
+        "meaningful primary metric evidence",
+        "answer-only VQA behavior under strict prompt"
       ]
     },
     {

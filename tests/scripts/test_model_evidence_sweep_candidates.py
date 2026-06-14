@@ -81,6 +81,9 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
         assert specs[slug].vision_text_materialization["dataset"] == (
             "Multimodal-Fatima/VQAv2_sample_validation"
         )
+    assert "Do not explain or include thinking" in str(
+        specs["qwen_qwen3_5_4b"].vision_text_materialization["prompt_template"]
+    )
     assert specs["microsoft_phi_4_mini_instruct"].preset_relpath == (
         "configs/presets/causal_lm/phi4_mini_512.yaml"
     )

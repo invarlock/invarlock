@@ -103,9 +103,7 @@ def test_hf_multimodal_processor_text_forwards_chat_template_kwargs() -> None:
     rendered = adapter._processor_text(processor, prompt="what is shown?")
 
     assert rendered == "USER:what is shown?\nASSISTANT:"
-    assert processor.template_kwargs == [
-        {"chat_template_kwargs": {"enable_thinking": False}}
-    ]
+    assert processor.template_kwargs == [{"enable_thinking": False}]
 
 
 def test_hf_multimodal_processor_digest_includes_chat_template_kwargs() -> None:

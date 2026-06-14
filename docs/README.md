@@ -272,8 +272,13 @@ Notes
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | Qwen3.5 4B image-text LM | Yes | Yes | Yes | No |
 
-Qwen3.5 4B is prepared but not promoted because the 2026-06-14 H100 no-op run
-passed mechanically while producing 0/400 baseline and subject VQA accuracy.
+Qwen3.5 4B is prepared but not promoted. The 2026-06-14 H100 no-op run passed
+mechanically while producing 0/400 baseline and subject VQA accuracy; after the
+multimodal chat-template argument-forwarding fix and a strict answer-only prompt
+rerun, a 16/16 H100 sanity still produced 0/32 exact-answer VQA accuracy.
+Decoded outputs were instruction-analysis text rather than short VQA answers, so
+publication remains blocked until the preset/model choice yields a meaningful
+primary metric.
 Gemma 3 and Gemma 3n hosted checkpoints are not included in the repo-prepared
 candidate inventory because their Hugging Face pages are gated under Gemma
 terms.

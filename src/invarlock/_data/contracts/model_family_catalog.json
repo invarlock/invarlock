@@ -497,7 +497,7 @@
         "tests/cli/test_preset_multimodal_presets.py",
         "tests/scripts/test_model_evidence_sweep_catalog.py"
       ],
-      "notes": "Prepared from support_matrix lane qwen3-5-4b-image-text-hf. A 2026-06-14 H100 no-op run passed mechanically but produced 0/400 baseline and subject accuracy, so public-basis promotion is blocked until the preset/model choice yields a meaningful primary metric.",
+      "notes": "Prepared from support_matrix lane qwen3-5-4b-image-text-hf. A 2026-06-14 H100 no-op run passed mechanically but produced 0/400 baseline and subject accuracy. After the multimodal chat-template argument-forwarding fix and a strict answer-only prompt rerun, a 16/16 H100 sanity still produced 0/32 exact-answer VQA accuracy with instruction-analysis outputs, so public-basis promotion is blocked until the preset/model choice yields a meaningful primary metric.",
       "support_groups": [
         "small_local",
         "multimodal_candidate",
@@ -888,7 +888,7 @@
         "public_evidence/published_basis/qwen3_5_2b/evaluation.report.json",
         "public_evidence/published_basis/qwen3_5_2b/evidence_pack"
       ],
-      "notes": "Shared qwen-family heuristics cover aliases beyond the declared text-only Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 9B public lanes. Qwen3.5 2B now has published image-text evidence through hf_multimodal and pinned public VQAv2 materialization; Qwen3.5 4B remains prepared but blocked on a meaningful primary metric."
+      "notes": "Shared qwen-family heuristics cover aliases beyond the declared text-only Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 9B public lanes. Qwen3.5 2B now has published image-text evidence through hf_multimodal and pinned public VQAv2 materialization; Qwen3.5 4B remains prepared but blocked after strict-prompt H100 sanity reproduced zero exact-answer VQA accuracy."
     },
     {
       "family_id": "yi",
