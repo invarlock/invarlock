@@ -186,7 +186,7 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
         "Remove HF surface venv",
         "Create advanced surface venv",
         "Run advanced surface pip-audit",
-        "Run gitleaks history scan",
+        "Run gitleaks PR range scan",
         "Upload supply-chain artifacts",
         "Fail on secret findings",
     ]
@@ -275,8 +275,19 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
         in advanced_audit_step["run"]
     )
 
-    secret_scan_step = _find_step_by_name(steps, "Run gitleaks history scan")
+    secret_scan_step = _find_step_by_name(steps, "Run gitleaks PR range scan")
+    assert (
+        secret_scan_step["env"]["PR_BASE_SHA"]
+        == "${{ github.event.pull_request.base.sha }}"
+    )
+    assert (
+        secret_scan_step["env"]["PR_HEAD_SHA"]
+        == "${{ github.event.pull_request.head.sha }}"
+    )
     assert "gitleaks git ." in secret_scan_step["run"]
+    assert '--log-opts="${scan_range}"' in secret_scan_step["run"]
+    assert 'scan_range="${PR_BASE_SHA}..${PR_HEAD_SHA}"' in secret_scan_step["run"]
+    assert 'scan_range="-1 HEAD"' in secret_scan_step["run"]
     assert "--report-format json" in secret_scan_step["run"]
     assert "--report-format sarif" in secret_scan_step["run"]
     assert "artifacts/supply-chain/gitleaks.json" in secret_scan_step["run"]
