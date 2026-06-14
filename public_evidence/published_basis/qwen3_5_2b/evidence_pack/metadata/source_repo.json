@@ -1,0 +1,14 @@
+{
+  "artifact_class": "public_evidence_fixture",
+  "fixture_paths": [
+    "public_evidence/published_basis/qwen3_5_2b/evaluation.report.json",
+    "public_evidence/published_basis/qwen3_5_2b/runtime.manifest.json"
+  ],
+  "repo": "invarlock-public",
+  "source_ref": "42bd719b564f583b0d25e56bfea08fa03d9d83da",
+  "remote_artifacts": {
+    "artifact_manifest": "artifacts/model-evidence/remote/20260614Tqwen35VlmRevisionFixA/shard-01-gpu-1/artifact_manifest.json",
+    "model_revisions": "artifacts/model-evidence/remote/20260614Tqwen35VlmRevisionFixA/shard-01-gpu-1/model_revisions.json",
+    "summary": "artifacts/model-evidence/remote/20260614Tqwen35VlmRevisionFixA/shard-01-gpu-1/summary.json"
+  }
+}

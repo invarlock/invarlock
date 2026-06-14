@@ -497,7 +497,7 @@
         "tests/cli/test_preset_multimodal_presets.py",
         "tests/scripts/test_model_evidence_sweep_catalog.py"
       ],
-      "notes": "Prepared from support_matrix lane qwen3-5-4b-image-text-hf and awaiting public evidence artifacts.",
+      "notes": "Prepared from support_matrix lane qwen3-5-4b-image-text-hf. A 2026-06-14 H100 no-op run passed mechanically but produced 0/400 baseline and subject accuracy, so public-basis promotion is blocked until the preset/model choice yields a meaningful primary metric.",
       "support_groups": [
         "small_local",
         "multimodal_candidate",
@@ -513,7 +513,7 @@
         "image"
       ],
       "task_role": "image_text",
-      "state": "community_experimental",
+      "state": "published_basis",
       "representative_models": [
         "Qwen/Qwen3.5-2B"
       ],
@@ -524,10 +524,14 @@
         "scripts/model_evidence/materialize_vision_text_dataset.py",
         "scripts/model_evidence/model_evidence_sweep.py",
         "tests/cli/test_preset_multimodal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py"
+        "tests/scripts/test_model_evidence_sweep_catalog.py",
+        "public_evidence/published_basis/qwen3_5_2b/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_5_2b/runtime.manifest.json",
+        "public_evidence/published_basis/qwen3_5_2b/evidence_pack"
       ],
-      "notes": "Prepared from support_matrix lane qwen3-5-2b-image-text-hf and awaiting public evidence artifacts.",
+      "notes": "Promoted from support_matrix lane qwen3-5-2b-image-text-hf with release-profile container-backed public VQAv2 image-text evidence, runtime manifest, and signed evidence pack. This is no-op preservation/null-behavior evidence, not guard-value proof.",
       "support_groups": [
+        "published_modern",
         "small_local",
         "multimodal_candidate",
         "enterprise_permissive"
@@ -554,7 +558,7 @@
         "tests/cli/test_preset_multimodal_presets.py",
         "tests/scripts/test_model_evidence_sweep_catalog.py"
       ],
-      "notes": "Prepared as an image-text Gemma 3n candidate on public VQAv2. Audio/video evaluation is intentionally deferred until the evaluation provider exists. Evidence execution requires a Hugging Face token with accepted Gemma access terms.",
+      "notes": "Prepared from support_matrix lane gemma3n-e4b-image-text-hf. A 2026-06-14 H100 probe reached the direct Gemma3n loader but Hugging Face returned 401 gated-repo access without an authenticated token and accepted Gemma terms; audio/video capabilities remain deferred.",
       "support_groups": [
         "small_local",
         "multimodal_candidate",
@@ -582,7 +586,7 @@
         "tests/cli/test_preset_multimodal_presets.py",
         "tests/scripts/test_model_evidence_sweep_catalog.py"
       ],
-      "notes": "Reclassified from a text-only out-of-scope candidate into an explicit image-text candidate lane using hf_multimodal and pinned public VQAv2 materialization. Evidence execution requires a Hugging Face token with accepted Gemma access terms.",
+      "notes": "Prepared from support_matrix lane gemma3-4b-it-image-text-hf. A 2026-06-14 H100 probe reached the direct Gemma3 loader but Hugging Face returned 401 gated-repo access without an authenticated token and accepted Gemma terms.",
       "support_groups": [
         "small_local",
         "multimodal_candidate",
@@ -960,9 +964,11 @@
         "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
         "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
         "configs/calibration/null_sweep_qwen3_5_4b.yaml",
-        "configs/calibration/null_sweep_qwen3_5_2b.yaml"
+        "configs/calibration/null_sweep_qwen3_5_2b.yaml",
+        "public_evidence/published_basis/qwen3_5_2b/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_5_2b/evidence_pack"
       ],
-      "notes": "Shared qwen-family heuristics cover aliases beyond the declared text-only Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 9B public lanes. Qwen3.5 4B and 2B now have prepared image-text candidate lanes through hf_multimodal and pinned public VQAv2 materialization."
+      "notes": "Shared qwen-family heuristics cover aliases beyond the declared text-only Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 9B public lanes. Qwen3.5 2B now has published image-text evidence through hf_multimodal and pinned public VQAv2 materialization; Qwen3.5 4B remains prepared but blocked on a meaningful primary metric."
     },
     {
       "family_id": "yi",

@@ -265,16 +265,18 @@ Notes
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | Gemma 4 12B any-to-any LM | Yes | Yes | Yes | Yes |
 | Gemma 4 26B-A4B MoE image-text LM | Yes | Yes | Yes | Yes |
+| Qwen3.5 2B image-text LM | Yes | Yes | Yes | Yes |
 
 ### Prepared Small/Multimodal Candidate Lanes
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | Qwen3.5 4B image-text LM | Yes | Yes | Yes | No |
-| Qwen3.5 2B image-text LM | Yes | Yes | Yes | No |
 | Gemma 3n E4B image-text LM | Yes | Yes | Yes | No |
 | Gemma 3 4B IT image-text LM | Yes | Yes | Yes | No |
 
+Qwen3.5 4B is prepared but not promoted because the 2026-06-14 H100 no-op run
+passed mechanically while producing 0/400 baseline and subject VQA accuracy.
 Gemma 3n E4B and Gemma 3 4B IT evidence execution requires an authenticated
 Hugging Face token with accepted Gemma access terms.
 
@@ -297,7 +299,8 @@ Ministral 3 8B, Ministral 3 14B, TinyLlama 1.1B, Gemma 4 E2B text-only,
 Gemma 4 12B image-text, Gemma 4 26B-A4B image-text MoE, Granite 4.1 3B,
 Granite 4.1 8B, OLMo 2 7B, OLMo 2 13B, Qwen2 7B, OpenLLaMA 7B,
 Falcon 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B,
-DeepSeek-R1-Distill-Qwen 7B, DeepSeek-R1-0528-Qwen3 8B,
+Qwen3.5 2B image-text, DeepSeek-R1-Distill-Qwen 7B,
+DeepSeek-R1-0528-Qwen3 8B,
 DeepSeek-R1-Distill-Qwen 14B, Phi-4 text-only, OLMoE 1B-active/7B-total
 MoE, Mixtral 8x7B MoE, Qwen3 30B-A3B MoE, and FLAN-T5 base seq2seq profiles.
 Repo-included presets and pilot calibration configs for prepared practical-pick
@@ -325,9 +328,9 @@ preset policy; strict release verification accepts that declared skip.
 The FLAN-T5 base public fixture uses pinned CNN/DailyMail validation data via
 `hf_seq2seq`; strict release verification accepts one advisory guard warning
 while the hard policy gates pass.
-The prepared small/multimodal candidate lanes for Qwen3.5 4B, Qwen3.5 2B,
-Gemma 3n E4B, and Gemma 3 4B IT include public VQAv2 presets and null-sweep
-configs, but they are not published assurance bases until public report,
+The prepared small/multimodal candidate lanes for Qwen3.5 4B, Gemma 3n E4B,
+and Gemma 3 4B IT include public VQAv2 presets and null-sweep configs, but
+they are not published assurance bases until public report,
 runtime-manifest, and evidence-pack artifacts are attached and audited.
 
 `published_basis` remains the narrow public evidence floor, while
@@ -343,9 +346,9 @@ Image-text evaluation uses the built-in
 `invarlock[multimodal]` for this path; Gemma 4 unified checkpoints require
 `transformers>=5.12.0` and `torchvision>=0.26.0`. The Gemma 4 E2B public lane
 remains text-only, Gemma 4 12B and Gemma 4 26B-A4B now have public image-text
-bases on pinned VQAv2 materialization, Qwen3.5 4B/2B and Gemma 3n E4B/Gemma
-3 4B IT have prepared image-text candidate lanes, and audio evaluation is
-deferred.
+bases on pinned VQAv2 materialization, Qwen3.5 2B now has a public image-text
+basis, Qwen3.5 4B and Gemma 3n E4B/Gemma 3 4B IT have prepared image-text
+candidate lanes, and audio evaluation is deferred.
 
 Machine-readable support metadata lives in `contracts/support_matrix.json`. It is
 the canonical source of truth for normalized support tiers
@@ -378,8 +381,9 @@ remains provider/config validation only. Gemma 4 26B-A4B uses the analogous
 `configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml` and
 `configs/calibration/null_sweep_gemma4_26b_a4b.yaml` promotion path; its public
 fixture lives under `public_evidence/published_basis/gemma4_26b_a4b/`. The
-prepared Qwen3.5 4B, Qwen3.5 2B, Gemma 3n E4B, and Gemma 3 4B IT image-text
-candidates use the same pinned VQAv2 materialization pattern through
+Qwen3.5 2B public image-text basis and the prepared Qwen3.5 4B, Gemma 3n E4B,
+and Gemma 3 4B IT image-text candidates use the same pinned VQAv2
+materialization pattern through
 `configs/presets/multimodal/*_public_vqav2_256.yaml` and matching
 `configs/calibration/null_sweep_*.yaml` files.
 
