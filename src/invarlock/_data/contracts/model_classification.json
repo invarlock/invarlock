@@ -274,14 +274,18 @@
     },
     {
       "id": "gemma4-12b-any-to-any-hf",
-      "classification": "published",
-      "eligibility": "eligible",
+      "classification": "blocked",
+      "eligibility": "blocked",
       "support_matrix_lane_id": "gemma4-12b-any-to-any-hf",
       "catalog_family_ids": [
         "gemma-4-12b-any-to-any-lm"
       ],
       "suite_roles": [
         "support-matrix-backlog-gpu"
+      ],
+      "blockers": [
+        "published image-text basis quality floor",
+        "meaningful primary metric evidence"
       ]
     },
     {
@@ -314,14 +318,18 @@
     },
     {
       "id": "gemma4-26b-a4b-moe-image-text-hf",
-      "classification": "published",
-      "eligibility": "eligible",
+      "classification": "blocked",
+      "eligibility": "blocked",
       "support_matrix_lane_id": "gemma4-26b-a4b-moe-image-text-hf",
       "catalog_family_ids": [
         "gemma-4-26b-a4b-moe-image-text-lm"
       ],
       "suite_roles": [
         "support-matrix-backlog-gpu"
+      ],
+      "blockers": [
+        "published image-text basis quality floor",
+        "meaningful primary metric evidence"
       ]
     },
     {

@@ -81,9 +81,11 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
         assert specs[slug].vision_text_materialization["dataset"] == (
             "Multimodal-Fatima/VQAv2_sample_validation"
         )
-    assert "Do not explain or include thinking" in str(
+    qwen4_prompt = str(
         specs["qwen_qwen3_5_4b"].vision_text_materialization["prompt_template"]
     )
+    assert '{"answer":"short phrase"}' in qwen4_prompt
+    assert "Do not explain or include thinking" in qwen4_prompt
     assert specs["microsoft_phi_4_mini_instruct"].preset_relpath == (
         "configs/presets/causal_lm/phi4_mini_512.yaml"
     )
@@ -227,6 +229,10 @@ def test_support_matrix_backlog_gemma_dry_run_materializes_public_vqav2(
         "Multimodal-Fatima/VQAv2_sample_validation"
     )
     assert lane["vision_text_materialization"]["max_samples"] == 800
+    assert (
+        '{"answer":"short phrase"}'
+        in lane["vision_text_materialization"]["prompt_template"]
+    )
 
 
 def test_lane_requires_remote_code_uses_preset_model_flag() -> None:

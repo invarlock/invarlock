@@ -470,7 +470,11 @@ def _public_vqav2_materialization() -> dict[str, object]:
         "answer_field": "multiple_choice_answer",
         "answers_field": "answers",
         "id_field": "question_id",
-        "prompt_template": "{question}\nAnswer with a short phrase.",
+        "prompt_template": (
+            "{question}\n"
+            'Return exactly one JSON object like {{"answer":"short phrase"}}. '
+            "Use a short phrase only. Do not explain."
+        ),
         "image_format": "png",
     }
 
@@ -479,7 +483,8 @@ def _qwen3_5_4b_vqav2_materialization() -> dict[str, object]:
     materialization = _public_vqav2_materialization()
     materialization["prompt_template"] = (
         "{question}\n"
-        "Answer with only the final short phrase. Do not explain or include thinking."
+        'Return exactly one JSON object like {{"answer":"short phrase"}}. '
+        "Use a short phrase only. Do not explain or include thinking."
     )
     return materialization
 

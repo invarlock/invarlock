@@ -71,7 +71,7 @@ def test_compute_real_metrics_supports_vision_text_classification() -> None:
                 "id": "ex-1",
                 "image_path": "/tmp/a.png",
                 "answers": ["cat"],
-                "prediction": "cat",
+                "prediction": '{"answer": "cat"}',
             },
             {
                 "id": "ex-2",
@@ -99,12 +99,31 @@ def test_compute_real_metrics_supports_vision_text_classification() -> None:
         "reason": None,
     }
     assert eval_windows["preview"]["example_ids"] == ["ex-1"]
+    assert eval_windows["preview"]["records"][0]["prediction"] == '{"answer": "cat"}'
+    assert eval_windows["preview"]["records"][0]["prediction_answer"] == "cat"
     assert eval_windows["final"]["records"][0]["correct"] is False
     assert eval_windows["preview"]["input_records"][0]["image_path"] == "/tmp/a.png"
     assert eval_windows["preview"]["input_records"][0]["answers"] == ["cat"]
     assert "prediction" not in eval_windows["preview"]["input_records"][0]
     assert metrics["primary_metric"]["preview"] == 1.0
     assert metrics["primary_metric"]["final"] == 0.0
+
+
+@pytest.mark.parametrize(
+    ("prediction", "expected"),
+    [
+        ("", ""),
+        ('```json\n{"answer": "blue shirt"}\n```', "blue shirt"),
+        ('```\n{"answer": "green"}\n```', "green"),
+        ('{"not_answer": "cat"}', '{"not_answer": "cat"}'),
+        ('["cat"]', '["cat"]'),
+        (r'The result is {"answer": "red\q cup"} today.', r"red\q cup"),
+    ],
+)
+def test_prediction_answer_text_extracts_structured_answers(
+    prediction: str, expected: str
+) -> None:
+    assert rem._prediction_answer_text(prediction) == expected
 
 
 def test_multimodal_metric_kind_rejects_unknown_config_value() -> None:

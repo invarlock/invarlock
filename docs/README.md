@@ -262,16 +262,22 @@ Notes
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| Gemma 4 12B any-to-any LM | Yes | Yes | Yes | Yes |
-| Gemma 4 26B-A4B MoE image-text LM | Yes | Yes | Yes | Yes |
 | Qwen3.5 2B image-text LM | Yes | Yes | Yes | Yes |
 
 ### Prepared Small/Multimodal Candidate Lanes
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
+| Gemma 4 12B any-to-any LM | Yes | Yes | Yes | No |
+| Gemma 4 26B-A4B MoE image-text LM | Yes | Yes | Yes | No |
 | Qwen3.5 4B image-text LM | Yes | Yes | Yes | No |
 
+Gemma 4 12B and Gemma 4 26B-A4B have archived no-op preservation fixtures
+under `public_evidence/preservation_fixtures/`, but they are not published
+image-text assurance bases. Their VQAv2 runs passed preservation policy while
+producing 0.035 and 0.045 final exact-answer accuracy respectively, below the
+published image-text basis floor. Promotion requires a rerun with a suitable
+prompt, dataset, and scorer that yields a meaningful primary metric.
 Qwen3.5 4B is prepared but not promoted. The 2026-06-14 H100 no-op run passed
 mechanically while producing 0/400 baseline and subject VQA accuracy; after the
 multimodal chat-template argument-forwarding fix and a strict answer-only prompt
@@ -299,8 +305,7 @@ terms.
 
 Published assurance basis covers GPT-2, BERT, Mistral 7B, Ministral 3 3B,
 Ministral 3 8B, Ministral 3 14B, TinyLlama 1.1B, Gemma 4 E2B text-only,
-Gemma 4 12B image-text, Gemma 4 26B-A4B image-text MoE, Granite 4.1 3B,
-Granite 4.1 8B, OLMo 2 7B, OLMo 2 13B, Qwen2 7B, OpenLLaMA 7B,
+Granite 4.1 3B, Granite 4.1 8B, OLMo 2 7B, OLMo 2 13B, Qwen2 7B, OpenLLaMA 7B,
 Falcon 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B,
 Qwen3.5 2B image-text, DeepSeek-R1-Distill-Qwen 7B,
 DeepSeek-R1-0528-Qwen3 8B,
@@ -309,8 +314,10 @@ MoE, Mixtral 8x7B MoE, Qwen3 30B-A3B MoE, and FLAN-T5 base seq2seq profiles.
 Repo-included presets and pilot calibration configs for prepared practical-pick
 lanes do not become part of the published assurance basis until supporting
 artifacts are attached. OLMoE is the smaller MoE published-basis validation
-lane; Mixtral 8x7B, Gemma 4 26B-A4B, and Qwen3 30B-A3B are larger H100-backed
-no-op preservation bases. The Qwen3 30B-A3B fixture requires all-8 H100
+lane; Mixtral 8x7B and Qwen3 30B-A3B are larger H100-backed no-op preservation
+bases. Gemma 4 26B-A4B remains a prepared H100-backed multimodal MoE lane with
+archived preservation artifacts, but it is quality-blocked from published-basis
+status. The Qwen3 30B-A3B fixture requires all-8 H100
 sharding and uses scoped attention/router/shared-expert guard scans; it is not
 an exhaustive expert-bank or MoE routing-quality claim.
 The empirical guard manifest includes no-op published-basis summaries for the
@@ -333,8 +340,8 @@ The FLAN-T5 base public fixture uses pinned CNN/DailyMail validation data via
 while the hard policy gates pass.
 The prepared small/multimodal candidate lane for Qwen3.5 4B includes a public
 VQAv2 preset and null-sweep config, but it is not a published assurance basis
-until public report, runtime-manifest, and evidence-pack artifacts are attached
-and audited.
+until a public report, runtime manifest, evidence pack, and image-text quality
+floor all pass audit.
 
 `published_basis` remains the narrow public evidence floor, while
 `supported_experimental` means the repo ships the preset, calibration config,
@@ -348,10 +355,11 @@ Image-text evaluation uses the built-in
 `hf_multimodal` adapter and the `vision_text` provider. Install
 `invarlock[multimodal]` for this path; Gemma 4 unified checkpoints require
 `transformers>=5.12.0` and `torchvision>=0.26.0`. The Gemma 4 E2B public lane
-remains text-only, Gemma 4 12B and Gemma 4 26B-A4B now have public image-text
-bases on pinned VQAv2 materialization, Qwen3.5 2B now has a public image-text
-basis, Qwen3.5 4B has a prepared image-text candidate lane, and audio
-evaluation is deferred.
+remains text-only, Qwen3.5 2B has a public image-text basis, Gemma 4 12B,
+Gemma 4 26B-A4B, and Qwen3.5 4B have prepared image-text candidate lanes, and
+audio evaluation is deferred. Public image-text basis promotion requires
+measured accuracy on a pinned public dataset above the repo floor; preservation
+passing alone is not sufficient.
 
 Machine-readable support metadata lives in `contracts/support_matrix.json`. It is
 the canonical source of truth for normalized support tiers
@@ -378,18 +386,21 @@ The image-text path also includes an offline demo preset at
 `configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml` and a Gemma
 4 12B pilot at `configs/presets/multimodal/gemma4_12b_vision_text_256.yaml` plus
 `tests/fixtures/vision_text/demo_manifest.jsonl` for provider/config validation.
-Gemma 4 12B promotion uses
+Gemma 4 12B promotion candidates use
 `configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml` and
 `configs/calibration/null_sweep_gemma4_12b.yaml` together with the model-evidence
-materializer for pinned public VQAv2 sample-validation data; the published
-evidence fixture lives under
-`public_evidence/published_basis/gemma4_12b/`, and the local smoke manifest
-remains provider/config validation only. Gemma 4 26B-A4B uses the analogous
+materializer for pinned public VQAv2 sample-validation data. The archived
+preservation fixture lives under
+`public_evidence/preservation_fixtures/gemma4_12b/`, and the local smoke
+manifest remains provider/config validation only. Gemma 4 26B-A4B uses the analogous
 `configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml` and
-`configs/calibration/null_sweep_gemma4_26b_a4b.yaml` promotion path; its public
-fixture lives under `public_evidence/published_basis/gemma4_26b_a4b/`. The
-Qwen3.5 2B public image-text basis and the prepared Qwen3.5 4B image-text
-candidate use the same pinned VQAv2 materialization pattern through
+`configs/calibration/null_sweep_gemma4_26b_a4b.yaml` promotion path; its
+archived preservation fixture lives under
+`public_evidence/preservation_fixtures/gemma4_26b_a4b/`. Both Gemma image-text
+lanes are quality-blocked from published-basis status until reruns pass the
+image-text primary-metric floor. The Qwen3.5 2B public image-text basis and the
+prepared Qwen3.5 4B image-text candidate use the same pinned VQAv2
+materialization pattern through
 `configs/presets/multimodal/*_public_vqav2_256.yaml` and matching
 `configs/calibration/null_sweep_*.yaml` files.
 

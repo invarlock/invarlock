@@ -20,11 +20,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Granite 4.1, DeepSeek R1 Qwen variants, Phi-4, SmolLM3, TinyLlama,
   OLMo 2, OpenLLaMA, and Falcon lanes.
 - Added published-basis coverage for additional architecture families,
-  including FLAN-T5 seq2seq, Gemma 4 multimodal/image-text lanes, OLMoE,
-  Mixtral, Gemma 4 26B-A4B MoE, and Qwen3 30B-A3B MoE evidence lanes.
+  including FLAN-T5 seq2seq, OLMoE, Mixtral, and Qwen3 30B-A3B MoE evidence
+  lanes; Gemma 4 multimodal/image-text lanes remain prepared with archived
+  preservation fixtures until they pass the image-text quality floor.
 - Added public VQAv2 materialization support, scarce vision-text evidence
   window splitting, multimodal replay preservation, and processor digest
   evidence for image-text model runs.
+- Added a public image-text published-basis adequacy gate requiring measured
+  accuracy, enough final examples, and concise answer-shaped generations when
+  prediction records are embedded.
+- Added JSON-answer extraction for `vision_text` evaluation so public VQA runs
+  can prompt models for `{"answer": "..."}` structured output without breaking
+  exact-answer scoring.
 - Added seq2seq evidence-run support for FLAN-T5, including label preservation,
   shuffled split handling, T5 guard targets, and calibration preview labels.
 - Added model-evidence GPU backlog lanes, preset overrides, remote-code
@@ -69,6 +76,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated public evidence packaging to use compact evaluation reports for large
   published-basis artifacts while retaining the evidence manifests, runtime
   manifests, model revisions, and provenance needed for audit.
+- Updated Gemma 4 12B and Gemma 4 26B-A4B image-text evidence status from
+  published basis to archived preservation fixtures after their VQAv2 exact
+  answer accuracy fell below the new published-basis floor.
 - Updated model-evidence sweeps to use an explicit repo-visible Hugging Face
   cache by default so container GPU runs and revision capture inspect the same
   downloaded model snapshots.
@@ -90,9 +100,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   evaluate phases, and host/container output publication paths.
 - Fixed Mistral guard-demo manifests and public evidence scope notes so the
   published demo no longer overclaims non-baseline-relative FP8 guard signals.
-- Fixed Gemma 4 12B public evaluation gates by using classification-count
+- Fixed Gemma/Qwen multimodal evaluation gates by using classification-count
   accuracy intervals, delta semantics for accuracy drift, paired multimodal
-  window reporting, and scarce-window split handling.
+  window reporting, scarce-window split handling, and a public-basis absolute
+  image-text quality floor.
 - Fixed MoE and large-model guard/report behavior, including router warning
   handling, Qwen variance calibration bounds, and variance calibration
   truncation fallbacks.

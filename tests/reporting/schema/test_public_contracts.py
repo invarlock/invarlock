@@ -102,8 +102,6 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "granite-4-1-3b-causal-hf",
         "granite-4-1-8b-causal-hf",
         "gemma4-e2b-text-causal-hf",
-        "gemma4-12b-any-to-any-hf",
-        "gemma4-26b-a4b-moe-image-text-hf",
         "deepseek-r1-distill-qwen-causal-hf",
         "deepseek-r1-0528-qwen3-8b-causal-hf",
         "deepseek-r1-distill-qwen-14b-causal-hf",
@@ -163,11 +161,12 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     assert "not a benchmark-quality" in qwen3_moe["notes"]
     assert "four-GPU diagnostic lane failed" in qwen3_moe["notes"]
     gemma4_26b = implemented["Gemma 4 26B-A4B MoE image-text LM"]
-    assert gemma4_26b["state"] == "published_basis"
+    assert gemma4_26b["state"] == "community_experimental"
     assert any(
-        evidence == "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack"
+        evidence == "public_evidence/preservation_fixtures/gemma4_26b_a4b/evidence_pack"
         for evidence in gemma4_26b["repo_evidence"]
     )
+    assert "below the published image-text basis floor" in gemma4_26b["notes"]
 
     usage_only = {item["display_name"] for item in family_catalog["usage_only"]}
     assert "QwQ 32B reasoning" not in usage_only

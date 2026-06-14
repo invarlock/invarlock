@@ -54,7 +54,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--id-field", default="question_id")
     parser.add_argument(
         "--prompt-template",
-        default="{question}\nAnswer with a short phrase.",
+        default=(
+            "{question}\n"
+            'Return exactly one JSON object like {{"answer":"short phrase"}}. '
+            "Use a short phrase only. Do not explain."
+        ),
         help="Template used to build prompts from the prompt field.",
     )
     parser.add_argument("--max-samples", type=int, default=64)

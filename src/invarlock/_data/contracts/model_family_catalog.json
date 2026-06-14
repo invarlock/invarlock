@@ -452,7 +452,7 @@
         "audio"
       ],
       "task_role": "any_to_any",
-      "state": "published_basis",
+      "state": "community_experimental",
       "representative_models": [
         "google/gemma-4-12B-it"
       ],
@@ -464,17 +464,16 @@
         "configs/calibration/null_sweep_gemma4_12b.yaml",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
         "src/invarlock/adapters/hf_loading.py",
-        "public_evidence/published_basis/gemma4_12b/evaluation.report.json",
-        "public_evidence/published_basis/gemma4_12b/runtime.manifest.json",
-        "public_evidence/published_basis/gemma4_12b/evidence_pack"
+        "public_evidence/preservation_fixtures/gemma4_12b/evaluation.report.json",
+        "public_evidence/preservation_fixtures/gemma4_12b/runtime.manifest.json",
+        "public_evidence/preservation_fixtures/gemma4_12b/evidence_pack"
       ],
       "support_groups": [
-        "published_modern",
         "practical_shortlist",
         "enterprise_permissive",
         "multimodal_candidate"
       ],
-      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence, runtime manifest, and signed evidence pack. Gemma 4 12B uses the explicit hf_multimodal path and requires the multimodal runtime stack (transformers>=5.12.0 and torchvision>=0.26.0); audio evaluation remains deferred."
+      "notes": "Prepared Gemma 4 multimodal lane with release-profile preservation artifacts archived under public_evidence/preservation_fixtures/gemma4_12b. The archived no-op run passed preservation policy but produced 0.035 final exact-answer VQA accuracy, below the published image-text basis floor; promotion is blocked until a rerun with a suitable prompt/dataset/scorer yields a meaningful primary metric. Gemma 4 12B uses the explicit hf_multimodal path and requires the multimodal runtime stack (transformers>=5.12.0 and torchvision>=0.26.0); audio evaluation remains deferred."
     },
     {
       "family_id": "qwen3-5-4b-image-text-lm",
@@ -760,7 +759,7 @@
         "moe_candidate",
         "small_local"
       ],
-      "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack from H100 validation run 20260613Tolmoe1b7bH100A. This fixture is the smaller MoE validation basis; larger MoE assurance is now covered by Mixtral and Gemma 4 26B-A4B published bases, while Qwen3 30B-A3B remains a candidate lane."
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack from H100 validation run 20260613Tolmoe1b7bH100A. This fixture is the smaller MoE validation basis; larger MoE assurance is now covered by Mixtral and Qwen3 30B-A3B published bases. Gemma 4 26B-A4B remains a prepared multimodal MoE lane with archived preservation artifacts but is quality-blocked from published-basis status."
     }
   ],
   "implemented_coverage": [
@@ -798,7 +797,7 @@
         "image"
       ],
       "task_role": "any_to_any",
-      "state": "published_basis",
+      "state": "community_experimental",
       "representative_models": [
         "google/gemma-4-26B-A4B-it"
       ],
@@ -808,15 +807,15 @@
         "src/invarlock/adapters/hf_loading.py",
         "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
         "configs/calibration/null_sweep_gemma4_26b_a4b.yaml",
-        "public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json",
-        "public_evidence/published_basis/gemma4_26b_a4b/runtime.manifest.json",
-        "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack",
+        "public_evidence/preservation_fixtures/gemma4_26b_a4b/evaluation.report.json",
+        "public_evidence/preservation_fixtures/gemma4_26b_a4b/runtime.manifest.json",
+        "public_evidence/preservation_fixtures/gemma4_26b_a4b/evidence_pack",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
         "scripts/model_evidence/model_evidence_sweep.py",
         "tests/cli/test_preset_multimodal_presets.py",
         "tests/scripts/test_model_evidence_sweep_catalog.py"
       ],
-      "notes": "Promoted as a recent Gemma 4 multimodal MoE published basis using the explicit hf_multimodal path, pinned public VQAv2 image-text materialization, release-profile H100 CUDA report, runtime manifest, and signed evidence pack from run 20260613Tgemma426ba4bH100A. This is no-op preservation evidence; it is not a benchmark-quality, fine-tuning, audio, or MoE routing-quality claim."
+      "notes": "Prepared recent Gemma 4 multimodal MoE lane with release-profile preservation artifacts archived under public_evidence/preservation_fixtures/gemma4_26b_a4b. The archived no-op run passed preservation policy but produced 0.045 final exact-answer VQA accuracy, below the published image-text basis floor; promotion is blocked until a rerun with a suitable prompt/dataset/scorer yields a meaningful primary metric. This is not an audio or MoE routing-quality claim."
     },
     {
       "family_id": "mixtral",
@@ -953,7 +952,7 @@
         "configs/calibration/null_sweep_gemma4_12b.yaml",
         "configs/calibration/null_sweep_gemma4_26b_a4b.yaml"
       ],
-      "notes": "Gemma-family selectors and loaders are first-class for compatible local or user-supplied checkpoints. Repo-declared Gemma support is limited to Gemma 4 lanes with public evidence: Gemma 4 E2B text-only plus Gemma 4 12B and 26B-A4B image-text public bases. Gemma 3 and Gemma 3n hosted checkpoints are omitted from the repo support/promotion inventory because their Hugging Face pages are access-gated under Gemma terms."
+      "notes": "Gemma-family selectors and loaders are first-class for compatible local or user-supplied checkpoints. Repo-declared published Gemma support is currently Gemma 4 E2B text-only. Gemma 4 12B and 26B-A4B image-text preservation fixtures are archived but quality-blocked from published-basis status until reruns pass the image-text primary-metric floor. Gemma 3 and Gemma 3n hosted checkpoints are omitted from the repo support/promotion inventory because their Hugging Face pages are access-gated under Gemma terms."
     },
     {
       "family_id": "opt-neox-gptj",
