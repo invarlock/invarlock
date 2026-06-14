@@ -156,6 +156,22 @@ def test_report_outline_summarizes_multimodal_accuracy_without_ppl_language() ->
     assert "ppl" not in primary.summary.lower()
 
 
+def test_report_outline_uses_policy_threshold_not_auto_target_ratio() -> None:
+    cert = make_report(_mk_report(), _mk_report())
+    cert.setdefault("auto", {})["tier"] = "balanced"
+    cert["auto"]["target_pm_ratio"] = 1.0
+    cert["primary_metric"]["ratio_vs_baseline"] = 1.48
+    cert["validation"]["primary_metric_acceptable"] = False
+
+    outline = build_evaluation_report_outline(cert)
+    policy_gates = _section(outline, "policy_gates")
+
+    assert (
+        policy_gates.facts_by_label["Primary Metric Acceptable"].value
+        == "FAIL | 1.480x vs ≤ 1.10x"
+    )
+
+
 def test_report_outline_omits_benchmark_section_when_absent() -> None:
     cert = make_report(_mk_report(), _mk_report())
 

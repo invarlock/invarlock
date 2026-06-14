@@ -233,9 +233,6 @@ def build_safety_dashboard_summary(
             "none": 1.10,
         }
         ratio_limit = tier_thresholds.get(tier, 1.10)
-        target_ratio = auto.get("target_pm_ratio")
-        if isinstance(target_ratio, int | float) and target_ratio > 0:
-            ratio_limit = min(ratio_limit, float(target_ratio))
         threshold = f"≤ {ratio_limit:.2f}× ({pm_basis})"
 
     if isinstance(pm_ok, bool):
@@ -368,9 +365,6 @@ def build_quality_gates_summary(
                 "none": 1.10,
             }
             ratio_limit = tier_thresholds.get(tier, 1.10)
-            target_ratio = auto_info.get("target_pm_ratio")
-            if isinstance(target_ratio, int | float) and target_ratio > 0:
-                ratio_limit = min(ratio_limit, float(target_ratio))
             measured = f"{value:.3f}x" if isinstance(value, int | float) else "N/A"
             threshold = f"≤ {ratio_limit:.2f}x"
             description = "Ratio vs baseline"
