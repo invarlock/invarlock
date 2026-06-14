@@ -477,6 +477,70 @@
       "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence from the 2026-06-14 H100 runner. The no-op report passes strict policy with 0.565 final accuracy over 400 examples, ratio_vs_baseline 1.009, and no guard warnings. Gemma 4 12B uses the explicit hf_multimodal path and requires the multimodal runtime stack (transformers>=5.12.0 and torchvision>=0.26.0). This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof."
     },
     {
+      "family_id": "gemma-4-e4b-image-text-lm",
+      "display_name": "Gemma 4 E4B image-text LM",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "task_role": "image_text",
+      "state": "published_basis",
+      "representative_models": [
+        "google/gemma-4-E4B-it"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/multimodal/gemma4_e4b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_gemma4_e4b.yaml",
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_multimodal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py",
+        "public_evidence/published_basis/gemma4_e4b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_e4b/runtime.manifest.json",
+        "public_evidence/published_basis/gemma4_e4b/evidence_pack"
+      ],
+      "support_groups": [
+        "published_modern",
+        "small_local",
+        "enterprise_permissive",
+        "multimodal_candidate"
+      ],
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence from the 2026-06-14 H100 runner. The no-op report passes strict policy with 0.500 final accuracy over 400 examples, ratio_vs_baseline 1.010, and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof."
+    },
+    {
+      "family_id": "gemma-4-e2b-image-text-lm",
+      "display_name": "Gemma 4 E2B image-text LM",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "task_role": "image_text",
+      "state": "published_basis",
+      "representative_models": [
+        "google/gemma-4-E2B-it"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/multimodal/gemma4_e2b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_gemma4_e2b_image_text.yaml",
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_multimodal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py",
+        "public_evidence/published_basis/gemma4_e2b_image_text/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_e2b_image_text/runtime.manifest.json",
+        "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack"
+      ],
+      "support_groups": [
+        "published_modern",
+        "small_local",
+        "enterprise_permissive",
+        "multimodal_candidate"
+      ],
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence from the 2026-06-14 H100 runner. The no-op report passes strict policy with 0.388 final accuracy over 400 examples, ratio_vs_baseline 1.013, and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader multimodal behavior remain out of scope, and it is not guard-value proof."
+    },
+    {
       "family_id": "qwen3-5-4b-image-text-lm",
       "display_name": "Qwen3.5 4B image-text LM",
       "modalities": [
@@ -952,6 +1016,7 @@
       "state": "profile_first_class",
       "representative_models": [
         "google/gemma-4-E2B-it",
+        "google/gemma-4-E4B-it",
         "google/gemma-4-12B-it",
         "google/gemma-4-26B-A4B-it"
       ],
@@ -960,16 +1025,24 @@
         "src/invarlock/adapters/hf_loading.py",
         "src/invarlock/adapters/hf_multimodal.py",
         "src/invarlock/eval/data.py",
+        "configs/presets/multimodal/gemma4_e2b_public_vqav2_256.yaml",
+        "configs/presets/multimodal/gemma4_e4b_public_vqav2_256.yaml",
         "configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml",
         "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_gemma4_e2b_image_text.yaml",
+        "configs/calibration/null_sweep_gemma4_e4b.yaml",
         "configs/calibration/null_sweep_gemma4_12b.yaml",
         "configs/calibration/null_sweep_gemma4_26b_a4b.yaml",
+        "public_evidence/published_basis/gemma4_e2b_image_text/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack",
+        "public_evidence/published_basis/gemma4_e4b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_e4b/evidence_pack",
         "public_evidence/published_basis/gemma4_12b/evaluation.report.json",
         "public_evidence/published_basis/gemma4_12b/evidence_pack",
         "public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json",
         "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack"
       ],
-      "notes": "Gemma-family selectors and loaders are first-class for compatible local or user-supplied checkpoints. Repo-declared published Gemma support now includes Gemma 4 E2B text-only plus Gemma 4 12B and Gemma 4 26B-A4B image-text published-basis evidence."
+      "notes": "Gemma-family selectors and loaders are first-class for compatible local or user-supplied checkpoints. Repo-declared published Gemma support includes Gemma 4 E2B text-only plus Gemma 4 E2B, E4B, 12B, and 26B-A4B image-text published-basis evidence."
     },
     {
       "family_id": "opt-neox-gptj",

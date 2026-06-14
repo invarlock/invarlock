@@ -106,8 +106,7 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
 
     assert specs["google_gemma_4_e4b_it"].lane_id == "gemma4-e4b-image-text-hf"
     assert (
-        specs["google_gemma_4_e2b_it_image_text"].lane_id
-        == "gemma4-e2b-image-text-hf"
+        specs["google_gemma_4_e2b_it_image_text"].lane_id == "gemma4-e2b-image-text-hf"
     )
 
 

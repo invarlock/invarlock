@@ -466,6 +466,58 @@
       "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence from the 2026-06-14 H100 runner. The no-op report passes strict policy with 0.565 final accuracy over 400 examples, ratio_vs_baseline 1.009, and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof."
     },
     {
+      "lane_id": "gemma4-e4b-image-text-hf",
+      "family": "Gemma 4 E4B image-text LM",
+      "runtime": "huggingface-pytorch",
+      "adapter": "hf_multimodal",
+      "support_tier": "published_basis",
+      "evidence_status": "published_release_strict",
+      "docs_label": "Yes",
+      "provenance_source": "docs/README.md#support-matrix",
+      "support_groups": [
+        "published_modern",
+        "small_local",
+        "enterprise_permissive",
+        "multimodal_candidate"
+      ],
+      "representative_models": [
+        "google/gemma-4-E4B-it"
+      ],
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/gemma4_e4b/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/gemma4_e4b/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/gemma4_e4b/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/gemma4_e4b/evidence_pack"
+      },
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence from the 2026-06-14 H100 runner. The no-op report passes strict policy with 0.500 final accuracy over 400 examples, ratio_vs_baseline 1.010, and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof."
+    },
+    {
+      "lane_id": "gemma4-e2b-image-text-hf",
+      "family": "Gemma 4 E2B image-text LM",
+      "runtime": "huggingface-pytorch",
+      "adapter": "hf_multimodal",
+      "support_tier": "published_basis",
+      "evidence_status": "published_release_strict",
+      "docs_label": "Yes",
+      "provenance_source": "docs/README.md#support-matrix",
+      "support_groups": [
+        "published_modern",
+        "small_local",
+        "enterprise_permissive",
+        "multimodal_candidate"
+      ],
+      "representative_models": [
+        "google/gemma-4-E2B-it"
+      ],
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/gemma4_e2b_image_text/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/gemma4_e2b_image_text/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack"
+      },
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence from the 2026-06-14 H100 runner. The no-op report passes strict policy with 0.388 final accuracy over 400 examples, ratio_vs_baseline 1.013, and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader multimodal behavior remain out of scope, and it is not guard-value proof."
+    },
+    {
       "lane_id": "qwen3-5-4b-image-text-hf",
       "family": "Qwen3.5 4B image-text LM",
       "runtime": "huggingface-pytorch",

@@ -264,6 +264,8 @@ Notes
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | Qwen3.5 2B image-text LM | Yes | Yes | Yes | Yes |
 | Qwen3.5 4B image-text LM | Yes | Yes | Yes | Yes |
+| Gemma 4 E2B image-text LM | Yes | Yes | Yes | Yes |
+| Gemma 4 E4B image-text LM | Yes | Yes | Yes | Yes |
 | Gemma 4 12B any-to-any LM | Yes | Yes | Yes | Yes |
 | Gemma 4 26B-A4B MoE image-text LM | Yes | Yes | Yes | Yes |
 
@@ -283,7 +285,8 @@ Notes
 
 Published assurance basis covers GPT-2, BERT, Mistral 7B, Ministral 3 3B,
 Ministral 3 8B, Ministral 3 14B, TinyLlama 1.1B, Gemma 4 E2B text-only,
-Granite 4.1 3B, Granite 4.1 8B, OLMo 2 7B, OLMo 2 13B, Qwen2 7B, OpenLLaMA 7B,
+Gemma 4 E2B image-text, Gemma 4 E4B image-text, Granite 4.1 3B,
+Granite 4.1 8B, OLMo 2 7B, OLMo 2 13B, Qwen2 7B, OpenLLaMA 7B,
 Falcon 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B,
 Qwen3.5 2B image-text, DeepSeek-R1-Distill-Qwen 7B,
 DeepSeek-R1-0528-Qwen3 8B,
@@ -333,9 +336,10 @@ they become release-supported lanes.
 Image-text evaluation uses the built-in
 `hf_multimodal` adapter and the `vision_text` provider. Install
 `invarlock[multimodal]` for this path; Gemma 4 unified checkpoints require
-`transformers>=5.12.0` and `torchvision>=0.26.0`. The Gemma 4 E2B public lane
-remains text-only, while Qwen3.5 2B, Qwen3.5 4B, Gemma 4 12B, and Gemma 4
-26B-A4B have public image-text bases. Audio evaluation is deferred. Public
+`transformers>=5.12.0` and `torchvision>=0.26.0`. Gemma 4 E2B has separate
+text-only and image-text public bases; Qwen3.5 2B, Qwen3.5 4B, Gemma 4 E4B,
+Gemma 4 12B, and Gemma 4 26B-A4B also have public image-text bases. Audio
+evaluation is deferred. Public
 image-text basis promotion requires
 measured accuracy on a pinned public dataset above the repo floor; preservation
 passing alone is not sufficient.
@@ -365,12 +369,16 @@ The image-text path also includes an offline demo preset at
 `configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml` and a Gemma
 4 12B pilot at `configs/presets/multimodal/gemma4_12b_vision_text_256.yaml` plus
 `tests/fixtures/vision_text/demo_manifest.jsonl` for provider/config validation.
-Gemma 4 12B uses
+Gemma 4 E2B, Gemma 4 E4B, and Gemma 4 12B use
+`configs/presets/multimodal/gemma4_e2b_public_vqav2_256.yaml`,
+`configs/presets/multimodal/gemma4_e4b_public_vqav2_256.yaml`, and
 `configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml` and
-`configs/calibration/null_sweep_gemma4_12b.yaml` together with the model-evidence
-materializer for pinned public VQAv2 sample-validation data. Its public fixture
-lives under `public_evidence/published_basis/gemma4_12b/`, and the local smoke
-manifest remains provider/config validation only. Gemma 4 26B-A4B uses the analogous
+matching `configs/calibration/null_sweep_gemma4_*.yaml` files together with the
+model-evidence materializer for pinned public VQAv2 sample-validation data. Their
+public fixtures live under `public_evidence/published_basis/gemma4_e2b_image_text/`,
+`public_evidence/published_basis/gemma4_e4b/`, and
+`public_evidence/published_basis/gemma4_12b/`, and the local smoke manifest
+remains provider/config validation only. Gemma 4 26B-A4B uses the analogous
 `configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml` and
 `configs/calibration/null_sweep_gemma4_26b_a4b.yaml` path; its public fixture
 lives under `public_evidence/published_basis/gemma4_26b_a4b/`. The Qwen3.5 2B

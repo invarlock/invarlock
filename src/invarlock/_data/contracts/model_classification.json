@@ -285,6 +285,30 @@
       ]
     },
     {
+      "id": "gemma4-e4b-image-text-hf",
+      "classification": "published",
+      "eligibility": "eligible",
+      "support_matrix_lane_id": "gemma4-e4b-image-text-hf",
+      "catalog_family_ids": [
+        "gemma-4-e4b-image-text-lm"
+      ],
+      "suite_roles": [
+        "support-matrix-backlog-gpu"
+      ]
+    },
+    {
+      "id": "gemma4-e2b-image-text-hf",
+      "classification": "published",
+      "eligibility": "eligible",
+      "support_matrix_lane_id": "gemma4-e2b-image-text-hf",
+      "catalog_family_ids": [
+        "gemma-4-e2b-image-text-lm"
+      ],
+      "suite_roles": [
+        "support-matrix-backlog-gpu"
+      ]
+    },
+    {
       "id": "qwen3-5-4b-image-text-hf",
       "classification": "published",
       "eligibility": "eligible",
