@@ -7,7 +7,7 @@
     "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:7a06bd7d937f833255d0b0f52168287e9b5ac6c9db14b30977e28bd616f1716b",
+  "expected_fingerprint": "sha256:101461d7c14c9d27ec6cfcc404ab7c4f37d26bf7a37c3384de3e55b50018a8d5",
   "generated_by": "model evidence remote sweep",
   "model_revision": "cfbefacb99257ffa30c83adab238a50856ac3083",
   "non_goals": [
@@ -19,6 +19,6 @@
   "summary": "Release-strict verifier fixture for the Phi-4 mini published-basis lane.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/phi4_mini/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/phi4_mini/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:7a06bd7d937f833255d0b0f52168287e9b5ac6c9db14b30977e28bd616f1716b"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/phi4_mini/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:101461d7c14c9d27ec6cfcc404ab7c4f37d26bf7a37c3384de3e55b50018a8d5"
   ]
 }

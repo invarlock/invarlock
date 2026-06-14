@@ -1,12 +1,12 @@
 {
   "artifact_paths": {
     "evaluation_report": "evaluation.report.json",
-    "runtime_manifest": "runtime.manifest.json",
+    "evidence_pack": "evidence_pack",
     "evidence_pack_recipe": "evidence_pack_recipe.json",
-    "evidence_pack": "evidence_pack"
+    "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:215eb98ee4109ee39973900d3d46f699a3dceaa9effe9efa1a3cf483d26b6ea9",
+  "expected_fingerprint": "sha256:872e15d0386389bf9549122e15e973ef9cb595ee3b5120576d31b673dd947f7f",
   "generated_by": "model evidence remote sweep",
   "model_revision": "c0650403e44e78ec0262dab1c90914c65b196c4e",
   "non_goals": [
@@ -17,6 +17,6 @@
   "summary": "Release-strict verifier fixture for the Granite 4.1 3B published-basis lane.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/granite4_1_3b/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/granite4_1_3b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:215eb98ee4109ee39973900d3d46f699a3dceaa9effe9efa1a3cf483d26b6ea9"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/granite4_1_3b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:872e15d0386389bf9549122e15e973ef9cb595ee3b5120576d31b673dd947f7f"
   ]
 }

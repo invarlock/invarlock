@@ -6,7 +6,7 @@
     "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:ec49bdbd571958f9a4043ba9dc65a6e284acb4866410e0018e612f87ff168db7",
+  "expected_fingerprint": "sha256:38ed77f9da0aa782f71dc4859540895d95db06e55c5d4c1d31f577b176ae99c6",
   "generated_by": "model evidence remote sweep",
   "model_revision": "b968826d9c46dd6066d109eabc6255188de91218",
   "non_goals": [
@@ -17,6 +17,6 @@
   "summary": "Release-strict verifier fixture for the Qwen3 8B published-basis lane.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/qwen3_8b/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/qwen3_8b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:ec49bdbd571958f9a4043ba9dc65a6e284acb4866410e0018e612f87ff168db7"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/qwen3_8b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:38ed77f9da0aa782f71dc4859540895d95db06e55c5d4c1d31f577b176ae99c6"
   ]
 }

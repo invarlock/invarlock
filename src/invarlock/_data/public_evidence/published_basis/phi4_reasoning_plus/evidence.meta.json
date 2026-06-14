@@ -6,7 +6,7 @@
     "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:d5dc2a2b810684b3c54bb56f0e49f5756bbd83631da8790e1c07e49583f76ae7",
+  "expected_fingerprint": "sha256:bdba8583eee68832d06e0154c502dc96ee3d7fdc584a66ab125000693dfe1a04",
   "generated_by": "model evidence remote sweep",
   "model_revision": "69baf8528e1bcf05f475034d9e5dd32875ed125f",
   "non_goals": [
@@ -19,6 +19,6 @@
   "summary": "Release-strict verifier fixture for the Phi-4 reasoning-plus published-basis lane.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/phi4_reasoning_plus/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/phi4_reasoning_plus/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:d5dc2a2b810684b3c54bb56f0e49f5756bbd83631da8790e1c07e49583f76ae7"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/phi4_reasoning_plus/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:bdba8583eee68832d06e0154c502dc96ee3d7fdc584a66ab125000693dfe1a04"
   ]
 }

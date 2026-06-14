@@ -1,12 +1,12 @@
 {
   "artifact_paths": {
     "evaluation_report": "evaluation.report.json",
-    "runtime_manifest": "runtime.manifest.json",
+    "evidence_pack": "evidence_pack",
     "evidence_pack_recipe": "evidence_pack_recipe.json",
-    "evidence_pack": "evidence_pack"
+    "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:2da6fc28bc63c81e71547d7bae45a24a32a022ac23a83e734428250c8f8695c0",
+  "expected_fingerprint": "sha256:e2adf44fb2ff7be7048e0e4e5f2dfd26e5080a22dd04ed550e0e4de547eab489",
   "generated_by": "model evidence remote sweep",
   "model_revision": "8ad60471ac9865280da0c6b29de387a183c8db73",
   "non_goals": [
@@ -17,6 +17,6 @@
   "summary": "Release-strict verifier fixture for the Ministral 3 8B published-basis lane.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/ministral3_8b/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/ministral3_8b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:2da6fc28bc63c81e71547d7bae45a24a32a022ac23a83e734428250c8f8695c0"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/ministral3_8b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:e2adf44fb2ff7be7048e0e4e5f2dfd26e5080a22dd04ed550e0e4de547eab489"
   ]
 }

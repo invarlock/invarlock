@@ -1,12 +1,12 @@
 {
   "artifact_paths": {
     "evaluation_report": "evaluation.report.json",
-    "runtime_manifest": "runtime.manifest.json",
+    "evidence_pack": "evidence_pack",
     "evidence_pack_recipe": "evidence_pack_recipe.json",
-    "evidence_pack": "evidence_pack"
+    "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:83064b15edc3ab112e677f336b97a1e813b2e2ff9bcd2be78d765227b209fd77",
+  "expected_fingerprint": "sha256:3fd5c6acf0d1342052ed6eabb1547056fe0d572ee61ddef0d1319f2f7ac0d2d5",
   "generated_by": "model evidence remote sweep",
   "model_revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
   "non_goals": [
@@ -17,6 +17,6 @@
   "summary": "Release-strict verifier fixture for the Qwen3.5 9B published-basis lane.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/qwen3_5_9b/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/qwen3_5_9b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:83064b15edc3ab112e677f336b97a1e813b2e2ff9bcd2be78d765227b209fd77"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/qwen3_5_9b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:3fd5c6acf0d1342052ed6eabb1547056fe0d572ee61ddef0d1319f2f7ac0d2d5"
   ]
 }

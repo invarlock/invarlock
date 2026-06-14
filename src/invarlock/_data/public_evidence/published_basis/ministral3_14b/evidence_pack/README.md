@@ -10,7 +10,7 @@ Why it might be wrong:
 - Nested report verification succeeded for the bundled clean reports, but reviewers should still inspect the underlying evaluation.report.json files.
 - Error-injection reports are expected-failure evidence and should not be interpreted as clean PASS runs.
 - The pack is ready for strict verification; signed manifest and checksum sealing are present.
-- Signer fingerprint: sha256:e89d8cbaf20f9eb8f2cb3beb9d71022588d5cee2a1e5508833dff377a3ecd7ac
+- Signer fingerprint: sha256:873063bcd389792af73439bbe496545db856bb5771a49b5741a01845893e41e9
 
 ## Verify
 

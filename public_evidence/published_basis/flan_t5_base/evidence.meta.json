@@ -7,7 +7,7 @@
     "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:c9561f3b465977dda79cf97b76be36ef5a9b65dcf24fbc9e93fad36461e03d02",
+  "expected_fingerprint": "sha256:fa3384e4f4b010c3966593bc14986317253a7c1b87215baa5f80f367fc02e0e9",
   "generated_by": "model evidence remote sweep",
   "model_revision": "7bcac572ce56db69c1ea7c8af255c5d7c9672fc2",
   "non_goals": [
@@ -19,6 +19,6 @@
   "summary": "Release-strict verifier fixture for the FLAN-T5 base seq2seq published-basis lane.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/flan_t5_base/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/flan_t5_base/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:c9561f3b465977dda79cf97b76be36ef5a9b65dcf24fbc9e93fad36461e03d02"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/flan_t5_base/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:fa3384e4f4b010c3966593bc14986317253a7c1b87215baa5f80f367fc02e0e9"
   ]
 }

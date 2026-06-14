@@ -1,11 +1,30 @@
-# Qwen3 30B-A3B Published-Basis Evidence Pack
+# InvarLock Evidence Pack
 
-This pack contains the strict release-profile no-op preservation evidence for `Qwen/Qwen3-30B-A3B-Instruct-2507` on public WikiText-103.
+This evidence pack bundles reports, summary reports, and metadata for offline
+verification. No model weights are included.
 
-Scope: this is a verifier fixture for InvarLock guard/report behavior. It is not a benchmark-quality, fine-tuning, compression, deployment, or MoE routing-quality claim. The successful run used all eight H100 80GB GPUs on `root@31.56.109.46`; a restricted four-GPU diagnostic lane failed during RMT/forward execution and is therefore not used as publication evidence.
+Evidence level: high
+Review summary: clean_reports=1, error_injection_reports=0, failed_reports=0, profile=release.
 
-Verify with:
+Why it might be wrong:
+- Nested report verification succeeded for the bundled clean reports, but reviewers should still inspect the underlying evaluation.report.json files.
+- Error-injection reports are expected-failure evidence and should not be interpreted as clean PASS runs.
+- The pack is ready for strict verification; signed manifest and checksum sealing are present.
+- Signer fingerprint: sha256:2a26840aa713ff2a15db6573f21580a4b524239bddfa284b1973f4456d1fa995
 
-```bash
-scripts/evidence_packs/verify_pack.sh --pack <pack-dir> --strict
-```
+## Verify
+
+1. Verify the manifest signature and strict pack integrity:
+   invarlock advanced evidence-pack verify <pack-dir> --strict
+
+2. Verify file checksums:
+   sha256sum -c checksums.sha256
+   # macOS: shasum -a 256 -c checksums.sha256
+
+3. Verify report integrity:
+   invarlock verify --json reports/**/evaluation.report.json
+
+Or use:
+  invarlock advanced evidence-pack verify <pack-dir> --strict
+Repo workflow alternative:
+  scripts/evidence_packs/verify_pack.sh --pack <pack-dir> --strict

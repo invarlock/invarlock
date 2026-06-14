@@ -6,7 +6,7 @@
     "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:aca992f8a62d49d6651fcc993882fa471915681f0a58f26e3b80d36ba554b3fd",
+  "expected_fingerprint": "sha256:53fc0e8528ac800ea85b5af483ec32cd5782ddca2c923f5455d6bf17ecebe70e",
   "generated_by": "model evidence remote sweep",
   "model_revision": "6fb184ff23774c25bf84b3628e49c8b78372c7be",
   "non_goals": [
@@ -17,6 +17,6 @@
   "summary": "Release-strict verifier fixture for the OpenLLaMA 7B published-basis lane.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/open_llama_7b/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/open_llama_7b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:aca992f8a62d49d6651fcc993882fa471915681f0a58f26e3b80d36ba554b3fd"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/open_llama_7b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:53fc0e8528ac800ea85b5af483ec32cd5782ddca2c923f5455d6bf17ecebe70e"
   ]
 }

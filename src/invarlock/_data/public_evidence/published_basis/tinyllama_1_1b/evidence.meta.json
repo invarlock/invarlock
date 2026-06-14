@@ -1,12 +1,12 @@
 {
   "artifact_paths": {
     "evaluation_report": "evaluation.report.json",
-    "runtime_manifest": "runtime.manifest.json",
+    "evidence_pack": "evidence_pack",
     "evidence_pack_recipe": "evidence_pack_recipe.json",
-    "evidence_pack": "evidence_pack"
+    "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:300b261d567b598d0810d11be3cce5d3cb188f77ef1692c1a1bfc8b5f0416c9b",
+  "expected_fingerprint": "sha256:8237da1f87af9d8550540c7cdde415164e6600b741202e1d78fd43e75e3e0b2d",
   "generated_by": "model evidence remote sweep",
   "model_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
   "non_goals": [
@@ -17,6 +17,6 @@
   "summary": "Release-strict verifier fixture for the TinyLlama 1.1B published-basis lane.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/tinyllama_1_1b/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/tinyllama_1_1b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:300b261d567b598d0810d11be3cce5d3cb188f77ef1692c1a1bfc8b5f0416c9b"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/tinyllama_1_1b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:8237da1f87af9d8550540c7cdde415164e6600b741202e1d78fd43e75e3e0b2d"
   ]
 }

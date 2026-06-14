@@ -6,7 +6,7 @@
     "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:e482b7bbdb14a23adea1388dc23ea5bb73e7254144667edb4fcb770685600b9c",
+  "expected_fingerprint": "sha256:c5fab4a32d7d3640071dcfbb53cfbd5830e933aea0bd4e2ef7a1404761686986",
   "generated_by": "model evidence remote sweep",
   "model_revision": "5926caa4ec0cac5cbfadaf4077420520de1d5205",
   "non_goals": [
@@ -18,6 +18,6 @@
   "summary": "Release-strict verifier fixture for the Gemma 4 12B image-text published-basis lane on pinned public VQAv2 materialization.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/gemma4_12b/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/gemma4_12b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:e482b7bbdb14a23adea1388dc23ea5bb73e7254144667edb4fcb770685600b9c"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/gemma4_12b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:c5fab4a32d7d3640071dcfbb53cfbd5830e933aea0bd4e2ef7a1404761686986"
   ]
 }
