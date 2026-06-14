@@ -615,12 +615,12 @@
     {
       "model_id": "THUDM/glm-4-9b-chat",
       "license_id": "glm-4",
-      "reason": "custom/restricted public license outside the repo named-checkpoint Apache-2.0/MIT policy"
+      "reason": "outside the repo named-checkpoint Apache-2.0/MIT policy"
     },
     {
       "model_id": "zai-org/glm-4-9b-chat",
       "license_id": "glm-4",
-      "reason": "custom/restricted public license outside the repo named-checkpoint Apache-2.0/MIT policy"
+      "reason": "outside the repo named-checkpoint Apache-2.0/MIT policy"
     },
     {
       "model_id": "facebook/opt-1.3b",

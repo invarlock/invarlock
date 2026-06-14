@@ -1021,7 +1021,7 @@
       "repo_evidence": [
         "src/invarlock/adapters/auto.py"
       ],
-      "notes": "Family visibility currently comes from adapter-auto heuristics only. The catalog intentionally avoids naming the hosted GLM-4 9B Chat checkpoint because its public license is custom/restricted rather than Apache-2.0 or MIT."
+      "notes": "Family visibility currently comes from adapter-auto heuristics only. The public catalog intentionally avoids naming hosted GLM chat checkpoints that fall outside the repo's Apache-2.0/MIT named-checkpoint policy."
     },
     {
       "family_id": "deepseek",
