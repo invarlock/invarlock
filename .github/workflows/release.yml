@@ -121,12 +121,14 @@ jobs:
           mkdir -p artifacts/supply-chain
           set +e
           gitleaks git . \
+            --config .gitleaks.toml \
             --redact \
             --no-banner \
             --report-format json \
             --report-path artifacts/supply-chain/gitleaks.json
           exit_code=$?
           gitleaks git . \
+            --config .gitleaks.toml \
             --redact \
             --no-banner \
             --report-format sarif \

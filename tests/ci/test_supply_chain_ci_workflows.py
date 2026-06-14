@@ -290,6 +290,7 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
     )
     assert 'scan_root="artifacts/supply-chain/pr-files"' in secret_scan_step["run"]
     assert 'gitleaks dir "${scan_root}"' in secret_scan_step["run"]
+    assert "--config .gitleaks.toml" in secret_scan_step["run"]
     assert 'scan_range="${PR_BASE_SHA}..${PR_HEAD_SHA}"' in secret_scan_step["run"]
     assert 'scan_range="-1 HEAD"' in secret_scan_step["run"]
     assert "scanned_file_count=" in secret_scan_step["run"]
@@ -618,10 +619,15 @@ def test_release_workflow_builds_and_publishes_tag_only_artifacts():
 
     gitleaks_scan = _find_step_by_name(build_steps, "Run gitleaks history scan")
     assert "gitleaks git ." in gitleaks_scan["run"]
+    assert "--config .gitleaks.toml" in gitleaks_scan["run"]
     assert "artifacts/supply-chain/gitleaks.json" in gitleaks_scan["run"]
     assert "artifacts/supply-chain/gitleaks.sarif" in gitleaks_scan["run"]
     assert "--report-format json" in gitleaks_scan["run"]
     assert "--report-format sarif" in gitleaks_scan["run"]
+
+    config_text = Path(".gitleaks.toml").read_text(encoding="utf-8")
+    assert "tokenizer_(?:hash|sha256)" in config_text
+    assert "public_evidence/published_basis" in config_text
 
     smoke_step = _find_step_by_name(build_steps, "Install smoke from wheel")
     assert (

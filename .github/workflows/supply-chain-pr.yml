@@ -167,12 +167,14 @@ jobs:
           fi
           set +e
           gitleaks dir "${scan_root}" \
+            --config .gitleaks.toml \
             --redact \
             --no-banner \
             --report-format json \
             --report-path artifacts/supply-chain/gitleaks.json
           json_exit=$?
           gitleaks dir "${scan_root}" \
+            --config .gitleaks.toml \
             --redact \
             --no-banner \
             --report-format sarif \
