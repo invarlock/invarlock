@@ -11,6 +11,8 @@ model:
   device_map: "auto"
   low_cpu_mem_usage: true
   collect_loading_info: false
+  chat_template_kwargs:
+    enable_thinking: false
 
 dataset:
   provider:

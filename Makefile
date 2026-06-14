@@ -90,6 +90,7 @@ COVERAGE_TESTS_ADAPTERS := \
 	tests/adapters/test_adapter_auto_runtime.py \
 	tests/adapters/test_hf_loading_helpers.py \
 	tests/adapters/test_hf_multimodal_adapter.py \
+	tests/adapters/test_hf_multimodal_chat_template_kwargs.py \
 	tests/adapters/test_adapter_errors.py \
 	tests/adapters/test_hf_causal_loader_fallback.py \
 	tests/adapters/test_hf_causal_variant_paths.py \

@@ -36,11 +36,17 @@ class _FakeProcessor:
         self.tokenizer = _FakeTokenizer()
         self.image_processor = _FakeImageProcessor()
         self.decoded_inputs: list[list[int]] = []
+        self.template_kwargs: list[dict[str, object]] = []
 
     def apply_chat_template(
-        self, messages, tokenize=False, add_generation_prompt=False
+        self,
+        messages,
+        tokenize=False,
+        add_generation_prompt=False,
+        **kwargs,
     ):  # noqa: ANN001
         del tokenize
+        self.template_kwargs.append(dict(kwargs))
         prompt = messages[0]["content"][1]["text"]
         if len(messages) > 1:
             answer = messages[1]["content"][0]["text"]
@@ -137,9 +143,9 @@ class _ProcessorZeroPromptLength:
         self.image_processor = _FakeImageProcessor()
 
     def apply_chat_template(
-        self, messages, tokenize=False, add_generation_prompt=False
+        self, messages, tokenize=False, add_generation_prompt=False, **kwargs
     ):  # noqa: ANN001
-        del tokenize, add_generation_prompt
+        del tokenize, add_generation_prompt, kwargs
         prompt = messages[0]["content"][1]["text"]
         if len(messages) > 1:
             answer = messages[1]["content"][0]["text"]

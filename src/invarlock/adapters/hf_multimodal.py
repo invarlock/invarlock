@@ -62,9 +62,18 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
         self._processor: Any | None = None
         self._processor_digest: str | None = None
         self._last_model_id: str | None = None
+        self._chat_template_kwargs: dict[str, Any] = {}
 
     def load_model(self, model_id: str, device: str = "auto", **kwargs: Any) -> Any:
         self._last_model_id = str(model_id)
+        chat_template_kwargs = kwargs.pop("chat_template_kwargs", None)
+        if chat_template_kwargs is None:
+            self._chat_template_kwargs = {}
+        elif isinstance(chat_template_kwargs, Mapping):
+            self._chat_template_kwargs = dict(chat_template_kwargs)
+        else:
+            raise ValueError("model.chat_template_kwargs must be a mapping")
+        self._processor_digest = None
         try:
             with wrap_errors(
                 DependencyError,
@@ -180,6 +189,10 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
                 "image_mean": _json_safe_processor_value(image_mean),
                 "image_std": _json_safe_processor_value(image_std),
             }
+        if self._chat_template_kwargs:
+            payload["chat_template_kwargs"] = _json_safe_processor_value(
+                self._chat_template_kwargs
+            )
         return _hash_json(payload)
 
     @property
@@ -232,10 +245,14 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
         self, processor: Any, *, prompt: str, answer: str | None = None
     ) -> str:
         if hasattr(processor, "apply_chat_template"):
+            extra_kwargs: dict[str, Any] = {}
+            if self._chat_template_kwargs:
+                extra_kwargs["chat_template_kwargs"] = dict(self._chat_template_kwargs)
             return processor.apply_chat_template(
                 self._chat_messages(prompt=prompt, answer=answer),
                 tokenize=False,
                 add_generation_prompt=answer is None,
+                **extra_kwargs,
             )
         if answer is None:
             return prompt
