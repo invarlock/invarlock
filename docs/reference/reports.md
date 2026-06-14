@@ -84,7 +84,8 @@ The HTML export renders that shared outline directly instead of converting the
 historical Markdown body. It adds:
 
 - summary chips for overall status, model, primary-metric kind, and guard warnings
-- quick links for the outline sections
+- a sticky brand/theme row with a light/dark toggle
+- quick links for the outline sections, with the active section highlighted while scrolling
 - task-aware primary-metric wording, including ratio output for ppl-like tasks
   and percentage-point deltas for accuracy tasks
 - guard-warning detail tables when baseline-relative warning data is present

@@ -95,10 +95,14 @@ def _render_summary_strip(outline: EvaluationReportOutline) -> str:
 
 
 def _render_nav(outline: EvaluationReportOutline) -> str:
-    items = "".join(
-        f'<li><a href="#{escape(section.key)}">{escape(section.title)}</a></li>'
-        for section in outline.sections
-    )
+    links: list[str] = []
+    for index, section in enumerate(outline.sections):
+        current = ' aria-current="true"' if index == 0 else ""
+        links.append(
+            f'<li><a href="#{escape(section.key)}"{current}>'
+            f"{escape(section.title)}</a></li>"
+        )
+    items = "".join(links)
     return (
         '<nav class="report-outline" aria-label="Report sections">'
         '<p class="outline-eyebrow">Sections</p>'
@@ -110,10 +114,13 @@ def _render_nav(outline: EvaluationReportOutline) -> str:
 def _render_source_chips(section: ReportSection) -> str:
     if not section.source_blocks:
         return ""
-    chips = "".join(
+    sources = ", ".join(
         f"<code>{escape(source)}</code>" for source in section.source_blocks
     )
-    return f'<div class="source-chips" aria-label="JSON source blocks">{chips}</div>'
+    return (
+        '<p class="source-line" aria-label="JSON source blocks">'
+        f"Source blocks: {sources}</p>"
+    )
 
 
 def _render_fact_table(section: ReportSection) -> str:
@@ -265,25 +272,38 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
         '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         f"<title>{escape(outline.title)}</title>"
+        "<script>(function(){try{var t=localStorage.getItem('invarlock-report-theme');"
+        "if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t;}}"
+        "catch(e){}})();</script>"
         "<style>"
-        ":root{--pass:#2f6b4f;--fail:#a02c24;--warn:#95671c;--info:#5c5950;"
+        ":root,:root[data-theme='light']{color-scheme:light;"
+        "--pass:#2f6b4f;--fail:#a02c24;--warn:#95671c;--info:#5c5950;"
         "--ink:#18150f;--muted:#5c5950;--bg:#fcfbf7;--panel:#f4f2eb;"
-        "--panel-soft:#ebe8df;--border:#d8d3c5;--shadow:none;"
+        "--panel-soft:#ebe8df;--border:#d8d3c5;"
         "--accent:#1f3a7a;--accent-hover:#172c5e;--accent-soft:#ebe8df;"
         "--signal:#8d2433;--color-accent:var(--accent);--brand-mark-accent:var(--accent)}"
         "@media (prefers-color-scheme: dark){"
-        ":root{--pass:#9ad0a9;--fail:#f19a92;--warn:#e6ba72;--info:#c9c0aa;"
+        ":root:not([data-theme='light']){color-scheme:dark;"
+        "--pass:#9ad0a9;--fail:#f19a92;--warn:#e6ba72;--info:#c9c0aa;"
         "--ink:#f4efe3;--muted:#c9c0aa;--bg:#11130f;--panel:#191c16;"
-        "--panel-soft:#23271e;--border:#3f4235;--shadow:none;"
+        "--panel-soft:#23271e;--border:#3f4235;"
         "--accent:#9fb7ff;--accent-hover:#c0ccff;--accent-soft:#23271e;"
         "--signal:#eda1ac;--color-accent:var(--accent);--brand-mark-accent:var(--accent)}}"
+        ":root[data-theme='dark']{color-scheme:dark;"
+        "--pass:#9ad0a9;--fail:#f19a92;--warn:#e6ba72;--info:#c9c0aa;"
+        "--ink:#f4efe3;--muted:#c9c0aa;--bg:#11130f;--panel:#191c16;"
+        "--panel-soft:#23271e;--border:#3f4235;"
+        "--accent:#9fb7ff;--accent-hover:#c0ccff;--accent-soft:#23271e;"
+        "--signal:#eda1ac;--color-accent:var(--accent);--brand-mark-accent:var(--accent)}"
         "*{box-sizing:border-box}"
-        "body{margin:0;min-height:100vh;padding:28px;color:var(--ink);"
+        "body{margin:0;min-height:100vh;padding:34px;color:var(--ink);"
         'font-family:"Sora","Avenir Next","Segoe UI Variable","Segoe UI",ui-sans-serif,system-ui,sans-serif;'
         "line-height:1.55;background:var(--bg)}"
         ".report-shell{max-width:1180px;margin:0 auto}"
-        ".report-header{margin:0 0 16px 0;padding:22px 24px;border:1px solid var(--border);"
-        "border-radius:2px;background:var(--panel);box-shadow:var(--shadow)}"
+        ".report-topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;"
+        "justify-content:space-between;gap:16px;margin:0 0 18px 0;padding:10px 0;"
+        "background:var(--bg);border-bottom:1px solid var(--border)}"
+        ".report-header{margin:0 0 18px 0;padding:0 0 22px 0;border-bottom:1px solid var(--border)}"
         ".eyebrow{margin:0;font-size:0.78rem;font-weight:700;letter-spacing:0.08em;"
         "text-transform:uppercase;color:var(--signal)}"
         '.report-header h1{margin:10px 0 6px 0;font-family:"Newsreader",ui-serif,Georgia,serif;'
@@ -294,62 +314,69 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
         "color:var(--ink)}"
         ".brand-mark-svg{display:block;width:38px;height:38px}"
         ".brand-meta{margin-top:10px!important;font-size:0.9rem}"
-        ".summary-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;"
-        "margin:0 0 16px 0}"
-        ".summary-chip{padding:13px 14px;border-radius:2px;border:1px solid var(--border);"
-        "background:var(--panel);box-shadow:var(--shadow)}"
+        ".theme-toggle{appearance:none;border:1px solid var(--border);background:transparent;"
+        "color:var(--ink);padding:7px 10px;border-radius:2px;font:inherit;font-size:0.86rem;"
+        "font-weight:700;line-height:1;cursor:pointer}"
+        ".theme-toggle:hover,.theme-toggle:focus-visible{border-color:var(--accent);color:var(--accent);outline:none}"
+        ".summary-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;"
+        "margin:0 0 24px 0;padding:12px 0;border-bottom:1px solid var(--border)}"
+        ".summary-chip{padding:12px 0;background:transparent}"
         ".summary-chip p{margin:0 0 6px 0;font-size:0.78rem;font-weight:700;"
         "letter-spacing:0.06em;text-transform:uppercase;color:var(--muted)}"
         ".summary-chip strong{font-size:1rem;line-height:1.3;overflow-wrap:anywhere}"
-        ".report-grid{display:grid;grid-template-columns:minmax(220px,260px) minmax(0,1fr);gap:18px;align-items:start}"
-        ".report-outline{position:sticky;top:24px;padding:16px;border-radius:2px;"
-        "border:1px solid var(--border);background:var(--panel);box-shadow:var(--shadow)}"
+        ".report-grid{display:grid;grid-template-columns:minmax(180px,220px) minmax(0,1fr);gap:36px;align-items:start}"
+        ".report-outline{position:sticky;top:24px;padding:4px 16px 0 0;border-right:1px solid var(--border)}"
         ".outline-eyebrow{margin:0 0 10px 0;font-size:0.78rem;font-weight:700;"
         "letter-spacing:0.08em;text-transform:uppercase;color:var(--signal)}"
         ".report-outline ol{list-style:none;padding:0;margin:0;display:grid;gap:6px}"
-        ".report-outline a{display:block;padding:7px 8px;border-radius:6px;text-decoration:none;"
+        ".report-outline a{display:block;padding:5px 0;text-decoration:none;"
         "color:var(--ink);background:transparent}"
-        ".report-outline a:hover{background:var(--accent-soft);color:var(--accent-hover)}"
-        ".report-sections{display:grid;gap:16px}"
-        ".report-section{padding:20px;border:1px solid var(--border);border-radius:2px;"
-        "background:var(--panel);box-shadow:var(--shadow);scroll-margin-top:24px}"
+        ".report-outline a:hover{color:var(--accent-hover)}"
+        ".report-outline a[aria-current='true']{color:var(--accent);font-weight:700;"
+        "border-left:2px solid var(--accent);padding-left:8px}"
+        ".report-sections{display:block}"
+        ".report-section{padding:26px 0;border-top:1px solid var(--border);background:transparent;scroll-margin-top:24px}"
+        ".report-section:first-child{border-top:0;padding-top:0}"
         ".report-section header{margin-bottom:14px}"
         '.report-section h2{margin:0 0 6px 0;font-family:"Newsreader",ui-serif,Georgia,serif;'
         "font-size:1.35rem;line-height:1.2;font-weight:600}"
         ".report-section h3{margin:18px 0 6px 0;font-size:1rem}"
         ".report-section p{margin:0;color:var(--muted)}"
-        ".source-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}"
+        ".source-line{margin-top:8px!important;font-size:0.82rem}"
         "a{color:var(--accent)}"
         ".table-wrap{width:100%;overflow:auto}"
-        "table{border-collapse:collapse;width:100%;margin:0;background:var(--panel);font-size:0.94rem}"
+        "table{border-collapse:collapse;width:100%;margin:0;background:transparent;font-size:0.94rem}"
         "th,td{border-top:1px solid var(--border);padding:9px 10px;text-align:left;vertical-align:top}"
         "thead th{border-top:0;color:var(--muted);font-size:0.78rem;letter-spacing:0.05em;text-transform:uppercase}"
         "tbody th{width:22%;font-weight:700}"
         "td{overflow-wrap:anywhere}"
-        'code,pre{background:var(--panel-soft);border-radius:2px;font-family:"JetBrains Mono",ui-monospace,monospace}'
-        "code{padding:0.12rem 0.32rem;font-size:0.86em}"
+        'code,pre{font-family:"JetBrains Mono",ui-monospace,monospace}'
+        "code{font-size:0.86em;color:var(--ink)}"
+        "pre{background:var(--panel-soft)}"
         "pre{padding:12px;overflow:auto;border:1px solid var(--border);font-size:0.84rem;line-height:1.45}"
-        ".status-pill{display:inline-block;padding:2px 7px;border-radius:999px;font-weight:750}"
+        ".status-pill{font-weight:750}"
         ".tone-pass{color:var(--pass)}.tone-fail{color:var(--fail)}"
         ".tone-warn{color:var(--warn)}.tone-info{color:var(--info)}"
         ".detail-block{margin-top:18px;padding-top:16px;border-top:1px solid var(--border)}"
         ".appendix-previews{display:grid;gap:10px;margin-top:16px}"
-        "details{border:1px solid var(--border);border-radius:2px;background:var(--panel-soft)}"
-        "summary{cursor:pointer;padding:10px 12px;font-weight:700}"
-        "details pre{margin:0;border:0;border-top:1px solid var(--border);border-radius:0}"
+        "details{border-top:1px solid var(--border);background:transparent}"
+        "summary{cursor:pointer;padding:10px 0;font-weight:700}"
+        "details pre{margin:0 0 10px 0;border:1px solid var(--border);border-radius:0}"
         "@media (max-width:980px){.summary-strip{grid-template-columns:repeat(2,minmax(0,1fr))}"
-        ".report-grid{grid-template-columns:1fr}.report-outline{position:static}}"
-        "@media (max-width:720px){body{padding:16px}.report-header{padding:18px}"
-        ".report-header h1{font-size:1.7rem}.summary-strip{grid-template-columns:1fr}"
+        ".report-grid{grid-template-columns:1fr}.report-outline{position:static;border-right:0;border-bottom:1px solid var(--border);padding:0 0 14px 0}}"
+        "@media (max-width:720px){body{padding:16px}.report-topbar{top:0}.report-header{padding:0 0 18px 0}"
+        ".report-topbar{align-items:flex-start}.report-header h1{font-size:1.7rem}.summary-strip{grid-template-columns:1fr}"
         ".report-section{padding:16px}th,td{padding:8px}tbody th{width:auto}}"
-        "@media print{body{background:#fff;padding:0}.report-header,.summary-chip,.report-outline,.report-section{"
-        "box-shadow:none;border-color:#d0d7de}.report-grid{grid-template-columns:1fr}"
+        "@media print{body{background:#fff;padding:0}.theme-toggle{display:none}.report-grid{grid-template-columns:1fr}"
         ".report-outline{display:none}a{color:inherit;text-decoration:none}}"
         "</style>"
         '</head><body><div class="report-shell">'
-        '<header class="report-header">'
+        '<div class="report-topbar">'
         f'<div class="brand-lockup"><span class="brand-mark">{html_brand_mark()}</span>'
         '<p class="eyebrow">InvarLock</p></div>'
+        '<button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Toggle light and dark theme">Light/Dark</button>'
+        "</div>"
+        '<header class="report-header">'
         f"<h1>{escape(outline.title)}</h1>"
         f"<p>{escape(BRAND_TAGLINE)}</p>"
         f'<p class="brand-meta">{escape(BRAND_NAME)} {escape(version_label())} · schema {escape(REPORT_SCHEMA_VERSION)} · renderer outline</p>'
@@ -359,7 +386,26 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
         f"{nav}"
         f'<main class="report-sections">{sections}</main>'
         "</div>"
-        "</div></body></html>"
+        "</div>"
+        "<script>(function(){var root=document.documentElement;"
+        "var button=document.querySelector('[data-theme-toggle]');"
+        "if(!button){return;}function systemTheme(){return matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}"
+        "function activeTheme(){return root.dataset.theme||systemTheme();}"
+        "function sync(){var current=activeTheme();button.textContent=current==='dark'?'Light':'Dark';"
+        "button.setAttribute('aria-pressed',current==='dark'?'true':'false');}"
+        "button.addEventListener('click',function(){var next=activeTheme()==='dark'?'light':'dark';"
+        "root.dataset.theme=next;try{localStorage.setItem('invarlock-report-theme',next);}catch(e){}sync();});"
+        "sync();})();"
+        "(function(){var links=[].slice.call(document.querySelectorAll('.report-outline a[href^=\"#\"]'));"
+        "if(!links.length){return;}var items=links.map(function(link){var id=link.getAttribute('href').slice(1);"
+        "return{link:link,section:document.getElementById(id),id:id};}).filter(function(item){return item.section;});"
+        "function setActive(id){items.forEach(function(item){if(item.id===id){item.link.setAttribute('aria-current','true');}"
+        "else{item.link.removeAttribute('aria-current');}});}function updateActive(){var y=window.scrollY+120;"
+        "var active=items[0];items.forEach(function(item){if(item.section.offsetTop<=y){active=item;}});"
+        "if(active){setActive(active.id);}}window.addEventListener('scroll',updateActive,{passive:true});"
+        "window.addEventListener('resize',updateActive);window.addEventListener('hashchange',updateActive);"
+        "updateActive();})();</script>"
+        "</body></html>"
     )
     return shell
 

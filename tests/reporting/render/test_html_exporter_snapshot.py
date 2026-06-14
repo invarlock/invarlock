@@ -65,6 +65,11 @@ def test_html_exporter_renders_report_outline_sections():
     assert "<table" in html
     assert "report-outline" in html
     assert "summary-strip" in html
+    assert "data-theme-toggle" in html
+    assert "invarlock-report-theme" in html
+    assert "aria-current" in html
+    assert "box-shadow" not in html
+    assert "summary-chip{padding:12px 0;background:transparent" in html
     assert "Linked Run Reports" not in html
     assert "Workflow" not in html
     assert "brand-lockup" in html
@@ -165,8 +170,8 @@ def test_html_exporter_escapes_report_controlled_html_payloads():
     html = render_report_html(cert)
     lowered = html.lower()
 
-    assert "<script" not in lowered
-    assert "</script" not in lowered
+    assert lowered.count("<script") == 2
+    assert '<script>alert("adapter")</script>' not in lowered
     assert "<img" not in lowered
     assert "&lt;script&gt;" in lowered
     assert "&lt;img" in lowered

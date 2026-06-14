@@ -66,6 +66,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   report outline, including benchmark-comparison and guard-warning sections,
   instead of converting the historical Markdown body, and aligned report HTML
   colors with the site Ledger ink branding tokens.
+- Updated evaluation-report HTML layout to use a flatter ledger-style document
+  treatment with a sticky brand/theme row, light/dark toggle, and active-section
+  highlighting in the left rail.
 - Updated support-matrix organization and evidence grouping so published-basis,
   experimental, multimodal, seq2seq, MoE, and blocked/access-gated lanes are
   easier to scan without adding a redundant grouping column.
