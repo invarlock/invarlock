@@ -79,6 +79,10 @@ def test_report_outline_orders_modern_sections_before_appendix() -> None:
         "warned": False,
         "stats": {"q95": 0.01, "tail_mass": 0.0},
     }
+    cert["baseline_ref"] = {
+        "model_id": "gpt2",
+        "run_id": "baseline-run-1234567890",
+    }
     cert["benchmark_comparison"] = {
         "schema_version": "bench-v1",
         "profile": "ci",
@@ -116,6 +120,10 @@ def test_report_outline_orders_modern_sections_before_appendix() -> None:
         "technical_appendix",
     ]
     assert _section(outline, "decision").facts_by_label["Guard Warnings"].value == "1"
+    assert (
+        _section(outline, "decision").facts_by_label["Baseline"].value
+        == "gpt2 · run baseline…34567890"
+    )
     assert (
         _section(outline, "primary_metric").facts_by_label["Tail Gate"].value == "PASS"
     )

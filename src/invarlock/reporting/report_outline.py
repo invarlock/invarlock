@@ -126,6 +126,23 @@ def _guard_warning_count(evaluation_report: dict[str, Any]) -> int:
         return 0
 
 
+def _baseline_summary(evaluation_report: dict[str, Any]) -> str:
+    baseline_ref = _mapping(evaluation_report.get("baseline_ref"))
+    provenance = _mapping(evaluation_report.get("provenance"))
+    baseline_provenance = _mapping(provenance.get("baseline"))
+    model_id = str(baseline_ref.get("model_id") or "").strip()
+    run_id = str(
+        baseline_ref.get("run_id") or baseline_provenance.get("run_id") or ""
+    ).strip()
+    if model_id and run_id:
+        return f"{model_id} · run {_short_digest(run_id)}"
+    if model_id:
+        return model_id
+    if run_id:
+        return f"run {_short_digest(run_id)}"
+    return "unknown"
+
+
 def _build_decision_section(evaluation_report: dict[str, Any]) -> ReportSection:
     block = compute_console_validation_block(evaluation_report)
     overall_pass = bool(block.get("overall_pass"))
@@ -137,6 +154,11 @@ def _build_decision_section(evaluation_report: dict[str, Any]) -> ReportSection:
         ReportFact("Overall", status_value, status, source="validation"),
         ReportFact("Evidence Mode", _assurance_mode(evaluation_report), source="assurance"),
         ReportFact("Model", str(meta.get("model_id") or "unknown"), source="meta.model_id"),
+        ReportFact(
+            "Baseline",
+            _baseline_summary(evaluation_report),
+            source="baseline_ref",
+        ),
         ReportFact("Adapter", str(meta.get("adapter") or "unknown"), source="meta.adapter"),
         ReportFact(
             "Edit",
@@ -158,9 +180,16 @@ def _build_decision_section(evaluation_report: dict[str, Any]) -> ReportSection:
     return ReportSection(
         key="decision",
         title="Decision",
-        summary="Policy verdict, evidence mode, model identity, edit, and warning count.",
+        summary="Policy verdict, evidence mode, subject/baseline identity, edit, and warning count.",
         priority="summary",
-        source_blocks=("validation", "assurance", "meta", "primary_metric", "guard_warnings"),
+        source_blocks=(
+            "validation",
+            "assurance",
+            "meta",
+            "baseline_ref",
+            "primary_metric",
+            "guard_warnings",
+        ),
         facts=facts,
     )
 

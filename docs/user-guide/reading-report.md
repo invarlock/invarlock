@@ -16,7 +16,7 @@ interpret them.
 Browser-first reading order for the HTML export:
 
 ```text
-1. Summary chips
+1. Summary ledger row
 2. Sections rail
 3. Decision
 4. Primary Metric
@@ -31,14 +31,15 @@ comes from `evaluation.report.json` and should be re-checked with
 `invarlock verify`.
 
 - Decision
-  - First-screen summary of overall PASS/FAIL, evidence mode, model, adapter,
-    edit, primary metric, and guard-warning count.
-- Summary chips
-  - Browser overview of overall status, model, primary-metric kind, and guard
-    warnings.
+  - First-screen summary of overall PASS/FAIL, evidence mode, subject model,
+    baseline model/run, adapter, edit, primary metric, and guard-warning count.
+- Summary ledger row
+  - Browser overview of verdict, subject, baseline, primary-metric kind, and
+    guard warnings.
 - Sections rail
   - Browser navigation for jumping to the canonical outline sections without
-    scrolling through the whole report.
+    scrolling through the whole report. In HTML, the active section is
+    highlighted using the same measured sticky-row offset as hash navigation.
 - Primary Metric row
   - Shows the task‑appropriate metric (ppl_* or accuracy), its point estimates,
     and paired CI. The ratio/Δpp vs baseline drives the gate.

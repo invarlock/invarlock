@@ -83,9 +83,11 @@ Container-backed evaluations emit `runtime.manifest.json` next to
 The HTML export renders that shared outline directly instead of converting the
 historical Markdown body. It adds:
 
-- summary chips for overall status, model, primary-metric kind, and guard warnings
+- a summary ledger row for verdict, subject model, baseline model/run, metric,
+  and guard warnings
 - a sticky brand/theme row with a light/dark toggle
-- quick links for the outline sections, with the active section highlighted while scrolling
+- quick links for the outline sections, with hash anchors and the active
+  section highlight aligned to the sticky row while scrolling
 - task-aware primary-metric wording, including ratio output for ppl-like tasks
   and percentage-point deltas for accuracy tasks
 - guard-warning detail tables when baseline-relative warning data is present
@@ -99,7 +101,7 @@ map: warm paper/ink in light mode, warm-black/cream in dark mode, blue as the
 brand accent, oxblood as the editorial signal, and green/red/yellow reserved
 for verdict states.
 
-- **Executive Summary**: one-line PASS/FAIL + compact gate table (primary metric, drift, invariants, spectral, RMT, overhead).
+- **Decision**: PASS/FAIL, evidence mode, subject model, baseline model/run, edit, primary metric, and warning count.
 - **Quality Gates**: table of canonical gating checks with measured values.
 - **Guard Check Details**: invariants, spectral stability, RMT health, and pairing snapshots.
 - **Primary Metric**: task-specific metric summary with CI + baseline comparison.

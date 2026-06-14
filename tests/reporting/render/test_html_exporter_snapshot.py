@@ -65,11 +65,16 @@ def test_html_exporter_renders_report_outline_sections():
     assert "<table" in html
     assert "report-outline" in html
     assert "summary-strip" in html
+    assert "summary-table" in html
+    assert "<th>Baseline</th>" in html
+    assert "baseline_ref" in html
     assert "data-theme-toggle" in html
     assert "invarlock-report-theme" in html
     assert "aria-current" in html
+    assert "stickyOffset()" in html
+    assert "--sticky-offset" in html
     assert "box-shadow" not in html
-    assert "summary-chip{padding:12px 0;background:transparent" in html
+    assert "summary-chip" not in html
     assert "Linked Run Reports" not in html
     assert "Workflow" not in html
     assert "brand-lockup" in html
@@ -96,8 +101,8 @@ def test_html_summary_uses_computed_validation_status():
 
     html = render_report_html(cert)
 
-    assert '<p>Overall</p><strong class="tone-pass">PASS</strong>' in html
-    assert '<p>Overall</p><strong class="tone-fail">FAIL</strong>' not in html
+    assert '<td><strong class="tone-pass">PASS</strong></td>' in html
+    assert '<td><strong class="tone-fail">FAIL</strong></td>' not in html
 
 
 def test_html_exporter_renders_benchmark_comparison_section():

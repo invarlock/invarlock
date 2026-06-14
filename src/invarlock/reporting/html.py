@@ -70,28 +70,34 @@ def _render_summary_strip(outline: EvaluationReportOutline) -> str:
     if decision is None or primary is None:
         return ""
     warning_count = _fact_value(decision, "Guard Warnings", "0")
-    chips = (
+    cells = (
         (
-            "Overall",
+            "Verdict",
             outline.overall_status,
             "pass" if outline.overall_status == "PASS" else "fail",
         ),
-        ("Model", _fact_value(decision, "Model"), "info"),
-        ("Primary Metric", _fact_value(primary, "Metric"), "info"),
+        ("Subject", _fact_value(decision, "Model"), "info"),
+        ("Baseline", _fact_value(decision, "Baseline"), "info"),
+        ("Metric", _fact_value(primary, "Metric"), "info"),
         (
-            "Guard Warnings",
+            "Warnings",
             warning_count,
             "warn" if warning_count not in {"0", "N/A"} else "pass",
         ),
     )
-    items = "".join(
-        '<article class="summary-chip">'
-        f"<p>{escape(label)}</p>"
-        f'<strong class="{_tone(tone)}">{escape(value)}</strong>'
-        "</article>"
-        for label, value, tone in chips
+    headings = "".join(f"<th>{escape(label)}</th>" for label, _value, _tone_name in cells)
+    values = "".join(
+        f'<td><strong class="{_tone(tone_name)}">{escape(value)}</strong></td>'
+        for _label, value, tone_name in cells
     )
-    return f'<section class="summary-strip" aria-label="Report summary">{items}</section>'
+    return (
+        '<section class="summary-strip" aria-label="Report summary">'
+        '<table class="summary-table">'
+        f"<thead><tr>{headings}</tr></thead>"
+        f"<tbody><tr>{values}</tr></tbody>"
+        "</table>"
+        "</section>"
+    )
 
 
 def _render_nav(outline: EvaluationReportOutline) -> str:
@@ -277,6 +283,7 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
         "catch(e){}})();</script>"
         "<style>"
         ":root,:root[data-theme='light']{color-scheme:light;"
+        "--sticky-offset:72px;"
         "--pass:#2f6b4f;--fail:#a02c24;--warn:#95671c;--info:#5c5950;"
         "--ink:#18150f;--muted:#5c5950;--bg:#fcfbf7;--panel:#f4f2eb;"
         "--panel-soft:#ebe8df;--border:#d8d3c5;"
@@ -284,12 +291,14 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
         "--signal:#8d2433;--color-accent:var(--accent);--brand-mark-accent:var(--accent)}"
         "@media (prefers-color-scheme: dark){"
         ":root:not([data-theme='light']){color-scheme:dark;"
+        "--sticky-offset:72px;"
         "--pass:#9ad0a9;--fail:#f19a92;--warn:#e6ba72;--info:#c9c0aa;"
         "--ink:#f4efe3;--muted:#c9c0aa;--bg:#11130f;--panel:#191c16;"
         "--panel-soft:#23271e;--border:#3f4235;"
         "--accent:#9fb7ff;--accent-hover:#c0ccff;--accent-soft:#23271e;"
         "--signal:#eda1ac;--color-accent:var(--accent);--brand-mark-accent:var(--accent)}}"
         ":root[data-theme='dark']{color-scheme:dark;"
+        "--sticky-offset:72px;"
         "--pass:#9ad0a9;--fail:#f19a92;--warn:#e6ba72;--info:#c9c0aa;"
         "--ink:#f4efe3;--muted:#c9c0aa;--bg:#11130f;--panel:#191c16;"
         "--panel-soft:#23271e;--border:#3f4235;"
@@ -318,14 +327,15 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
         "color:var(--ink);padding:7px 10px;border-radius:2px;font:inherit;font-size:0.86rem;"
         "font-weight:700;line-height:1;cursor:pointer}"
         ".theme-toggle:hover,.theme-toggle:focus-visible{border-color:var(--accent);color:var(--accent);outline:none}"
-        ".summary-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;"
-        "margin:0 0 24px 0;padding:12px 0;border-bottom:1px solid var(--border)}"
-        ".summary-chip{padding:12px 0;background:transparent}"
-        ".summary-chip p{margin:0 0 6px 0;font-size:0.78rem;font-weight:700;"
-        "letter-spacing:0.06em;text-transform:uppercase;color:var(--muted)}"
-        ".summary-chip strong{font-size:1rem;line-height:1.3;overflow-wrap:anywhere}"
+        ".summary-strip{margin:0 0 24px 0;padding:0 0 16px 0;border-bottom:1px solid var(--border)}"
+        ".summary-table{width:100%;border-collapse:collapse;background:transparent;table-layout:fixed}"
+        ".summary-table th{padding:10px 14px 6px 0;border-top:0;color:var(--muted);"
+        "font-size:0.78rem;letter-spacing:0.06em;text-transform:uppercase;text-align:left}"
+        ".summary-table td{padding:0 14px 10px 0;border-top:0;vertical-align:top}"
+        ".summary-table th+th,.summary-table td+td{border-left:1px solid var(--border);padding-left:14px}"
+        ".summary-table strong{font-size:1rem;line-height:1.3;overflow-wrap:anywhere}"
         ".report-grid{display:grid;grid-template-columns:minmax(180px,220px) minmax(0,1fr);gap:36px;align-items:start}"
-        ".report-outline{position:sticky;top:24px;padding:4px 16px 0 0;border-right:1px solid var(--border)}"
+        ".report-outline{position:sticky;top:calc(var(--sticky-offset,72px) + 16px);padding:4px 16px 0 0;border-right:1px solid var(--border)}"
         ".outline-eyebrow{margin:0 0 10px 0;font-size:0.78rem;font-weight:700;"
         "letter-spacing:0.08em;text-transform:uppercase;color:var(--signal)}"
         ".report-outline ol{list-style:none;padding:0;margin:0;display:grid;gap:6px}"
@@ -335,7 +345,7 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
         ".report-outline a[aria-current='true']{color:var(--accent);font-weight:700;"
         "border-left:2px solid var(--accent);padding-left:8px}"
         ".report-sections{display:block}"
-        ".report-section{padding:26px 0;border-top:1px solid var(--border);background:transparent;scroll-margin-top:24px}"
+        ".report-section{padding:26px 0;border-top:1px solid var(--border);background:transparent;scroll-margin-top:calc(var(--sticky-offset,72px) + 16px)}"
         ".report-section:first-child{border-top:0;padding-top:0}"
         ".report-section header{margin-bottom:14px}"
         '.report-section h2{margin:0 0 6px 0;font-family:"Newsreader",ui-serif,Georgia,serif;'
@@ -362,10 +372,19 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
         "details{border-top:1px solid var(--border);background:transparent}"
         "summary{cursor:pointer;padding:10px 0;font-weight:700}"
         "details pre{margin:0 0 10px 0;border:1px solid var(--border);border-radius:0}"
-        "@media (max-width:980px){.summary-strip{grid-template-columns:repeat(2,minmax(0,1fr))}"
+        "@media (max-width:980px){.summary-table{table-layout:auto}"
         ".report-grid{grid-template-columns:1fr}.report-outline{position:static;border-right:0;border-bottom:1px solid var(--border);padding:0 0 14px 0}}"
         "@media (max-width:720px){body{padding:16px}.report-topbar{top:0}.report-header{padding:0 0 18px 0}"
-        ".report-topbar{align-items:flex-start}.report-header h1{font-size:1.7rem}.summary-strip{grid-template-columns:1fr}"
+        ".report-topbar{align-items:flex-start}.report-header h1{font-size:1.7rem}"
+        ".summary-table thead{display:none}.summary-table,.summary-table tbody,.summary-table tr,.summary-table td{display:block;width:100%}"
+        ".summary-table td{padding:8px 0;border-left:0!important;border-top:1px solid var(--border)}"
+        ".summary-table td::before{display:block;margin-bottom:2px;color:var(--muted);font-size:0.72rem;"
+        "font-weight:700;letter-spacing:0.06em;text-transform:uppercase}"
+        ".summary-table td:nth-child(1)::before{content:'Verdict'}"
+        ".summary-table td:nth-child(2)::before{content:'Subject'}"
+        ".summary-table td:nth-child(3)::before{content:'Baseline'}"
+        ".summary-table td:nth-child(4)::before{content:'Metric'}"
+        ".summary-table td:nth-child(5)::before{content:'Warnings'}"
         ".report-section{padding:16px}th,td{padding:8px}tbody th{width:auto}}"
         "@media print{body{background:#fff;padding:0}.theme-toggle{display:none}.report-grid{grid-template-columns:1fr}"
         ".report-outline{display:none}a{color:inherit;text-decoration:none}}"
@@ -396,11 +415,19 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
         "button.addEventListener('click',function(){var next=activeTheme()==='dark'?'light':'dark';"
         "root.dataset.theme=next;try{localStorage.setItem('invarlock-report-theme',next);}catch(e){}sync();});"
         "sync();})();"
-        "(function(){var links=[].slice.call(document.querySelectorAll('.report-outline a[href^=\"#\"]'));"
+        "(function(){var root=document.documentElement;var topbar=document.querySelector('.report-topbar');"
+        "function offset(){var value=topbar?Math.ceil(topbar.getBoundingClientRect().height):72;"
+        "root.style.setProperty('--sticky-offset',value+'px');return value;}"
+        "offset();window.addEventListener('resize',offset);})();"
+        "(function(){var root=document.documentElement;var topbar=document.querySelector('.report-topbar');"
+        "var links=[].slice.call(document.querySelectorAll('.report-outline a[href^=\"#\"]'));"
         "if(!links.length){return;}var items=links.map(function(link){var id=link.getAttribute('href').slice(1);"
         "return{link:link,section:document.getElementById(id),id:id};}).filter(function(item){return item.section;});"
         "function setActive(id){items.forEach(function(item){if(item.id===id){item.link.setAttribute('aria-current','true');}"
-        "else{item.link.removeAttribute('aria-current');}});}function updateActive(){var y=window.scrollY+120;"
+        "else{item.link.removeAttribute('aria-current');}});}function stickyOffset(){"
+        "var css=parseFloat(getComputedStyle(root).getPropertyValue('--sticky-offset'));"
+        "if(Number.isFinite(css)){return css;}return topbar?topbar.getBoundingClientRect().height:72;}"
+        "function updateActive(){var y=window.scrollY+stickyOffset()+18;"
         "var active=items[0];items.forEach(function(item){if(item.section.offsetTop<=y){active=item;}});"
         "if(active){setActive(active.id);}}window.addEventListener('scroll',updateActive,{passive:true});"
         "window.addEventListener('resize',updateActive);window.addEventListener('hashchange',updateActive);"
