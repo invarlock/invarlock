@@ -478,6 +478,15 @@ def test_hf_multimodal_processor_digest_returns_none_when_processor_lookup_fails
     assert adapter.processor_digest is None
 
 
+def test_hf_multimodal_processor_digest_computes_from_existing_processor() -> None:
+    adapter = HF_Multimodal_Adapter()
+    processor = SimpleNamespace(name_or_path="already-loaded")
+    adapter._processor = processor
+    adapter._processor_digest = None
+
+    assert adapter.processor_digest == adapter._compute_processor_digest(processor)
+
+
 def test_hf_multimodal_compute_digest_and_helpers_cover_fallback_paths(
     tmp_path: Path,
 ) -> None:

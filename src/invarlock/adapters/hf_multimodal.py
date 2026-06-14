@@ -166,7 +166,12 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
     def processor_digest(self) -> str | None:
         if self._processor_digest is None:
             try:
-                self._require_processor()
+                if self._processor is not None:
+                    self._processor_digest = self._compute_processor_digest(
+                        self._processor
+                    )
+                else:
+                    self._require_processor()
             except _PROCESSOR_DIGEST_ERRORS:
                 return None
         return self._processor_digest
