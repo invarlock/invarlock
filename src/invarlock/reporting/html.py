@@ -12,7 +12,7 @@ from html import escape
 from importlib import import_module
 from typing import Any
 
-from .branding import BRAND_TAGLINE
+from .branding import BRAND_TAGLINE, html_brand_mark
 from .render_markdown import render_report_markdown
 from .report_schema import validate_report
 from .report_summary import compute_console_validation_block
@@ -153,12 +153,12 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
         ":root{--pass:#1f7a46;--fail:#b42318;--warn:#a15c07;--ink:#17212b;"
         "--muted:#52606d;--bg:#eef3f8;--bg-accent:#dfe9f3;--panel:#f7fafc;"
         "--panel-strong:#ffffff;--border:#cbd5e1;--shadow:rgba(15,23,42,0.12);"
-        "--accent:#0f5f8c;--accent-soft:#d8ebf7}"
+        "--accent:#0f5f8c;--accent-soft:#d8ebf7;--brand-mark-accent:#1f3a7a}"
         "@media (prefers-color-scheme: dark){"
         ":root{--pass:#3fb36b;--fail:#ff7b72;--warn:#f2b44f;--ink:#e6edf3;"
         "--muted:#9fb0c0;--bg:#0f1722;--bg-accent:#162334;--panel:#111c2a;"
         "--panel-strong:#162334;--border:#2c3e50;--shadow:rgba(0,0,0,0.35);"
-        "--accent:#7cc7ff;--accent-soft:#1b3044}}"
+        "--accent:#7cc7ff;--accent-soft:#1b3044;--brand-mark-accent:#9fb7ff}}"
         "body{margin:0;min-height:100vh;padding:30px;color:var(--ink);"
         'font-family:"Avenir Next","Segoe UI Variable","Segoe UI",sans-serif;'
         "line-height:1.65;background:"
@@ -174,8 +174,9 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
         'font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif}'
         ".report-header p{margin:10px 0 0 0;max-width:52rem;color:var(--muted)}"
         ".brand-lockup{display:flex;align-items:center;gap:10px;margin-bottom:8px}"
-        ".brand-mark{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:8px;"
-        "background:var(--accent);color:var(--panel-strong);font-weight:800;letter-spacing:0}"
+        ".brand-mark{display:inline-grid;place-items:center;width:42px;height:42px;"
+        "color:var(--ink)}"
+        ".brand-mark-svg{display:block;width:42px;height:42px}"
         ".summary-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;"
         "margin:0 0 18px 0}"
         ".summary-chip{padding:14px 16px;border-radius:18px;border:1px solid var(--border);"
@@ -229,7 +230,7 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
         "</style>"
         '</head><body><div class="report-shell">'
         '<header class="report-header">'
-        '<div class="brand-lockup"><span class="brand-mark" aria-hidden="true">IL</span>'
+        f'<div class="brand-lockup"><span class="brand-mark">{html_brand_mark()}</span>'
         '<p class="eyebrow">InvarLock</p></div>'
         "<h1>Evaluation Report</h1>"
         f"<p>{escape(BRAND_TAGLINE)} Browser-first rendering of the canonical evaluation bundle, with quick links for faster reviewer navigation.</p>"

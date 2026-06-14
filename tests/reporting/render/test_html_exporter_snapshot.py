@@ -71,6 +71,12 @@ def test_html_export_contains_same_numbers_as_markdown():
     m = re.search(r"<body[^>]*>(.*)</body>", html, flags=re.DOTALL | re.IGNORECASE)
     assert m, "expected <body> in HTML output"
     body = m.group(1)
+    body = re.sub(
+        r'<svg[^>]*aria-hidden="true"[^>]*>.*?</svg>',
+        " ",
+        body,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
     stripped = re.sub(r"<[^>]+>", " ", body)
     nums_html = _extract_numbers(html_mod.unescape(stripped))
 
@@ -90,6 +96,8 @@ def test_html_exporter_prefers_markdown_when_available():
         assert "report-outline" in html
         assert "summary-strip" in html
     assert "brand-lockup" in html
+    assert "brand-mark-svg" in html
+    assert ">IL<" not in html
     assert "Auditable verification for edited model checkpoints." in html
     assert f"InvarLock {__version__}" in html
 

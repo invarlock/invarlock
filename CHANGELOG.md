@@ -99,6 +99,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed exported HTML reports to use the packaged InvarLock bracket-and-signal
+  mark instead of the temporary `IL` text fallback.
 - Fixed evidence-pack queue and GPU-runner stability issues, including memory
   helper resolution, container scratch cleanup, retry handling after interrupted
   evaluate phases, and host/container output publication paths.
