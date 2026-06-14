@@ -100,6 +100,7 @@ def verify_command(
     json_out: bool = False,
     runtime_provenance: str = "container",
     assurance: str = "report",
+    warning_policy: str = "pass",
 ) -> None:
     """
     Verify evaluation report integrity.
@@ -117,6 +118,7 @@ def verify_command(
         ),
         json_mode=bool(json_out),
         assurance_mode=normalize_verify_assurance_mode(assurance),
+        warning_policy=warning_policy,
     )
     exit_code = _verify_exit_code(result, profile=profile)
     if not json_out:

@@ -305,6 +305,11 @@ def _evaluate_lazy(
         "--allow-network",
         help="Allow network access, including runtime-image pulls and model fetches.",
     ),
+    allow_remote_code: bool = typer.Option(
+        False,
+        "--allow-remote-code",
+        help="Allow trust_remote_code-style model loading for this command.",
+    ),
 ):
     from .commands.evaluate import evaluate_command as _eval
 
@@ -334,6 +339,7 @@ def _evaluate_lazy(
         assurance=assurance,
         no_color=no_color,
         allow_network=allow_network,
+        allow_remote_code=allow_remote_code,
     )
 
 
@@ -511,6 +517,16 @@ def _verify_typed(
         "--assurance",
         help="Assurance verification mode (report|strict|off).",
     ),
+    warning_policy: str = typer.Option(
+        "pass",
+        "--warning-policy",
+        help="Guard-warning handling mode (pass|fail).",
+    ),
+    fail_on_warnings: bool = typer.Option(
+        False,
+        "--fail-on-warnings",
+        help="Alias for --warning-policy fail.",
+    ),
 ):
     from pathlib import Path as _Path
 
@@ -537,6 +553,7 @@ def _verify_typed(
         json_out=json_out,
         runtime_provenance=runtime_provenance.value,
         assurance=assurance,
+        warning_policy="fail" if fail_on_warnings else warning_policy,
     )
 
 

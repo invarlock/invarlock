@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shlex
 import subprocess
 import sys
@@ -21,12 +22,14 @@ DEFAULT_REMOTE_VENV_CANDIDATES = (
     "/root/venvs/invarlock/bin/python",
 )
 EXECUTION_MODES = ("container", "host")
+REMOTE_ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 @dataclass(frozen=True)
 class RemoteLaunch:
     session: str
     gpu: str
+    gpu_group: tuple[str, ...]
     shard_index: int
     shard_count: int
     output_root: str
@@ -37,6 +40,7 @@ class RemoteLaunch:
         return {
             "session": self.session,
             "gpu": self.gpu,
+            "gpu_group": list(self.gpu_group),
             "shard_index": self.shard_index,
             "shard_count": self.shard_count,
             "output_root": self.output_root,
@@ -92,6 +96,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Repeat to restrict the sweep to specific support_matrix lane_ids.",
     )
     parser.add_argument(
+        "--preset-override",
+        action="append",
+        default=[],
+        metavar="SLUG=PATH",
+        help=(
+            "Pass a SLUG=PATH preset override through to the remote sweep. "
+            "Repeat for multiple lanes."
+        ),
+    )
+    parser.add_argument(
         "--profile",
         default=None,
         help=(
@@ -118,6 +132,28 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--gpus",
         default="0",
         help="Comma-separated GPU ids. One tmux shard is launched per GPU id.",
+    )
+    parser.add_argument(
+        "--gpu-group",
+        action="append",
+        default=[],
+        metavar="IDS",
+        help=(
+            "Comma-separated GPU ids that should be exposed to one tmux shard, "
+            "for example 0,1,2,3 for a sharded MoE load. Repeat for multiple "
+            "groups. When set, these groups define the shards and --gpus is "
+            "used only for payload visibility/backwards-compatible dry runs."
+        ),
+    )
+    parser.add_argument(
+        "--remote-env",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help=(
+            "Repeat to export an extra environment variable inside each remote "
+            "tmux shard, for example HF_HUB_DISABLE_XET=1."
+        ),
     )
     parser.add_argument(
         "--session-prefix",
@@ -155,7 +191,7 @@ def _remote_repo(remote_repo: str) -> tuple[str, list[str], list[str]]:
         'REPO_DIR=""',
         "for candidate in "
         + " ".join(shlex.quote(path) for path in candidate_paths)
-        + '; do if [ -d "$candidate/.git" ]; then REPO_DIR="$candidate"; break; fi; done',
+        + '; do if [ -d "$candidate/.git" ] || [ -f "$candidate/.git" ]; then REPO_DIR="$candidate"; break; fi; done',
         f'if [ -z "$REPO_DIR" ]; then REPO_DIR={shlex.quote(remote_repo)}; fi',
     ]
     return "$REPO_DIR", setup, candidate_paths
@@ -201,6 +237,44 @@ def _parse_gpus(raw: str) -> list[str]:
     if not gpus:
         raise ValueError("At least one GPU id must be supplied via --gpus")
     return gpus
+
+
+def _parse_gpu_groups(
+    raw_items: list[str], fallback_gpus: list[str]
+) -> list[tuple[str, ...]]:
+    if not raw_items:
+        return [(gpu,) for gpu in fallback_gpus]
+    groups: list[tuple[str, ...]] = []
+    seen: set[tuple[str, ...]] = set()
+    for raw in raw_items:
+        group = tuple(item.strip() for item in raw.split(",") if item.strip())
+        if not group:
+            raise ValueError("--gpu-group entries must contain at least one GPU id")
+        if group in seen:
+            raise ValueError("--gpu-group entries must be unique")
+        seen.add(group)
+        groups.append(group)
+    return groups
+
+
+def _gpu_group_label(group: tuple[str, ...]) -> str:
+    return "-".join(re.sub(r"[^A-Za-z0-9_.-]+", "-", item) for item in group)
+
+
+def _flatten_gpu_groups(gpu_groups: list[tuple[str, ...]]) -> list[str]:
+    return list(dict.fromkeys(gpu for group in gpu_groups for gpu in group))
+
+
+def _parse_remote_env(raw_items: list[str]) -> list[tuple[str, str]]:
+    parsed: list[tuple[str, str]] = []
+    for raw in raw_items:
+        if "=" not in raw:
+            raise ValueError("--remote-env entries must use KEY=VALUE")
+        key, value = raw.split("=", 1)
+        if not REMOTE_ENV_KEY_RE.fullmatch(key):
+            raise ValueError(f"--remote-env key is not a valid shell name: {key!r}")
+        parsed.append((key, value))
+    return parsed
 
 
 def _shell_join(args: list[str]) -> str:
@@ -249,21 +323,25 @@ def build_launches(
     suite: str,
     slugs: list[str],
     lane_ids: list[str],
+    preset_overrides: list[str],
     profile: str | None,
     device: str,
     execution_mode: str,
-    gpus: list[str],
+    gpu_groups: list[tuple[str, ...]],
+    remote_env: list[tuple[str, str]],
     session_prefix: str,
     stamp: str,
     repo_setup: list[str],
     python_setup: list[str],
 ) -> list[RemoteLaunch]:
     launches: list[RemoteLaunch] = []
-    shard_count = len(gpus)
-    for shard_index, gpu in enumerate(gpus):
-        session = f"{session_prefix}-{stamp}-g{gpu}"
+    shard_count = len(gpu_groups)
+    for shard_index, gpu_group in enumerate(gpu_groups):
+        gpu = ",".join(gpu_group)
+        gpu_label = _gpu_group_label(gpu_group)
+        session = f"{session_prefix}-{stamp}-g{gpu_label}"
         shard_output_root = (
-            f"{remote_output_root.rstrip('/')}/shard-{shard_index:02d}-gpu-{gpu}"
+            f"{remote_output_root.rstrip('/')}/shard-{shard_index:02d}-gpu-{gpu_label}"
         )
         sweep_cmd = [
             remote_python,
@@ -287,6 +365,18 @@ def build_launches(
             sweep_cmd.extend(["--slug", slug])
         for lane_id in lane_ids:
             sweep_cmd.extend(["--lane-id", lane_id])
+        for preset_override in preset_overrides:
+            sweep_cmd.extend(["--preset-override", preset_override])
+
+        export_pairs = [
+            ("PYTHONPATH", "src"),
+            ("INVARLOCK_ALLOW_NETWORK", "1"),
+            *remote_env,
+            ("CUDA_VISIBLE_DEVICES", gpu),
+        ]
+        export_command = "export " + " ".join(
+            f"{key}={shlex.quote(value)}" for key, value in export_pairs
+        )
 
         inner_command = " && ".join(
             [
@@ -294,10 +384,7 @@ def build_launches(
                 f"cd {_shell_path(remote_repo)}",
                 f"mkdir -p {shlex.quote(shard_output_root)}",
                 *python_setup,
-                (
-                    "export PYTHONPATH=src INVARLOCK_ALLOW_NETWORK=1 "
-                    f"CUDA_VISIBLE_DEVICES={shlex.quote(gpu)}"
-                ),
+                export_command,
                 _shell_command(sweep_cmd),
             ]
         )
@@ -309,6 +396,7 @@ def build_launches(
             RemoteLaunch(
                 session=session,
                 gpu=gpu,
+                gpu_group=gpu_group,
                 shard_index=shard_index,
                 shard_count=shard_count,
                 output_root=shard_output_root,
@@ -349,6 +437,9 @@ def run_remote(args: argparse.Namespace) -> int:
     )
     remote_output_root = args.remote_output_root or _default_remote_output_root(stamp)
     gpus = _parse_gpus(args.gpus)
+    gpu_groups = _parse_gpu_groups(args.gpu_group, gpus)
+    payload_gpus = _flatten_gpu_groups(gpu_groups)
+    remote_env = _parse_remote_env(args.remote_env)
 
     sync_command = None
     if not args.skip_sync:
@@ -368,10 +459,12 @@ def run_remote(args: argparse.Namespace) -> int:
         suite=args.suite,
         slugs=args.slug,
         lane_ids=args.lane_id,
+        preset_overrides=args.preset_override,
         profile=args.profile,
         device=args.device,
         execution_mode=args.execution_mode,
-        gpus=gpus,
+        gpu_groups=gpu_groups,
+        remote_env=remote_env,
         session_prefix=args.session_prefix,
         stamp=stamp,
         repo_setup=repo_setup,
@@ -387,7 +480,10 @@ def run_remote(args: argparse.Namespace) -> int:
         "remote_output_root": remote_output_root,
         "suite": args.suite,
         "execution_mode": args.execution_mode,
-        "gpus": gpus,
+        "gpus": payload_gpus,
+        "gpu_groups": [list(group) for group in gpu_groups],
+        "remote_env": [{"name": key, "value": value} for key, value in remote_env],
+        "preset_overrides": args.preset_override,
         "sync_command": sync_command,
         "launches": [launch.to_payload() for launch in launches],
         "monitor": _monitor_commands(args.host, launches),

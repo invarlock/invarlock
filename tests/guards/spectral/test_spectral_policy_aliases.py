@@ -89,6 +89,17 @@ def test_normalize_multiple_testing_config_rejects_bad_method_and_zero_alpha():
         spectral_policy.normalize_multiple_testing_config({"m": False})
 
 
+def test_normalize_module_patterns_filters_and_rejects_invalid_entries() -> None:
+    assert spectral_policy.normalize_module_patterns(None) == ()
+    assert spectral_policy.normalize_module_patterns(
+        [" model.* ", "", "model.*", "*.mlp"]
+    ) == ("model.*", "*.mlp")
+    assert spectral_policy.normalize_module_patterns(" *.attn.* ") == ("*.attn.*",)
+
+    with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
+        spectral_policy.normalize_module_patterns(["ok", 3])
+
+
 def test_normalize_estimator_config_rejects_unknown_init():
     with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
         spectral_policy.normalize_estimator_config({"iters": 2, "init": "random"})
@@ -145,6 +156,25 @@ def test_apply_policy_overrides_updates_optional_numeric_fields() -> None:
     assert guard.config["max_caps"] == 4
     assert guard.correction_enabled is False
     assert guard.config["correction_enabled"] is False
+
+
+def test_apply_policy_overrides_updates_module_patterns() -> None:
+    guard = SpectralGuard()
+    guard._scoped_modules_model_id = "cached"
+
+    spectral_policy.apply_policy_overrides(
+        guard,
+        {
+            "module_include_patterns": [" model.* ", "", "model.*"],
+            "module_exclude_patterns": "*.audio_tower.*",
+        },
+    )
+
+    assert guard.module_include_patterns == ("model.*",)
+    assert guard.module_exclude_patterns == ("*.audio_tower.*",)
+    assert guard.config["module_include_patterns"] == ["model.*"]
+    assert guard.config["module_exclude_patterns"] == ["*.audio_tower.*"]
+    assert guard._scoped_modules_model_id is None
 
 
 def test_apply_policy_overrides_updates_individual_numeric_fields() -> None:

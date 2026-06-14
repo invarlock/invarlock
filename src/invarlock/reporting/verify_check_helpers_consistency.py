@@ -6,6 +6,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from invarlock.core.metric_kind_contract import (
+    MetricKindContractError,
+    is_ppl_metric_kind,
+    normalize_metric_kind,
+)
+
 from .verify_check_helpers_metrics import (
     _VERIFY_PARSE_EXCEPTIONS,
     REPORT_JSON_SCHEMA,
@@ -151,8 +157,57 @@ def _validate_drift_band(report: dict[str, Any]) -> list[str]:
     if not isinstance(pm, dict) or not pm:
         errors.append("report missing primary_metric block.")
         return errors
-    if bool(pm.get("invalid")):
+    try:
+        if bool(pm.get("invalid")):
+            return errors
+        pm_kind = normalize_metric_kind(pm.get("kind"))
+    except (MetricKindContractError, RuntimeError, ValueError):
+        pm_kind = None
+
+    if pm_kind == "accuracy":
+        prev = _coerce_float(pm.get("preview"))
+        fin = _coerce_float(pm.get("final"))
+        if prev is None or fin is None:
+            errors.append("report missing preview/final to compute accuracy drift.")
+            return errors
+
+        accuracy_delta_limit = None
+        try:
+            resolved_policy = report.get("resolved_policy") or {}
+            metrics_policy = (
+                resolved_policy.get("metrics")
+                if isinstance(resolved_policy, dict)
+                else {}
+            )
+            accuracy_policy = (
+                metrics_policy.get("accuracy")
+                if isinstance(metrics_policy, dict)
+                else {}
+            )
+            if isinstance(accuracy_policy, dict):
+                accuracy_delta_limit = _coerce_float(
+                    accuracy_policy.get("preview_final_delta_pp_max")
+                )
+                if accuracy_delta_limit is None:
+                    accuracy_delta_limit = _coerce_float(
+                        accuracy_policy.get("hysteresis_delta_pp")
+                    )
+        except _VERIFY_PARSE_EXCEPTIONS:
+            accuracy_delta_limit = None
+        if accuracy_delta_limit is None:
+            accuracy_delta_limit = 0.1
+        accuracy_delta_limit = max(0.0, accuracy_delta_limit)
+        observed_delta = abs(fin - prev)
+        if observed_delta > accuracy_delta_limit:
+            errors.append(
+                "Preview→final accuracy drift out of band "
+                f"(≤ {accuracy_delta_limit:.6f}): observed {observed_delta:.6f}."
+            )
         return errors
+
+    if pm_kind is not None and not is_ppl_metric_kind(pm_kind):
+        return errors
+
     drift_ratio = None
     try:
         prev = _coerce_float(pm.get("preview"))

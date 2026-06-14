@@ -64,7 +64,7 @@ Copy-paste checklist for production or CI deployments:
 - Keep Python at 3.12+ and update dependencies regularly.
 - Use the PR-time supply-chain workflow for pre-merge checks (install-surface
   SBOM + `pip-audit` on the base/`hf`/`advanced` shipped surfaces + `gitleaks`
-  history JSON/SARIF artifacts), and keep the
+  changed-file JSON/SARIF artifacts), and keep the
   scheduled/tag CI supply-chain job as the slower backstop. See the allowlist
   page for documented exceptions.
 

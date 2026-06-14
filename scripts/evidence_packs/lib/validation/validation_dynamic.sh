@@ -243,23 +243,44 @@ main_dynamic() {
         # Run in subshell that sources libraries (bash functions don't inherit to background processes)
         # Note: SCRIPT_DIR, LIB_DIR, QUEUE_DIR, OUTPUT_DIR must all be exported before this point
         (
+            set +e
+            set +u
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Worker bootstrap starting"
+            source_worker_lib() {
+                local label="$1"
+                local path="$2"
+                local required_function="${3:-}"
+                local source_rc=0
+                source "${path}"
+                source_rc=$?
+                if [[ -n "${required_function}" ]] && ! declare -F "${required_function}" >/dev/null 2>&1; then
+                    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: source missing ${label} function=${required_function} rc=${source_rc}"
+                fi
+                if [[ ${source_rc} -ne 0 ]]; then
+                    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: source status ${label} rc=${source_rc} after symbol validation"
+                fi
+            }
             # Re-source all necessary modules in the subshell context
             if [[ -f "${LIB_DIR}/tasks/task_serialization.sh" ]]; then
-                source "${LIB_DIR}/tasks/task_serialization.sh"
-                source "${LIB_DIR}/queue/queue_manager.sh"
-                source "${LIB_DIR}/queue/scheduler.sh"
-                source "${LIB_DIR}/tasks/task_functions.sh"
-                source "${LIB_DIR}/queue/gpu_worker.sh"
+                source_worker_lib "task_serialization" "${LIB_DIR}/tasks/task_serialization.sh" "get_task_id"
+                source_worker_lib "queue_manager" "${LIB_DIR}/queue/queue_manager.sh" "count_tasks"
+                source_worker_lib "scheduler" "${LIB_DIR}/queue/scheduler.sh" "find_and_claim_task"
+                source_worker_lib "task_functions" "${LIB_DIR}/tasks/task_functions.sh" "execute_task"
+                source_worker_lib "gpu_worker" "${LIB_DIR}/queue/gpu_worker.sh" "gpu_worker"
                 [[ -f "${LIB_DIR}/core/fault_tolerance.sh" ]] && source "${LIB_DIR}/core/fault_tolerance.sh"
             else
-                source "${LIB_DIR}/task_serialization.sh"
-                source "${LIB_DIR}/queue_manager.sh"
-                source "${LIB_DIR}/scheduler.sh"
-                source "${LIB_DIR}/task_functions.sh"
-                source "${LIB_DIR}/gpu_worker.sh"
+                source_worker_lib "task_serialization" "${LIB_DIR}/task_serialization.sh" "get_task_id"
+                source_worker_lib "queue_manager" "${LIB_DIR}/queue_manager.sh" "count_tasks"
+                source_worker_lib "scheduler" "${LIB_DIR}/scheduler.sh" "find_and_claim_task"
+                source_worker_lib "task_functions" "${LIB_DIR}/task_functions.sh" "execute_task"
+                source_worker_lib "gpu_worker" "${LIB_DIR}/gpu_worker.sh" "gpu_worker"
                 [[ -f "${LIB_DIR}/fault_tolerance.sh" ]] && source "${LIB_DIR}/fault_tolerance.sh"
             fi
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Worker libraries ready"
             gpu_worker "${gpu_id}" "${OUTPUT_DIR}"
+            worker_rc=$?
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Worker bootstrap exiting rc=${worker_rc}"
+            exit "${worker_rc}"
         ) >> "${OUTPUT_DIR}/logs/gpu_${gpu_id}.log" 2>&1 &
         pids[${gpu_id}]=$!
         echo "${pids[${gpu_id}]}" > "${OUTPUT_DIR}/workers/gpu_${gpu_id}.pid"

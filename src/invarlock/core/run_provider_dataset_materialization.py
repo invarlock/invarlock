@@ -122,7 +122,7 @@ def _calibration_entry(
     arm: str,
     index: int,
     use_mlm: bool,
-    provider_labels_fin: Any,
+    provider_labels: Any,
     tensor_or_list_to_ints_fn: TensorOrListToIntsFn,
 ) -> dict[str, Any]:
     entry = {
@@ -134,9 +134,8 @@ def _calibration_entry(
     }
     if use_mlm:
         entry["labels"] = record.get("labels", [-100] * len(record["input_ids"]))
-    elif arm == "final" and provider_labels_fin is not None:
-        if index < len(provider_labels_fin):
-            entry["labels"] = tensor_or_list_to_ints_fn(provider_labels_fin[index])
+    elif provider_labels is not None and index < len(provider_labels):
+        entry["labels"] = tensor_or_list_to_ints_fn(provider_labels[index])
     return entry
 
 
@@ -145,6 +144,7 @@ def _build_calibration_data(
     preview_records: list[dict[str, Any]],
     final_records: list[dict[str, Any]],
     use_mlm: bool,
+    provider_labels_prev: Any,
     provider_labels_fin: Any,
     tensor_or_list_to_ints_fn: TensorOrListToIntsFn,
 ) -> tuple[list[dict[str, Any]], list[Any], list[Any]]:
@@ -157,7 +157,7 @@ def _build_calibration_data(
                 arm="preview",
                 index=idx,
                 use_mlm=use_mlm,
-                provider_labels_fin=None,
+                provider_labels=provider_labels_prev,
                 tensor_or_list_to_ints_fn=tensor_or_list_to_ints_fn,
             )
         )
@@ -170,7 +170,7 @@ def _build_calibration_data(
                 arm="final",
                 index=idx,
                 use_mlm=use_mlm,
-                provider_labels_fin=provider_labels_fin,
+                provider_labels=provider_labels_fin,
                 tensor_or_list_to_ints_fn=tensor_or_list_to_ints_fn,
             )
         )
@@ -321,6 +321,7 @@ def _materialize_text_provider_dataset_plan(
         preview_records=preview_records,
         final_records=final_records,
         use_mlm=use_mlm,
+        provider_labels_prev=provider_labels_prev,
         provider_labels_fin=provider_labels_fin,
         tensor_or_list_to_ints_fn=tensor_or_list_to_ints_fn,
     )

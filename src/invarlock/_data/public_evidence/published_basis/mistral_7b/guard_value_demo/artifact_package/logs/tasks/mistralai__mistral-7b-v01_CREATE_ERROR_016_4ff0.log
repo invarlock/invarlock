@@ -1,0 +1,42 @@
+[2026-06-12 07:02:24] Starting task: mistralai__mistral-7b-v01_CREATE_ERROR_016_4ff0
+  Type: CREATE_ERROR
+  Model: mistralai/Mistral-7B-v0.1
+  GPU(s): 0
+  Params: {
+  "error_type": "rank_collapse",
+  "error_env": {}
+}
+[2026-06-12 07:02:24] Creating error model: rank_collapse
+[2026-06-12 07:02:24] Creating error model (type=rank_collapse, GPU 0)
+Loading baseline from /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/models/mistralai__mistral-7b-v01/baseline...
+
+Loading weights:   0%|          | 0/291 [00:00<?, ?it/s]
+Loading weights:   4%|▍         | 13/291 [00:00<00:02, 114.39it/s]
+Loading weights:  11%|█         | 31/291 [00:00<00:01, 144.78it/s]
+Loading weights:  17%|█▋        | 49/291 [00:00<00:01, 154.88it/s]
+Loading weights:  23%|██▎       | 67/291 [00:00<00:01, 160.81it/s]
+Loading weights:  29%|██▉       | 85/291 [00:00<00:01, 162.96it/s]
+Loading weights:  35%|███▌      | 103/291 [00:00<00:01, 164.18it/s]
+Loading weights:  42%|████▏     | 121/291 [00:00<00:01, 164.09it/s]
+Loading weights:  48%|████▊     | 139/291 [00:00<00:00, 165.56it/s]
+Loading weights:  54%|█████▍    | 157/291 [00:00<00:00, 165.21it/s]
+Loading weights:  60%|██████    | 175/291 [00:01<00:00, 165.92it/s]
+Loading weights:  66%|██████▋   | 193/291 [00:01<00:00, 166.62it/s]
+Loading weights:  73%|███████▎  | 211/291 [00:01<00:00, 166.00it/s]
+Loading weights:  79%|███████▊  | 229/291 [00:01<00:00, 164.67it/s]
+Loading weights:  85%|████████▍ | 247/291 [00:01<00:00, 164.75it/s]
+Loading weights:  91%|█████████ | 265/291 [00:01<00:00, 164.94it/s]
+Loading weights:  97%|█████████▋| 283/291 [00:01<00:00, 165.91it/s]
+Loading weights: 100%|██████████| 291/291 [00:01<00:00, 163.78it/s]
+Detected 32 transformer blocks
+Rank-collapsed: model.layers.0.self_attn.q_proj.weight
+Rank-collapsed: model.layers.0.self_attn.k_proj.weight
+Rank-collapsed: model.layers.0.self_attn.v_proj.weight
+Applied rank collapse to 8 weight matrices
+
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]
+Writing model shards: 100%|██████████| 1/1 [00:19<00:00, 19.63s/it]
+Writing model shards: 100%|██████████| 1/1 [00:19<00:00, 19.63s/it]
+Saved error model to /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/models/error_rank_collapse
+  Created: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/models/error_rank_collapse
+[2026-06-12 07:03:00] Task mistralai__mistral-7b-v01_CREATE_ERROR_016_4ff0 finished with exit code: 0

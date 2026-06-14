@@ -99,6 +99,168 @@ def _spectral_caps_applied(cert: dict[str, Any]) -> int:
     return max(0, _as_int(spectral.get("caps_applied"), default=0))
 
 
+def _spectral_cap_modules(cert: dict[str, Any] | None) -> set[tuple[str, str]]:
+    if not isinstance(cert, dict):
+        return set()
+    spectral = cert.get("spectral")
+    if not isinstance(spectral, dict):
+        return set()
+    modules: set[tuple[str, str]] = set()
+    violations = spectral.get("violations")
+    if not isinstance(violations, list):
+        return modules
+    for violation in violations:
+        if not isinstance(violation, dict):
+            continue
+        if str(violation.get("type") or "") != "family_z_cap":
+            continue
+        module = violation.get("module")
+        if not isinstance(module, str) or not module.strip():
+            continue
+        family = violation.get("family")
+        family_name = family if isinstance(family, str) else ""
+        modules.add((module.strip(), family_name.strip()))
+    return modules
+
+
+def _spectral_baseline_relative_summary(
+    cert: dict[str, Any],
+    baseline_cert: dict[str, Any] | None,
+) -> dict[str, Any]:
+    baseline_available = isinstance(baseline_cert, dict)
+    subject_caps = _spectral_caps_applied(cert)
+    baseline_caps = _spectral_caps_applied(baseline_cert or {})
+    subject_modules = _spectral_cap_modules(cert)
+    baseline_modules = _spectral_cap_modules(baseline_cert)
+    new_modules = sorted(
+        [
+            {"module": module, "family": family}
+            for module, family in subject_modules - baseline_modules
+        ],
+        key=lambda item: (item["family"], item["module"]),
+    )
+    return {
+        "baseline_available": baseline_available,
+        "baseline_caps_applied": baseline_caps if baseline_available else None,
+        "subject_caps_applied": subject_caps,
+        "delta_caps_applied": (
+            max(0, subject_caps - baseline_caps) if baseline_available else None
+        ),
+        "new_caps_applied": len(new_modules) if baseline_available else None,
+        "new_cap_modules": new_modules,
+    }
+
+
+def _rmt_signal(cert: dict[str, Any] | None) -> bool:
+    if not isinstance(cert, dict):
+        return False
+    validation = cert.get("validation")
+    if isinstance(validation, dict) and "rmt_stable" in validation:
+        if _as_bool(validation.get("rmt_stable"), default=True) is False:
+            return True
+    probe = cert.get("rmt_probe")
+    if isinstance(probe, dict) and "stable" in probe:
+        if _as_bool(probe.get("stable"), default=True) is False:
+            return True
+    return False
+
+
+def _variance_signal(cert: dict[str, Any] | None) -> bool:
+    if not isinstance(cert, dict):
+        return False
+    probe = cert.get("ve_probe")
+    if not isinstance(probe, dict):
+        return False
+    if _as_bool(probe.get("signal"), default=False):
+        return True
+    if _as_bool(probe.get("would_enable"), default=False):
+        return True
+    if _as_int(probe.get("proposed_scales"), default=0) > 0:
+        return True
+    gain = _as_float(probe.get("ab_gain"), default=None)
+    return gain is not None and gain > 0.0
+
+
+def _invariants_signal(cert: dict[str, Any] | None) -> bool:
+    if not isinstance(cert, dict):
+        return False
+    validation = cert.get("validation")
+    if isinstance(validation, dict) and "invariants_pass" in validation:
+        if _as_bool(validation.get("invariants_pass"), default=False) is False:
+            return True
+    invariants = cert.get("invariants")
+    if isinstance(invariants, dict):
+        status = invariants.get("status")
+        if isinstance(status, str) and status.strip().lower() in {
+            "warn",
+            "fail",
+            "error",
+        }:
+            return True
+    return False
+
+
+def _primary_metric_signal(cert: dict[str, Any] | None) -> bool:
+    if not isinstance(cert, dict):
+        return False
+    validation = cert.get("validation")
+    if isinstance(validation, dict) and "primary_metric_acceptable" in validation:
+        if _as_bool(validation.get("primary_metric_acceptable"), default=True) is False:
+            return True
+    primary_metric = cert.get("primary_metric")
+    if isinstance(primary_metric, dict):
+        if _as_bool(primary_metric.get("degraded"), default=False):
+            return True
+        if _as_bool(primary_metric.get("invalid"), default=False):
+            return True
+    return False
+
+
+def _guard_signal(cert: dict[str, Any] | None, guard: str) -> bool:
+    guard_name = guard.strip().lower()
+    if guard_name == "spectral":
+        return _spectral_caps_applied(cert or {}) > 0
+    if guard_name == "rmt":
+        return _rmt_signal(cert)
+    if guard_name == "variance":
+        return _variance_signal(cert)
+    if guard_name == "invariants":
+        return _invariants_signal(cert)
+    if guard_name == "primary_metric":
+        return _primary_metric_signal(cert)
+    return False
+
+
+def _guard_baseline_relative_summary(
+    cert: dict[str, Any],
+    baseline_cert: dict[str, Any] | None,
+    guard: str,
+) -> dict[str, Any]:
+    guard_name = guard.strip().lower()
+    baseline_available = isinstance(baseline_cert, dict)
+    subject_signal = _guard_signal(cert, guard_name)
+    baseline_signal = _guard_signal(baseline_cert, guard_name)
+    payload: dict[str, Any] = {
+        "baseline_available": baseline_available,
+        "subject_signal": subject_signal,
+        "baseline_signal": baseline_signal if baseline_available else None,
+        "relative_signal": baseline_available
+        and subject_signal
+        and not baseline_signal,
+    }
+    if guard_name == "spectral":
+        spectral = _spectral_baseline_relative_summary(cert, baseline_cert)
+        payload.update(spectral)
+        payload["relative_signal"] = bool(
+            spectral.get("baseline_available")
+            and (
+                _as_int(spectral.get("new_caps_applied"), default=0) > 0
+                or _as_int(spectral.get("delta_caps_applied"), default=0) > 0
+            )
+        )
+    return payload
+
+
 @dataclass(frozen=True)
 class ValidationSnapshot:
     invariants_ok: bool
@@ -193,7 +355,12 @@ def _guard_flags(snapshot: ValidationSnapshot) -> dict[str, bool]:
     }
 
 
-def _detector_matches(cert: dict[str, Any], detector: dict[str, Any]) -> bool:
+def _detector_matches(
+    cert: dict[str, Any],
+    detector: dict[str, Any],
+    *,
+    baseline_cert: dict[str, Any] | None = None,
+) -> bool:
     kind = str(detector.get("kind") or "").strip().lower()
     if kind == "validation_flag":
         flag = detector.get("flag")
@@ -257,6 +424,75 @@ def _detector_matches(cert: dict[str, Any], detector: dict[str, Any]) -> bool:
         if min_val < 0:
             min_val = 0
         return _spectral_caps_applied(cert) >= min_val
+
+    if kind == "spectral_caps_baseline_relative":
+        if not isinstance(baseline_cert, dict):
+            return False
+
+        summary = _spectral_baseline_relative_summary(cert, baseline_cert)
+
+        min_new_modules = detector.get("min_new_modules")
+        min_delta_count = detector.get("min_delta_count")
+        if min_new_modules is None and min_delta_count is None:
+            min_new_modules = 1
+
+        if min_new_modules is not None:
+            try:
+                min_new = int(min_new_modules)
+            except (TypeError, ValueError, OverflowError):
+                return False
+            if min_new < 0:
+                min_new = 0
+            if _as_int(summary.get("new_caps_applied"), default=0) < min_new:
+                return False
+
+        if min_delta_count is not None:
+            try:
+                min_delta = int(min_delta_count)
+            except (TypeError, ValueError, OverflowError):
+                return False
+            if min_delta < 0:
+                min_delta = 0
+            if _as_int(summary.get("delta_caps_applied"), default=0) < min_delta:
+                return False
+
+        return True
+
+    if kind == "guard_signal_baseline_relative":
+        guard = detector.get("guard")
+        if not isinstance(guard, str) or not guard.strip():
+            return False
+        guard_name = guard.strip().lower()
+        if guard_name == "spectral":
+            if not isinstance(baseline_cert, dict):
+                return False
+            summary = _guard_baseline_relative_summary(cert, baseline_cert, guard_name)
+            min_new_modules = detector.get("min_new_modules")
+            min_delta_count = detector.get("min_delta_count")
+            if min_new_modules is None and min_delta_count is None:
+                return bool(summary.get("relative_signal"))
+            if min_new_modules is not None:
+                try:
+                    min_new = int(min_new_modules)
+                except (TypeError, ValueError, OverflowError):
+                    return False
+                if min_new < 0:
+                    min_new = 0
+                if _as_int(summary.get("new_caps_applied"), default=0) < min_new:
+                    return False
+            if min_delta_count is not None:
+                try:
+                    min_delta = int(min_delta_count)
+                except (TypeError, ValueError, OverflowError):
+                    return False
+                if min_delta < 0:
+                    min_delta = 0
+                if _as_int(summary.get("delta_caps_applied"), default=0) < min_delta:
+                    return False
+            return True
+
+        summary = _guard_baseline_relative_summary(cert, baseline_cert, guard_name)
+        return bool(summary.get("relative_signal"))
 
     if kind == "ve_probe":
         field = detector.get("field")
@@ -415,6 +651,16 @@ def _record_primary_guard_hit(record: dict[str, Any]) -> bool:
     flags = record.get("guard_flags")
     if not isinstance(flags, dict):
         flags = {}
+
+    if bool(record.get("primary_guard_baseline_relative_required")):
+        relative_by_guard = record.get("guard_baseline_relative")
+        if not isinstance(relative_by_guard, dict):
+            return False
+        relative = relative_by_guard.get(primary_guard)
+        if not isinstance(relative, dict):
+            return False
+        return bool(relative.get("relative_signal"))
+
     if bool(flags.get(primary_guard)):
         return True
 
@@ -425,6 +671,15 @@ def _record_primary_guard_hit(record: dict[str, Any]) -> bool:
             if stable is not None and _as_bool(stable, default=True) is False:
                 return True
     if primary_guard == "spectral":
+        if bool(record.get("spectral_baseline_relative_required")):
+            relative = record.get("spectral_baseline_relative")
+            if not isinstance(relative, dict):
+                return False
+            if _as_int(relative.get("new_caps_applied"), default=0) > 0:
+                return True
+            if _as_int(relative.get("delta_caps_applied"), default=0) > 0:
+                return True
+            return False
         if int(record.get("spectral_caps_applied") or 0) > 0:
             return True
     if primary_guard == "variance":

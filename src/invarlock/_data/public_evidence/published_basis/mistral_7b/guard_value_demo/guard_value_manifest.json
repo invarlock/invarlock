@@ -1,0 +1,353 @@
+{
+  "artifact_root": "public_evidence/published_basis/mistral_7b/guard_value_demo",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "6604eda2b2fb9c2118673f17100289a6ba6f6be1bca2c4646c56bf54c7c4ff22",
+      "size_bytes": 2177
+    },
+    {
+      "path": "artifact_package/logs/run_pack.log",
+      "sha256": "fa09da5e27a924c798dc0f1c8ac1a372ff91d0e85ce1265d62222dd35acb0302",
+      "size_bytes": 9855
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CALIBRATION_RUN_002_48c0.log",
+      "sha256": "d6ed68796e214082dd8d9281b38815188be670cb22fd68df9448eed7f4b64f39",
+      "size_bytes": 6134
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CALIBRATION_RUN_003_1f87.log",
+      "sha256": "4fbff115939d88ce1425f162d973f613fb0f64d32694a8434d063a5d21e8d12b",
+      "size_bytes": 5704
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CALIBRATION_RUN_004_07f5.log",
+      "sha256": "f0794817795a3b3a369631ab33047402c0dbf47e48e5bd7d773caaa93aaa0850",
+      "size_bytes": 6010
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CALIBRATION_RUN_005_61a9.log",
+      "sha256": "f2a607e9d7587c2213de33b7014bffec7d414f97d81998cc8b7385d165536105",
+      "size_bytes": 6172
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CALIBRATION_RUN_006_31d4.log",
+      "sha256": "d0c764f107a860c17b0454e03cf42212972dfcfae3de6f01e70135e16f8b196f",
+      "size_bytes": 4912
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CLEANUP_EDIT_012_2db9.log",
+      "sha256": "c11c0a03a04a72be9f5ed85b8a49fadce80f92a28ab1bc8168e84fa64692eef9",
+      "size_bytes": 510
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CLEANUP_ERROR_015_1670.log",
+      "sha256": "44c96ce9cca814a3e0f469f3c1f1e5143fa2203790669396762c1cb7a8b25190",
+      "size_bytes": 514
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CLEANUP_ERROR_018_0821.log",
+      "sha256": "9d3230fea5cb8c573b96f7e260b3ff2312b0c24f745cd3dd6596e39d330ec1f5",
+      "size_bytes": 508
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CREATE_EDIT_009_3114.log",
+      "sha256": "7b8de04406aefc7003a7a8189227731edae907c731d8f505a8581e3b666a5bd1",
+      "size_bytes": 3036
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CREATE_ERROR_013_6a07.log",
+      "sha256": "b6343169fb8e5c152e3be0c1c25daf2ab5530846108cbd4c62557727ae0654e2",
+      "size_bytes": 2567
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_CREATE_ERROR_016_4ff0.log",
+      "sha256": "24db47bf5aaef714a90f383adaebdf44d207dfdfc3f3c6112a91deb426a19b12",
+      "size_bytes": 2713
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_GENERATE_PRESET_007_41cd.log",
+      "sha256": "2679358f75cbcf4971517ab73232ef644fca22571b3c53c9d9ebb63bce820986",
+      "size_bytes": 1221
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_SETUP_BASELINE_001_6f25.log",
+      "sha256": "2ad7c5874d8109735c4e792fe69ee9c15618b717e0f22604eaf82b3030d125dc",
+      "size_bytes": 484
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_SETUP_EVALUATE_BASELINE_REPORT_008_21f7.log",
+      "sha256": "52c4e60fb8318b1f07bdbee3641bb20b4b087d00ee371e7b0da93bcc7fd5817c",
+      "size_bytes": 5918
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_evaluate_EDIT_010_6a14.log",
+      "sha256": "de1c9a0417cca64d7c7c5bbdf9dad9341fd6e3579295b3ba777bc0da77d64625",
+      "size_bytes": 5041
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_evaluate_EDIT_011_08e7.log",
+      "sha256": "ef13a59204fd2b26b04bb471cb77a3b6d7ca2c7a3731185eedf5ef963f27f878",
+      "size_bytes": 4968
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_evaluate_ERROR_014_5c90.log",
+      "sha256": "4ed2285a4fc1fc1fc8fdd1f72f237cf5da786884ba2adf18c79309eaaa46ae20",
+      "size_bytes": 4889
+    },
+    {
+      "path": "artifact_package/logs/tasks/mistralai__mistral-7b-v01_evaluate_ERROR_017_2ab3.log",
+      "sha256": "6673338bd54ac5d42d31cde9a4c9aa1f2556081025b7e25561c5310541783a85",
+      "size_bytes": 4873
+    },
+    {
+      "path": "artifact_package/reports/analysis/ve_baseline_probe.json",
+      "sha256": "01837e87e11833a85d81dd51c4bfb368e663b8751d8684b7c3b68986c82424e5",
+      "size_bytes": 7585
+    },
+    {
+      "path": "artifact_package/reports/category_summary.json",
+      "sha256": "339a72d231dc4fb3995917e611a656d03fb6d752b007169975f47cf75ce3bf2e",
+      "size_bytes": 482
+    },
+    {
+      "path": "artifact_package/reports/errors/rank_collapse/evaluate_timing.json",
+      "sha256": "6c78ab598f3b170cd1d6cfb28c0c890909503cfdf33a6b43639ba744e329106c",
+      "size_bytes": 1541
+    },
+    {
+      "path": "artifact_package/reports/errors/rank_collapse/evaluation.report.json",
+      "sha256": "2bc0449e6593cf70e01d5524e4b05630362c770ec13ff02bc3e27d27d4d8b29d",
+      "size_bytes": 9713450
+    },
+    {
+      "path": "artifact_package/reports/errors/rank_collapse/runtime.manifest.json",
+      "sha256": "12ec8daf39a7298abcbb829d02ec1e6a8d314f0a6ef60c61f9aeb8ef457a07e3",
+      "size_bytes": 1056
+    },
+    {
+      "path": "artifact_package/reports/errors/rmt_norm_noise_l31_ffn_up_b030/evaluate_timing.json",
+      "sha256": "623766dfdb4e92e59211f29622bab41ef32207ed9bfa2ade105e73486ee1a7ad",
+      "size_bytes": 1561
+    },
+    {
+      "path": "artifact_package/reports/errors/rmt_norm_noise_l31_ffn_up_b030/evaluation.report.json",
+      "sha256": "3f0fd87d8d9f4a23d8aea19299f7362e58f1a28072e5d4926fac0e7e72f274ff",
+      "size_bytes": 8902225
+    },
+    {
+      "path": "artifact_package/reports/errors/rmt_norm_noise_l31_ffn_up_b030/rmt_probe.json",
+      "sha256": "0c61bdd9c04b99b49b38d67634c589f1e089e8bf6de9933f7426421f2c0feac4",
+      "size_bytes": 12508
+    },
+    {
+      "path": "artifact_package/reports/errors/rmt_norm_noise_l31_ffn_up_b030/runtime.manifest.json",
+      "sha256": "9399ed53186529dc23681e1670ccc44a32fea60d3a33a210b98d6425305c1013",
+      "size_bytes": 1070
+    },
+    {
+      "path": "artifact_package/reports/errors/rmt_norm_noise_l31_ffn_up_b030/runtime_inputs/calibrated_preset_mistralai__mistral-7b-v01.yaml",
+      "sha256": "0b18287d4fafd51d4c6bfecb34ea418986fd2a1c5677d41930775b0ec8f1a06a",
+      "size_bytes": 953
+    },
+    {
+      "path": "artifact_package/reports/errors/scale_explosion/evaluate_timing.json",
+      "sha256": "4b89c3cff9eba2c2cb305ec572aa16b900225ddfd1640f46b6af8e367da09532",
+      "size_bytes": 1540
+    },
+    {
+      "path": "artifact_package/reports/errors/scale_explosion/evaluation.report.json",
+      "sha256": "b4ff63b33f007371cef912c7e0addde5c4a22072d30193afcec75709a85824e6",
+      "size_bytes": 9712089
+    },
+    {
+      "path": "artifact_package/reports/errors/scale_explosion/runtime.manifest.json",
+      "sha256": "07da80f363d9927ef61f79c521754461a6d8a5e35b65658ccecdde1ebe0ca850",
+      "size_bytes": 1058
+    },
+    {
+      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/config_root/runtime/profiles/ci.yaml",
+      "sha256": "f27ccff9c1a9f6d81f0072afb3985ca3c5f894d5cf3a5d061d91a1a323743e26",
+      "size_bytes": 226
+    },
+    {
+      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluate_timing.json",
+      "sha256": "e7ad71fc0a09f6224cd5042bb88ed0702f9ad5d27cda833ca80b7d0778c61901",
+      "size_bytes": 1565
+    },
+    {
+      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json",
+      "sha256": "b34873741b4a8ad264fbefbc42aa4302be53b3c4ad887f0f9f890ff99b2d37ce",
+      "size_bytes": 8902283
+    },
+    {
+      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/runtime.manifest.json",
+      "sha256": "f5f196f7c095fa7cc29cd5a9103057b9cd0eb99625bf9bc5ace0f8b72714dcab",
+      "size_bytes": 1082
+    },
+    {
+      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/runtime_inputs/calibrated_preset_mistralai__mistral-7b-v01.yaml",
+      "sha256": "0b18287d4fafd51d4c6bfecb34ea418986fd2a1c5677d41930775b0ec8f1a06a",
+      "size_bytes": 953
+    },
+    {
+      "path": "artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/config_root/runtime/profiles/ci.yaml",
+      "sha256": "f27ccff9c1a9f6d81f0072afb3985ca3c5f894d5cf3a5d061d91a1a323743e26",
+      "size_bytes": 226
+    },
+    {
+      "path": "artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluate_timing.json",
+      "sha256": "fa25d0586a8c33b8a6e332a98f90632ce85768265c2da217baf43c144aee480f",
+      "size_bytes": 1567
+    },
+    {
+      "path": "artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json",
+      "sha256": "37bc145c7a23c055ae29039673ec2eaf99cec3d5d5eedea8d6010f844a6c4859",
+      "size_bytes": 8903979
+    },
+    {
+      "path": "artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/runtime.manifest.json",
+      "sha256": "dc7f894535250e559227b8e525580e552bb5226f040bfa97e15a61f754420c91",
+      "size_bytes": 1082
+    },
+    {
+      "path": "artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/runtime_inputs/calibrated_preset_mistralai__mistral-7b-v01.yaml",
+      "sha256": "0b18287d4fafd51d4c6bfecb34ea418986fd2a1c5677d41930775b0ec8f1a06a",
+      "size_bytes": 953
+    },
+    {
+      "path": "artifact_package/reports/errors/ve_mlp_scale_skew_l31_down_s090/evaluate_timing.json",
+      "sha256": "82f9f7f183f147127f2f0587dde775f55b4d86a510f8075c1dc831a1cf5c1caa",
+      "size_bytes": 1561
+    },
+    {
+      "path": "artifact_package/reports/errors/ve_mlp_scale_skew_l31_down_s090/evaluation.report.json",
+      "sha256": "672fa36f029f0f971082e85db4496f390942a2917e5e5eb64cc7c2a6f8bb71b8",
+      "size_bytes": 8902241
+    },
+    {
+      "path": "artifact_package/reports/errors/ve_mlp_scale_skew_l31_down_s090/runtime.manifest.json",
+      "sha256": "a773f507660a0036dad8a2b83627c49a3dd3f6e319497e43b12d6b7cca75f4e0",
+      "size_bytes": 1071
+    },
+    {
+      "path": "artifact_package/reports/errors/ve_mlp_scale_skew_l31_down_s090/runtime_inputs/calibrated_preset_mistralai__mistral-7b-v01.yaml",
+      "sha256": "0b18287d4fafd51d4c6bfecb34ea418986fd2a1c5677d41930775b0ec8f1a06a",
+      "size_bytes": 953
+    },
+    {
+      "path": "artifact_package/reports/errors/ve_mlp_scale_skew_l31_down_s090/ve_probe.json",
+      "sha256": "23af79afc58a55bfb594eb2564774444429a6ec928f6869db37d2143f43cf823",
+      "size_bytes": 7540
+    },
+    {
+      "path": "artifact_package/reports/final_verdict.json",
+      "sha256": "851b964224fe4da82f1b7aa987b9fd14250d43ecd69026ce04551743ac17eb2d",
+      "size_bytes": 14695
+    },
+    {
+      "path": "artifact_package/reports/final_verdict.txt",
+      "sha256": "f148ad31d74ea666239d1dc889a35f137b23c611a66b7d76f99a4cd5c153ddd7",
+      "size_bytes": 275
+    },
+    {
+      "path": "artifact_package/reports/fp8_e5m2_stress/run_2/edit_metadata.json",
+      "sha256": "b056c5e150a04b4a4694180acb0048ce80ee5103c24c40b91b005ae27c142e63",
+      "size_bytes": 969
+    },
+    {
+      "path": "artifact_package/reports/fp8_e5m2_stress/run_2/evaluate_timing.json",
+      "sha256": "6c0db813a2cb28d86add1e3bc8982aa2021596074b695734e89d9117e233cad3",
+      "size_bytes": 1531
+    },
+    {
+      "path": "artifact_package/reports/fp8_e5m2_stress/run_2/evaluation.report.json",
+      "sha256": "c95711333520911b9b4ae8cd1ae7f3ef0e4c6007031a42efd2cc94b648f81d17",
+      "size_bytes": 9710288
+    },
+    {
+      "path": "artifact_package/reports/fp8_e5m2_stress/run_2/runtime.manifest.json",
+      "sha256": "875af92f55a098ccab40132aa05982c1d26a51f9ca9cbeb2cc1cff455b5acb45",
+      "size_bytes": 1057
+    },
+    {
+      "path": "artifact_package/reports/guard_intervention_summary.json",
+      "sha256": "613eba6b85d4978eebfbe6f04593a63ca2fefabc0ae8ad797bf75648706b33b6",
+      "size_bytes": 176
+    },
+    {
+      "path": "artifact_package/reports/guard_signal_summary.json",
+      "sha256": "a20557275c7fe66b22d6be7b0ac9b3fb7e605d322d8ccaba76241640cd936074",
+      "size_bytes": 362
+    },
+    {
+      "path": "artifact_package/reports/guard_value_all_guard_probe_sweep.json",
+      "sha256": "17575486a0ec029c509918f217b03aad3f44c5924bda93a3c2272e0a8426f043",
+      "size_bytes": 12940
+    },
+    {
+      "path": "artifact_package/reports/guard_value_probe_sweep.json",
+      "sha256": "289c89d311c1f36d2a6aa02aa173d9fa3b59b4b3a0b62d8c8cc1df44715e87bb",
+      "size_bytes": 13736
+    },
+    {
+      "path": "artifact_package/reports/scenario_signal_summary.json",
+      "sha256": "f26fdf63674f9803beed2b0da2deeee21b3c360dfc60d7cd8d50203b51f638a3",
+      "size_bytes": 1710
+    },
+    {
+      "path": "artifact_package/state/model_revisions.json",
+      "sha256": "3788a04c7f40d0a03ffa0f80ed26f9933ef00b3c681c6286004c59e46c9e778d",
+      "size_bytes": 333
+    },
+    {
+      "path": "artifact_package/state/scenarios.json",
+      "sha256": "b725446c93f77ac927dbbed6215fb2f3b0dc30b5d672819874176cbcf48b44a5",
+      "size_bytes": 8046
+    },
+    {
+      "path": "artifact_package/state/tuned_edit_params.json",
+      "sha256": "13b7f6a365240d2a406859efea0faf5143bd790bf92f6299950e5a6dc2ae781f",
+      "size_bytes": 22749
+    },
+    {
+      "path": "evidence.meta.json",
+      "sha256": "f326fe1ae347055a5c566818860323e7a3b6b666109b41a19cc23d99b6d166b3",
+      "size_bytes": 2558
+    },
+    {
+      "path": "guard_value_summary.json",
+      "sha256": "07387fd99f972cea598f12dc773218ba5c7d425a3b94d14b8e23a8292534498c",
+      "size_bytes": 14623
+    },
+    {
+      "path": "run_command.txt",
+      "sha256": "ef56e60f47fd62c80420de15063b278269c023f4869efc5fa9d0dddf23aa760f",
+      "size_bytes": 1753
+    }
+  ],
+  "schema": "invarlock.public_evidence.guard_value_manifest.v2",
+  "source_run": {
+    "host": "self-hosted CUDA runner",
+    "model_id": "mistralai/Mistral-7B-v0.1",
+    "model_revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",
+    "remote_output_root": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d",
+    "remote_output_roots": [
+      "/root/evidence-pack-runs/mistral_guard_value_real_20260612d",
+      "/root/evidence-pack-runs/mistral_guard_all_guards_20260612a",
+      "/root/evidence-pack-runs/mistral_guard_confirm_20260612a"
+    ],
+    "scenario_ids": [
+      "rmt_norm_noise_l31_ffn_up_b030",
+      "spectral_moderate_scale_attn_l31_o_s112",
+      "spectral_moderate_scale_attn_l31_o_s118",
+      "spectral_moderate_scale_attn_l31_o_s125",
+      "spectral_moderate_scale_mlp_l31_up_s112",
+      "spectral_moderate_scale_mlp_l31_up_s116",
+      "spectral_moderate_scale_mlp_l31_up_s120",
+      "ve_mlp_scale_skew_l31_down_s090"
+    ],
+    "suite": "manual_guard_value_probe_plus_all_guard_confirmation"
+  }
+}

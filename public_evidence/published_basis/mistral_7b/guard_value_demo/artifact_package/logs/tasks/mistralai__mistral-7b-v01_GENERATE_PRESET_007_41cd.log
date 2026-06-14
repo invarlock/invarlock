@@ -1,0 +1,13 @@
+[2026-06-12 07:02:22] Starting task: mistralai__mistral-7b-v01_GENERATE_PRESET_007_41cd
+  Type: GENERATE_PRESET
+  Model: mistralai/Mistral-7B-v0.1
+  GPU(s): 0
+  Params: {}
+[2026-06-12 07:02:22] Generating calibrated preset
+Saved preset to /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/presets/calibrated_preset_mistralai__mistral-7b-v01.yaml
+Saved stats to /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/reports/calibration/calibration_stats.json
+Saved derived preset to /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/presets/calibrated_preset_mistralai__mistral-7b-v01__quant_rtn.yaml
+Saved derived preset to /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/presets/calibrated_preset_mistralai__mistral-7b-v01__fp8_quant.yaml
+Saved derived preset to /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/presets/calibrated_preset_mistralai__mistral-7b-v01__magnitude_prune.yaml
+Saved derived preset to /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/presets/calibrated_preset_mistralai__mistral-7b-v01__lowrank_svd.yaml
+[2026-06-12 07:02:23] Task mistralai__mistral-7b-v01_GENERATE_PRESET_007_41cd finished with exit code: 0

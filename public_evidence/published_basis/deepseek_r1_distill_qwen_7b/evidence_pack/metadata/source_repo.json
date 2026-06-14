@@ -1,0 +1,14 @@
+{
+  "artifact_class": "public_evidence_fixture",
+  "fixture_paths": [
+    "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evaluation.report.json",
+    "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/runtime.manifest.json"
+  ],
+  "repo": "invarlock-public",
+  "source_ref": "c8876a49a9a0efe848be189758ad0819d806b351",
+  "remote_artifacts": {
+    "artifact_manifest": "artifacts/model-evidence/remote/20260612TdeepseekOlmo27bParallelZ/shard-00-gpu-0/artifact_manifest.json",
+    "model_revisions": "artifacts/model-evidence/remote/20260612TdeepseekOlmo27bParallelZ/shard-00-gpu-0/model_revisions.json",
+    "summary": "artifacts/model-evidence/remote/20260612TdeepseekOlmo27bParallelZ/shard-00-gpu-0/summary.json"
+  }
+}

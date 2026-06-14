@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from .generator_helpers import (
+    CORE_GUARDS,
     SUMMARY_CATEGORIES,
     ScenarioCatalog,
     _as_bool,
@@ -16,7 +17,9 @@ from .generator_helpers import (
     _edit_family,
     _evaluate_report,
     _extract_run_num,
+    _guard_baseline_relative_summary,
     _record_primary_guard_hit,
+    _spectral_baseline_relative_summary,
     _spectral_caps_applied,
 )
 
@@ -52,7 +55,14 @@ def _build_scenario_catalog(manifest: dict[str, Any]) -> ScenarioCatalog:
         if category not in expected_by_category:
             continue
         expected_by_category[category].add(scenario_id)
-        if strictness in {"must_pass", "must_fail", "must_detect"}:
+        if (
+            (category == "clean" and strictness == "must_pass")
+            or (category == "stress" and strictness == "must_fail")
+            or (
+                category == "error_injection"
+                and strictness in {"must_fail", "must_detect"}
+            )
+        ):
             gating_by_category[category].add(scenario_id)
         if category == "stress" and strictness == "informational":
             informational_stress.add(scenario_id)
@@ -111,6 +121,43 @@ def _load_report_with_probes(cert_path: Path) -> dict[str, Any] | None:
     return cert
 
 
+def _collect_baseline_reports(output_dir: Path) -> dict[str, dict[str, Any]]:
+    baselines: dict[str, dict[str, Any]] = {}
+
+    candidates: dict[str, list[Path]] = {}
+    for path in sorted(output_dir.glob("*/baseline_reports/**/baseline_report.json")):
+        try:
+            rel = path.relative_to(output_dir)
+        except ValueError:
+            continue
+        if not rel.parts:
+            continue
+        candidates.setdefault(rel.parts[0], []).append(path)
+
+    # Older runs may only retain calibration reports. Use them as a fallback so
+    # baseline-relative detectors still fail/diagnose deterministically.
+    for path in sorted(
+        output_dir.glob("*/reports/calibration/run_*/evaluation.report.json")
+    ):
+        try:
+            rel = path.relative_to(output_dir)
+        except ValueError:
+            continue
+        if not rel.parts or rel.parts[0] in candidates:
+            continue
+        candidates.setdefault(rel.parts[0], []).append(path)
+
+    for model_name, paths in candidates.items():
+        for path in sorted(paths, reverse=True):
+            cert = _load_json_object(path)
+            if cert is not None:
+                cert["_baseline_report_path"] = str(path)
+                baselines[model_name] = cert
+                break
+
+    return baselines
+
+
 def _scenario_detectors(
     spec: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], bool]:
@@ -133,16 +180,22 @@ def _detectors_hit(
     cert: dict[str, Any],
     detectors_any: list[dict[str, Any]],
     detectors_all: list[dict[str, Any]],
+    *,
+    baseline_cert: dict[str, Any] | None,
 ) -> bool:
     if not detectors_any and not detectors_all:
         return False
 
     matched = True
     if detectors_any:
-        matched = any(_detector_matches(cert, detector) for detector in detectors_any)
+        matched = any(
+            _detector_matches(cert, detector, baseline_cert=baseline_cert)
+            for detector in detectors_any
+        )
     if detectors_all:
         matched = matched and all(
-            _detector_matches(cert, detector) for detector in detectors_all
+            _detector_matches(cert, detector, baseline_cert=baseline_cert)
+            for detector in detectors_all
         )
     return matched
 
@@ -171,6 +224,24 @@ def _apply_probe_guard_overrides(
             record["guard_flags"]["variance"] = True
 
 
+def _guard_warnings_summary(cert: dict[str, Any]) -> dict[str, Any]:
+    guard_warnings = cert.get("guard_warnings")
+    if not isinstance(guard_warnings, dict):
+        return {"present": False, "warning_count": 0, "warnings": []}
+    warnings = guard_warnings.get("warnings")
+    if not isinstance(warnings, list):
+        warnings = []
+    warning_count = _as_int(
+        guard_warnings.get("warning_count"),
+        default=len(warnings),
+    )
+    return {
+        "present": bool(guard_warnings.get("present")) or warning_count > 0,
+        "warning_count": max(0, warning_count),
+        "warnings": warnings,
+    }
+
+
 def _build_record(
     *,
     cert: dict[str, Any],
@@ -180,12 +251,33 @@ def _build_record(
     scenario_id: str,
     run_num: int,
     scenario_index: dict[str, dict[str, Any]],
+    baseline_cert: dict[str, Any] | None,
 ) -> dict[str, Any]:
     outcome = _evaluate_report(cert)
     spec = scenario_index.get(scenario_id, {})
     if not isinstance(spec, dict):
         spec = {}
     detectors_any, detectors_all, primary_guard_required = _scenario_detectors(spec)
+
+    detector_kinds = {
+        str(detector.get("kind") or "").strip().lower()
+        for detector in [*detectors_any, *detectors_all]
+        if isinstance(detector, dict)
+    }
+    spectral_baseline_relative_required = (
+        "spectral_caps_baseline_relative" in detector_kinds
+    )
+    primary_guard_baseline_relative_required = (
+        "guard_signal_baseline_relative" in detector_kinds
+    )
+    spectral_baseline_relative = _spectral_baseline_relative_summary(
+        cert,
+        baseline_cert,
+    )
+    guard_baseline_relative = {
+        guard: _guard_baseline_relative_summary(cert, baseline_cert, guard)
+        for guard in CORE_GUARDS
+    }
 
     record: dict[str, Any] = {
         "model": model_name,
@@ -199,15 +291,32 @@ def _build_record(
         "family": _edit_family(scenario_id) if category in {"clean", "stress"} else "",
         "passed": outcome.passed,
         "reasons": list(outcome.reasons),
-        "detectors_hit": _detectors_hit(cert, detectors_any, detectors_all),
+        "detectors_hit": _detectors_hit(
+            cert,
+            detectors_any,
+            detectors_all,
+            baseline_cert=baseline_cert,
+        ),
         "detectors": detectors_any,
         "detectors_all_of": detectors_all,
         "primary_guard_required": primary_guard_required,
         "invariants_status": outcome.invariants_status,
         "guard_flags": outcome.guard_flags,
+        "guard_warnings": _guard_warnings_summary(cert),
         "spectral_caps_applied": _spectral_caps_applied(cert),
+        "spectral_baseline_relative_required": spectral_baseline_relative_required,
+        "spectral_baseline_relative": spectral_baseline_relative,
+        "primary_guard_baseline_relative_required": (
+            primary_guard_baseline_relative_required
+        ),
+        "guard_baseline_relative": guard_baseline_relative,
         "path": str(cert_path),
     }
+    if isinstance(baseline_cert, dict) and isinstance(
+        baseline_cert.get("_baseline_report_path"),
+        str,
+    ):
+        record["baseline_report"] = baseline_cert["_baseline_report_path"]
     _apply_probe_guard_overrides(record, cert)
     record["primary_guard_hit"] = _record_primary_guard_hit(record)
     record["any_core_guard_flag"] = _core_signal_count(record) > 0
@@ -218,9 +327,12 @@ def _collect_records(
     latest: dict[tuple[str, str, str], tuple[int, Path]],
     *,
     scenario_index: dict[str, dict[str, Any]],
+    baseline_reports: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     records: list[dict[str, Any]] = []
     models: set[str] = set()
+    if baseline_reports is None:
+        baseline_reports = {}
     for (model_name, category, scenario_id), (run_num, cert_path) in sorted(
         latest.items()
     ):
@@ -237,6 +349,7 @@ def _collect_records(
                 scenario_id=scenario_id,
                 run_num=run_num,
                 scenario_index=scenario_index,
+                baseline_cert=baseline_reports.get(model_name),
             )
         )
     return records, sorted(models)

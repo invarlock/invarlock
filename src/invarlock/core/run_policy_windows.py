@@ -46,6 +46,11 @@ def _window_payload(window: Mapping[str, Any] | None) -> dict[str, Any]:
         payload["records"] = [
             dict(record) for record in records if isinstance(record, Mapping)
         ]
+    input_records = window_map.get("input_records")
+    if isinstance(input_records, list):
+        payload["input_records"] = [
+            dict(record) for record in input_records if isinstance(record, Mapping)
+        ]
     processor_sha = window_map.get("processor_sha256")
     if isinstance(processor_sha, str) and processor_sha:
         payload["processor_sha256"] = processor_sha

@@ -117,6 +117,35 @@ def test_drift_band_and_tokenizer_hash():
     assert any("Tokenizer hash mismatch" in e for e in errs)
 
 
+def test_accuracy_drift_band_uses_delta_not_ratio():
+    cert = _cert_base(
+        {
+            "kind": "accuracy",
+            "preview": 0.0125,
+            "final": 0.035,
+            "ratio_vs_baseline": 1.0,
+        }
+    )
+    cert["resolved_policy"] = {"metrics": {"accuracy": {"hysteresis_delta_pp": 0.1}}}
+
+    assert v._validate_drift_band(cert) == []
+
+    cert_bad = _cert_base(
+        {
+            "kind": "accuracy",
+            "preview": 0.01,
+            "final": 0.25,
+            "ratio_vs_baseline": 1.0,
+        }
+    )
+    cert_bad["resolved_policy"] = {
+        "metrics": {"accuracy": {"hysteresis_delta_pp": 0.1}}
+    }
+
+    errs = v._validate_drift_band(cert_bad)
+    assert any("accuracy drift out of band" in e for e in errs)
+
+
 def test_profile_lints_helpers(tmp_path: Path):
     cert = _cert_base({"kind": "ppl_causal", "final": 100.0, "ratio_vs_baseline": 1.0})
     cert["meta"]["model_profile"] = {

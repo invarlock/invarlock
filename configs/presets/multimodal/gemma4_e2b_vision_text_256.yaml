@@ -42,7 +42,15 @@ context:
     skip_overhead_check: true
 
 guards:
-  order: ["invariants", "rmt", "variance", "invariants"]
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+  spectral:
+    module_include_patterns:
+      - "model.language_model.layers.*.self_attn.*"
+      - "model.language_model.layers.*.mlp.*"
+  rmt:
+    module_include_patterns:
+      - "model.language_model.layers.*.self_attn.*"
+      - "model.language_model.layers.*.mlp.*"
 
 output:
   dir: "runs"

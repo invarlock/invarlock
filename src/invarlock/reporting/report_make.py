@@ -346,6 +346,7 @@ def _build_evaluation_report(
     edit_name: str | None,
     artifacts_payload: dict[str, Any],
     validation_filtered: dict[str, Any],
+    guard_warning_summary: dict[str, Any] | None = None,
     guard_overhead_section: dict[str, Any],
     pm_tail_result: dict[str, Any],
 ) -> dict[str, Any]:
@@ -375,6 +376,8 @@ def _build_evaluation_report(
         ),
         "artifacts": artifacts_payload,
         "validation": validation_filtered,
+        "guard_warnings": guard_warning_summary
+        or {"present": False, "warning_count": 0, "warnings": []},
         "guard_overhead": guard_overhead_section,
         "primary_metric_tail": pm_tail_result,
         "context": (
@@ -580,6 +583,7 @@ def make_report(
         sections["invariants"],
         sections["spectral"],
         sections["rmt"],
+        sections["variance"],
         sections["ppl_metrics"],
         provenance_env_flags,
         blocking_state,
@@ -607,6 +611,7 @@ def make_report(
         edit_name=policy_context["edit_name"],
         artifacts_payload=assembly_context["artifacts_payload"],
         validation_filtered=assembly_context["validation_filtered"],
+        guard_warning_summary=assembly_context["guard_warning_summary"],
         guard_overhead_section=assembly_context["guard_overhead_section"],
         pm_tail_result=assembly_context["pm_tail_result"],
     )

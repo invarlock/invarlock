@@ -1,0 +1,19 @@
+{
+  "format_version": "published-basis-evidence-pack-recipe-v1",
+  "lane_id": "olmo-2-13b-causal-hf",
+  "suite": "current-supported-experimental",
+  "network_mode": "online_first_then_offline",
+  "commands": [
+    "make runtime-image-cuda",
+    "uv run python scripts/model_evidence/run_model_evidence_remote.py --host root@86.38.238.232 --gpus 0,1 --suite current-supported-experimental --slug tinyllama_1_1b --slug olmo2_7b --slug olmo2_13b --slug qwen3_5_9b --slug gemma4_e2b --slug ministral3_8b --slug ministral3_14b --execution-mode container --remote-env HF_HUB_DISABLE_XET=1 --remote-env HF_HOME=/root/.cache/huggingface --remote-env INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-local --skip-sync --stamp 20260612TremainingExperimentalZ",
+    "uv run invarlock advanced evidence-pack build public_evidence/published_basis/olmo2_13b/evidence_pack --final-verdict tmp/olmo2_13b_pack_inputs/final_verdict.json --report public_evidence/published_basis/olmo2_13b/evaluation.report.json --source-repo tmp/olmo2_13b_pack_inputs/source_repo.json --environment tmp/olmo2_13b_pack_inputs/environment.json --material model_revisions=artifacts/model-evidence/remote/20260612TremainingExperimentalZ/shard-00-gpu-0/model_revisions.json --material artifact_manifest=artifacts/model-evidence/remote/20260612TremainingExperimentalZ/shard-00-gpu-0/artifact_manifest.json --signing-key tmp/olmo2_13b_pack_inputs/evidence-pack-signing-key.pem --profile release --report-assurance strict --release-review"
+  ],
+  "artifacts": [
+    "public_evidence/published_basis/olmo2_13b/evaluation.report.json",
+    "public_evidence/published_basis/olmo2_13b/runtime.manifest.json",
+    "public_evidence/published_basis/olmo2_13b/evidence_pack/manifest.json",
+    "public_evidence/published_basis/olmo2_13b/evidence_pack/manifest.signature.json",
+    "public_evidence/published_basis/olmo2_13b/evidence_pack/checksums.sha256",
+    "public_evidence/published_basis/olmo2_13b/evidence_pack/results/final_verdict.json"
+  ]
+}

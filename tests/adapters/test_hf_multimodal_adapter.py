@@ -296,7 +296,13 @@ def test_hf_multimodal_load_model_uses_resolved_strategy(
     assert adapter._last_model_id == "fake/model"
     assert adapter._last_loader_strategy == "direct_submodule"
     assert adapter._last_loader_label == "direct-loader"
-    assert calls == [("direct-loader", "fake/model", {"trust_remote_code": False})]
+    assert calls == [
+        (
+            "direct-loader",
+            "fake/model",
+            {"load_device": "cpu", "trust_remote_code": False},
+        )
+    ]
 
 
 def test_hf_multimodal_load_model_falls_back_to_auto_loader(
@@ -470,6 +476,74 @@ def test_hf_multimodal_processor_digest_returns_none_when_processor_lookup_fails
     )
 
     assert adapter.processor_digest is None
+
+
+def test_hf_multimodal_processor_digest_computes_from_existing_processor() -> None:
+    adapter = HF_Multimodal_Adapter()
+    processor = SimpleNamespace(name_or_path="already-loaded")
+    adapter._processor = processor
+    adapter._processor_digest = None
+
+    assert adapter.processor_digest == adapter._compute_processor_digest(processor)
+
+
+def test_hf_multimodal_processor_digest_normalizes_processor_metadata() -> None:
+    adapter = HF_Multimodal_Adapter()
+
+    class _SizeDict:
+        def to_dict(self) -> dict[str, int]:
+            return {"height": 224, "width": 224}
+
+    processor = SimpleNamespace(
+        name_or_path="qwen-like",
+        tokenizer=SimpleNamespace(
+            name_or_path="qwen-like",
+            vocab_size=42,
+            eos_token="<eos>",
+            pad_token="<pad>",
+        ),
+        image_processor=SimpleNamespace(
+            size=_SizeDict(),
+            image_mean=(0.5, 0.5, 0.5),
+            image_std=(0.25, 0.25, 0.25),
+        ),
+    )
+
+    digest = adapter._compute_processor_digest(processor)
+
+    assert isinstance(digest, str)
+    assert len(digest) == 64
+
+
+def test_hf_multimodal_processor_digest_normalizes_mapping_and_fallback_values() -> (
+    None
+):
+    adapter = HF_Multimodal_Adapter()
+
+    class _BrokenToDict:
+        def to_dict(self) -> dict[str, int]:
+            raise ValueError("metadata not serializable")
+
+        def __str__(self) -> str:
+            return "fallback-size"
+
+    class _StringOnlyValue:
+        def __str__(self) -> str:
+            return "string-only-value"
+
+    processor = SimpleNamespace(
+        name_or_path="mapping-like",
+        image_processor=SimpleNamespace(
+            size={2: _BrokenToDict(), "height": 224},
+            image_mean=[0.5, {"nested": (0.25, 0.75)}],
+            image_std=_StringOnlyValue(),
+        ),
+    )
+
+    digest = adapter._compute_processor_digest(processor)
+
+    assert isinstance(digest, str)
+    assert len(digest) == 64
 
 
 def test_hf_multimodal_compute_digest_and_helpers_cover_fallback_paths(

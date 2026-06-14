@@ -1,0 +1,30 @@
+{
+  "artifact_paths": {
+    "all_guard_probe_sweep": "artifact_package/reports/guard_value_all_guard_probe_sweep.json",
+    "artifact_package": "artifact_package",
+    "guard_value_manifest": "guard_value_manifest.json",
+    "guard_value_summary": "guard_value_summary.json",
+    "probe_sweep": "artifact_package/reports/guard_value_probe_sweep.json",
+    "run_command": "run_command.txt"
+  },
+  "evidence_class": "real_guard_value_demo",
+  "generated_by": "manual no-calibration guard-value probe sweep and clean confirmation rerun using invarlock evaluate via scripts/evidence_packs/python/task_tools.py and task_evaluate_error",
+  "model_family": "mistral_7b",
+  "model_revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",
+  "non_goals": [
+    "This is real scenario evidence from Mistral-7B, not a synthetic caught-regression fixture.",
+    "The all-guard extension publishes PM-pass, baseline-relative evidence for spectral, RMT, and variance/VE sidecar guards.",
+    "Invariants are structural checks and are required to pass in these PM-pass guard-value cases; no invariant-fail PM-pass flagship case is claimed here.",
+    "The selected reports do not mean every stock runtime cap or sidecar signal is an automatic release failure; they demonstrate the evidence-pack PM+guard comparison can detect targeted regressions relative to noop.",
+    "Reports were generated with report assurance, so verifier commands use --assurance report rather than --assurance strict."
+  ],
+  "profile": "release/report-assurance",
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "Real Mistral-7B baseline-relative guard-value demo: PM-only accepts while spectral, RMT, and variance sidecar probes each publish a reproduced guard movement.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json --profile release --assurance report",
+    "uv run pytest tests/ci/test_golden_runs_offline.py::test_real_guard_value_demo_publishes_baseline_relative_spectral_catch",
+    "uv run invarlock verify public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/errors/rmt_norm_noise_l31_ffn_up_b030/evaluation.report.json --profile release --assurance report",
+    "uv run invarlock verify public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/errors/ve_mlp_scale_skew_l31_down_s090/evaluation.report.json --profile release --assurance report"
+  ]
+}

@@ -7,7 +7,7 @@
 | **Purpose** | Load models, describe structure, and snapshot/restore state for edits and guards. |
 | **Audience** | CLI users choosing `model.adapter` and Python callers instantiating adapters. |
 | **Supported surface** | Core HF text and image-text adapters, auto-match adapters, platform-dependent BNB, GPTQModel-backed AWQ/GPTQ adapters, torchao runtime quantization, HQQ runtime quantization, Quanto runtime quantization, and compressed-tensors checkpoint loading. |
-| **Requires** | `invarlock[adapters]` or `invarlock[hf]` for core HF adapters; `invarlock[gpu]`, `invarlock[awq]`, `invarlock[gptq]`, `invarlock[torchao]`, `invarlock[hqq]`, `invarlock[quanto]`, or `invarlock[compressed-tensors]` for quantized adapters. |
+| **Requires** | `invarlock[adapters]` or `invarlock[hf]` for core HF text adapters; `invarlock[multimodal]` for image-text adapters such as Gemma 4 unified checkpoints; `invarlock[gpu]`, `invarlock[awq]`, `invarlock[gptq]`, `invarlock[torchao]`, `invarlock[hqq]`, `invarlock[quanto]`, or `invarlock[compressed-tensors]` for quantized adapters. All HF-backed extras require `transformers>=5.12.0`. |
 | **Network** | Offline by default; use `evaluate --allow-network` when a run needs model downloads. |
 | **Inputs** | `model.id` (HF repo or local path), adapter name, device. |
 | **Outputs / Artifacts** | Loaded model object; optional snapshots; exported model directories when enabled. |
@@ -18,6 +18,9 @@
 ```bash
 # Install core HF adapters + evaluation stack
 pip install "invarlock[hf]"
+
+# Install HF image-text / multimodal support
+pip install "invarlock[multimodal]"
 
 # Inspect adapter availability
 invarlock advanced plugins adapters
@@ -41,11 +44,14 @@ model = adapter.load_model("gpt2", device="auto")
 print(adapter.describe(model)["model_type"])
 ```
 
-> Adapter availability is broader than the published assurance basis. GPT-2 and
-> BERT back the published calibrated basis; current experimental lanes are
-> enumerated in `contracts/support_matrix.json`, with broader inventory in the
-> Model Family Catalog. Examples include Mistral 7B, Qwen2 7B, Qwen2.5 7B, and
-> Qwen2.5 14B; treat the contract files as authoritative for the complete list.
+> Adapter availability is broader than the published evidence basis. Current
+> `published_basis` lanes span GPT-2/BERT fixtures, dense decoder families
+> (Mistral, Ministral, TinyLlama, Granite, OLMo, OpenLLaMA, Falcon, Qwen,
+> DeepSeek, Phi, Gemma text-only, and SmolLM), FLAN-T5 through `hf_seq2seq`,
+> Gemma 4 image-text through `hf_multimodal` plus `vision_text`, and MoE causal
+> lanes such as OLMoE, Mixtral, and Qwen3 30B-A3B. Treat
+> `contracts/support_matrix.json` as authoritative for model-lane status and the
+> Model Family Catalog as the broader inventory of adapter/profile coverage.
 
 ## Support Tiers
 
@@ -96,7 +102,7 @@ Do not infer `published_basis` from adapter availability alone. For example,
 
 | `model_type` family | Adapter |
 | --- | --- |
-| llama / mistral / mistral3 / mixtral / qwen / gemma / OLMo / yi | `hf_causal` |
+| llama / mistral / mistral3 / mixtral / qwen / gemma / OLMo / OLMoE / yi | `hf_causal` |
 | gpt2 / gpt_oss / opt / neo-x / phi | `hf_causal` |
 | bert / roberta | `hf_mlm` |
 | t5 / bart | `hf_seq2seq` |
@@ -128,7 +134,7 @@ Machine-readable adapter capability metadata is published at
 | --- | --- | --- | --- | --- |
 | `hf_causal` | Decoder-only causal LMs (dense + MoE + GPT2-like) | `invarlock[adapters]` | All platforms with torch | Default causal LM adapter. |
 | `hf_mlm` | BERT/RoBERTa/DeBERTa MLMs | `invarlock[adapters]` | All platforms with torch | Loads `AutoModelForMaskedLM` when possible. |
-| `hf_multimodal` | Image-text generation models exposed through HF `AutoModelForImageTextToText` | `invarlock[adapters]` | All platforms with torch | Single-image `vision_text` evaluation with explicit adapter selection. |
+| `hf_multimodal` | Image-text and unified multimodal generation models exposed through HF `AutoModelForImageTextToText` or `AutoModelForMultimodalLM` | `invarlock[multimodal]` | All platforms with torch | Single-image `vision_text` evaluation with explicit adapter selection; Gemma 4 unified checkpoints require `transformers>=5.12.0` and `torchvision>=0.26.0`. |
 | `hf_seq2seq` | T5/encoder‑decoder models | `invarlock[adapters]` | All platforms with torch | For seq2seq evaluation. |
 | `hf_auto` | Auto-select HF adapter | `invarlock[adapters]` | All platforms with torch | Delegates to a role adapter; prefers quant adapters when detected. |
 | `hf_bnb` | Bitsandbytes quantized LMs | `invarlock[gpu]` | Platform-dependent | Uses `device_map="auto"`; no `.to()`. Latest bitsandbytes wheels can work outside Linux/CUDA when the runtime imports cleanly. |
@@ -173,6 +179,55 @@ model:
 ```
 
 ```yaml
+# Seq2seq text-to-text run
+model:
+  id: google/flan-t5-base
+  adapter: hf_seq2seq
+  device: auto
+
+dataset:
+  provider:
+    kind: hf_seq2seq
+    dataset_name: abisee/cnn_dailymail
+    config_name: 3.0.0
+    src_field: article
+    tgt_field: highlights
+    src_prefix: "summarize: "
+  split: validation
+```
+
+```yaml
+# Gemma 4 image-text run; use explicit hf_multimodal, not adapter auto
+model:
+  id: google/gemma-4-12B-it
+  adapter: hf_multimodal
+  device: auto
+  dtype: bfloat16
+  device_map: auto
+  low_cpu_mem_usage: true
+
+dataset:
+  provider:
+    kind: vision_text
+    path: tests/fixtures/vision_text/demo_manifest.jsonl
+```
+
+```yaml
+# Large/MoE causal LM load; shard across the visible accelerator set
+model:
+  id: Qwen/Qwen3-30B-A3B-Instruct-2507
+  adapter: hf_causal
+  device: cuda
+  dtype: bfloat16
+  device_map: auto
+  low_cpu_mem_usage: true
+```
+
+The `vision_text` path above is a local smoke fixture. Public promotion evidence
+uses materialized, pinned public datasets with dataset materialization summaries
+stored alongside the run artifacts.
+
+```yaml
 # Bitsandbytes quantized load (Linux + gpu extra)
 model:
   id: mistralai/Mistral-7B-v0.1
@@ -190,9 +245,16 @@ Adapter loaders pass through standard Hugging Face `from_pretrained` arguments:
 | --- | --- | --- |
 | `dtype` | Force `float16`/`bfloat16` | HF adapters |
 | `device_map` | Sharding/placement | HF adapters |
+| `low_cpu_mem_usage` | Reduce CPU peak during Hugging Face loads | HF adapters |
+| `memory_efficient_load` | Set `false` to opt out of InvarLock's automatic HF memory defaults | HF adapters |
 | `trust_remote_code` | Enable custom model code only with `INVARLOCK_ALLOW_REMOTE_CODE=1` for public `evaluate`; advanced model-loading commands also expose `--allow-remote-code` | HF adapters |
 | `revision` | Pin model revision | HF adapters |
 | `cache_dir` | Cache location | HF adapters |
+
+By default, HF adapters apply safe memory defaults at load time. Accelerated
+loads get a hardware-aware `dtype` when one is not configured, all HF loads use
+`low_cpu_mem_usage=True` unless overridden, and large/MoE model IDs get
+`device_map="auto"` on accelerated devices. Explicit config values always win.
 
 ### Adapter describe fields
 
@@ -227,7 +289,12 @@ finally:
 ## Troubleshooting
 
 - **Adapter missing from `invarlock advanced plugins adapters`**: install the required extra
-  (`invarlock[adapters]`, `invarlock[gpu]`, `invarlock[gptq]`, `invarlock[awq]`).
+  (`invarlock[adapters]`, `invarlock[multimodal]`, `invarlock[gpu]`,
+  `invarlock[gptq]`, `invarlock[awq]`).
+- **Gemma 4 unified or image-text load fails**: use the explicit
+  `hf_multimodal` adapter and install `invarlock[multimodal]`, which pins the
+  Transformers and torchvision floor required by current Gemma 4 unified
+  checkpoints.
 - **GPTQModel-backed adapters unavailable**: `hf_awq` and `hf_gptq` use
   GPTQModel-backed loading; verify the selected GPTQModel wheel supports your
   Python, PyTorch, and accelerator stack.

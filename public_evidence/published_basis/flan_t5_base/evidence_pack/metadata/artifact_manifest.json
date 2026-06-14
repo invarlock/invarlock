@@ -1,0 +1,66 @@
+{
+  "execution_mode": "container",
+  "files": [
+    {
+      "bytes": 9142613,
+      "path": "eval/google_flan_t5_base/report/evaluation.report.json",
+      "sha256": "753744bd502ea43092ee2e76a557b702126bb8c50a471045b2821a63833482ac"
+    },
+    {
+      "bytes": 727,
+      "path": "eval/google_flan_t5_base/verify.json",
+      "sha256": "bcd5269c74b0f2b4e9a4ddfc6387085c2884b51925824234f2e79bad54f12b2a"
+    },
+    {
+      "bytes": 4765,
+      "path": "logs/google_flan_t5_base.log",
+      "sha256": "8461c80ff036bfba4cc47ef2a2624cb2c93681e17f268ef65c09c28a3df31c9a"
+    },
+    {
+      "bytes": 470,
+      "path": "manifest.json",
+      "sha256": "75e8bb99ddf1f0d4ee344c66fd1fd994eb5c4f73b0ad3802a8fdc26082f8fa2b"
+    },
+    {
+      "bytes": 642,
+      "path": "model_revisions.json",
+      "sha256": "96606f08b859b4a91699646ca26d248a7b456c7515fb0b43d0f6471a8f38f987"
+    },
+    {
+      "bytes": 251,
+      "path": "status.log",
+      "sha256": "948061433f99f5d0567a50e1a35225656dad11bd9664122cad35beae0aad5c6e"
+    },
+    {
+      "bytes": 749,
+      "path": "summary.json",
+      "sha256": "83661ee521694e82c43e6277ffa3a75b4734bbdf2ee9f445325dee8d80b3e5b4"
+    },
+    {
+      "bytes": 234,
+      "path": "summary.tsv",
+      "sha256": "164446fe0438e71f9fc4b979de04376070d18353548184be0cdcf2fc3e766615"
+    }
+  ],
+  "generated_at": "2026-06-13T11:04:31.834450+00:00",
+  "lane_results": [
+    {
+      "detail": null,
+      "evaluate_exit": 0,
+      "lane_id": "flan-t5-base-seq2seq-hf",
+      "model_id": "google/flan-t5-base",
+      "ok": true,
+      "preset": "configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml",
+      "report_path": "/root/model-evidence/20260613TflanT5Seq2SeqReleaseE/shard-00-gpu-0/eval/google_flan_t5_base/report/evaluation.report.json",
+      "slug": "google_flan_t5_base",
+      "status": "ok",
+      "verify_exit": 0,
+      "verify_path": "/root/model-evidence/20260613TflanT5Seq2SeqReleaseE/shard-00-gpu-0/eval/google_flan_t5_base/verify.json"
+    }
+  ],
+  "ok": true,
+  "schema": "invarlock/model-evidence-artifact-manifest-v1",
+  "shard_count": 1,
+  "shard_index": 0,
+  "suite": "support-matrix-backlog-gpu"
+}

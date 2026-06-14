@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -21,9 +22,10 @@ ALLOWED_CLASSES = {
     "policy_failure_fixture",
     "byoe_subject_fixture",
     "real_model_run",
+    "real_guard_value_demo",
     "signed_real_model_pack",
 }
-REAL_CLASSES = {"real_model_run", "signed_real_model_pack"}
+REAL_CLASSES = {"real_model_run", "real_guard_value_demo", "signed_real_model_pack"}
 
 
 def _load_json(path: Path) -> tuple[dict[str, Any] | None, str | None]:
@@ -45,6 +47,9 @@ def _is_inside_special_dir(path: Path, root: Path) -> bool:
 
 def _artifact_dirs(root: Path) -> set[Path]:
     dirs: set[Path] = set()
+    for metadata in root.rglob(META_FILENAME):
+        if metadata.is_file() and not _is_inside_special_dir(metadata, root):
+            dirs.add(metadata.parent)
     for path in root.rglob("*"):
         if not path.is_file() or path.name.startswith("."):
             continue
@@ -132,6 +137,47 @@ def _check_signed_pack(
         )
 
 
+def _check_guard_value_demo(
+    errors: list[str],
+    base: Path,
+    artifact_paths: dict[str, Any],
+) -> None:
+    manifest_path = _require_path(errors, base, artifact_paths, "guard_value_manifest")
+    _require_path(errors, base, artifact_paths, "guard_value_summary")
+    _require_path(errors, base, artifact_paths, "artifact_package", directory=True)
+    if manifest_path is None:
+        return
+    manifest, error = _load_json(manifest_path)
+    if error:
+        errors.append(error)
+        return
+    assert manifest is not None
+    files = manifest.get("files")
+    if not isinstance(files, list) or not files:
+        errors.append(f"{_relative(manifest_path)}: files must be a non-empty list")
+        return
+    for index, entry in enumerate(files):
+        if not isinstance(entry, dict):
+            errors.append(f"{_relative(manifest_path)}: files[{index}] must be object")
+            continue
+        rel_path = entry.get("path")
+        expected_hash = entry.get("sha256")
+        expected_size = entry.get("size_bytes")
+        if not isinstance(rel_path, str) or not rel_path:
+            errors.append(f"{_relative(manifest_path)}: files[{index}].path required")
+            continue
+        path = base / rel_path
+        if not path.is_file():
+            errors.append(f"{_relative(base)}: manifest file missing {rel_path!r}")
+            continue
+        content = path.read_bytes()
+        actual_hash = hashlib.sha256(content).hexdigest()
+        if actual_hash != expected_hash:
+            errors.append(f"{_relative(base)}: manifest hash mismatch for {rel_path!r}")
+        if len(content) != expected_size:
+            errors.append(f"{_relative(base)}: manifest size mismatch for {rel_path!r}")
+
+
 def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
     errors: list[str] = []
     root = root.resolve()
@@ -186,6 +232,9 @@ def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
 
         if "evidence_pack" in artifact_paths:
             _check_signed_pack(errors, artifact_dir, metadata, artifact_paths)
+
+        if evidence_class == "real_guard_value_demo":
+            _check_guard_value_demo(errors, artifact_dir, artifact_paths)
 
         commands = metadata.get("verifier_commands")
         if not isinstance(commands, list) or not commands:

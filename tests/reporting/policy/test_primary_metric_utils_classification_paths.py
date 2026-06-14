@@ -7,9 +7,11 @@ from invarlock.reporting.primary_metric_utils import (
     _attach_classification_primary_metric_fallback,
     _attach_ppl_analysis_fields,
     _attach_primary_metric_from_report,
+    _classification_final_counts,
     _ensure_primary_metric_display_ci,
     _finalize_primary_metric_snapshot,
     _resolve_logspace_ci,
+    _wilson_accuracy_ci,
     attach_primary_metric,
 )
 
@@ -104,6 +106,84 @@ def test_attach_primary_metric_falls_back_when_ppl_ci_is_non_finite() -> None:
     assert pm["display_ci"] == [2.0, 2.0]
 
 
+def test_classification_final_counts_handles_example_and_invalid_paths() -> None:
+    assert _classification_final_counts({"classification": "bad"}) is None
+    assert _classification_final_counts({"classification": {"final": "bad"}}) is None
+    assert _classification_final_counts(
+        {"classification": {"final": {"example_correct": [True, False, 1]}}}
+    ) == (2, 3)
+    assert _classification_final_counts(
+        {
+            "classification": {
+                "final": {"total": 5, "example_correct": [True, False, True]}
+            }
+        }
+    ) == (2, 5)
+    assert (
+        _classification_final_counts(
+            {"classification": {"final": {"example_correct": "bad"}}}
+        )
+        is None
+    )
+    assert (
+        _classification_final_counts({"classification": {"final": {"total": 3}}})
+        is None
+    )
+    assert (
+        _classification_final_counts(
+            {"classification": {"final": {"correct_total": 4, "total": 3}}}
+        )
+        is None
+    )
+
+    class _BrokenMetrics(dict):
+        def get(self, key, default=None):  # type: ignore[override]
+            raise RuntimeError(f"broken:{key}")
+
+    assert _classification_final_counts(_BrokenMetrics()) is None
+
+
+def test_wilson_accuracy_ci_invalid_and_exception_paths(monkeypatch) -> None:
+    assert _wilson_accuracy_ci(0, 0) is None
+    assert _wilson_accuracy_ci(-1, 10) is None
+    assert _wilson_accuracy_ci(11, 10) is None
+
+    monkeypatch.setattr(primary_metric_utils.math, "sqrt", lambda _value: "bad")
+    assert _wilson_accuracy_ci(1, 2) is None
+
+
+def test_finalize_accuracy_primary_metric_falls_back_without_usable_counts() -> None:
+    pm = _finalize_primary_metric_snapshot(
+        {"kind": "accuracy", "final": 0.7},
+        report={},
+        metrics_map={"classification": {"final": {"correct_total": 1, "total": 0}}},
+        baseline_ref=None,
+        ppl_analysis=None,
+    )
+
+    assert pm["display_ci"] == [0.7, 0.7]
+
+
+def test_finalize_accuracy_primary_metric_falls_back_when_wilson_ci_unavailable(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        primary_metric_utils,
+        "_wilson_accuracy_ci",
+        lambda _correct, _total: None,
+    )
+
+    pm = _finalize_primary_metric_snapshot(
+        {"kind": "accuracy", "final": 0.6},
+        report={},
+        metrics_map={"classification": {"final": {"correct_total": 6, "total": 10}}},
+        baseline_ref=None,
+        ppl_analysis=None,
+    )
+
+    assert pm["display_ci"] == [0.6, 0.6]
+
+
 def test_attach_primary_metric_skips_exploding_primary_metric_get() -> None:
     evaluation_report: dict[str, object] = {}
 
@@ -193,6 +273,52 @@ def test_attach_primary_metric_classification_without_baseline(monkeypatch):
     assert pm["kind"] == "accuracy"
     assert pm["final"] == pytest.approx(0.55)
     assert "ratio_vs_baseline" not in pm
+
+
+def test_attach_accuracy_primary_metric_uses_classification_count_ci(monkeypatch):
+    evaluation_report: dict[str, object] = {}
+    report = {
+        "metrics": {
+            "primary_metric": {
+                "kind": "accuracy",
+                "final": 0.55,
+                "ratio_vs_baseline": 0.0,
+            },
+            "classification": {
+                "final": {"correct_total": 55, "total": 100},
+            },
+        },
+        "meta": {"model_id": "invarlock"},
+    }
+
+    import invarlock.eval.primary_metric as pm_mod
+
+    monkeypatch.setattr(
+        pm_mod,
+        "compute_primary_metric_from_report",
+        lambda *_, **__: None,
+        raising=False,
+    )
+
+    attach_primary_metric(
+        evaluation_report,
+        report,
+        baseline_raw={},
+        baseline_ref={},
+        ppl_analysis=None,
+    )
+
+    pm = evaluation_report["primary_metric"]
+    assert pm["kind"] == "accuracy"
+    assert pm["ci"][0] < 0.55 < pm["ci"][1]
+    assert pm["display_ci"] == pm["ci"]
+    assert evaluation_report["report_build"]["synthesized_fields"] == [
+        {
+            "field": "primary_metric.display_ci",
+            "reason": "computed_from_primary_metric_ci",
+            "source": "primary_metric_utils._attach_primary_metric_from_report",
+        }
+    ]
 
 
 def test_attach_primary_metric_classification_bad_final_and_bad_baseline(

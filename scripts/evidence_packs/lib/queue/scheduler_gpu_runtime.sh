@@ -42,7 +42,8 @@ check_oom_safe() {
     # Check each assigned GPU has enough memory
     IFS=',' read -ra gpus <<< "${gpu_ids}"
     for gpu_id in "${gpus[@]}"; do
-        local available=$(get_gpu_available_memory "${gpu_id}")
+        local available
+        available=$(get_gpu_available_memory "${gpu_id}" 2>/dev/null || echo "0")
         if [[ ${available} -lt ${required_mem} ]]; then
             echo "[OOM_CHECK] GPU ${gpu_id} has ${available}GB free but task needs ~${required_mem}GB. RISK DETECTED." >&2
             return 1
@@ -78,7 +79,8 @@ get_oom_risk_level() {
     local min_available=999999
     IFS=',' read -ra gpus <<< "${gpu_ids}"
     for gpu_id in "${gpus[@]}"; do
-        local available=$(get_gpu_available_memory "${gpu_id}")
+        local available
+        available=$(get_gpu_available_memory "${gpu_id}" 2>/dev/null || echo "0")
         [[ ${available} -lt ${min_available} ]] && min_available=${available}
     done
 
@@ -165,7 +167,7 @@ get_gpu_available_memory() {
 
     # Try to read from cache first
     local cached_val
-    cached_val=$(_read_gpu_cache "${gpu_id}" "free_mem")
+    cached_val=$(_read_gpu_cache "${gpu_id}" "free_mem" 2>/dev/null || true)
     if [[ -n "${cached_val}" && "${cached_val}" =~ ^[0-9]+$ ]]; then
         echo "${cached_val}"
         return 0
@@ -234,7 +236,7 @@ is_gpu_idle() {
 
     # Try to read from cache first
     local cached_idle
-    cached_idle=$(_read_gpu_cache "${gpu_id}" "is_idle")
+    cached_idle=$(_read_gpu_cache "${gpu_id}" "is_idle" 2>/dev/null || true)
     if [[ -n "${cached_idle}" ]]; then
         [[ "${cached_idle}" == "true" ]]
         return $?

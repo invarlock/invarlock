@@ -1,0 +1,9 @@
+{
+  "assurance": "strict",
+  "basis": "public_evidence/published_basis/mixtral_8x7b/evaluation.report.json",
+  "evidence_run": "20260613Tmixtral8x7bH100F",
+  "model_id": "mistralai/Mixtral-8x7B-v0.1",
+  "note": "Container-backed release-profile Mixtral 8x7B MoE no-op preservation evidence run on pinned WikiText-103 text data. The run uses the large-model snapshot policy path that skips the optional overhead check and records guard-overhead as not evaluated.",
+  "profile": "release",
+  "verdict": "PASS"
+}

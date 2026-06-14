@@ -21,7 +21,7 @@ def test_materialization_private_edges_for_blank_tokenizer_and_short_labels() ->
         arm="final",
         index=1,
         use_mlm=False,
-        provider_labels_fin=[[7, 8]],
+        provider_labels=[[7, 8]],
         tensor_or_list_to_ints_fn=lambda values: list(values),
     )
 
@@ -189,6 +189,7 @@ def test_materialize_text_provider_dataset_plan_uses_provider_labels_and_metadat
     )
 
     assert result.preview_records[0]["labels"] == [9, 8]
+    assert result.calibration_data[0]["labels"] == [9, 8]
     assert result.calibration_data[1]["labels"] == [7, 6]
     assert result.dataset_meta["stratification"] == {"mode": "balanced"}
     assert result.dataset_meta["scorer_profile"] == {"kind": "seq2seq"}

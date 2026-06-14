@@ -1,0 +1,66 @@
+{
+  "execution_mode": "container",
+  "files": [
+    {
+      "bytes": 8903986,
+      "path": "eval/mistral_7b/report/evaluation.report.json",
+      "sha256": "e63c0b0c05966f9204e9790f784230455c3294e6b4f6904b2bd293e390c24fd2"
+    },
+    {
+      "bytes": 657,
+      "path": "eval/mistral_7b/verify.json",
+      "sha256": "1021962006521e5b596582938745927cab4d4154a6874ce8ba893d2f8fc0c9c5"
+    },
+    {
+      "bytes": 5631,
+      "path": "logs/mistral_7b.log",
+      "sha256": "5556708e71730ca2b94d2a7836f76e4e47df6fcbaa26399f0c7a94f070e0f47c"
+    },
+    {
+      "bytes": 440,
+      "path": "manifest.json",
+      "sha256": "3dd4ee756562623531f75a872779472d3f8d6eee2cc113968ba4cc3cd0f16472"
+    },
+    {
+      "bytes": 681,
+      "path": "model_revisions.json",
+      "sha256": "50c9dc672da3bcb6627101481d244992d53572a3494e93eb74cb3df32250b4f1"
+    },
+    {
+      "bytes": 233,
+      "path": "status.log",
+      "sha256": "a18030e73062c1d5c197c098685d98bdd4f959cb4e80aa4fb9a7f87dca9c35dd"
+    },
+    {
+      "bytes": 715,
+      "path": "summary.json",
+      "sha256": "437ad5c23c3b8e94e0e06ba91ad03a9aed6fc7149d852cc937267d27c01f071e"
+    },
+    {
+      "bytes": 213,
+      "path": "summary.tsv",
+      "sha256": "7049267c09bb396ad3428663e283bbfdef443d7e6c70ed87a593fd2ac956b081"
+    }
+  ],
+  "generated_at": "2026-06-11T22:57:20.311173+00:00",
+  "lane_results": [
+    {
+      "detail": null,
+      "evaluate_exit": 0,
+      "lane_id": "mistral-7b-causal-hf",
+      "model_id": "mistralai/Mistral-7B-v0.1",
+      "ok": true,
+      "preset": "configs/presets/causal_lm/mistral_7b_512.yaml",
+      "report_path": "/root/model-evidence/20260611TmistralQwen2ParallelZ/shard-00-gpu-0/eval/mistral_7b/report/evaluation.report.json",
+      "slug": "mistral_7b",
+      "status": "ok",
+      "verify_exit": 0,
+      "verify_path": "/root/model-evidence/20260611TmistralQwen2ParallelZ/shard-00-gpu-0/eval/mistral_7b/verify.json"
+    }
+  ],
+  "ok": true,
+  "schema": "invarlock/model-evidence-artifact-manifest-v1",
+  "shard_count": 2,
+  "shard_index": 0,
+  "suite": "current-supported-experimental"
+}

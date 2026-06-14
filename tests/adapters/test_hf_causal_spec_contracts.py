@@ -10,9 +10,11 @@ from invarlock.adapters import hf_causal as hf_causal_mod
 from invarlock.adapters.hf_causal import HF_Causal_Adapter
 from invarlock.adapters.hf_causal_specs import (
     _CausalSpec,
+    _ChatGlmDecoderSpec,
     _coerce_config_int,
     _DenseDecoderSpec,
     _FalconDecoderSpec,
+    _FalconH1HybridDecoderSpec,
     _first_item,
     _GlmDecoderSpec,
     _GPT2LikeDecoderSpec,
@@ -277,6 +279,49 @@ def test_phi_glm_and_qwen_specs_cover_metadata_fallbacks() -> None:
         qwen_layer.linear_attn.out_proj
     )
 
+    chatglm_layer = nn.Module()
+    chatglm_layer.self_attention = nn.Module()
+    chatglm_layer.self_attention.query_key_value = _linear(4, 12)
+    chatglm_layer.self_attention.dense = _linear()
+    chatglm_layer.mlp = nn.Module()
+    chatglm_layer.mlp.dense_h_to_4h = _linear(4, 16)
+    chatglm_layer.mlp.dense_4h_to_h = nn.Module()
+    chatglm_layer.input_layernorm = _norm()
+    chatglm_layer.post_attention_layernorm = _norm()
+    chatglm_spec = _ChatGlmDecoderSpec()
+    assert chatglm_spec.matches(object(), object(), []) is False
+    assert chatglm_spec.matches(object(), object(), [chatglm_layer]) is True
+    assert (
+        chatglm_spec.infer_mlp_dim(
+            chatglm_layer, SimpleNamespace(ffn_hidden_size=12), 4
+        )
+        == 8
+    )
+    chatglm_layer.mlp.dense_h_to_4h = nn.Module()
+    assert (
+        chatglm_spec.infer_mlp_dim(
+            chatglm_layer, SimpleNamespace(ffn_hidden_size=12), 4
+        )
+        == 12
+    )
+    chatglm_base = nn.Module()
+    chatglm_base.embedding = nn.Module()
+    chatglm_base.embedding.word_embeddings = nn.Embedding(16, 4)
+    chatglm_model = nn.Module()
+    chatglm_model.transformer = nn.Module()
+    chatglm_model.transformer.output_layer = _linear(4, 16)
+    chatglm_model.transformer.output_layer.weight = (
+        chatglm_base.embedding.word_embeddings.weight
+    )
+    chatglm_model.transformer.embedding = chatglm_base.embedding
+    assert chatglm_spec.tying_map(chatglm_model, chatglm_base) == {
+        "transformer.output_layer.weight": (
+            "transformer.embedding.word_embeddings.weight"
+        )
+    }
+    chatglm_model.transformer.output_layer = _linear(4, 16)
+    assert chatglm_spec.tying_map(chatglm_model, chatglm_base) == {}
+
 
 def test_moe_specs_cover_legacy_tensorized_and_error_paths() -> None:
     legacy_layer = _dense_layer()
@@ -477,6 +522,36 @@ def test_gpt_oss_neox_falcon_opt_and_gpt2_specs_cover_fallbacks() -> None:
     }
     falcon_model.lm_head = _linear(4, 16)
     assert falcon_spec.tying_map(falcon_model, falcon_base) == {}
+
+    falcon_h1_layer = nn.Module()
+    falcon_h1_layer.self_attn = nn.Module()
+    falcon_h1_layer.self_attn.q_proj = _linear()
+    falcon_h1_layer.self_attn.k_proj = _linear()
+    falcon_h1_layer.self_attn.v_proj = _linear()
+    falcon_h1_layer.self_attn.o_proj = _linear()
+    falcon_h1_layer.feed_forward = nn.Module()
+    falcon_h1_layer.feed_forward.gate_proj = nn.Module()
+    falcon_h1_layer.feed_forward.up_proj = _linear(4, 8)
+    falcon_h1_layer.feed_forward.down_proj = _linear(8, 4)
+    falcon_h1_layer.mamba = nn.Module()
+    falcon_h1_layer.mamba.in_proj = _linear()
+    falcon_h1_layer.mamba.out_proj = _linear()
+    falcon_h1_layer.input_layernorm = _norm()
+    falcon_h1_layer.pre_ff_layernorm = _norm()
+    falcon_h1_spec = _FalconH1HybridDecoderSpec()
+    assert falcon_h1_spec.matches(object(), object(), []) is False
+    assert falcon_h1_spec.matches(object(), object(), [falcon_h1_layer]) is True
+    assert (
+        falcon_h1_spec.infer_mlp_dim(
+            falcon_h1_layer, SimpleNamespace(intermediate_size=6), 4
+        )
+        == 6
+    )
+    falcon_h1_base = _base_model_with_layers([falcon_h1_layer])
+    falcon_h1_model = _causal_model(falcon_h1_base)
+    assert falcon_h1_spec.tying_map(falcon_h1_model, falcon_h1_base) == {
+        "lm_head.weight": "model.embed_tokens.weight"
+    }
 
     opt_layer = nn.Module()
     opt_layer.self_attn = nn.Module()

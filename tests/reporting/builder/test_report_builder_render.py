@@ -203,7 +203,7 @@ class TestRenderEvaluationReportMarkdown:
             "| Gate | Status | Measured | Threshold | Basis | Description |" in markdown
         )
         assert "> *Basis:" in markdown
-        assert "| Family | κ | q95 | Max |z| | Violations |" in markdown
+        assert "| Family | κ | q95 | Max |z| | Caps Applied |" in markdown
         assert "Top |z| per family:" in markdown
 
     def test_render_markdown_with_invariant_failures(self):
@@ -477,7 +477,7 @@ class TestRenderEvaluationReportMarkdown:
         markdown = render_report_markdown(evaluation_report)
 
         assert "Spectral Guard" in markdown
-        assert "| Family | κ | q95 | Max |z| | Violations |" in markdown
+        assert "| Family | κ | q95 | Max |z| | Caps Applied |" in markdown
         assert "Top |z| per family" in markdown
         assert "| Family | ε_f | Bare | Guarded |" in markdown
         assert "Bare Primary Metric: 118.000" in markdown

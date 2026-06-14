@@ -28,6 +28,18 @@ from .run_report_formatters import to_html, to_json, to_markdown
 _NON_FATAL_EXCEPTIONS = (AttributeError, OSError, TypeError, ValueError)
 
 
+def _serialize_evaluation_report_json(evaluation_report: dict[str, Any]) -> str:
+    return (
+        json.dumps(
+            evaluation_report,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        + "\n"
+    )
+
+
 def render_evaluation_bundle_reviewer_summary(
     summary: ReportManifestSummary,
     *,
@@ -190,7 +202,7 @@ def save_evaluation_bundle(
 
     saved_files: dict[str, Path] = {}
 
-    report_json = json.dumps(evaluation_report, indent=2, ensure_ascii=False)
+    report_json = _serialize_evaluation_report_json(evaluation_report)
     report_json_path = output_path / "evaluation.report.json"
     report_json_path.write_text(report_json, encoding="utf-8")
     saved_files["report"] = report_json_path

@@ -1,0 +1,66 @@
+{
+  "execution_mode": "container",
+  "files": [
+    {
+      "bytes": 18078670,
+      "path": "eval/mistralai_ministral_3_3b_instruct_2512_bf16/report/evaluation.report.json",
+      "sha256": "63e2af44828a068874a673c08a2f2354308f1e85d67dc1ac0ecfc746b83ac263"
+    },
+    {
+      "bytes": 690,
+      "path": "eval/mistralai_ministral_3_3b_instruct_2512_bf16/verify.json",
+      "sha256": "ad50ecc58328378ab90755298e9e03370f7468f25f50c26ed49945ce7589b1b0"
+    },
+    {
+      "bytes": 5607,
+      "path": "logs/mistralai_ministral_3_3b_instruct_2512_bf16.log",
+      "sha256": "6e9e23494a73105318dc97c38e3dde97cc2574785a2f2c5112809726edcf78ea"
+    },
+    {
+      "bytes": 536,
+      "path": "manifest.json",
+      "sha256": "01f4f9db09007215d9dbd7513a5aec3bbb07f503a3c30762dccc45abe279178f"
+    },
+    {
+      "bytes": 745,
+      "path": "model_revisions.json",
+      "sha256": "caa30e07247513c2767d8636dacbfe05ac06a18ecdbb6efd9a911d1940fda12b"
+    },
+    {
+      "bytes": 299,
+      "path": "status.log",
+      "sha256": "ce1175a2f1561ec31cfcaac5aac74d561457489a6fdb38ccd5f5bd6f4e314910"
+    },
+    {
+      "bytes": 836,
+      "path": "summary.json",
+      "sha256": "bb097c0c0e6f8c437a42da76a89cbea91a24e3466ce1ee7efbb4267a26374029"
+    },
+    {
+      "bytes": 286,
+      "path": "summary.tsv",
+      "sha256": "5da167183a1a84cb59d00966d877877c1dac26dca658d35d1970962c015bf86a"
+    }
+  ],
+  "generated_at": "2026-06-12T10:59:18.007576+00:00",
+  "lane_results": [
+    {
+      "detail": null,
+      "evaluate_exit": 0,
+      "lane_id": "ministral-3-3b-text-causal-hf",
+      "model_id": "mistralai/Ministral-3-3B-Instruct-2512-BF16",
+      "ok": true,
+      "preset": "configs/presets/causal_lm/ministral3_3b_512.yaml",
+      "report_path": "/root/model-evidence/20260612Tministral3bReleaseA/shard-00-gpu-0/eval/mistralai_ministral_3_3b_instruct_2512_bf16/report/evaluation.report.json",
+      "slug": "mistralai_ministral_3_3b_instruct_2512_bf16",
+      "status": "ok",
+      "verify_exit": 0,
+      "verify_path": "/root/model-evidence/20260612Tministral3bReleaseA/shard-00-gpu-0/eval/mistralai_ministral_3_3b_instruct_2512_bf16/verify.json"
+    }
+  ],
+  "ok": true,
+  "schema": "invarlock/model-evidence-artifact-manifest-v1",
+  "shard_count": 1,
+  "shard_index": 0,
+  "suite": "support-matrix-backlog-gpu"
+}

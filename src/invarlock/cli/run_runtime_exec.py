@@ -403,6 +403,8 @@ def run_bare_control(
     finally:
         if private_model_loaded:
             free_model_memory(bare_target_model)
+        else:
+            release_process_memory()
 
     bare_ppl_final = None
     bare_ppl_preview = None
@@ -541,24 +543,27 @@ def execute_guarded_run(
         run_config=run_config,
     )
 
-    with suppress_noisy_warnings(
-        profile_normalized,
-        event_path=getattr(run_config, "event_path", None),
-        context={"phase": "core_runner_execute"},
-    ):
-        core_report = runner.execute(
-            model=model,
-            adapter=adapter,
-            edit=edit_op,
-            guards=guards,
-            config=run_config,
-            calibration_data=calibration_data,
-            auto_config=auto_config,
-            edit_config=dict(edit_config or {}),
-            edit_runtime=edit_runtime,
-            preview_n=preview_count,
-            final_n=final_count,
-        )
+    try:
+        with suppress_noisy_warnings(
+            profile_normalized,
+            event_path=getattr(run_config, "event_path", None),
+            context={"phase": "core_runner_execute"},
+        ):
+            core_report = runner.execute(
+                model=model,
+                adapter=adapter,
+                edit=edit_op,
+                guards=guards,
+                config=run_config,
+                calibration_data=calibration_data,
+                auto_config=auto_config,
+                edit_config=dict(edit_config or {}),
+                edit_runtime=edit_runtime,
+                preview_n=preview_count,
+                final_n=final_count,
+            )
+    finally:
+        release_process_memory()
     return core_report, model
 
 

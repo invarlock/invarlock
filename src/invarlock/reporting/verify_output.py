@@ -184,6 +184,18 @@ def build_verify_json_result_item(
         primary_metric=primary_metric,
         tolerance=tolerance,
     )
+    guard_warnings = (
+        cert_obj.get("guard_warnings", {}) if isinstance(cert_obj, dict) else {}
+    )
+    warning_count = 0
+    warnings_present = False
+    if isinstance(guard_warnings, dict):
+        try:
+            warning_count = int(guard_warnings.get("warning_count") or 0)
+        except _VERIFY_OUTPUT_EXCEPTIONS:
+            warnings = guard_warnings.get("warnings")
+            warning_count = len(warnings) if isinstance(warnings, list) else 0
+        warnings_present = bool(guard_warnings.get("present")) or warning_count > 0
     item = {
         "id": str(cert_path),
         "schema_version": "v1",
@@ -193,6 +205,8 @@ def build_verify_json_result_item(
         "ratio_vs_baseline": _coerce_finite_float(ratio),
         "ci": ci_out,
         "recompute": recompute,
+        "guard_warnings_present": warnings_present,
+        "warning_count": warning_count,
     }
     if verification:
         item["verification"] = verification

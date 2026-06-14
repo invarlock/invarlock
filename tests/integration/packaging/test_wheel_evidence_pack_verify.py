@@ -138,7 +138,7 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
     assert resolved_public_evidence
     for evidence in resolved_public_evidence.values():
         for key, path in evidence.items():
-            if key in {"artifact_package", "evidence_pack_fixture"}:
+            if key in {"artifact_package", "evidence_pack_fixture", "guard_value_demo"}:
                 assert Path(path).is_dir(), path
             else:
                 assert Path(path).is_file(), path

@@ -15,19 +15,19 @@
 
 <p align="center">
   <a href="https://github.com/invarlock/invarlock/actions/workflows/ci.yml">
-    <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&label=CI&logo=github&labelColor=172b25&color=0f7669" />
+    <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&label=CI&logo=github&labelColor=18150f&color=1f3a7a" />
   </a>
   <a href="https://pypi.org/project/invarlock/">
-    <img alt="PyPI" src="https://img.shields.io/pypi/v/invarlock?label=PyPI&logo=pypi&labelColor=172b25&color=0f7669" />
+    <img alt="PyPI" src="https://img.shields.io/pypi/v/invarlock?label=PyPI&logo=pypi&labelColor=18150f&color=1f3a7a" />
   </a>
   <a href="https://invarlock.github.io/invarlock/0.10.0/">
-    <img alt="Docs" src="https://img.shields.io/badge/docs-quickstart-0f7669?labelColor=172b25" />
+    <img alt="Docs" src="https://img.shields.io/badge/docs-quickstart-1f3a7a?labelColor=18150f" />
   </a>
   <a href="LICENSE">
-    <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-0f7669?labelColor=172b25" />
+    <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-1f3a7a?labelColor=18150f" />
   </a>
   <a href="https://www.python.org/downloads/release/python-3120/">
-    <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-0f7669?logo=python&logoColor=f3eadc&labelColor=172b25" />
+    <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-1f3a7a?logo=python&logoColor=f4efe3&labelColor=18150f" />
   </a>
 </p>
 
@@ -55,6 +55,11 @@ The `public_evidence/` tree separates verifier fixtures from real runs. Fixtures
 validate report, runtime-manifest, failure-policy, and evidence-pack contracts;
 `public_evidence/real_runs/` contains concrete GPT-2-family `invarlock evaluate`
 runs with signed, fingerprint-pinned evidence packs.
+The strongest public guard-value artifact is the Mistral 7B scenario package at
+`public_evidence/published_basis/mistral_7b/guard_value_demo/`: PM-only accepts
+the selected edits, while the evidence-pack PM+guards comparison records
+baseline-relative spectral, RMT, and variance/VE guard movement from clean
+reruns.
 
 ## Why InvarLock?
 
@@ -213,6 +218,9 @@ pip install invarlock
 # HF workflows (torch/transformers)
 pip install "invarlock[hf]"
 ```
+
+HF-backed extras require `transformers>=5.12.0`; this covers text, multimodal,
+and quantized adapter loading through one tested HF runtime floor.
 
 Optional extras: `invarlock[probes]`, `invarlock[gpu]`,
 `invarlock[awq,gptq]`, `invarlock[torchao]`, `invarlock[hqq]`,

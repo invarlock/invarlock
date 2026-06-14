@@ -100,12 +100,20 @@ model:
   device: auto
   # extra adapter kwargs (passed to load_model)
   dtype: float16
+  low_cpu_mem_usage: true
+  memory_efficient_load: true
   trust_remote_code: false
   # Optional: v5-native HF quantization config (e.g., bitsandbytes)
   # quantization_config:
   #   quant_method: bitsandbytes
   #   bitwidth: 8
 ```
+
+For HF adapters, `memory_efficient_load` defaults to automatic behavior:
+accelerated loads receive a hardware-aware dtype when unset, HF loading uses
+`low_cpu_mem_usage=True`, and large/MoE model IDs receive `device_map: auto` on
+accelerated devices. Set explicit values to override the defaults, or set
+`memory_efficient_load: false` to opt out.
 
 ### Dataset
 
@@ -193,8 +201,8 @@ context:
     tiny_relax: false
   snapshot:
     mode: auto
-    ram_fraction: 0.4
-    threshold_mb: 768
+    ram_fraction: 0.4        # chunk when model exceeds this RAM fraction
+    threshold_mb: 768        # absolute chunked-snapshot threshold
     disk_free_margin_ratio: 1.2
     temp_dir: /tmp
 ```

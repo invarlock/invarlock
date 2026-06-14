@@ -221,11 +221,14 @@ Stress edits are split into required-fail (catastrophic) and informational scena
 Required-fail scenarios are gating in the final verdict; informational scenarios are tracked
 as detection-quality signals and are validated by a minimum signal-fraction criterion.
 
-Important nuance: some guards remediate without flipping a boolean validation gate. For
-example, Spectral can remain `validation.spectral_stable=true` while applying caps
-(`spectral.caps_applied > 0`). Informational stress scenarios treat both hard gate flips
-and remediation events (caps applied) as a “signal” so the suite measures guard activity
-without manufacturing clean false positives.
+Important nuance: some guards remediate without flipping a boolean validation
+gate. For example, Spectral can remain `validation.spectral_stable=true` while
+applying caps (`spectral.caps_applied > 0`). Raw remediation events can be
+useful diagnostics, but public guard-value evidence must be baseline-relative:
+a stock cap already present in the noop basis does not count. Published
+guard-value cases must show PM acceptance plus new guard movement relative to
+the matching baseline, then reproduce that movement in a clean confirmation
+rerun.
 
 | Edit Type | Artifact class | Parameters | Scope |
 | --- | --- | --- | --- |
@@ -266,6 +269,11 @@ primary-metric improvement.
 
 Source of truth: `scripts/evidence_packs/scenarios.json` strictness + `intent` +
 `primary_guard` metadata.
+
+The reference public package for this stricter interpretation is
+`public_evidence/published_basis/mistral_7b/guard_value_demo/`, whose
+`artifact_package/reports/guard_value_all_guard_probe_sweep.json` records
+baseline-relative spectral, RMT, and variance/VE cases.
 
 ## Scheduling
 

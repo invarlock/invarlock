@@ -109,6 +109,7 @@ gpu = "optional"
 invoked_by = ["make model-evidence-list", "make model-evidence-sweep", "manual remote campaigns"]
 description = "Model-evidence sweep planning, remote launch, command generation, and outputs."
 paths = [
+  "scripts/model_evidence/materialize_vision_text_dataset.py",
   "scripts/model_evidence/model_evidence_lanes.py",
   "scripts/model_evidence/model_evidence_sweep.py",
   "scripts/model_evidence/run_model_evidence_remote.py",

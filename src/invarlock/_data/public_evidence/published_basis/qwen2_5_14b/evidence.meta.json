@@ -1,0 +1,22 @@
+{
+  "artifact_paths": {
+    "evaluation_report": "evaluation.report.json",
+    "evidence_pack": "evidence_pack",
+    "evidence_pack_recipe": "evidence_pack_recipe.json",
+    "runtime_manifest": "runtime.manifest.json"
+  },
+  "evidence_class": "strict_pass_fixture",
+  "expected_fingerprint": "sha256:6bab9631ede03ba661d17e0f399e2dd9b1facbd739f21aa7e45af0c929806d13",
+  "generated_by": "model evidence remote sweep",
+  "model_revision": "97e1e76335b7017d8f67c08a19d103c0504298c9",
+  "non_goals": [
+    "Model weights are external Hugging Face references.",
+    "This fixture is a no-op preservation basis, not a fine-tuning or compression benchmark."
+  ],
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "Release-strict verifier fixture for the Qwen2.5 14B published-basis lane.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/published_basis/qwen2_5_14b/evaluation.report.json --profile release --assurance strict",
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/qwen2_5_14b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:6bab9631ede03ba661d17e0f399e2dd9b1facbd739f21aa7e45af0c929806d13"
+  ]
+}

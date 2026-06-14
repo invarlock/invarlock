@@ -1,0 +1,185 @@
+=== Evidence Pack Preflight ===
+Execution mode: container
+Network mode: PACK_NET=1 (INVARLOCK_ALLOW_NETWORK=1)
+Remote code opt-in: INVARLOCK_ALLOW_REMOTE_CODE=1
+Baseline storage mode: snapshot_copy
+Flash-attn policy: SKIP_FLASH_ATTN=true
+
+============================================================
+PHASE 0: DATASET PREFLIGHT
+============================================================
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[DATASET_PREFLIGHT] OK: provider=wikitext2 split=validation size=3760
+[2026-06-12 06:54:53] Dataset preflight: OK
+
+============================================================
+PHASE 0: DEPENDENCY CHECK
+============================================================
+Transformers 5.5.0
+[2026-06-12 06:54:58] Flash Attention 2: Skipped (SKIP_FLASH_ATTN=true)
+[2026-06-12 06:54:58] All dependencies satisfied
+Wrote model revisions to /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/state/model_revisions.json
+========================================================================
+  InvarLock Evidence Pack Suite vevidence-packs-v1
+  autoGB x 2 GPU DYNAMIC SCHEDULING
+========================================================================
+
+[2026-06-12 06:54:59] GPU pool configured from CUDA_VISIBLE_DEVICES: NUM_GPUS=2, GPU_ID_LIST=0,1
+
+============================================================
+PHASE 0: GPU ENVIRONMENT SETUP
+============================================================
+=== Evidence Pack Environment Configuration ===
+
+GPUs Detected: 2
+  GPU 0: NVIDIA A100-SXM4-80GB (79.2 GB)
+  GPU 1: NVIDIA A100-SXM4-80GB (79.2 GB)
+
+Total VRAM: 158.5 GB
+Min GPU VRAM: 79.2 GB
+FP8 Support: True
+
+Determinism mode: throughput (PACK_DETERMINISM=throughput)
+
+TF32 enabled: True
+cuDNN benchmark: True
+Default dtype: bfloat16
+
+Flash Attention 2: False
+torch.compile: True
+
+[PACK_GPU_NAME=NVIDIA A100-SXM4-80GB]
+[PACK_GPU_MEM_GB=79]
+[PACK_GPU_COUNT=2]
+[FP8_NATIVE_SUPPORT=true]
+
+=== Environment Ready for Evidence Pack Runs ===
+[2026-06-12 06:55:02] GPU Environment Setup: Complete (FP8_NATIVE_SUPPORT=true)
+[2026-06-12 06:55:02] Output directory: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j
+[2026-06-12 06:55:02] GPU pool: 2 GPU(s) [0,1]
+[2026-06-12 06:55:02] Models: 1 (PACK_SUITE=subset)
+[2026-06-12 06:55:03] Edit scenarios: 0 clean + 1 stress = 1 per model (state/scenarios.json)
+[2026-06-12 06:55:03] Edit evaluate runs: clean=0×3=0, stress=1×2=2 (total=2 per model)
+[2026-06-12 06:55:03] Error scenarios: 2 (RUN_ERROR_INJECTION=true) (state/scenarios.json)
+[2026-06-12 06:55:03] Tuned edit presets: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/state/tuned_edit_params.json
+[2026-06-12 06:55:03] Calibration presets: 5 run(s)
+[2026-06-12 06:55:03] Scheduling: DYNAMIC (work-stealing enabled)
+[2026-06-12 06:55:03]
+
+============================================================
+PHASE 1: INITIALIZING TASK QUEUE
+============================================================
+/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/queue
+[2026-06-12 06:55:03] GPU reservations dir: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/workers/gpu_reservations; GPUs: 0,1
+[2026-06-12 06:55:03] Generating tasks for all models...
+[2026-06-12 06:55:03] Config: CLEAN_EDIT_RUNS=3, STRESS_EDIT_RUNS=2, RUN_ERROR_INJECTION=true, DRIFT_CALIBRATION_RUNS=5, PACK_PRESET_READY=false, PACK_USE_BATCH_EDITS=auto
+[2026-06-12 06:55:03] Models: mistralai/Mistral-7B-v0.1
+
+=== Generating tasks for model 1: mistralai__mistral-7b-v01 ===
+Created: mistralai__mistral-7b-v01_SETUP_BASELINE_001_6f25
+Created: mistralai__mistral-7b-v01_CALIBRATION_RUN_002_48c0
+Created: mistralai__mistral-7b-v01_CALIBRATION_RUN_003_1f87
+Created: mistralai__mistral-7b-v01_CALIBRATION_RUN_004_07f5
+Created: mistralai__mistral-7b-v01_CALIBRATION_RUN_005_61a9
+Created: mistralai__mistral-7b-v01_CALIBRATION_RUN_006_31d4
+Created: mistralai__mistral-7b-v01_GENERATE_PRESET_007_41cd
+Created: mistralai__mistral-7b-v01_SETUP_EVALUATE_BASELINE_REPORT_008_21f7
+Created: mistralai__mistral-7b-v01_CREATE_EDIT_009_3114
+Created: mistralai__mistral-7b-v01_evaluate_EDIT_010_6a14
+Created: mistralai__mistral-7b-v01_evaluate_EDIT_011_08e7
+Created: mistralai__mistral-7b-v01_CLEANUP_EDIT_012_2db9
+Created: mistralai__mistral-7b-v01_CREATE_ERROR_013_6a07
+Created: mistralai__mistral-7b-v01_evaluate_ERROR_014_5c90
+Created: mistralai__mistral-7b-v01_CLEANUP_ERROR_015_1670
+Created: mistralai__mistral-7b-v01_CREATE_ERROR_016_4ff0
+Created: mistralai__mistral-7b-v01_evaluate_ERROR_017_2ab3
+Created: mistralai__mistral-7b-v01_CLEANUP_ERROR_018_0821
+Generated tasks for model mistralai__mistral-7b-v01
+
+=== Resolving initial dependencies ===
+Moved 1 tasks to ready queue
+
+=== QUEUE STATUS ===
+Pending:   17
+Ready:     1
+Running:   0
+Completed: 0
+Failed:    0
+Total:     18
+[2026-06-12 06:55:05] Resolved initial dependencies: moved 0 task(s) to ready queue
+[2026-06-12 06:55:05] Total tasks in queue: 18 (pending+ready: 18)
+
+============================================================
+PHASE 2: LAUNCHING GPU WORKERS
+============================================================
+[2026-06-12 06:55:05] Starting 2 GPU workers with dynamic task scheduling...
+
+============================================================
+PHASE 3: MONITORING PROGRESS
+============================================================
+[2026-06-12 06:55:05]   GPU 0: Starting worker
+[2026-06-12 06:55:05]   GPU 1: Starting worker
+[2026-06-12 06:56:05] Progress: 1/18 tasks (5%) | Running: 2 | Ready: 7 | Failed: 0
+[2026-06-12 06:57:05] Progress: 1/18 tasks (5%) | Running: 2 | Ready: 7 | Failed: 0
+[2026-06-12 06:58:05] Progress: 3/18 tasks (16%) | Running: 2 | Ready: 5 | Failed: 0
+[2026-06-12 06:59:06] Progress: 3/18 tasks (16%) | Running: 2 | Ready: 5 | Failed: 0
+[2026-06-12 07:00:06] Progress: 5/18 tasks (27%) | Running: 2 | Ready: 3 | Failed: 0
+[2026-06-12 07:01:06] Progress: 6/18 tasks (33%) | Running: 2 | Ready: 2 | Failed: 0
+[2026-06-12 07:02:06] Monitor: Promoted 1 task(s) from pending to ready queue
+[2026-06-12 07:02:07] Progress: 7/18 tasks (38%) | Running: 2 | Ready: 2 | Failed: 0
+[2026-06-12 07:03:07] Progress: 10/18 tasks (55%) | Running: 1 | Ready: 0 | Failed: 0
+[2026-06-12 07:04:07] Progress: 10/18 tasks (55%) | Running: 1 | Ready: 0 | Failed: 0
+[2026-06-12 07:05:07] Progress: 10/18 tasks (55%) | Running: 1 | Ready: 0 | Failed: 0
+[2026-06-12 07:06:07] Progress: 10/18 tasks (55%) | Running: 1 | Ready: 0 | Failed: 0
+[2026-06-12 07:07:08] Progress: 10/18 tasks (55%) | Running: 1 | Ready: 0 | Failed: 0
+[2026-06-12 07:08:08] Progress: 10/18 tasks (55%) | Running: 1 | Ready: 0 | Failed: 0
+[2026-06-12 07:09:08] Progress: 10/18 tasks (55%) | Running: 1 | Ready: 0 | Failed: 0
+[2026-06-12 07:10:08] Progress: 11/18 tasks (61%) | Running: 2 | Ready: 2 | Failed: 0
+[2026-06-12 07:11:09] Progress: 11/18 tasks (61%) | Running: 2 | Ready: 2 | Failed: 0
+[2026-06-12 07:12:09] Progress: 11/18 tasks (61%) | Running: 2 | Ready: 2 | Failed: 0
+[2026-06-12 07:13:09] Progress: 11/18 tasks (61%) | Running: 2 | Ready: 2 | Failed: 0
+[2026-06-12 07:14:09] Progress: 11/18 tasks (61%) | Running: 2 | Ready: 2 | Failed: 0
+[2026-06-12 07:15:10] Progress: 11/18 tasks (61%) | Running: 2 | Ready: 2 | Failed: 0
+[2026-06-12 07:16:10] Progress: 11/18 tasks (61%) | Running: 2 | Ready: 2 | Failed: 0
+[2026-06-12 07:17:10] Monitor: Promoted 1 task(s) from pending to ready queue
+[2026-06-12 07:17:10] Progress: 13/18 tasks (72%) | Running: 2 | Ready: 1 | Failed: 0
+[2026-06-12 07:18:10] Progress: 13/18 tasks (72%) | Running: 2 | Ready: 1 | Failed: 0
+[2026-06-12 07:19:10] Progress: 13/18 tasks (72%) | Running: 2 | Ready: 1 | Failed: 0
+[2026-06-12 07:20:11] Progress: 13/18 tasks (72%) | Running: 2 | Ready: 1 | Failed: 0
+[2026-06-12 07:21:11] Progress: 13/18 tasks (72%) | Running: 2 | Ready: 1 | Failed: 0
+[2026-06-12 07:22:11] Progress: 13/18 tasks (72%) | Running: 2 | Ready: 1 | Failed: 0
+[2026-06-12 07:23:11] Progress: 13/18 tasks (72%) | Running: 2 | Ready: 1 | Failed: 0
+[2026-06-12 07:24:11] Monitor: Promoted 2 task(s) from pending to ready queue
+[2026-06-12 07:24:11] Progress: 15/18 tasks (83%) | Running: 1 | Ready: 2 | Failed: 0
+[2026-06-12 07:25:11] Shutdown signal sent to all workers
+[2026-06-12 07:25:12] Waiting for all workers to complete...
+[2026-06-12 07:25:12]   GPU 0: Worker completed successfully
+[2026-06-12 07:25:12]   GPU 1: Worker completed successfully
+=== QUEUE STATUS ===
+Pending:   0
+Ready:     0
+Running:   0
+Completed: 18
+Failed:    0
+Total:     18
+
+============================================================
+PHASE 4: ANALYSIS
+============================================================
+
+============================================================
+FINAL VERDICT
+============================================================
+[2026-06-12 07:25:12] Wrote: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/reports/final_verdict.txt
+[2026-06-12 07:25:12] Wrote: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/reports/final_verdict.json
+
+============================================================
+COMPLETE
+============================================================
+[2026-06-12 07:25:12] Total time: 0h 30m 13s
+[2026-06-12 07:25:12] Tasks completed: 18/18
+[2026-06-12 07:25:12] Report: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/reports/final_verdict.txt
+[2026-06-12 07:25:12] Presets: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/presets/
+Verified: 2 expected-pass, 2 error-injection expected-fail, 0 scenario expected-fail, 0 unexpected failures; report assurance=report
+[run_pack.sh] Writing README.md to /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/.evidence_pack.tmp.fcQPPS
+[2026-06-12 07:25:17] Script interrupted or finished with exit code: 0

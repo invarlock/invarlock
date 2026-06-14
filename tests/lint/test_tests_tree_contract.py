@@ -15,7 +15,6 @@ EXPECTED_EXECUTABLE_DIRS = {
     "docs",
     "edits",
     "eval",
-    "fuzzing",
     "guards",
     "integration",
     "lint",

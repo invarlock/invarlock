@@ -1,0 +1,66 @@
+{
+  "execution_mode": "container",
+  "files": [
+    {
+      "bytes": 19269572,
+      "path": "eval/microsoft_phi_4_mini_instruct/report/evaluation.report.json",
+      "sha256": "0ed5f0534cd2e56e7c8bd5aa281e3189203403f5844b4956d33f0bab4d59ec31"
+    },
+    {
+      "bytes": 743,
+      "path": "eval/microsoft_phi_4_mini_instruct/verify.json",
+      "sha256": "35fa38a9bd3b47ca580708c370b38b1d24bf0db6fb1e68fbc671e71ed8b13ced"
+    },
+    {
+      "bytes": 5168,
+      "path": "logs/microsoft_phi_4_mini_instruct.log",
+      "sha256": "761f4f7e3e32f2481709b6c71981cbb494b41df6d4859d55844453ef7f245278"
+    },
+    {
+      "bytes": 464,
+      "path": "manifest.json",
+      "sha256": "e140e166dd7282bf913d59b1dc00650c14a692dcee10b7c5a52fcd4075eca415"
+    },
+    {
+      "bytes": 703,
+      "path": "model_revisions.json",
+      "sha256": "8a8c2af0fa37673d78f169b1e27ba6897a99650283d17e161a7baf97f54a82ad"
+    },
+    {
+      "bytes": 271,
+      "path": "status.log",
+      "sha256": "6cb1e4eb60f61550fa474f3881d4e7e68f5692d4c48269b59360e4065fe45df9"
+    },
+    {
+      "bytes": 773,
+      "path": "summary.json",
+      "sha256": "dea12d8e9061e482c01e1bae7589cb5e09840a5abb696edf8db8465b7ff6fc10"
+    },
+    {
+      "bytes": 252,
+      "path": "summary.tsv",
+      "sha256": "26dd12eef9c6211d10f8cbba3b815ab193c309e049797abc1f3f20c051cbafc7"
+    }
+  ],
+  "generated_at": "2026-06-13T08:44:36.642183+00:00",
+  "lane_results": [
+    {
+      "detail": null,
+      "evaluate_exit": 0,
+      "lane_id": "phi-4-mini-causal-hf",
+      "model_id": "microsoft/Phi-4-mini-instruct",
+      "ok": true,
+      "preset": "configs/presets/causal_lm/phi4_mini_512.yaml",
+      "report_path": "/root/model-evidence/20260613Tphi4MiniRelease400FixA/shard-00-gpu-1/eval/microsoft_phi_4_mini_instruct/report/evaluation.report.json",
+      "slug": "microsoft_phi_4_mini_instruct",
+      "status": "ok",
+      "verify_exit": 0,
+      "verify_path": "/root/model-evidence/20260613Tphi4MiniRelease400FixA/shard-00-gpu-1/eval/microsoft_phi_4_mini_instruct/verify.json"
+    }
+  ],
+  "ok": true,
+  "schema": "invarlock/model-evidence-artifact-manifest-v1",
+  "shard_count": 1,
+  "shard_index": 0,
+  "suite": "support-matrix-backlog-gpu"
+}

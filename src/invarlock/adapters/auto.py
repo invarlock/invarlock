@@ -29,6 +29,7 @@ _CAUSAL_MODEL_TYPES = {
     "mixtral",
     "olmo",
     "olmo2",
+    "olmoe",
     "opt",
     "phi",
     "phi3",

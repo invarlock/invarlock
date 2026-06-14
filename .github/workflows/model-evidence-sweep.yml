@@ -34,8 +34,16 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # Scheduled GPU evidence should not pile up behind an unavailable self-hosted
+  # runner. Manual launches keep unique groups so maintainers can run explicit
+  # shards without canceling each other.
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'schedule' }}
+
 jobs:
   model-evidence-sweep:
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.ENABLE_NIGHTLY_GPU_EVIDENCE == 'true' }}
     runs-on:
       - self-hosted
       - linux

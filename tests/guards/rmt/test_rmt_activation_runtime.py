@@ -89,6 +89,19 @@ def test_collect_calibration_batches_handles_non_mapping_policy_and_len_failure(
     ) == [0, 4]
 
 
+def test_get_activation_modules_includes_t5_dense_relu_dense_projections() -> None:
+    model = nn.Module()
+    model.encoder = nn.Module()
+    model.encoder.block = nn.ModuleList([nn.Module()])
+    model.encoder.block[0].layer = nn.ModuleList([nn.Module(), nn.Module()])
+    model.encoder.block[0].layer[1].DenseReluDense = nn.Module()
+    model.encoder.block[0].layer[1].DenseReluDense.wo = nn.Linear(2, 2)
+
+    modules = dict(runtime.get_activation_modules(model, allowed_suffixes=()))
+
+    assert "encoder.block.0.layer.1.DenseReluDense.wo" in modules
+
+
 def test_prepare_activation_inputs_normalizes_and_falls_back_to_clone(
     monkeypatch,
 ) -> None:
@@ -110,6 +123,26 @@ def test_prepare_activation_inputs_normalizes_and_falls_back_to_clone(
     assert attention_mask is not None
     assert tuple(input_ids.shape) == (1, 2)
     assert tuple(attention_mask.shape) == (1, 2)
+
+
+def test_release_activation_batch_memory_paths(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(torch.cuda, "empty_cache", lambda: calls.append("empty"))
+
+    runtime._release_activation_batch_memory(None)
+    runtime._release_activation_batch_memory(torch.device("cpu"))
+    runtime._release_activation_batch_memory(torch.device("cuda"))
+
+    assert calls == ["empty"]
+
+    monkeypatch.setattr(
+        torch.cuda,
+        "empty_cache",
+        lambda: (_ for _ in ()).throw(RuntimeError("cache unavailable")),
+    )
+    runtime._release_activation_batch_memory(torch.device("cuda"))
 
 
 def test_prepare_activation_inputs_drops_mask_when_clone_fallback_fails(
@@ -428,6 +461,27 @@ def test_compute_activation_edge_risk_handles_attention_mask_typeerror_and_bad_h
     assert result["edge_risk_by_family"]["attn"] >= 0.0
 
 
+def test_compute_activation_edge_risk_releases_each_batch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(
+        runtime,
+        "_release_activation_batch_memory",
+        lambda device: calls.append(str(device)),
+    )
+
+    result = runtime.compute_activation_edge_risk(
+        TinyActivationModel(),
+        [activation_batch(), activation_batch()],
+        **activation_kwargs(estimator={"iters": 1, "init": "e0"}),
+    )
+
+    assert result is not None
+    assert result["batches_used"] == 2
+    assert calls == ["cpu", "cpu"]
+
+
 def test_rmt_runtime_adapter_hook_resolution_and_adapter_paths() -> None:
     assert runtime._resolve_adapter_hook(None, "prepare_generation_inputs") is None
     assert runtime._resolve_adapter_hook(Mock(), "prepare_generation_inputs") is None
@@ -512,6 +566,27 @@ def test_rmt_compute_activation_outliers_uses_adapter_generation_inputs() -> Non
     assert out is not None
     assert out["outlier_count"] > 0
     assert out["token_weight_total"] == 2
+
+
+def test_compute_activation_outliers_releases_each_batch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(
+        runtime,
+        "_release_activation_batch_memory",
+        lambda device: calls.append(str(device)),
+    )
+
+    out = runtime.compute_activation_outliers(
+        ActivationGuardStub(),
+        TinyActivationModel(),
+        [activation_batch(), activation_batch()],
+    )
+
+    assert out is not None
+    assert out["token_weight_total"] == 4
+    assert calls == ["cpu", "cpu"]
 
 
 def test_compute_activation_outliers_failure_and_restore_paths() -> None:

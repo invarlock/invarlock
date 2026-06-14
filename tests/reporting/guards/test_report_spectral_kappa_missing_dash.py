@@ -50,5 +50,5 @@ def test_spectral_family_caps_kappa_missing_renders_dash():
     }
     md = render_report_markdown(cert)
     # Expect dash in κ column
-    assert "| Family | κ | q95 | Max |z| | Violations |" in md
+    assert "| Family | κ | q95 | Max |z| | Caps Applied |" in md
     assert "| ffn | - | - | - | 3 |" in md

@@ -51,6 +51,25 @@ def _normalize_reference_answers(value: Any) -> list[str]:
     return [str(item).strip() for item in candidates if str(item).strip()]
 
 
+def _replay_input_record(batch: dict[str, Any], *, example_id: str) -> dict[str, Any]:
+    record: dict[str, Any] = {"id": example_id, "example_id": example_id}
+    for key in (
+        "image_path",
+        "prompt",
+        "answer",
+        "answers",
+        "image_sha256",
+        "prompt_sha256",
+        "answer_sha256",
+        "source_file",
+        "source_line",
+    ):
+        value = batch.get(key)
+        if value is not None:
+            record[key] = value
+    return record
+
+
 def _is_multimodal_batch(batch: Any) -> bool:
     return isinstance(batch, dict) and (
         "image_path" in batch or "example_id" in batch or "answers" in batch
@@ -98,6 +117,7 @@ def _evaluate_vision_text_arm(
     token_counts: list[int] = []
     example_correct: list[int] = []
     records: list[dict[str, Any]] = []
+    input_records: list[dict[str, Any]] = []
     example_ids: list[str] = []
     processor_sha: str | None = None
     latency_ms = 0.0
@@ -150,6 +170,7 @@ def _evaluate_vision_text_arm(
             or ""
         )
         example_ids.append(example_id)
+        input_records.append(_replay_input_record(batch, example_id=example_id))
         if processor_sha is None:
             candidate = generation_inputs.get("_processor_sha256")
             if isinstance(candidate, str) and candidate:
@@ -186,6 +207,8 @@ def _evaluate_vision_text_arm(
         "total_tokens": total_answer_tokens,
         "mean_logloss": mean_logloss,
     }
+    if input_records:
+        payload["input_records"] = input_records
     if processor_sha:
         payload["processor_sha256"] = processor_sha
     return payload, latency_ms
@@ -227,6 +250,10 @@ def _build_multimodal_eval_result(
     metric_kind = _resolve_metric_kind(config, fallback="accuracy")
     preview_accuracy = float(preview_payload.get("accuracy", float("nan")))
     final_accuracy = float(final_payload.get("accuracy", float("nan")))
+    preview_total = int(preview_payload.get("total", 0))
+    final_total = int(final_payload.get("total", 0))
+    paired_windows = min(preview_total, final_total)
+    pairing_reason = None if paired_windows > 0 else "no_pairs"
     primary_metric = {
         "kind": metric_kind,
         "preview": preview_accuracy if math.isfinite(preview_accuracy) else None,
@@ -237,8 +264,8 @@ def _build_multimodal_eval_result(
         "degraded": False,
         "counts_source": "measured",
         "estimated": False,
-        "n_preview": int(preview_payload.get("total", 0)),
-        "n_final": int(final_payload.get("total", 0)),
+        "n_preview": preview_total,
+        "n_final": final_total,
     }
     metrics = {
         "primary_metric": primary_metric,
@@ -274,11 +301,24 @@ def _build_multimodal_eval_result(
         "final_total_tokens": int(final_payload["total_tokens"]),
         "window_overlap_fraction": 0.0,
         "window_match_fraction": 1.0,
+        "window_pairing_reason": pairing_reason,
+        "window_pairing_preview": {
+            "matched": preview_total,
+            "expected": preview_total,
+            "reason": pairing_reason,
+        },
+        "window_pairing_final": {
+            "matched": final_total,
+            "expected": final_total,
+            "reason": pairing_reason,
+        },
+        "paired_windows": paired_windows,
     }
     eval_windows = {
         "preview": {
             "example_ids": list(preview_payload["example_ids"]),
             "records": list(preview_payload["records"]),
+            "input_records": list(preview_payload.get("input_records", [])),
             "logloss": list(preview_payload["logloss"]),
             "token_counts": list(preview_payload["token_counts"]),
             "processor_sha256": preview_payload.get("processor_sha256"),
@@ -286,6 +326,7 @@ def _build_multimodal_eval_result(
         "final": {
             "example_ids": list(final_payload["example_ids"]),
             "records": list(final_payload["records"]),
+            "input_records": list(final_payload.get("input_records", [])),
             "logloss": list(final_payload["logloss"]),
             "token_counts": list(final_payload["token_counts"]),
             "processor_sha256": final_payload.get("processor_sha256")

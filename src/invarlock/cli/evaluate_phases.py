@@ -14,6 +14,31 @@ from invarlock.core.evaluate_contract import (
     require_run_report_artifact,
 )
 
+_PROFILE_DATASET_ERRORS = (RuntimeError, TypeError, ValueError)
+
+
+def _profile_effective_dataset_config(
+    baseline_cfg: dict[str, Any],
+    *,
+    profile_name: str,
+) -> dict[str, Any] | None:
+    dataset_cfg = baseline_cfg.get("dataset")
+    if not isinstance(dataset_cfg, dict):
+        return None
+    normalized_profile = str(profile_name or "").strip().lower()
+    if normalized_profile in {"", "dev"}:
+        return dataset_cfg
+    try:
+        from invarlock.core.config_loader import apply_profile
+        from invarlock.core.config_runtime import InvarLockConfig
+
+        effective_cfg = apply_profile(InvarLockConfig(baseline_cfg), normalized_profile)
+        effective_payload = effective_cfg.model_dump()
+    except _PROFILE_DATASET_ERRORS:
+        return dataset_cfg
+    effective_dataset = effective_payload.get("dataset")
+    return effective_dataset if isinstance(effective_dataset, dict) else dataset_cfg
+
 
 def _run_baseline_evaluation_phase(
     *,
@@ -61,7 +86,10 @@ def _run_baseline_evaluation_phase(
             assurance_mode = (
                 assurance_cfg.get("mode") if isinstance(assurance_cfg, dict) else None
             )
-            dataset_cfg = baseline_cfg.get("dataset")
+            dataset_cfg = _profile_effective_dataset_config(
+                baseline_cfg,
+                profile_name=profile_name,
+            )
             baseline_report_path, _ = load_validated_baseline_report(
                 Path(baseline_report),
                 expected_model_id=str(baseline_model_id or ""),
@@ -69,7 +97,7 @@ def _run_baseline_evaluation_phase(
                 expected_tier=tier_name,
                 expected_adapter=str(eff_adapter),
                 expected_assurance_mode=str(assurance_mode or "off"),
-                expected_dataset=dataset_cfg if isinstance(dataset_cfg, dict) else None,
+                expected_dataset=dataset_cfg,
             )
         except typer.BadParameter as exc:
             fail_fn(str(getattr(exc, "message", exc)), exit_code=2)

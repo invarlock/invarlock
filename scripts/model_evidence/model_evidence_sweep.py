@@ -15,6 +15,8 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+import yaml
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
@@ -32,8 +34,11 @@ from model_evidence_lanes import (  # noqa: E402
     REPO_MENTIONED_GPU_SUITE,
     REPO_ROOT,
     SUITES,
+    SUPPORT_MATRIX_BACKLOG_GPU_LANES,
+    SUPPORT_MATRIX_BACKLOG_GPU_SUITE,
     EvidenceLane,
     lane_requires_remote_code,
+    lane_resource_estimate,
     manifest_lane_ids,
     select_specs,
     supported_experimental_lane_ids,
@@ -54,6 +59,8 @@ __all__ = [
     "PROMOTION_GAP_GPU_SUITE",
     "REPO_MENTIONED_GPU_SUITE",
     "SUITES",
+    "SUPPORT_MATRIX_BACKLOG_GPU_LANES",
+    "SUPPORT_MATRIX_BACKLOG_GPU_SUITE",
     "EvidenceLane",
     "manifest_lane_ids",
     "select_specs",
@@ -141,6 +148,161 @@ def write_manifest(
     )
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _capture_artifacts(output_root: Path) -> list[dict[str, object]]:
+    relpaths: set[Path] = set()
+    for pattern in (
+        "manifest.json",
+        "summary.json",
+        "summary.tsv",
+        "status.log",
+        "model_revisions.json",
+        "logs/*.log",
+        "eval/*/dataset/manifest.jsonl",
+        "eval/*/dataset/materialization_summary.json",
+        "eval/*/dataset/images/*",
+        "eval/*/prepared_preset.yaml",
+        "eval/*/report/evaluation.report.json",
+        "eval/*/verify.json",
+    ):
+        relpaths.update(
+            path.relative_to(output_root)
+            for path in output_root.glob(pattern)
+            if path.is_file()
+        )
+
+    files: list[dict[str, object]] = []
+    for relpath in sorted(relpaths):
+        path = output_root / relpath
+        files.append(
+            {
+                "path": relpath.as_posix(),
+                "bytes": path.stat().st_size,
+                "sha256": _sha256_file(path),
+            }
+        )
+    return files
+
+
+def _collect_hf_model_revisions(
+    specs: Sequence[EvidenceLane],
+) -> list[dict[str, object]]:
+    try:
+        from huggingface_hub import scan_cache_dir
+    except Exception as exc:  # pragma: no cover - environment-bound.
+        return [
+            {
+                "slug": spec.slug,
+                "model_id": spec.model_id,
+                "status": "unavailable",
+                "reason": f"huggingface_hub_unavailable:{type(exc).__name__}",
+            }
+            for spec in specs
+        ]
+
+    try:
+        cache_info = scan_cache_dir()
+    except Exception as exc:  # pragma: no cover - cache state is host-specific.
+        return [
+            {
+                "slug": spec.slug,
+                "model_id": spec.model_id,
+                "status": "unavailable",
+                "reason": f"cache_scan_failed:{type(exc).__name__}",
+            }
+            for spec in specs
+        ]
+
+    repos = {repo.repo_id: repo for repo in cache_info.repos}
+    revisions: list[dict[str, object]] = []
+    for spec in specs:
+        repo = repos.get(spec.model_id)
+        if repo is None:
+            revisions.append(
+                {
+                    "slug": spec.slug,
+                    "model_id": spec.model_id,
+                    "status": "missing",
+                    "revisions": [],
+                }
+            )
+            continue
+        repo_revisions = sorted(
+            (
+                {
+                    "commit_hash": revision.commit_hash,
+                    "refs": sorted(revision.refs),
+                    "snapshot_path": str(revision.snapshot_path),
+                    "size_on_disk": revision.size_on_disk,
+                }
+                for revision in repo.revisions
+            ),
+            key=lambda item: str(item["commit_hash"]),
+        )
+        revisions.append(
+            {
+                "slug": spec.slug,
+                "model_id": spec.model_id,
+                "status": "observed" if repo_revisions else "missing",
+                "revisions": repo_revisions,
+            }
+        )
+    return revisions
+
+
+def write_model_revisions(
+    output_root: Path,
+    *,
+    suite: str,
+    execution_mode: str,
+    specs: Sequence[EvidenceLane],
+) -> None:
+    payload = {
+        "schema": "invarlock/model-evidence-model-revisions-v1",
+        "generated_at": datetime.now(UTC).isoformat(),
+        "suite": suite,
+        "execution_mode": execution_mode,
+        "models": _collect_hf_model_revisions(specs),
+    }
+    (output_root / "model_revisions.json").write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def write_artifact_manifest(
+    output_root: Path,
+    *,
+    suite: str,
+    execution_mode: str,
+    shard_index: int,
+    shard_count: int,
+    results: Sequence[LaneResult],
+) -> None:
+    payload = {
+        "schema": "invarlock/model-evidence-artifact-manifest-v1",
+        "generated_at": datetime.now(UTC).isoformat(),
+        "suite": suite,
+        "execution_mode": execution_mode,
+        "shard_index": shard_index,
+        "shard_count": shard_count,
+        "ok": all(result.ok for result in results),
+        "lane_results": [result.to_summary_entry() for result in results],
+        "files": _capture_artifacts(output_root),
+    }
+    (output_root / "artifact_manifest.json").write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 def default_output_root() -> Path:
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     return REPO_ROOT / "runs" / "model_evidence" / stamp
@@ -170,6 +332,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="append",
         default=[],
         help="Restrict to one or more support_matrix lane_ids.",
+    )
+    parser.add_argument(
+        "--preset-override",
+        action="append",
+        default=[],
+        metavar="SLUG=PATH",
+        help=(
+            "Use PATH instead of the lane preset for one manifest slug. "
+            "Repeat for multiple lanes."
+        ),
     )
     parser.add_argument(
         "--output-root",
@@ -239,7 +411,9 @@ def build_evaluate_command(
     device: str,
     execution_mode: str,
     lane_root: Path,
+    preset_arg_override: str | None = None,
 ) -> list[str]:
+    preset_arg = preset_arg_override or spec.preset_arg(execution_mode=execution_mode)
     command = [
         python_exe,
         "-m",
@@ -254,7 +428,7 @@ def build_evaluate_command(
         "--subject-adapter",
         spec.adapter,
         "--preset",
-        spec.preset_arg(execution_mode=execution_mode),
+        preset_arg,
         "--profile",
         profile,
         "--allow-network",
@@ -267,9 +441,110 @@ def build_evaluate_command(
     ]
     if execution_mode == "host":
         command.extend(["--execution-mode", "host"])
+    if lane_requires_remote_code(spec):
+        command.append("--allow-remote-code")
     if profile == "dev":
         command.extend(["--assurance", "off"])
     return command
+
+
+def parse_preset_overrides(raw_items: Sequence[str]) -> dict[str, str]:
+    overrides: dict[str, str] = {}
+    for raw in raw_items:
+        if "=" not in raw:
+            raise ValueError("--preset-override entries must use SLUG=PATH")
+        slug, path = raw.split("=", 1)
+        slug = slug.strip()
+        path = path.strip()
+        if not slug or not path:
+            raise ValueError("--preset-override entries must use non-empty SLUG=PATH")
+        if slug in overrides:
+            raise ValueError(f"duplicate --preset-override for slug: {slug}")
+        overrides[slug] = path
+    return overrides
+
+
+def build_vision_text_materialize_command(
+    spec: EvidenceLane,
+    *,
+    python_exe: str,
+    lane_root: Path,
+    execution_mode: str,
+) -> list[str] | None:
+    materialization = spec.vision_text_materialization
+    if not materialization:
+        return None
+    output_dir = lane_root / "dataset"
+    command = [
+        python_exe,
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "--dataset",
+        str(materialization["dataset"]),
+        "--split",
+        str(materialization.get("split", "validation")),
+        "--output-dir",
+        _command_path(output_dir, execution_mode=execution_mode),
+        "--max-samples",
+        str(materialization.get("max_samples", 64)),
+        "--image-field",
+        str(materialization.get("image_field", "image")),
+        "--prompt-field",
+        str(materialization.get("prompt_field", "question")),
+        "--image-format",
+        str(materialization.get("image_format", "png")),
+        "--overwrite",
+    ]
+    optional_flags = (
+        ("revision", "--revision"),
+        ("config_name", "--config-name"),
+        ("answer_field", "--answer-field"),
+        ("answers_field", "--answers-field"),
+        ("id_field", "--id-field"),
+        ("prompt_template", "--prompt-template"),
+    )
+    for key, flag in optional_flags:
+        value = materialization.get(key)
+        if value is not None and str(value) != "":
+            command.extend([flag, str(value)])
+    if bool(materialization.get("shuffle", False)):
+        command.append("--shuffle")
+    if "seed" in materialization:
+        command.extend(["--seed", str(materialization["seed"])])
+    return command
+
+
+def write_prepared_preset(
+    spec: EvidenceLane,
+    *,
+    lane_root: Path,
+    execution_mode: str,
+) -> Path | None:
+    if not spec.vision_text_materialization:
+        return None
+    preset_data = yaml.safe_load(spec.preset_path.read_text(encoding="utf-8"))
+    if not isinstance(preset_data, dict):
+        raise ValueError(f"Preset must be a mapping: {spec.preset_relpath}")
+    dataset = preset_data.setdefault("dataset", {})
+    if not isinstance(dataset, dict):
+        raise ValueError(
+            f"Preset dataset section must be a mapping: {spec.preset_relpath}"
+        )
+    provider = dataset.setdefault("provider", {})
+    if not isinstance(provider, dict):
+        raise ValueError(
+            f"Preset dataset.provider section must be a mapping: {spec.preset_relpath}"
+        )
+    provider["kind"] = "vision_text"
+    provider["path"] = _command_path(
+        lane_root / "dataset" / "manifest.jsonl",
+        execution_mode=execution_mode,
+    )
+    prepared_path = lane_root / "prepared_preset.yaml"
+    prepared_path.write_text(
+        yaml.safe_dump(preset_data, sort_keys=False),
+        encoding="utf-8",
+    )
+    return prepared_path
 
 
 def _prefetch_adapter_name(spec: EvidenceLane) -> str:
@@ -343,6 +618,54 @@ def runtime_env() -> dict[str, str]:
     return env
 
 
+def _accelerator_requested(device: str) -> bool:
+    normalized = str(device or "").strip().lower()
+    return normalized in {"auto", "cuda"} or normalized.startswith("cuda:")
+
+
+def visible_cuda_device_count(env: dict[str, str]) -> int | None:
+    raw_value = env.get("CUDA_VISIBLE_DEVICES")
+    if raw_value is None or raw_value.strip() == "":
+        return None
+    normalized = raw_value.strip().lower()
+    if normalized in {"all", "gpu-all"}:
+        return None
+    if normalized in {"-1", "none", "void"}:
+        return 0
+    return len([item for item in raw_value.split(",") if item.strip()])
+
+
+def lane_resource_preflight(
+    spec: EvidenceLane,
+    *,
+    env: dict[str, str],
+    device: str,
+) -> dict[str, object] | None:
+    estimate = lane_resource_estimate(spec.model_id)
+    if estimate is None:
+        return None
+
+    visible_gpus = (
+        visible_cuda_device_count(env) if _accelerator_requested(device) else 0
+    )
+    recommended = int(estimate["recommended_min_gpus_80gb"])
+    payload: dict[str, object] = {
+        "resource_estimate": estimate,
+        "requested_device": device,
+        "visible_cuda_devices": visible_gpus,
+        "recommended_min_gpus_80gb": recommended,
+        "ok": True,
+    }
+    if visible_gpus is not None and visible_gpus < recommended:
+        payload["ok"] = False
+        payload["warning"] = (
+            f"visible CUDA device count {visible_gpus} is below the "
+            f"recommended minimum {recommended} for {spec.slug}; use --gpu-group "
+            "or CUDA_VISIBLE_DEVICES to expose enough devices for this lane"
+        )
+    return payload
+
+
 def _is_within_repo(path: Path) -> bool:
     try:
         path.resolve().relative_to(REPO_ROOT)
@@ -378,6 +701,43 @@ def _publish_lane_artifacts(source: Path, destination: Path) -> None:
     shutil.copytree(source, destination)
 
 
+def _cleanup_execution_lane(
+    lane_root: Path,
+    *,
+    execution_root: Path,
+    output_root: Path,
+) -> None:
+    if execution_root == output_root:
+        return
+    scratch_root = REPO_ROOT / "tmp" / "model_evidence_container"
+    try:
+        lane_resolved = lane_root.resolve()
+        lane_resolved.relative_to(scratch_root.resolve())
+    except ValueError:
+        return
+    shutil.rmtree(lane_resolved, ignore_errors=True)
+    for candidate in (lane_resolved.parent, execution_root):
+        try:
+            candidate.rmdir()
+        except OSError:
+            pass
+
+
+def _publish_and_cleanup_lane_artifacts(
+    *,
+    lane_root: Path,
+    published_lane_root: Path,
+    execution_root: Path,
+    output_root: Path,
+) -> None:
+    _publish_lane_artifacts(lane_root, published_lane_root)
+    _cleanup_execution_lane(
+        lane_root,
+        execution_root=execution_root,
+        output_root=output_root,
+    )
+
+
 def _classify_failure(
     *,
     log_path: Path,
@@ -410,6 +770,15 @@ def _classify_failure(
         or "primary metric degraded or non-finite" in text
     ):
         return ("failed", "invalid_primary_metric")
+    if evaluate_exit == 125 and (
+        "docker:" in text
+        and (
+            "error from registry: denied" in text
+            or "unable to find image" in text
+            or "pull access denied" in text
+        )
+    ):
+        return ("failed", "container_image_pull_denied")
     if evaluate_exit != 0:
         return ("failed", f"{phase}_failed")
     if verify_exit not in {None, 0}:
@@ -427,6 +796,7 @@ def run_lane(
     device: str,
     execution_mode: str,
     env: dict[str, str],
+    preset_overrides: dict[str, str] | None = None,
 ) -> LaneResult:
     lane_root = execution_root / "eval" / spec.slug
     lane_root.mkdir(parents=True, exist_ok=True)
@@ -447,6 +817,58 @@ def run_lane(
         execution_mode=execution_mode,
         spec=spec,
     )
+    prepared_preset = None
+    materialize_cmd = build_vision_text_materialize_command(
+        spec,
+        python_exe=python_exe,
+        lane_root=lane_root,
+        execution_mode=execution_mode,
+    )
+    if materialize_cmd is not None:
+        with log_path.open(log_mode, encoding="utf-8") as log_file:
+            log_file.write("$ " + " ".join(materialize_cmd) + "\n")
+            materialize_proc = subprocess.run(
+                materialize_cmd,
+                cwd=REPO_ROOT,
+                env=lane_env,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
+            )
+        log_mode = "a"
+        if materialize_proc.returncode != 0:
+            _publish_and_cleanup_lane_artifacts(
+                lane_root=lane_root,
+                published_lane_root=published_lane_root,
+                execution_root=execution_root,
+                output_root=output_root,
+            )
+            published_report_path = (
+                published_lane_root / "report" / "evaluation.report.json"
+            )
+            published_verify_path = published_lane_root / "verify.json"
+            return LaneResult(
+                slug=spec.slug,
+                lane_id=spec.lane_id,
+                model_id=spec.model_id,
+                preset=spec.preset_relpath,
+                evaluate_exit=materialize_proc.returncode,
+                verify_exit=None,
+                report_path=str(published_report_path),
+                verify_path=(
+                    str(published_verify_path)
+                    if published_verify_path.is_file()
+                    else None
+                ),
+                status="failed",
+                detail="dataset_materialize_failed",
+            )
+        prepared_preset = write_prepared_preset(
+            spec,
+            lane_root=lane_root,
+            execution_mode=execution_mode,
+        )
     if execution_mode == "host":
         prefetch_cmd = build_prefetch_command(spec, python_exe=python_exe)
         with log_path.open(log_mode, encoding="utf-8") as log_file:
@@ -468,8 +890,12 @@ def run_lane(
                 verify_exit=None,
                 phase="prefetch",
             )
-            _publish_lane_artifacts(
-                lane_root, published_lane_root := output_root / "eval" / spec.slug
+            published_lane_root = output_root / "eval" / spec.slug
+            _publish_and_cleanup_lane_artifacts(
+                lane_root=lane_root,
+                published_lane_root=published_lane_root,
+                execution_root=execution_root,
+                output_root=output_root,
             )
             published_report_path = (
                 published_lane_root / "report" / "evaluation.report.json"
@@ -492,6 +918,14 @@ def run_lane(
                 detail=detail,
             )
 
+    preset_arg_override: str | None = None
+    if prepared_preset is not None:
+        preset_arg_override = _command_path(
+            prepared_preset, execution_mode=execution_mode
+        )
+    elif preset_overrides:
+        preset_arg_override = preset_overrides.get(spec.slug)
+
     evaluate_cmd = build_evaluate_command(
         spec,
         python_exe=python_exe,
@@ -499,6 +933,7 @@ def run_lane(
         device=device,
         execution_mode=execution_mode,
         lane_root=lane_root,
+        preset_arg_override=preset_arg_override,
     )
     with log_path.open(log_mode, encoding="utf-8") as log_file:
         log_file.write("$ " + " ".join(evaluate_cmd) + "\n")
@@ -553,7 +988,12 @@ def run_lane(
             )
             verify_exit = verify_proc.returncode
 
-    _publish_lane_artifacts(lane_root, published_lane_root)
+    _publish_and_cleanup_lane_artifacts(
+        lane_root=lane_root,
+        published_lane_root=published_lane_root,
+        execution_root=execution_root,
+        output_root=output_root,
+    )
     published_report_path = published_lane_root / "report" / "evaluation.report.json"
     published_verify_path = published_lane_root / "verify.json"
     status, detail = _classify_failure(
@@ -589,6 +1029,11 @@ def run_sweep(args: argparse.Namespace) -> int:
         return 2
 
     validate_manifest_coverage(CURRENT_SUPPORTED_EXPERIMENTAL_LANES)
+    try:
+        preset_overrides = parse_preset_overrides(args.preset_override)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     specs = select_specs(
         args.suite,
         slugs=args.slug,
@@ -613,6 +1058,7 @@ def run_sweep(args: argparse.Namespace) -> int:
     execution_root = _execution_root(output_root, execution_mode=args.execution_mode)
     if execution_root != output_root:
         execution_root.mkdir(parents=True, exist_ok=True)
+    env = runtime_env()
     write_manifest(
         output_root,
         suite=args.suite,
@@ -626,6 +1072,11 @@ def run_sweep(args: argparse.Namespace) -> int:
             item = {
                 "slug": spec.slug,
                 "execution_mode": args.execution_mode,
+                "resource_preflight": lane_resource_preflight(
+                    spec,
+                    env=env,
+                    device=args.device,
+                ),
                 "evaluate": build_evaluate_command(
                     spec,
                     python_exe=args.python,
@@ -637,6 +1088,14 @@ def run_sweep(args: argparse.Namespace) -> int:
                     device=args.device,
                     execution_mode=args.execution_mode,
                     lane_root=lane_root,
+                    preset_arg_override=(
+                        _command_path(
+                            lane_root / "prepared_preset.yaml",
+                            execution_mode=args.execution_mode,
+                        )
+                        if spec.vision_text_materialization
+                        else preset_overrides.get(spec.slug)
+                    ),
                 ),
                 "verify": build_verify_command(
                     python_exe=args.python,
@@ -654,16 +1113,33 @@ def run_sweep(args: argparse.Namespace) -> int:
                     spec,
                     python_exe=args.python,
                 )
+            materialize = build_vision_text_materialize_command(
+                spec,
+                python_exe=args.python,
+                lane_root=lane_root,
+                execution_mode=args.execution_mode,
+            )
+            if materialize is not None:
+                item["materialize_dataset"] = materialize
+                item["prepared_preset"] = _command_path(
+                    lane_root / "prepared_preset.yaml",
+                    execution_mode=args.execution_mode,
+                )
             payload.append(item)
         print(json.dumps(payload, indent=2))
         return 0
 
     status_log = output_root / "status.log"
-    env = runtime_env()
     results: list[LaneResult] = []
     with status_log.open("w", encoding="utf-8") as handle:
         handle.write(f"[{datetime.now(UTC).isoformat()}] START\n")
         for spec in specs:
+            preflight = lane_resource_preflight(spec, env=env, device=args.device)
+            if preflight and preflight.get("warning"):
+                handle.write(
+                    f"[{datetime.now(UTC).isoformat()}] WARN {spec.slug} "
+                    f"resource_preflight={preflight['warning']}\n"
+                )
             handle.write(f"[{datetime.now(UTC).isoformat()}] START {spec.slug}\n")
             handle.flush()
             result = run_lane(
@@ -675,6 +1151,7 @@ def run_sweep(args: argparse.Namespace) -> int:
                 device=args.device,
                 execution_mode=args.execution_mode,
                 env=env,
+                preset_overrides=preset_overrides,
             )
             results.append(result)
             verify_repr = (
@@ -690,6 +1167,20 @@ def run_sweep(args: argparse.Namespace) -> int:
                 break
         handle.write(f"[{datetime.now(UTC).isoformat()}] ALL_TASKS_COMPLETE\n")
     write_summary(
+        output_root,
+        suite=args.suite,
+        execution_mode=args.execution_mode,
+        shard_index=args.shard_index,
+        shard_count=args.shard_count,
+        results=results,
+    )
+    write_model_revisions(
+        output_root,
+        suite=args.suite,
+        execution_mode=args.execution_mode,
+        specs=specs,
+    )
+    write_artifact_manifest(
         output_root,
         suite=args.suite,
         execution_mode=args.execution_mode,

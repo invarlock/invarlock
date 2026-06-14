@@ -866,7 +866,11 @@ test_update_model_task_memory_allows_single_gpu_downsize_after_refinement() {
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
 
-    _cmd_python() { echo "44 1"; }
+    _runtime_python() {
+        assert_eq "queue_state.py" "${1:-}" "memory refinement uses runtime helper module resolution"
+        assert_eq "estimate-task-memory" "${2:-}" "memory refinement invokes estimate-task-memory"
+        echo "44 1"
+    }
 
     jq -n '{task_id:"t", task_type:"CALIBRATION_RUN", model_id:"allenai/OLMo-2-1124-7B", model_name:"olmo", status:"ready", model_size_gb:82, required_gpus:1, retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{run:1}, priority:85}' \
         > "${QUEUE_DIR}/ready/t.task"

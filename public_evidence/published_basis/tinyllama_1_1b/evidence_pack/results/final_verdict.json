@@ -1,0 +1,9 @@
+{
+  "assurance": "strict",
+  "basis": "public_evidence/published_basis/tinyllama_1_1b/evaluation.report.json",
+  "evidence_run": "20260612TremainingExperimentalZ",
+  "model_id": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+  "note": "Container-backed CI-profile TinyLlama 1.1B published-basis evidence run.",
+  "profile": "release",
+  "verdict": "PASS"
+}

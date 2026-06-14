@@ -1,0 +1,12 @@
+{
+  "device": "cuda",
+  "execution_mode": "container",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "gpu_id": "0",
+  "host": "root@86.38.238.232",
+  "profile": "release",
+  "runtime_image": "invarlock-runtime:cuda-local",
+  "runtime_image_digest": "sha256:dc735a60fad29fc02681bd86dec92c23f4e7388f00414d3ffc97e6c33b3fa773",
+  "stamp": "20260612TgemmaTextScopeReleaseB",
+  "model_revision": "70af34e20bd4b7a91f0de6b22675850c43922a03"
+}

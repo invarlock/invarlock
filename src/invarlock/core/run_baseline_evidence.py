@@ -301,12 +301,13 @@ def _build_text_pairing_entries(
             "attention_mask": attention_mask,
             "window_id": f"{arm}::{window_id}",
         }
+        labels_list: list[int] = []
+        if isinstance(labels, list) and idx < len(labels):
+            labels_list = tensor_or_list_to_ints_fn(labels[idx])
+        if labels_list:
+            entry["labels"] = labels_list
         if use_mlm:
-            labels_list: list[int] = []
-            if isinstance(labels, list) and idx < len(labels):
-                labels_list = tensor_or_list_to_ints_fn(labels[idx])
             if labels_list and any(token != -100 for token in labels_list):
-                entry["labels"] = labels_list
                 entry["mlm_masked"] = sum(1 for token in labels_list if token != -100)
             else:
                 entry["labels"] = []

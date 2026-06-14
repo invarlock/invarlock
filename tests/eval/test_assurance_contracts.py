@@ -7,12 +7,14 @@ from unittest.mock import patch
 
 import numpy as np
 import pytest
+import torch
 
 # NOTE: import VarianceGuard only if it's part of the public surface;
 # otherwise, drive it via evaluation_report inputs in an integration test.
 from invarlock.core.auto_tuning import get_tier_policies
 from invarlock.core.runner_pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
 from invarlock.guards.spectral import SpectralGuard
+from invarlock.guards.spectral_control import apply_relative_spectral_cap
 from invarlock.guards.variance import VarianceGuard
 from invarlock.reporting.guards_spectral import _extract_spectral_analysis
 from invarlock.reporting.report_make import _extract_rmt_analysis, make_report
@@ -156,7 +158,7 @@ def test_evaluation_report_enforces_paired_ratio_identity():
     assert isinstance(ratio_ci, tuple | list) and len(ratio_ci) == 2
 
 
-def test_evaluation_report_rejects_inconsistent_ratio():
+def test_evaluation_report_flags_inconsistent_ratio_gate_failure_in_dev_profile():
     report, baseline = _build_paired_run_and_baseline()
     report["metrics"]["paired_delta_summary"]["mean"] += 0.1  # Break consistency
     with patch(
@@ -166,9 +168,11 @@ def test_evaluation_report_rejects_inconsistent_ratio():
         report.setdefault("metrics", {}).setdefault("window_plan", {})["profile"] = (
             "dev"
         )
-        # Normalized evaluation_report generation now degrades this inconsistency without raising
         cert = make_report(report, baseline)
-        assert isinstance(cert, dict)
+    assert isinstance(cert, dict)
+    assert cert["validation"]["primary_metric_acceptable"] is False
+    assert cert["validation"]["preview_final_drift_acceptable"] is False
+    assert cert["primary_metric"]["invalid"] is False
 
 
 def _make_ratio_report(
@@ -319,12 +323,23 @@ def test_evaluation_report_rejects_ci_pairing_mismatch():
             make_report(deepcopy(report), deepcopy(baseline))
 
 
-def test_infeasible_lowrank_cap_rejected():
-    # Deprecated: low-rank edit configs are not supported
-    import pytest
+def test_spectral_cap_product_path_limits_weight_growth():
+    module = torch.nn.Linear(2, 2, bias=False)
+    with torch.no_grad():
+        module.weight.copy_(torch.diag(torch.tensor([4.0, 1.0])))
+    model = torch.nn.Sequential(module)
 
-    with pytest.raises(RuntimeError):
-        raise RuntimeError("unsupported edit type")
+    result = apply_relative_spectral_cap(
+        model,
+        cap_ratio=1.1,
+        baseline_sigmas={"0": 1.0},
+        should_process_module_fn=lambda name, _module, _scope: name == "0",
+    )
+
+    assert result["applied"] is True
+    assert result["capped_modules"][0]["module"] == "0"
+    sigma_after = float(torch.linalg.svdvals(module.weight).max().item())
+    assert sigma_after <= 1.1 + 1e-6
 
 
 def test_spectral_fpr_matches_tail_probabilities():

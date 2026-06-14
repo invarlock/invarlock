@@ -320,7 +320,7 @@ is_gpu_usable() {
     fi
 
     local free_mem
-    free_mem=$(get_gpu_available_memory "${gpu_id}")
+    free_mem=$(get_gpu_available_memory "${gpu_id}" 2>/dev/null || echo "0")
     if ! [[ "${free_mem}" =~ ^[0-9]+$ ]] || [[ "${free_mem}" -lt ${min_free} ]]; then
         return 1
     fi
@@ -352,7 +352,7 @@ get_available_gpus() {
         if is_gpu_usable "${gpu_id}"; then
             if [[ -n "${min_free_gb}" && "${min_free_gb}" =~ ^[0-9]+$ ]]; then
                 local free_mem
-                free_mem=$(get_gpu_available_memory "${gpu_id}")
+                free_mem=$(get_gpu_available_memory "${gpu_id}" 2>/dev/null || echo "0")
                 [[ -n "${free_mem}" && "${free_mem}" -lt ${min_free_gb} ]] && continue
             fi
             available+=("${gpu_id}")

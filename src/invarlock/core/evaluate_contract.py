@@ -14,6 +14,7 @@ from .report_inputs import (
 
 _TEXT_NORMALIZATION_ERRORS = (RuntimeError, TypeError, ValueError)
 _FINITE_NUMBER_ERRORS = (OverflowError, RuntimeError, TypeError, ValueError)
+_OPTIONAL_BASELINE_REPORT_DATA_KEYS = {"seed"}
 
 
 def require_run_report_artifact(run_result: str | Path | None, *, stage: str) -> Path:
@@ -404,7 +405,13 @@ def _validate_baseline_dataset(
             (data.get(report_key) for report_key in report_keys if report_key in data),
             None,
         )
-        if actual_value != expected_value:
+        if actual_value is None and expected_key in _OPTIONAL_BASELINE_REPORT_DATA_KEYS:
+            continue
+        if not _baseline_dataset_value_matches(
+            expected_key,
+            expected_value,
+            actual_value,
+        ):
             raise ValidationError(
                 code="E222",
                 message=(
@@ -417,6 +424,36 @@ def _validate_baseline_dataset(
                     "field": f"data.{expected_key}",
                 },
             )
+
+
+def _baseline_dataset_value_matches(
+    expected_key: str,
+    expected_value: Any,
+    actual_value: Any,
+) -> bool:
+    if actual_value == expected_value:
+        return True
+    if expected_key == "provider":
+        return _provider_values_equivalent(expected_value, actual_value)
+    return False
+
+
+def _provider_kind(value: Any) -> str | None:
+    if isinstance(value, str):
+        kind = value.strip()
+        return kind or None
+    if isinstance(value, dict):
+        for key in ("kind", "provider", "dataset"):
+            raw = value.get(key)
+            if isinstance(raw, str) and raw.strip():
+                return raw.strip()
+    return None
+
+
+def _provider_values_equivalent(expected_value: Any, actual_value: Any) -> bool:
+    expected_kind = _provider_kind(expected_value)
+    actual_kind = _provider_kind(actual_value)
+    return bool(expected_kind and actual_kind and expected_kind == actual_kind)
 
 
 @dataclass(frozen=True)

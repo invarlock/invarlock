@@ -7,6 +7,7 @@ from typing import Any
 from invarlock.core import auto_tuning as auto_tuning_mod
 from invarlock.eval import tail_stats as tail_stats_mod
 
+from . import guard_warnings as guard_warnings_mod
 from . import policy_utils as report_policy_utils_mod
 from . import report_builder_support as report_builder_support_mod
 from . import report_edit_summary as report_edit_summary_mod
@@ -250,6 +251,7 @@ def _build_report_assembly_context(
     invariants: dict[str, Any],
     spectral: dict[str, Any],
     rmt: dict[str, Any],
+    variance: dict[str, Any],
     ppl_metrics: dict[str, Any] | Any,
     provenance_env_flags: dict[str, Any] | None,
     blocking_state: dict[str, bool],
@@ -343,6 +345,26 @@ def _build_report_assembly_context(
         pm_drift_band_default=report_policy_mod.PM_DRIFT_BAND_DEFAULT,
         get_tier_policies_fn=auto_tuning_mod.get_tier_policies,
     )
+    baseline_warning_context = dict(baseline_normalized)
+    if isinstance(baseline_raw_map.get("guards"), list):
+        baseline_warning_context["guards"] = baseline_raw_map.get("guards")
+    if isinstance(baseline_raw_map.get("metrics"), dict):
+        baseline_warning_context["metrics"] = baseline_raw_map.get("metrics")
+
+    guard_warning_summary = guard_warnings_mod.build_guard_warnings(
+        subject={
+            "spectral": spectral,
+            "rmt": rmt,
+            "invariants": invariants,
+            "variance": variance,
+        },
+        baseline=baseline_warning_context,
+        validation=validation_flags,
+    )
+    validation_flags["guard_warnings_present"] = bool(
+        guard_warning_summary.get("present", False)
+    )
+    validation_flags["guard_warning_policy_acceptable"] = True
 
     _allowed_validation = load_validation_allowlist()
     validation_filtered = {
@@ -364,5 +386,6 @@ def _build_report_assembly_context(
         "pm_drift_band": pm_drift_band,
         "tiny_relax": tiny_relax,
         "pm_tail_result": pm_tail_result,
+        "guard_warning_summary": guard_warning_summary,
         "validation_filtered": validation_filtered,
     }

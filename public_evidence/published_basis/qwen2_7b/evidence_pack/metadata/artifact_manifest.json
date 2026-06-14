@@ -1,0 +1,66 @@
+{
+  "execution_mode": "container",
+  "files": [
+    {
+      "bytes": 11579371,
+      "path": "eval/qwen2_7b/report/evaluation.report.json",
+      "sha256": "b4832878e3da716bb2d8a7911e5ff705dd92709ba73aaa6ef63b559e9c3ec66c"
+    },
+    {
+      "bytes": 655,
+      "path": "eval/qwen2_7b/verify.json",
+      "sha256": "c4940c325cad266f18bbe614220e8ff7559444fcfb776b416ec3d692923d799e"
+    },
+    {
+      "bytes": 4649,
+      "path": "logs/qwen2_7b.log",
+      "sha256": "f67d30006dfa62c53f13c83ee435c3587c041fe55c6b7a15cf9aa33aafcf1ffd"
+    },
+    {
+      "bytes": 420,
+      "path": "manifest.json",
+      "sha256": "5577cf3e3e2a631498882d4cffcbbce9bf3a283864355132b8764339475da10c"
+    },
+    {
+      "bytes": 655,
+      "path": "model_revisions.json",
+      "sha256": "9248de41890315d511363501e0333dd8fadd6076036b216757fb70644aa0e59d"
+    },
+    {
+      "bytes": 229,
+      "path": "status.log",
+      "sha256": "2898050652fb17b16a3df6575535ee617eee9bbe09b335636bb529125def4b31"
+    },
+    {
+      "bytes": 693,
+      "path": "summary.json",
+      "sha256": "96e832508606d86ea7c372cbe26630a32bf782125e380e3cc6ec60510ae2d801"
+    },
+    {
+      "bytes": 207,
+      "path": "summary.tsv",
+      "sha256": "cca338a74021076a45d81cdba2479aa4d55bc3fc54c805137041c1f0d86da319"
+    }
+  ],
+  "generated_at": "2026-06-11T22:55:59.718643+00:00",
+  "lane_results": [
+    {
+      "detail": null,
+      "evaluate_exit": 0,
+      "lane_id": "qwen2-7b-causal-hf",
+      "model_id": "Qwen/Qwen2-7B",
+      "ok": true,
+      "preset": "configs/presets/causal_lm/qwen2_7b_512.yaml",
+      "report_path": "/root/model-evidence/20260611TmistralQwen2ParallelZ/shard-01-gpu-1/eval/qwen2_7b/report/evaluation.report.json",
+      "slug": "qwen2_7b",
+      "status": "ok",
+      "verify_exit": 0,
+      "verify_path": "/root/model-evidence/20260611TmistralQwen2ParallelZ/shard-01-gpu-1/eval/qwen2_7b/verify.json"
+    }
+  ],
+  "ok": true,
+  "schema": "invarlock/model-evidence-artifact-manifest-v1",
+  "shard_count": 2,
+  "shard_index": 1,
+  "suite": "current-supported-experimental"
+}

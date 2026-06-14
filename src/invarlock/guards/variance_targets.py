@@ -115,6 +115,19 @@ def scale_matches_target(scale_name: str, target_name: str) -> bool:
     return False
 
 
+def _t5_dense_relu_dense(block: nn.Module) -> nn.Module | None:
+    layers = getattr(block, "layer", None)
+    if layers is not None:
+        try:
+            for layer in layers:
+                dense = getattr(layer, "DenseReluDense", None)
+                if dense is not None:
+                    return dense
+        except (AttributeError, TypeError):
+            pass
+    return getattr(block, "DenseReluDense", None)
+
+
 def is_focus_match(guard: Any, name: str) -> bool:
     """Check whether a module name matches the configured focus list."""
     if not guard._focus_modules:
@@ -277,8 +290,17 @@ def resolve_target_modules(
             return f"transformer.h.{index}.attn.c_proj"
         if leaf in mlp_aliases and any(
             token in lower
-            for token in ("mlp", "ffn", "feed_forward", "expert", "block_sparse_moe")
+            for token in (
+                "mlp",
+                "ffn",
+                "feed_forward",
+                "expert",
+                "block_sparse_moe",
+                "densereludense",
+            )
         ):
+            return f"transformer.h.{index}.mlp.c_proj"
+        if leaf == "wo" and "densereludense" in lower:
             return f"transformer.h.{index}.mlp.c_proj"
         if leaf == "c_proj":
             branch = "attn" if "attn" in lower or "attention" in lower else "mlp"
@@ -306,12 +328,15 @@ def resolve_target_modules(
             if mlp_container is None:
                 mlp_container = getattr(block, "block_sparse_moe", None)
             if mlp_container is None:
+                mlp_container = _t5_dense_relu_dense(block)
+            if mlp_container is None:
                 continue
 
             mlp_proj = (
                 getattr(mlp_container, "c_proj", None)
                 or getattr(mlp_container, "down_proj", None)
                 or getattr(mlp_container, "fc2", None)
+                or getattr(mlp_container, "wo", None)
             )
             name = f"transformer.h.{index}.mlp.c_proj"
             if mlp_proj is None:

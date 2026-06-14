@@ -7,10 +7,12 @@ import pytest
 import torch
 import torch.nn as nn
 
+import invarlock.guards.variance_batching as variance_batching
 from invarlock.guards.variance_batching import (
     _resolve_adapter_hook,
     compute_ppl_for_batches,
     prepare_batch_tensors,
+    release_batch_memory,
 )
 
 
@@ -38,6 +40,41 @@ def test_prepare_batch_tensors_handles_none_and_attention_mask_lists() -> None:
 
     assert tuple(input_ids.shape) == (1, 3)
     assert labels.tolist() == [[1, 2, -100]]
+
+
+def test_prepare_batch_tensors_honors_calibration_max_seq_len() -> None:
+    guard = SimpleNamespace(
+        _policy={"calibration": {"max_seq_len": 2}},
+        _stats={},
+    )
+    device = torch.device("cpu")
+
+    input_ids, labels = prepare_batch_tensors(
+        guard,
+        {"input_ids": [1, 2, 3, 4], "attention_mask": [1, 0, 1, 1]},
+        device,
+    )
+
+    assert input_ids.tolist() == [[1, 2]]
+    assert labels.tolist() == [[1, -100]]
+
+
+def test_release_batch_memory_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(torch.cuda, "empty_cache", lambda: calls.append("empty"))
+
+    release_batch_memory(None)
+    release_batch_memory(torch.device("cpu"))
+    release_batch_memory(torch.device("cuda"))
+
+    assert calls == ["empty"]
+
+    monkeypatch.setattr(
+        torch.cuda,
+        "empty_cache",
+        lambda: (_ for _ in ()).throw(RuntimeError("cache unavailable")),
+    )
+    release_batch_memory(torch.device("cuda"))
 
 
 def test_compute_ppl_for_batches_handles_empty_batches_and_missing_inputs() -> None:
@@ -145,6 +182,28 @@ def test_compute_ppl_for_batches_uses_adapter_prepare_model_inputs_path() -> Non
     assert ppl == [1.0]
     assert losses == [0.0]
     assert counts == [7]
+
+
+def test_compute_ppl_for_batches_releases_each_batch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(
+        variance_batching,
+        "release_batch_memory",
+        lambda device: calls.append(str(device)),
+    )
+
+    ppl, losses = compute_ppl_for_batches(
+        _Guard(),
+        _TinyModel(),
+        [{"input_ids": [1, 2]}, {"input_ids": [3, 4]}],
+        torch.device("cpu"),
+    )
+
+    assert ppl == [1.0, 1.0]
+    assert losses == [0.0, 0.0]
+    assert calls == ["cpu", "cpu"]
 
 
 def test_compute_ppl_for_batches_falls_back_to_zero_count_when_numel_raises(

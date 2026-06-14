@@ -91,6 +91,7 @@ def test_build_provider_dataset_plan_collects_diagnostics_and_provider_kwargs() 
         "dataset_name": "demo",
         "path": "demo.jsonl",
     }
+    assert result.calibration_data[0]["labels"] == [11, 12]
     assert result.calibration_data[1]["labels"] == [21, 22]
     assert result.preview_records[0]["labels"] == [11, 12]
     assert result.dataset_meta["stratification"] == {"mode": "balanced"}

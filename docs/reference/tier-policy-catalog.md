@@ -208,6 +208,8 @@ monitoring.
   `all` vs `ffn`), described in `docs/assurance/05-spectral-fpr-derivation.md`.
 - `max_caps` *(policy)* — per-run WARN/cap budget; exceeding this aborts in
   CI/Release (see `docs/assurance/05-spectral-fpr-derivation.md`).
+  Caps inside this budget are observations; reports may surface them as
+  `guard_warnings` when they are new relative to the baseline.
 - `max_spectral_norm` *(policy)* — optional absolute clamp. `null` means “no
   absolute clamp”; rely on relative z-caps and the WARN budget (see
   `docs/assurance/09-tier-v1-calibration.md` “Keep these fixed … no clamp”).

@@ -177,6 +177,34 @@ spectral did not pass
 That is the intended strict-verification behavior: guard stability is required even
 when the summary metric is clean.
 
+## Real guard-value demo
+
+The Mistral 7B published basis also ships a real scenario-pack artifact, separate
+from the fixture-only caught regressions:
+
+```bash
+invarlock verify --profile release --assurance report \
+  public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json
+```
+
+Expected outcome: verification passes for the selected report itself. The
+packaged `guard_value_summary.json` records the guard-value comparison:
+PM-only accepts `spectral_moderate_scale_mlp_l31_up_s112`
+(`ratio_vs_baseline = 1.0076338080085065`), while the evidence-pack PM+guards
+comparison finds one new spectral cap relative to the Mistral noop basis:
+`model.layers.31.mlp.up_proj`.
+
+The same artifact includes `spectral_moderate_scale_attn_l31_o_s112` as a
+negative control: the same 1.12x scale on the closest non-baseline attention
+module passes PM and does not add a new baseline-relative cap. The compact sweep
+summary records adjacent scale points showing that the attention target starts
+triggering at 1.18 and the FFN target remains PM-accepted through 1.20.
+
+This is not a strict spectral-failure example: `validation.spectral_stable`
+remains true because the spectral cap budget is not exceeded. It is an
+evidence-pack guard-value demonstration: baseline-only guard signals do not count
+as new guard catches, but a PM-passing run that adds a new capped module does.
+
 ## Policy failures
 
 The policy-failure fixtures show non-guard and provenance predicates that can

@@ -187,6 +187,7 @@ def test_resolve_auto_adapter_causal_model_type_only_hints(tmp_path: Path) -> No
         "gemma4",
         "gpt_oss",
         "olmo2",
+        "olmoe",
     ):
         model_dir = tmp_path / model_type
         model_dir.mkdir()

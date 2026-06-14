@@ -1,251 +1,936 @@
 {
   "format_version": "model-family-catalog-v1",
-  "as_of": "2026-04-19",
+  "as_of": "2026-06-13",
   "declared_support": [
     {
       "family_id": "gpt2-causal-lm",
       "display_name": "GPT-2 causal LM",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
       "state": "published_basis",
-      "representative_models": ["openai-community/gpt2"],
+      "representative_models": [
+        "openai-community/gpt2"
+      ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "docs/README.md",
         "docs/reference/model-adapters.md"
       ],
-      "notes": "Derived from support_matrix lane gpt2-causal-hf."
+      "notes": "Derived from support_matrix lane gpt2-causal-hf.",
+      "support_groups": [
+        "baseline_reference"
+      ]
     },
     {
       "family_id": "bert-roberta-mlm",
       "display_name": "BERT / RoBERTa MLM",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "masked_lm",
       "state": "published_basis",
-      "representative_models": ["bert-base-uncased", "roberta-base"],
+      "representative_models": [
+        "bert-base-uncased",
+        "roberta-base"
+      ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "docs/README.md",
         "docs/reference/model-adapters.md"
       ],
-      "notes": "Derived from support_matrix lane bert-mlm-hf."
+      "notes": "Derived from support_matrix lane bert-mlm-hf.",
+      "support_groups": [
+        "baseline_reference"
+      ]
     },
     {
       "family_id": "mistral-7b-causal-lm",
       "display_name": "Mistral 7B causal LM",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
-      "state": "supported_experimental",
-      "representative_models": ["mistralai/Mistral-7B-v0.1"],
+      "state": "published_basis",
+      "representative_models": [
+        "mistralai/Mistral-7B-v0.1"
+      ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/mistral_7b_512.yaml",
-        "configs/calibration/null_sweep_mistral_7b.yaml"
+        "configs/calibration/null_sweep_mistral_7b.yaml",
+        "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+        "public_evidence/published_basis/mistral_7b/runtime.manifest.json",
+        "public_evidence/published_basis/mistral_7b/evidence_pack"
       ],
-      "notes": "Derived from support_matrix lane mistral-7b-causal-hf."
+      "notes": "Promoted from support_matrix lane mistral-7b-causal-hf with container-backed public evidence.",
+      "support_groups": [
+        "published_modern",
+        "enterprise_permissive"
+      ]
     },
     {
-      "family_id": "ministral-3-text-causal-lm",
-      "display_name": "Ministral 3 causal LM (text-only eval)",
-      "modalities": ["text"],
+      "family_id": "ministral-3-8b-text-causal-lm",
+      "display_name": "Ministral 3 8B causal LM (text-only eval)",
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
-      "state": "supported_experimental",
+      "state": "published_basis",
       "representative_models": [
-        "mistralai/Ministral-3-8B-Instruct-2512-BF16",
-        "mistralai/Ministral-3-14B-Instruct-2512-BF16"
+        "mistralai/Ministral-3-8B-Instruct-2512-BF16"
       ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/ministral3_8b_512.yaml",
         "configs/calibration/null_sweep_ministral3_8b.yaml",
-        "configs/presets/causal_lm/ministral3_14b_512.yaml",
-        "configs/calibration/null_sweep_ministral3_14b.yaml"
+        "public_evidence/published_basis/ministral3_8b/evaluation.report.json",
+        "public_evidence/published_basis/ministral3_8b/runtime.manifest.json",
+        "public_evidence/published_basis/ministral3_8b/evidence_pack"
       ],
-      "notes": "Derived from support_matrix lane ministral-3-text-causal-hf. Public support is text-only in phase 1; image-text evaluation remains an explicit multimodal follow-up."
+      "notes": "Promoted from support_matrix lane ministral-3-8b-text-causal-hf with container-backed public evidence. The separate 14B Ministral lane has its own published evidence fixture.",
+      "support_groups": [
+        "published_modern",
+        "practical_shortlist",
+        "small_local",
+        "enterprise_permissive"
+      ]
+    },
+    {
+      "family_id": "ministral-3-14b-text-causal-lm",
+      "display_name": "Ministral 3 14B causal LM (text-only eval)",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "mistralai/Ministral-3-14B-Instruct-2512-BF16"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/ministral3_14b_512.yaml",
+        "configs/calibration/null_sweep_ministral3_14b.yaml",
+        "public_evidence/published_basis/ministral3_14b/evaluation.report.json",
+        "public_evidence/published_basis/ministral3_14b/runtime.manifest.json",
+        "public_evidence/published_basis/ministral3_14b/evidence_pack"
+      ],
+      "notes": "Promoted from support_matrix lane ministral-3-14b-text-causal-hf with container-backed public evidence.",
+      "support_groups": [
+        "published_modern",
+        "practical_shortlist",
+        "enterprise_permissive"
+      ]
     },
     {
       "family_id": "qwen2-7b-causal-lm",
       "display_name": "Qwen2 7B causal LM",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
-      "state": "supported_experimental",
-      "representative_models": ["Qwen/Qwen2-7B"],
+      "state": "published_basis",
+      "representative_models": [
+        "Qwen/Qwen2-7B"
+      ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen2_7b_512.yaml",
-        "configs/calibration/null_sweep_qwen2_7b.yaml"
+        "configs/calibration/null_sweep_qwen2_7b.yaml",
+        "public_evidence/published_basis/qwen2_7b/evaluation.report.json",
+        "public_evidence/published_basis/qwen2_7b/runtime.manifest.json",
+        "public_evidence/published_basis/qwen2_7b/evidence_pack"
       ],
-      "notes": "Derived from support_matrix lane qwen2-7b-causal-hf."
+      "notes": "Promoted from support_matrix lane qwen2-7b-causal-hf with container-backed public evidence.",
+      "support_groups": [
+        "published_modern"
+      ]
     },
     {
       "family_id": "qwen2-5-7b-causal-lm",
       "display_name": "Qwen2.5 7B causal LM",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
-      "state": "supported_experimental",
-      "representative_models": ["Qwen/Qwen2.5-7B"],
+      "state": "published_basis",
+      "representative_models": [
+        "Qwen/Qwen2.5-7B"
+      ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen2_5_7b_512.yaml",
-        "configs/calibration/null_sweep_qwen2_5_7b.yaml"
+        "configs/calibration/null_sweep_qwen2_5_7b.yaml",
+        "public_evidence/published_basis/qwen2_5_7b/evaluation.report.json",
+        "public_evidence/published_basis/qwen2_5_7b/runtime.manifest.json",
+        "public_evidence/published_basis/qwen2_5_7b/evidence_pack"
       ],
-      "notes": "Derived from support_matrix lane qwen2-5-7b-causal-hf."
+      "notes": "Promoted from support_matrix lane qwen2-5-7b-causal-hf with container-backed public evidence.",
+      "support_groups": [
+        "published_modern"
+      ]
     },
     {
       "family_id": "qwen2-5-14b-causal-lm",
       "display_name": "Qwen2.5 14B causal LM",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
-      "state": "supported_experimental",
-      "representative_models": ["Qwen/Qwen2.5-14B"],
+      "state": "published_basis",
+      "representative_models": [
+        "Qwen/Qwen2.5-14B"
+      ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen2_5_14b_512.yaml",
-        "configs/calibration/null_sweep_qwen2_5_14b.yaml"
+        "configs/calibration/null_sweep_qwen2_5_14b.yaml",
+        "public_evidence/published_basis/qwen2_5_14b/evaluation.report.json",
+        "public_evidence/published_basis/qwen2_5_14b/runtime.manifest.json",
+        "public_evidence/published_basis/qwen2_5_14b/evidence_pack"
       ],
-      "notes": "Derived from support_matrix lane qwen2-5-14b-causal-hf."
+      "notes": "Promoted from support_matrix lane qwen2-5-14b-causal-hf with container-backed public evidence.",
+      "support_groups": [
+        "published_modern"
+      ]
     },
     {
       "family_id": "qwen3-causal-lm",
       "display_name": "Qwen3 causal LM",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
-      "state": "supported_experimental",
-      "representative_models": ["Qwen/Qwen3-8B"],
+      "state": "published_basis",
+      "representative_models": [
+        "Qwen/Qwen3-8B"
+      ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen3_8b_512.yaml",
-        "configs/calibration/null_sweep_qwen3_8b.yaml"
+        "configs/calibration/null_sweep_qwen3_8b.yaml",
+        "public_evidence/published_basis/qwen3_8b/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_8b/runtime.manifest.json",
+        "public_evidence/published_basis/qwen3_8b/evidence_pack"
       ],
-      "notes": "Derived from support_matrix lane qwen3-causal-hf."
+      "notes": "Promoted from support_matrix lane qwen3-causal-hf with container-backed public evidence.",
+      "support_groups": [
+        "published_modern",
+        "reasoning_focused"
+      ]
     },
     {
       "family_id": "deepseek-r1-distill-qwen-causal-lm",
       "display_name": "DeepSeek-R1-Distill-Qwen causal LM",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
-      "state": "supported_experimental",
-      "representative_models": ["deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"],
+      "state": "published_basis",
+      "representative_models": [
+        "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+      ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/deepseek_r1_distill_qwen_7b_512.yaml",
-        "configs/calibration/null_sweep_deepseek_r1_distill_qwen_7b.yaml"
+        "configs/calibration/null_sweep_deepseek_r1_distill_qwen_7b.yaml",
+        "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evaluation.report.json",
+        "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/runtime.manifest.json",
+        "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evidence_pack"
       ],
-      "notes": "Derived from support_matrix lane deepseek-r1-distill-qwen-causal-hf."
+      "notes": "Promoted from support_matrix lane deepseek-r1-distill-qwen-causal-hf with container-backed public evidence.",
+      "support_groups": [
+        "published_modern",
+        "reasoning_focused"
+      ]
     },
     {
       "family_id": "phi-4-text-causal-lm",
       "display_name": "Phi-4 causal LM (text-only eval)",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
-      "state": "supported_experimental",
-      "representative_models": ["microsoft/Phi-4-reasoning-plus"],
+      "state": "published_basis",
+      "representative_models": [
+        "microsoft/Phi-4-reasoning-plus"
+      ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/phi4_reasoning_plus_512.yaml",
-        "configs/calibration/null_sweep_phi4_reasoning_plus.yaml"
+        "configs/calibration/null_sweep_phi4_reasoning_plus.yaml",
+        "public_evidence/published_basis/phi4_reasoning_plus/evaluation.report.json",
+        "public_evidence/published_basis/phi4_reasoning_plus/runtime.manifest.json",
+        "public_evidence/published_basis/phi4_reasoning_plus/evidence_pack"
       ],
-      "notes": "Derived from support_matrix lane phi-4-text-causal-hf after the shipped text-only pilot closed with passing evaluate and verify evidence. Current HF runtime validation requires explicit trust_remote_code opt-in for this lane."
+      "notes": "Promoted from support_matrix lane phi-4-text-causal-hf with container-backed public evidence. The public fixture is text-only and skips guard-overhead measurement by preset policy.",
+      "support_groups": [
+        "published_modern",
+        "reasoning_focused"
+      ]
     },
     {
       "family_id": "gemma-4-e2b-text-causal-lm",
       "display_name": "Gemma 4 E2B causal LM (text-only eval)",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
-      "state": "supported_experimental",
-      "representative_models": ["google/gemma-4-E2B-it"],
+      "state": "published_basis",
+      "representative_models": [
+        "google/gemma-4-E2B-it"
+      ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/gemma4_e2b_512.yaml",
-        "configs/calibration/null_sweep_gemma4_e2b.yaml"
+        "configs/calibration/null_sweep_gemma4_e2b.yaml",
+        "public_evidence/published_basis/gemma4_e2b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_e2b/runtime.manifest.json",
+        "public_evidence/published_basis/gemma4_e2b/evidence_pack"
       ],
-      "notes": "Derived from support_matrix lane gemma4-e2b-text-causal-hf. Public support is text-only in phase 1; image-text evaluation is shipped separately via hf_multimodal + vision_text."
+      "notes": "Promoted from support_matrix lane gemma4-e2b-text-causal-hf with release-profile container-backed public evidence. Public support is text-only; image-text evaluation remains on the explicit hf_multimodal + vision_text path.",
+      "support_groups": [
+        "published_modern",
+        "small_local",
+        "enterprise_permissive"
+      ]
     },
     {
       "family_id": "tinyllama-1-1b-causal-lm",
       "display_name": "TinyLlama 1.1B causal LM",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
-      "state": "supported_experimental",
-      "representative_models": ["TinyLlama/TinyLlama-1.1B-Chat-v1.0"],
+      "state": "published_basis",
+      "representative_models": [
+        "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+      ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/tinyllama_1_1b_512.yaml",
-        "configs/calibration/null_sweep_tinyllama_1_1b.yaml"
+        "configs/calibration/null_sweep_tinyllama_1_1b.yaml",
+        "public_evidence/published_basis/tinyllama_1_1b/evaluation.report.json",
+        "public_evidence/published_basis/tinyllama_1_1b/runtime.manifest.json",
+        "public_evidence/published_basis/tinyllama_1_1b/evidence_pack"
       ],
-      "notes": "Derived from support_matrix lane tinyllama-1-1b-causal-hf. This is the ungated Llama-family replacement lane."
+      "notes": "Promoted from support_matrix lane tinyllama-1-1b-causal-hf with container-backed public evidence.",
+      "support_groups": [
+        "published_modern",
+        "small_local"
+      ]
     },
     {
-      "family_id": "olmo-2-causal-lm",
-      "display_name": "OLMo 2 causal LM",
-      "modalities": ["text"],
+      "family_id": "olmo-2-7b-causal-lm",
+      "display_name": "OLMo 2 7B causal LM",
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
-      "state": "supported_experimental",
+      "state": "published_basis",
       "representative_models": [
-        "allenai/OLMo-2-1124-7B",
-        "allenai/OLMo-2-1124-13B-Instruct"
+        "allenai/OLMo-2-1124-7B"
       ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/olmo2_7b_512.yaml",
         "configs/calibration/null_sweep_olmo2_7b.yaml",
-        "configs/presets/causal_lm/olmo2_13b_512.yaml",
-        "configs/calibration/null_sweep_olmo2_13b.yaml"
+        "public_evidence/published_basis/olmo2_7b/evaluation.report.json",
+        "public_evidence/published_basis/olmo2_7b/runtime.manifest.json",
+        "public_evidence/published_basis/olmo2_7b/evidence_pack"
       ],
-      "notes": "Derived from support_matrix lane olmo-2-causal-hf."
+      "notes": "Promoted from support_matrix lane olmo-2-7b-causal-hf with container-backed public evidence.",
+      "support_groups": [
+        "published_modern"
+      ]
+    },
+    {
+      "family_id": "olmo-2-13b-causal-lm",
+      "display_name": "OLMo 2 13B causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "allenai/OLMo-2-1124-13B-Instruct"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/olmo2_13b_512.yaml",
+        "configs/calibration/null_sweep_olmo2_13b.yaml",
+        "public_evidence/published_basis/olmo2_13b/evaluation.report.json",
+        "public_evidence/published_basis/olmo2_13b/runtime.manifest.json",
+        "public_evidence/published_basis/olmo2_13b/evidence_pack"
+      ],
+      "notes": "Promoted from support_matrix lane olmo-2-13b-causal-hf with container-backed public evidence.",
+      "support_groups": [
+        "published_modern"
+      ]
+    },
+    {
+      "family_id": "openllama-7b-causal-lm",
+      "display_name": "OpenLLaMA 7B causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "openlm-research/open_llama_7b"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/open_llama_7b_512.yaml",
+        "configs/calibration/null_sweep_open_llama_7b.yaml",
+        "public_evidence/published_basis/open_llama_7b/evaluation.report.json",
+        "public_evidence/published_basis/open_llama_7b/runtime.manifest.json",
+        "public_evidence/published_basis/open_llama_7b/evidence_pack"
+      ],
+      "notes": "Promoted from support_matrix lane open-llama-7b-causal-hf with release-profile container-backed public evidence.",
+      "support_groups": [
+        "published_modern"
+      ]
+    },
+    {
+      "family_id": "falcon-7b-causal-lm",
+      "display_name": "Falcon 7B causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "tiiuae/falcon-7b"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/falcon_7b_512.yaml",
+        "configs/calibration/null_sweep_falcon_7b.yaml",
+        "public_evidence/published_basis/falcon_7b/evaluation.report.json",
+        "public_evidence/published_basis/falcon_7b/runtime.manifest.json",
+        "public_evidence/published_basis/falcon_7b/evidence_pack"
+      ],
+      "notes": "Promoted from support_matrix lane falcon-7b-causal-hf with release-profile container-backed public evidence.",
+      "support_groups": [
+        "published_modern"
+      ]
     },
     {
       "family_id": "qwen3-5-causal-lm",
       "display_name": "Qwen3.5 causal LM",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
-      "state": "supported_experimental",
-      "representative_models": ["Qwen/Qwen3.5-9B"],
+      "state": "published_basis",
+      "representative_models": [
+        "Qwen/Qwen3.5-9B"
+      ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen3_5_9b_512.yaml",
-        "configs/calibration/null_sweep_qwen3_5_9b.yaml"
+        "configs/calibration/null_sweep_qwen3_5_9b.yaml",
+        "public_evidence/published_basis/qwen3_5_9b/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_5_9b/runtime.manifest.json",
+        "public_evidence/published_basis/qwen3_5_9b/evidence_pack"
       ],
-      "notes": "Derived from support_matrix lane qwen3-5-causal-hf."
+      "notes": "Promoted from support_matrix lane qwen3-5-causal-hf with container-backed public evidence.",
+      "support_groups": [
+        "published_modern",
+        "practical_shortlist",
+        "enterprise_permissive"
+      ]
     },
     {
-      "family_id": "seq2seq-local-pairs",
-      "display_name": "Seq2Seq / local pairs",
-      "modalities": ["text"],
-      "task_role": "seq2seq",
-      "state": "community_experimental",
-      "representative_models": ["t5-small", "facebook/bart-base"],
+      "family_id": "gemma-4-12b-any-to-any-lm",
+      "display_name": "Gemma 4 12B any-to-any LM",
+      "modalities": [
+        "text",
+        "image",
+        "audio"
+      ],
+      "task_role": "any_to_any",
+      "state": "published_basis",
+      "representative_models": [
+        "google/gemma-4-12B-it"
+      ],
       "repo_evidence": [
         "contracts/support_matrix.json",
         "docs/README.md",
-        "docs/reference/model-adapters.md"
+        "configs/presets/multimodal/gemma4_12b_vision_text_256.yaml",
+        "configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_gemma4_12b.yaml",
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "src/invarlock/adapters/hf_loading.py",
+        "public_evidence/published_basis/gemma4_12b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_12b/runtime.manifest.json",
+        "public_evidence/published_basis/gemma4_12b/evidence_pack"
       ],
-      "notes": "Derived from support_matrix lane seq2seq-local-pairs."
+      "support_groups": [
+        "published_modern",
+        "practical_shortlist",
+        "enterprise_permissive",
+        "multimodal_candidate"
+      ],
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence, runtime manifest, and signed evidence pack. Gemma 4 12B uses the explicit hf_multimodal path and requires the multimodal runtime stack (transformers>=5.12.0 and torchvision>=0.26.0); audio evaluation remains deferred."
+    },
+    {
+      "family_id": "qwen3-5-4b-image-text-lm",
+      "display_name": "Qwen3.5 4B image-text LM",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "task_role": "image_text",
+      "state": "community_experimental",
+      "representative_models": [
+        "Qwen/Qwen3.5-4B"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_qwen3_5_4b.yaml",
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_multimodal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
+      ],
+      "notes": "Prepared from support_matrix lane qwen3-5-4b-image-text-hf and awaiting public evidence artifacts.",
+      "support_groups": [
+        "small_local",
+        "multimodal_candidate",
+        "practical_shortlist",
+        "enterprise_permissive"
+      ]
+    },
+    {
+      "family_id": "qwen3-5-2b-image-text-lm",
+      "display_name": "Qwen3.5 2B image-text LM",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "task_role": "image_text",
+      "state": "community_experimental",
+      "representative_models": [
+        "Qwen/Qwen3.5-2B"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_qwen3_5_2b.yaml",
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_multimodal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
+      ],
+      "notes": "Prepared from support_matrix lane qwen3-5-2b-image-text-hf and awaiting public evidence artifacts.",
+      "support_groups": [
+        "small_local",
+        "multimodal_candidate",
+        "enterprise_permissive"
+      ]
+    },
+    {
+      "family_id": "gemma3n-e4b-image-text-lm",
+      "display_name": "Gemma 3n E4B image-text LM",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "task_role": "image_text",
+      "state": "community_experimental",
+      "representative_models": [
+        "google/gemma-3n-E4B-it"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/multimodal/gemma3n_e4b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_gemma3n_e4b.yaml",
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_multimodal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
+      ],
+      "notes": "Prepared as an image-text Gemma 3n candidate on public VQAv2. Audio/video evaluation is intentionally deferred until the evaluation provider exists. Evidence execution requires a Hugging Face token with accepted Gemma access terms.",
+      "support_groups": [
+        "small_local",
+        "multimodal_candidate",
+        "practical_shortlist"
+      ]
+    },
+    {
+      "family_id": "gemma3-4b-it-image-text-lm",
+      "display_name": "Gemma 3 4B IT image-text LM",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "task_role": "image_text",
+      "state": "community_experimental",
+      "representative_models": [
+        "google/gemma-3-4b-it"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/multimodal/gemma3_4b_it_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_gemma3_4b_it.yaml",
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_multimodal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
+      ],
+      "notes": "Reclassified from a text-only out-of-scope candidate into an explicit image-text candidate lane using hf_multimodal and pinned public VQAv2 materialization. Evidence execution requires a Hugging Face token with accepted Gemma access terms.",
+      "support_groups": [
+        "small_local",
+        "multimodal_candidate",
+        "practical_shortlist"
+      ]
+    },
+    {
+      "family_id": "ministral-3-3b-text-causal-lm",
+      "display_name": "Ministral 3 3B causal LM (text-only eval)",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "mistralai/Ministral-3-3B-Instruct-2512-BF16"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/ministral3_3b_512.yaml",
+        "configs/calibration/null_sweep_ministral3_3b.yaml",
+        "public_evidence/published_basis/ministral3_3b/evaluation.report.json",
+        "public_evidence/published_basis/ministral3_3b/runtime.manifest.json",
+        "public_evidence/published_basis/ministral3_3b/evidence_pack"
+      ],
+      "support_groups": [
+        "published_modern",
+        "small_local",
+        "enterprise_permissive"
+      ],
+      "notes": "Promoted from support_matrix lane ministral-3-3b-text-causal-hf with container-backed public evidence."
+    },
+    {
+      "family_id": "granite-4-1-3b-causal-lm",
+      "display_name": "Granite 4.1 3B causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "ibm-granite/granite-4.1-3b"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/granite4_1_3b_512.yaml",
+        "configs/calibration/null_sweep_granite4_1_3b.yaml",
+        "public_evidence/published_basis/granite4_1_3b/evaluation.report.json",
+        "public_evidence/published_basis/granite4_1_3b/runtime.manifest.json",
+        "public_evidence/published_basis/granite4_1_3b/evidence_pack"
+      ],
+      "support_groups": [
+        "published_modern",
+        "small_local",
+        "enterprise_permissive"
+      ],
+      "notes": "Promoted from support_matrix lane granite-4-1-3b-causal-hf with container-backed release-profile public evidence."
+    },
+    {
+      "family_id": "granite-4-1-8b-causal-lm",
+      "display_name": "Granite 4.1 8B causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "ibm-granite/granite-4.1-8b"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/granite4_1_8b_512.yaml",
+        "configs/calibration/null_sweep_granite4_1_8b.yaml",
+        "public_evidence/published_basis/granite4_1_8b/evaluation.report.json",
+        "public_evidence/published_basis/granite4_1_8b/runtime.manifest.json",
+        "public_evidence/published_basis/granite4_1_8b/evidence_pack"
+      ],
+      "support_groups": [
+        "practical_shortlist",
+        "enterprise_permissive"
+      ],
+      "notes": "Public release-profile container-backed evidence fixture is included from remote run 20260612Tgranite8bPrefetchReleaseA after tokenizer prefetch recovery."
+    },
+    {
+      "family_id": "smollm3-3b-causal-lm",
+      "display_name": "SmolLM3 3B causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "HuggingFaceTB/SmolLM3-3B"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/smollm3_3b_512.yaml",
+        "configs/calibration/null_sweep_smollm3_3b.yaml",
+        "public_evidence/published_basis/smollm3_3b/evaluation.report.json",
+        "public_evidence/published_basis/smollm3_3b/runtime.manifest.json",
+        "public_evidence/published_basis/smollm3_3b/evidence_pack"
+      ],
+      "support_groups": [
+        "small_local"
+      ],
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window run preset. The preset explicitly skips guard-overhead measurement, so this is preservation evidence and not guard-overhead evidence."
+    },
+    {
+      "family_id": "phi-4-mini-causal-lm",
+      "display_name": "Phi-4 mini causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "microsoft/Phi-4-mini-instruct"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/phi4_mini_512.yaml",
+        "configs/calibration/null_sweep_phi4_mini.yaml",
+        "public_evidence/published_basis/phi4_mini/evaluation.report.json",
+        "public_evidence/published_basis/phi4_mini/runtime.manifest.json",
+        "public_evidence/published_basis/phi4_mini/evidence_pack"
+      ],
+      "support_groups": [
+        "small_local",
+        "reasoning_focused"
+      ],
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window run preset after FFN projection family classification was fixed."
+    },
+    {
+      "family_id": "deepseek-r1-distill-qwen-14b-causal-lm",
+      "display_name": "DeepSeek-R1-Distill-Qwen 14B causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/deepseek_r1_distill_qwen_14b_512.yaml",
+        "configs/calibration/null_sweep_deepseek_r1_distill_qwen_14b.yaml",
+        "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evaluation.report.json",
+        "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/runtime.manifest.json",
+        "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evidence_pack"
+      ],
+      "support_groups": [
+        "published_modern",
+        "reasoning_focused"
+      ],
+      "notes": "Promoted from support_matrix lane deepseek-r1-distill-qwen-14b-causal-hf with container-backed public evidence using baseline-report reuse recovery."
+    },
+    {
+      "family_id": "deepseek-r1-0528-qwen3-8b-causal-lm",
+      "display_name": "DeepSeek-R1-0528-Qwen3 8B causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/deepseek_r1_0528_qwen3_8b_512.yaml",
+        "configs/calibration/null_sweep_deepseek_r1_0528_qwen3_8b.yaml",
+        "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evaluation.report.json",
+        "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/runtime.manifest.json",
+        "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evidence_pack"
+      ],
+      "support_groups": [
+        "published_modern",
+        "reasoning_focused"
+      ],
+      "notes": "Promoted from support_matrix lane deepseek-r1-0528-qwen3-8b-causal-hf with container-backed public evidence."
+    },
+    {
+      "family_id": "falcon-h1r-7b-causal-lm",
+      "display_name": "Falcon-H1R 7B causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "tiiuae/Falcon-H1R-7B"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/falcon_h1r_7b_512.yaml",
+        "configs/calibration/null_sweep_falcon_h1r_7b.yaml",
+        "public_evidence/published_basis/falcon_h1r_7b/evaluation.report.json",
+        "public_evidence/published_basis/falcon_h1r_7b/runtime.manifest.json",
+        "public_evidence/published_basis/falcon_h1r_7b/evidence_pack"
+      ],
+      "support_groups": [
+        "reasoning_focused"
+      ],
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window run preset after Mamba projection spectral-family classification and Falcon embedding spectral exclusion."
+    },
+    {
+      "family_id": "flan-t5-base-seq2seq-lm",
+      "display_name": "FLAN-T5 base seq2seq LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "seq2seq",
+      "state": "published_basis",
+      "representative_models": [
+        "google/flan-t5-base"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml",
+        "configs/calibration/null_sweep_flan_t5_base.yaml",
+        "public_evidence/published_basis/flan_t5_base/evaluation.report.json",
+        "public_evidence/published_basis/flan_t5_base/runtime.manifest.json",
+        "public_evidence/published_basis/flan_t5_base/evidence_pack"
+      ],
+      "support_groups": [
+        "seq2seq"
+      ],
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and pinned CNN/DailyMail validation data through hf_seq2seq."
+    },
+    {
+      "family_id": "olmoe-1b-7b-causal-lm",
+      "display_name": "OLMoE 1B-active/7B-total causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "allenai/OLMoE-1B-7B-0924"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/olmoe_1b_7b_0924_512.yaml",
+        "configs/calibration/null_sweep_olmoe_1b_7b_0924.yaml",
+        "public_evidence/published_basis/olmoe_1b_7b/evaluation.report.json",
+        "public_evidence/published_basis/olmoe_1b_7b/runtime.manifest.json",
+        "public_evidence/published_basis/olmoe_1b_7b/evidence_pack"
+      ],
+      "support_groups": [
+        "moe_candidate",
+        "small_local"
+      ],
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack from H100 validation run 20260613Tolmoe1b7bH100A. This fixture is the smaller MoE validation basis; larger MoE assurance is now covered by Mixtral and Gemma 4 26B-A4B published bases, while Qwen3 30B-A3B remains a candidate lane."
     }
   ],
   "implemented_coverage": [
     {
-      "family_id": "mixtral",
-      "display_name": "Mixtral",
-      "modalities": ["text"],
+      "family_id": "qwen3-30b-a3b-moe-causal-lm",
+      "display_name": "Qwen3 30B-A3B MoE causal LM",
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
-      "state": "profile_first_class",
-      "representative_models": ["mistralai/Mixtral-8x7B-v0.1"],
+      "state": "published_basis",
+      "representative_models": [
+        "Qwen/Qwen3-30B-A3B-Instruct-2507"
+      ],
       "repo_evidence": [
         "src/invarlock/model_profile.py",
         "src/invarlock/adapters/hf_loading.py",
-        "tests/core/test_model_profiles.py"
+        "configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml",
+        "configs/calibration/null_sweep_qwen3_30b_a3b_instruct_2507.yaml",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_causal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py",
+        "contracts/support_matrix.json",
+        "public_evidence/published_basis/qwen3_30b_a3b/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_30b_a3b/runtime.manifest.json",
+        "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack"
       ],
-      "notes": "Recognized directly by model profile and causal loader helpers, but not listed as a public support lane."
+      "notes": "Promoted as a recent Qwen3 MoE causal LM published basis with explicit hf_causal preset, public WikiText-103 release-profile H100 CUDA report, runtime manifest, and signed evidence pack from run 20260613Tqwen330ba3bH100All8. The fixture uses bfloat16/low-CPU-memory loading, disabled optional Hugging Face loading-info collection, automatic device placement across all eight H100 80GB GPUs, and scoped attention/router/shared-expert guard scans. This is no-op preservation evidence; it is not a benchmark-quality, fine-tuning, deployment, exhaustive expert-bank, or MoE routing-quality claim. A restricted four-GPU diagnostic lane failed and is intentionally not used as publication evidence."
+    },
+    {
+      "family_id": "gemma-4-26b-a4b-moe-image-text-lm",
+      "display_name": "Gemma 4 26B-A4B MoE image-text LM",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "task_role": "any_to_any",
+      "state": "published_basis",
+      "representative_models": [
+        "google/gemma-4-26B-A4B-it"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "src/invarlock/model_profile.py",
+        "src/invarlock/adapters/hf_loading.py",
+        "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_gemma4_26b_a4b.yaml",
+        "public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_26b_a4b/runtime.manifest.json",
+        "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack",
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_multimodal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
+      ],
+      "notes": "Promoted as a recent Gemma 4 multimodal MoE published basis using the explicit hf_multimodal path, pinned public VQAv2 image-text materialization, release-profile H100 CUDA report, runtime manifest, and signed evidence pack from run 20260613Tgemma426ba4bH100A. This is no-op preservation evidence; it is not a benchmark-quality, fine-tuning, audio, or MoE routing-quality claim."
+    },
+    {
+      "family_id": "mixtral",
+      "display_name": "Mixtral 8x7B MoE causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "mistralai/Mixtral-8x7B-v0.1"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "src/invarlock/model_profile.py",
+        "src/invarlock/adapters/hf_loading.py",
+        "src/invarlock/adapters/auto.py",
+        "configs/presets/causal_lm/mixtral_8x7b_512.yaml",
+        "configs/calibration/null_sweep_mixtral_8x7b.yaml",
+        "public_evidence/published_basis/mixtral_8x7b/evaluation.report.json",
+        "public_evidence/published_basis/mixtral_8x7b/runtime.manifest.json",
+        "public_evidence/published_basis/mixtral_8x7b/evidence_pack",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/core/test_model_profiles.py",
+        "tests/cli/test_preset_causal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
+      ],
+      "notes": "Promoted as a Mixtral MoE causal LM published basis with explicit hf_causal preset, release-profile H100 CUDA report, runtime manifest, and signed evidence pack. The preset keeps the full guard scan surface while using BF16, automatic device placement, low-CPU-memory loading, disabled optional HF loading-info collection, and a skipped optional guard-overhead check for large-model resource discipline."
     },
     {
       "family_id": "llama",
       "display_name": "Llama",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
       "state": "profile_first_class",
       "representative_models": [
-        "openlm-research/open_llama_7b",
         "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
       ],
       "repo_evidence": [
@@ -253,32 +938,43 @@
         "src/invarlock/adapters/hf_loading.py",
         "src/invarlock/adapters/auto.py"
       ],
-      "notes": "Generic Llama-family profile handling is first-class. TinyLlama now provides the ungated declared support lane, while access-gated vendor checkpoints remain omitted."
+      "notes": "Generic Llama-family profile handling is first-class. OpenLLaMA and TinyLlama now provide ungated declared support lanes, while access-gated vendor checkpoints remain omitted."
     },
     {
       "family_id": "qwen-family-aliases",
       "display_name": "Qwen family aliases (Qwen1.5/Qwen2.5/Qwen3 naming)",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
       "state": "profile_first_class",
       "representative_models": [
         "Qwen/Qwen2.5-14B",
-        "Qwen/Qwen3.5-9B"
+        "Qwen/Qwen3.5-9B",
+        "Qwen/Qwen3.5-4B"
       ],
       "repo_evidence": [
         "src/invarlock/model_profile.py",
         "src/invarlock/adapters/auto.py",
-        "docs/reference/model-adapters.md"
+        "docs/reference/model-adapters.md",
+        "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
+        "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_qwen3_5_4b.yaml",
+        "configs/calibration/null_sweep_qwen3_5_2b.yaml"
       ],
-      "notes": "Shared qwen-family heuristics still cover aliases beyond the declared Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 public lanes, including usage-only Qwen2.5 checkpoints."
+      "notes": "Shared qwen-family heuristics cover aliases beyond the declared text-only Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 9B public lanes. Qwen3.5 4B and 2B now have prepared image-text candidate lanes through hf_multimodal and pinned public VQAv2 materialization."
     },
     {
       "family_id": "yi",
       "display_name": "Yi",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
       "state": "profile_first_class",
-      "representative_models": ["01-ai/Yi-34B"],
+      "representative_models": [
+        "01-ai/Yi-34B"
+      ],
       "repo_evidence": [
         "src/invarlock/model_profile.py",
         "src/invarlock/adapters/auto.py",
@@ -289,7 +985,10 @@
     {
       "family_id": "phi-family",
       "display_name": "Phi family",
-      "modalities": ["text", "image"],
+      "modalities": [
+        "text",
+        "image"
+      ],
       "task_role": "causal_lm",
       "state": "profile_first_class",
       "representative_models": [
@@ -306,28 +1005,42 @@
     {
       "family_id": "gemma-family",
       "display_name": "Gemma family",
-      "modalities": ["text", "image", "audio"],
+      "modalities": [
+        "text",
+        "image",
+        "audio"
+      ],
       "task_role": "causal_lm",
       "state": "profile_first_class",
       "representative_models": [
         "google/gemma-3-4b-it",
+        "google/gemma-3n-E4B-it",
         "google/gemma-4-E2B-it"
       ],
       "repo_evidence": [
         "src/invarlock/model_profile.py",
         "src/invarlock/adapters/hf_loading.py",
         "src/invarlock/adapters/hf_multimodal.py",
-        "src/invarlock/eval/data.py"
+        "src/invarlock/eval/data.py",
+        "configs/presets/multimodal/gemma3_4b_it_public_vqav2_256.yaml",
+        "configs/presets/multimodal/gemma3n_e4b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_gemma3_4b_it.yaml",
+        "configs/calibration/null_sweep_gemma3n_e4b.yaml"
       ],
-      "notes": "Gemma 3/4 selectors and loaders are first-class. Gemma 4 E2B now has a declared text-only lane, image-text evaluation is shipped through hf_multimodal + vision_text, and audio remains deferred."
+      "notes": "Gemma 3/4 selectors and loaders are first-class. Gemma 4 E2B has a declared text-only lane, Gemma 4 12B and 26B-A4B have public image-text bases, and Gemma 3 4B IT plus Gemma 3n E4B now have prepared image-text candidate lanes through hf_multimodal and pinned public VQAv2 materialization. Audio/video evaluation remains deferred."
     },
     {
       "family_id": "opt-neox-gptj",
       "display_name": "OPT / GPT-NeoX / GPT-J",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
       "state": "profile_shared_alias",
-      "representative_models": ["facebook/opt-1.3b", "EleutherAI/gpt-neox-20b"],
+      "representative_models": [
+        "facebook/opt-1.3b",
+        "EleutherAI/gpt-neox-20b"
+      ],
       "repo_evidence": [
         "src/invarlock/model_profile.py",
         "src/invarlock/adapters/hf_loading.py",
@@ -338,10 +1051,14 @@
     {
       "family_id": "gpt-oss",
       "display_name": "GPT-OSS",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
       "state": "profile_shared_alias",
-      "representative_models": ["openai/gpt-oss-20b"],
+      "representative_models": [
+        "openai/gpt-oss-20b"
+      ],
       "repo_evidence": [
         "src/invarlock/model_profile.py",
         "src/invarlock/adapters/hf_loading.py",
@@ -352,22 +1069,31 @@
     {
       "family_id": "falcon",
       "display_name": "Falcon",
-      "modalities": ["text"],
-      "task_role": "causal_lm",
-      "state": "auto_or_loader_only",
-      "representative_models": ["tiiuae/falcon-7b"],
-      "repo_evidence": [
-        "src/invarlock/adapters/auto.py"
+      "modalities": [
+        "text"
       ],
-      "notes": "Family visibility currently comes from adapter-auto heuristics only."
+      "task_role": "causal_lm",
+      "state": "profile_shared_alias",
+      "representative_models": [
+        "tiiuae/falcon-7b"
+      ],
+      "repo_evidence": [
+        "src/invarlock/adapters/auto.py",
+        "tests/adapters/test_hf_causal_variant_paths.py"
+      ],
+      "notes": "Falcon 7B now has a declared support lane; remaining Falcon-family coverage is available through adapter-auto heuristics and variant-path tests."
     },
     {
       "family_id": "glm",
       "display_name": "GLM",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
       "state": "auto_or_loader_only",
-      "representative_models": ["THUDM/glm-4-9b-chat"],
+      "representative_models": [
+        "THUDM/glm-4-9b-chat"
+      ],
       "repo_evidence": [
         "src/invarlock/adapters/auto.py"
       ],
@@ -376,10 +1102,14 @@
     {
       "family_id": "deepseek",
       "display_name": "DeepSeek",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
       "state": "profile_first_class",
-      "representative_models": ["deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"],
+      "representative_models": [
+        "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+      ],
       "repo_evidence": [
         "src/invarlock/model_profile.py",
         "src/invarlock/adapters/hf_loading.py",
@@ -390,7 +1120,9 @@
     {
       "family_id": "broader-bert-like-mlms",
       "display_name": "Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "masked_lm",
       "state": "auto_or_loader_only",
       "representative_models": [
@@ -407,26 +1139,35 @@
     {
       "family_id": "broader-seq2seq",
       "display_name": "Broader seq2seq families (mBART/PEGASUS/Marian)",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "seq2seq",
       "state": "auto_or_loader_only",
-      "representative_models": ["facebook/mbart-large-50", "Helsinki-NLP/opus-mt-en-de"],
+      "representative_models": [
+        "facebook/mbart-large-50",
+        "Helsinki-NLP/opus-mt-en-de"
+      ],
       "repo_evidence": [
         "src/invarlock/adapters/hf_loading.py",
         "src/invarlock/adapters/auto.py",
         "docs/reference/model-adapters.md"
       ],
-      "notes": "Concrete loader families exist even though the public support matrix keeps seq2seq at a generic local-pairs lane."
+      "notes": "Concrete loader families exist beyond the public FLAN-T5 base seq2seq basis; mBART/PEGASUS/Marian still need dedicated presets and public evidence before they become declared support lanes."
     }
   ],
   "usage_only": [
     {
       "family_id": "qwen2-5-32b",
       "display_name": "Qwen2.5 32B",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
       "state": "usage_only",
-      "representative_models": ["Qwen/Qwen2.5-32B"],
+      "representative_models": [
+        "Qwen/Qwen2.5-32B"
+      ],
       "repo_evidence": [
         "docs/user-guide/evidence-packs-internals.md",
         "scripts/evidence_packs/run_suite.sh",
@@ -437,10 +1178,14 @@
     {
       "family_id": "qwen1-5-72b",
       "display_name": "Qwen1.5 72B",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
       "state": "usage_only",
-      "representative_models": ["Qwen/Qwen1.5-72B"],
+      "representative_models": [
+        "Qwen/Qwen1.5-72B"
+      ],
       "repo_evidence": [
         "docs/user-guide/evidence-packs-internals.md",
         "scripts/evidence_packs/run_suite.sh",
@@ -451,30 +1196,20 @@
     {
       "family_id": "yi-34b",
       "display_name": "Yi 34B",
-      "modalities": ["text"],
+      "modalities": [
+        "text"
+      ],
       "task_role": "causal_lm",
       "state": "usage_only",
-      "representative_models": ["01-ai/Yi-34B"],
+      "representative_models": [
+        "01-ai/Yi-34B"
+      ],
       "repo_evidence": [
         "docs/user-guide/evidence-packs-internals.md",
         "scripts/evidence_packs/run_suite.sh",
         "scripts/evidence_packs/tuned_edit_params.json"
       ],
       "notes": "Used in workshop and full evidence-pack suites without a public support lane."
-    },
-    {
-      "family_id": "mixtral-8x7b",
-      "display_name": "Mixtral 8x7B",
-      "modalities": ["text"],
-      "task_role": "causal_lm",
-      "state": "usage_only",
-      "representative_models": ["mistralai/Mixtral-8x7B-v0.1"],
-      "repo_evidence": [
-        "docs/user-guide/evidence-packs-internals.md",
-        "scripts/evidence_packs/run_suite.sh",
-        "scripts/evidence_packs/tuned_edit_params.json"
-      ],
-      "notes": "Used concretely in evidence-pack flows while remaining outside the public support matrix."
     }
   ],
   "promotion_candidates_text_le_14b": {
@@ -493,8 +1228,8 @@
         "candidate_id": "qwen2-5-7b-causal-lm",
         "display_name": "Qwen2.5 7B causal LM",
         "representative_model": "Qwen/Qwen2.5-7B",
-        "current_catalog_state": "supported_experimental",
-        "decision": "promote_now",
+        "current_catalog_state": "published_basis",
+        "decision": "promoted_published_basis",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
           "included_preset": "pass",
@@ -514,21 +1249,133 @@
           "scripts/evidence_packs/lib/validation/validation_suite.sh"
         ],
         "missing_artifacts": [],
-        "notes": "The reduced promotion matrix now closes on the shipped preset/config/test/smoke path, so the lane moves into declared support as supported_experimental."
+        "notes": "Promoted with container-backed Qwen2.5 7B public report, runtime manifest, and signed evidence pack."
       },
       {
-        "candidate_id": "openllama-7b-causal-lm",
-        "display_name": "OpenLLaMA 7B causal LM",
-        "representative_model": "openlm-research/open_llama_7b",
-        "current_catalog_state": "implemented_coverage",
-        "decision": "blocked_missing_artifacts",
+        "candidate_id": "qwen2-5-14b-causal-lm",
+        "display_name": "Qwen2.5 14B causal LM",
+        "representative_model": "Qwen/Qwen2.5-14B",
+        "current_catalog_state": "published_basis",
+        "decision": "promoted_published_basis",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
           "included_preset": "pass",
           "included_calibration_config": "pass",
           "targeted_tests": "pass",
           "cli_smoke_evidence": "pass",
-          "approved_calibration_or_evaluation_evidence": "fail"
+          "approved_calibration_or_evaluation_evidence": "pass"
+        },
+        "repo_evidence": [
+          "src/invarlock/model_profile.py",
+          "configs/presets/causal_lm/qwen2_5_14b_512.yaml",
+          "configs/calibration/null_sweep_qwen2_5_14b.yaml",
+          "tests/core/test_model_profiles.py",
+          "tests/cli/test_preset_causal_presets.py",
+          "tests/scripts/test_model_evidence_sweep.py",
+          "scripts/model_evidence/model_evidence_sweep.py",
+          "public_evidence/published_basis/qwen2_5_14b/evaluation.report.json",
+          "public_evidence/published_basis/qwen2_5_14b/evidence_pack"
+        ],
+        "missing_artifacts": [],
+        "notes": "Promoted with container-backed Qwen2.5 14B public report, runtime manifest, and signed evidence pack."
+      },
+      {
+        "candidate_id": "qwen3-8b-causal-lm",
+        "display_name": "Qwen3 8B causal LM",
+        "representative_model": "Qwen/Qwen3-8B",
+        "current_catalog_state": "published_basis",
+        "decision": "promoted_published_basis",
+        "criteria_status": {
+          "explicit_adapter_or_profile_recognition": "pass",
+          "included_preset": "pass",
+          "included_calibration_config": "pass",
+          "targeted_tests": "pass",
+          "cli_smoke_evidence": "pass",
+          "approved_calibration_or_evaluation_evidence": "pass"
+        },
+        "repo_evidence": [
+          "src/invarlock/model_profile.py",
+          "configs/presets/causal_lm/qwen3_8b_512.yaml",
+          "configs/calibration/null_sweep_qwen3_8b.yaml",
+          "tests/core/test_model_profiles.py",
+          "tests/cli/test_preset_causal_presets.py",
+          "tests/scripts/test_model_evidence_sweep.py",
+          "scripts/model_evidence/model_evidence_sweep.py",
+          "public_evidence/published_basis/qwen3_8b/evaluation.report.json",
+          "public_evidence/published_basis/qwen3_8b/evidence_pack"
+        ],
+        "missing_artifacts": [],
+        "notes": "Promoted with container-backed Qwen3 8B public report, runtime manifest, and signed evidence pack."
+      },
+      {
+        "candidate_id": "deepseek-r1-distill-qwen-causal-lm",
+        "display_name": "DeepSeek-R1-Distill-Qwen causal LM",
+        "representative_model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+        "current_catalog_state": "published_basis",
+        "decision": "promoted_published_basis",
+        "criteria_status": {
+          "explicit_adapter_or_profile_recognition": "pass",
+          "included_preset": "pass",
+          "included_calibration_config": "pass",
+          "targeted_tests": "pass",
+          "cli_smoke_evidence": "pass",
+          "approved_calibration_or_evaluation_evidence": "pass"
+        },
+        "repo_evidence": [
+          "src/invarlock/model_profile.py",
+          "configs/presets/causal_lm/deepseek_r1_distill_qwen_7b_512.yaml",
+          "configs/calibration/null_sweep_deepseek_r1_distill_qwen_7b.yaml",
+          "tests/core/test_model_profiles.py",
+          "tests/cli/test_preset_causal_presets.py",
+          "tests/scripts/test_model_evidence_sweep.py",
+          "scripts/model_evidence/model_evidence_sweep.py",
+          "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evaluation.report.json",
+          "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evidence_pack"
+        ],
+        "missing_artifacts": [],
+        "notes": "Promoted with container-backed DeepSeek-R1-Distill-Qwen 7B public report, runtime manifest, and signed evidence pack."
+      },
+      {
+        "candidate_id": "phi-4-reasoning-plus-causal-lm",
+        "display_name": "Phi-4 reasoning-plus causal LM",
+        "representative_model": "microsoft/Phi-4-reasoning-plus",
+        "current_catalog_state": "published_basis",
+        "decision": "promoted_published_basis",
+        "criteria_status": {
+          "explicit_adapter_or_profile_recognition": "pass",
+          "included_preset": "pass",
+          "included_calibration_config": "pass",
+          "targeted_tests": "pass",
+          "cli_smoke_evidence": "pass",
+          "approved_calibration_or_evaluation_evidence": "pass"
+        },
+        "repo_evidence": [
+          "src/invarlock/model_profile.py",
+          "configs/presets/causal_lm/phi4_reasoning_plus_512.yaml",
+          "configs/calibration/null_sweep_phi4_reasoning_plus.yaml",
+          "tests/core/test_model_profiles.py",
+          "tests/cli/test_preset_causal_presets.py",
+          "tests/scripts/test_model_evidence_sweep.py",
+          "scripts/model_evidence/model_evidence_sweep.py",
+          "public_evidence/published_basis/phi4_reasoning_plus/evaluation.report.json",
+          "public_evidence/published_basis/phi4_reasoning_plus/evidence_pack"
+        ],
+        "missing_artifacts": [],
+        "notes": "Promoted with container-backed Phi-4 reasoning-plus public report, runtime manifest, and signed evidence pack. This fixture is text-only and skips guard-overhead measurement by preset policy."
+      },
+      {
+        "candidate_id": "openllama-7b-causal-lm",
+        "display_name": "OpenLLaMA 7B causal LM",
+        "representative_model": "openlm-research/open_llama_7b",
+        "current_catalog_state": "published_basis",
+        "decision": "promoted_published_basis",
+        "criteria_status": {
+          "explicit_adapter_or_profile_recognition": "pass",
+          "included_preset": "pass",
+          "included_calibration_config": "pass",
+          "targeted_tests": "pass",
+          "cli_smoke_evidence": "pass",
+          "approved_calibration_or_evaluation_evidence": "pass"
         },
         "repo_evidence": [
           "configs/presets/causal_lm/open_llama_7b_512.yaml",
@@ -537,10 +1384,12 @@
           "src/invarlock/adapters/hf_loading.py",
           "src/invarlock/adapters/auto.py",
           "tests/core/test_model_profiles.py",
-          "tests/cli/test_preset_causal_presets.py"
+          "tests/cli/test_preset_causal_presets.py",
+          "public_evidence/published_basis/open_llama_7b/evaluation.report.json",
+          "public_evidence/published_basis/open_llama_7b/evidence_pack"
         ],
-        "missing_artifacts": ["approved calibration/evaluation evidence"],
-        "notes": "The family is recognized and now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing."
+        "missing_artifacts": [],
+        "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack from corrected promotion-gap CUDA run 20260613TpromotionGapReleasePromoteA."
       },
       {
         "candidate_id": "phi-3-mini-4k-instruct-causal-lm",
@@ -567,26 +1416,33 @@
         "notes": "The public Phi surface is intentionally held at the shipped Phi-4 text-only lane in this wave rather than widening to another family-specific lane."
       },
       {
-        "candidate_id": "gemma-3-4b-it-causal-lm",
+        "candidate_id": "gemma-3-4b-it-image-text-lm",
         "display_name": "Gemma 3 4B IT",
         "representative_model": "google/gemma-3-4b-it",
-        "current_catalog_state": "implemented_coverage",
-        "decision": "explicitly_out_of_scope",
+        "current_catalog_state": "community_experimental",
+        "decision": "redirected_to_image_text_candidate",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
-          "included_preset": "fail",
-          "included_calibration_config": "fail",
+          "included_preset": "pass",
+          "included_calibration_config": "pass",
           "targeted_tests": "pass",
-          "cli_smoke_evidence": "fail",
+          "cli_smoke_evidence": "pass",
           "approved_calibration_or_evaluation_evidence": "fail"
         },
         "repo_evidence": [
           "src/invarlock/model_profile.py",
           "src/invarlock/adapters/hf_loading.py",
-          "src/invarlock/adapters/hf_multimodal.py"
+          "src/invarlock/adapters/hf_multimodal.py",
+          "configs/presets/multimodal/gemma3_4b_it_public_vqav2_256.yaml",
+          "configs/calibration/null_sweep_gemma3_4b_it.yaml",
+          "tests/cli/test_preset_multimodal_presets.py",
+          "tests/scripts/test_model_evidence_sweep_catalog.py",
+          "scripts/model_evidence/model_evidence_sweep.py"
         ],
-        "missing_artifacts": [],
-        "notes": "Gemma-family expansion beyond the existing text-only Gemma 4 E2B lane stays out of this wave because the broader family remains multimodal/audio-capable."
+        "missing_artifacts": [
+          "approved calibration/evaluation evidence"
+        ],
+        "notes": "This checkpoint is no longer treated as a text-only out-of-scope row. It is tracked as an image-text candidate through hf_multimodal and public VQAv2, pending public evidence artifacts."
       },
       {
         "candidate_id": "opt-1-3b-causal-lm",
@@ -612,32 +1468,36 @@
           "tests/core/test_model_profile_local_config.py",
           "tests/cli/test_preset_causal_presets.py"
         ],
-        "missing_artifacts": ["approved calibration/evaluation evidence"],
+        "missing_artifacts": [
+          "approved calibration/evaluation evidence"
+        ],
         "notes": "Shared GPT-style recognition and targeted tests exist, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing."
       },
       {
         "candidate_id": "falcon-7b-causal-lm",
         "display_name": "Falcon 7B causal LM",
         "representative_model": "tiiuae/falcon-7b",
-        "current_catalog_state": "implemented_coverage",
-        "decision": "blocked_missing_artifacts",
+        "current_catalog_state": "published_basis",
+        "decision": "promoted_published_basis",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
           "included_preset": "pass",
           "included_calibration_config": "pass",
           "targeted_tests": "pass",
           "cli_smoke_evidence": "pass",
-          "approved_calibration_or_evaluation_evidence": "fail"
+          "approved_calibration_or_evaluation_evidence": "pass"
         },
         "repo_evidence": [
           "configs/presets/causal_lm/falcon_7b_512.yaml",
           "configs/calibration/null_sweep_falcon_7b.yaml",
           "src/invarlock/adapters/auto.py",
           "tests/adapters/test_hf_causal_variant_paths.py",
-          "tests/cli/test_preset_causal_presets.py"
+          "tests/cli/test_preset_causal_presets.py",
+          "public_evidence/published_basis/falcon_7b/evaluation.report.json",
+          "public_evidence/published_basis/falcon_7b/evidence_pack"
         ],
-        "missing_artifacts": ["approved calibration/evaluation evidence"],
-        "notes": "Recognition and targeted variant-path tests exist, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing."
+        "missing_artifacts": [],
+        "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack from corrected promotion-gap CUDA run 20260613TpromotionGapReleasePromoteA."
       },
       {
         "candidate_id": "glm-4-9b-chat-causal-lm",
@@ -660,7 +1520,9 @@
           "tests/adapters/test_hf_causal_variant_paths.py",
           "tests/cli/test_preset_causal_presets.py"
         ],
-        "missing_artifacts": ["approved calibration/evaluation evidence"],
+        "missing_artifacts": [
+          "approved calibration/evaluation evidence"
+        ],
         "notes": "Recognition and targeted variant-path tests exist, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing."
       },
       {
@@ -713,7 +1575,7 @@
           "docs/reference/model-adapters.md"
         ],
         "missing_artifacts": [],
-        "notes": "Generic seq2seq/community lanes are intentionally excluded from this text-only promotion wave."
+        "notes": "FLAN-T5 base now supplies the concrete public seq2seq basis; this broader mBART candidate remains intentionally out of scope until it has its own preset, calibration config, smoke evidence, and public run."
       }
     ]
   },
@@ -721,7 +1583,11 @@
     {
       "family_id": "audio-text-evaluation",
       "display_name": "Audio-text evaluation pipeline",
-      "modalities": ["text", "image", "audio"],
+      "modalities": [
+        "text",
+        "image",
+        "audio"
+      ],
       "task_role": "audio_multimodal_eval",
       "state": "recommended_p2_deferred",
       "priority": "P2",

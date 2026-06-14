@@ -21,6 +21,26 @@ class _TinyModel(nn.Module):
         self.block = _TinyBlock()
 
 
+class _TinyGemmaLikeModel(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.model = nn.Module()
+        self.model.language_model = nn.Module()
+        self.model.language_model.layers = nn.ModuleList([nn.Module()])
+        layer = self.model.language_model.layers[0]
+        layer.self_attn = nn.Module()
+        layer.self_attn.q_proj = nn.Linear(2, 2, bias=False)
+        layer.mlp = nn.Module()
+        layer.mlp.down_proj = nn.Linear(2, 2, bias=False)
+        layer.per_layer_projection = nn.Linear(2, 2, bias=False)
+        self.model.audio_tower = nn.Module()
+        self.model.audio_tower.layers = nn.ModuleList([nn.Module()])
+        self.model.audio_tower.layers[0].self_attn = nn.Module()
+        self.model.audio_tower.layers[0].self_attn.relative_k_proj = nn.Linear(
+            2, 2, bias=False
+        )
+
+
 def test_capture_baseline_mp_stats_allowed_module_names_filters() -> None:
     model = _TinyModel()
     allowed = ["block.attn.c_attn"]
@@ -37,6 +57,32 @@ def test_runtime_detection_reports_supported_modules() -> None:
     per_layer = out.get("per_layer", [])
     assert isinstance(per_layer, list)
     assert any(item.get("module_name") == "block.attn.c_attn" for item in per_layer)
+
+
+def test_rmt_activation_modules_honor_gemma_text_pattern_filter() -> None:
+    model = _TinyGemmaLikeModel()
+    guard = runtime_rmt.RMTGuard(correct=False)
+    guard.module_include_patterns = (
+        "model.language_model.layers.*.self_attn.*",
+        "model.language_model.layers.*.mlp.*",
+    )
+
+    names = [name for name, _module in guard._get_activation_modules(model)]
+
+    assert names == [
+        "model.language_model.layers.0.mlp.down_proj",
+        "model.language_model.layers.0.self_attn.q_proj",
+    ]
+
+
+def test_rmt_activation_module_filter_excludes_matching_patterns() -> None:
+    guard = runtime_rmt.RMTGuard(correct=False)
+    guard.module_include_patterns = ("model.*",)
+    guard.module_exclude_patterns = ("*.audio_tower.*",)
+
+    assert guard._module_filter_allows("model.language_model.layers.0.mlp") is True
+    assert guard._module_filter_allows("model.audio_tower.layers.0.attn") is False
+    assert guard._module_filter_allows("other.layers.0.mlp") is False
 
 
 def test_capture_baseline_mp_stats_svd_failure_is_skipped(monkeypatch) -> None:

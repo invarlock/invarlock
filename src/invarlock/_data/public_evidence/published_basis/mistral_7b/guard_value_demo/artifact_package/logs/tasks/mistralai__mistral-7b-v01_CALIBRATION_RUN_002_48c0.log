@@ -1,0 +1,104 @@
+[2026-06-12 06:55:47] Starting task: mistralai__mistral-7b-v01_CALIBRATION_RUN_002_48c0
+  Type: CALIBRATION_RUN
+  Model: mistralai/Mistral-7B-v0.1
+  GPU(s): 1
+  Params: {
+  "run": 1,
+  "seed": 42
+}
+[2026-06-12 06:55:47] Running calibration run 1 (seed=42)
+  Model size: 7, Config: seq=512, stride=512, windows=64+64, batch=96
+  CI window override: preview=400, final=400
+  Calibration: enforcing window_overlap_fraction=0.0
+  Calibration: context.run.skip_overhead_check=true
+[INIT] Loading configuration:
+/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7
+b-v01/reports/calibration/run_1/calibration_config.yaml
+[INIT] Deterministic seeds → python=42, numpy=42, torch=42
+  Device    : cuda:0 (auto-resolved)
+  Output    :
+/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7
+b-v01/reports/calibration/run_1/20260612_065552
+  Run ID    : run_1-20260612_065552
+[INIT] Starting InvarLock pipeline...
+[DATA] Adapter: hf_auto
+[DATA] Loading dataset: wikitext2
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[INFO] provider resolved
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[INFO] Duplicate windows detected; reducing per-arm windows.
+[EXEC] Executing pipeline with 5 guards...
+  Edit      : noop
+  Guards    : invariants → spectral → rmt → variance → invariants
+[INIT] Loading model once:
+/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/models/mistralai__mi
+stral-7b-v01/baseline
+
+Loading weights:   0%|          | 0/291 [00:00<?, ?it/s]
+Loading weights:   4%|▍         | 13/291 [00:00<00:02, 127.66it/s]
+Loading weights:  11%|█         | 31/291 [00:00<00:01, 157.62it/s]
+Loading weights:  16%|█▋        | 48/291 [00:00<00:01, 163.19it/s]
+Loading weights:  23%|██▎       | 68/291 [00:00<00:01, 161.33it/s]
+Loading weights:  31%|███       | 89/291 [00:00<00:01, 177.70it/s]
+Loading weights:  37%|███▋      | 107/291 [00:00<00:01, 177.41it/s]
+Loading weights:  43%|████▎     | 125/291 [00:00<00:00, 177.94it/s]
+Loading weights:  49%|████▉     | 143/291 [00:00<00:00, 178.22it/s]
+Loading weights:  55%|█████▌    | 161/291 [00:00<00:00, 177.95it/s]
+Loading weights:  62%|██████▏   | 179/291 [00:01<00:00, 178.35it/s]
+Loading weights:  68%|██████▊   | 198/291 [00:01<00:00, 179.99it/s]
+Loading weights:  75%|███████▍  | 217/291 [00:01<00:00, 178.67it/s]
+Loading weights:  81%|████████  | 235/291 [00:01<00:00, 177.36it/s]
+Loading weights:  87%|████████▋ | 253/291 [00:01<00:00, 177.47it/s]
+Loading weights:  93%|█████████▎| 271/291 [00:01<00:00, 178.14it/s]
+Loading weights:  99%|█████████▉| 289/291 [00:01<00:00, 178.35it/s]
+Loading weights: 100%|██████████| 291/291 [00:01<00:00, 176.22it/s]
+[INFO] Overhead check skipped via config policy
+(config:context.run.skip_overhead_check)
+[INFO] Reusing initially loaded model for guarded execution.
+[PASS] Run completed successfully!
+[DATA] Report:
+/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7
+b-v01/reports/calibration/run_1/20260612_065552/report.json
+[DATA] Events:
+/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7
+b-v01/reports/calibration/run_1/20260612_065552/events.jsonl
+[METRIC] Primary Metric [ppl_causal] — preview: 9.429, final: 8.892
+[METRIC] Guard Overhead: not evaluated
+[INFO] Cleanup: skipped
+Evaluation report generation warning: CI/Release requires paired baseline evidence (window_pairing_reason='no_baseline_reference').
+WARNING: calibration report kept without evaluation.report.json from /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/reports/calibration/run_1/20260612_065552/report.json (exit=1)
+[2026-06-12 06:57:54] Task mistralai__mistral-7b-v01_CALIBRATION_RUN_002_48c0 finished with exit code: 0
