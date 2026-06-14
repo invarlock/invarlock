@@ -483,18 +483,19 @@
       "representative_models": [
         "Qwen/Qwen3.5-4B"
       ],
-      "notes": "Prepared image-text candidate lane with explicit hf_multimodal preset, public VQAv2 materialization recipe, and null-sweep calibration config. It is not a published assurance basis until public report, runtime manifest, and evidence pack artifacts are attached."
+      "notes": "Prepared image-text candidate lane with explicit hf_multimodal preset, public VQAv2 materialization recipe, and null-sweep calibration config. A 2026-06-14 H100 no-op run passed mechanically but produced 0/400 baseline and subject accuracy, so it is held out of the published assurance basis until the preset/model choice yields a meaningful primary metric."
     },
     {
       "lane_id": "qwen3-5-2b-image-text-hf",
       "family": "Qwen3.5 2B image-text LM",
       "runtime": "huggingface-pytorch",
       "adapter": "hf_multimodal",
-      "support_tier": "community_experimental",
-      "evidence_status": "prepared_candidate",
-      "docs_label": "No",
+      "support_tier": "published_basis",
+      "evidence_status": "published_release_strict",
+      "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
+        "published_modern",
         "small_local",
         "multimodal_candidate",
         "enterprise_permissive"
@@ -502,7 +503,13 @@
       "representative_models": [
         "Qwen/Qwen3.5-2B"
       ],
-      "notes": "Prepared smaller image-text candidate lane with explicit hf_multimodal preset, public VQAv2 materialization recipe, and null-sweep calibration config. It remains outside the published assurance basis until validated artifacts are attached."
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence, runtime manifest, and signed evidence pack from the H100 runner. This is a no-op preservation/null-behavior basis with 0.85 final accuracy and no guard warnings; it is not guard-value proof.",
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/qwen3_5_2b/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/qwen3_5_2b/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/qwen3_5_2b/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/qwen3_5_2b/evidence_pack"
+      }
     },
     {
       "lane_id": "gemma3n-e4b-image-text-hf",
@@ -521,7 +528,7 @@
       "representative_models": [
         "google/gemma-3n-E4B-it"
       ],
-      "notes": "Prepared Gemma 3n image-text candidate lane on pinned public VQAv2 materialization. Audio/video capabilities remain deferred; this row is not a published assurance basis until public evidence artifacts are attached. Evidence execution requires a Hugging Face token with accepted Gemma access terms."
+      "notes": "Prepared Gemma 3n image-text candidate lane on pinned public VQAv2 materialization. Audio/video capabilities remain deferred; this row is not a published assurance basis until public evidence artifacts are attached. A 2026-06-14 H100 probe reached the direct Gemma3n loader but Hugging Face returned 401 gated-repo access without an authenticated token and accepted Gemma terms."
     },
     {
       "lane_id": "gemma3-4b-it-image-text-hf",
@@ -540,7 +547,7 @@
       "representative_models": [
         "google/gemma-3-4b-it"
       ],
-      "notes": "Reopened as an image-text candidate through hf_multimodal and public VQAv2 rather than a text-only promotion lane. It remains outside the published assurance basis until public evidence artifacts are attached. Evidence execution requires a Hugging Face token with accepted Gemma access terms."
+      "notes": "Reopened as an image-text candidate through hf_multimodal and public VQAv2 rather than a text-only promotion lane. It remains outside the published assurance basis until public evidence artifacts are attached. A 2026-06-14 H100 probe reached the direct Gemma3 loader but Hugging Face returned 401 gated-repo access without an authenticated token and accepted Gemma terms."
     },
     {
       "lane_id": "gemma4-26b-a4b-moe-image-text-hf",

@@ -296,6 +296,10 @@ def test_resolve_core_loader_strategy_uses_direct_submodule_when_allowed(
             "transformers.models.gemma3.modeling_gemma3.Gemma3ForConditionalGeneration",
         ),
         (
+            "gemma3n",
+            "transformers.models.gemma3n.modeling_gemma3n.Gemma3nForConditionalGeneration",
+        ),
+        (
             "gemma4",
             "transformers.models.gemma4.modeling_gemma4.Gemma4ForConditionalGeneration",
         ),

@@ -96,6 +96,7 @@ def test_offline_golden_runs_public_fixtures() -> None:
         "qwen2_5_14b",
         "qwen3_8b",
         "qwen3_5_9b",
+        "qwen3_5_2b",
         "gemma4_e2b",
         "gemma4_12b",
         "gemma4_26b_a4b",

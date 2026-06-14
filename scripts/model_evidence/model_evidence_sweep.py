@@ -191,8 +191,37 @@ def _capture_artifacts(output_root: Path) -> list[dict[str, object]]:
     return files
 
 
+def _default_hf_home() -> Path:
+    return REPO_ROOT / "tmp" / "model_evidence_hf_home"
+
+
+def _ensure_hf_cache_env(env: dict[str, str]) -> None:
+    hf_home = env.get("HF_HOME")
+    if hf_home is None or not hf_home.strip():
+        hf_home = str(_default_hf_home())
+        env["HF_HOME"] = hf_home
+    if not env.get("HF_HUB_CACHE", "").strip():
+        env["HF_HUB_CACHE"] = str(Path(hf_home) / "hub")
+    if not env.get("HF_DATASETS_CACHE", "").strip():
+        env["HF_DATASETS_CACHE"] = str(Path(hf_home) / "datasets")
+    for name in ("HF_HOME", "HF_HUB_CACHE", "HF_DATASETS_CACHE"):
+        Path(env[name]).expanduser().mkdir(parents=True, exist_ok=True)
+
+
+def _hf_cache_dir_from_env(env: dict[str, str]) -> Path | None:
+    hub_cache = env.get("HF_HUB_CACHE")
+    if hub_cache and hub_cache.strip():
+        return Path(hub_cache).expanduser()
+    hf_home = env.get("HF_HOME")
+    if hf_home and hf_home.strip():
+        return Path(hf_home).expanduser() / "hub"
+    return None
+
+
 def _collect_hf_model_revisions(
     specs: Sequence[EvidenceLane],
+    *,
+    env: dict[str, str],
 ) -> list[dict[str, object]]:
     try:
         from huggingface_hub import scan_cache_dir
@@ -207,8 +236,11 @@ def _collect_hf_model_revisions(
             for spec in specs
         ]
 
+    cache_dir = _hf_cache_dir_from_env(env)
     try:
-        cache_info = scan_cache_dir()
+        cache_info = (
+            scan_cache_dir(cache_dir=cache_dir) if cache_dir else scan_cache_dir()
+        )
     except Exception as exc:  # pragma: no cover - cache state is host-specific.
         return [
             {
@@ -216,6 +248,7 @@ def _collect_hf_model_revisions(
                 "model_id": spec.model_id,
                 "status": "unavailable",
                 "reason": f"cache_scan_failed:{type(exc).__name__}",
+                "cache_dir": str(cache_dir) if cache_dir else None,
             }
             for spec in specs
         ]
@@ -231,6 +264,7 @@ def _collect_hf_model_revisions(
                     "model_id": spec.model_id,
                     "status": "missing",
                     "revisions": [],
+                    "cache_dir": str(cache_dir) if cache_dir else None,
                 }
             )
             continue
@@ -252,6 +286,7 @@ def _collect_hf_model_revisions(
                 "model_id": spec.model_id,
                 "status": "observed" if repo_revisions else "missing",
                 "revisions": repo_revisions,
+                "cache_dir": str(cache_dir) if cache_dir else None,
             }
         )
     return revisions
@@ -263,13 +298,14 @@ def write_model_revisions(
     suite: str,
     execution_mode: str,
     specs: Sequence[EvidenceLane],
+    env: dict[str, str],
 ) -> None:
     payload = {
         "schema": "invarlock/model-evidence-model-revisions-v1",
         "generated_at": datetime.now(UTC).isoformat(),
         "suite": suite,
         "execution_mode": execution_mode,
-        "models": _collect_hf_model_revisions(specs),
+        "models": _collect_hf_model_revisions(specs, env=env),
     }
     (output_root / "model_revisions.json").write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
@@ -615,6 +651,7 @@ def runtime_env() -> dict[str, str]:
     env = dict(os.environ)
     env.setdefault("PYTHONPATH", str(REPO_ROOT / "src"))
     env.setdefault("INVARLOCK_ALLOW_NETWORK", "1")
+    _ensure_hf_cache_env(env)
     return env
 
 
@@ -1179,6 +1216,7 @@ def run_sweep(args: argparse.Namespace) -> int:
         suite=args.suite,
         execution_mode=args.execution_mode,
         specs=specs,
+        env=env,
     )
     write_artifact_manifest(
         output_root,

@@ -135,9 +135,13 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
     assert families["OpenLLaMA 7B causal LM"]["support_tier"] == "published_basis"
     assert families["Falcon 7B causal LM"]["support_tier"] == "published_basis"
     assert families["Qwen3.5 causal LM"]["support_tier"] == "published_basis"
+    assert families["Qwen3.5 2B image-text LM"]["support_tier"] == "published_basis"
+    assert (
+        families["Qwen3.5 2B image-text LM"]["evidence_status"]
+        == "published_release_strict"
+    )
     for family in (
         "Qwen3.5 4B image-text LM",
-        "Qwen3.5 2B image-text LM",
         "Gemma 3n E4B image-text LM",
         "Gemma 3 4B IT image-text LM",
     ):

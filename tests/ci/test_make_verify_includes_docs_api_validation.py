@@ -81,3 +81,11 @@ def test_makefile_exposes_scripts_audit_target() -> None:
     block = _get_make_target_block(data, "scripts-audit")
     assert block is not None, "scripts-audit target not found in Makefile"
     assert "scripts/check_scripts_inventory.py --json" in block
+
+
+def test_contracts_check_runs_model_candidate_compatibility_audit() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    data = makefile.read_text(encoding="utf-8")
+    block = _get_make_target_block(data, "contracts-check")
+    assert block is not None, "contracts-check target not found in Makefile"
+    assert "scripts/checks/check_model_candidate_compatibility.py" in block

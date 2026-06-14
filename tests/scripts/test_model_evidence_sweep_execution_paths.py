@@ -279,6 +279,28 @@ def test_runtime_env_preserves_container_default_runtime_overrides(
     assert env["INVARLOCK_SNAPSHOT_MODE"] == "auto"
 
 
+def test_runtime_env_defaults_hf_cache_to_repo_visible_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    mod = load_script_module("model_evidence_sweep")
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    monkeypatch.setattr(mod, "REPO_ROOT", repo_root)
+    monkeypatch.delenv("HF_HOME", raising=False)
+    monkeypatch.delenv("HF_HUB_CACHE", raising=False)
+    monkeypatch.delenv("HF_DATASETS_CACHE", raising=False)
+
+    env = mod.runtime_env()
+
+    hf_home = repo_root / "tmp" / "model_evidence_hf_home"
+    assert env["HF_HOME"] == str(hf_home)
+    assert env["HF_HUB_CACHE"] == str(hf_home / "hub")
+    assert env["HF_DATASETS_CACHE"] == str(hf_home / "datasets")
+    assert hf_home.is_dir()
+    assert (hf_home / "hub").is_dir()
+    assert (hf_home / "datasets").is_dir()
+
+
 def test_model_evidence_sweep_container_mode_publishes_external_output_root(
     tmp_path: Path,
 ) -> None:

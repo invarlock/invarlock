@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added model-evidence GPU backlog lanes, preset overrides, remote-code
   opt-in propagation, worktree-aware remote launch handling, and GPU preflight
   warnings for underprovisioned MoE lanes.
+- Added an offline model-candidate compatibility audit to `contracts-check` so
+  named lanes and catalog candidates must have coherent adapter routes, presets,
+  materialization metadata, and large-model loading hints before GPU launch.
 - Added large-model and MoE memory controls for evidence runs, including
   memory-sensitive HF loads, bounded calibration windows, snapshot policy
   controls, container scratch cleanup, and safer cleanup between phases.
@@ -66,6 +69,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated public evidence packaging to use compact evaluation reports for large
   published-basis artifacts while retaining the evidence manifests, runtime
   manifests, model revisions, and provenance needed for audit.
+- Updated model-evidence sweeps to use an explicit repo-visible Hugging Face
+  cache by default so container GPU runs and revision capture inspect the same
+  downloaded model snapshots.
 - Updated README branding to the Ledger ink palette, including static
   GitHub/PyPI-compatible Shields badges and refreshed light/dark logo, mark,
   app-icon, and favicon assets synced from the current site brand surface.
@@ -88,6 +94,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed MoE and large-model guard/report behavior, including router warning
   handling, Qwen variance calibration bounds, and variance calibration
   truncation fallbacks.
+- Fixed `adapter:auto` routing for named image-text Gemma/Qwen candidates and
+  Marian/OPUS/MBART/Pegasus seq2seq model IDs.
 - Fixed seq2seq evidence correctness for shuffled splits and preserved labels
   in paired evidence runs.
 - Fixed GPTQModel compatibility with newer Transformers imports.

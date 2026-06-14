@@ -177,6 +177,81 @@ def test_resolve_auto_adapter_additional_family_paths(tmp_path: Path) -> None:
     assert mod.resolve_auto_adapter("org/model-t5-small") == "hf_seq2seq"
 
 
+def test_resolve_auto_adapter_routes_named_multimodal_configs(
+    tmp_path: Path,
+) -> None:
+    cases = {
+        "gemma3": ["Gemma3ForConditionalGeneration"],
+        "gemma4": ["Gemma4ForConditionalGeneration"],
+        "gemma4_unified": ["Gemma4UnifiedForConditionalGeneration"],
+        "qwen3_5": ["Qwen3_5ForConditionalGeneration"],
+        "qwen3_5_vl": ["Qwen3_5ForConditionalGeneration"],
+        "unknown": ["AutoModelForImageTextToText"],
+        "unknown-mm": ["AutoModelForMultimodalLM"],
+        "unknown-v2s": ["AutoModelForVision2Seq"],
+    }
+
+    for model_type, archs in cases.items():
+        model_dir = tmp_path / model_type
+        model_dir.mkdir()
+        (model_dir / "config.json").write_text(
+            json.dumps({"model_type": model_type, "architectures": archs}),
+            encoding="utf-8",
+        )
+        assert mod.resolve_auto_adapter(model_dir) == "hf_multimodal"
+
+
+def test_resolve_auto_adapter_keeps_mistral3_conditional_generation_causal(
+    tmp_path: Path,
+) -> None:
+    model_dir = tmp_path / "mistral3"
+    model_dir.mkdir()
+    (model_dir / "config.json").write_text(
+        json.dumps(
+            {
+                "model_type": "mistral3",
+                "architectures": ["Mistral3ForConditionalGeneration"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert mod.resolve_auto_adapter(model_dir) == "hf_causal"
+
+
+@pytest.mark.parametrize(
+    "model_id",
+    [
+        "Qwen/Qwen3.5-4B",
+        "Qwen/Qwen3.5-2B",
+        "google/gemma-3n-E4B-it",
+        "google/gemma-3-4b-it",
+        "google/gemma-4-E4B-it",
+        "google/gemma-4-12B-it",
+        "google/gemma-4-26B-A4B-it",
+    ],
+)
+def test_resolve_auto_adapter_routes_named_multimodal_model_ids(
+    model_id: str,
+) -> None:
+    assert mod.resolve_auto_adapter(model_id) == "hf_multimodal"
+
+
+@pytest.mark.parametrize(
+    "model_id",
+    [
+        "Helsinki-NLP/opus-mt-en-de",
+        "demo/marian-checkpoint",
+        "facebook/mbart-large-50",
+        "google/pegasus-xsum",
+    ],
+)
+def test_resolve_auto_adapter_routes_named_seq2seq_model_ids(
+    model_id: str,
+) -> None:
+    assert mod.resolve_auto_adapter(model_id) == "hf_seq2seq"
+
+
 def test_resolve_auto_adapter_causal_model_type_only_hints(tmp_path: Path) -> None:
     for model_type in (
         "llama",

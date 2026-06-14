@@ -33,6 +33,9 @@ High-signal workflow front doors:
   evaluations. Remove `--dry-run` for a real sweep; use `MODEL_EVIDENCE_ARGS`
   for `--suite`, `--slug`, `--lane-id`, `--device`, sharding, and execution-mode
   overrides.
+- `python scripts/checks/check_model_candidate_compatibility.py`: run the
+  offline candidate compatibility audit used by `make contracts-check` before
+  spending GPU time on named model-evidence lanes.
 - `scripts/evidence_packs/run_suite.sh`: run evidence-pack scenarios without
   packaging the result. This is for development/debugging.
 - `scripts/evidence_packs/run_pack.sh`: run the suite and build a distributable
