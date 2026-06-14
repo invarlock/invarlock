@@ -474,7 +474,7 @@
         "enterprise_permissive",
         "multimodal_candidate"
       ],
-      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence from the 2026-06-14 H100 runner. The no-op report passes strict policy with 0.565 final accuracy over 400 examples, ratio_vs_baseline 1.009, and no guard warnings. Gemma 4 12B uses the explicit hf_multimodal path and requires the multimodal runtime stack (transformers>=5.12.0 and torchvision>=0.26.0). This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof."
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.565 final accuracy over 400 examples, ratio_vs_baseline 1.009, and no guard warnings. Gemma 4 12B uses the explicit hf_multimodal path and requires the multimodal runtime stack (transformers>=5.12.0 and torchvision>=0.26.0). This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof."
     },
     {
       "family_id": "gemma-4-e4b-image-text-lm",
@@ -506,7 +506,7 @@
         "enterprise_permissive",
         "multimodal_candidate"
       ],
-      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence from the 2026-06-14 H100 runner. The no-op report passes strict policy with 0.500 final accuracy over 400 examples, ratio_vs_baseline 1.010, and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof."
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.500 final accuracy over 400 examples, ratio_vs_baseline 1.010, and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof."
     },
     {
       "family_id": "gemma-4-e2b-image-text-lm",
@@ -538,7 +538,7 @@
         "enterprise_permissive",
         "multimodal_candidate"
       ],
-      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence from the 2026-06-14 H100 runner. The no-op report passes strict policy with 0.388 final accuracy over 400 examples, ratio_vs_baseline 1.013, and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader multimodal behavior remain out of scope, and it is not guard-value proof."
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.388 final accuracy over 400 examples, ratio_vs_baseline 1.013, and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader multimodal behavior remain out of scope, and it is not guard-value proof."
     },
     {
       "family_id": "qwen3-5-4b-image-text-lm",
@@ -564,7 +564,7 @@
         "public_evidence/published_basis/qwen3_5_4b/runtime.manifest.json",
         "public_evidence/published_basis/qwen3_5_4b/evidence_pack"
       ],
-      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence from the 2026-06-14 H100 runner after the structured JSON answer prompt fix. The no-op report passes strict policy with 0.855 final accuracy over 400 examples, ratio_vs_baseline 1.036, and no guard warnings. This is no-op preservation/null-behavior evidence; it is not guard-value proof.",
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.855 final accuracy over 400 examples, ratio_vs_baseline 1.036, and no guard warnings. This is no-op preservation/null-behavior evidence; it is not guard-value proof.",
       "support_groups": [
         "published_modern",
         "small_local",
@@ -680,7 +680,7 @@
         "practical_shortlist",
         "enterprise_permissive"
       ],
-      "notes": "Public release-profile container-backed evidence fixture is included from remote run 20260612Tgranite8bPrefetchReleaseA after tokenizer prefetch recovery."
+      "notes": "Public release-profile container-backed evidence fixture is included."
     },
     {
       "family_id": "smollm3-3b-causal-lm",
@@ -704,7 +704,7 @@
       "support_groups": [
         "small_local"
       ],
-      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window run preset. The preset explicitly skips guard-overhead measurement, so this is preservation evidence and not guard-overhead evidence."
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window preservation evidence. The preset explicitly skips guard-overhead measurement, so this is preservation evidence and not guard-overhead evidence."
     },
     {
       "family_id": "phi-4-mini-causal-lm",
@@ -729,7 +729,7 @@
         "small_local",
         "reasoning_focused"
       ],
-      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window run preset after FFN projection family classification was fixed."
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window preservation evidence."
     },
     {
       "family_id": "deepseek-r1-distill-qwen-14b-causal-lm",
@@ -828,7 +828,7 @@
         "moe_candidate",
         "small_local"
       ],
-      "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack from H100 validation run 20260613Tolmoe1b7bH100A. This fixture is the smaller MoE validation basis; larger MoE assurance is covered by Mixtral, Qwen3 30B-A3B, and Gemma 4 26B-A4B published bases. Gemma 4 26B-A4B is image-text preservation/null-behavior evidence, not audio, exhaustive expert-bank, or MoE routing-quality evidence."
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack. This fixture is the smaller MoE validation basis; larger MoE assurance is covered by Mixtral, Qwen3 30B-A3B, and Gemma 4 26B-A4B published bases. Gemma 4 26B-A4B is image-text preservation/null-behavior evidence, not audio, exhaustive expert-bank, or MoE routing-quality evidence."
     }
   ],
   "implemented_coverage": [
@@ -856,7 +856,7 @@
         "public_evidence/published_basis/qwen3_30b_a3b/runtime.manifest.json",
         "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack"
       ],
-      "notes": "Promoted as a recent Qwen3 MoE causal LM published basis with explicit hf_causal preset, public WikiText-103 release-profile H100 CUDA report, runtime manifest, and signed evidence pack from run 20260613Tqwen330ba3bH100All8. The fixture uses bfloat16/low-CPU-memory loading, disabled optional Hugging Face loading-info collection, automatic device placement across all eight H100 80GB GPUs, and scoped attention/router/shared-expert guard scans. This is no-op preservation evidence; it is not a benchmark-quality, fine-tuning, deployment, exhaustive expert-bank, or MoE routing-quality claim. A restricted four-GPU diagnostic lane failed and is intentionally not used as publication evidence."
+      "notes": "Promoted as a recent Qwen3 MoE causal LM published basis with explicit hf_causal preset, public WikiText-103 release-profile report, runtime manifest, and signed evidence pack. The fixture uses bfloat16/low-CPU-memory loading, disabled optional Hugging Face loading-info collection, automatic device placement across all eight 80GB GPUs, and scoped attention/router/shared-expert guard scans. This is no-op preservation evidence; it is not a benchmark-quality, fine-tuning, deployment, exhaustive expert-bank, or MoE routing-quality claim. A restricted four-GPU diagnostic lane failed and is intentionally not used as publication evidence."
     },
     {
       "family_id": "gemma-4-26b-a4b-moe-image-text-lm",
@@ -884,7 +884,7 @@
         "tests/cli/test_preset_multimodal_presets.py",
         "tests/scripts/test_model_evidence_sweep_catalog.py"
       ],
-      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence from the 2026-06-14 H100 runner. The no-op report passes strict policy with 0.555 final accuracy over 400 examples, ratio_vs_baseline 1.009, and no guard warnings. This is no-op preservation/null-behavior evidence; audio, exhaustive expert-bank behavior, and MoE routing quality remain out of scope, and it is not guard-value proof.",
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.555 final accuracy over 400 examples, ratio_vs_baseline 1.009, and no guard warnings. This is no-op preservation/null-behavior evidence; audio, exhaustive expert-bank behavior, and MoE routing quality remain out of scope, and it is not guard-value proof.",
       "support_groups": [
         "published_modern",
         "enterprise_permissive",
@@ -918,7 +918,7 @@
         "tests/cli/test_preset_causal_presets.py",
         "tests/scripts/test_model_evidence_sweep_catalog.py"
       ],
-      "notes": "Promoted as a Mixtral MoE causal LM published basis with explicit hf_causal preset, release-profile H100 CUDA report, runtime manifest, and signed evidence pack. The preset keeps the full guard scan surface while using BF16, automatic device placement, low-CPU-memory loading, disabled optional HF loading-info collection, and a skipped optional guard-overhead check for large-model resource discipline."
+      "notes": "Promoted as a Mixtral MoE causal LM published basis with explicit hf_causal preset, release-profile public report, runtime manifest, and signed evidence pack. The preset keeps the full guard scan surface while using BF16, automatic device placement, low-CPU-memory loading, disabled optional HF loading-info collection, and a skipped optional guard-overhead check for large-model resource discipline."
     },
     {
       "family_id": "llama",
@@ -1384,7 +1384,7 @@
           "public_evidence/published_basis/open_llama_7b/evidence_pack"
         ],
         "missing_artifacts": [],
-        "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack from corrected promotion-gap CUDA run 20260613TpromotionGapReleasePromoteA."
+        "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack."
       },
       {
         "candidate_id": "phi-3-mini-4k-instruct-causal-lm",
@@ -1434,7 +1434,7 @@
           "public_evidence/published_basis/falcon_7b/evidence_pack"
         ],
         "missing_artifacts": [],
-        "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack from corrected promotion-gap CUDA run 20260613TpromotionGapReleasePromoteA."
+        "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack."
       },
       {
         "candidate_id": "broader-bert-like-mlms",

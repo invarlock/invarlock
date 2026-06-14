@@ -78,7 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   manifests, model revisions, and provenance needed for audit.
 - Updated Qwen3.5 4B, Gemma 4 E2B, Gemma 4 E4B, Gemma 4 12B, and Gemma 4
   26B-A4B image-text evidence status to published basis after structured
-  JSON-answer H100 reruns passed the public VQAv2 quality floor with strict
+  JSON-answer reruns passed the public VQAv2 quality floor with strict
   verification and no guard warnings.
 - Updated model-evidence sweeps to use an explicit repo-visible Hugging Face
   cache by default so container GPU runs and revision capture inspect the same

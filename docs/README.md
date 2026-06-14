@@ -297,10 +297,10 @@ seq2seq profiles.
 Repo-included presets and pilot calibration configs for prepared practical-pick
 lanes do not become part of the published assurance basis until supporting
 artifacts are attached. OLMoE is the smaller MoE published-basis validation
-lane; Mixtral 8x7B and Qwen3 30B-A3B are larger H100-backed no-op preservation
+lane; Mixtral 8x7B and Qwen3 30B-A3B are larger no-op preservation
 bases. Gemma 4 26B-A4B is a multimodal MoE image-text preservation basis; it is
 not audio, exhaustive expert-bank, or MoE routing-quality evidence. The Qwen3
-30B-A3B fixture requires all-8 H100 sharding and uses scoped
+30B-A3B fixture requires all-8 80GB-GPU sharding and uses scoped
 attention/router/shared-expert guard scans; it is not an exhaustive expert-bank
 or MoE routing-quality claim.
 The empirical guard manifest includes no-op published-basis summaries for the
