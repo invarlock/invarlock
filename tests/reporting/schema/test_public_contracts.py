@@ -259,6 +259,15 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     assert (
         catalog["model_family_catalog"]["format_version"] == "model-family-catalog-v1"
     )
+    model_classification = contracts.load_model_classification()
+    assert model_classification["format_version"] == "model-classification-v1"
+    assert model_classification["policy"]["allowed_named_checkpoint_license_ids"] == [
+        "apache-2.0",
+        "mit",
+    ]
+    assert (
+        catalog["model_classification"]["format_version"] == "model-classification-v1"
+    )
     assert catalog["plugin_compatibility"]["core_abi"] == "0.1"
     assert catalog["plugin_compatibility"]["match_policy"] == "exact_match"
     assert catalog["validation_keys"]["path"] == "contracts/validation_keys.json"
@@ -388,7 +397,7 @@ def test_readme_surfaces_public_contract_catalog_entries() -> None:
 
     assert "doctor --json" in readme
     assert "advanced plugins ... --json" in readme
-    assert "`validation_keys`, `console_labels`, and `metric_kinds`" in readme
+    assert "`model_classification`, `validation_keys`, `console_labels`, and" in readme
 
 
 def test_contract_reference_records_scalar_payload_kind(

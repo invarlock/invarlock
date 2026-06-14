@@ -18,10 +18,13 @@ of the support matrix:
 | --- | --- | --- |
 | `support tier` | Public support/assurance posture for a declared lane. Values stay aligned with `support_matrix.json`. | `contracts/support_matrix.json` |
 | `coverage state` | Repo implementation maturity outside the public support matrix, such as `profile_first_class`, `profile_shared_alias`, `auto_or_loader_only`, `loader_only`, or backlog states. | `contracts/model_family_catalog.json` |
+| `lifecycle classification` | Whether a lane, catalog family, or candidate is published, backlog, blocked, smoke-only, usage-only, or out of scope. | `contracts/model_classification.json` |
 
 The support matrix remains strict. The model family catalog is broader by
 design and records code-level visibility, usage-only checkpoints, and
-recommended additions. The support matrix is ordered by evidence readiness:
+recommended additions. The model classification contract records the promotion
+decision and blocker state for those entries, including the blocked named
+checkpoint list used by repo checks. The support matrix is ordered by evidence readiness:
 baseline fixtures, published modern decoder evidence, repo-maintained
 experimental lanes, community candidate backlog, and concrete task-family
 bases. Within those sections, related families and scale points stay adjacent

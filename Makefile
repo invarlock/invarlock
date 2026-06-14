@@ -635,6 +635,7 @@ ci-matrix:  ## Verify CI matrix
 contracts-check:  ## Ensure packaged contracts match the repo contract source
 	$(MAKE) ensure-python
 	$(PYTHON) scripts/checks/sync_packaged_contracts.py --check
+	$(PYTHON) scripts/checks/check_model_classification.py
 	$(PYTHON) scripts/checks/check_model_candidate_compatibility.py
 
 repo-cruft-check:  ## Fail if macOS transport artifacts leaked into repo source paths

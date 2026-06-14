@@ -351,7 +351,10 @@ evaluation is deferred.
 Machine-readable support metadata lives in `contracts/support_matrix.json`. It is
 the canonical source of truth for normalized support tiers
 (`published_basis`, `supported_experimental`, `community_experimental`) and for
-published-basis evidence references.
+published-basis evidence references. Model lifecycle decisions live in
+`contracts/model_classification.json`: that file records whether a lane or
+family is published, backlog, blocked, smoke-only, usage-only, or out of scope,
+and centralizes blocked named checkpoints for future license/access changes.
 
 Model evidence automation lives in
 `scripts/model_evidence/model_evidence_sweep.py`, with tmux-based remote launch support in
@@ -362,7 +365,8 @@ supports grouped CUDA visibility, for example
 `--gpu-group 0,1,2,3` to launch one sweep shard with all four GPUs exposed
 instead of one shard per GPU.
 Repo-prepared-but-not-yet-promoted lanes are tracked in
-`contracts/model_family_catalog.json`.
+`contracts/model_family_catalog.json`; promotion eligibility and blockers are
+tracked in `contracts/model_classification.json`.
 For the Gemma 4 text lane, the repo-maintained local smoke is the included
 manifest dry-run (`scripts/model_evidence/model_evidence_sweep.py --suite repo-mentioned-gpu --slug gemma4_e2b_public --dry-run`).
 The image-text path also includes an offline demo preset at

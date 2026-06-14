@@ -186,7 +186,8 @@ Runtime provenance: reports/eval/runtime.manifest.json
   emitted by `doctor --json` and `advanced plugins ... --json`.
 - Runtime-manifest verifier: `invarlock advanced runtime-verify --report <evaluation.report.json> --manifest <runtime.manifest.json>`.
 - The public contract catalog exposed by those JSON surfaces includes
-  `validation_keys`, `console_labels`, and `metric_kinds`.
+  `model_classification`, `validation_keys`, `console_labels`, and
+  `metric_kinds`.
 - Advanced workflows: `invarlock advanced evidence-pack`, `invarlock advanced policy`,
   `invarlock advanced plugins`, and `invarlock advanced calibrate`.
 - Host execution for the core evaluate path uses `--execution-mode host`.
