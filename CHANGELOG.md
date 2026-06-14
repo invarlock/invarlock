@@ -9,11 +9,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added first-class baseline-relative guard warnings in reports and verification,
+  including strict warning-policy handling so users can treat guard movement as
+  advisory by default or fail verification when warnings are present.
+- Added published guard-value evidence for Mistral 7B with clean reruns covering
+  spectral, RMT, and variance/VE guard movement, plus scenario-backed PM-only
+  versus PM+guards comparison artifacts.
+- Added modern published-basis evidence for expanded dense causal model
+  families, including Mistral/Ministral, Qwen2/Qwen2.5/Qwen3/Qwen3.5,
+  Granite 4.1, DeepSeek R1 Qwen variants, Phi-4, SmolLM3, TinyLlama,
+  OLMo 2, OpenLLaMA, Falcon, and Falcon-H1R lanes.
+- Added published-basis coverage for additional architecture families,
+  including FLAN-T5 seq2seq, Gemma 4 multimodal/image-text lanes, OLMoE,
+  Mixtral, Gemma 4 26B-A4B MoE, and Qwen3 30B-A3B MoE evidence lanes.
+- Added public VQAv2 materialization support, scarce vision-text evidence
+  window splitting, multimodal replay preservation, and processor digest
+  evidence for image-text model runs.
+- Added seq2seq evidence-run support for FLAN-T5, including label preservation,
+  shuffled split handling, T5 guard targets, and calibration preview labels.
+- Added model-evidence GPU backlog lanes, preset overrides, remote-code
+  opt-in propagation, worktree-aware remote launch handling, and GPU preflight
+  warnings for underprovisioned MoE lanes.
+- Added large-model and MoE memory controls for evidence runs, including
+  memory-sensitive HF loads, bounded calibration windows, snapshot policy
+  controls, container scratch cleanup, and safer cleanup between phases.
+- Added Gemma 4 12B calibration configuration and documented gated/access
+  requirements for Gemma candidate lanes.
+- Added production identity assets for the README and external surfaces,
+  including light/dark logo and mark variants, app icon, and favicons.
+
 ### Changed
+
+- Tightened evidence-pack guard-value detection so published guard claims must
+  be baseline-relative and scenario-backed rather than relying on guard signals
+  that already appear in the no-edit baseline.
+- Updated guard-value claim wording across evidence-pack docs, public evidence,
+  and support-matrix surfaces to distinguish policy failures, guard warnings,
+  and published guard-value proof.
+- Updated support-matrix organization and evidence grouping so published-basis,
+  experimental, multimodal, seq2seq, MoE, and blocked/access-gated lanes are
+  easier to scan without adding a redundant grouping column.
+- Updated HF adapter support for newer model shapes, including resilient
+  multimodal loader fallback, tokenizer remote-code propagation, ChatGLM layout
+  and loader shims, Falcon-H1/Falcon-Mamba projection classification, dense
+  gate-up FFN classification, and Gemma 4 multimodal runtime extras.
+- Raised the Hugging Face adapter Transformers floor for modern model support
+  and refreshed optional Torch requirements to avoid `torch==2.12.0` while the
+  current supply-chain advisory has no fixed upstream version.
+- Updated adapter examples to reflect the newly published dense, multimodal,
+  seq2seq, and MoE model shapes.
+- Updated ordinary CI expectations so long GPU evidence sweeps are treated as
+  nightly/model-evidence work instead of blocking the standard green-main gate.
+- Updated public evidence packaging to use compact evaluation reports for large
+  published-basis artifacts while retaining the evidence manifests, runtime
+  manifests, model revisions, and provenance needed for audit.
+- Updated README branding to the Ledger ink palette, including static
+  GitHub/PyPI-compatible Shields badges and refreshed light/dark logo, mark,
+  app-icon, and favicon assets synced from the current site brand surface.
 
 ### Removed
 
+- Removed the stale `tests/fuzzing` owner expectation from the active test-tree
+  contract after the fuzzing surface was retired from the repo layout.
+
 ### Fixed
+
+- Fixed evidence-pack queue and GPU-runner stability issues, including memory
+  helper resolution, container scratch cleanup, retry handling after interrupted
+  evaluate phases, and host/container output publication paths.
+- Fixed Mistral guard-demo manifests and public evidence scope notes so the
+  published demo no longer overclaims non-baseline-relative FP8 guard signals.
+- Fixed Gemma 4 12B public evaluation gates by using classification-count
+  accuracy intervals, delta semantics for accuracy drift, paired multimodal
+  window reporting, and scarce-window split handling.
+- Fixed MoE and large-model guard/report behavior, including router warning
+  handling, Qwen variance calibration bounds, and variance calibration
+  truncation fallbacks.
+- Fixed seq2seq evidence correctness for shuffled splits and preserved labels
+  in paired evidence runs.
+- Fixed GPTQModel compatibility with newer Transformers imports.
+- Fixed typed-surface checking for tokenizer load kwargs attached to dataclass
+  model profiles.
+- Fixed local verification hygiene after the published-basis expansion by
+  keeping test files under the repository size guideline and restoring coverage
+  enforcement edge-path tests.
 
 ## [0.10.0] - 2026-06-03
 
