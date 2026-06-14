@@ -69,6 +69,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated public evidence packaging to use compact evaluation reports for large
   published-basis artifacts while retaining the evidence manifests, runtime
   manifests, model revisions, and provenance needed for audit.
+- Updated model-evidence sweeps to use an explicit repo-visible Hugging Face
+  cache by default so container GPU runs and revision capture inspect the same
+  downloaded model snapshots.
 - Updated README branding to the Ledger ink palette, including static
   GitHub/PyPI-compatible Shields badges and refreshed light/dark logo, mark,
   app-icon, and favicon assets synced from the current site brand surface.

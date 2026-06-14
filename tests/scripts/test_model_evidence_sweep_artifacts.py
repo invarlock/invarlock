@@ -4,7 +4,10 @@ import json
 import stat
 import subprocess
 import sys
+import types
 from pathlib import Path
+
+from tests.scripts._support_model_evidence_sweep import load_script_module
 
 
 def test_model_evidence_sweep_captures_artifact_manifest_and_failure_reason(
@@ -79,3 +82,52 @@ exit 99
     assert artifact_manifest["lane_results"][0]["detail"] == (
         "container_image_pull_denied"
     )
+
+
+def test_model_evidence_sweep_collects_revisions_from_explicit_hf_cache(
+    monkeypatch, tmp_path: Path
+) -> None:
+    mod = load_script_module("model_evidence_sweep")
+    hub_cache = tmp_path / "hf-home" / "hub"
+    calls: list[Path | None] = []
+
+    def scan_cache_dir(*, cache_dir=None):
+        calls.append(cache_dir)
+        revision = types.SimpleNamespace(
+            commit_hash="abc123",
+            refs={"main"},
+            snapshot_path=hub_cache / "models--org--model" / "snapshots" / "abc123",
+            size_on_disk=42,
+        )
+        repo = types.SimpleNamespace(repo_id="org/model", revisions=[revision])
+        return types.SimpleNamespace(repos=[repo])
+
+    fake_hub = types.ModuleType("huggingface_hub")
+    fake_hub.scan_cache_dir = scan_cache_dir
+    monkeypatch.setitem(sys.modules, "huggingface_hub", fake_hub)
+
+    spec = types.SimpleNamespace(slug="org_model", model_id="org/model")
+    revisions = mod._collect_hf_model_revisions(
+        [spec],
+        env={"HF_HUB_CACHE": str(hub_cache)},
+    )
+
+    assert calls == [hub_cache]
+    assert revisions == [
+        {
+            "cache_dir": str(hub_cache),
+            "model_id": "org/model",
+            "revisions": [
+                {
+                    "commit_hash": "abc123",
+                    "refs": ["main"],
+                    "size_on_disk": 42,
+                    "snapshot_path": str(
+                        hub_cache / "models--org--model" / "snapshots" / "abc123"
+                    ),
+                }
+            ],
+            "slug": "org_model",
+            "status": "observed",
+        }
+    ]
