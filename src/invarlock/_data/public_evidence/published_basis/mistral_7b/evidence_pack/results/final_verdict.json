@@ -1,9 +1,0 @@
-{
-  "assurance": "strict",
-  "basis": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
-  "evidence_run": "20260611TmistralQwen2ParallelZ",
-  "model_id": "mistralai/Mistral-7B-v0.1",
-  "note": "Container-backed CI-profile Mistral 7B published-basis evidence run. The primary metric preserved the no-op baseline; the report marks the primary metric as unstable, so consumers should treat this as a preservation fixture rather than a broad quality claim.",
-  "profile": "release",
-  "verdict": "PASS"
-}

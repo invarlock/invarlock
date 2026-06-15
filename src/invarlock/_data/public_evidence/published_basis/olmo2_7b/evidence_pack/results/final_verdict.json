@@ -1,9 +1,0 @@
-{
-  "assurance": "strict",
-  "basis": "public_evidence/published_basis/olmo2_7b/evaluation.report.json",
-  "evidence_run": "20260612TsupportMatrixA",
-  "model_id": "allenai/OLMo-2-1124-7B",
-  "note": "Container-backed CI-profile OLMo 2 7B published-basis evidence run.",
-  "profile": "release",
-  "verdict": "PASS"
-}

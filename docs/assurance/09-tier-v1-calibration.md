@@ -7,14 +7,17 @@
 > (weight-based Spectral κ, activation-based RMT ε, VE min-effect, and window
 > sizing).
 > Every knob is surfaced in run reports and reports so reviewers can audit or recompute.
-> The public evidence floor is the packaged `published_basis` fixture set. That
-> fixture set demonstrates the public report/evidence-pack contract; it is not
-> the entire calibration corpus used to justify every numeric tier constant:
-> `src/invarlock/_data/public_evidence/published_basis/gpt2/evaluation.report.json`,
-> `src/invarlock/_data/public_evidence/published_basis/gpt2/evidence_pack_recipe.json`,
-> `src/invarlock/_data/public_evidence/published_basis/gpt2/evidence_pack/`,
-> `src/invarlock/_data/public_evidence/published_basis/bert/evaluation.report.json`,
-> and `src/invarlock/_data/public_evidence/published_basis/bert/evidence_pack_recipe.json`.
+> The public evidence floor is the source-tree `published_basis` fixture set.
+> That fixture set demonstrates the public report/evidence-pack contract; it is
+> not the entire calibration corpus used to justify every numeric tier constant:
+> `public_evidence/published_basis/gpt2/evaluation.report.json`,
+> `public_evidence/published_basis/gpt2/evidence_pack_recipe.json`,
+> `public_evidence/published_basis/gpt2/evidence_pack/`,
+> `public_evidence/published_basis/bert/evaluation.report.json`,
+> and `public_evidence/published_basis/bert/evidence_pack_recipe.json`.
+> Installed wheels carry a compact
+> `invarlock/_data/public_evidence/published_basis_index.json` summary of this
+> source-tree evidence rather than duplicating the full artifact corpus.
 >
 > For a key-by-key explanation of every value in the packaged tier file
 > (`runtime/tiers.yaml`; override path

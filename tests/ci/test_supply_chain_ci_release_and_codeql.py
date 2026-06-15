@@ -293,7 +293,7 @@ def test_codeql_workflow_uses_repo_config():
     analyze_step = _find_step_by_uses_prefix(
         analyze["steps"], "github/codeql-action/analyze@"
     )
-    expected_pin = "87557b9c84dde89fdd9b10e88954ac2f4248e463"
+    expected_pin = "8aad20d150bbac5944a9f9d289da16a4b0d87c1e"
 
     assert init_step["uses"] == f"github/codeql-action/init@{expected_pin}"
     assert autobuild_step["uses"] == f"github/codeql-action/autobuild@{expected_pin}"
@@ -344,7 +344,7 @@ def test_model_evidence_workflow_is_configured() -> None:
 
     triggers = workflow["on"]
     assert "workflow_dispatch" in triggers
-    assert triggers["schedule"] == [{"cron": "0 5 * * *"}]
+    assert "schedule" not in triggers
     assert workflow["permissions"] == {"contents": "read"}
 
     job = workflow["jobs"]["model-evidence-sweep"]
