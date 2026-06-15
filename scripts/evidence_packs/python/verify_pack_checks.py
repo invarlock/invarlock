@@ -8,6 +8,20 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+try:
+    from scripts.evidence_workflows.workflow_state import (
+        WorkflowVerificationSummary,
+        write_verification_summary,
+    )
+except ImportError:  # pragma: no cover - direct script execution path
+    _SCRIPTS_DIR = Path(__file__).resolve().parents[2]
+    if str(_SCRIPTS_DIR) not in sys.path:
+        sys.path.insert(0, str(_SCRIPTS_DIR))
+    from evidence_workflows.workflow_state import (
+        WorkflowVerificationSummary,
+        write_verification_summary,
+    )
+
 CONTROL_FILES = {
     "checksums.sha256",
     "manifest.json",
@@ -377,21 +391,15 @@ def _verify_reports_with_sidecars(
         return 1
 
     if summary_out is not None:
-        summary_out.parent.mkdir(parents=True, exist_ok=True)
-        summary_out.write_text(
-            json.dumps(
-                {
-                    "clean_reports": count_clean,
-                    "error_injection_reports": count_error,
-                    "expected_failure_reports": count_expected_failure,
-                    "failed_reports": count_failed,
-                    "policy_profile": profile,
-                },
-                indent=2,
-                sort_keys=True,
-            )
-            + "\n",
-            encoding="utf-8",
+        write_verification_summary(
+            summary_out,
+            summary=WorkflowVerificationSummary(
+                clean_reports=count_clean,
+                error_injection_reports=count_error,
+                expected_failure_reports=count_expected_failure,
+                failed_reports=count_failed,
+                policy_profile=profile,
+            ),
         )
 
     print(
