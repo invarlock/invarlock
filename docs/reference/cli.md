@@ -92,7 +92,7 @@ invarlock report explain --evaluation-report reports/eval/evaluation.report.json
 | `invarlock evaluate` | Yes (`--out`, default `runs/`) | Yes (`--report-out`, default `reports/eval`) | Produces the paired evaluation report bundle |
 | `invarlock verify` | No | No | Reads existing evaluation report JSON |
 | `invarlock report html` | No | Yes (`--output`) | Renders HTML from an existing report |
-| `invarlock report explain` | No | No | Prefers `evaluation.report.json`, then auto-resolves linked run reports; also accepts explicit `--subject-report` and `--baseline-report` |
+| `invarlock report explain` | No | No | Explains `evaluation.report.json` directly; also accepts explicit `--subject-report` and `--baseline-report` when you need to rebuild from raw run artifacts |
 | `invarlock doctor` | No | No | Diagnostics only |
 | `invarlock advanced evidence-pack` | Depends on subcommand | Depends on subcommand | Advanced evidence packaging |
 | `invarlock advanced policy` | Depends on subcommand | No | Advanced policy-pack tooling |

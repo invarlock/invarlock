@@ -150,47 +150,20 @@ def test_report_explain_resolves_canonical_directories(monkeypatch, tmp_path):
     assert captured["baseline_report"] == str(baseline_json.resolve())
 
 
-def test_report_explain_resolves_linked_run_reports_from_evaluation_bundle(
-    monkeypatch, tmp_path
-):
-    run_report = {
-        "meta": {"seed": 1},
-        "data": {},
-        "edit": {},
-        "guards": [],
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 1.0}},
-        "artifacts": {},
-        "flags": {},
-    }
-    subject_dir = tmp_path / "runs" / "subject"
-    baseline_dir = tmp_path / "runs" / "baseline"
-    subject_dir.mkdir(parents=True)
-    baseline_dir.mkdir(parents=True)
-    subject_json = subject_dir / "report.json"
-    baseline_json = baseline_dir / "report.json"
-    subject_json.write_text(json.dumps(run_report), encoding="utf-8")
-    baseline_json.write_text(json.dumps(run_report), encoding="utf-8")
-
+def test_report_explain_uses_evaluation_bundle_directly(monkeypatch, tmp_path):
     evaluation_dir = tmp_path / "reports" / "eval"
     evaluation_dir.mkdir(parents=True)
     evaluation_json = evaluation_dir / "evaluation.report.json"
-    evaluation_json.write_text(
-        json.dumps(
-            {
-                "schema_version": "v1",
-                "validation": {},
-                "provenance": {
-                    "edited": {"report_path": "../../runs/subject/report.json"},
-                    "baseline": {"report_path": "../../runs/baseline/report.json"},
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
+    evaluation_payload = {
+        "schema_version": "v1",
+        "validation": {"primary_metric_acceptable": True},
+        "primary_metric": {"kind": "ppl_causal", "ratio_vs_baseline": 1.0},
+    }
+    evaluation_json.write_text(json.dumps(evaluation_payload), encoding="utf-8")
     captured: dict[str, object] = {}
     monkeypatch.setattr(
-        "invarlock.cli.commands.explain_gates.explain_gates_command",
-        lambda **kwargs: captured.update(kwargs),
+        "invarlock.cli.commands.explain_gates.explain_evaluation_report",
+        lambda payload: captured.update({"evaluation_report": payload}),
         raising=False,
     )
     monkeypatch.setattr(
@@ -199,8 +172,7 @@ def test_report_explain_resolves_linked_run_reports_from_evaluation_bundle(
 
     report_mod.report_explain(evaluation_report=str(evaluation_json))
 
-    assert captured["subject_report"] == str(subject_json.resolve())
-    assert captured["baseline_report"] == str(baseline_json.resolve())
+    assert captured == {"evaluation_report": evaluation_payload}
 
 
 @pytest.mark.parametrize("invalid_slot", ["report", "baseline"])

@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from invarlock.reporting.render import render_report_markdown
+
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_outline import build_evaluation_report_outline
 
@@ -190,3 +192,23 @@ def test_report_outline_accepts_step14_benchmark_fixture() -> None:
     assert benchmark.facts_by_label["Scenarios"].value == "2 total, 2 passed, 0 skipped"
     assert benchmark.facts_by_label["Primary Metric Overhead"].value == "0.8% to 0.9%"
     assert benchmark.facts_by_label["RMT Outliers"].value == "2->3"
+
+
+def test_markdown_report_outline_uses_shared_summary_facts() -> None:
+    cert = make_report(_mk_report(), _mk_report())
+    cert["baseline_ref"] = {
+        "model_id": "gpt2",
+        "run_id": "baseline-run-1234567890",
+    }
+
+    md = render_report_markdown(cert)
+
+    assert "## Report Outline" in md
+    assert (
+        "| Decision | Baseline | gpt2 · run baseline…34567890 | info | `baseline_ref` |"
+        in md
+    )
+    assert (
+        "| Policy Gates | Primary Metric Acceptable | PASS \\| 1.000x vs ≤ 1.10x | pass | `validation` |"
+        in md
+    )

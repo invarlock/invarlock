@@ -110,8 +110,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   first step toward thinner evidence-pack and model-evidence orchestration
   entrypoints.
 - Moved `evaluate` evaluation-report generation and runtime-manifest emission
-  into a dedicated report-phase helper with injected dependencies, preserving
-  existing report-generation monkeypatch paths while thinning the command body.
+  into a dedicated report-phase helper with explicit dependencies and a thinner
+  command body.
+- Added shared report-outline facts to Markdown reports and `report explain` so
+  the human Markdown, HTML, and CLI explain surfaces expose the same high-level
+  decision, policy, and guard-signal facts before their detailed sections.
+- Made `report explain --evaluation-report` explain the supplied
+  `evaluation.report.json` directly so portable reviewer bundles no longer need
+  linked raw baseline/subject run artifacts for the explain path.
 - Updated README branding to the Ledger ink palette, including static
   GitHub/PyPI-compatible Shields badges and refreshed light/dark logo, mark,
   app-icon, and favicon assets synced from the current site brand surface.
@@ -162,6 +168,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed the PR-time supply-chain scan to run `gitleaks` over pull request
   changed-file contents instead of timing out on repository-history scans;
   release and scheduled backstop scans still cover full history.
+- Fixed PR supply-chain scans by raising `cryptography` and security-tool `pip`
+  floors, then refreshing workflow locks past vulnerable pins.
 - Fixed `gitleaks` false positives for published evidence tokenizer digest
   fields by adding a narrow config allowlist used by PR and release scans.
 
