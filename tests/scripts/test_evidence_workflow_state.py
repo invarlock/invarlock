@@ -49,9 +49,7 @@ def test_workflow_lane_run_state_preserves_skip_as_legacy_ok_result() -> None:
         preset="configs/preset.yaml",
         report_path="eval/lane/report/evaluation.report.json",
         verify_path=None,
-        phases=(
-            WorkflowPhaseResult("prefetch", 1, "skipped", "gated_repo"),
-        ),
+        phases=(WorkflowPhaseResult("prefetch", 1, "skipped", "gated_repo"),),
     )
 
     result = state.to_lane_result()

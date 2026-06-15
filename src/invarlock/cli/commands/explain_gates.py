@@ -175,7 +175,11 @@ def explain_evaluation_report(
         console.print(f"  observed: {primary_row.measured}")
     else:
         ratio = pm.get("ratio_vs_baseline")
-        if isinstance(ratio, int | float) and isinstance(ratio_ci, tuple | list) and len(ratio_ci) == 2:
+        if (
+            isinstance(ratio, int | float)
+            and isinstance(ratio_ci, tuple | list)
+            and len(ratio_ci) == 2
+        ):
             console.print(
                 f"  observed: {ratio:.3f}x (CI {ratio_ci[0]:.3f}-{ratio_ci[1]:.3f})"
             )

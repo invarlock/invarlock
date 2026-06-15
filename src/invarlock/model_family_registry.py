@@ -86,9 +86,7 @@ class ModelFamilyRouteIndex:
         )
         return cls(
             records=record_tuple,
-            records_by_model={
-                key: tuple(value) for key, value in grouped.items()
-            },
+            records_by_model={key: tuple(value) for key, value in grouped.items()},
             support_rows_by_model=_support_rows_by_model_id(support_payload),
         )
 

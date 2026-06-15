@@ -26,7 +26,11 @@ class WorkflowCommandRun:
 
 def workflow_return_code(results: Sequence[object]) -> int:
     """Return process exit code for a sequence with result.ok semantics."""
-    return 0 if results and all(bool(getattr(result, "ok", False)) for result in results) else 1
+    return (
+        0
+        if results and all(bool(getattr(result, "ok", False)) for result in results)
+        else 1
+    )
 
 
 def write_status_event(

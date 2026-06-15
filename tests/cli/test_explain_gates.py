@@ -92,9 +92,7 @@ def test_explain_gates_hysteresis_and_overhead_rendering(monkeypatch, tmp_path):
     assert "1.015x" in r.stdout
 
 
-def test_explain_gates_accuracy_uses_delta_pp_and_audit_outline(
-    monkeypatch, tmp_path
-):
+def test_explain_gates_accuracy_uses_delta_pp_and_audit_outline(monkeypatch, tmp_path):
     rep = tmp_path / "rep.json"
     base = tmp_path / "base.json"
     rep.write_text(json.dumps({}), encoding="utf-8")

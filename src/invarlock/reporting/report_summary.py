@@ -219,7 +219,11 @@ def _primary_metric_measured_and_threshold(
         acc_policy = _mapping(metrics_policy.get("accuracy"))
         delta_min = _coerce_finite_float(acc_policy.get("delta_min_pp"))
         if delta_min is None:
-            delta_min = {"conservative": -0.5, "balanced": -1.0, "aggressive": -2.0}.get(
+            delta_min = {
+                "conservative": -0.5,
+                "balanced": -1.0,
+                "aggressive": -2.0,
+            }.get(
                 tier,
                 -1.0,
             )
@@ -261,7 +265,9 @@ def _primary_metric_drift_measured_and_threshold(
             measured = "N/A"
         else:
             measured = f"{(final - preview) * 100.0:+.2f} pp"
-        acc_policy = _mapping(_resolved_metrics_policy(evaluation_report).get("accuracy"))
+        acc_policy = _mapping(
+            _resolved_metrics_policy(evaluation_report).get("accuracy")
+        )
         limit = _coerce_finite_float(acc_policy.get("preview_final_delta_pp_max"))
         if limit is None:
             limit = _coerce_finite_float(acc_policy.get("hysteresis_delta_pp"))
