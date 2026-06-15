@@ -15,7 +15,7 @@ from invarlock.reporting.report_builder_support import (
 )
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_outline import build_evaluation_report_outline
-from invarlock.reporting.report_policy import PM_DRIFT_BAND_DEFAULT
+from invarlock.reporting.report_summary import build_quality_gates_summary
 
 console = Console()
 
@@ -70,7 +70,7 @@ def _print_report_outline_summary(evaluation_report: dict[str, object]) -> None:
     outline = build_evaluation_report_outline(evaluation_report)
     console.print("[bold]Report Outline[/bold]")
     for section in outline.sections:
-        if section.priority not in {"summary", "review"}:
+        if section.priority not in {"summary", "review", "audit"}:
             continue
         console.print(
             f"  {section.title}: {section.summary}",
@@ -102,6 +102,8 @@ def explain_evaluation_report(
         if isinstance(evaluation_report.get("validation"), dict)
         else {}
     )
+    quality_gates = build_quality_gates_summary(evaluation_report)
+    quality_by_label = {row.label: row for row in quality_gates.rows}
     auto = (
         evaluation_report.get("auto", {})
         if isinstance(evaluation_report.get("auto"), dict)
@@ -157,25 +159,35 @@ def explain_evaluation_report(
     )
     tokens_ok = (min_tokens == 0) or (total_tokens >= min_tokens) or tiny_relax
 
-    # Primary-metric ratio gate explanation (ppl-like kinds shown as ratios)
-    ratio = None
+    # Primary-metric gate explanation. PPL-like metrics use ratios; accuracy uses
+    # baseline-relative percentage-point deltas.
     ratio_ci = None
+    pm: dict[str, object] = {}
     if isinstance(evaluation_report.get("primary_metric"), dict):
         pm = evaluation_report.get("primary_metric", {})
-        ratio = pm.get("ratio_vs_baseline")
         ratio_ci = pm.get("display_ci")
     hysteresis_applied = bool(validation.get("hysteresis_applied"))
     status = "PASS" if bool(validation.get("primary_metric_acceptable")) else "FAIL"
+    primary_row = quality_by_label.get("Primary Metric Acceptable")
     console.print("[bold]Gate: Primary Metric vs Baseline[/bold]")
     console.print(f"  status: {status}")
-    if isinstance(ratio, int | float):
-        if isinstance(ratio_ci, tuple | list) and len(ratio_ci) == 2:
+    if primary_row is not None:
+        console.print(f"  observed: {primary_row.measured}")
+    else:
+        ratio = pm.get("ratio_vs_baseline")
+        if (
+            isinstance(ratio, int | float)
+            and isinstance(ratio_ci, tuple | list)
+            and len(ratio_ci) == 2
+        ):
             console.print(
                 f"  observed: {ratio:.3f}x (CI {ratio_ci[0]:.3f}-{ratio_ci[1]:.3f})"
             )
-        else:
+        elif isinstance(ratio, int | float):
             console.print(f"  observed: {ratio:.3f}x")
-    if isinstance(limit_base, int | float):
+    if primary_row is not None:
+        console.print(f"  threshold: {primary_row.threshold}")
+    elif isinstance(limit_base, int | float):
         hyst_suffix = (
             f" (+hysteresis {hysteresis_ratio:.3f})" if hysteresis_ratio else ""
         )
@@ -258,40 +270,25 @@ def explain_evaluation_report(
     if split_line:
         console.print(split_line)
 
-    # Drift gate explanation (ppl-like kinds only)
-    drift = None
+    # Drift gate explanation.
     drift_status = (
         "PASS" if bool(validation.get("preview_final_drift_acceptable")) else "FAIL"
     )
-    pm = (
-        evaluation_report.get("primary_metric", {})
-        if isinstance(evaluation_report.get("primary_metric"), dict)
-        else {}
-    )
     kind = str(pm.get("kind", "") or "").lower()
-    if kind.startswith("ppl"):
-        preview = pm.get("preview")
-        final = pm.get("final")
-        drift = _drift_ratio(preview, final)
-
+    drift_row = quality_by_label.get("Preview Final Drift Acceptable")
+    if kind.startswith("ppl") or kind == "accuracy":
         console.print("\n[bold]Gate: Drift (final/preview)[/bold]")
-        if isinstance(drift, int | float):
-            console.print(f"  observed: {drift:.3f}")
-        drift_band = (
-            pm.get("drift_band") if isinstance(pm.get("drift_band"), dict) else {}
-        )
-        drift_min = drift_band.get("min")
-        drift_max = drift_band.get("max")
-        if not (
-            isinstance(drift_min, int | float)
-            and isinstance(drift_max, int | float)
-            and math.isfinite(float(drift_min))
-            and math.isfinite(float(drift_max))
-            and float(drift_min) > 0.0
-            and float(drift_min) < float(drift_max)
-        ):
-            drift_min, drift_max = PM_DRIFT_BAND_DEFAULT
-        console.print(f"  threshold: {float(drift_min):.3f}-{float(drift_max):.3f}")
+        if drift_row is not None:
+            console.print(f"  observed: {drift_row.measured}")
+            console.print(f"  threshold: {drift_row.threshold}")
+            console.print(f"  basis: {drift_row.basis}")
+        elif kind.startswith("ppl"):
+            preview = pm.get("preview")
+            final = pm.get("final")
+            drift = _drift_ratio(preview, final)
+            if isinstance(drift, int | float):
+                console.print(f"  observed: {drift:.3f}")
+            console.print("  threshold: unavailable")
         console.print(f"  status: {drift_status}")
 
     spectral = (

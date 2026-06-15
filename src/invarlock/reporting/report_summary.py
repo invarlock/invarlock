@@ -5,6 +5,7 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
+from invarlock.core.auto_tuning import get_tier_policies
 from invarlock.public_contracts import load_json_contract
 
 _PARSE_EXCEPTIONS = (AttributeError, KeyError, OverflowError, TypeError, ValueError)
@@ -162,6 +163,148 @@ class ReportManifestSummary:
     gates_total: int
 
 
+def _mapping(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _coerce_finite_float(value: Any) -> float | None:
+    if not isinstance(value, int | float):
+        return None
+    try:
+        numeric = float(value)
+    except _PARSE_EXCEPTIONS:
+        return None
+    return numeric if math.isfinite(numeric) else None
+
+
+def _resolved_metrics_policy(evaluation_report: dict[str, Any]) -> dict[str, Any]:
+    auto = _mapping(evaluation_report.get("auto"))
+    tier = str(auto.get("tier") or "balanced").lower()
+    resolved = _mapping(evaluation_report.get("resolved_policy"))
+    metrics = _mapping(resolved.get("metrics"))
+    if metrics:
+        return metrics
+    defaults = get_tier_policies().get(tier, {})
+    return _mapping(_mapping(defaults).get("metrics"))
+
+
+def _pm_acceptance_range(evaluation_report: dict[str, Any]) -> dict[str, float]:
+    meta = _mapping(evaluation_report.get("meta"))
+    raw = _mapping(meta.get("pm_acceptance_range"))
+    lo = _coerce_finite_float(raw.get("min"))
+    hi = _coerce_finite_float(raw.get("max"))
+    if lo is None and hi is None:
+        return {}
+    out: dict[str, float] = {}
+    if lo is not None:
+        out["min"] = lo
+    if hi is not None:
+        out["max"] = hi
+    return out
+
+
+def _primary_metric_measured_and_threshold(
+    evaluation_report: dict[str, Any],
+) -> tuple[str, str, str]:
+    pm = _mapping(evaluation_report.get("primary_metric"))
+    auto = _mapping(evaluation_report.get("auto"))
+    tiny_relax = bool(auto.get("tiny_relax"))
+    tier = "aggressive" if tiny_relax else str(auto.get("tier") or "balanced").lower()
+    kind = str(pm.get("kind") or "").lower()
+    basis = str(pm.get("gating_basis") or pm.get("basis") or "point")
+    metrics_policy = {} if tiny_relax else _resolved_metrics_policy(evaluation_report)
+    if kind == "accuracy":
+        delta = _coerce_finite_float(pm.get("ratio_vs_baseline"))
+        measured = f"{delta:+.2f} pp" if delta is not None else "N/A"
+        acc_policy = _mapping(metrics_policy.get("accuracy"))
+        delta_min = _coerce_finite_float(acc_policy.get("delta_min_pp"))
+        if delta_min is None:
+            delta_min = {
+                "conservative": -0.5,
+                "balanced": -1.0,
+                "aggressive": -2.0,
+            }.get(
+                tier,
+                -1.0,
+            )
+        hysteresis = _coerce_finite_float(acc_policy.get("hysteresis_delta_pp")) or 0.0
+        threshold = f">= {delta_min:+.2f} pp"
+        if hysteresis > 0.0:
+            threshold += f" (+{hysteresis:.2f} pp hysteresis)"
+        return measured, threshold.replace(">=", "≥"), basis
+
+    value = _coerce_finite_float(pm.get("ratio_vs_baseline"))
+    measured = f"{value:.3f}x" if value is not None else "N/A"
+    acceptance = _pm_acceptance_range(evaluation_report)
+    lo = acceptance.get("min")
+    hi = acceptance.get("max")
+    if hi is None:
+        pm_policy = _mapping(metrics_policy.get("pm_ratio"))
+        hi = _coerce_finite_float(pm_policy.get("ratio_limit_base"))
+    if hi is None:
+        hi = {"conservative": 1.05, "balanced": 1.10, "aggressive": 1.20}.get(
+            tier,
+            1.10,
+        )
+    if lo is not None:
+        threshold = f"{lo:.2f}x to {hi:.2f}x"
+    else:
+        threshold = f"≤ {hi:.2f}x"
+    return measured, threshold, basis
+
+
+def _primary_metric_drift_measured_and_threshold(
+    evaluation_report: dict[str, Any],
+) -> tuple[str, str, str]:
+    pm = _mapping(evaluation_report.get("primary_metric"))
+    kind = str(pm.get("kind") or "").lower()
+    if kind == "accuracy":
+        preview = _coerce_finite_float(pm.get("preview"))
+        final = _coerce_finite_float(pm.get("final"))
+        if preview is None or final is None:
+            measured = "N/A"
+        else:
+            measured = f"{(final - preview) * 100.0:+.2f} pp"
+        acc_policy = _mapping(
+            _resolved_metrics_policy(evaluation_report).get("accuracy")
+        )
+        limit = _coerce_finite_float(acc_policy.get("preview_final_delta_pp_max"))
+        if limit is None:
+            limit = _coerce_finite_float(acc_policy.get("hysteresis_delta_pp"))
+        if limit is None:
+            limit = 0.1
+        return measured, f"≤ ±{limit * 100.0:.2f} pp", "absolute-delta"
+
+    try:
+        pv = _finite_float_or_nan(pm.get("preview"))
+        fv = _finite_float_or_nan(pm.get("final"))
+        drift = (
+            fv / pv
+            if (math.isfinite(pv) and pv > 0 and math.isfinite(fv))
+            else float("nan")
+        )
+    except _PARSE_EXCEPTIONS:
+        drift = float("nan")
+    measured = f"{drift:.3f}x" if math.isfinite(drift) else "N/A"
+    drift_min = 0.95
+    drift_max = 1.05
+    try:
+        drift_band = pm.get("drift_band") if isinstance(pm, dict) else None
+        if isinstance(drift_band, dict):
+            lo = _coerce_finite_float(drift_band.get("min"))
+            hi = _coerce_finite_float(drift_band.get("max"))
+            if lo is not None and hi is not None and 0 < lo < hi:
+                drift_min, drift_max = lo, hi
+        elif isinstance(drift_band, list | tuple) and len(drift_band) == 2:
+            lo = _coerce_finite_float(drift_band[0])
+            hi = _coerce_finite_float(drift_band[1])
+            if lo is not None and hi is not None and 0 < lo < hi:
+                drift_min, drift_max = lo, hi
+    except _PARSE_EXCEPTIONS:
+        pass
+    return measured, f"{drift_min:.2f}–{drift_max:.2f}x", "point"
+
+
 def derive_report_manifest_evidence_level(
     summary: ReportManifestSummary,
     *,
@@ -202,38 +345,14 @@ def build_safety_dashboard_summary(
     )
 
     validation = evaluation_report.get("validation", {}) or {}
-    pm = evaluation_report.get("primary_metric", {}) or {}
-    auto = evaluation_report.get("auto", {}) or {}
-    tier = str(auto.get("tier") or "balanced").lower()
-
-    pm_kind = str(pm.get("kind", "")).lower()
-    pm_basis = pm.get("gating_basis") or pm.get("basis") or "point"
     if isinstance(validation, dict) and "primary_metric_acceptable" in validation:
         pm_ok: bool | None = bool(validation.get("primary_metric_acceptable"))
     else:
         pm_ok = None
-    pm_value = pm.get("ratio_vs_baseline")
-
-    if pm_kind == "accuracy":
-        measured = f"{pm_value:+.2f} pp" if isinstance(pm_value, int | float) else "N/A"
-        th_map = {
-            "conservative": -0.5,
-            "balanced": -1.0,
-            "aggressive": -2.0,
-            "none": -1.0,
-        }
-        th = th_map.get(tier, -1.0)
-        threshold = f"≥ {th:+.2f} pp ({pm_basis})"
-    else:
-        measured = f"{pm_value:.3f}×" if isinstance(pm_value, int | float) else "N/A"
-        tier_thresholds = {
-            "conservative": 1.05,
-            "balanced": 1.10,
-            "aggressive": 1.20,
-            "none": 1.10,
-        }
-        ratio_limit = tier_thresholds.get(tier, 1.10)
-        threshold = f"≤ {ratio_limit:.2f}× ({pm_basis})"
+    measured, threshold, pm_basis = _primary_metric_measured_and_threshold(
+        evaluation_report
+    )
+    threshold = f"{threshold} ({pm_basis})"
 
     if isinstance(pm_ok, bool):
         pm_status = f"{'✅' if pm_ok else '❌'} {measured}"
@@ -244,19 +363,9 @@ def build_safety_dashboard_summary(
         drift_ok: bool | None = bool(validation.get("preview_final_drift_acceptable"))
     else:
         drift_ok = None
-    drift_val = "N/A"
-    try:
-        pv = _finite_float_or_nan(pm.get("preview"))
-        fv = _finite_float_or_nan(pm.get("final"))
-        drift = (
-            fv / pv
-            if (math.isfinite(pv) and pv > 0 and math.isfinite(fv))
-            else float("nan")
-        )
-        if math.isfinite(drift):
-            drift_val = f"{drift:.3f}×"
-    except _PARSE_EXCEPTIONS:
-        drift_val = "N/A"
+    drift_val, drift_threshold, _drift_basis = (
+        _primary_metric_drift_measured_and_threshold(evaluation_report)
+    )
     if isinstance(drift_ok, bool):
         drift_status = f"{'✅' if drift_ok else '❌'} {drift_val}"
     else:
@@ -264,7 +373,7 @@ def build_safety_dashboard_summary(
 
     rows: list[SafetyDashboardRow] = [
         SafetyDashboardRow("Primary Metric", pm_status, threshold),
-        SafetyDashboardRow("Drift", drift_status, "0.95–1.05× band"),
+        SafetyDashboardRow("Drift", drift_status, drift_threshold),
         SafetyDashboardRow(
             "Invariants",
             _format_gate_status(validation, "invariants_pass"),
@@ -335,38 +444,19 @@ def build_quality_gates_summary(
 
     pm_block = evaluation_report.get("primary_metric", {}) or {}
     has_pm = isinstance(pm_block, dict) and bool(pm_block)
-    auto_info = evaluation_report.get("auto", {})
-    tier = (auto_info.get("tier") or "balanced").lower()
     validation = evaluation_report.get("validation", {}) or {}
 
     rows: list[QualityGateRow] = []
     if has_pm:
         pm_kind = str(pm_block.get("kind", "")).lower()
-        value = pm_block.get("ratio_vs_baseline")
-        gating_basis = pm_block.get("gating_basis") or "point"
+        measured, threshold, gating_basis = _primary_metric_measured_and_threshold(
+            evaluation_report
+        )
         pm_ok = bool(validation.get("primary_metric_acceptable", True))
         status = "✅ PASS" if pm_ok else "❌ FAIL"
         if pm_kind == "accuracy":
-            measured = f"{value:+.2f} pp" if isinstance(value, int | float) else "N/A"
-            th_map = {
-                "conservative": -0.5,
-                "balanced": -1.0,
-                "aggressive": -2.0,
-                "none": -1.0,
-            }
-            th = th_map.get(tier, -1.0)
-            threshold = f"≥ {th:+.2f} pp"
             description = "Δ accuracy vs baseline"
         else:
-            tier_thresholds = {
-                "conservative": 1.05,
-                "balanced": 1.10,
-                "aggressive": 1.20,
-                "none": 1.10,
-            }
-            ratio_limit = tier_thresholds.get(tier, 1.10)
-            measured = f"{value:.3f}x" if isinstance(value, int | float) else "N/A"
-            threshold = f"≤ {ratio_limit:.2f}x"
             description = "Ratio vs baseline"
         rows.append(
             QualityGateRow(
@@ -380,50 +470,21 @@ def build_quality_gates_summary(
         )
 
         drift_ok = bool(validation.get("preview_final_drift_acceptable", True))
-        drift_min = 0.95
-        drift_max = 1.05
-        try:
-            drift_band = (
-                pm_block.get("drift_band") if isinstance(pm_block, dict) else None
-            )
-            if isinstance(drift_band, dict):
-                lo = drift_band.get("min")
-                hi = drift_band.get("max")
-                if isinstance(lo, int | float) and isinstance(hi, int | float):
-                    lo_f = float(lo)
-                    hi_f = float(hi)
-                    if math.isfinite(lo_f) and math.isfinite(hi_f) and 0 < lo_f < hi_f:
-                        drift_min = lo_f
-                        drift_max = hi_f
-            elif isinstance(drift_band, list | tuple) and len(drift_band) == 2:
-                lo_raw, hi_raw = drift_band[0], drift_band[1]
-                if isinstance(lo_raw, int | float) and isinstance(hi_raw, int | float):
-                    lo_f = float(lo_raw)
-                    hi_f = float(hi_raw)
-                    if math.isfinite(lo_f) and math.isfinite(hi_f) and 0 < lo_f < hi_f:
-                        drift_min = lo_f
-                        drift_max = hi_f
-        except _PARSE_EXCEPTIONS:
-            pass
-        try:
-            pv = _finite_float_or_nan(pm_block.get("preview"))
-            fv = _finite_float_or_nan(pm_block.get("final"))
-            drift = (
-                fv / pv
-                if (math.isfinite(pv) and pv > 0 and math.isfinite(fv))
-                else float("nan")
-            )
-        except _PARSE_EXCEPTIONS:
-            drift = float("nan")
-        measured = f"{drift:.3f}x" if math.isfinite(drift) else "N/A"
+        measured, threshold, drift_basis = _primary_metric_drift_measured_and_threshold(
+            evaluation_report
+        )
         rows.append(
             QualityGateRow(
                 label="Preview Final Drift Acceptable",
                 status="✅ PASS" if drift_ok else "❌ FAIL",
                 measured=measured,
-                threshold=f"{drift_min:.2f}–{drift_max:.2f}x",
-                basis="point",
-                description="Final/Preview ratio stability",
+                threshold=threshold,
+                basis=drift_basis,
+                description=(
+                    "Preview/final accuracy delta"
+                    if pm_kind == "accuracy"
+                    else "Final/Preview ratio stability"
+                ),
             )
         )
 

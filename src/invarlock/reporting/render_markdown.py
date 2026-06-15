@@ -176,7 +176,10 @@ def _append_primary_metric_section(
     lines.append(f"| Final | {_fmt_by_kind(final, str(kind))} |")
 
     if kind == "accuracy":
-        lines.append(f"| Δ vs Baseline | {_fmt_by_kind(ratio, str(kind))} |")
+        if isinstance(ratio, int | float):
+            lines.append(f"| Δ vs Baseline | {float(ratio):+.2f} pp |")
+        else:
+            lines.append("| Δ vs Baseline | N/A |")
         try:
             baseline_point = primary_metric.get("baseline_point")
         except _MODEL_CONTEXT_PARSE_EXCEPTIONS:

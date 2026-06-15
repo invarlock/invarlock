@@ -42,6 +42,84 @@ class WorkflowLaneResult:
 
 
 @dataclass(frozen=True)
+class WorkflowPhaseResult:
+    name: str
+    returncode: int | None
+    status: str
+    detail: str | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.status in {"ok", "skipped"}
+
+    def to_summary_entry(self) -> dict[str, object]:
+        payload = asdict(self)
+        payload["ok"] = self.ok
+        return payload
+
+
+@dataclass(frozen=True)
+class WorkflowLaneRunState:
+    slug: str
+    lane_id: str
+    model_id: str
+    preset: str
+    report_path: str
+    verify_path: str | None
+    phases: tuple[WorkflowPhaseResult, ...]
+
+    @property
+    def status(self) -> str:
+        if not self.phases:
+            return "failed"
+        if all(phase.ok for phase in self.phases):
+            if any(phase.status == "skipped" for phase in self.phases):
+                return "skipped"
+            return "ok"
+        return "failed"
+
+    @property
+    def detail(self) -> str | None:
+        for phase in reversed(self.phases):
+            if phase.detail:
+                return phase.detail
+        return None
+
+    def phase_returncode(self, name: str) -> int | None:
+        for phase in reversed(self.phases):
+            if phase.name == name:
+                return phase.returncode
+        return None
+
+    def to_lane_result(self) -> WorkflowLaneResult:
+        return WorkflowLaneResult(
+            slug=self.slug,
+            lane_id=self.lane_id,
+            model_id=self.model_id,
+            preset=self.preset,
+            evaluate_exit=self.phase_returncode("evaluate")
+            if self.phase_returncode("evaluate") is not None
+            else self._first_nonzero_returncode(),
+            verify_exit=self.phase_returncode("verify"),
+            report_path=self.report_path,
+            verify_path=self.verify_path,
+            status=self.status,
+            detail=self.detail,
+        )
+
+    def to_summary_entry(self) -> dict[str, object]:
+        lane_result = self.to_lane_result().to_summary_entry()
+        lane_result["phases"] = [phase.to_summary_entry() for phase in self.phases]
+        return lane_result
+
+    def _first_nonzero_returncode(self) -> int:
+        for phase in self.phases:
+            if phase.returncode not in {None, 0}:
+                return int(phase.returncode)
+        return 0
+
+
+@dataclass(frozen=True)
 class WorkflowArtifact:
     path: str
     bytes: int

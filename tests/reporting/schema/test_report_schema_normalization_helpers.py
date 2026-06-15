@@ -82,6 +82,52 @@ def test_validate_evaluation_report_uses_jsonschema(monkeypatch):
     assert dummy.calls == 1
 
 
+def _minimal_schema_valid_report() -> dict:
+    return {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "run-tail",
+        "artifacts": {},
+        "plugins": {},
+        "meta": {},
+        "dataset": {
+            "provider": "unit",
+            "seq_len": 8,
+            "windows": {"preview": 1, "final": 1, "stats": {}},
+        },
+        "primary_metric": {"kind": "ppl_causal", "ratio_vs_baseline": 1.0},
+        "validation": {"primary_metric_acceptable": True},
+    }
+
+
+def test_report_schema_validates_primary_metric_tail_shape() -> None:
+    if schema_mod.jsonschema is None:
+        pytest.skip("jsonschema not installed")
+    evaluation_report = _minimal_schema_valid_report()
+    evaluation_report["primary_metric_tail"] = {
+        "evaluated": True,
+        "passed": True,
+        "warned": False,
+        "mode": "warn",
+        "policy": {"quantile": 0.95},
+        "stats": {"q95": 0.01},
+    }
+
+    assert schema_mod.validate_report(evaluation_report) is True
+
+
+def test_report_schema_rejects_malformed_primary_metric_tail() -> None:
+    if schema_mod.jsonschema is None:
+        pytest.skip("jsonschema not installed")
+    evaluation_report = _minimal_schema_valid_report()
+    evaluation_report["primary_metric_tail"] = {
+        "evaluated": "yes",
+        "policy": "not-a-policy",
+        "stats": [],
+    }
+
+    assert schema_mod.validate_report(evaluation_report) is False
+
+
 def test_validate_evaluation_report_rejects_payload_when_jsonschema_fails(monkeypatch):
     class FailingSchema:
         def validate(self, instance, schema):

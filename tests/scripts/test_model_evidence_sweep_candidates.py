@@ -316,6 +316,8 @@ exit 99
 
 def test_run_lane_sets_remote_code_env_for_matching_preset(tmp_path: Path) -> None:
     mod = load_script_module("model_evidence_sweep")
+    import evidence_workflows.workflow_runner as workflow_runner
+
     spec = next(
         lane
         for lane in mod.SUITES[mod.REPO_MENTIONED_GPU_SUITE]
@@ -347,8 +349,8 @@ def test_run_lane_sets_remote_code_env_for_matching_preset(tmp_path: Path) -> No
             return real_completed(cmd, 0)
         raise AssertionError(f"unexpected command: {cmd}")
 
-    original_run = mod.subprocess.run
-    mod.subprocess.run = fake_run
+    original_run = workflow_runner.subprocess.run
+    workflow_runner.subprocess.run = fake_run
     try:
         execution_root = mod._execution_root(output_root, execution_mode="host")
         result = mod.run_lane(
@@ -362,7 +364,7 @@ def test_run_lane_sets_remote_code_env_for_matching_preset(tmp_path: Path) -> No
             env={"PYTHONPATH": "src"},
         )
     finally:
-        mod.subprocess.run = original_run
+        workflow_runner.subprocess.run = original_run
 
     assert result.evaluate_exit == 0
     assert result.verify_exit == 0

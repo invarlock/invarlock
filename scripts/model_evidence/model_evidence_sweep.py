@@ -10,7 +10,6 @@ import hashlib
 import json
 import os
 import shutil
-import subprocess
 import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -25,6 +24,17 @@ if str(SCRIPT_DIR) not in sys.path:
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
+from evidence_workflows.workflow_plan import (
+    WorkflowCommandStep,
+    WorkflowLanePlan,
+    WorkflowSweepPlan,
+)
+from evidence_workflows.workflow_runner import (
+    run_logged_command,
+    run_logged_command_with_retry,
+    workflow_return_code,
+    write_status_event,
+)
 from evidence_workflows.workflow_state import (
     WorkflowLaneResult as LaneResult,
 )
@@ -731,6 +741,147 @@ def _publish_and_cleanup_lane_artifacts(
     )
 
 
+def build_lane_plan(
+    spec: EvidenceLane,
+    *,
+    output_root: Path,
+    execution_root: Path,
+    python_exe: str,
+    profile: str | None,
+    device: str,
+    execution_mode: str,
+    env: dict[str, str],
+    preset_overrides: dict[str, str] | None = None,
+) -> WorkflowLanePlan:
+    lane_root = execution_root / "eval" / spec.slug
+    published_lane_root = output_root / "eval" / spec.slug
+    lane_profile = resolve_lane_profile(
+        profile_override=profile,
+        execution_mode=execution_mode,
+        spec=spec,
+    )
+
+    materialize_cmd = build_vision_text_materialize_command(
+        spec,
+        python_exe=python_exe,
+        lane_root=lane_root,
+        execution_mode=execution_mode,
+    )
+    prepared_preset = None
+    preset_arg_override = None
+    steps: list[WorkflowCommandStep] = []
+    if materialize_cmd is not None:
+        prepared_preset = _command_path(
+            lane_root / "prepared_preset.yaml",
+            execution_mode=execution_mode,
+        )
+        preset_arg_override = prepared_preset
+        steps.append(
+            WorkflowCommandStep(
+                name="materialize_dataset",
+                command=tuple(materialize_cmd),
+                log_mode="w",
+            )
+        )
+    elif preset_overrides:
+        preset_arg_override = preset_overrides.get(spec.slug)
+
+    if execution_mode == "host":
+        steps.append(
+            WorkflowCommandStep(
+                name="prefetch",
+                command=tuple(build_prefetch_command(spec, python_exe=python_exe)),
+                log_mode="a" if steps else "w",
+            )
+        )
+
+    evaluate_cmd = build_evaluate_command(
+        spec,
+        python_exe=python_exe,
+        profile=lane_profile,
+        device=device,
+        execution_mode=execution_mode,
+        lane_root=lane_root,
+        preset_arg_override=preset_arg_override,
+    )
+    steps.append(
+        WorkflowCommandStep(
+            name="evaluate",
+            command=tuple(evaluate_cmd),
+            log_mode="a" if steps else "w",
+            retry_returncodes=tuple(sorted(RETRYABLE_EVALUATE_RETURNCODES)),
+            retry_message="evaluate exited with {returncode}; retrying once.",
+        )
+    )
+    report_path = lane_root / "report" / "evaluation.report.json"
+    verify_path = lane_root / "verify.json"
+    steps.append(
+        WorkflowCommandStep(
+            name="verify",
+            command=tuple(
+                build_verify_command(
+                    python_exe=python_exe,
+                    profile=lane_profile,
+                    execution_mode=execution_mode,
+                    report_path=report_path,
+                )
+            ),
+            output_path=verify_path,
+        )
+    )
+    return WorkflowLanePlan(
+        slug=spec.slug,
+        lane_id=spec.lane_id,
+        model_id=spec.model_id,
+        execution_mode=execution_mode,
+        lane_root=lane_root,
+        published_lane_root=published_lane_root,
+        report_path=report_path,
+        verify_path=verify_path,
+        profile=lane_profile,
+        steps=tuple(steps),
+        resource_preflight=lane_resource_preflight(spec, env=env, device=device),
+        prepared_preset=prepared_preset,
+    )
+
+
+def build_sweep_plan(
+    *,
+    args: argparse.Namespace,
+    output_root: Path,
+    execution_root: Path,
+    specs: Sequence[EvidenceLane],
+    env: dict[str, str],
+    preset_overrides: dict[str, str],
+) -> WorkflowSweepPlan:
+    metadata = WorkflowRunMetadata(
+        suite=args.suite,
+        execution_mode=args.execution_mode,
+        shard_index=args.shard_index,
+        shard_count=args.shard_count,
+    )
+    lanes = tuple(
+        build_lane_plan(
+            spec,
+            output_root=output_root,
+            execution_root=execution_root,
+            python_exe=args.python,
+            profile=args.profile,
+            device=args.device,
+            execution_mode=args.execution_mode,
+            env=env,
+            preset_overrides=preset_overrides,
+        )
+        for spec in specs
+    )
+    return WorkflowSweepPlan(
+        metadata=metadata,
+        output_root=output_root,
+        execution_root=execution_root,
+        lanes=lanes,
+    )
+
+
 def _classify_failure(
     *,
     log_path: Path,
@@ -790,47 +941,41 @@ def run_lane(
     execution_mode: str,
     env: dict[str, str],
     preset_overrides: dict[str, str] | None = None,
+    plan: WorkflowLanePlan | None = None,
 ) -> LaneResult:
-    lane_root = execution_root / "eval" / spec.slug
+    if plan is None:
+        plan = build_lane_plan(
+            spec,
+            output_root=output_root,
+            execution_root=execution_root,
+            python_exe=python_exe,
+            profile=profile,
+            device=device,
+            execution_mode=execution_mode,
+            env=env,
+            preset_overrides=preset_overrides,
+        )
+    lane_root = plan.lane_root
     lane_root.mkdir(parents=True, exist_ok=True)
-    published_lane_root = output_root / "eval" / spec.slug
+    published_lane_root = plan.published_lane_root
     log_dir = output_root / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"{spec.slug}.log"
-    report_path = lane_root / "report" / "evaluation.report.json"
-    verify_path = lane_root / "verify.json"
     lane_env = dict(env)
     if lane_requires_remote_code(spec):
         lane_env["INVARLOCK_ALLOW_REMOTE_CODE"] = "1"
 
-    log_mode = "w"
-    eval_returncode: int | None = None
-    lane_profile = resolve_lane_profile(
-        profile_override=profile,
-        execution_mode=execution_mode,
-        spec=spec,
-    )
-    prepared_preset = None
-    materialize_cmd = build_vision_text_materialize_command(
-        spec,
-        python_exe=python_exe,
-        lane_root=lane_root,
-        execution_mode=execution_mode,
-    )
-    if materialize_cmd is not None:
-        with log_path.open(log_mode, encoding="utf-8") as log_file:
-            log_file.write("$ " + " ".join(materialize_cmd) + "\n")
-            materialize_proc = subprocess.run(
-                materialize_cmd,
-                cwd=REPO_ROOT,
-                env=lane_env,
-                stdout=log_file,
-                stderr=subprocess.STDOUT,
-                text=True,
-                check=False,
-            )
-        log_mode = "a"
-        if materialize_proc.returncode != 0:
+    materialize_step = plan.optional_step("materialize_dataset")
+    if materialize_step is not None:
+        materialize_run = run_logged_command(
+            name=materialize_step.name,
+            command=materialize_step.command,
+            cwd=REPO_ROOT,
+            env=lane_env,
+            log_path=log_path,
+            log_mode=materialize_step.log_mode,
+        )
+        if not materialize_run.ok:
             _publish_and_cleanup_lane_artifacts(
                 lane_root=lane_root,
                 published_lane_root=published_lane_root,
@@ -846,7 +991,7 @@ def run_lane(
                 lane_id=spec.lane_id,
                 model_id=spec.model_id,
                 preset=spec.preset_relpath,
-                evaluate_exit=materialize_proc.returncode,
+                evaluate_exit=materialize_run.returncode,
                 verify_exit=None,
                 report_path=str(published_report_path),
                 verify_path=(
@@ -857,33 +1002,29 @@ def run_lane(
                 status="failed",
                 detail="dataset_materialize_failed",
             )
-        prepared_preset = write_prepared_preset(
+        write_prepared_preset(
             spec,
             lane_root=lane_root,
             execution_mode=execution_mode,
         )
-    if execution_mode == "host":
-        prefetch_cmd = build_prefetch_command(spec, python_exe=python_exe)
-        with log_path.open(log_mode, encoding="utf-8") as log_file:
-            log_file.write("$ " + " ".join(prefetch_cmd) + "\n")
-            prefetch_proc = subprocess.run(
-                prefetch_cmd,
-                cwd=REPO_ROOT,
-                env=lane_env,
-                stdout=log_file,
-                stderr=subprocess.STDOUT,
-                text=True,
-                check=False,
-            )
-        log_mode = "a"
-        if prefetch_proc.returncode != 0:
+
+    prefetch_step = plan.optional_step("prefetch")
+    if prefetch_step is not None:
+        prefetch_run = run_logged_command(
+            name=prefetch_step.name,
+            command=prefetch_step.command,
+            cwd=REPO_ROOT,
+            env=lane_env,
+            log_path=log_path,
+            log_mode=prefetch_step.log_mode,
+        )
+        if not prefetch_run.ok:
             status, detail = _classify_failure(
                 log_path=log_path,
-                evaluate_exit=prefetch_proc.returncode,
+                evaluate_exit=prefetch_run.returncode,
                 verify_exit=None,
                 phase="prefetch",
             )
-            published_lane_root = output_root / "eval" / spec.slug
             _publish_and_cleanup_lane_artifacts(
                 lane_root=lane_root,
                 published_lane_root=published_lane_root,
@@ -899,7 +1040,7 @@ def run_lane(
                 lane_id=spec.lane_id,
                 model_id=spec.model_id,
                 preset=spec.preset_relpath,
-                evaluate_exit=prefetch_proc.returncode,
+                evaluate_exit=prefetch_run.returncode,
                 verify_exit=None,
                 report_path=str(published_report_path),
                 verify_path=(
@@ -911,75 +1052,32 @@ def run_lane(
                 detail=detail,
             )
 
-    preset_arg_override: str | None = None
-    if prepared_preset is not None:
-        preset_arg_override = _command_path(
-            prepared_preset, execution_mode=execution_mode
-        )
-    elif preset_overrides:
-        preset_arg_override = preset_overrides.get(spec.slug)
-
-    evaluate_cmd = build_evaluate_command(
-        spec,
-        python_exe=python_exe,
-        profile=lane_profile,
-        device=device,
-        execution_mode=execution_mode,
-        lane_root=lane_root,
-        preset_arg_override=preset_arg_override,
+    evaluate_step = plan.evaluate_step
+    evaluate_run = run_logged_command_with_retry(
+        name=evaluate_step.name,
+        command=evaluate_step.command,
+        cwd=REPO_ROOT,
+        env=lane_env,
+        log_path=log_path,
+        log_mode=evaluate_step.log_mode,
+        retry_returncodes=evaluate_step.retry_returncodes,
+        retry_message=evaluate_step.retry_message,
     )
-    with log_path.open(log_mode, encoding="utf-8") as log_file:
-        log_file.write("$ " + " ".join(evaluate_cmd) + "\n")
-        eval_proc = subprocess.run(
-            evaluate_cmd,
-            cwd=REPO_ROOT,
-            env=lane_env,
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
-            text=True,
-            check=False,
-        )
-    eval_returncode = eval_proc.returncode
-    if eval_returncode in RETRYABLE_EVALUATE_RETURNCODES:
-        with log_path.open("a", encoding="utf-8") as log_file:
-            log_file.write(
-                f"\n[WARN] evaluate exited with {eval_returncode}; retrying once.\n"
-            )
-            log_file.write("$ " + " ".join(evaluate_cmd) + "\n")
-            eval_proc = subprocess.run(
-                evaluate_cmd,
-                cwd=REPO_ROOT,
-                env=lane_env,
-                stdout=log_file,
-                stderr=subprocess.STDOUT,
-                text=True,
-                check=False,
-            )
-        eval_returncode = eval_proc.returncode
+    eval_returncode = evaluate_run.returncode
 
     verify_exit: int | None = None
-    if eval_returncode == 0 and report_path.is_file():
-        verify_cmd = build_verify_command(
-            python_exe=python_exe,
-            profile=lane_profile,
-            execution_mode=execution_mode,
-            report_path=report_path,
+    if eval_returncode == 0 and plan.report_path.is_file():
+        verify_step = plan.verify_step
+        verify_run = run_logged_command(
+            name=verify_step.name,
+            command=verify_step.command,
+            cwd=REPO_ROOT,
+            env=lane_env,
+            log_path=log_path,
+            log_mode="a",
+            output_path=verify_step.output_path,
         )
-        with (
-            verify_path.open("w", encoding="utf-8") as verify_file,
-            log_path.open("a", encoding="utf-8") as log_file,
-        ):
-            log_file.write("\n$ " + " ".join(verify_cmd) + "\n")
-            verify_proc = subprocess.run(
-                verify_cmd,
-                cwd=REPO_ROOT,
-                env=lane_env,
-                stdout=verify_file,
-                stderr=log_file,
-                text=True,
-                check=False,
-            )
-            verify_exit = verify_proc.returncode
+        verify_exit = verify_run.returncode
 
     _publish_and_cleanup_lane_artifacts(
         lane_root=lane_root,
@@ -1052,6 +1150,14 @@ def run_sweep(args: argparse.Namespace) -> int:
     if execution_root != output_root:
         execution_root.mkdir(parents=True, exist_ok=True)
     env = runtime_env()
+    plan = build_sweep_plan(
+        args=args,
+        output_root=output_root,
+        execution_root=execution_root,
+        specs=specs,
+        env=env,
+        preset_overrides=preset_overrides,
+    )
     write_manifest(
         output_root,
         suite=args.suite,
@@ -1059,82 +1165,23 @@ def run_sweep(args: argparse.Namespace) -> int:
         specs=specs,
     )
     if args.dry_run:
-        payload = []
-        for spec in specs:
-            lane_root = execution_root / "eval" / spec.slug
-            item = {
-                "slug": spec.slug,
-                "execution_mode": args.execution_mode,
-                "resource_preflight": lane_resource_preflight(
-                    spec,
-                    env=env,
-                    device=args.device,
-                ),
-                "evaluate": build_evaluate_command(
-                    spec,
-                    python_exe=args.python,
-                    profile=resolve_lane_profile(
-                        profile_override=args.profile,
-                        execution_mode=args.execution_mode,
-                        spec=spec,
-                    ),
-                    device=args.device,
-                    execution_mode=args.execution_mode,
-                    lane_root=lane_root,
-                    preset_arg_override=(
-                        _command_path(
-                            lane_root / "prepared_preset.yaml",
-                            execution_mode=args.execution_mode,
-                        )
-                        if spec.vision_text_materialization
-                        else preset_overrides.get(spec.slug)
-                    ),
-                ),
-                "verify": build_verify_command(
-                    python_exe=args.python,
-                    profile=resolve_lane_profile(
-                        profile_override=args.profile,
-                        execution_mode=args.execution_mode,
-                        spec=spec,
-                    ),
-                    execution_mode=args.execution_mode,
-                    report_path=lane_root / "report" / "evaluation.report.json",
-                ),
-            }
-            if args.execution_mode == "host":
-                item["prefetch"] = build_prefetch_command(
-                    spec,
-                    python_exe=args.python,
-                )
-            materialize = build_vision_text_materialize_command(
-                spec,
-                python_exe=args.python,
-                lane_root=lane_root,
-                execution_mode=args.execution_mode,
-            )
-            if materialize is not None:
-                item["materialize_dataset"] = materialize
-                item["prepared_preset"] = _command_path(
-                    lane_root / "prepared_preset.yaml",
-                    execution_mode=args.execution_mode,
-                )
-            payload.append(item)
-        print(json.dumps(payload, indent=2))
+        print(json.dumps(plan.to_dry_run_payload(), indent=2))
         return 0
 
     status_log = output_root / "status.log"
     results: list[LaneResult] = []
     with status_log.open("w", encoding="utf-8") as handle:
-        handle.write(f"[{datetime.now(UTC).isoformat()}] START\n")
-        for spec in specs:
-            preflight = lane_resource_preflight(spec, env=env, device=args.device)
+        write_status_event(handle, "START")
+        for spec, lane_plan in zip(specs, plan.lanes, strict=True):
+            preflight = lane_plan.resource_preflight
             if preflight and preflight.get("warning"):
-                handle.write(
-                    f"[{datetime.now(UTC).isoformat()}] WARN {spec.slug} "
-                    f"resource_preflight={preflight['warning']}\n"
+                write_status_event(
+                    handle,
+                    "WARN",
+                    slug=spec.slug,
+                    fields={"resource_preflight": preflight["warning"]},
                 )
-            handle.write(f"[{datetime.now(UTC).isoformat()}] START {spec.slug}\n")
-            handle.flush()
+            write_status_event(handle, "START", slug=spec.slug)
             result = run_lane(
                 spec,
                 output_root=output_root,
@@ -1145,20 +1192,26 @@ def run_sweep(args: argparse.Namespace) -> int:
                 execution_mode=args.execution_mode,
                 env=env,
                 preset_overrides=preset_overrides,
+                plan=lane_plan,
             )
             results.append(result)
             verify_repr = (
                 "NA" if result.verify_exit is None else str(result.verify_exit)
             )
-            handle.write(
-                f"[{datetime.now(UTC).isoformat()}] DONE {result.slug} "
-                f"status={result.status} detail={result.detail or '-'} "
-                f"eval={result.evaluate_exit} verify={verify_repr}\n"
+            write_status_event(
+                handle,
+                "DONE",
+                slug=result.slug,
+                fields={
+                    "status": result.status,
+                    "detail": result.detail or "-",
+                    "eval": result.evaluate_exit,
+                    "verify": verify_repr,
+                },
             )
-            handle.flush()
             if args.fail_fast and not result.ok:
                 break
-        handle.write(f"[{datetime.now(UTC).isoformat()}] ALL_TASKS_COMPLETE\n")
+        write_status_event(handle, "ALL_TASKS_COMPLETE")
     write_summary(
         output_root,
         suite=args.suite,
@@ -1182,7 +1235,7 @@ def run_sweep(args: argparse.Namespace) -> int:
         shard_count=args.shard_count,
         results=results,
     )
-    return 0 if results and all(result.ok for result in results) else 1
+    return workflow_return_code(results)
 
 
 def main(argv: list[str] | None = None) -> int:

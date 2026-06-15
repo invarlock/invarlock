@@ -37,7 +37,7 @@ from model_evidence_lanes import (  # noqa: E402
 )
 
 from invarlock.adapters.auto import resolve_auto_adapter  # noqa: E402
-from invarlock.model_family_registry import catalog_routed_model_ids  # noqa: E402
+from invarlock.model_family_registry import ModelFamilyRouteIndex  # noqa: E402
 
 ALLOWED_ADAPTERS = {"auto", "hf_causal", "hf_mlm", "hf_multimodal", "hf_seq2seq"}
 EXPECTED_PROVIDER_KINDS = {
@@ -384,10 +384,10 @@ def audit() -> list[Finding]:
 
     catalog_payload = _load_json(MODEL_FAMILY_CATALOG_PATH)
     support_payload = _load_json(SUPPORT_MATRIX_PATH)
-    routed_model_ids = catalog_routed_model_ids(
+    routed_model_ids = ModelFamilyRouteIndex.from_contracts(
         catalog=catalog_payload,
         support_matrix=support_payload,
-    )
+    ).routed_model_ids()
     catalog_model_ids = _model_ids_from_catalog()
     missing_catalog_routes = sorted(
         catalog_model_ids - lane_model_ids - routed_model_ids

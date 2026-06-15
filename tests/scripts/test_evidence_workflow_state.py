@@ -5,6 +5,8 @@ from pathlib import Path
 
 from scripts.evidence_workflows.workflow_state import (
     WorkflowLaneResult,
+    WorkflowLaneRunState,
+    WorkflowPhaseResult,
     WorkflowRunMetadata,
     WorkflowVerificationSummary,
     capture_artifacts,
@@ -13,6 +15,50 @@ from scripts.evidence_workflows.workflow_state import (
     write_summary_files,
     write_verification_summary,
 )
+
+
+def test_workflow_lane_run_state_rolls_up_phase_results() -> None:
+    state = WorkflowLaneRunState(
+        slug="lane",
+        lane_id="lane-id",
+        model_id="org/model",
+        preset="configs/preset.yaml",
+        report_path="eval/lane/report/evaluation.report.json",
+        verify_path="eval/lane/verify.json",
+        phases=(
+            WorkflowPhaseResult("materialize_dataset", 0, "ok"),
+            WorkflowPhaseResult("evaluate", 0, "ok"),
+            WorkflowPhaseResult("verify", 1, "failed", "verify_failed"),
+        ),
+    )
+
+    result = state.to_lane_result()
+
+    assert result.evaluate_exit == 0
+    assert result.verify_exit == 1
+    assert result.status == "failed"
+    assert result.detail == "verify_failed"
+    assert state.to_summary_entry()["phases"][-1]["ok"] is False
+
+
+def test_workflow_lane_run_state_preserves_skip_as_legacy_ok_result() -> None:
+    state = WorkflowLaneRunState(
+        slug="lane",
+        lane_id="lane-id",
+        model_id="org/model",
+        preset="configs/preset.yaml",
+        report_path="eval/lane/report/evaluation.report.json",
+        verify_path=None,
+        phases=(WorkflowPhaseResult("prefetch", 1, "skipped", "gated_repo"),),
+    )
+
+    result = state.to_lane_result()
+
+    assert result.ok is True
+    assert result.evaluate_exit == 1
+    assert result.verify_exit is None
+    assert result.status == "skipped"
+    assert result.detail == "gated_repo"
 
 
 def test_workflow_lane_result_marks_skipped_as_ok() -> None:
