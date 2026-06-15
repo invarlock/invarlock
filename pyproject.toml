@@ -329,7 +329,7 @@ where = ["src"]
 "*" = ["py.typed"]
 "invarlock" = [
   "_data/contracts/*.json",
-  "_data/public_evidence/published_basis/**/*",
+  "_data/public_evidence/*.json",
 ]
 "invarlock._data.runtime" = [
   "profiles/*.yaml",

@@ -203,7 +203,8 @@ def test_contract_reference_docs_freeze_versioned_json_and_packaged_public_evide
     assert 'format_version: "evidence-pack-verify-v1"' in text
     assert 'verify.format_version: "verify-v1"' in text
     assert "public_evidence/published_basis/" in text
-    assert "invarlock/_data/public_evidence/published_basis/" in text
+    assert "invarlock/_data/public_evidence/published_basis_index.json" in text
+    assert "compact generated index" in text
     assert "maintained public contract carriers" in normalized
     assert "make_public_contract_bundle.py" not in text
 

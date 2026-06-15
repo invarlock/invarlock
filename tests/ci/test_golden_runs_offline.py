@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from invarlock.evidence_pack import EvidencePackStatus, verify_evidence_pack
-from invarlock.public_contracts import published_basis_lanes
+from invarlock.public_contracts import load_public_evidence_index, published_basis_lanes
 from invarlock.reporting.report_schema import validate_report
 from invarlock.reporting.verify_contract import VerifyOutcome, run_verify_reports
 
@@ -31,46 +31,28 @@ def test_published_basis_lanes_ship_public_evidence_references() -> None:
             assert (REPO_ROOT / evidence_pack_fixture).is_dir(), evidence_pack_fixture
 
 
-def test_packaged_public_evidence_matches_repo_public_evidence() -> None:
-    pairs = []
-    packaged_basis_root = (
-        REPO_ROOT
-        / "src"
-        / "invarlock"
-        / "_data"
-        / "public_evidence"
-        / "published_basis"
-    )
+def test_packaged_public_evidence_index_matches_repo_public_evidence() -> None:
+    index = load_public_evidence_index()
+    assert index["carrier_policy"]["installed_wheel"] == "compact_index_only"
+    indexed = {entry["slug"]: entry for entry in index["entries"]}
+
     for lane in published_basis_lanes():
         evidence = lane.get("evidence", {})
         report_fixture = evidence.get("evaluation_report_fixture")
         assert isinstance(report_fixture, str)
         basis_id = Path(report_fixture).parts[2]
-        pairs.append(
-            (
-                REPO_ROOT / "public_evidence" / "published_basis" / basis_id,
-                packaged_basis_root / basis_id,
-            )
-        )
-
-    for source_dir, packaged_dir in pairs:
+        source_dir = REPO_ROOT / "public_evidence" / "published_basis" / basis_id
         assert source_dir.is_dir(), source_dir
-        assert packaged_dir.is_dir(), packaged_dir
-        source_files = sorted(
-            path.relative_to(source_dir)
-            for path in source_dir.rglob("*")
-            if path.is_file()
-        )
-        packaged_files = sorted(
-            path.relative_to(packaged_dir)
-            for path in packaged_dir.rglob("*")
-            if path.is_file()
-        )
-        assert packaged_files == source_files
-        for rel_path in source_files:
-            assert (packaged_dir / rel_path).read_bytes() == (
-                source_dir / rel_path
-            ).read_bytes()
+        assert basis_id in indexed
+        assert lane["lane_id"] in indexed[basis_id]["lanes"]
+
+        artifacts = indexed[basis_id]["artifacts"]
+        for key in ("evaluation_report", "runtime_manifest"):
+            artifact = artifacts[key]
+            source_path = REPO_ROOT / artifact["path"]
+            assert source_path.is_file(), source_path
+            expected = "sha256:" + hashlib.sha256(source_path.read_bytes()).hexdigest()
+            assert artifact["sha256"] == expected
 
 
 def test_offline_golden_runs_public_fixtures() -> None:

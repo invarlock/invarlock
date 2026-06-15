@@ -1,9 +1,0 @@
-{
-  "assurance": "strict",
-  "basis": "public_evidence/published_basis/qwen3_30b_a3b/evaluation.report.json",
-  "evidence_run": "20260613Tqwen330ba3bH100All8",
-  "model_id": "Qwen/Qwen3-30B-A3B-Instruct-2507",
-  "note": "Container-backed release-profile Qwen3 30B-A3B no-op preservation evidence run on public WikiText-103. The fixture records strict guard behavior under all-8 H100 sharding; it is not a fine-tuning, compression, benchmark-quality, or MoE routing-quality claim.",
-  "profile": "release",
-  "verdict": "PASS"
-}

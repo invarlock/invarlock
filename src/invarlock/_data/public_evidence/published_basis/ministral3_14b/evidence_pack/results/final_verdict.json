@@ -1,9 +1,0 @@
-{
-  "assurance": "strict",
-  "basis": "public_evidence/published_basis/ministral3_14b/evaluation.report.json",
-  "evidence_run": "20260612TremainingExperimentalZ",
-  "model_id": "mistralai/Ministral-3-14B-Instruct-2512-BF16",
-  "note": "Container-backed CI-profile Ministral 3 14B published-basis evidence run.",
-  "profile": "release",
-  "verdict": "PASS"
-}

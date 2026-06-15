@@ -1,0 +1,1543 @@
+{
+  "carrier_policy": {
+    "installed_wheel": "compact_index_only",
+    "source_repository": "full_public_evidence_artifacts"
+  },
+  "entries": [
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/bert/evaluation.report.json",
+          "sha256": "sha256:f25d7124f80994aaff83735f72049a7725434a88e0acb3fc057cef6fcaacc366",
+          "size_bytes": 6260
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/bert/evidence_pack_recipe.json",
+          "sha256": "sha256:89ddc055b79ba2527b3ca7c6de3ae5b500484424c0aa6dbd907afd0ef5b5ef56",
+          "size_bytes": 717
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/bert/runtime.manifest.json",
+          "sha256": "sha256:b507782c3a1cc54bbf38a4055e4adf24b9607ec63a437017416436dae6a19a9a",
+          "size_bytes": 782
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "lanes": [
+        "bert-mlm-hf"
+      ],
+      "path": "public_evidence/published_basis/bert",
+      "slug": "bert",
+      "summary": "Strict-pass verifier fixture for the BERT-style published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evaluation.report.json",
+          "sha256": "sha256:ee3ea714b029b85ce427576aba9e6ef74a9fbd3f69bc2dd88f8aa5d9e753a7a1",
+          "size_bytes": 5603263
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:3ee4e3230c3977c2260c322ab3ccbf3df9cbe3b1883e39675e20667210d1d093",
+            "manifest.json": "sha256:5f45b78d59659f8518db3f0375662abcd89594f84828be62ec74aded70689bab",
+            "manifest.signature.json": "sha256:d1c686259e9a5041568e4f17cea87ab4b3fb2e0d8fd022bbe6a11e4e96787ca8",
+            "results/final_verdict.json": "sha256:e66447aee6473e1a8b61874fc4ebffeb75dedae1162adcfeaeee2d3fb57db1bb"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evidence_pack",
+          "size_bytes": 5613448
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evidence_pack_recipe.json",
+          "sha256": "sha256:d104082f4da4a4dca4b782218d65a9b39c3ed1d4fd3cb84273a62e74c46e81e6",
+          "size_bytes": 2155
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/runtime.manifest.json",
+          "sha256": "sha256:0aa5e11f2d19ab2dce806466fbc9acae3b8cbd8b141bcf44c1b6a91357a1743b",
+          "size_bytes": 908
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:75798fd4fad6525f20f8d01fce1a61369cb0fc985f7b1552a4014d247b413350",
+      "lanes": [
+        "deepseek-r1-0528-qwen3-8b-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b",
+      "slug": "deepseek_r1_0528_qwen3_8b",
+      "summary": "Release-strict verifier fixture for the DeepSeek-R1-0528-Qwen3-8B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evaluation.report.json",
+          "sha256": "sha256:d947729d730ca2eb947e49a00c835301826893bb00b84a4295b714b455cf8993",
+          "size_bytes": 5618531
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:98d0f9edc4b2a2e0c68b3708595e0e2ce15db678e1e7b8a33279cf923b59bbbf",
+            "manifest.json": "sha256:be12c87e5ea413c1a813842d0348490a046bd2808c6fedb74c8f25aa80b69d27",
+            "manifest.signature.json": "sha256:de7f9c3ec09ae6490f00ffaeb835e502de4c57e8a7e96e716e479d0180826a81",
+            "results/final_verdict.json": "sha256:b894abe8aadaa5391170ef81a3096a539df0a535b964041a203980f9ea8cd3b9"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evidence_pack",
+          "size_bytes": 5629174
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evidence_pack_recipe.json",
+          "sha256": "sha256:87fcf3b044bd072ac4004b2683d50ec8bf56604f9ab67ca0ab09f6c3163d4577",
+          "size_bytes": 2605
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/runtime.manifest.json",
+          "sha256": "sha256:1b0ad3383955a3f4cbcc96b7a572d3c322389fe6400b6d0217455240df67656a",
+          "size_bytes": 932
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:f88230dad0fe58f6e36ce7b7d3dc986a2a46c7c4f47f36307e5cd46f240fb884",
+      "lanes": [
+        "deepseek-r1-distill-qwen-14b-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/deepseek_r1_distill_qwen_14b",
+      "slug": "deepseek_r1_distill_qwen_14b",
+      "summary": "Release-strict verifier fixture for the DeepSeek-R1-Distill-Qwen 14B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evaluation.report.json",
+          "sha256": "sha256:3c182e475163a08c28ea47be27bb9bb49bb2a3136de50cb3c2e9da84b2478f0e",
+          "size_bytes": 3391169
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:b1d3edd9ceebd3e951bb31ad118a0048eaa2a877932131c6149dbcf424038676",
+            "manifest.json": "sha256:693619c6d43266f807374963204ee16ad6905c030cb53b4ad5696cf862d637ff",
+            "manifest.signature.json": "sha256:4e9d8ded0158cddaa86e926bdfaf32dbec5020858349dd9891cd069f62dd8803",
+            "results/final_verdict.json": "sha256:407178d9defec41e5c66dbedeb27f230967f9f6aa0cef3f1f6c11aee2eea3550"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evidence_pack",
+          "size_bytes": 3400202
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evidence_pack_recipe.json",
+          "sha256": "sha256:b34dd653ae992bdf7e8e3467e3cd7cae3f4362397cfd14eae12036765cd0aa02",
+          "size_bytes": 2152
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/runtime.manifest.json",
+          "sha256": "sha256:3f826502b6bfee2570dd58c61e4c2834f93bdbff3019c5d9e8e9ee1becfeb43a",
+          "size_bytes": 893
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:07f70e0fd5f09b50fdf8e59ce393cf69f600fc85bd165dbd7a9a5d7658996c57",
+      "lanes": [
+        "deepseek-r1-distill-qwen-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/deepseek_r1_distill_qwen_7b",
+      "slug": "deepseek_r1_distill_qwen_7b",
+      "summary": "Release-strict verifier fixture for the DeepSeek-R1-Distill-Qwen 7B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/falcon_7b/evaluation.report.json",
+          "sha256": "sha256:6a04e8d121089875fe6e2e80ca90ba5520bf08f7dbae6a527311736dd3be9964",
+          "size_bytes": 2373871
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:01733a972c1f432fd1e0e3832c2432f57e7c04f662e7630174a81e16c8799db9",
+            "manifest.json": "sha256:e0ae0815e2074ee51adf236e1acb1da0f3cbc772d4257f1a24ab842924c4437e",
+            "manifest.signature.json": "sha256:83d6d07100877d6b9e4944eb27501294800b1a7e207cb755541a1f8ff6fd230f",
+            "results/final_verdict.json": "sha256:bb98e2a3c790e5869e32312d52e6d1173452b39c37ed32009855cdfc053ba6ae"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/falcon_7b/evidence_pack",
+          "size_bytes": 2387173
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/falcon_7b/evidence_pack_recipe.json",
+          "sha256": "sha256:b08986e6ee19844dbc24de6bd000631ec6fe7d80a5d182a732e3ec6b61d6223b",
+          "size_bytes": 2031
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/falcon_7b/runtime.manifest.json",
+          "sha256": "sha256:2a40ea2087e0b7d4b7247acc0e51ae965c7d086ed94920571190a9828f39d0a3",
+          "size_bytes": 887
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:9c4d57fa720129487b65e922acbba9484112d5f3c85beac3ce67d543bbc645c8",
+      "lanes": [
+        "falcon-7b-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/falcon_7b",
+      "slug": "falcon_7b",
+      "summary": "Release-strict verifier fixture for the Falcon 7B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/flan_t5_base/evaluation.report.json",
+          "sha256": "sha256:79950658c4577e398fa482c7882ef59b9b4360439ce5eb053d7b4ea5a34597a5",
+          "size_bytes": 2268703
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:f72bb5ccb93f0b70d97d542d5167b0b4fda04415c83ce3bc1edbcb77b38e5a49",
+            "manifest.json": "sha256:472c0045d36587287ea844b702039659715c9280c99d1f5cafafde350cbcce7c",
+            "manifest.signature.json": "sha256:339ce73d03edb14e9e840977eb1ca45dbe11bc8b7716b8cc7fdb756a3f12cc1f",
+            "results/final_verdict.json": "sha256:d16dc69e3aa728360ac65f213394e548097792b86b780b86bb390c477935e783"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/flan_t5_base/evidence_pack",
+          "size_bytes": 2279340
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/flan_t5_base/evidence_pack_recipe.json",
+          "sha256": "sha256:463f086c26d96cee26d42f50ea60edde3cd56c6f21057e152add886ff0306ba7",
+          "size_bytes": 2151
+        },
+        "evidence_run_preset": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/flan_t5_base/evidence_run_preset.yaml",
+          "sha256": "sha256:26541fdbe66501c4c0bbe27fa8e66b52c143a4ac38663e6af1fcc8a8f5a70029",
+          "size_bytes": 933
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/flan_t5_base/runtime.manifest.json",
+          "sha256": "sha256:88e95bd3308f06d5febd943fbb97f8225e3b86f92bc10362714c798be31fdcc8",
+          "size_bytes": 890
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:fa3384e4f4b010c3966593bc14986317253a7c1b87215baa5f80f367fc02e0e9",
+      "lanes": [
+        "flan-t5-base-seq2seq-hf"
+      ],
+      "path": "public_evidence/published_basis/flan_t5_base",
+      "slug": "flan_t5_base",
+      "summary": "Release-strict verifier fixture for the FLAN-T5 base seq2seq published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_12b/evaluation.report.json",
+          "sha256": "sha256:16db3277cd79c7b1672a3c23d26c21dc20552486bb3a73a27e1c3928f2c10fca",
+          "size_bytes": 1037313
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:9e5378ee33956ce48280ea6f1b416fce7bf5ed2fa2671bd09de30342fde47975",
+            "manifest.json": "sha256:4210fdd8b6cb8a2e50c35e8af38049b9bce825570fc178860071db1116279e0b",
+            "manifest.signature.json": "sha256:4643d6e819bd6376314db0ffb959be58957db7b7f6565eedeb81cb10dcb9e9ea",
+            "results/final_verdict.json": "sha256:691747a38288c5cca32f11414860195bd7e8f5b64848008d97adbd0856fa2567"
+          },
+          "file_count": 13,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/gemma4_12b/evidence_pack",
+          "size_bytes": 1375543
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_12b/evidence_pack_recipe.json",
+          "sha256": "sha256:8a37044fcecac8126eac642ca57a28b8631428333fcb62947551c6cf4aa19c65",
+          "size_bytes": 1998
+        },
+        "evidence_run_preset": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_12b/evidence_run_preset.yaml",
+          "sha256": "sha256:4d212c53a36f259e1e7a4ecd5ce429f7bb090ee41b17290a38763db7fcfbf4dd",
+          "size_bytes": 1084
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_12b/runtime.manifest.json",
+          "sha256": "sha256:accfbc3fc128ea93c1486c4f65764630aba29fa09a3e3d39850e9e1e24f2bc9e",
+          "size_bytes": 1125
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:e520b5ce1082199e8a8abe2c6c492f552f3cfb375f01986ab482bc8baa656810",
+      "lanes": [
+        "gemma4-12b-any-to-any-hf"
+      ],
+      "path": "public_evidence/published_basis/gemma4_12b",
+      "slug": "gemma4_12b",
+      "summary": "Release-strict verifier fixture for the Gemma 4 12B image-text published-basis lane. Final accuracy 0.565 over 400 examples; ratio_vs_baseline 1.009; no guard warnings."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json",
+          "sha256": "sha256:80ce570e171ffc351a1fe8488a44c71a1cb5b3ddf5f39a6fa49cd0087d47babc",
+          "size_bytes": 1019442
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:ab3245af959d3485bb07ca53bcf157d2b520a9977a3b5422b7f5004166ca1b53",
+            "manifest.json": "sha256:c715e64787e70bde33a7a47a0e16a83b2c0688a8d2f647cf852bc7cd3c9e9578",
+            "manifest.signature.json": "sha256:2fccfdb59ec7b1d13996d170fe161c1de1cdc1db9d0f97ad40748216041232ff",
+            "results/final_verdict.json": "sha256:97cc63ecbdb7df2c9f18cd95fe2abbe8fd2af9c72622a3c9ff0926c401efad7c"
+          },
+          "file_count": 13,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack",
+          "size_bytes": 1361093
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack_recipe.json",
+          "sha256": "sha256:dc777e61cf63d4a91bf228e3f2aefbb33f2f4950757f93aed87d5f6b02baa2a0",
+          "size_bytes": 2112
+        },
+        "evidence_run_preset": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_26b_a4b/evidence_run_preset.yaml",
+          "sha256": "sha256:ff1b59ac871a7a10e6ddae7ca8ff3a2b1409a1cfb9c2a8319ce876f9bf256fd5",
+          "size_bytes": 1197
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_26b_a4b/runtime.manifest.json",
+          "sha256": "sha256:c3908d938485097ef61ae61c5a58a1abe3f6968cd6f509207b2678f2fd3c29d0",
+          "size_bytes": 1129
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:af9ea464b796dd4df5b62d1e06e5330d61b13f5c0b62eb62c55f375ff9467360",
+      "lanes": [
+        "gemma4-26b-a4b-moe-image-text-hf"
+      ],
+      "path": "public_evidence/published_basis/gemma4_26b_a4b",
+      "slug": "gemma4_26b_a4b",
+      "summary": "Release-strict verifier fixture for the Gemma 4 26B-A4B MoE image-text published-basis lane. Final accuracy 0.555 over 400 examples; ratio_vs_baseline 1.009; no guard warnings."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_e2b/evaluation.report.json",
+          "sha256": "sha256:2274a10df15c319ffb48d0d5f25e69648f5d8b09de1b101bcd8a9e39c33b94fc",
+          "size_bytes": 4087874
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:46fe74b2dc32d064bbbfa53ee5b92b3d980c25ba861857d9e0686b1f0fe3e6a5",
+            "manifest.json": "sha256:030ae634b5d3d9fe2ff441eb11a2c58ad3bf5eb5822ddd3f16fd3514c8a0b233",
+            "manifest.signature.json": "sha256:bd15b4e8b2e62f979caf7cb3075896912c74d237abeb51a11ecc8f015c027f2c",
+            "results/final_verdict.json": "sha256:efb88f2be649ec56dfbe7db430aaecdaa2e3b2e8386be4abdb4d47c3a053ccc9"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/gemma4_e2b/evidence_pack",
+          "size_bytes": 4098029
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_e2b/evidence_pack_recipe.json",
+          "sha256": "sha256:6ac735646d90cb7028276e8de085b44b7199058f25e143b1cc56a1527a951ff4",
+          "size_bytes": 1916
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_e2b/runtime.manifest.json",
+          "sha256": "sha256:96235ec3a078a46438c4d7c07b50cf04f8ee07467c89af1745acec7425b43821",
+          "size_bytes": 881
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:8b9e68ba80fff3df92429f074ff834f595fc22ebe3be59cce72d2b7b6d16a92a",
+      "lanes": [
+        "gemma4-e2b-text-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/gemma4_e2b",
+      "slug": "gemma4_e2b",
+      "summary": "Release-strict verifier fixture for the Gemma 4 E2B text-only published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_e2b_image_text/evaluation.report.json",
+          "sha256": "sha256:1edc1325aa0807ac0516a8906552561790f2dc4aa10714fedf75fd5c387f35e8",
+          "size_bytes": 1053970
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:6b0aabbf5ca6fa5451592f069871cc98c9fab422b18f40ca7d2e1af97ed6789a",
+            "manifest.json": "sha256:fd546824a2e386841af7b56d292291025ffb1dfb24669d5a48df98e844d5cf19",
+            "manifest.signature.json": "sha256:c7d6fb35e5e982c5cf5e4c23d5f9c9dfc7a12d718b04ffa10e4b58bf9919fd2b",
+            "results/final_verdict.json": "sha256:ee81fee3b1ebd77141c42d90070b548a7c89d785009c6e1eedb4764354229175"
+          },
+          "file_count": 15,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack",
+          "size_bytes": 1402906
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack_recipe.json",
+          "sha256": "sha256:78eaed254bac9a79d66c46bcf5fb791aee0649efbeba9753844c299bd94e7ba7",
+          "size_bytes": 2542
+        },
+        "evidence_run_preset": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_e2b_image_text/evidence_run_preset.yaml",
+          "sha256": "sha256:4a9779d65eeea7ae7849d7d0c51ea8639db124ed606b29b644c30e8d24e601c1",
+          "size_bytes": 1095
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_e2b_image_text/runtime.manifest.json",
+          "sha256": "sha256:b8ee16c436308c1f12eef13580b6a94961ad0924926bd77d2fa5ec138aa1ae36",
+          "size_bytes": 1136
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:206fe5b53f0741b01809245518bf3c2a1c1f0f49e0f2e15e4a68ebd960a9f04f",
+      "lanes": [
+        "gemma4-e2b-image-text-hf"
+      ],
+      "path": "public_evidence/published_basis/gemma4_e2b_image_text",
+      "slug": "gemma4_e2b_image_text",
+      "summary": "Release-strict verifier fixture for the Gemma 4 E2B image-text published-basis lane. Final accuracy 0.388 over 400 examples; ratio_vs_baseline 1.013; no guard warnings."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_e4b/evaluation.report.json",
+          "sha256": "sha256:acbc6ae7e4b1565e0cbca98ba53fe4cdb6e1a2c0610d0f302f6a49d0f088d8c5",
+          "size_bytes": 1038956
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:f4abe48916fbcbece66998b5171c753725607ca2509383f255a8dd078adb69d2",
+            "manifest.json": "sha256:87ca95fa7f14af6870f44cc9a6bd0abfbc30f731b29c0269b14f693f31e1b0e6",
+            "manifest.signature.json": "sha256:b2520141092e4d1edca09919e8edee0f6b38fd3a1be7a77fbe788864bdaca573",
+            "results/final_verdict.json": "sha256:1f98fca08147009d551646db82f9c4945879437c09338f1ba12741d64bd284c8"
+          },
+          "file_count": 15,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/gemma4_e4b/evidence_pack",
+          "size_bytes": 1378869
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_e4b/evidence_pack_recipe.json",
+          "sha256": "sha256:eae6433cef2d5b800a33b237f923cae34b2bc1e12c7d566aaad520ee72e994ea",
+          "size_bytes": 2377
+        },
+        "evidence_run_preset": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_e4b/evidence_run_preset.yaml",
+          "sha256": "sha256:b0bfade563e633af3b6d939f6510f0b356894490a17b358a43937cc29bfbd991",
+          "size_bytes": 1084
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_e4b/runtime.manifest.json",
+          "sha256": "sha256:2db338a04eff260f935f8e60d35ace967b81d80eb56e2f854e670bb37aa72430",
+          "size_bytes": 1125
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:b1843d68b0fd5bc67300ebf564e980dff48e81002821c5665396d7b60c9a3b11",
+      "lanes": [
+        "gemma4-e4b-image-text-hf"
+      ],
+      "path": "public_evidence/published_basis/gemma4_e4b",
+      "slug": "gemma4_e4b",
+      "summary": "Release-strict verifier fixture for the Gemma 4 E4B image-text published-basis lane. Final accuracy 0.500 over 400 examples; ratio_vs_baseline 1.010; no guard warnings."
+    },
+    {
+      "artifacts": {
+        "artifact_package": {
+          "control_hashes": {},
+          "file_count": 3,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/gpt2/artifact_package",
+          "size_bytes": 4167
+        },
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gpt2/evaluation.report.json",
+          "sha256": "sha256:e0ffd8143b48ae1d171345aa606753b4ff9d4436adb46d366a041b6e131942f0",
+          "size_bytes": 6254
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:29c6f96d4035f06fedba1bc5920cbcb43b0fa81beb126523f4171e1610adb3a6",
+            "manifest.json": "sha256:14e7a9c84a69a772fb4bc0ac141d3402ee5482b6c87b7ff5e9b616e3c0d0a151",
+            "manifest.signature.json": "sha256:65f734bc71807de2df33c62ecff3f1bcb203d2819d8d5b5ed13a604f7533df6e",
+            "results/final_verdict.json": "sha256:6f04be9d050f03c16005b9a1ed8ba6e28f5d3a27ccc623311179b6ccc4f406b9"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/gpt2/evidence_pack",
+          "size_bytes": 11937
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gpt2/evidence_pack_recipe.json",
+          "sha256": "sha256:4842736e9b1ec38612df322546e0563778c87b125a1dd278c6c3ee1846c66cdf",
+          "size_bytes": 913
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gpt2/runtime.manifest.json",
+          "sha256": "sha256:9ecf9c36f4df414c1ea944d2056b48427e5f8d1c87c8de1e6bc87067629057e1",
+          "size_bytes": 782
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:eff9de615ddb03ecd5f90e2ba3fa7cf13a0dddeb651df7a4f587b7ca348f9059",
+      "lanes": [
+        "gpt2-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/gpt2",
+      "slug": "gpt2",
+      "summary": "Strict-pass verifier fixture for the GPT-2-style published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/granite4_1_3b/evaluation.report.json",
+          "sha256": "sha256:4f0974e2a5bedece359cae07420fc4bfeb57b9eee8222215079fd439b9e09ad1",
+          "size_bytes": 5633409
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:5355c2f1e98d90cf05ee3140f84223319dffc7db3449d846b3219ce19bcaf263",
+            "manifest.json": "sha256:40c488a54268ff16ca3d2d9fb994c6a4b6dffdf0f6a8a800ad5c93eb8e995220",
+            "manifest.signature.json": "sha256:0dbff55a70e94a467af588dd471e4f6d2076f858d6670521fee52ae8a77d95c7",
+            "results/final_verdict.json": "sha256:2d45438ef161056cd569dd746c0a1678feb88c71cc3223ad6323684bda5214a8"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/granite4_1_3b/evidence_pack",
+          "size_bytes": 5642295
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/granite4_1_3b/evidence_pack_recipe.json",
+          "sha256": "sha256:acf5fdb2ddea4da07ec473ac099c36f00187e380645b01cbd1477cacd5771d7f",
+          "size_bytes": 1995
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/granite4_1_3b/runtime.manifest.json",
+          "sha256": "sha256:6d83e90fdf15fb151c0235ee98ef3076b552f4890929087fdeccc52cbe571f71",
+          "size_bytes": 897
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:872e15d0386389bf9549122e15e973ef9cb595ee3b5120576d31b673dd947f7f",
+      "lanes": [
+        "granite-4-1-3b-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/granite4_1_3b",
+      "slug": "granite4_1_3b",
+      "summary": "Release-strict verifier fixture for the Granite 4.1 3B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/granite4_1_8b/evaluation.report.json",
+          "sha256": "sha256:60c3f83074bc85683bef73521699160f8e56ac219dab5e6b3ea3c4312807ccd6",
+          "size_bytes": 5633873
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:25a8c6647381558e9c4b799f040abed3d27cb389a2ff67587903c29609bcf752",
+            "manifest.json": "sha256:754e422f72418982c1012da5d1872344a3f5c0fcbb6ad9a92b946da26bc2d0d4",
+            "manifest.signature.json": "sha256:d73a10c3081511ac4997aa4077525889a98213f635c90ac96e28d570d576aee2",
+            "results/final_verdict.json": "sha256:2970b78e5ace51784197f949207d9fe4979332ccf87d2c5d20582468e61b79d6"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/granite4_1_8b/evidence_pack",
+          "size_bytes": 5642781
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/granite4_1_8b/evidence_pack_recipe.json",
+          "sha256": "sha256:e3fdd909d63db6edbd641b5cdc2e9834a8d0340a256dff3b233becd785b294ed",
+          "size_bytes": 1968
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/granite4_1_8b/runtime.manifest.json",
+          "sha256": "sha256:e44a19111eae0c85ed0963d40a45abf7a27d5ef9ad7934b1a21aeaa94dbf3c42",
+          "size_bytes": 897
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:eeb80b76d8e7ed5b052d44f4a5f8834f42b891274b6eec5d4e98910ea961fa36",
+      "lanes": [
+        "granite-4-1-8b-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/granite4_1_8b",
+      "slug": "granite4_1_8b",
+      "summary": "Release-strict verifier fixture for the Granite 4.1 8B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/ministral3_14b/evaluation.report.json",
+          "sha256": "sha256:feb3ade45956fc108664db1317020a48672a97065213778ea546875fbb0189bc",
+          "size_bytes": 2723027
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:3ddf9f4fcc4ee98c5101c914321b2ec2a60c82cbcd5995228d13b42abb4af75b",
+            "manifest.json": "sha256:a413fac4e91d014d2da290a368c7f229280a5a7d937aec6cc4fac5c78810a362",
+            "manifest.signature.json": "sha256:2271ebceb4e3f2883642a1c955dec86088b14644c00b7c901ba57715324b38dc",
+            "results/final_verdict.json": "sha256:6151bbcee4ad21e2a14879c1f819617c5e523d727bd44d65263965609e970d19"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/ministral3_14b/evidence_pack",
+          "size_bytes": 2736566
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/ministral3_14b/evidence_pack_recipe.json",
+          "sha256": "sha256:da0cd564b2256642750f35b4ebef1b4fd10c20b5efef52a882ef66108e588684",
+          "size_bytes": 2069
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/ministral3_14b/runtime.manifest.json",
+          "sha256": "sha256:83cbbd0a71ae41d7c30aa70d5e31cda8eeed7a63bb14dd8df0811d9cd610640e",
+          "size_bytes": 880
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:873063bcd389792af73439bbe496545db856bb5771a49b5741a01845893e41e9",
+      "lanes": [
+        "ministral-3-14b-text-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/ministral3_14b",
+      "slug": "ministral3_14b",
+      "summary": "Release-strict verifier fixture for the Ministral 3 14B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/ministral3_3b/evaluation.report.json",
+          "sha256": "sha256:a6066734c49a10290adcc5be31d99baf8e5139fe2490f27b28e650437f662807",
+          "size_bytes": 4444793
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:bde6982f41080c78b1c6ffeeee9d050acbfb388a116d2f23267771c2dd119cc8",
+            "manifest.json": "sha256:dae50b284ce4daa8e1b5c2172bdb606b599028bac66e4912c981f0d00c82f9cb",
+            "manifest.signature.json": "sha256:bb101a6a90f9c3dc78b94ca9096ec048f4234a83bad383ae71b4588e8add8973",
+            "results/final_verdict.json": "sha256:56d56556c44b6c1c4bf57119610ee2af4da1bd63973dec834859543a3a06e4b3"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/ministral3_3b/evidence_pack",
+          "size_bytes": 4454712
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/ministral3_3b/evidence_pack_recipe.json",
+          "sha256": "sha256:c165145a33198f42c7cdf272440b0d67f87dcfd1b3eb56a34ed7539a55bbd3c7",
+          "size_bytes": 1972
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/ministral3_3b/runtime.manifest.json",
+          "sha256": "sha256:6d1ee1353c5561d3a8ec57ce82d96669ac8586dac640cd62715d851b14812078",
+          "size_bytes": 914
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:d66c3fdca621707339bdd18c6555aadfb7f0bd147955c1aaabeb31dbc7206fff",
+      "lanes": [
+        "ministral-3-3b-text-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/ministral3_3b",
+      "slug": "ministral3_3b",
+      "summary": "Release-strict verifier fixture for the Ministral 3 3B text-only published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/ministral3_8b/evaluation.report.json",
+          "sha256": "sha256:7ac9072bd52f575e28a627535e357db28b4c8863bbedada1a91384fde4ed1e67",
+          "size_bytes": 2711160
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:751b227715e0983ea73021ca946212a6166ce41113e54ec8cb566acac8c77ef7",
+            "manifest.json": "sha256:aed4f640ab8dee488ceb112eabeb07ca540abdd40addff1990abe04bbe44e56d",
+            "manifest.signature.json": "sha256:ef78da96db3d39dd15e9f3e2c7edbd34383ffef0d36f3f07e08dc0069d7d0741",
+            "results/final_verdict.json": "sha256:4bb6c8344789f3d8a3648aa45d44cc96379c838494b4324f5769f54d87419908"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/ministral3_8b/evidence_pack",
+          "size_bytes": 2722601
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/ministral3_8b/evidence_pack_recipe.json",
+          "sha256": "sha256:30bfe8b1957698bb6e975ce8aaf096d934c94fe53163e686087f5edb1a90648d",
+          "size_bytes": 2053
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/ministral3_8b/runtime.manifest.json",
+          "sha256": "sha256:9a944b83e1393afbc0e8846876e14304ed6265ca980c11b77031edb90aaf3526",
+          "size_bytes": 879
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:e2adf44fb2ff7be7048e0e4e5f2dfd26e5080a22dd04ed550e0e4de547eab489",
+      "lanes": [
+        "ministral-3-8b-text-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/ministral3_8b",
+      "slug": "ministral3_8b",
+      "summary": "Release-strict verifier fixture for the Ministral 3 8B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+          "sha256": "sha256:79029a9227dd4ec89763e828cca0f30aca85b09ad1caa15e1cfb82bccce5f3f7",
+          "size_bytes": 2069696
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:2b8e6d46e081a2be8160a5bb8e72d3d7bdd77b2e937cbbfbe6235400b78eebcb",
+            "manifest.json": "sha256:bf2ee3cfbba1ab063142ed75c3c19322f12d065a1904227b13df6078f83d9276",
+            "manifest.signature.json": "sha256:8cf9a0560a0934703fa21eadbc72bc463235e3157317f078fbaaf8500d7d6562",
+            "results/final_verdict.json": "sha256:fdbe4be8be54cfbd70d70cd42f914617528ede4b281951321bea87065d865fd6"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/mistral_7b/evidence_pack",
+          "size_bytes": 2078606
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/mistral_7b/evidence_pack_recipe.json",
+          "sha256": "sha256:69b44cf53c640c1afd54db6dce37193f403ac8261335ef0a0c5bb81cacc0a372",
+          "size_bytes": 1910
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/mistral_7b/runtime.manifest.json",
+          "sha256": "sha256:16a197ac0a4f92fccb0e2d316c4ab4106982c10b4129d31da517c2a375b12a2f",
+          "size_bytes": 876
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:f70191d2da181f3196f31587abf64ed4173382bc418f904298da725d763b11a8",
+      "lanes": [
+        "mistral-7b-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/mistral_7b",
+      "slug": "mistral_7b",
+      "summary": "Release-strict verifier fixture for the Mistral 7B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/mixtral_8x7b/evaluation.report.json",
+          "sha256": "sha256:79655793a5f52eec22629774ce8932ac00c2047074750f2c90ca16df005af8af",
+          "size_bytes": 4041668
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:839b4f4f8dc0a3ef00d56e41d5b79cbf44bd19caead7b809bee8c5723fe90f4f",
+            "manifest.json": "sha256:0ec8f55c17f9534593a013da3134c5a732e15da091769db1ee22e61363bf1915",
+            "manifest.signature.json": "sha256:9cdc8c0f170edc61c75fd13f2772c0fe59951b460b44fdc38bf1fd0317237b42",
+            "results/final_verdict.json": "sha256:2edaf7c59d43290dfc8fccd9861497b67e64f1ce8fc338590fe976aa6632a8b1"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/mixtral_8x7b/evidence_pack",
+          "size_bytes": 4052704
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/mixtral_8x7b/evidence_pack_recipe.json",
+          "sha256": "sha256:8c4c06232cb4f2155615551b4cb83ed445b6aadd9af1ba2bb58e00d2a2349435",
+          "size_bytes": 2176
+        },
+        "evidence_run_preset": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/mixtral_8x7b/evidence_run_preset.yaml",
+          "sha256": "sha256:52255960ed6dd3b052a5257f29f8d6412fbf4c66effe96c16cd2aece93707c13",
+          "size_bytes": 1015
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/mixtral_8x7b/runtime.manifest.json",
+          "sha256": "sha256:b74fd9a063944851ab63fced12fd333ee6ccb9341287d79ebae09c1c1adc02ca",
+          "size_bytes": 984
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:a9ab799ebfffd1fc19c74c8c23cbfa4da2fc52a8f97d2e910d15793727389c1d",
+      "lanes": [
+        "mixtral-8x7b-moe-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/mixtral_8x7b",
+      "slug": "mixtral_8x7b",
+      "summary": "Release-strict verifier fixture for the Mixtral 8x7B MoE published-basis lane on pinned WikiText-103 text data."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/olmo2_13b/evaluation.report.json",
+          "sha256": "sha256:fa46234edd062cfb5820af58370167cf3a22caab4e9292cea0cf6acc82eabd35",
+          "size_bytes": 3416165
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:fc084e4c351dd7bfd3829358a3e42b57ac255aa4a37075fb674c672ecd9610a0",
+            "manifest.json": "sha256:8bac20029ce71ff944a569adddc861cfadde31765fce15f8c2c9bf35e69160a6",
+            "manifest.signature.json": "sha256:fa1aac07310e770b8b77d2ed28fe874be328162e3194fb851691ddd796c29ad9",
+            "results/final_verdict.json": "sha256:85252008c54f497fc4cb207276e555d9326f8c1b81c4fd1821350b759a99473c"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/olmo2_13b/evidence_pack",
+          "size_bytes": 3429667
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/olmo2_13b/evidence_pack_recipe.json",
+          "sha256": "sha256:8632a463dc7b01cfab8c6c18d5b7a44e79f91740bcf9a08565f8aeac097c9920",
+          "size_bytes": 1999
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/olmo2_13b/runtime.manifest.json",
+          "sha256": "sha256:8b0981b6aa26cb85673de0ccb6dff60a537728f43e73629e8d1e417abea7fe8c",
+          "size_bytes": 875
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:12b8916497e9035f11fc376ac87dae0952f5fff00fea2c727dd5d33ab2d9a1f8",
+      "lanes": [
+        "olmo-2-13b-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/olmo2_13b",
+      "slug": "olmo2_13b",
+      "summary": "Release-strict verifier fixture for the OLMo 2 13B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/olmo2_7b/evaluation.report.json",
+          "sha256": "sha256:f6e5ce83c7ba72418feb73e9f5c71cbee63703b922e3d682581825ca9d3296d4",
+          "size_bytes": 3406568
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:270194a090da69ecdf1fe3a12e75c96a3eb668d7eee1c72974cbb31989b432f6",
+            "manifest.json": "sha256:5dec8254747f890f3a697480d7ec820861f21182c221cfe03af8f7f1d000316e",
+            "manifest.signature.json": "sha256:159b31d27b34d473b046a350e0cc945cd409f1bfd717b68571d878ff4099c65b",
+            "results/final_verdict.json": "sha256:0db82c520fafa003634bd4673dea6aab0bd8f571e34ac12cc0d32abf6bc7a304"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/olmo2_7b/evidence_pack",
+          "size_bytes": 3415202
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/olmo2_7b/evidence_pack_recipe.json",
+          "sha256": "sha256:fb72acffead8348ff8fc25c61de9bf8cb4616dde796c827a2baf3f443f124e01",
+          "size_bytes": 1828
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/olmo2_7b/runtime.manifest.json",
+          "sha256": "sha256:29aca37240ff522464dbf1a8968598f0c6b7de55725bbf65ebefacb370b105ec",
+          "size_bytes": 874
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:15909f84c79594ce65ffaa222a3fa5179f658dab3ba994920346561b88d5e0ba",
+      "lanes": [
+        "olmo-2-7b-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/olmo2_7b",
+      "slug": "olmo2_7b",
+      "summary": "Release-strict verifier fixture for the OLMo 2 7B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/olmoe_1b_7b/evaluation.report.json",
+          "sha256": "sha256:65aa136996f9d5e74f789b04490b1f28fa14265f82d93d326e4ccd12df4ca593",
+          "size_bytes": 3964439
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:35148416707045918a28b1df2ed7b3a3621fcab7b5b7a5bd505d798d45ccb8ad",
+            "manifest.json": "sha256:a5eefffb481f95c086f96c608e1181b8ffb0c699dc820655b2f3892a33e96618",
+            "manifest.signature.json": "sha256:9a0b03ec9275a884f0e6c38f767995656c739bc811d0d2ba8a09717f74f630d4",
+            "results/final_verdict.json": "sha256:d1b393412cb8419bb3ddc02060970753d4b095fbe238c1434bd88953d359567e"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/olmoe_1b_7b/evidence_pack",
+          "size_bytes": 3974799
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/olmoe_1b_7b/evidence_pack_recipe.json",
+          "sha256": "sha256:35dba5f6d72268114ac2453374fbb95916b995adf9eeceeb5bcf83ac58a2e144",
+          "size_bytes": 1969
+        },
+        "evidence_run_preset": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/olmoe_1b_7b/evidence_run_preset.yaml",
+          "sha256": "sha256:00c986da90233f3358fdc25a332ca67ca2ed58ad9d720e43d7cc955780d2eddc",
+          "size_bytes": 952
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/olmoe_1b_7b/runtime.manifest.json",
+          "sha256": "sha256:065bbb8ba07e69148939a3a654b888a8d3e0bbc81fe22ed50de6076f62934064",
+          "size_bytes": 981
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:9951bf26e79ad969862e33fc9525eb5b3d82cca1b2625ae6dc81e5fb64b9bcef",
+      "lanes": [
+        "olmoe-1b-7b-0924-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/olmoe_1b_7b",
+      "slug": "olmoe_1b_7b",
+      "summary": "Release-strict verifier fixture for the OLMoE 1B-active/7B-total published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/open_llama_7b/evaluation.report.json",
+          "sha256": "sha256:208cad90280a21b9c16203393d766f89a12737a7847fc2647da78299d2c61716",
+          "size_bytes": 2258775
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:2d23c26a2688b14ef544fc355f4feb7268fdb73acf9e3a6359665e9adc6a4286",
+            "manifest.json": "sha256:9d355d188577200f381af2c64c6a1722284cf42dcf4ca29ccd70410ad5913c64",
+            "manifest.signature.json": "sha256:a9da05d3a513094eca3a00fdc9ce175adc86b67ce889c17359cf81b2a7f27e01",
+            "results/final_verdict.json": "sha256:76ee05ab3e499e42e3fcd3d1d27c79f1880a484eb6830484a5ad20e80bb6890a"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/open_llama_7b/evidence_pack",
+          "size_bytes": 2272126
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/open_llama_7b/evidence_pack_recipe.json",
+          "sha256": "sha256:91358d84abfba43ab0a00be7393d8296dd522cba99898ab38a81868747c8e291",
+          "size_bytes": 2096
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/open_llama_7b/runtime.manifest.json",
+          "sha256": "sha256:811cccecc479f1a4a7c6d84db1bc1dbba989874e8151fac400fa35c89154ca63",
+          "size_bytes": 900
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:53fc0e8528ac800ea85b5af483ec32cd5782ddca2c923f5455d6bf17ecebe70e",
+      "lanes": [
+        "open-llama-7b-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/open_llama_7b",
+      "slug": "open_llama_7b",
+      "summary": "Release-strict verifier fixture for the OpenLLaMA 7B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/phi4_mini/evaluation.report.json",
+          "sha256": "sha256:4efaee6b0d6abeef4838b9845ba923f1efeadb7abc8ae30920709553e8cc06a1",
+          "size_bytes": 5639462
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:d21b6263c1fbe83f6154c2f300b09befdc51dbcdbe545243ad5b3b7fa449f86a",
+            "manifest.json": "sha256:54c04d857bf7077f3a56cd5789e747fbb19cca195ccb9ccbf185b2225876864a",
+            "manifest.signature.json": "sha256:0fd6bb1c65fe3e2117b30335c61020fc291267efc52e02db9f4c89f6d433a70d",
+            "results/final_verdict.json": "sha256:99eb70d272c7d2d4f3d14dda0e5ae6399c9b80ec6cf1b66e9be718444f41aa1d"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/phi4_mini/evidence_pack",
+          "size_bytes": 5649801
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/phi4_mini/evidence_pack_recipe.json",
+          "sha256": "sha256:666e9d158f14f08fb48e459fd7783eb3fb08cb810a8da71ea74dd1089f3e8bf3",
+          "size_bytes": 2243
+        },
+        "evidence_run_preset": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/phi4_mini/evidence_run_preset.yaml",
+          "sha256": "sha256:06ba0de8b6137a5cffb80e515e7ec8ae474e62f89775837c4534ba1359cf296c",
+          "size_bytes": 762
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/phi4_mini/runtime.manifest.json",
+          "sha256": "sha256:ffe0e238029adb97acf7a1fc8ac9b2204eb21bd4b25ea165a17262477b0807b2",
+          "size_bytes": 900
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:101461d7c14c9d27ec6cfcc404ab7c4f37d26bf7a37c3384de3e55b50018a8d5",
+      "lanes": [
+        "phi-4-mini-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/phi4_mini",
+      "slug": "phi4_mini",
+      "summary": "Release-strict verifier fixture for the Phi-4 mini published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/phi4_reasoning_plus/evaluation.report.json",
+          "sha256": "sha256:2f6dc4a49adec73e3f21c8b9051348514e1bb23990abdc62e4b429cfdf0e5226",
+          "size_bytes": 3407877
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:249c8b418955675e9914e9872fe2c1ea2b194e4df8d1ef725109efa57f27fcec",
+            "manifest.json": "sha256:1bcf3dd1508b1da6cc4a339f257ce55883399c6a5f8f0e9c1f9e3d2aaccf2c75",
+            "manifest.signature.json": "sha256:d96508c6581d0c6d85803cefabb53ecf436558935a05aa126a3d4668d271906e",
+            "results/final_verdict.json": "sha256:9faa76dbe996069b2bdeda06451ce9c4e534a2bc704a6835e2fdcafd1f17089f"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/phi4_reasoning_plus/evidence_pack",
+          "size_bytes": 3416652
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/phi4_reasoning_plus/evidence_pack_recipe.json",
+          "sha256": "sha256:082e44137f88d01e878cd1650875414157f8863f17fc54560b7a700df16620b4",
+          "size_bytes": 1971
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/phi4_reasoning_plus/runtime.manifest.json",
+          "sha256": "sha256:dc8312acca293ec3dcc8cc5168494a8ce28220b5010fb173be57d5c0be7ddc48",
+          "size_bytes": 885
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:bdba8583eee68832d06e0154c502dc96ee3d7fdc584a66ab125000693dfe1a04",
+      "lanes": [
+        "phi-4-text-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/phi4_reasoning_plus",
+      "slug": "phi4_reasoning_plus",
+      "summary": "Release-strict verifier fixture for the Phi-4 reasoning-plus published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen2_5_14b/evaluation.report.json",
+          "sha256": "sha256:cdb99756fb708b90dbd73913907eb9df657a1a00db11b084de4778f4bcd9ebb5",
+          "size_bytes": 3412221
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:a0c3498d250528f96e8df2744a92fb0d5dd33f437b72e2e241d70077aeaf7417",
+            "manifest.json": "sha256:5e6be46f11aa68209487c384691b7f487f01450b5048ad9cf3dac44db09e4105",
+            "manifest.signature.json": "sha256:2f74ff6b3ae2c2c3cedb943010c24a92fd2f7f8e9dc7eeceb6ebd89b8077e88e",
+            "results/final_verdict.json": "sha256:a47ba38b55aa80387bdb0b09c65942a1c5bb0bc0da5f50087e8ebb3b09640fa8"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/qwen2_5_14b/evidence_pack",
+          "size_bytes": 3420948
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen2_5_14b/evidence_pack_recipe.json",
+          "sha256": "sha256:f487edb63ccbabc56f74fb6dd92075c5ca942c621ff3be49ada8e18eb86e0ede",
+          "size_bytes": 1934
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen2_5_14b/runtime.manifest.json",
+          "sha256": "sha256:324f02c69b89cd0ea1e36932e7e64c45924af95ede0084d06b7135f12e6d8493",
+          "size_bytes": 877
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:6bab9631ede03ba661d17e0f399e2dd9b1facbd739f21aa7e45af0c929806d13",
+      "lanes": [
+        "qwen2-5-14b-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/qwen2_5_14b",
+      "slug": "qwen2_5_14b",
+      "summary": "Release-strict verifier fixture for the Qwen2.5 14B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen2_5_7b/evaluation.report.json",
+          "sha256": "sha256:ab741370e297103cf63561580bc19cbfdf78c58478093c8cb57c4a8468c37030",
+          "size_bytes": 3388755
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:bc4f026649cd6bc70d24d0c8046d26e53d47e1e65cbbce4b29b451858c82fd14",
+            "manifest.json": "sha256:0b4b0744078faf0825e4de00f9de98891a1a460b09ca4ef1f0d2ded1c56b28b3",
+            "manifest.signature.json": "sha256:9560c068c9ba977e62c80929d42088a6d384016d89e5d6a18f8414d98fcaf8a2",
+            "results/final_verdict.json": "sha256:d51660f8d375852bf68fa672699f32cc75acd1ae8dcee89c2aaa28f0c745b884"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/qwen2_5_7b/evidence_pack",
+          "size_bytes": 3397426
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen2_5_7b/evidence_pack_recipe.json",
+          "sha256": "sha256:0434c008a515c6ce6e379efa0aae1cd25962d36dcafb7b9d85d346dc4a3ea5c5",
+          "size_bytes": 1888
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen2_5_7b/runtime.manifest.json",
+          "sha256": "sha256:2d48a7f7ef650d60cc4985b0b4534ecc4ca5acfacca9ec636ae2c26b3df5f669",
+          "size_bytes": 876
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:e5bec17780a381332c4213fc6664ad52e8fc5ca120e78d019ae8f5897915e78e",
+      "lanes": [
+        "qwen2-5-7b-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/qwen2_5_7b",
+      "slug": "qwen2_5_7b",
+      "summary": "Release-strict verifier fixture for the Qwen2.5 7B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen2_7b/evaluation.report.json",
+          "sha256": "sha256:d703f68ecad3aca7f5919f9687ae08f4fde0349a651afb14095c457f1562e071",
+          "size_bytes": 3388470
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:142014d8a864bd56d6722eb39598a27ab5d7bc4c5a0eb70fe92aeeab5887344d",
+            "manifest.json": "sha256:516f72f8f257e4418d5b893882fb93ef9a3740d0ad6505ee5c3cfb19a1def91d",
+            "manifest.signature.json": "sha256:9c85603e736b3c0c948772ef6214761fb6fc9cb2eda0e3834a6ba68601986b7b",
+            "results/final_verdict.json": "sha256:270be76e56a190071b209364acbef02e261677b31781c3434106d3a178adc14d"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/qwen2_7b/evidence_pack",
+          "size_bytes": 3397115
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen2_7b/evidence_pack_recipe.json",
+          "sha256": "sha256:d98217aa4a02ad587f39bb2b23deba6a8f5df437983cf88f619bb057c6c0be34",
+          "size_bytes": 1884
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen2_7b/runtime.manifest.json",
+          "sha256": "sha256:58e8973e0557b23cfaf2c4e0f0218b801780b42ef807c7c8129fc34a293d190c",
+          "size_bytes": 874
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:b9641984651aa5f9342e71869404439723069224d3d2fc50e5b4e94401d3353e",
+      "lanes": [
+        "qwen2-7b-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/qwen2_7b",
+      "slug": "qwen2_7b",
+      "summary": "Release-strict verifier fixture for the Qwen2 7B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_30b_a3b/evaluation.report.json",
+          "sha256": "sha256:ea102c3fbe3438209280e1a546bad6ee7d4d969160ee277ff1bfb997d8d3df03",
+          "size_bytes": 5606679
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:851753400632402e7cb971702584aa58b2c0dcddb0d3218d5cc60d09844c1a8c",
+            "manifest.json": "sha256:373c8759cbbfa80c358098f8e6584bff8657e0ad7abfbf42c31be4b1e99c3525",
+            "manifest.signature.json": "sha256:4a01e4bbedcdbf64f306b132070340b39c85e9b8eca38be240d5ad8ab944aca0",
+            "results/final_verdict.json": "sha256:92c1d05791c21143d4da895f0b7a77e676c45843222611d02695dc96e6cd52d9"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack",
+          "size_bytes": 5618487
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack_recipe.json",
+          "sha256": "sha256:26644817eeada2a7831d65f7009b3f6c06f0fd359e04f64b100bb881a7db47b9",
+          "size_bytes": 2273
+        },
+        "evidence_run_preset": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_30b_a3b/evidence_run_preset.yaml",
+          "sha256": "sha256:2e6d9b69e1338a28031d096cb744173b6f7d007f2e0aff1f33f074fa7a2ae429",
+          "size_bytes": 1517
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_30b_a3b/runtime.manifest.json",
+          "sha256": "sha256:19274ba2ba2f5fdfffa3d689aade1c603d912777932302f8a2f65acbdb51dfaf",
+          "size_bytes": 941
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:2a26840aa713ff2a15db6573f21580a4b524239bddfa284b1973f4456d1fa995",
+      "lanes": [
+        "qwen3-30b-a3b-moe-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/qwen3_30b_a3b",
+      "slug": "qwen3_30b_a3b",
+      "summary": "Release-strict verifier fixture for the Qwen3 30B-A3B MoE published-basis lane on public WikiText-103."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_5_2b/evaluation.report.json",
+          "sha256": "sha256:be75968ca4674aa69d554d123a799e6c7f9afccef1d52bc48badad96f4a89ba7",
+          "size_bytes": 910510
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:c7937527ccdff4ce220b9c23c0744b0aeae8ac4098784d1a37ee248bef8ff86b",
+            "manifest.json": "sha256:a84066922278433e034d00f11f39c23dc5e0138c849f0cc7cfa21e387d77662e",
+            "manifest.signature.json": "sha256:7cf44029d72b7160b038812b6b6657c91cf7b5f65105f8c4d41ff79893214825",
+            "results/final_verdict.json": "sha256:4e9ec6acf859145435918480ea3e536b557aa74143c4aa2a2ae04859463c510e"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/qwen3_5_2b/evidence_pack",
+          "size_bytes": 1074498
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_5_2b/evidence_pack_recipe.json",
+          "sha256": "sha256:25a39f1b848019267e0d3023455645523dbd1954e0982c6f3200c7ba2a88dce3",
+          "size_bytes": 1904
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_5_2b/runtime.manifest.json",
+          "sha256": "sha256:b24d3b5eb4945b2024426ef46b7539cbe866370bc9607e2549104e56d4005b7a",
+          "size_bytes": 1119
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:003678d3e32f92f8ea05fce4683bf3099b7577098b43d7dc6bf2981f8cb039c5",
+      "lanes": [
+        "qwen3-5-2b-image-text-hf"
+      ],
+      "path": "public_evidence/published_basis/qwen3_5_2b",
+      "slug": "qwen3_5_2b",
+      "summary": "Release-strict verifier fixture for the Qwen3.5 2B image-text published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_5_4b/evaluation.report.json",
+          "sha256": "sha256:c1da4ef9d00e39893901920079b693017e66d0f39f2ba7de3823b74ac18b087b",
+          "size_bytes": 1043830
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:e41a911d7b243ddeb4ca2955d8ac717410c055b4b85f7423844543cb2895f499",
+            "manifest.json": "sha256:a29a3b8932c80c840f119eeb54997fab65a0e6c889a5a8dd6adcd1e7ba83f19b",
+            "manifest.signature.json": "sha256:c90f41f1deeaa977e1378b2c7d9308ada6e08ae9488bd7fb4cbd27700f7c3b2f",
+            "results/final_verdict.json": "sha256:32bf690981f94d0150c4d79f71f525aa724dcb1f14e46dcbc9b203e154cdbab0"
+          },
+          "file_count": 13,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/qwen3_5_4b/evidence_pack",
+          "size_bytes": 1377134
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_5_4b/evidence_pack_recipe.json",
+          "sha256": "sha256:7826bea96a379a7e93442bb127fbbbcf7dc80fea66a43c9e46c9f8370ce10983",
+          "size_bytes": 1990
+        },
+        "evidence_run_preset": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_5_4b/evidence_run_preset.yaml",
+          "sha256": "sha256:4921396b9b4351dbbcc0a537d8d1f185708a58288a30d3cb4156269d9e52a8b9",
+          "size_bytes": 1397
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_5_4b/runtime.manifest.json",
+          "sha256": "sha256:ef61f1cd2e40e320917d6f6055e6bee1f96db4b66ef18ce5d74f1a73947b1812",
+          "size_bytes": 1119
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:5948c48d3b7c0f87b447bd303bb9864dd6589ff519c0230ee351a3cca70bd9a4",
+      "lanes": [
+        "qwen3-5-4b-image-text-hf"
+      ],
+      "path": "public_evidence/published_basis/qwen3_5_4b",
+      "slug": "qwen3_5_4b",
+      "summary": "Release-strict verifier fixture for the Qwen3.5 4B image-text published-basis lane. Final accuracy 0.855 over 400 examples; ratio_vs_baseline 1.036; no guard warnings."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_5_9b/evaluation.report.json",
+          "sha256": "sha256:1138495e3297abe5dda9ddec46c8fde699fdd7ed4905a7ace35f70a109195ded",
+          "size_bytes": 3396221
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:59452cd28762acc740db46b3f6b2918930dbce6165cbc51769f83d97bdf6803c",
+            "manifest.json": "sha256:dae4512c69cf754cc7b82d5bfdab283073a4ac5a685bc9c69d1815e8ef93fc10",
+            "manifest.signature.json": "sha256:de5f5b19adc5af4ba927d2e0aa4c8124c032af0278bdae4780568aeb278123bc",
+            "results/final_verdict.json": "sha256:74255249fb11de7b71afb70b339f4e7c2a504829ba4cbe8d739ba17d71fe2ff6"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/qwen3_5_9b/evidence_pack",
+          "size_bytes": 3407618
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_5_9b/evidence_pack_recipe.json",
+          "sha256": "sha256:0c0c641ceb755cfbf2091ac99c1ac2f3dc791b9e78ce02a7dc5a11eefc8dc09e",
+          "size_bytes": 2008
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_5_9b/runtime.manifest.json",
+          "sha256": "sha256:f751e8a06d44754fa5189d6274d5b3a41c9a744b6a1c03860b8d62dba70d52a2",
+          "size_bytes": 876
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:3fd5c6acf0d1342052ed6eabb1547056fe0d572ee61ddef0d1319f2f7ac0d2d5",
+      "lanes": [
+        "qwen3-5-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/qwen3_5_9b",
+      "slug": "qwen3_5_9b",
+      "summary": "Release-strict verifier fixture for the Qwen3.5 9B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_8b/evaluation.report.json",
+          "sha256": "sha256:a9e87c55b961b792bcde2178de681a55ca15b31793cc280bae670290058bf386",
+          "size_bytes": 3396543
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:093f6d0156dae85e1562ef7c9eeae050e48344ba4e7e5a12fbad49903b74f486",
+            "manifest.json": "sha256:9de1dec095d444d253b2df487a64874641e2e858cf547753d13543d6a359b56a",
+            "manifest.signature.json": "sha256:d6a9ebdeb194d3d22b518950fc6d3e0ab5bbca316394e3764d43e3be9ffb1d5f",
+            "results/final_verdict.json": "sha256:ca92c346fb90fd52eceb8e235a12858b5c045ac1c3c8e598ac73430b6998e8b3"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/qwen3_8b/evidence_pack",
+          "size_bytes": 3405213
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_8b/evidence_pack_recipe.json",
+          "sha256": "sha256:7444839cf893e3cfb45572631a8707f630c5818e2e107931ffe7fd2e84bba05e",
+          "size_bytes": 1892
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_8b/runtime.manifest.json",
+          "sha256": "sha256:27d2167719de490b5877cc07d393dd6c633ac207a02ba4749adf3db56de803a6",
+          "size_bytes": 874
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:38ed77f9da0aa782f71dc4859540895d95db06e55c5d4c1d31f577b176ae99c6",
+      "lanes": [
+        "qwen3-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/qwen3_8b",
+      "slug": "qwen3_8b",
+      "summary": "Release-strict verifier fixture for the Qwen3 8B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/smollm3_3b/evaluation.report.json",
+          "sha256": "sha256:1a3cd4638d51b9484d8670463a1b436416acc997c9b3daa687c2c42b233dd957",
+          "size_bytes": 5628255
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:2cfb16d708d099142f65032d1a17bbe0391863b609dc11ea1d5747b3340caa2c",
+            "manifest.json": "sha256:f2c1f0b69de04ba730f949f42109676a8da126bd1db1ed29566113b5af7a5d4a",
+            "manifest.signature.json": "sha256:617136fbba8407b210bf96d50ec35e86d7166473c3360cd91e9551ff3f0d610a",
+            "results/final_verdict.json": "sha256:98cb81552bcd6f570085bcc1f71f1371408b9bfc6f7ce6216680d7d46e02362e"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/smollm3_3b/evidence_pack",
+          "size_bytes": 5638745
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/smollm3_3b/evidence_pack_recipe.json",
+          "sha256": "sha256:d13f71cdf1593c1a229d9c984d1fb2425c4451a3b0d4dc5f81df1a30f5b5f5fa",
+          "size_bytes": 2247
+        },
+        "evidence_run_preset": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/smollm3_3b/evidence_run_preset.yaml",
+          "sha256": "sha256:4f1116c8df3951560a4fd24625e873ae6f8b9cba9f61f2d6553517202eec2cd3",
+          "size_bytes": 801
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/smollm3_3b/runtime.manifest.json",
+          "sha256": "sha256:b24f9462ead95a546892660bb77855a3cbcfa2d2c59b679149d5d7ae4d4b1223",
+          "size_bytes": 895
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:eb0e6c13b3e25858cc253a3870ca7702dc61d23c4216bdf1f70d61ab30567fb5",
+      "lanes": [
+        "smollm3-3b-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/smollm3_3b",
+      "slug": "smollm3_3b",
+      "summary": "Release-strict verifier fixture for the SmolLM3 3B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/tinyllama_1_1b/evaluation.report.json",
+          "sha256": "sha256:d66bb7e2e247d5f5fd09290412076804198f0617252885377ad1d2a20e51c10a",
+          "size_bytes": 2059539
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:4b8782d07000a8d56dd44cce38ade5d16a9af282fa656ccb5469735e63c28386",
+            "manifest.json": "sha256:5658c0c195c2a6bfce05ae24a8950abebfc80f5c8038a3664df4096ef8196ac6",
+            "manifest.signature.json": "sha256:ccbc7bf940d7a18a7582b97a53f7622f4e62ae711f851ae741a91917c0059fd6",
+            "results/final_verdict.json": "sha256:1d0f582023ce72f086f60f14e48cc550591b6e14449b72e3f5e9c5335a2c57c4"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/tinyllama_1_1b/evidence_pack",
+          "size_bytes": 2073067
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/tinyllama_1_1b/evidence_pack_recipe.json",
+          "sha256": "sha256:8054834f3ddeaf6e450a57a03a3558b36324275181f4fb7ff5a03e82004443b1",
+          "size_bytes": 2063
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/tinyllama_1_1b/runtime.manifest.json",
+          "sha256": "sha256:82a8ebdd20458f366395fa59712fe462be630d54790c29ff160a2c57251eb35f",
+          "size_bytes": 880
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:8237da1f87af9d8550540c7cdde415164e6600b741202e1d78fd43e75e3e0b2d",
+      "lanes": [
+        "tinyllama-1-1b-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/tinyllama_1_1b",
+      "slug": "tinyllama_1_1b",
+      "summary": "Release-strict verifier fixture for the TinyLlama 1.1B published-basis lane."
+    }
+  ],
+  "format_version": "public-evidence-index-v1",
+  "published_basis_count": 35,
+  "published_basis_file_count": 507,
+  "published_basis_size_bytes": 220442566,
+  "source_root": "public_evidence"
+}

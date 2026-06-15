@@ -1,9 +1,0 @@
-{
-  "assurance": "strict",
-  "basis": "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evaluation.report.json",
-  "evidence_run": "20260612Tdeepseek8bTokenizerAliasReleaseA",
-  "model_id": "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B",
-  "note": "Container-backed release-profile DeepSeek-R1-0528-Qwen3-8B published-basis no-op preservation evidence run.",
-  "profile": "release",
-  "verdict": "PASS"
-}

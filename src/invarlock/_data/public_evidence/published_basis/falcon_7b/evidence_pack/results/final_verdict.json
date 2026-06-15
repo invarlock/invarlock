@@ -1,9 +1,0 @@
-{
-  "assurance": "strict",
-  "basis": "public_evidence/published_basis/falcon_7b/evaluation.report.json",
-  "evidence_run": "20260613TpromotionGapReleasePromoteA",
-  "model_id": "tiiuae/falcon-7b",
-  "note": "Container-backed release-profile Falcon 7B published-basis no-op preservation evidence run.",
-  "profile": "release",
-  "verdict": "PASS"
-}

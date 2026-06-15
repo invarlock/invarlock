@@ -152,14 +152,19 @@ Repo tags and installed wheels are the only maintained public contract
 carriers.
 
 The support-matrix published-basis evidence paths remain logical
-`public_evidence/published_basis/...` references. Installed wheels resolve those
-logical paths from packaged files under
-`invarlock/_data/public_evidence/published_basis/...`, so installed packages can
-render and verify the shipped published-basis `evaluation.report.json` examples
-with their sibling `runtime.manifest.json` files, and load the paired
-`evidence_pack_recipe.json` data without cloning the repo. The GPT-2
-published-basis lane also packages a signed `evidence_pack/` directory for
-strict offline evidence-pack verification.
+`public_evidence/published_basis/...` references. Source repository tags carry
+the full public evidence artifacts at those paths: reports, runtime manifests,
+evidence-pack recipes, signed packs where present, and guard-value demo
+packages.
+
+Installed wheels intentionally do not duplicate the full published-basis
+artifact tree. Instead, they ship the compact generated index at
+`invarlock/_data/public_evidence/published_basis_index.json`. That index records
+the published-basis entries, logical source paths, lane IDs, file hashes, sizes,
+directory control-file hashes, and the carrier policy. Wheel users can inspect
+which public evidence exists and where it lives in the source tag; verifying or
+rendering the full public evidence artifacts requires the repository source
+tree or an explicit artifact copy.
 
 ## Policy packs
 

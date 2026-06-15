@@ -69,6 +69,10 @@ def test_public_subcontract_versions_are_single_sourced() -> None:
         == contracts.ADAPTER_SUPPORT_TIER_POLICY_VERSION
     )
     assert (
+        subcontract_catalog["public_evidence_index"]["version"]
+        == contracts.PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION
+    )
+    assert (
         subcontract_catalog["cli_stability_policy"]["stable_json_surfaces"]
         == contracts.stable_cli_json_surfaces()
     )
@@ -406,6 +410,51 @@ def test_readme_surfaces_public_contract_catalog_entries() -> None:
     assert "`model_classification`, `validation_keys`, `console_labels`, and" in readme
 
 
+def test_packaged_public_evidence_index_covers_published_basis_lanes() -> None:
+    index = contracts.load_public_evidence_index()
+    assert index["format_version"] == contracts.PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION
+    assert index["carrier_policy"]["installed_wheel"] == "compact_index_only"
+    assert index["published_basis_count"] == len(index["entries"])
+
+    indexed_lanes = {
+        lane_id for entry in index["entries"] for lane_id in entry.get("lanes", [])
+    }
+    expected_lanes = {lane["lane_id"] for lane in contracts.published_basis_lanes()}
+    assert expected_lanes <= indexed_lanes
+
+    for entry in index["entries"]:
+        assert entry["path"].startswith("public_evidence/published_basis/")
+        assert entry["artifacts"]["evaluation_report"]["sha256"].startswith("sha256:")
+        assert entry["artifacts"]["runtime_manifest"]["sha256"].startswith("sha256:")
+
+
+def test_packaged_public_evidence_index_rejects_non_object(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    index_root = tmp_path / "public_evidence"
+    index_root.mkdir()
+    (index_root / "published_basis_index.json").write_text("[]\n", encoding="utf-8")
+    monkeypatch.setattr(contracts, "PACKAGE_PUBLIC_EVIDENCE_ROOT", index_root)
+
+    with pytest.raises(contracts.ContractLoadError, match="expected JSON object"):
+        contracts.load_public_evidence_index()
+
+
+def test_packaged_public_evidence_index_rejects_wrong_format_version(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    index_root = tmp_path / "public_evidence"
+    index_root.mkdir()
+    (index_root / "published_basis_index.json").write_text(
+        json.dumps({"format_version": "older-index"}) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(contracts, "PACKAGE_PUBLIC_EVIDENCE_ROOT", index_root)
+
+    with pytest.raises(contracts.ContractLoadError, match="format_version must be"):
+        contracts.load_public_evidence_index()
+
+
 def test_contract_reference_records_scalar_payload_kind(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -635,6 +684,11 @@ def test_public_contract_helpers_raise_when_contracts_are_unavailable(
 ) -> None:
     monkeypatch.setattr(
         contracts,
+        "PACKAGE_PUBLIC_EVIDENCE_ROOT",
+        Path("/missing-public-evidence-index"),
+    )
+    monkeypatch.setattr(
+        contracts,
         "load_json_contract",
         lambda _filename: (_ for _ in ()).throw(OSError("missing")),
     )
@@ -659,6 +713,8 @@ def test_public_contract_helpers_raise_when_contracts_are_unavailable(
         contracts.load_runtime_manifest_schema()
     with pytest.raises(contracts.ContractLoadError, match="verify_output.schema.json"):
         contracts.load_verify_output_schema()
+    with pytest.raises(contracts.ContractLoadError, match="published_basis_index.json"):
+        contracts.load_public_evidence_index()
     assert contracts.contract_reference("support_matrix.json") == {
         "path": "contracts/support_matrix.json",
         "load_error": "missing",
