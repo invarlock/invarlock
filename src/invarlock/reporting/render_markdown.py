@@ -31,6 +31,7 @@ from .render_markdown_tables import (
 from .render_markdown_tables import (
     append_system_overhead_section as _append_system_overhead_section,
 )
+from .report_outline import build_evaluation_report_outline
 from .report_summary import build_quality_gates_summary, build_safety_dashboard_summary
 from .report_summary import (
     compute_report_hash as _compute_report_hash,
@@ -617,6 +618,44 @@ def _append_executive_summary_section(
         lines.append("")
 
 
+def _markdown_table_cell(value: Any) -> str:
+    text = str(value)
+    return text.replace("|", "\\|").replace("\n", " ").strip()
+
+
+def _append_outline_fact_summary_section(
+    lines: list[str], evaluation_report: dict[str, Any]
+) -> None:
+    outline = build_evaluation_report_outline(evaluation_report)
+    summary_sections = [
+        section
+        for section in outline.sections
+        if section.priority in {"summary", "review"}
+    ]
+    if not summary_sections:
+        return
+
+    lines.append("## Report Outline")
+    lines.append("")
+    lines.append(
+        "Renderer-neutral summary facts shared by HTML, Markdown, and report explain surfaces."
+    )
+    lines.append("")
+    lines.append("| Section | Fact | Value | Status | Source |")
+    lines.append("|---------|------|-------|--------|--------|")
+    for section in summary_sections:
+        for fact in section.facts:
+            lines.append(
+                "| "
+                f"{_markdown_table_cell(section.title)} | "
+                f"{_markdown_table_cell(fact.label)} | "
+                f"{_markdown_table_cell(fact.value)} | "
+                f"{_markdown_table_cell(fact.status)} | "
+                f"`{_markdown_table_cell(fact.source or '-')}` |"
+            )
+    lines.append("")
+
+
 def _append_quality_gates_section(
     lines: list[str], evaluation_report: dict[str, Any]
 ) -> None:
@@ -682,6 +721,8 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
     _append_plugin_provenance_section(lines, evaluation_report)
 
     _append_executive_summary_section(lines, evaluation_report)
+
+    _append_outline_fact_summary_section(lines, evaluation_report)
 
     _append_quality_gates_section(lines, evaluation_report)
 
