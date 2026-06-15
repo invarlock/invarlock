@@ -36,7 +36,7 @@ def test_report_help_lists_report_subcommands() -> None:
     assert result.exit_code == 0
     out = strip_ansi(result.stdout)
 
-    for name in ("generate", "explain", "html", "validate"):
+    for name in ("generate", "explain", "html", "export", "validate"):
         assert re.search(rf"^\s*│\s+{re.escape(name)}\s", out, re.MULTILINE)
 
 

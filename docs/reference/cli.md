@@ -55,6 +55,7 @@ invarlock verify --assurance strict reports/eval/evaluation.report.json
 # Render shareable HTML
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 invarlock report explain --evaluation-report reports/eval/evaluation.report.json
+invarlock report export -i reports/eval/evaluation.report.json --format mlflow-tags
 ```
 
 ## Security Defaults
@@ -82,6 +83,7 @@ invarlock report explain --evaluation-report reports/eval/evaluation.report.json
 | Validate an evaluation report | `invarlock verify` | Exit code plus human or JSON verification output |
 | Render HTML from an evaluation report | `invarlock report html` | HTML file |
 | Explain gate decisions from an evaluation bundle or explicit run reports | `invarlock report explain` | Human-readable explanation |
+| Export evidence to CI and registry handoff formats | `invarlock report export` | MLflow tag JSON, model-card Markdown, or release-review Markdown |
 | Inspect environment health | `invarlock doctor` | Human or JSON diagnostics |
 | Evidence-pack, policy, plugin, or calibration workflows | `invarlock advanced ...` | Advanced artifacts and diagnostics |
 
@@ -93,6 +95,7 @@ invarlock report explain --evaluation-report reports/eval/evaluation.report.json
 | `invarlock verify` | No | No | Reads existing evaluation report JSON |
 | `invarlock report html` | No | Yes (`--output`) | Renders HTML from an existing report |
 | `invarlock report explain` | No | No | Explains `evaluation.report.json` directly; also accepts explicit `--subject-report` and `--baseline-report` when you need to rebuild from raw run artifacts |
+| `invarlock report export` | No | Optional (`--output`) | Exports MLflow tags, model-card Markdown, or release-review Markdown from an existing evaluation report |
 | `invarlock doctor` | No | No | Diagnostics only |
 | `invarlock advanced evidence-pack` | Depends on subcommand | Depends on subcommand | Advanced evidence packaging |
 | `invarlock advanced policy` | Depends on subcommand | No | Advanced policy-pack tooling |
@@ -118,7 +121,7 @@ Exit codes: `0=success`, `1=generic failure`, `2=usage/schema/config failure`,
 
 | Stability class | Commands | Contract |
 | --- | --- | --- |
-| Stable core workflow | `invarlock evaluate`, `invarlock verify`, `invarlock report html`, `invarlock report explain`, `invarlock report validate`, `invarlock doctor`, `invarlock version` | Documented command names, documented options, exit-code meaning, and artifact paths are stable within the current CLI policy. |
+| Stable core workflow | `invarlock evaluate`, `invarlock verify`, `invarlock report html`, `invarlock report explain`, `invarlock report export`, `invarlock report validate`, `invarlock doctor`, `invarlock version` | Documented command names, documented options, exit-code meaning, and artifact paths are stable within the current CLI policy. |
 | Stable JSON automation | `invarlock doctor --json`, `invarlock verify --json`, `invarlock advanced runtime-verify --json`, `invarlock advanced plugins list --json`, `invarlock advanced plugins adapters --json`, `invarlock advanced evidence-pack verify --json`, `invarlock advanced policy verify --json` | Required envelope fields and `format_version` values are stable; optional fields are additive. |
 | Stable advanced verifiers | `invarlock advanced runtime-verify`, `invarlock advanced evidence-pack inspect`, `invarlock advanced evidence-pack verify`, `invarlock advanced policy build`, `invarlock advanced policy verify`, `invarlock advanced plugins list`, `invarlock advanced plugins adapters` | Public operational commands outside the core user loop. Their documented behavior is maintained, while additional subcommands may evolve faster. |
 | Experimental or maintainer-only | `invarlock advanced calibrate`, repo scripts under `scripts/`, package-internal config runners, undocumented flags, and local harness entrypoints | Useful for development, calibration, and release work; not covered by the public CLI stability contract until promoted here. |
@@ -218,6 +221,12 @@ Core subcommands:
   - Explain gates and primary-metric behavior from the preferred evaluation
     bundle input, or from explicit subject/baseline run reports when needed
   - Options: `--evaluation-report`, `--subject-report`, `--baseline-report`
+- `invarlock report export`
+  - Export an existing evaluation report for CI and registry handoff surfaces
+  - Formats: `mlflow-tags`, `model-card-md`, `release-review-md`
+  - Options: `-i/--evaluation-report`, `--format`, `-o/--output`,
+    `--policy-profile`, `--report-url`, `--evidence-url`, `--verify-result`,
+    `--force`
 - `invarlock report validate`
   - Validate a report JSON against the v1 schema
 - Directory inputs are command-specific:

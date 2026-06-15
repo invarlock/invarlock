@@ -23,6 +23,15 @@ self-hosted-runner:
 - **`pre-commit.yml`** - Pre-commit hook validation
 - **`repo-hygiene.yml`** - PR hygiene checks (no generated artifacts, no large files, no duplicate tests)
 
+### Local Composite Actions
+
+- **`actions/invarlock-report-gate`** - Verifies an existing
+  `evaluation.report.json`, renders HTML, writes `invarlock-verify.json`,
+  exports MLflow tags, exports a release-review Markdown packet, appends a PR
+  summary, and uploads those files as an Actions artifact. The action exposes
+  `profile`, `assurance`, `runtime-provenance`, and `warning-policy` inputs so
+  workflows can keep verification policy explicit.
+
 ### Security Workflows
 
 - **`codeql.yml`** - CodeQL static analysis (SAST) for security vulnerabilities

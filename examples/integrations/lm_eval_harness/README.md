@@ -14,6 +14,11 @@ Eval sidecar provides broader task-score context beside those artifacts.
 The example keeps LM Evaluation Harness in the example environment rather than
 the core InvarLock install.
 
+The same sidecar pattern applies to LightEval or in-house evaluation runners:
+write their task metrics beside the InvarLock report as context, keep their
+dependencies outside the core install, and do not treat those sidecar scores as
+verifier inputs unless a future report schema explicitly defines that contract.
+
 ## Prerequisites
 
 Install InvarLock with the Hugging Face stack and add LM Evaluation Harness to

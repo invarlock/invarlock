@@ -28,6 +28,11 @@ Evidence-pack verification is separate from report verification. A signed
 evidence pack validates manifest integrity; signer authenticity requires pinning
 with `--expected-fingerprint` or a local trust store.
 
+Reviewer-facing exports such as `invarlock report export --format release-review-md`
+are presentation wrappers around the report and verifier result. They do not
+create a new assurance mode; acceptance still depends on `invarlock verify` and
+the runtime/evidence-pack checks described here.
+
 ## What A Strict Pass Means
 
 A strict pass means one configured edited checkpoint comparison did not

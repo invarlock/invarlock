@@ -1,0 +1,109 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from invarlock.reporting.oss_exports import (
+    build_report_export_context,
+    render_mlflow_tags_export,
+    render_model_card_evidence_block,
+)
+
+
+def _passing_report() -> dict[str, object]:
+    return {
+        "schema_version": "v1",
+        "run_id": "run-123",
+        "meta": {"model_id": "subject-model"},
+        "baseline_ref": {"model_id": "baseline-model"},
+        "edit": {"name": "quant_rtn"},
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "final": 2.91,
+            "ratio_vs_baseline": 1.0246,
+        },
+        "validation": {
+            "invariants_pass": True,
+            "preview_final_drift_acceptable": True,
+            "primary_metric_acceptable": True,
+            "rmt_stable": True,
+            "spectral_stable": True,
+        },
+    }
+
+
+def _write_report(tmp_path: Path, report: dict[str, object]) -> Path:
+    path = tmp_path / "evaluation.report.json"
+    path.write_text(json.dumps(report, sort_keys=True), encoding="utf-8")
+    return path
+
+
+def test_verify_result_overrides_report_local_status(tmp_path: Path) -> None:
+    report = _passing_report()
+    report_path = _write_report(tmp_path, report)
+    verify_result = {
+        "format_version": "verify-v1",
+        "summary": {"ok": False, "reason": "policy_fail"},
+        "results": [
+            {
+                "id": str(report_path),
+                "ok": False,
+                "reason": "policy_fail",
+                "verification": {
+                    "runtime_provenance": {
+                        "status": "failed",
+                        "verified": False,
+                    }
+                },
+            }
+        ],
+    }
+
+    context = build_report_export_context(
+        report_path,
+        report,
+        policy_profile="ci",
+        verify_result=verify_result,
+    )
+    tags = render_mlflow_tags_export(context)["tags"]
+
+    assert context.status == "fail"
+    assert context.verifier_status == "fail"
+    assert context.runtime_provenance_status == "failed"
+    assert tags["invarlock.status"] == "fail"
+    assert tags["invarlock.verifier_reason"] == "policy_fail"
+    assert tags["invarlock.runtime_provenance_status"] == "failed"
+
+
+def test_mlflow_export_includes_registry_search_tags(tmp_path: Path) -> None:
+    report = _passing_report()
+    report_path = _write_report(tmp_path, report)
+
+    context = build_report_export_context(
+        report_path,
+        report,
+        policy_profile="release",
+        report_url="https://example.test/evaluation.report.json",
+        evidence_url="https://example.test/evidence.zip",
+    )
+    tags = render_mlflow_tags_export(context)["tags"]
+
+    assert tags["invarlock.edit_name"] == "quant_rtn"
+    assert tags["invarlock.primary_metric_kind"] == "ppl_causal"
+    assert tags["invarlock.primary_metric_final"] == "2.91"
+    assert tags["invarlock.primary_metric_ratio_vs_baseline"] == "1.0246"
+    assert tags["invarlock.report_url"] == "https://example.test/evaluation.report.json"
+    assert tags["invarlock.evidence_url"] == "https://example.test/evidence.zip"
+
+
+def test_model_card_markdown_escapes_table_cells(tmp_path: Path) -> None:
+    report = _passing_report()
+    report["meta"] = {"model_id": "subject|model\nline"}
+    report["baseline_ref"] = {"model_id": "baseline|model"}
+    report_path = _write_report(tmp_path, report)
+
+    context = build_report_export_context(report_path, report)
+    markdown = render_model_card_evidence_block(context)
+
+    assert "subject\\|model<br>line" in markdown
+    assert "baseline\\|model" in markdown

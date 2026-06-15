@@ -21,6 +21,7 @@ invarlock evaluate --allow-network \
 # Render HTML from the emitted evaluation bundle
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 invarlock report explain --evaluation-report reports/eval/evaluation.report.json
+invarlock report export -i reports/eval/evaluation.report.json --format release-review-md
 ```
 
 Model-loading commands use the runtime container by default unless a
@@ -46,6 +47,7 @@ quick-start path above stays wheel-compatible by using direct flags only.
 | --- | --- | --- |
 | `invarlock evaluate` | `runs/`, `reports/<name>/evaluation.report.json`, `runtime.manifest.json` | Evaluation report bundle plus runtime provenance for container-backed runs. |
 | `invarlock report html` | `reports/<name>/evaluation.html` | Optional (can be rebuilt). |
+| `invarlock report export` | Optional output path for `mlflow-tags.json`, `model-card-invarlock.md`, or `release-review.md` | Optional reviewer/registry convenience output (can be rebuilt). |
 
 ## Reference
 
@@ -67,6 +69,10 @@ reports/
     evaluation.report.json
     runtime.manifest.json
     evaluation.html
+    mlflow-tags.json
+    model-card-invarlock.md
+    release-review.md
+    invarlock-verify.json
 ```
 
 ### Archive checklist
@@ -82,6 +88,10 @@ reports/
 | `runtime.manifest.json` | Runtime provenance for container-backed outputs | Yes |
 | `events.jsonl` | Debugging timeline | No |
 | `evaluation.html` | Human review | No |
+| `mlflow-tags.json` | Registry tag handoff | No |
+| `model-card-invarlock.md` | Model-card evidence block | No |
+| `release-review.md` | Reviewer packet | No |
+| `invarlock-verify.json` | Stored CI verify output | No |
 
 ### Seeds, hashes, and policy digests
 

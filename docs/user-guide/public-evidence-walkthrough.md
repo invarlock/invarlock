@@ -127,6 +127,45 @@ That artifact is the concrete real-run evidence for BYOE/custom subjects: the
 checkpoint weights are not vendored, `checkpoint_refs.json` records the external
 edit type and file hashes, and the report records `edit_name = custom`.
 
+## Export evidence for reviewers
+
+Existing public reports can be converted into CI and registry handoff artifacts
+without adding generated files to `public_evidence/`:
+
+```bash
+mkdir -p reports/public-evidence-export
+
+invarlock verify --json \
+  public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json \
+  --profile release \
+  --assurance strict \
+  > reports/public-evidence-export/invarlock-verify.json
+
+invarlock report export \
+  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json \
+  --format mlflow-tags \
+  --policy-profile release \
+  --verify-result reports/public-evidence-export/invarlock-verify.json \
+  --output reports/public-evidence-export/mlflow-tags.json
+
+invarlock report export \
+  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json \
+  --format model-card-md \
+  --verify-result reports/public-evidence-export/invarlock-verify.json \
+  --output reports/public-evidence-export/model-card-invarlock.md
+
+invarlock report export \
+  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json \
+  --format release-review-md \
+  --policy-profile release \
+  --verify-result reports/public-evidence-export/invarlock-verify.json \
+  --output reports/public-evidence-export/release-review.md
+```
+
+These generated files are reviewer conveniences. The canonical evidence remains
+the checked-in `evaluation.report.json`, `runtime.manifest.json`, and evidence
+pack.
+
 ## BYOE edit examples
 
 The repository also ships small strict-verifiable BYOE examples for multiple

@@ -1,0 +1,130 @@
+name: InvarLock report gate
+description: Verify an InvarLock evaluation report and publish reviewer artifacts.
+
+inputs:
+  report:
+    description: Path to evaluation.report.json.
+    required: true
+  profile:
+    description: Verification and policy profile label.
+    required: false
+    default: ci
+  python:
+    description: Python executable used to run InvarLock.
+    required: false
+    default: python
+  html-output:
+    description: Path for rendered report HTML.
+    required: false
+    default: reports/eval/evaluation.html
+  verify-output:
+    description: Path for machine-readable verify JSON.
+    required: false
+    default: reports/eval/invarlock-verify.json
+  review-output:
+    description: Path for generated release-review Markdown.
+    required: false
+    default: reports/eval/release-review.md
+  mlflow-tags-output:
+    description: Path for generated MLflow tag export JSON.
+    required: false
+    default: reports/eval/mlflow-tags.json
+  artifact-name:
+    description: Uploaded artifact name.
+    required: false
+    default: invarlock-evidence
+  fail-on-verify:
+    description: Fail the job when invarlock verify exits non-zero.
+    required: false
+    default: "true"
+  assurance:
+    description: Assurance verification mode passed to invarlock verify.
+    required: false
+    default: report
+  runtime-provenance:
+    description: Runtime provenance mode passed to invarlock verify.
+    required: false
+    default: container
+  warning-policy:
+    description: Warning policy passed to invarlock verify.
+    required: false
+    default: pass
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare InvarLock artifact directories
+      shell: bash
+      run: |
+        mkdir -p "$(dirname "${{ inputs.html-output }}")"
+        mkdir -p "$(dirname "${{ inputs.verify-output }}")"
+        mkdir -p "$(dirname "${{ inputs.review-output }}")"
+        mkdir -p "$(dirname "${{ inputs.mlflow-tags-output }}")"
+
+    - name: Verify InvarLock report
+      shell: bash
+      run: |
+        set +e
+        "${{ inputs.python }}" -m invarlock verify \
+          "${{ inputs.report }}" \
+          --profile "${{ inputs.profile }}" \
+          --assurance "${{ inputs.assurance }}" \
+          --runtime-provenance "${{ inputs.runtime-provenance }}" \
+          --warning-policy "${{ inputs.warning-policy }}" \
+          --json > "${{ inputs.verify-output }}"
+        status=$?
+        cat "${{ inputs.verify-output }}"
+        if [ "$status" -ne 0 ] && [ "${{ inputs.fail-on-verify }}" = "true" ]; then
+          exit "$status"
+        fi
+
+    - name: Render InvarLock HTML report
+      shell: bash
+      run: |
+        "${{ inputs.python }}" -m invarlock report html \
+          --input "${{ inputs.report }}" \
+          --output "${{ inputs.html-output }}" \
+          --force
+
+    - name: Export InvarLock MLflow tags
+      shell: bash
+      run: |
+        "${{ inputs.python }}" -m invarlock report export \
+          --evaluation-report "${{ inputs.report }}" \
+          --format mlflow-tags \
+          --policy-profile "${{ inputs.profile }}" \
+          --verify-result "${{ inputs.verify-output }}" \
+          --output "${{ inputs.mlflow-tags-output }}" \
+          --force
+
+    - name: Export InvarLock review packet
+      shell: bash
+      run: |
+        "${{ inputs.python }}" -m invarlock report export \
+          --evaluation-report "${{ inputs.report }}" \
+          --format release-review-md \
+          --policy-profile "${{ inputs.profile }}" \
+          --verify-result "${{ inputs.verify-output }}" \
+          --output "${{ inputs.review-output }}" \
+          --force
+
+    - name: Append InvarLock PR summary
+      shell: bash
+      run: |
+        {
+          echo "### InvarLock"
+          echo
+          cat "${{ inputs.review-output }}"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Upload InvarLock evidence
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        if-no-files-found: error
+        path: |
+          ${{ inputs.report }}
+          ${{ inputs.verify-output }}
+          ${{ inputs.html-output }}
+          ${{ inputs.review-output }}
+          ${{ inputs.mlflow-tags-output }}
