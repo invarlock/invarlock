@@ -575,10 +575,7 @@ def report_explain(
             print_event(
                 console,
                 "INFO",
-                (
-                    "Explaining evaluation bundle directly: "
-                    f"{evaluation_path}"
-                ),
+                (f"Explaining evaluation bundle directly: {evaluation_path}"),
                 style=output_style,
             )
             return _explain_evaluation_report(evaluation_payload)
