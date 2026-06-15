@@ -16,10 +16,8 @@ from invarlock.model_family_registry import (
     CATALOG_MODEL_SECTIONS,
     CatalogRouteUnavailable,
     ModelFamilyRecord,
-    catalog_lane_defaults,
+    ModelFamilyRouteIndex,
     catalog_slug,
-    iter_model_family_records,
-    records_by_model_id,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -550,17 +548,18 @@ def _build_model_catalog_gpu_lanes(
     payload: dict[str, object] | None = None,
 ) -> tuple[EvidenceLane, ...]:
     catalog = payload or _load_model_family_catalog()
-    lanes: list[EvidenceLane] = []
-    seen: set[str] = set()
-    for record in iter_model_family_records(
+    route_index = ModelFamilyRouteIndex.from_contracts(
         catalog=catalog,
         sections=MODEL_FAMILY_CATALOG_SECTIONS,
-    ):
+    )
+    lanes: list[EvidenceLane] = []
+    seen: set[str] = set()
+    for record in route_index.records:
         model_id = record.representative_model
         if model_id in seen:
             continue
         try:
-            defaults = catalog_lane_defaults(record)
+            defaults = route_index.lane_defaults(record)
         except CatalogRouteUnavailable:
             continue
         lanes.append(
@@ -597,7 +596,7 @@ def _build_promotion_gap_gpu_lanes(
         )
 
     lanes: list[EvidenceLane] = []
-    catalog_records = records_by_model_id(catalog=catalog)
+    route_index = ModelFamilyRouteIndex.from_contracts(catalog=catalog)
     for candidate in candidates:
         if not isinstance(candidate, dict):
             continue
@@ -618,7 +617,7 @@ def _build_promotion_gap_gpu_lanes(
         family = candidate.get("display_name")
         family_label = family if isinstance(family, str) and family else model_id
         base_record = next(
-            iter(catalog_records.get(model_id, ())),
+            iter(route_index.records_for_model(model_id)),
             ModelFamilyRecord(
                 section="promotion_candidates_text_le_14b",
                 family_id=str(candidate.get("candidate_id") or model_id),
@@ -651,7 +650,7 @@ def _build_promotion_gap_gpu_lanes(
             support_groups=base_record.support_groups,
         )
         try:
-            defaults = catalog_lane_defaults(defaults_record)
+            defaults = route_index.lane_defaults(defaults_record)
         except CatalogRouteUnavailable:
             continue
         lanes.append(

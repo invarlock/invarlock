@@ -66,7 +66,8 @@ def test_phase5_owner_modules_keep_split_imports() -> None:
         ),
         REPO_ROOT / "src/invarlock/cli/commands/evaluate.py": (
             (2, "evaluate_output", "_evaluation_report_manifest_execution"),
-            (2, "evaluate_phases", "_run_baseline_evaluation_phase"),
+            (2, "evaluate_phases", "BaselineEvaluationRequest"),
+            (2, "evaluate_phases", "run_baseline_evaluation_phase"),
         ),
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute.py": (
             (

@@ -50,6 +50,99 @@ class CatalogLaneDefaults:
     source: str
 
 
+@dataclass(frozen=True, slots=True)
+class ModelFamilyRouteIndex:
+    records: tuple[ModelFamilyRecord, ...]
+    records_by_model: Mapping[str, tuple[ModelFamilyRecord, ...]]
+    support_rows_by_model: Mapping[str, tuple[Mapping[str, Any], ...]]
+
+    @classmethod
+    def from_contracts(
+        cls,
+        *,
+        catalog: Mapping[str, Any] | None = None,
+        support_matrix: Mapping[str, Any] | None = None,
+        sections: Iterable[str] = CATALOG_MODEL_SECTIONS,
+    ) -> ModelFamilyRouteIndex:
+        records = iter_model_family_records(catalog=catalog, sections=sections)
+        support_payload = (
+            support_matrix if support_matrix is not None else load_support_matrix()
+        )
+        return cls.from_records(records, support_matrix=support_payload)
+
+    @classmethod
+    def from_records(
+        cls,
+        records: Iterable[ModelFamilyRecord],
+        *,
+        support_matrix: Mapping[str, Any] | None = None,
+    ) -> ModelFamilyRouteIndex:
+        record_tuple = tuple(records)
+        grouped: dict[str, list[ModelFamilyRecord]] = {}
+        for record in record_tuple:
+            grouped.setdefault(record.representative_model, []).append(record)
+        support_payload = (
+            support_matrix if support_matrix is not None else load_support_matrix()
+        )
+        return cls(
+            records=record_tuple,
+            records_by_model={
+                key: tuple(value) for key, value in grouped.items()
+            },
+            support_rows_by_model=_support_rows_by_model_id(support_payload),
+        )
+
+    def records_for_model(self, model_id: str) -> tuple[ModelFamilyRecord, ...]:
+        return self.records_by_model.get(model_id, ())
+
+    def lane_defaults(self, record: ModelFamilyRecord) -> CatalogLaneDefaults:
+        support_rows = self.support_rows_by_model.get(record.representative_model, ())
+        inferred_adapter = _adapter_from_record(record)
+        adapter = _adapter_from_support_rows(record, support_rows, inferred_adapter)
+        preset = _select_preset_path(record, adapter=adapter)
+        if preset:
+            return CatalogLaneDefaults(
+                preset_relpath=preset,
+                adapter=adapter,
+                source="model_family_catalog.repo_evidence",
+            )
+        return CatalogLaneDefaults(
+            preset_relpath=_default_preset_for_adapter(adapter),
+            adapter=adapter,
+            source="task_role_default",
+        )
+
+    def lane_defaults_for_model(self, model_id: str) -> CatalogLaneDefaults:
+        records = self.records_for_model(model_id)
+        if records:
+            return self.lane_defaults(records[0])
+        return self.lane_defaults(
+            ModelFamilyRecord(
+                section="synthetic",
+                family_id=model_id,
+                display_name=model_id,
+                representative_model=model_id,
+                representative_index=0,
+                modalities=("text",),
+                task_role="causal_lm",
+                state="unknown",
+                repo_evidence=(),
+                support_groups=(),
+            )
+        )
+
+    def routed_model_ids(self) -> set[str]:
+        routed: set[str] = set()
+        for record in self.records:
+            try:
+                defaults = self.lane_defaults(record)
+            except CatalogRouteUnavailable:
+                continue
+            if defaults.preset_relpath and defaults.adapter:
+                routed.add(record.representative_model)
+        return routed
+
+
 def catalog_slug(model_id: str) -> str:
     slug = model_id.lower().replace("/", "_")
     for old, new in ((".", "_"), ("-", "_"), ("+", "_")):
@@ -83,7 +176,7 @@ def iter_model_family_records(
     catalog: Mapping[str, Any] | None = None,
     sections: Iterable[str] = CATALOG_MODEL_SECTIONS,
 ) -> tuple[ModelFamilyRecord, ...]:
-    payload = catalog or load_model_family_catalog()
+    payload = catalog if catalog is not None else load_model_family_catalog()
     records: list[ModelFamilyRecord] = []
     for section in sections:
         families = payload.get(section) or []
@@ -267,25 +360,10 @@ def catalog_lane_defaults(
     *,
     support_matrix: Mapping[str, Any] | None = None,
 ) -> CatalogLaneDefaults:
-    support_payload = support_matrix or load_support_matrix()
-    support_rows = _support_rows_by_model_id(support_payload).get(
-        record.representative_model,
-        (),
-    )
-    inferred_adapter = _adapter_from_record(record)
-    adapter = _adapter_from_support_rows(record, support_rows, inferred_adapter)
-    preset = _select_preset_path(record, adapter=adapter)
-    if preset:
-        return CatalogLaneDefaults(
-            preset_relpath=preset,
-            adapter=adapter,
-            source="model_family_catalog.repo_evidence",
-        )
-    return CatalogLaneDefaults(
-        preset_relpath=_default_preset_for_adapter(adapter),
-        adapter=adapter,
-        source="task_role_default",
-    )
+    return ModelFamilyRouteIndex.from_records(
+        (record,),
+        support_matrix=support_matrix,
+    ).lane_defaults(record)
 
 
 def catalog_lane_defaults_for_model(
@@ -294,22 +372,10 @@ def catalog_lane_defaults_for_model(
     catalog: Mapping[str, Any] | None = None,
     support_matrix: Mapping[str, Any] | None = None,
 ) -> CatalogLaneDefaults:
-    records = records_by_model_id(catalog=catalog).get(model_id, ())
-    if records:
-        return catalog_lane_defaults(records[0], support_matrix=support_matrix)
-    record = ModelFamilyRecord(
-        section="synthetic",
-        family_id=model_id,
-        display_name=model_id,
-        representative_model=model_id,
-        representative_index=0,
-        modalities=("text",),
-        task_role="causal_lm",
-        state="unknown",
-        repo_evidence=(),
-        support_groups=(),
-    )
-    return catalog_lane_defaults(record, support_matrix=support_matrix)
+    return ModelFamilyRouteIndex.from_contracts(
+        catalog=catalog,
+        support_matrix=support_matrix,
+    ).lane_defaults_for_model(model_id)
 
 
 def catalog_routed_model_ids(
@@ -317,16 +383,10 @@ def catalog_routed_model_ids(
     catalog: Mapping[str, Any] | None = None,
     support_matrix: Mapping[str, Any] | None = None,
 ) -> set[str]:
-    support_payload = support_matrix or load_support_matrix()
-    routed: set[str] = set()
-    for record in iter_model_family_records(catalog=catalog):
-        try:
-            defaults = catalog_lane_defaults(record, support_matrix=support_payload)
-        except CatalogRouteUnavailable:
-            continue
-        if defaults.preset_relpath and defaults.adapter:
-            routed.add(record.representative_model)
-    return routed
+    return ModelFamilyRouteIndex.from_contracts(
+        catalog=catalog,
+        support_matrix=support_matrix,
+    ).routed_model_ids()
 
 
 __all__ = [
@@ -334,6 +394,7 @@ __all__ = [
     "CatalogLaneDefaults",
     "CatalogRouteUnavailable",
     "ModelFamilyRecord",
+    "ModelFamilyRouteIndex",
     "catalog_lane_defaults",
     "catalog_lane_defaults_for_model",
     "catalog_routed_model_ids",

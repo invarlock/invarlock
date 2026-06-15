@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -9,42 +10,51 @@ from invarlock.cli import output as cli_output
 from invarlock.core.exceptions import ConfigError, MetricsError, ValidationError
 
 
+@dataclass(frozen=True)
+class EvaluationReportRequest:
+    edited_report: Path
+    baseline_report_path: Path
+    report_out: str | Path
+    baseline: str
+    subject: str
+    baseline_eff_adapter: str
+    subject_eff_adapter: str
+    profile_name: str
+    tier_name: str
+    preset: str | None
+    out: str
+    edit_config: str | None
+    edit_label: str | None
+    allow_network: bool
+    allow_remote_code: bool
+    allow_third_party_plugins: bool
+    execution_mode: str
+    assurance_mode: str
+    defer_report_rendering: bool
+
+
+@dataclass(frozen=True)
+class EvaluationReportRuntime:
+    console: Any
+    output_style: Any
+    timings: dict[str, float]
+    info_fn: Any
+    fail_fn: Any
+    generate_reports_fn: Any
+    emit_runtime_manifest_fn: Any
+    manifest_execution_fn: Any
+
+
 def emit_evaluation_report_phase(
-    *,
-    edited_report: Path,
-    baseline_report_path: Path,
-    report_out: str | Path,
-    baseline: str,
-    subject: str,
-    baseline_eff_adapter: str,
-    subject_eff_adapter: str,
-    profile_name: str,
-    tier_name: str,
-    preset: str | None,
-    out: str,
-    edit_config: str | None,
-    edit_label: str | None,
-    allow_network: bool,
-    allow_remote_code: bool,
-    allow_third_party_plugins: bool,
-    execution_mode: str,
-    assurance_mode: str,
-    defer_report_rendering: bool,
-    console: Any,
-    output_style: Any,
-    timings: dict[str, float],
-    info_fn: Any,
-    fail_fn: Any,
-    generate_reports_fn: Any,
-    emit_runtime_manifest_fn: Any,
-    manifest_execution_fn: Any,
+    request: EvaluationReportRequest,
+    runtime: EvaluationReportRuntime,
 ) -> None:
     """Generate the paired evaluation report and emit runtime provenance."""
-    info_fn("Emitting evaluation report", tag="EXEC", emoji="📜")
+    runtime.info_fn("Emitting evaluation report", tag="EXEC", emoji="📜")
     with cli_output.timed_step(
-        console=console,
-        style=output_style,
-        timings=timings,
+        console=runtime.console,
+        style=runtime.output_style,
+        timings=runtime.timings,
         key="evaluation_report",
         tag="EXEC",
         message="Evaluation Report",
@@ -52,53 +62,57 @@ def emit_evaluation_report_phase(
     ):
         try:
             report_kwargs: dict[str, Any] = {
-                "run": str(edited_report),
+                "run": str(request.edited_report),
                 "format": "report",
-                "baseline": str(baseline_report_path),
-                "output": str(report_out),
-                "render_optional": not defer_report_rendering,
+                "baseline": str(request.baseline_report_path),
+                "output": str(request.report_out),
+                "render_optional": not request.defer_report_rendering,
             }
-            generate_reports_fn(**report_kwargs)
+            runtime.generate_reports_fn(**report_kwargs)
         except (ConfigError, MetricsError, ValidationError) as exc:
-            fail_fn(str(getattr(exc, "message", exc)), exit_code=1)
+            runtime.fail_fn(str(getattr(exc, "message", exc)), exit_code=1)
             return
 
-    emit_runtime_manifest_fn(
-        Path(report_out) / "evaluation.report.json",
+    runtime.emit_runtime_manifest_fn(
+        Path(request.report_out) / "evaluation.report.json",
         config_payload={
             "command": "evaluate",
-            "baseline": baseline,
-            "subject": subject,
-            "baseline_adapter": baseline_eff_adapter,
-            "subject_adapter": subject_eff_adapter,
-            "profile": profile_name,
-            "tier": tier_name,
-            "preset": preset,
-            "out": out,
-            "report_out": report_out,
-            "edit_config": edit_config,
-            "edit_label": edit_label,
-            "allow_network": allow_network,
-            "allow_remote_code": allow_remote_code,
-            "allow_third_party_plugins": allow_third_party_plugins,
-            "execution_mode": execution_mode,
-            "assurance": assurance_mode,
-            "defer_report_rendering": bool(defer_report_rendering),
+            "baseline": request.baseline,
+            "subject": request.subject,
+            "baseline_adapter": request.baseline_eff_adapter,
+            "subject_adapter": request.subject_eff_adapter,
+            "profile": request.profile_name,
+            "tier": request.tier_name,
+            "preset": request.preset,
+            "out": request.out,
+            "report_out": request.report_out,
+            "edit_config": request.edit_config,
+            "edit_label": request.edit_label,
+            "allow_network": request.allow_network,
+            "allow_remote_code": request.allow_remote_code,
+            "allow_third_party_plugins": request.allow_third_party_plugins,
+            "execution_mode": request.execution_mode,
+            "assurance": request.assurance_mode,
+            "defer_report_rendering": bool(request.defer_report_rendering),
         },
         extra={
             "command": "evaluate",
-            "profile": profile_name,
-            "tier": tier_name,
-            "execution_mode": execution_mode,
-            "assurance": assurance_mode,
+            "profile": request.profile_name,
+            "tier": request.tier_name,
+            "execution_mode": request.execution_mode,
+            "assurance": request.assurance_mode,
         },
-        execution=manifest_execution_fn(
-            execution_mode=execution_mode,
-            allow_network=allow_network,
-            allow_remote_code=allow_remote_code,
-            allow_third_party_plugins=allow_third_party_plugins,
+        execution=runtime.manifest_execution_fn(
+            execution_mode=request.execution_mode,
+            allow_network=request.allow_network,
+            allow_remote_code=request.allow_remote_code,
+            allow_third_party_plugins=request.allow_third_party_plugins,
         ),
     )
 
 
-__all__ = ["emit_evaluation_report_phase"]
+__all__ = [
+    "EvaluationReportRequest",
+    "EvaluationReportRuntime",
+    "emit_evaluation_report_phase",
+]

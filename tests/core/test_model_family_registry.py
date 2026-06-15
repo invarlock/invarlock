@@ -5,6 +5,7 @@ import pytest
 from invarlock.model_family_registry import (
     CatalogRouteUnavailable,
     ModelFamilyRecord,
+    ModelFamilyRouteIndex,
     catalog_lane_defaults,
     catalog_routed_model_ids,
     catalog_slug,
@@ -113,6 +114,59 @@ def test_catalog_lane_defaults_uses_record_context_for_same_model_id() -> None:
     assert image_defaults.preset_relpath == (
         "configs/presets/multimodal/demo_vqa_256.yaml"
     )
+
+
+def test_model_family_route_index_preserves_ambiguous_context() -> None:
+    catalog = {
+        "declared_support": [
+            {
+                "family_id": "demo-text",
+                "display_name": "Demo text",
+                "modalities": ["text"],
+                "task_role": "causal_lm",
+                "state": "published_basis",
+                "representative_models": ["demo/model"],
+                "repo_evidence": ["configs/presets/causal_lm/demo_512.yaml"],
+                "support_groups": ["text"],
+            },
+            {
+                "family_id": "demo-image",
+                "display_name": "Demo image",
+                "modalities": ["text", "image"],
+                "task_role": "image_text",
+                "state": "published_basis",
+                "representative_models": ["demo/model"],
+                "repo_evidence": ["configs/presets/multimodal/demo_vqa_256.yaml"],
+                "support_groups": ["vision"],
+            },
+        ]
+    }
+    support_matrix = {
+        "lanes": [
+            {
+                "family": "Demo text",
+                "adapter": "hf_causal",
+                "support_groups": ["text"],
+                "representative_models": ["demo/model"],
+            },
+            {
+                "family": "Demo image",
+                "adapter": "hf_multimodal",
+                "support_groups": ["vision"],
+                "representative_models": ["demo/model"],
+            },
+        ]
+    }
+
+    index = ModelFamilyRouteIndex.from_contracts(
+        catalog=catalog,
+        support_matrix=support_matrix,
+    )
+    text_record, image_record = index.records_for_model("demo/model")
+
+    assert index.lane_defaults(text_record).adapter == "hf_causal"
+    assert index.lane_defaults(image_record).adapter == "hf_multimodal"
+    assert index.routed_model_ids() == {"demo/model"}
 
 
 def test_catalog_lane_defaults_requires_explicit_multimodal_preset() -> None:

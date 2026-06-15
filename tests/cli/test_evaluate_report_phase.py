@@ -9,13 +9,17 @@ import pytest
 from rich.console import Console
 
 import invarlock.cli.evaluate_report_phase as phase_mod
-from invarlock.cli.evaluate_report_phase import emit_evaluation_report_phase
+from invarlock.cli.evaluate_report_phase import (
+    EvaluationReportRequest,
+    EvaluationReportRuntime,
+    emit_evaluation_report_phase,
+)
 from invarlock.cli.output import resolve_output_style
 from invarlock.core.exceptions import ConfigError, MetricsError, ValidationError
 
 
-def _base_kwargs(tmp_path: Path) -> dict[str, Any]:
-    return {
+def _base_request(tmp_path: Path, **overrides: Any) -> EvaluationReportRequest:
+    payload: dict[str, Any] = {
         "edited_report": tmp_path / "edited.report.json",
         "baseline_report_path": tmp_path / "baseline.report.json",
         "report_out": tmp_path / "reports",
@@ -35,17 +39,36 @@ def _base_kwargs(tmp_path: Path) -> dict[str, Any]:
         "execution_mode": "host",
         "assurance_mode": "off",
         "defer_report_rendering": False,
-        "console": Console(file=None),
-        "output_style": resolve_output_style(
+    }
+    payload.update(overrides)
+    return EvaluationReportRequest(**payload)
+
+
+def _base_runtime(
+    *,
+    timings: dict[str, float] | None = None,
+    fail_fn: Any | None = None,
+    generate_reports_fn: Any | None = None,
+    emit_runtime_manifest_fn: Any | None = None,
+    manifest_execution_fn: Any | None = None,
+) -> EvaluationReportRuntime:
+    return EvaluationReportRuntime(
+        console=Console(file=None),
+        output_style=resolve_output_style(
             style="audit",
             profile="dev",
             progress=False,
             timing=False,
             no_color=True,
         ),
-        "timings": {},
-        "info_fn": lambda *_args, **_kwargs: None,
-    }
+        timings=timings if timings is not None else {},
+        info_fn=lambda *_args, **_kwargs: None,
+        fail_fn=fail_fn or (lambda *_args, **_kwargs: None),
+        generate_reports_fn=generate_reports_fn or (lambda **_kwargs: None),
+        emit_runtime_manifest_fn=emit_runtime_manifest_fn
+        or (lambda *_args, **_kwargs: None),
+        manifest_execution_fn=manifest_execution_fn or (lambda **_kwargs: None),
+    )
 
 
 def test_evaluate_report_phase_calls_report_contract_with_render_optional(
@@ -70,13 +93,14 @@ def test_evaluate_report_phase_calls_report_contract_with_render_optional(
     def emit_runtime_manifest(path, **kwargs):  # noqa: ANN001
         manifest_calls.append({"path": path, **kwargs})
 
-    kwargs = _base_kwargs(tmp_path)
+    timings: dict[str, float] = {}
     emit_evaluation_report_phase(
-        **kwargs,
-        fail_fn=lambda *_args, **_kwargs: None,
-        generate_reports_fn=generate_reports,
-        emit_runtime_manifest_fn=emit_runtime_manifest,
-        manifest_execution_fn=lambda **_kwargs: None,
+        _base_request(tmp_path),
+        _base_runtime(
+            timings=timings,
+            generate_reports_fn=generate_reports,
+            emit_runtime_manifest_fn=emit_runtime_manifest,
+        ),
     )
 
     assert report_calls == [
@@ -88,7 +112,7 @@ def test_evaluate_report_phase_calls_report_contract_with_render_optional(
             "render_optional": True,
         }
     ]
-    assert "evaluation_report" in kwargs["timings"]
+    assert "evaluation_report" in timings
     assert manifest_calls[0]["path"] == tmp_path / "reports" / "evaluation.report.json"
     assert manifest_calls[0]["config_payload"]["baseline"] == "gpt2"
 
@@ -101,14 +125,9 @@ def test_evaluate_report_phase_disables_optional_rendering_when_deferred(
     def generate_reports(**kwargs):  # noqa: ANN001
         report_calls.append(dict(kwargs))
 
-    kwargs = _base_kwargs(tmp_path)
-    kwargs["defer_report_rendering"] = True
     emit_evaluation_report_phase(
-        **kwargs,
-        fail_fn=lambda *_args, **_kwargs: None,
-        generate_reports_fn=generate_reports,
-        emit_runtime_manifest_fn=lambda *_args, **_kwargs: None,
-        manifest_execution_fn=lambda **_kwargs: None,
+        _base_request(tmp_path, defer_report_rendering=True),
+        _base_runtime(generate_reports_fn=generate_reports),
     )
 
     assert report_calls[0]["render_optional"] is False
@@ -147,29 +166,30 @@ def test_evaluate_report_phase_emits_manifest_after_timed_report_generation(
         return execution
 
     monkeypatch.setattr(phase_mod.cli_output, "timed_step", timed_step, raising=True)
-    kwargs = _base_kwargs(tmp_path)
-    kwargs.update(
-        {
-            "allow_network": True,
-            "allow_remote_code": True,
-            "allow_third_party_plugins": True,
-            "execution_mode": "container",
-            "assurance_mode": "strict",
-            "preset": "configs/evaluate/current-supported.yaml",
-            "edit_config": "edits/noop.yaml",
-            "edit_label": "noop-edit",
-        }
+    timings: dict[str, float] = {}
+    request = _base_request(
+        tmp_path,
+        allow_network=True,
+        allow_remote_code=True,
+        allow_third_party_plugins=True,
+        execution_mode="container",
+        assurance_mode="strict",
+        preset="configs/evaluate/current-supported.yaml",
+        edit_config="edits/noop.yaml",
+        edit_label="noop-edit",
     )
     emit_evaluation_report_phase(
-        **kwargs,
-        fail_fn=lambda *_args, **_kwargs: None,
-        generate_reports_fn=generate_reports,
-        emit_runtime_manifest_fn=emit_runtime_manifest,
-        manifest_execution_fn=manifest_execution,
+        request,
+        _base_runtime(
+            timings=timings,
+            generate_reports_fn=generate_reports,
+            emit_runtime_manifest_fn=emit_runtime_manifest,
+            manifest_execution_fn=manifest_execution,
+        ),
     )
 
     assert events == ["timed-enter", "generate", "timed-exit", "manifest"]
-    assert kwargs["timings"]["evaluation_report"] == 1.5
+    assert timings["evaluation_report"] == 1.5
     assert manifest_calls == [
         {
             "path": tmp_path / "reports" / "evaluation.report.json",
@@ -229,13 +249,14 @@ def test_evaluate_report_phase_routes_report_errors_to_fail_handler(
         failures.append((message, exit_code))
 
     emit_evaluation_report_phase(
-        **_base_kwargs(tmp_path),
-        fail_fn=fail_fn,
-        generate_reports_fn=generate_reports,
-        emit_runtime_manifest_fn=lambda *args, **kwargs: manifest_calls.append(
-            (args, kwargs)
+        _base_request(tmp_path),
+        _base_runtime(
+            fail_fn=fail_fn,
+            generate_reports_fn=generate_reports,
+            emit_runtime_manifest_fn=lambda *args, **kwargs: manifest_calls.append(
+                (args, kwargs)
+            ),
         ),
-        manifest_execution_fn=lambda **_kwargs: None,
     )
 
     assert failures == [(message, 1)]
@@ -252,13 +273,13 @@ def test_evaluate_report_phase_bubbles_unexpected_report_errors(
 
     with pytest.raises(RuntimeError, match="boom"):
         emit_evaluation_report_phase(
-            **_base_kwargs(tmp_path),
-            fail_fn=lambda *_args, **_kwargs: None,
-            generate_reports_fn=generate_reports,
-            emit_runtime_manifest_fn=lambda *args, **kwargs: manifest_calls.append(
-                (args, kwargs)
+            _base_request(tmp_path),
+            _base_runtime(
+                generate_reports_fn=generate_reports,
+                emit_runtime_manifest_fn=lambda *args, **kwargs: manifest_calls.append(
+                    (args, kwargs)
+                ),
             ),
-            manifest_execution_fn=lambda **_kwargs: None,
         )
 
     assert manifest_calls == []

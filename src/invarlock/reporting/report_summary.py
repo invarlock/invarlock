@@ -208,10 +208,11 @@ def _primary_metric_measured_and_threshold(
 ) -> tuple[str, str, str]:
     pm = _mapping(evaluation_report.get("primary_metric"))
     auto = _mapping(evaluation_report.get("auto"))
-    tier = str(auto.get("tier") or "balanced").lower()
+    tiny_relax = bool(auto.get("tiny_relax"))
+    tier = "aggressive" if tiny_relax else str(auto.get("tier") or "balanced").lower()
     kind = str(pm.get("kind") or "").lower()
     basis = str(pm.get("gating_basis") or pm.get("basis") or "point")
-    metrics_policy = _resolved_metrics_policy(evaluation_report)
+    metrics_policy = {} if tiny_relax else _resolved_metrics_policy(evaluation_report)
     if kind == "accuracy":
         delta = _coerce_finite_float(pm.get("ratio_vs_baseline"))
         measured = f"{delta:+.2f} pp" if delta is not None else "N/A"
