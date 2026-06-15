@@ -27,7 +27,6 @@ for path in (MODEL_EVIDENCE_DIR, SRC_DIR):
         sys.path.insert(0, str(path))
 
 from model_evidence_lanes import (  # noqa: E402
-    CATALOG_PRESET_OVERRIDES,
     MODEL_CATALOG_GPU_SUITE,
     MODEL_FAMILY_CATALOG_PATH,
     SUITES,
@@ -38,6 +37,7 @@ from model_evidence_lanes import (  # noqa: E402
 )
 
 from invarlock.adapters.auto import resolve_auto_adapter  # noqa: E402
+from invarlock.model_family_registry import catalog_routed_model_ids  # noqa: E402
 
 ALLOWED_ADAPTERS = {"auto", "hf_causal", "hf_mlm", "hf_multimodal", "hf_seq2seq"}
 EXPECTED_PROVIDER_KINDS = {
@@ -382,10 +382,15 @@ def audit() -> list[Finding]:
             )
         )
 
-    override_model_ids = set(CATALOG_PRESET_OVERRIDES)
+    catalog_payload = _load_json(MODEL_FAMILY_CATALOG_PATH)
+    support_payload = _load_json(SUPPORT_MATRIX_PATH)
+    routed_model_ids = catalog_routed_model_ids(
+        catalog=catalog_payload,
+        support_matrix=support_payload,
+    )
     catalog_model_ids = _model_ids_from_catalog()
     missing_catalog_routes = sorted(
-        catalog_model_ids - lane_model_ids - override_model_ids
+        catalog_model_ids - lane_model_ids - routed_model_ids
     )
     for model_id in missing_catalog_routes:
         findings.append(

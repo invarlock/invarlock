@@ -12,6 +12,16 @@ from typing import Any
 
 import yaml
 
+from invarlock.model_family_registry import (
+    CATALOG_MODEL_SECTIONS,
+    CatalogRouteUnavailable,
+    ModelFamilyRecord,
+    catalog_lane_defaults,
+    catalog_slug,
+    iter_model_family_records,
+    records_by_model_id,
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SUPPORT_MATRIX_PATH = REPO_ROOT / "contracts" / "support_matrix.json"
 MODEL_FAMILY_CATALOG_PATH = REPO_ROOT / "contracts" / "model_family_catalog.json"
@@ -376,91 +386,7 @@ DOCUMENTED_SMOKE_CANARY_LANES: tuple[EvidenceLane, ...] = (
     ),
 )
 
-MODEL_FAMILY_CATALOG_SECTIONS = (
-    "declared_support",
-    "implemented_coverage",
-    "usage_only",
-    "recommended_additions",
-)
-
-CATALOG_PRESET_OVERRIDES: dict[str, tuple[str, str]] = {
-    "distilbert-base-uncased": (
-        "configs/presets/masked_lm/distilbert_base_uncased_128.yaml",
-        "hf_mlm",
-    ),
-    "openlm-research/open_llama_7b": (
-        "configs/presets/causal_lm/open_llama_7b_512.yaml",
-        "hf_causal",
-    ),
-    "tiiuae/falcon-7b": (
-        "configs/presets/causal_lm/falcon_7b_512.yaml",
-        "hf_causal",
-    ),
-    "mistralai/Ministral-3-3B-Instruct-2512-BF16": (
-        "configs/presets/causal_lm/ministral3_3b_512.yaml",
-        "hf_causal",
-    ),
-    "google/gemma-4-12B-it": (
-        "configs/presets/multimodal/gemma4_12b_vision_text_256.yaml",
-        "hf_multimodal",
-    ),
-    "google/gemma-4-E4B-it": (
-        "configs/presets/multimodal/gemma4_e4b_public_vqav2_256.yaml",
-        "hf_multimodal",
-    ),
-    "Qwen/Qwen3.5-4B": (
-        "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
-        "hf_multimodal",
-    ),
-    "Qwen/Qwen3.5-2B": (
-        "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
-        "hf_multimodal",
-    ),
-    "ibm-granite/granite-4.1-8b": (
-        "configs/presets/causal_lm/granite4_1_8b_512.yaml",
-        "hf_causal",
-    ),
-    "ibm-granite/granite-4.1-3b": (
-        "configs/presets/causal_lm/granite4_1_3b_512.yaml",
-        "hf_causal",
-    ),
-    "HuggingFaceTB/SmolLM3-3B": (
-        "configs/presets/causal_lm/smollm3_3b_512.yaml",
-        "hf_causal",
-    ),
-    "microsoft/Phi-4-mini-instruct": (
-        "configs/presets/causal_lm/phi4_mini_512.yaml",
-        "hf_causal",
-    ),
-    "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B": (
-        "configs/presets/causal_lm/deepseek_r1_distill_qwen_14b_512.yaml",
-        "hf_causal",
-    ),
-    "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B": (
-        "configs/presets/causal_lm/deepseek_r1_0528_qwen3_8b_512.yaml",
-        "hf_causal",
-    ),
-    "Qwen/Qwen3-30B-A3B-Instruct-2507": (
-        "configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml",
-        "hf_causal",
-    ),
-    "mistralai/Mixtral-8x7B-v0.1": (
-        "configs/presets/causal_lm/mixtral_8x7b_512.yaml",
-        "hf_causal",
-    ),
-    "allenai/OLMoE-1B-7B-0924": (
-        "configs/presets/causal_lm/olmoe_1b_7b_0924_512.yaml",
-        "hf_causal",
-    ),
-    "google/gemma-4-26B-A4B-it": (
-        "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
-        "hf_multimodal",
-    ),
-    "google/flan-t5-base": (
-        "configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml",
-        "hf_seq2seq",
-    ),
-}
+MODEL_FAMILY_CATALOG_SECTIONS = CATALOG_MODEL_SECTIONS
 
 
 def _public_vqav2_materialization() -> dict[str, object]:
@@ -620,72 +546,35 @@ def _load_model_family_catalog(
     return payload
 
 
-def _catalog_slug(model_id: str) -> str:
-    slug = model_id.lower().replace("/", "_")
-    for old, new in ((".", "_"), ("-", "_"), ("+", "_")):
-        slug = slug.replace(old, new)
-    return slug
-
-
-def _catalog_lane_defaults(model_id: str) -> tuple[str, str]:
-    model_lower = model_id.lower()
-    override = CATALOG_PRESET_OVERRIDES.get(model_id)
-    if override is not None:
-        return override
-    if any(
-        keyword in model_lower
-        for keyword in (
-            "bert",
-            "roberta",
-            "deberta",
-            "distilbert",
-            "albert",
-            "electra",
-        )
-    ):
-        return ("configs/presets/masked_lm/wikitext2_128.yaml", "hf_mlm")
-    if any(
-        keyword in model_lower
-        for keyword in ("t5", "bart", "mbart", "pegasus", "marian", "opus-mt")
-    ):
-        return ("configs/presets/seq2seq/synth_128.yaml", "hf_seq2seq")
-    return ("configs/presets/causal_lm/wikitext2_512.yaml", "auto")
-
-
 def _build_model_catalog_gpu_lanes(
     payload: dict[str, object] | None = None,
 ) -> tuple[EvidenceLane, ...]:
     catalog = payload or _load_model_family_catalog()
     lanes: list[EvidenceLane] = []
     seen: set[str] = set()
-    for section in MODEL_FAMILY_CATALOG_SECTIONS:
-        families = catalog.get(section) or []
-        if not isinstance(families, list):
-            raise ValueError(f"model_family_catalog.{section} must be a list")
-        for family in families:
-            if not isinstance(family, dict):
-                continue
-            display_name = family.get("display_name")
-            family_label = display_name if isinstance(display_name, str) else section
-            models = family.get("representative_models") or []
-            if not isinstance(models, list):
-                continue
-            for model_id in models:
-                if not isinstance(model_id, str) or not model_id or model_id in seen:
-                    continue
-                preset_relpath, adapter = _catalog_lane_defaults(model_id)
-                lanes.append(
-                    EvidenceLane(
-                        slug=_catalog_slug(model_id),
-                        lane_id=f"catalog::{_catalog_slug(model_id)}",
-                        family=family_label,
-                        model_id=model_id,
-                        preset_relpath=preset_relpath,
-                        adapter=adapter,
-                        verify_profile="dev",
-                    )
-                )
-                seen.add(model_id)
+    for record in iter_model_family_records(
+        catalog=catalog,
+        sections=MODEL_FAMILY_CATALOG_SECTIONS,
+    ):
+        model_id = record.representative_model
+        if model_id in seen:
+            continue
+        try:
+            defaults = catalog_lane_defaults(record)
+        except CatalogRouteUnavailable:
+            continue
+        lanes.append(
+            EvidenceLane(
+                slug=catalog_slug(model_id),
+                lane_id=f"catalog::{catalog_slug(model_id)}",
+                family=record.display_name,
+                model_id=model_id,
+                preset_relpath=defaults.preset_relpath,
+                adapter=defaults.adapter,
+                verify_profile="dev",
+            )
+        )
+        seen.add(model_id)
     return tuple(lanes)
 
 
@@ -708,6 +597,7 @@ def _build_promotion_gap_gpu_lanes(
         )
 
     lanes: list[EvidenceLane] = []
+    catalog_records = records_by_model_id(catalog=catalog)
     for candidate in candidates:
         if not isinstance(candidate, dict):
             continue
@@ -727,15 +617,51 @@ def _build_promotion_gap_gpu_lanes(
             continue
         family = candidate.get("display_name")
         family_label = family if isinstance(family, str) and family else model_id
-        preset_relpath, adapter = _catalog_lane_defaults(model_id)
+        base_record = next(
+            iter(catalog_records.get(model_id, ())),
+            ModelFamilyRecord(
+                section="promotion_candidates_text_le_14b",
+                family_id=str(candidate.get("candidate_id") or model_id),
+                display_name=family_label,
+                representative_model=model_id,
+                representative_index=0,
+                modalities=("text",),
+                task_role="causal_lm",
+                state=str(candidate.get("current_catalog_state") or ""),
+                repo_evidence=(),
+                support_groups=(),
+            ),
+        )
+        repo_evidence_value = candidate.get("repo_evidence")
+        repo_evidence = (
+            tuple(item for item in repo_evidence_value if isinstance(item, str))
+            if isinstance(repo_evidence_value, list)
+            else ()
+        )
+        defaults_record = ModelFamilyRecord(
+            section="promotion_candidates_text_le_14b",
+            family_id=str(candidate.get("candidate_id") or base_record.family_id),
+            display_name=family_label,
+            representative_model=model_id,
+            representative_index=base_record.representative_index,
+            modalities=base_record.modalities,
+            task_role=base_record.task_role,
+            state=str(candidate.get("current_catalog_state") or ""),
+            repo_evidence=repo_evidence,
+            support_groups=base_record.support_groups,
+        )
+        try:
+            defaults = catalog_lane_defaults(defaults_record)
+        except CatalogRouteUnavailable:
+            continue
         lanes.append(
             EvidenceLane(
-                slug=_catalog_slug(model_id),
-                lane_id=f"promotion-gap::{_catalog_slug(model_id)}",
+                slug=catalog_slug(model_id),
+                lane_id=f"promotion-gap::{catalog_slug(model_id)}",
                 family=family_label,
                 model_id=model_id,
-                preset_relpath=preset_relpath,
-                adapter=adapter,
+                preset_relpath=defaults.preset_relpath,
+                adapter=defaults.adapter,
                 verify_profile="dev",
             )
         )
