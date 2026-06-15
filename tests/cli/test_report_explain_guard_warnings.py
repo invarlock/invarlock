@@ -7,7 +7,10 @@ from pathlib import Path
 import pytest
 import typer
 
-from invarlock.cli.commands.explain_gates import explain_gates_command
+from invarlock.cli.commands.explain_gates import (
+    explain_evaluation_report,
+    explain_gates_command,
+)
 from invarlock.cli.commands.verify import verify_command
 
 
@@ -132,6 +135,21 @@ def test_report_explain_describes_guard_warning_separately_from_policy_failure(
         baseline_report=str(baseline),
     )
     out = capsys.readouterr().out
+    assert "Report Outline" in out
+    assert "Guard Warnings: 1 [warn]; source=guard_warnings.warning_count" in out
     assert "Guard Warnings" in out
     assert "policy: pass" in out
     assert "strict warning mode" in out
+
+
+def test_report_explain_direct_evaluation_report_shows_guard_warning(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    explain_evaluation_report(_cert_with_warning())
+
+    out = capsys.readouterr().out
+    assert "Report Outline" in out
+    assert "Guard Warnings: 1 [warn]; source=guard_warnings.warning_count" in out
+    assert "Gate: Primary Metric vs Baseline" in out
+    assert "Guard Warnings" in out
+    assert "policy: pass" in out

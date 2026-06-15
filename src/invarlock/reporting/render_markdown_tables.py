@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from .report_outline import build_evaluation_report_outline
 from .utils import _fmtv, _p
 
 _TABLE_PARSE_EXCEPTIONS = (
@@ -89,7 +90,47 @@ def append_accuracy_subgroups(lines: list[str], subgroups: dict[str, Any]) -> No
     lines.append("")
 
 
+def _markdown_table_cell(value: Any) -> str:
+    text = str(value)
+    return text.replace("|", "\\|").replace("\n", " ").strip()
+
+
+def append_outline_fact_summary_section(
+    lines: list[str], evaluation_report: dict[str, Any]
+) -> None:
+    """Append shared report-outline facts to the markdown report."""
+    outline = build_evaluation_report_outline(evaluation_report)
+    summary_sections = [
+        section
+        for section in outline.sections
+        if section.priority in {"summary", "review"}
+    ]
+    if not summary_sections:
+        return
+
+    lines.append("## Report Outline")
+    lines.append("")
+    lines.append(
+        "Renderer-neutral summary facts shared by HTML, Markdown, and report explain surfaces."
+    )
+    lines.append("")
+    lines.append("| Section | Fact | Value | Status | Source |")
+    lines.append("|---------|------|-------|--------|--------|")
+    for section in summary_sections:
+        for fact in section.facts:
+            lines.append(
+                "| "
+                f"{_markdown_table_cell(section.title)} | "
+                f"{_markdown_table_cell(fact.label)} | "
+                f"{_markdown_table_cell(fact.value)} | "
+                f"{_markdown_table_cell(fact.status)} | "
+                f"`{_markdown_table_cell(fact.source or '-')}` |"
+            )
+    lines.append("")
+
+
 __all__ = [
     "append_accuracy_subgroups",
+    "append_outline_fact_summary_section",
     "append_system_overhead_section",
 ]

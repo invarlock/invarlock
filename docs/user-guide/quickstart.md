@@ -89,9 +89,7 @@ invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/eva
 ```
 
 Optional: explain gate decisions directly from the evaluation bundle with
-`invarlock report explain --evaluation-report reports/eval/evaluation.report.json`
-when the bundle provenance still points to accessible baseline and subject
-`report.json` files.
+`invarlock report explain --evaluation-report reports/eval/evaluation.report.json`.
 
 If you only have the run reports, the lower-level form remains:
 `invarlock report explain --subject-report runs/subject/report.json --baseline-report runs/source/report.json`.
