@@ -29,6 +29,11 @@ jobs:
           runtime-provenance: container
 ```
 
+For repositories outside this source tree, copy
+`.github/actions/invarlock-report-gate/` into the target repository and keep the
+local `uses: ./.github/actions/invarlock-report-gate` reference. A versioned
+remote action reference is not part of the public contract yet.
+
 The action writes:
 
 | Artifact | Purpose |
