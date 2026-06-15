@@ -86,7 +86,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated adapter examples to reflect the newly published dense, multimodal,
   seq2seq, and MoE model shapes.
 - Updated ordinary CI expectations so long GPU evidence sweeps are treated as
-  nightly/model-evidence work instead of blocking the standard green-main gate.
+  manually dispatched model-evidence work instead of blocking the standard
+  green-main gate.
 - Updated public evidence packaging to use compact evaluation reports for large
   published-basis artifacts while retaining the evidence manifests, runtime
   manifests, model revisions, and provenance needed for audit.
@@ -103,6 +104,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Removed automatic scheduled CI and scheduled GPU model-evidence sweep triggers;
+  full verification remains available by manual dispatch, release supply-chain
+  checks remain tag-gated, and model-evidence sweeps remain manually runnable.
 - Removed the stale `tests/fuzzing` owner expectation from the active test-tree
   contract after the fuzzing surface was retired from the repo layout.
 - Removed confirmed non-Apache-2.0/MIT hosted model checkpoints from active
@@ -112,6 +116,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed exported HTML reports to use the packaged InvarLock bracket-and-signal
   mark instead of the temporary `IL` text fallback.
+- Fixed exported HTML report rendering for summary status fallback, policy
+  threshold wording, sticky navigation/active-section behavior, and empty table
+  detail columns.
 - Fixed evidence-pack queue and GPU-runner stability issues, including memory
   helper resolution, container scratch cleanup, retry handling after interrupted
   evaluate phases, and host/container output publication paths.

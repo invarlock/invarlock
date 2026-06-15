@@ -19,7 +19,7 @@ self-hosted-runner:
 
 ### Core CI Workflows (Tracked in Git)
 
-- **`ci.yml`** - Main CI (curated tests, docs build, PR-time `coverage-enforce`, typed-surface `mypy`, scheduled full verify, scheduled/tag supply-chain backstop)
+- **`ci.yml`** - Main CI (curated tests, docs build, PR-time `coverage-enforce`, typed-surface `mypy`, manual full verify, and tag-gated supply-chain backstop)
 - **`pre-commit.yml`** - Pre-commit hook validation
 - **`repo-hygiene.yml`** - PR hygiene checks (no generated artifacts, no large files, no duplicate tests)
 
@@ -71,7 +71,7 @@ job or step, emit container-backed outputs, and verify them without bypasses.
   `gitleaks`, uploads JSON/SARIF artifacts, audits the built wheel install
   surface for SBOM generation, and runs `pip-audit` against the base, `hf`, and `advanced` shipped dependency surfaces.
 - The release workflow peels annotated tags to immutable commit SHAs before checkout/publish, uses an installed-wheel environment for its release SBOM, and publishes distributions without a separate public release-asset upload step.
-- The scheduled/tag CI supply-chain job remains the slower backstop and keeps the tool-environment SBOM.
+- The tag-gated CI supply-chain job remains the slower release backstop and keeps the tool-environment SBOM.
 - The PR typed-surface lane covers observability, config loading/runtime, metric resolution, report schema/verification helpers, MI probes, registry metadata including the built-in plugin catalog, runtime-security modules, the split run-orchestrator owner modules, and CLI entrypoints.
 
 ## Troubleshooting

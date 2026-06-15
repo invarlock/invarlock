@@ -354,7 +354,7 @@ and centralizes blocked named checkpoints for future license/access changes.
 
 Model evidence automation lives in
 `scripts/model_evidence/model_evidence_sweep.py`, with tmux-based remote launch support in
-`scripts/model_evidence/run_model_evidence_remote.py` and a nightly/manual runner workflow in
+`scripts/model_evidence/run_model_evidence_remote.py` and a manual runner workflow in
 `.github/workflows/model-evidence-sweep.yml`.
 For large MoE lanes that do not fit comfortably on one GPU, the remote helper
 supports grouped CUDA visibility, for example
