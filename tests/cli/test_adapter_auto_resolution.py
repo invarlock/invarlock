@@ -224,8 +224,8 @@ def test_resolve_auto_adapter_keeps_mistral3_conditional_generation_causal(
     [
         "Qwen/Qwen3.5-4B",
         "Qwen/Qwen3.5-2B",
-        "google/gemma-3n-E4B-it",
-        "google/gemma-3-4b-it",
+        "demo/gemma3n-compatible-checkpoint",
+        "demo/gemma-3-4b-compatible-checkpoint",
         "google/gemma-4-E4B-it",
         "google/gemma-4-12B-it",
         "google/gemma-4-26B-A4B-it",
@@ -240,7 +240,6 @@ def test_resolve_auto_adapter_routes_named_multimodal_model_ids(
 @pytest.mark.parametrize(
     "model_id",
     [
-        "Helsinki-NLP/opus-mt-en-de",
         "demo/marian-checkpoint",
         "facebook/mbart-large-50",
         "google/pegasus-xsum",

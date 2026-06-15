@@ -46,6 +46,10 @@ For Compare & evaluate, reuse the same `dataset` block in baseline and subject r
   evidence workflow uses
   `scripts/model_evidence/materialize_vision_text_dataset.py` for this pattern,
   so evaluation remains offline/hashable after the download step.
+- **Image-text primary metric**: `vision_text` uses answer accuracy as the
+  primary metric because the evidence claim is whether the generated answer
+  matches the image question. Token log loss is still recorded as supporting
+  telemetry, but perplexity is not the public VQA gate.
 - **Tokenizer contract**: dataset providers expect either a callable tokenizer
   that returns `input_ids` plus optional `attention_mask`, or an `encode(...)`
   method that accepts `truncation=True`, `max_length=...`, and
@@ -163,13 +167,18 @@ python scripts/model_evidence/materialize_vision_text_dataset.py \
   --answer-field multiple_choice_answer \
   --answers-field answers \
   --id-field question_id \
+  --prompt-template '{question}
+Return exactly one JSON object like {{"answer":"short phrase"}}. Use a short phrase only. Do not explain.' \
   --overwrite
 ```
 
 The generated `manifest.jsonl`, `images/`, and
 `materialization_summary.json` are then consumed by `vision_text`. For evidence
 promotion, pin the dataset revision and keep the materialization summary with
-the run artifacts.
+the run artifacts. Public VQA evidence prompts should prefer a structured
+answer field such as `{"answer":"..."}`; the evaluator extracts that field
+before exact-answer scoring and falls back to the raw generation when no JSON
+answer is present.
 
 ### Seq2seq provider example (HF)
 

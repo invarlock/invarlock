@@ -246,7 +246,6 @@ Notes
 | OLMo 2 7B causal LM | Yes | Yes | Yes | Yes |
 | OpenLLaMA 7B causal LM | Yes | Yes | Yes | Yes |
 | Falcon 7B causal LM | Yes | Yes | Yes | Yes |
-| Falcon-H1R 7B causal LM | Yes | Yes | Yes | Yes |
 | Granite 4.1 8B causal LM | Yes | Yes | Yes | Yes |
 
 ### Published 13B-14B And Reasoning Decoder Evidence
@@ -263,22 +262,12 @@ Notes
 
 | Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
+| Qwen3.5 2B image-text LM | Yes | Yes | Yes | Yes |
+| Qwen3.5 4B image-text LM | Yes | Yes | Yes | Yes |
+| Gemma 4 E2B image-text LM | Yes | Yes | Yes | Yes |
+| Gemma 4 E4B image-text LM | Yes | Yes | Yes | Yes |
 | Gemma 4 12B any-to-any LM | Yes | Yes | Yes | Yes |
 | Gemma 4 26B-A4B MoE image-text LM | Yes | Yes | Yes | Yes |
-| Qwen3.5 2B image-text LM | Yes | Yes | Yes | Yes |
-
-### Prepared Small/Multimodal Candidate Lanes
-
-| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
-| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| Qwen3.5 4B image-text LM | Yes | Yes | Yes | No |
-| Gemma 3n E4B image-text LM | Yes | Yes | Yes | No |
-| Gemma 3 4B IT image-text LM | Yes | Yes | Yes | No |
-
-Qwen3.5 4B is prepared but not promoted because the 2026-06-14 H100 no-op run
-passed mechanically while producing 0/400 baseline and subject VQA accuracy.
-Gemma 3n E4B and Gemma 3 4B IT evidence execution requires an authenticated
-Hugging Face token with accepted Gemma access terms.
 
 ### Large/MoE Published Evidence
 
@@ -296,20 +285,24 @@ Hugging Face token with accepted Gemma access terms.
 
 Published assurance basis covers GPT-2, BERT, Mistral 7B, Ministral 3 3B,
 Ministral 3 8B, Ministral 3 14B, TinyLlama 1.1B, Gemma 4 E2B text-only,
-Gemma 4 12B image-text, Gemma 4 26B-A4B image-text MoE, Granite 4.1 3B,
+Gemma 4 E2B image-text, Gemma 4 E4B image-text, Granite 4.1 3B,
 Granite 4.1 8B, OLMo 2 7B, OLMo 2 13B, Qwen2 7B, OpenLLaMA 7B,
 Falcon 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B,
 Qwen3.5 2B image-text, DeepSeek-R1-Distill-Qwen 7B,
 DeepSeek-R1-0528-Qwen3 8B,
-DeepSeek-R1-Distill-Qwen 14B, Phi-4 text-only, OLMoE 1B-active/7B-total
-MoE, Mixtral 8x7B MoE, Qwen3 30B-A3B MoE, and FLAN-T5 base seq2seq profiles.
+DeepSeek-R1-Distill-Qwen 14B, Phi-4 text-only, Qwen3.5 4B image-text,
+Gemma 4 12B image-text, Gemma 4 26B-A4B image-text MoE, OLMoE
+1B-active/7B-total MoE, Mixtral 8x7B MoE, Qwen3 30B-A3B MoE, and FLAN-T5 base
+seq2seq profiles.
 Repo-included presets and pilot calibration configs for prepared practical-pick
 lanes do not become part of the published assurance basis until supporting
 artifacts are attached. OLMoE is the smaller MoE published-basis validation
-lane; Mixtral 8x7B, Gemma 4 26B-A4B, and Qwen3 30B-A3B are larger H100-backed
-no-op preservation bases. The Qwen3 30B-A3B fixture requires all-8 H100
-sharding and uses scoped attention/router/shared-expert guard scans; it is not
-an exhaustive expert-bank or MoE routing-quality claim.
+lane; Mixtral 8x7B and Qwen3 30B-A3B are larger no-op preservation
+bases. Gemma 4 26B-A4B is a multimodal MoE image-text preservation basis; it is
+not audio, exhaustive expert-bank, or MoE routing-quality evidence. The Qwen3
+30B-A3B fixture requires all-8 80GB-GPU sharding and uses scoped
+attention/router/shared-expert guard scans; it is not an exhaustive expert-bank
+or MoE routing-quality claim.
 The empirical guard manifest includes no-op published-basis summaries for the
 modern promoted families. They are null-behavior evidence and calibration
 inputs, but they do not re-derive the packaged spectral/RMT/variance tier
@@ -328,10 +321,9 @@ preset policy; strict release verification accepts that declared skip.
 The FLAN-T5 base public fixture uses pinned CNN/DailyMail validation data via
 `hf_seq2seq`; strict release verification accepts one advisory guard warning
 while the hard policy gates pass.
-The prepared small/multimodal candidate lanes for Qwen3.5 4B, Gemma 3n E4B,
-and Gemma 3 4B IT include public VQAv2 presets and null-sweep configs, but
-they are not published assurance bases until public report,
-runtime-manifest, and evidence-pack artifacts are attached and audited.
+The Qwen3.5 4B image-text lane now includes a public VQAv2 preset, null-sweep
+config, strict public report, runtime manifest, and signed evidence pack after
+the structured JSON-answer prompt fix.
 
 `published_basis` remains the narrow public evidence floor, while
 `supported_experimental` means the repo ships the preset, calibration config,
@@ -344,45 +336,53 @@ they become release-supported lanes.
 Image-text evaluation uses the built-in
 `hf_multimodal` adapter and the `vision_text` provider. Install
 `invarlock[multimodal]` for this path; Gemma 4 unified checkpoints require
-`transformers>=5.12.0` and `torchvision>=0.26.0`. The Gemma 4 E2B public lane
-remains text-only, Gemma 4 12B and Gemma 4 26B-A4B now have public image-text
-bases on pinned VQAv2 materialization, Qwen3.5 2B now has a public image-text
-basis, Qwen3.5 4B and Gemma 3n E4B/Gemma 3 4B IT have prepared image-text
-candidate lanes, and audio evaluation is deferred.
+`transformers>=5.12.0` and `torchvision>=0.26.0`. Gemma 4 E2B has separate
+text-only and image-text public bases; Qwen3.5 2B, Qwen3.5 4B, Gemma 4 E4B,
+Gemma 4 12B, and Gemma 4 26B-A4B also have public image-text bases. Audio
+evaluation is deferred. Public
+image-text basis promotion requires
+measured accuracy on a pinned public dataset above the repo floor; preservation
+passing alone is not sufficient.
 
 Machine-readable support metadata lives in `contracts/support_matrix.json`. It is
 the canonical source of truth for normalized support tiers
 (`published_basis`, `supported_experimental`, `community_experimental`) and for
-published-basis evidence references.
+published-basis evidence references. Model lifecycle decisions live in
+`contracts/model_classification.json`: that file records whether a lane or
+family is published, backlog, blocked, smoke-only, usage-only, or out of scope,
+and centralizes blocked named checkpoints for future license/access changes.
 
 Model evidence automation lives in
 `scripts/model_evidence/model_evidence_sweep.py`, with tmux-based remote launch support in
-`scripts/model_evidence/run_model_evidence_remote.py` and a nightly/manual runner workflow in
+`scripts/model_evidence/run_model_evidence_remote.py` and a manual runner workflow in
 `.github/workflows/model-evidence-sweep.yml`.
 For large MoE lanes that do not fit comfortably on one GPU, the remote helper
 supports grouped CUDA visibility, for example
 `--gpu-group 0,1,2,3` to launch one sweep shard with all four GPUs exposed
 instead of one shard per GPU.
 Repo-prepared-but-not-yet-promoted lanes are tracked in
-`contracts/model_family_catalog.json`.
+`contracts/model_family_catalog.json`; promotion eligibility and blockers are
+tracked in `contracts/model_classification.json`.
 For the Gemma 4 text lane, the repo-maintained local smoke is the included
 manifest dry-run (`scripts/model_evidence/model_evidence_sweep.py --suite repo-mentioned-gpu --slug gemma4_e2b_public --dry-run`).
 The image-text path also includes an offline demo preset at
 `configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml` and a Gemma
 4 12B pilot at `configs/presets/multimodal/gemma4_12b_vision_text_256.yaml` plus
 `tests/fixtures/vision_text/demo_manifest.jsonl` for provider/config validation.
-Gemma 4 12B promotion uses
+Gemma 4 E2B, Gemma 4 E4B, and Gemma 4 12B use
+`configs/presets/multimodal/gemma4_e2b_public_vqav2_256.yaml`,
+`configs/presets/multimodal/gemma4_e4b_public_vqav2_256.yaml`, and
 `configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml` and
-`configs/calibration/null_sweep_gemma4_12b.yaml` together with the model-evidence
-materializer for pinned public VQAv2 sample-validation data; the published
-evidence fixture lives under
+matching `configs/calibration/null_sweep_gemma4_*.yaml` files together with the
+model-evidence materializer for pinned public VQAv2 sample-validation data. Their
+public fixtures live under `public_evidence/published_basis/gemma4_e2b_image_text/`,
+`public_evidence/published_basis/gemma4_e4b/`, and
 `public_evidence/published_basis/gemma4_12b/`, and the local smoke manifest
 remains provider/config validation only. Gemma 4 26B-A4B uses the analogous
 `configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml` and
-`configs/calibration/null_sweep_gemma4_26b_a4b.yaml` promotion path; its public
-fixture lives under `public_evidence/published_basis/gemma4_26b_a4b/`. The
-Qwen3.5 2B public image-text basis and the prepared Qwen3.5 4B, Gemma 3n E4B,
-and Gemma 3 4B IT image-text candidates use the same pinned VQAv2
+`configs/calibration/null_sweep_gemma4_26b_a4b.yaml` path; its public fixture
+lives under `public_evidence/published_basis/gemma4_26b_a4b/`. The Qwen3.5 2B
+and Qwen3.5 4B public image-text bases use the same pinned VQAv2
 materialization pattern through
 `configs/presets/multimodal/*_public_vqav2_256.yaml` and matching
 `configs/calibration/null_sweep_*.yaml` files.

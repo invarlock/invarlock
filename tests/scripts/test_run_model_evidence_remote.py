@@ -59,7 +59,14 @@ def test_run_model_evidence_remote_dry_run_emits_tmux_launch_plan(
     )
     assert "for candidate in $REPO_DIR/.venv/bin/python" in payload["sync_command"]
     assert "'$REPO_DIR/.venv/bin/python'" not in payload["sync_command"]
+    assert (
+        "git fetch origin "
+        "refs/heads/staging/next:refs/remotes/origin/staging/next"
+        in payload["sync_command"]
+    )
     assert "git checkout staging/next" in payload["sync_command"]
+    assert "git merge --ff-only origin/staging/next" in payload["sync_command"]
+    assert "git pull --ff-only" not in payload["sync_command"]
     assert (
         "$PYTHON_BIN scripts/checks/sync_packaged_contracts.py --check"
         in payload["sync_command"]
@@ -78,6 +85,44 @@ def test_run_model_evidence_remote_dry_run_emits_tmux_launch_plan(
     assert "--shard-count 2" in payload["launches"][0]["remote_command"]
     assert payload["launches"][1]["session"] == "model-evidence-20260319T120000Z-g1"
     assert "tmux list-sessions" in " ".join(payload["monitor"]["tmux_list"])
+
+
+def test_run_model_evidence_remote_sync_handles_work_branch_names() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence" / "run_model_evidence_remote.py"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--host",
+            "root@example.test",
+            "--branch",
+            "work/purge-non-apache-qwen35-4b-sanity",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    assert (
+        "git fetch origin "
+        "refs/heads/work/purge-non-apache-qwen35-4b-sanity:"
+        "refs/remotes/origin/work/purge-non-apache-qwen35-4b-sanity"
+        in payload["sync_command"]
+    )
+    assert (
+        "git checkout work/purge-non-apache-qwen35-4b-sanity" in payload["sync_command"]
+    )
+    assert (
+        "git merge --ff-only origin/work/purge-non-apache-qwen35-4b-sanity"
+        in payload["sync_command"]
+    )
+    assert "git pull --ff-only" not in payload["sync_command"]
 
 
 def test_run_model_evidence_remote_dry_run_forwards_preset_overrides() -> None:

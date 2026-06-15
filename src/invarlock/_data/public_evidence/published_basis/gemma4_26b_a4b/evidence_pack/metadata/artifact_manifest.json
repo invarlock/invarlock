@@ -4002,62 +4002,62 @@
       "sha256": "b454132989802d89d2a493a16a347100228aae98209dca541c3441db75801dc0"
     },
     {
-      "bytes": 414745,
+      "bytes": 478745,
       "path": "eval/google_gemma_4_26b_a4b_it/dataset/manifest.jsonl",
-      "sha256": "b9c670d71bd0d0196bd6683a392d3e3efb6defec93810582c160470177457284"
+      "sha256": "b18073e194e812ceeb4ef1a7c2174ecad44136dfe6e299a0733ab159408025a0"
     },
     {
       "bytes": 167887,
       "path": "eval/google_gemma_4_26b_a4b_it/dataset/materialization_summary.json",
-      "sha256": "99b05ac933a940e1f8d4bf0191a5148ef0f173f63a9984dc44c4109eaad096ad"
+      "sha256": "1915ef99b09d004f3e5fb7d517c3cf4392ba478c72ad248dfa193f005a15486c"
     },
     {
       "bytes": 1197,
       "path": "eval/google_gemma_4_26b_a4b_it/prepared_preset.yaml",
-      "sha256": "998dbc37dbb9ddd2e75a6dd806c058bc26ec4d61a74e399dbbc58047e78b85e5"
+      "sha256": "ff1b59ac871a7a10e6ddae7ca8ff3a2b1409a1cfb9c2a8319ce876f9bf256fd5"
     },
     {
-      "bytes": 1264799,
+      "bytes": 1019442,
       "path": "eval/google_gemma_4_26b_a4b_it/report/evaluation.report.json",
-      "sha256": "f1ec5b76d2e581d6ee465909f421c175305c1717399afe742baae50857959654"
+      "sha256": "80ce570e171ffc351a1fe8488a44c71a1cb5b3ddf5f39a6fa49cd0087d47babc"
     },
     {
-      "bytes": 769,
+      "bytes": 779,
       "path": "eval/google_gemma_4_26b_a4b_it/verify.json",
-      "sha256": "ff447beab06cebdff408da00870310f1c5b61b4facfb410b67dbdf4a20be0ecf"
+      "sha256": "f4ce876ca5c55b810c4c13d17b592c208214ccdffcb8efaf510eee733c5fd74d"
     },
     {
-      "bytes": 151954,
+      "bytes": 151618,
       "path": "logs/google_gemma_4_26b_a4b_it.log",
-      "sha256": "79fdfa894b1b4c6265fa6e339c1983f2dad0b49b6e5db2f1f1de1ac7b3df25fc"
+      "sha256": "9f106544c865eb0ceab1e3d7878d39f4253b92c65cf8e00de8e11a08829f311e"
     },
     {
-      "bytes": 1389,
+      "bytes": 1471,
       "path": "manifest.json",
-      "sha256": "10cf35ab5cfe15d9deb151377c84701a1e3b8463548504d797001ebc9adca810"
+      "sha256": "c2247c40aa281bda6c9480f1ce21a3a2745fb71b3e73e8e4eadf50bcfae5d02f"
     },
     {
-      "bytes": 692,
+      "bytes": 809,
       "path": "model_revisions.json",
-      "sha256": "7b384f79ae1794af89362786edb3486d47c495b91c45eba92881f5d9163be147"
+      "sha256": "26641ede5cfd41125b65aa0169ef7b3c034f46b2454f56646dc0f2950aa452b1"
     },
     {
       "bytes": 263,
       "path": "status.log",
-      "sha256": "89a0f8b458a5a0ff464aa3468649f1a86e0400d0d2ba9d5da91dc640239a83e1"
+      "sha256": "b05a661311a8b10ef0341e797678bee83aa554a1902c7444cf90224d3aa523e3"
     },
     {
-      "bytes": 790,
+      "bytes": 808,
       "path": "summary.json",
-      "sha256": "51ff269b5d2cabc3ad1ff20096d9ec979fe96a4ed6366c90c75e22bd72288c04"
+      "sha256": "6007ea5092a8b9332316a688082384ec9d5d58c091780101c1fbbfadfa09b9d8"
     },
     {
-      "bytes": 257,
+      "bytes": 266,
       "path": "summary.tsv",
-      "sha256": "858e00c3260eac585d81e66b80983ed60d45b2ef18b0cc9b9e0c79af271c7182"
+      "sha256": "597a9dd635d3c0a3fdcb9e915093535f6d70afaf9cdc12f1c9a96f143f197e3c"
     }
   ],
-  "generated_at": "2026-06-13T21:43:24.594625+00:00",
+  "generated_at": "2026-06-14T09:33:58.822619+00:00",
   "lane_results": [
     {
       "detail": null,
@@ -4066,11 +4066,11 @@
       "model_id": "google/gemma-4-26B-A4B-it",
       "ok": true,
       "preset": "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
-      "report_path": "/root/model-evidence/20260613Tgemma426ba4bH100A/shard-00-gpu-0-1-2-3/eval/google_gemma_4_26b_a4b_it/report/evaluation.report.json",
+      "report_path": "/root/model-evidence/20260614Tgemma4_26b_a4b_json_sanity/shard-00-gpu-2-3-4-5/eval/google_gemma_4_26b_a4b_it/report/evaluation.report.json",
       "slug": "google_gemma_4_26b_a4b_it",
       "status": "ok",
       "verify_exit": 0,
-      "verify_path": "/root/model-evidence/20260613Tgemma426ba4bH100A/shard-00-gpu-0-1-2-3/eval/google_gemma_4_26b_a4b_it/verify.json"
+      "verify_path": "/root/model-evidence/20260614Tgemma4_26b_a4b_json_sanity/shard-00-gpu-2-3-4-5/eval/google_gemma_4_26b_a4b_it/verify.json"
     }
   ],
   "ok": true,

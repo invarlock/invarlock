@@ -225,7 +225,9 @@ model:
 
 The `vision_text` path above is a local smoke fixture. Public promotion evidence
 uses materialized, pinned public datasets with dataset materialization summaries
-stored alongside the run artifacts.
+stored alongside the run artifacts, and image-text published-basis promotion
+requires a measured primary-metric floor rather than preservation pass/fail
+alone.
 
 ```yaml
 # Bitsandbytes quantized load (Linux + gpu extra)

@@ -1,0 +1,24 @@
+{
+  "execution_mode": "container",
+  "generated_at": "2026-06-14T10:53:12.867914+00:00",
+  "models": [
+    {
+      "cache_dir": "/root/invarlock-public-promote/tmp/model_evidence_hf_home/hub",
+      "model_id": "google/gemma-4-E2B-it",
+      "revisions": [
+        {
+          "commit_hash": "70af34e20bd4b7a91f0de6b22675850c43922a03",
+          "refs": [
+            "main"
+          ],
+          "size_on_disk": 10278817826,
+          "snapshot_path": "/root/invarlock-public-promote/tmp/model_evidence_hf_home/hub/models--google--gemma-4-E2B-it/snapshots/70af34e20bd4b7a91f0de6b22675850c43922a03"
+        }
+      ],
+      "slug": "google_gemma_4_e2b_it_image_text",
+      "status": "observed"
+    }
+  ],
+  "schema": "invarlock/model-evidence-model-revisions-v1",
+  "suite": "support-matrix-backlog-gpu"
+}

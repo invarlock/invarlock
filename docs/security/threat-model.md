@@ -89,8 +89,8 @@ security or alignment.
   plugins disabled, and remote model code off unless explicitly allowed.
 - Supply-chain checks in CI and PR validation (install-surface SBOM
   generation, `pip-audit` on the base/`hf`/`advanced` shipped surfaces,
-  `gitleaks` history JSON/SARIF scanning), with scheduled/tag
-  backstops for drift detection.
+  `gitleaks` history JSON/SARIF scanning), with tag-gated release backstops
+  for drift detection.
 - CodeQL scans shipped Python code plus repository helper scripts, and the
   analysis workflow fails closed if upload/analysis cannot complete.
 - Release automation only rebuilds and publishes from validated tags resolved

@@ -1,0 +1,18 @@
+{
+  "generated_from": "remote H100 evidence sweep",
+  "logs": [
+    {
+      "bytes": 147300,
+      "kind": "sweep_log",
+      "path": "artifacts/model-evidence/remote/20260614Tgemma4_e4b_e2b_vqav2/shard-01-gpu-1/google_gemma_4_e2b_it_image_text.log",
+      "sha256": "81c78e8cc6e8df51ae8d7420d147f96883f221822c31a606a32664bc7563e6ed"
+    },
+    {
+      "bytes": 277,
+      "kind": "status_log",
+      "path": "artifacts/model-evidence/remote/20260614Tgemma4_e4b_e2b_vqav2/shard-01-gpu-1/status.log",
+      "sha256": "6f414368ad767b866a3dbf10b6fbb84cf17b877f36af57f71f553cb79ba50c24"
+    }
+  ],
+  "schema": "invarlock/model-evidence-log-capture-v1"
+}

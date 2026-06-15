@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from invarlock import __version__
 from scripts.evidence_packs.python.verdict.generator_helpers import _evaluate_report
 from tests.evidence_packs._verdict_contract_support import (
     run_verdict,
@@ -222,7 +223,13 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     )
 
     verdict = run_verdict(repo_root, output_dir)
+    verdict_text = (output_dir / "reports" / "final_verdict.txt").read_text(
+        encoding="utf-8"
+    )
     assert verdict["verdict"] == "PASS"
+    assert verdict_text.startswith("INVARLOCK EVIDENCE PACK - FINAL VERDICT")
+    assert f"InvarLock {__version__}" in verdict_text
+    assert "Auditable verification for edited model checkpoints." in verdict_text
     counts = verdict["counts"]
     assert counts["models_total"] == 1
     assert counts["clean_total"] == 4

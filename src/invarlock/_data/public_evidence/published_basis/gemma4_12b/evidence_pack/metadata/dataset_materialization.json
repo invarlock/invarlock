@@ -8,18 +8,18 @@
     "image": "image",
     "prompt": "question"
   },
-  "generated_at": "2026-06-13T07:01:53.751175+00:00",
+  "generated_at": "2026-06-14T09:03:38.131420+00:00",
   "hashes": {
     "answers_sha256": "357a5ed607b1fd6f9ae31dd683f3d85ba8610f87d84a9f82a90943c507b0d519",
     "ids_sha256": "edd5bca02a792755ceb9102e3b53267b0d90974570f3341d252d466636009a36",
     "images_sha256": "6bd147a7989768b0abafd433e848b9a0824627f7e201d78585dafb7e2a385a6a",
-    "prompts_sha256": "fdfb639de228858e9a58cf2781a1c15c20a21c32338fcec8a65ac8b2053a2c80"
+    "prompts_sha256": "b274c44f6c6762a52c0545bb4a9fe9513c42e2db0cc7a6e0a5d108fcea10183f"
   },
   "image_format": "png",
   "manifest": {
-    "bytes": 414745,
+    "bytes": 478745,
     "path": "manifest.jsonl",
-    "sha256": "b9c670d71bd0d0196bd6683a392d3e3efb6defec93810582c160470177457284"
+    "sha256": "b18073e194e812ceeb4ef1a7c2174ecad44136dfe6e299a0733ab159408025a0"
   },
   "max_samples": 800,
   "record_count": 800,

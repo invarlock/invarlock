@@ -4,6 +4,7 @@ from typing import Any
 
 import yaml
 
+from .branding import markdown_brand_line
 from .render_guard_sections import (
     append_guard_check_details_section,
     append_guard_observability_sections,
@@ -577,6 +578,10 @@ def _get_window_plan_summary(evaluation_report: dict[str, Any]) -> str | None:
 
 def _append_report_header(lines: list[str], evaluation_report: dict[str, Any]) -> None:
     lines.append("# InvarLock Evaluation Report")
+    lines.append("")
+    lines.append(
+        markdown_brand_line(schema_version=str(evaluation_report["schema_version"]))
+    )
     lines.append("")
     lines.append(
         "> *Basis: “point” gates check the point estimate; “upper” gates check the CI "

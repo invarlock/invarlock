@@ -308,8 +308,8 @@
     },
     {
       "path": "artifact_package/state/tuned_edit_params.json",
-      "sha256": "13b7f6a365240d2a406859efea0faf5143bd790bf92f6299950e5a6dc2ae781f",
-      "size_bytes": 22749
+      "sha256": "5b30b6f5326af36207dfd9159c710c85da9474a744ade31966ddbb340dcfce26",
+      "size_bytes": 19907
     },
     {
       "path": "evidence.meta.json",

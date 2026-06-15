@@ -10,7 +10,7 @@ model:
 dataset:
   provider:
     kind: vision_text
-    path: tmp/model_evidence_container/f5ea33d310325c84/eval/google_gemma_4_26b_a4b_it/dataset/manifest.jsonl
+    path: tmp/model_evidence_container/34e15e29dffc3a0b/eval/google_gemma_4_26b_a4b_it/dataset/manifest.jsonl
   split: validation
   seq_len: 256
   stride: 256

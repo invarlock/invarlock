@@ -17,6 +17,7 @@ telemetry fields, and HTML export.
 - [Quick Start](#quick-start)
 - [report Layout](#report-layout)
   - [Executive Summary Interpretation](#executive-summary-interpretation)
+- [Report Outline](report-outline.md)
 - [Schema](#schema)
   - [Minimal v1 report Example](#minimal-v1-report-example)
   - [Schema Summary](#schema-summary-validator-view)
@@ -70,16 +71,37 @@ run reports are also available.
 
 The markdown report is structured to highlight evaluation outcomes first:
 
+New renderers should use the shared renderer-neutral
+[Report Outline](report-outline.md) rather than deriving their own section
+order from the historical Markdown body. The outline groups modern report
+evidence as Decision, Primary Metric, Policy Gates, Guard Signals, optional
+Benchmark Comparison, Evidence And Provenance, and Technical Appendix.
+
 Container-backed evaluations emit `runtime.manifest.json` next to
 `evaluation.report.json`. Archive and verify them together.
 
-The HTML export keeps that same body content but adds a browser shell with:
+The HTML export renders that shared outline directly instead of converting the
+historical Markdown body. It adds:
 
-- summary chips for the overall status, primary-metric kind, and linked-run readiness
-- quick links for the major report sections
-- anchored section headings so reviews can deep-link directly into the report
+- a summary ledger row for verdict, subject model, baseline model/run, metric,
+  and guard warnings
+- a sticky brand/theme row with a light/dark toggle
+- quick links for the outline sections, with hash anchors and the active
+  section highlight aligned to the sticky row while scrolling
+- task-aware primary-metric wording, including ratio output for ppl-like tasks
+  and percentage-point deltas for accuracy tasks
+- guard-warning detail tables when baseline-relative warning data is present
+- an optional Benchmark Comparison section when benchmark/scenario data is
+  embedded in the report
+- capped appendix previews for raw policy/plugin/artifact blocks, with
+  `evaluation.report.json` remaining the complete audit artifact
 
-- **Executive Summary**: one-line PASS/FAIL + compact gate table (primary metric, drift, invariants, spectral, RMT, overhead).
+The embedded stylesheet follows the current InvarLock site Ledger ink token
+map: warm paper/ink in light mode, warm-black/cream in dark mode, blue as the
+brand accent, oxblood as the editorial signal, and green/red/yellow reserved
+for verdict states.
+
+- **Decision**: PASS/FAIL, evidence mode, subject model, baseline model/run, edit, primary metric, and warning count.
 - **Quality Gates**: table of canonical gating checks with measured values.
 - **Guard Check Details**: invariants, spectral stability, RMT health, and pairing snapshots.
 - **Primary Metric**: task-specific metric summary with CI + baseline comparison.
@@ -431,12 +453,11 @@ include the execution device. CPU telemetry sweeps are collected via
 
 ## HTML Export
 
-The HTML renderer converts the Markdown report into structured HTML
-tables (via the `markdown` library when available) and preserves the same
-numeric values (ratios, CIs, deltas). When the dependency is unavailable, the
-renderer falls back to a `<pre>` block. Use `--embed-css` (default) to inline
-a minimal stylesheet for standalone use, including status badges and
-print-friendly rules.
+The HTML renderer builds a browser-readable report from the shared
+renderer-neutral [Report Outline](report-outline.md). It does not depend on the
+Markdown renderer or the optional `markdown` Python package. Use `--embed-css`
+(default) to inline the standalone stylesheet; use `--no-embed-css` only when
+an external publishing system supplies its own styles.
 
 ### CLI
 

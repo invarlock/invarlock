@@ -18,9 +18,7 @@ def test_causal_lm_family_presets_load() -> None:
         "wikitext2_512.yaml": "sshleifer/tiny-gpt2",
         "mistral_7b_512.yaml": "mistralai/Mistral-7B-v0.1",
         "open_llama_7b_512.yaml": "openlm-research/open_llama_7b",
-        "opt_1_3b_512.yaml": "facebook/opt-1.3b",
         "falcon_7b_512.yaml": "tiiuae/falcon-7b",
-        "glm4_9b_chat_512.yaml": "THUDM/glm-4-9b-chat",
         "ministral3_8b_512.yaml": "mistralai/Ministral-3-8B-Instruct-2512-BF16",
         "ministral3_14b_512.yaml": "mistralai/Ministral-3-14B-Instruct-2512-BF16",
         "qwen2_7b_512.yaml": "Qwen/Qwen2-7B",
@@ -46,13 +44,11 @@ def test_causal_lm_family_presets_load() -> None:
             "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
         ),
         "deepseek_r1_0528_qwen3_8b_512.yaml": ("deepseek-ai/DeepSeek-R1-0528-Qwen3-8B"),
-        "falcon_h1r_7b_512.yaml": "tiiuae/Falcon-H1R-7B",
     }
     expected_provider_kinds = {
         "deepseek_r1_distill_qwen_7b_512.yaml": "hf_text",
         "deepseek_r1_distill_qwen_14b_512.yaml": "hf_text",
         "deepseek_r1_0528_qwen3_8b_512.yaml": "hf_text",
-        "falcon_h1r_7b_512.yaml": "hf_text",
         "gemma4_e2b_512.yaml": "hf_text",
         "granite4_1_3b_512.yaml": "hf_text",
         "granite4_1_8b_512.yaml": "hf_text",
@@ -125,10 +121,7 @@ def test_causal_lm_family_presets_load() -> None:
             guards = cfg.require_section("guards")
             assert guards["spectral"]["family_caps"]["router"] == 5.0
             assert "rmt" not in guards
-        if name in {
-            "glm4_9b_chat_512.yaml",
-            "phi4_reasoning_plus_512.yaml",
-        }:
+        if name == "phi4_reasoning_plus_512.yaml":
             assert cfg.require_section("model")["trust_remote_code"] is True
         if name == "phi4_mini_512.yaml":
             assert "trust_remote_code" not in cfg.require_section("model")
@@ -154,9 +147,7 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
     configs = {
         "null_sweep_mistral_7b.yaml": "mistralai/Mistral-7B-v0.1",
         "null_sweep_open_llama_7b.yaml": "openlm-research/open_llama_7b",
-        "null_sweep_opt_1_3b.yaml": "facebook/opt-1.3b",
         "null_sweep_falcon_7b.yaml": "tiiuae/falcon-7b",
-        "null_sweep_glm4_9b_chat.yaml": "THUDM/glm-4-9b-chat",
         "null_sweep_ministral3_8b.yaml": "mistralai/Ministral-3-8B-Instruct-2512-BF16",
         "null_sweep_ministral3_14b.yaml": "mistralai/Ministral-3-14B-Instruct-2512-BF16",
         "null_sweep_qwen2_7b.yaml": "Qwen/Qwen2-7B",
@@ -188,17 +179,13 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
         "null_sweep_deepseek_r1_0528_qwen3_8b.yaml": (
             "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B"
         ),
-        "null_sweep_falcon_h1r_7b.yaml": "tiiuae/Falcon-H1R-7B",
     }
     for name, model_id in configs.items():
         data = yaml.safe_load(
             (root / "configs/calibration" / name).read_text(encoding="utf-8")
         )
         assert data["model"]["id"] == model_id
-        if name in {
-            "null_sweep_glm4_9b_chat.yaml",
-            "null_sweep_phi4_reasoning_plus.yaml",
-        }:
+        if name == "null_sweep_phi4_reasoning_plus.yaml":
             assert data["model"]["trust_remote_code"] is True
         if name == "null_sweep_phi4_mini.yaml":
             assert "trust_remote_code" not in data["model"]
@@ -206,7 +193,6 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
             "null_sweep_deepseek_r1_distill_qwen_7b.yaml",
             "null_sweep_deepseek_r1_distill_qwen_14b.yaml",
             "null_sweep_deepseek_r1_0528_qwen3_8b.yaml",
-            "null_sweep_falcon_h1r_7b.yaml",
             "null_sweep_gemma4_e2b.yaml",
             "null_sweep_granite4_1_3b.yaml",
             "null_sweep_granite4_1_8b.yaml",
@@ -276,16 +262,8 @@ def test_candidate_causal_lm_presets_load() -> None:
             "openlm-research/open_llama_7b",
             "hf_causal",
         ),
-        "opt_1_3b_512.yaml": (
-            "facebook/opt-1.3b",
-            "hf_causal",
-        ),
         "falcon_7b_512.yaml": (
             "tiiuae/falcon-7b",
-            "hf_causal",
-        ),
-        "glm4_9b_chat_512.yaml": (
-            "THUDM/glm-4-9b-chat",
             "hf_causal",
         ),
     }
@@ -293,8 +271,6 @@ def test_candidate_causal_lm_presets_load() -> None:
         cfg = load_config(root / "configs/presets/causal_lm" / name)
         assert cfg.require_section("model")["id"] == model_id
         assert cfg.require_section("model")["adapter"] == adapter
-        if name == "glm4_9b_chat_512.yaml":
-            assert cfg.require_section("model")["trust_remote_code"] is True
         assert cfg.data["dataset"]["provider"] == "wikitext2"
         assert cfg.data["primary_metric"]["drift_band"] == expected_drift_band
 
@@ -307,16 +283,8 @@ def test_candidate_null_sweep_calibration_configs_reference_models() -> None:
             "openlm-research/open_llama_7b",
             "hf_causal",
         ),
-        "null_sweep_opt_1_3b.yaml": (
-            "facebook/opt-1.3b",
-            "hf_causal",
-        ),
         "null_sweep_falcon_7b.yaml": (
             "tiiuae/falcon-7b",
-            "hf_causal",
-        ),
-        "null_sweep_glm4_9b_chat.yaml": (
-            "THUDM/glm-4-9b-chat",
             "hf_causal",
         ),
     }
@@ -326,7 +294,5 @@ def test_candidate_null_sweep_calibration_configs_reference_models() -> None:
         )
         assert data["model"]["id"] == model_id
         assert data["model"]["adapter"] == adapter
-        if name == "null_sweep_glm4_9b_chat.yaml":
-            assert data["model"]["trust_remote_code"] is True
         assert data["dataset"]["provider"] == "wikitext2"
         assert data["primary_metric"]["drift_band"] == expected_drift_band

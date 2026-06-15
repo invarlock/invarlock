@@ -88,4 +88,5 @@ def test_contracts_check_runs_model_candidate_compatibility_audit() -> None:
     data = makefile.read_text(encoding="utf-8")
     block = _get_make_target_block(data, "contracts-check")
     assert block is not None, "contracts-check target not found in Makefile"
+    assert "scripts/checks/check_model_classification.py" in block
     assert "scripts/checks/check_model_candidate_compatibility.py" in block

@@ -392,16 +392,8 @@ CATALOG_PRESET_OVERRIDES: dict[str, tuple[str, str]] = {
         "configs/presets/causal_lm/open_llama_7b_512.yaml",
         "hf_causal",
     ),
-    "facebook/opt-1.3b": (
-        "configs/presets/causal_lm/opt_1_3b_512.yaml",
-        "hf_causal",
-    ),
     "tiiuae/falcon-7b": (
         "configs/presets/causal_lm/falcon_7b_512.yaml",
-        "hf_causal",
-    ),
-    "THUDM/glm-4-9b-chat": (
-        "configs/presets/causal_lm/glm4_9b_chat_512.yaml",
         "hf_causal",
     ),
     "mistralai/Ministral-3-3B-Instruct-2512-BF16": (
@@ -412,20 +404,16 @@ CATALOG_PRESET_OVERRIDES: dict[str, tuple[str, str]] = {
         "configs/presets/multimodal/gemma4_12b_vision_text_256.yaml",
         "hf_multimodal",
     ),
+    "google/gemma-4-E4B-it": (
+        "configs/presets/multimodal/gemma4_e4b_public_vqav2_256.yaml",
+        "hf_multimodal",
+    ),
     "Qwen/Qwen3.5-4B": (
         "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
         "hf_multimodal",
     ),
     "Qwen/Qwen3.5-2B": (
         "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
-        "hf_multimodal",
-    ),
-    "google/gemma-3n-E4B-it": (
-        "configs/presets/multimodal/gemma3n_e4b_public_vqav2_256.yaml",
-        "hf_multimodal",
-    ),
-    "google/gemma-3-4b-it": (
-        "configs/presets/multimodal/gemma3_4b_it_public_vqav2_256.yaml",
         "hf_multimodal",
     ),
     "ibm-granite/granite-4.1-8b": (
@@ -460,10 +448,6 @@ CATALOG_PRESET_OVERRIDES: dict[str, tuple[str, str]] = {
         "configs/presets/causal_lm/mixtral_8x7b_512.yaml",
         "hf_causal",
     ),
-    "tiiuae/Falcon-H1R-7B": (
-        "configs/presets/causal_lm/falcon_h1r_7b_512.yaml",
-        "hf_causal",
-    ),
     "allenai/OLMoE-1B-7B-0924": (
         "configs/presets/causal_lm/olmoe_1b_7b_0924_512.yaml",
         "hf_causal",
@@ -490,9 +474,23 @@ def _public_vqav2_materialization() -> dict[str, object]:
         "answer_field": "multiple_choice_answer",
         "answers_field": "answers",
         "id_field": "question_id",
-        "prompt_template": "{question}\nAnswer with a short phrase.",
+        "prompt_template": (
+            "{question}\n"
+            'Return exactly one JSON object like {{"answer":"short phrase"}}. '
+            "Use a short phrase only. Do not explain."
+        ),
         "image_format": "png",
     }
+
+
+def _qwen3_5_4b_vqav2_materialization() -> dict[str, object]:
+    materialization = _public_vqav2_materialization()
+    materialization["prompt_template"] = (
+        "{question}\n"
+        'Return exactly one JSON object like {{"answer":"short phrase"}}. '
+        "Use a short phrase only. Do not explain or include thinking."
+    )
+    return materialization
 
 
 SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
@@ -507,6 +505,26 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
         vision_text_materialization=_public_vqav2_materialization(),
     ),
     EvidenceLane(
+        slug="google_gemma_4_e4b_it",
+        lane_id="gemma4-e4b-image-text-hf",
+        family="Gemma 4 E4B image-text LM",
+        model_id="google/gemma-4-E4B-it",
+        preset_relpath="configs/presets/multimodal/gemma4_e4b_public_vqav2_256.yaml",
+        adapter="hf_multimodal",
+        verify_profile="release",
+        vision_text_materialization=_public_vqav2_materialization(),
+    ),
+    EvidenceLane(
+        slug="google_gemma_4_e2b_it_image_text",
+        lane_id="gemma4-e2b-image-text-hf",
+        family="Gemma 4 E2B image-text LM",
+        model_id="google/gemma-4-E2B-it",
+        preset_relpath="configs/presets/multimodal/gemma4_e2b_public_vqav2_256.yaml",
+        adapter="hf_multimodal",
+        verify_profile="release",
+        vision_text_materialization=_public_vqav2_materialization(),
+    ),
+    EvidenceLane(
         slug="qwen_qwen3_5_4b",
         lane_id="qwen3-5-4b-image-text-hf",
         family="Qwen3.5 4B image-text LM",
@@ -514,7 +532,7 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
         preset_relpath="configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
         adapter="hf_multimodal",
         verify_profile="release",
-        vision_text_materialization=_public_vqav2_materialization(),
+        vision_text_materialization=_qwen3_5_4b_vqav2_materialization(),
     ),
     EvidenceLane(
         slug="qwen_qwen3_5_2b",
@@ -522,26 +540,6 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
         family="Qwen3.5 2B image-text LM",
         model_id="Qwen/Qwen3.5-2B",
         preset_relpath="configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
-        adapter="hf_multimodal",
-        verify_profile="release",
-        vision_text_materialization=_public_vqav2_materialization(),
-    ),
-    EvidenceLane(
-        slug="google_gemma_3n_e4b_it",
-        lane_id="gemma3n-e4b-image-text-hf",
-        family="Gemma 3n E4B image-text LM",
-        model_id="google/gemma-3n-E4B-it",
-        preset_relpath="configs/presets/multimodal/gemma3n_e4b_public_vqav2_256.yaml",
-        adapter="hf_multimodal",
-        verify_profile="release",
-        vision_text_materialization=_public_vqav2_materialization(),
-    ),
-    EvidenceLane(
-        slug="google_gemma_3_4b_it",
-        lane_id="gemma3-4b-it-image-text-hf",
-        family="Gemma 3 4B IT image-text LM",
-        model_id="google/gemma-3-4b-it",
-        preset_relpath="configs/presets/multimodal/gemma3_4b_it_public_vqav2_256.yaml",
         adapter="hf_multimodal",
         verify_profile="release",
         vision_text_materialization=_public_vqav2_materialization(),
@@ -561,15 +559,6 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
         family="Phi-4 mini causal LM",
         model_id="microsoft/Phi-4-mini-instruct",
         preset_relpath="configs/presets/causal_lm/phi4_mini_512.yaml",
-        adapter="hf_causal",
-        verify_profile="dev",
-    ),
-    EvidenceLane(
-        slug="tiiuae_falcon_h1r_7b",
-        lane_id="falcon-h1r-7b-causal-hf",
-        family="Falcon-H1R 7B causal LM",
-        model_id="tiiuae/Falcon-H1R-7B",
-        preset_relpath="configs/presets/causal_lm/falcon_h1r_7b_512.yaml",
         adapter="hf_causal",
         verify_profile="dev",
     ),
@@ -660,11 +649,6 @@ def _catalog_lane_defaults(model_id: str) -> tuple[str, str]:
         for keyword in ("t5", "bart", "mbart", "pegasus", "marian", "opus-mt")
     ):
         return ("configs/presets/seq2seq/synth_128.yaml", "hf_seq2seq")
-    if model_lower == "google/gemma-4-e4b-it":
-        return (
-            "configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml",
-            "hf_multimodal",
-        )
     return ("configs/presets/causal_lm/wikitext2_512.yaml", "auto")
 
 

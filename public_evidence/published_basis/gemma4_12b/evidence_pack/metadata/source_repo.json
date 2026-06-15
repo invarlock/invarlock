@@ -2,25 +2,15 @@
   "artifact_class": "public_evidence_fixture",
   "fixture_paths": [
     "public_evidence/published_basis/gemma4_12b/evaluation.report.json",
-    "public_evidence/published_basis/gemma4_12b/runtime.manifest.json"
+    "public_evidence/published_basis/gemma4_12b/runtime.manifest.json",
+    "public_evidence/published_basis/gemma4_12b/evidence_run_preset.yaml"
   ],
   "remote_artifacts": {
-    "artifact_manifest": "artifacts/model-evidence/remote/20260613Tgemma12bPublicVqaH/shard-00-gpu-1/artifact_manifest.json",
-    "dataset_manifest": "artifacts/model-evidence/remote/20260613Tgemma12bPublicVqaH/shard-00-gpu-1/eval/google_gemma_4_12b_it/dataset/manifest.jsonl",
-    "dataset_materialization_summary": "artifacts/model-evidence/remote/20260613Tgemma12bPublicVqaH/shard-00-gpu-1/eval/google_gemma_4_12b_it/dataset/materialization_summary.json",
-    "model_revisions": "artifacts/model-evidence/remote/20260613Tgemma12bPublicVqaH/shard-00-gpu-1/model_revisions.json",
-    "summary": "artifacts/model-evidence/remote/20260613Tgemma12bPublicVqaH/shard-00-gpu-1/summary.json"
+    "artifact_manifest": "artifacts/model-evidence/remote/20260614Tgemma4_12b_json_sanity/shard-00-gpu-1/artifact_manifest.json",
+    "materialization_summary": "artifacts/model-evidence/remote/20260614Tgemma4_12b_json_sanity/shard-00-gpu-1/materialization_summary.json",
+    "model_revisions": "artifacts/model-evidence/remote/20260614Tgemma4_12b_json_sanity/shard-00-gpu-1/model_revisions.json",
+    "summary": "artifacts/model-evidence/remote/20260614Tgemma4_12b_json_sanity/shard-00-gpu-1/summary.json"
   },
-  "remote_checkout": "/root/invarlock-public-promote",
-  "remote_host": "root@86.38.238.232",
   "repo": "invarlock-public",
-  "reproducibility_run": {
-    "clean_rerun": "20260613Tgemma12bPublicVqaH",
-    "clean_rerun_verify_exit": 0,
-    "matching_dataset_manifest_sha256": "b9c670d71bd0d0196bd6683a392d3e3efb6defec93810582c160470177457284",
-    "source_run": "20260613Tgemma12bPublicVqaG"
-  },
-  "source_ref": "82e0f6e0dcf3ce0351af9744aef8db964c6b03ad",
-  "worktree_branch": "work/promote-gemma-deepseek",
-  "worktree_sync_note": "Clean remote checkout was already fast-forwarded to source_ref; remote launch used --skip-sync with explicit --remote-repo and --remote-python."
+  "source_ref": "730949e0349d61842ff3ed57b94c4df10ecea713"
 }

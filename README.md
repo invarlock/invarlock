@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="https://github.com/invarlock/invarlock/actions/workflows/ci.yml">
-    <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&label=CI&logo=github&labelColor=18150f&color=1f3a7a" />
+    <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&label=CI&logo=github&labelColor=18150f" />
   </a>
   <a href="https://pypi.org/project/invarlock/">
     <img alt="PyPI" src="https://img.shields.io/pypi/v/invarlock?label=PyPI&logo=pypi&labelColor=18150f&color=1f3a7a" />
@@ -186,7 +186,8 @@ Runtime provenance: reports/eval/runtime.manifest.json
   emitted by `doctor --json` and `advanced plugins ... --json`.
 - Runtime-manifest verifier: `invarlock advanced runtime-verify --report <evaluation.report.json> --manifest <runtime.manifest.json>`.
 - The public contract catalog exposed by those JSON surfaces includes
-  `validation_keys`, `console_labels`, and `metric_kinds`.
+  `model_classification`, `validation_keys`, `console_labels`, and
+  `metric_kinds`.
 - Advanced workflows: `invarlock advanced evidence-pack`, `invarlock advanced policy`,
   `invarlock advanced plugins`, and `invarlock advanced calibrate`.
 - Host execution for the core evaluate path uses `--execution-mode host`.

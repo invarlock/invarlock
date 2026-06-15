@@ -23,6 +23,7 @@ POLICY_PACK_VERIFY_OUTPUT_FORMAT_VERSION = "policy-pack-verify-v1"
 EVIDENCE_PACK_VERIFY_OUTPUT_FORMAT_VERSION = "evidence-pack-verify-v1"
 CLI_STABILITY_POLICY_VERSION = "cli-stability-v1"
 ADAPTER_SUPPORT_TIER_POLICY_VERSION = "adapter-support-tiers-v1"
+MODEL_CLASSIFICATION_FORMAT_VERSION = "model-classification-v1"
 
 STABLE_CLI_JSON_SURFACES: dict[str, str] = {
     "invarlock doctor --json": DOCTOR_OUTPUT_FORMAT_VERSION,
@@ -172,6 +173,13 @@ def load_model_family_catalog() -> dict[str, Any]:
     return data
 
 
+def load_model_classification() -> dict[str, Any]:
+    data = _load_object_contract_or_raise("model_classification.json")
+    data.setdefault("entries", [])
+    data.setdefault("blocked_named_checkpoints", [])
+    return data
+
+
 def load_plugin_compatibility() -> dict[str, Any]:
     return _load_object_contract_or_raise("plugin_compatibility.json")
 
@@ -312,6 +320,7 @@ def contract_catalog() -> dict[str, Any]:
     return {
         "support_matrix": contract_reference("support_matrix.json"),
         "model_family_catalog": contract_reference("model_family_catalog.json"),
+        "model_classification": contract_reference("model_classification.json"),
         "adapter_capabilities": contract_reference("adapter_capabilities.json"),
         "plugin_compatibility": contract_reference("plugin_compatibility.json"),
         "validation_keys": contract_reference("validation_keys.json"),
@@ -335,6 +344,7 @@ __all__ = [
     "DOCTOR_OUTPUT_FORMAT_VERSION",
     "EVIDENCE_PACK_FORMAT_VERSION",
     "EVIDENCE_PACK_VERIFY_OUTPUT_FORMAT_VERSION",
+    "MODEL_CLASSIFICATION_FORMAT_VERSION",
     "PLUGINS_OUTPUT_FORMAT_VERSION",
     "POLICY_PACK_VERIFY_OUTPUT_FORMAT_VERSION",
     "REPORT_SCHEMA_VERSION",
@@ -350,6 +360,7 @@ __all__ = [
     "contract_relpath",
     "load_adapter_capabilities",
     "load_json_contract",
+    "load_model_classification",
     "load_model_family_catalog",
     "load_plugin_compatibility",
     "load_policy_pack_schema",

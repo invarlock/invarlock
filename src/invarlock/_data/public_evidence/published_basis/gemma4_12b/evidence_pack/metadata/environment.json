@@ -1,22 +1,12 @@
 {
-  "dataset": "Multimodal-Fatima/VQAv2_sample_validation",
-  "dataset_manifest_sha256": "b9c670d71bd0d0196bd6683a392d3e3efb6defec93810582c160470177457284",
-  "dataset_record_count": 800,
-  "dataset_revision": "99487d2651df3799002b2fb3e455741744514a02",
-  "dataset_split": "validation",
+  "branch": "work/purge-non-apache-qwen35-4b-sanity",
   "device": "cuda",
   "execution_mode": "container",
+  "gpu": "NVIDIA H100 80GB HBM3",
   "gpu_id": "1",
-  "host": "root@86.38.238.232",
-  "model_revision": "5926caa4ec0cac5cbfadaf4077420520de1d5205",
-  "primary_metric_ci": [
-    0.02096129419797776,
-    0.057885139532918004
-  ],
-  "primary_metric_final": 0.035,
-  "primary_metric_kind": "accuracy",
+  "host": "root@31.56.109.46",
   "profile": "release",
-  "runtime_image": "ghcr.io/invarlock/invarlock-runtime:latest@sha256:989418de9de9059d7108d383b4f6971c5098e3424c1b930d4d51555a58fa4abd",
-  "runtime_image_digest": "sha256:989418de9de9059d7108d383b4f6971c5098e3424c1b930d4d51555a58fa4abd",
-  "stamp": "20260613Tgemma12bPublicVqaH"
+  "runtime_image": "ghcr.io/invarlock/invarlock-runtime:latest",
+  "source_ref": "730949e0349d61842ff3ed57b94c4df10ecea713",
+  "stamp": "20260614Tgemma4_12b_json_sanity"
 }

@@ -21,9 +21,9 @@ if [[ ! ${MODEL_4+x} ]]; then MODEL_4="Qwen/Qwen2.5-32B"; fi                    
 if [[ ! ${MODEL_5+x} ]]; then MODEL_5="01-ai/Yi-34B"; fi                        # ~68 GB
 if [[ ! ${MODEL_6+x} ]]; then MODEL_6="mistralai/Mixtral-8x7B-v0.1"; fi         # ~90 GB
 
-# Large models
-if [[ ! ${MODEL_7+x} ]]; then MODEL_7="Qwen/Qwen2.5-72B"; fi                    # ~144 GB
-if [[ ! ${MODEL_8+x} ]]; then MODEL_8="Qwen/Qwen1.5-72B"; fi                    # ~144 GB
+# Additional permissive-license defaults with tuned edit parameters.
+if [[ ! ${MODEL_7+x} ]]; then MODEL_7="Qwen/Qwen3-8B"; fi                       # ~16 GB
+if [[ ! ${MODEL_8+x} ]]; then MODEL_8=""; fi                                    # reserved
 
 pack_model_list() {
     local -a models=(

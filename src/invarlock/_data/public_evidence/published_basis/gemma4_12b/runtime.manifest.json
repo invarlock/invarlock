@@ -1,1 +1,31 @@
-{"config":{"path":null,"sha256":"ea6e605bf44022a3d540e597ddd87d619c97342ed064a325d7d4f2c9125e31d5","source":"inline"},"context":{"assurance":"strict","command":"evaluate","execution_mode":"container","profile":"release","tier":"balanced"},"execution_mode":"container","generated_at_utc":"2026-06-13T07:31:43.022140+00:00","manifest_version":1,"report":{"filename":"evaluation.report.json","path":"/workspace/tmp/model_evidence_container/0fa00928cbae04a5/eval/google_gemma_4_12b_it/report/evaluation.report.json","sha256":"7751d64a7c73e25de63690e2361b6c1fdcfe4548eb8248e6102d04bf9d607a72"},"runtime":{"allow_network":true,"allow_remote_code":false,"allow_third_party_plugins":false,"container_execution":true,"image_digest":"sha256:989418de9de9059d7108d383b4f6971c5098e3424c1b930d4d51555a58fa4abd","image_ref":"ghcr.io/invarlock/invarlock-runtime:latest@sha256:989418de9de9059d7108d383b4f6971c5098e3424c1b930d4d51555a58fa4abd"},"verifier_contract_version":"runtime-manifest-v1"}
+{
+  "config": {
+    "path": null,
+    "sha256": "b716e73ad37c37c74504bce78a811cc44eac792e683c276a183c5dfa24078ae7",
+    "source": "inline"
+  },
+  "context": {
+    "assurance": "strict",
+    "command": "evaluate",
+    "execution_mode": "container",
+    "profile": "release",
+    "tier": "balanced"
+  },
+  "execution_mode": "container",
+  "generated_at_utc": "2026-06-14T09:28:12.537887+00:00",
+  "manifest_version": 1,
+  "report": {
+    "filename": "evaluation.report.json",
+    "path": "/workspace/tmp/model_evidence_container/aa30b4a9468e147a/eval/google_gemma_4_12b_it/report/evaluation.report.json",
+    "sha256": "16db3277cd79c7b1672a3c23d26c21dc20552486bb3a73a27e1c3928f2c10fca"
+  },
+  "runtime": {
+    "allow_network": true,
+    "allow_remote_code": false,
+    "allow_third_party_plugins": false,
+    "container_execution": true,
+    "image_digest": "sha256:f1cf9be3fd7223a7290596268d789cda4ffcf8d731e3cbc1585281e5e18214bf",
+    "image_ref": "ghcr.io/invarlock/invarlock-runtime:latest@sha256:f1cf9be3fd7223a7290596268d789cda4ffcf8d731e3cbc1585281e5e18214bf"
+  },
+  "verifier_contract_version": "runtime-manifest-v1"
+}

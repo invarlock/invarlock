@@ -299,13 +299,20 @@ def build_sync_command(
     repo_setup: list[str],
     python_setup: list[str],
 ) -> str:
+    quoted_branch = shlex.quote(branch)
+    origin_ref = f"origin/{branch}"
+    quoted_origin_ref = shlex.quote(origin_ref)
+    quoted_fetch_refspec = shlex.quote(f"refs/heads/{branch}:refs/remotes/{origin_ref}")
     return " && ".join(
         [
             *repo_setup,
             f"cd {_shell_path(remote_repo)}",
-            "git fetch origin",
-            f"git checkout {shlex.quote(branch)}",
-            f"git pull --ff-only origin {shlex.quote(branch)}",
+            f"git fetch origin {quoted_fetch_refspec}",
+            (
+                f"git checkout {quoted_branch} "
+                f"|| git checkout -b {quoted_branch} --track {quoted_origin_ref}"
+            ),
+            f"git merge --ff-only {quoted_origin_ref}",
             *python_setup,
             _shell_command(
                 [remote_python, "scripts/checks/sync_packaged_contracts.py", "--check"]

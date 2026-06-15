@@ -85,9 +85,9 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         "Qwen3.5 causal LM",
         "Qwen3.5 4B image-text LM",
         "Qwen3.5 2B image-text LM",
+        "Gemma 4 E4B image-text LM",
+        "Gemma 4 E2B image-text LM",
         "Gemma 4 12B any-to-any LM",
-        "Gemma 3n E4B image-text LM",
-        "Gemma 3 4B IT image-text LM",
         "Gemma 4 26B-A4B MoE image-text LM",
         "Mixtral 8x7B MoE causal LM",
         "Qwen3 30B-A3B MoE causal LM",
@@ -99,7 +99,6 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         "Phi-4 mini causal LM",
         "DeepSeek-R1-Distill-Qwen 14B causal LM",
         "DeepSeek-R1-0528-Qwen3 8B causal LM",
-        "Falcon-H1R 7B causal LM",
         "FLAN-T5 base seq2seq LM",
     }
     assert families["GPT-2 causal LM"]["support_tier"] == "published_basis"
@@ -140,15 +139,23 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         families["Qwen3.5 2B image-text LM"]["evidence_status"]
         == "published_release_strict"
     )
-    for family in (
-        "Qwen3.5 4B image-text LM",
-        "Gemma 3n E4B image-text LM",
-        "Gemma 3 4B IT image-text LM",
-    ):
-        assert families[family]["support_tier"] == "community_experimental"
-        assert families[family]["evidence_status"] == "prepared_candidate"
-        assert families[family]["docs_label"] == "No"
+    assert families["Qwen3.5 4B image-text LM"]["support_tier"] == ("published_basis")
+    assert families["Qwen3.5 4B image-text LM"]["evidence_status"] == (
+        "published_release_strict"
+    )
+    assert families["Qwen3.5 4B image-text LM"]["docs_label"] == "Yes"
+    assert families["Gemma 4 E4B image-text LM"]["support_tier"] == ("published_basis")
+    assert families["Gemma 4 E4B image-text LM"]["evidence_status"] == (
+        "published_release_strict"
+    )
+    assert families["Gemma 4 E2B image-text LM"]["support_tier"] == ("published_basis")
+    assert families["Gemma 4 E2B image-text LM"]["evidence_status"] == (
+        "published_release_strict"
+    )
     assert families["Gemma 4 12B any-to-any LM"]["support_tier"] == ("published_basis")
+    assert families["Gemma 4 12B any-to-any LM"]["evidence_status"] == (
+        "published_release_strict"
+    )
     assert (
         families["Gemma 4 26B-A4B MoE image-text LM"]["support_tier"]
         == "published_basis"
@@ -192,10 +199,6 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
     )
     assert families["Phi-4 mini causal LM"]["support_tier"] == "published_basis"
     assert families["Phi-4 mini causal LM"]["evidence_status"] == (
-        "published_release_strict"
-    )
-    assert families["Falcon-H1R 7B causal LM"]["support_tier"] == "published_basis"
-    assert families["Falcon-H1R 7B causal LM"]["evidence_status"] == (
         "published_release_strict"
     )
     assert families["FLAN-T5 base seq2seq LM"]["support_tier"] == "published_basis"

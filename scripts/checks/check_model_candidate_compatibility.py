@@ -159,10 +159,39 @@ def _is_public_materialized_lane(suite_name: str, lane: EvidenceLane) -> bool:
     )
 
 
+def _allows_explicit_task_adapter(
+    *,
+    lane: EvidenceLane,
+    multi_adapter_model_ids: set[str],
+    effective_adapter: str,
+    preset_adapter: Any,
+    provider_kind: str | None,
+    loss_type: Any,
+) -> bool:
+    """Allow task-specific adapters for checkpoints with multiple declared lanes."""
+
+    if lane.model_id not in multi_adapter_model_ids:
+        return False
+    if preset_adapter is None or str(preset_adapter) != effective_adapter:
+        return False
+    expected_kinds = EXPECTED_PROVIDER_KINDS.get(effective_adapter)
+    if expected_kinds and provider_kind not in expected_kinds:
+        return False
+    expected_loss_types = EXPECTED_LOSS_TYPES.get(effective_adapter)
+    if (
+        expected_loss_types
+        and loss_type is not None
+        and str(loss_type) not in expected_loss_types
+    ):
+        return False
+    return True
+
+
 def _check_lane(
     suite_name: str,
     lane: EvidenceLane,
     support_rows: Mapping[str, Mapping[str, Any]],
+    multi_adapter_model_ids: set[str],
 ) -> list[Finding]:
     findings: list[Finding] = []
     scope = f"{suite_name}:{lane.slug}"
@@ -182,8 +211,23 @@ def _check_lane(
     if lane.adapter == "auto" and preset_adapter is not None:
         effective_adapter = str(preset_adapter)
 
+    provider = _nested(data, "dataset", "provider")
+    provider_kind = _provider_kind(provider)
+    loss_type = _nested(data, "eval", "loss", "type")
     expected_auto = resolve_auto_adapter(lane.model_id)
-    if effective_adapter != "auto" and expected_auto != effective_adapter:
+    explicit_task_adapter = _allows_explicit_task_adapter(
+        lane=lane,
+        multi_adapter_model_ids=multi_adapter_model_ids,
+        effective_adapter=effective_adapter,
+        preset_adapter=preset_adapter,
+        provider_kind=provider_kind,
+        loss_type=loss_type,
+    )
+    if (
+        effective_adapter != "auto"
+        and expected_auto != effective_adapter
+        and not explicit_task_adapter
+    ):
         findings.append(
             Finding(
                 "error",
@@ -207,8 +251,6 @@ def _check_lane(
             )
         )
 
-    provider = _nested(data, "dataset", "provider")
-    provider_kind = _provider_kind(provider)
     expected_kinds = EXPECTED_PROVIDER_KINDS.get(effective_adapter)
     if expected_kinds and provider_kind not in expected_kinds:
         findings.append(
@@ -220,7 +262,6 @@ def _check_lane(
             )
         )
 
-    loss_type = _nested(data, "eval", "loss", "type")
     expected_loss_types = EXPECTED_LOSS_TYPES.get(effective_adapter)
     if (
         expected_loss_types
@@ -318,10 +359,28 @@ def audit() -> list[Finding]:
     findings: list[Finding] = []
     support_rows = _support_matrix_rows()
     lane_model_ids: set[str] = set()
+    lanes = _all_lanes()
+    adapters_by_model_id: dict[str, set[str]] = {}
 
-    for suite_name, lane in _all_lanes():
+    for _suite_name, lane in lanes:
+        adapters_by_model_id.setdefault(lane.model_id, set()).add(lane.adapter)
+
+    multi_adapter_model_ids = {
+        model_id
+        for model_id, adapters in adapters_by_model_id.items()
+        if len(adapters) > 1
+    }
+
+    for suite_name, lane in lanes:
         lane_model_ids.add(lane.model_id)
-        findings.extend(_check_lane(suite_name, lane, support_rows))
+        findings.extend(
+            _check_lane(
+                suite_name,
+                lane,
+                support_rows,
+                multi_adapter_model_ids,
+            )
+        )
 
     override_model_ids = set(CATALOG_PRESET_OVERRIDES)
     catalog_model_ids = _model_ids_from_catalog()

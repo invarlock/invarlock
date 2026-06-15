@@ -192,7 +192,7 @@ exit 99
             "--suite",
             "model-catalog-gpu",
             "--slug",
-            "google_gemma_3_4b_it",
+            "qwen_qwen3_5_4b",
             "--execution-mode",
             "host",
             "--output-root",

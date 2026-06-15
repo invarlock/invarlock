@@ -33,6 +33,7 @@ nav:
       - Programmatic Quickstart: reference/programmatic-quickstart.md
       - Guards: reference/guards.md
       - Reports: reference/reports.md
+      - Report Outline: reference/report-outline.md
       - Environment Variables: reference/env-vars.md
       - Model Adapters: reference/model-adapters.md
       - Model Family Catalog: reference/model-family-catalog.md

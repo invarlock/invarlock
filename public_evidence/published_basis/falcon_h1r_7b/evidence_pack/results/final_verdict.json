@@ -1,9 +1,0 @@
-{
-  "assurance": "strict",
-  "basis": "public_evidence/published_basis/falcon_h1r_7b/evaluation.report.json",
-  "evidence_run": "20260613TfalconH1rSpectralFixA",
-  "model_id": "tiiuae/Falcon-H1R-7B",
-  "note": "Container-backed release-profile Falcon-H1R 7B no-op preservation evidence run after Mamba projection spectral-family classification and Falcon embedding spectral exclusion.",
-  "profile": "release",
-  "verdict": "PASS"
-}

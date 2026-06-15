@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added restrained InvarLock branding and version metadata to human-readable
+  Markdown/HTML reports and evidence-pack verdict summaries while keeping JSON
+  reports, manifests, and signed metadata machine-stable.
 - Added first-class baseline-relative guard warnings in reports and verification,
   including strict warning-policy handling so users can treat guard movement as
   advisory by default or fail verification when warnings are present.
@@ -18,13 +21,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added modern published-basis evidence for expanded dense causal model
   families, including Mistral/Ministral, Qwen2/Qwen2.5/Qwen3/Qwen3.5,
   Granite 4.1, DeepSeek R1 Qwen variants, Phi-4, SmolLM3, TinyLlama,
-  OLMo 2, OpenLLaMA, Falcon, and Falcon-H1R lanes.
+  OLMo 2, OpenLLaMA, and Falcon lanes.
 - Added published-basis coverage for additional architecture families,
-  including FLAN-T5 seq2seq, Gemma 4 multimodal/image-text lanes, OLMoE,
-  Mixtral, Gemma 4 26B-A4B MoE, and Qwen3 30B-A3B MoE evidence lanes.
+  including FLAN-T5 seq2seq, OLMoE, Mixtral, Qwen3 30B-A3B MoE, Qwen3.5 4B
+  image-text, Gemma 4 E2B image-text, Gemma 4 E4B image-text, Gemma 4 12B
+  image-text, and Gemma 4 26B-A4B image-text MoE evidence lanes.
 - Added public VQAv2 materialization support, scarce vision-text evidence
   window splitting, multimodal replay preservation, and processor digest
   evidence for image-text model runs.
+- Added a public image-text published-basis adequacy gate requiring measured
+  accuracy, enough final examples, and concise answer-shaped generations when
+  prediction records are embedded.
+- Added JSON-answer extraction for `vision_text` evaluation so public VQA runs
+  can prompt models for `{"answer": "..."}` structured output without breaking
+  exact-answer scoring.
+- Added a renderer-neutral report outline view model that groups modern
+  evaluation evidence into decision, primary-metric, policy-gate, guard-signal,
+  benchmark-comparison, provenance, and appendix sections before renderer work.
 - Added seq2seq evidence-run support for FLAN-T5, including label preservation,
   shuffled split handling, T5 guard targets, and calibration preview labels.
 - Added model-evidence GPU backlog lanes, preset overrides, remote-code
@@ -49,6 +62,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated guard-value claim wording across evidence-pack docs, public evidence,
   and support-matrix surfaces to distinguish policy failures, guard warnings,
   and published guard-value proof.
+- Updated evaluation-report HTML export to render directly from the shared
+  report outline, including benchmark-comparison and guard-warning sections,
+  instead of converting the historical Markdown body, and aligned report HTML
+  colors with the site Ledger ink branding tokens.
+- Updated evaluation-report HTML layout to use a flatter ledger-style document
+  treatment with a sticky brand/theme row, light/dark toggle, and active-section
+  highlighting in the left rail, and surfaced baseline identity in the summary
+  and Decision sections.
 - Updated support-matrix organization and evidence grouping so published-basis,
   experimental, multimodal, seq2seq, MoE, and blocked/access-gated lanes are
   easier to scan without adding a redundant grouping column.
@@ -65,10 +86,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated adapter examples to reflect the newly published dense, multimodal,
   seq2seq, and MoE model shapes.
 - Updated ordinary CI expectations so long GPU evidence sweeps are treated as
-  nightly/model-evidence work instead of blocking the standard green-main gate.
+  manually dispatched model-evidence work instead of blocking the standard
+  green-main gate.
 - Updated public evidence packaging to use compact evaluation reports for large
   published-basis artifacts while retaining the evidence manifests, runtime
   manifests, model revisions, and provenance needed for audit.
+- Updated Qwen3.5 4B, Gemma 4 E2B, Gemma 4 E4B, Gemma 4 12B, and Gemma 4
+  26B-A4B image-text evidence status to published basis after structured
+  JSON-answer reruns passed the public VQAv2 quality floor with strict
+  verification and no guard warnings.
 - Updated model-evidence sweeps to use an explicit repo-visible Hugging Face
   cache by default so container GPU runs and revision capture inspect the same
   downloaded model snapshots.
@@ -78,19 +104,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Removed automatic scheduled CI and scheduled GPU model-evidence sweep triggers;
+  full verification remains available by manual dispatch, release supply-chain
+  checks remain tag-gated, and model-evidence sweeps remain manually runnable.
 - Removed the stale `tests/fuzzing` owner expectation from the active test-tree
   contract after the fuzzing surface was retired from the repo layout.
+- Removed confirmed non-Apache-2.0/MIT hosted model checkpoints from active
+  support, calibration, and public-evidence surfaces.
 
 ### Fixed
 
+- Fixed exported HTML reports to use the packaged InvarLock bracket-and-signal
+  mark instead of the temporary `IL` text fallback.
+- Fixed exported HTML report rendering for summary status fallback, policy
+  threshold wording, sticky navigation/active-section behavior, and empty table
+  detail columns.
+- Fixed the root README CI badge to use Shields' semantic status colors for
+  passing/failing/default states instead of forcing the static brand accent.
 - Fixed evidence-pack queue and GPU-runner stability issues, including memory
   helper resolution, container scratch cleanup, retry handling after interrupted
   evaluate phases, and host/container output publication paths.
+- Fixed remote model-evidence branch sync for `work/...` branches by fetching
+  the current branch ref explicitly before fast-forwarding the remote checkout.
 - Fixed Mistral guard-demo manifests and public evidence scope notes so the
   published demo no longer overclaims non-baseline-relative FP8 guard signals.
-- Fixed Gemma 4 12B public evaluation gates by using classification-count
+- Fixed Gemma/Qwen multimodal evaluation gates by using classification-count
   accuracy intervals, delta semantics for accuracy drift, paired multimodal
-  window reporting, and scarce-window split handling.
+  window reporting, scarce-window split handling, and a public-basis absolute
+  image-text quality floor.
 - Fixed MoE and large-model guard/report behavior, including router warning
   handling, Qwen variance calibration bounds, and variance calibration
   truncation fallbacks.
