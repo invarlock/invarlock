@@ -112,6 +112,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added shared report-outline facts to Markdown reports and `report explain` so
   the human Markdown, HTML, and CLI explain surfaces expose the same high-level
   decision, policy, and guard-signal facts before their detailed sections.
+- Made `report explain --evaluation-report` explain the supplied
+  `evaluation.report.json` directly so portable reviewer bundles no longer need
+  linked raw baseline/subject run artifacts for the explain path.
 - Updated README branding to the Ledger ink palette, including static
   GitHub/PyPI-compatible Shields badges and refreshed light/dark logo, mark,
   app-icon, and favicon assets synced from the current site brand surface.

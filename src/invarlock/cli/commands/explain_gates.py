@@ -86,37 +86,12 @@ def _print_report_outline_summary(evaluation_report: dict[str, object]) -> None:
     console.print("")
 
 
-def explain_gates_command(
-    subject_report: str = typer.Option(
-        ...,
-        "--subject-report",
-        help="Path to the subject run report.json",
-    ),
-    baseline_report: str = typer.Option(
-        ...,
-        "--baseline-report",
-        help="Path to the baseline run report.json",
-    ),
+def explain_evaluation_report(
+    evaluation_report: dict[str, object],
+    *,
+    report_payload: object | None = None,
 ) -> None:
-    """Explain evaluation report gates for a report vs baseline.
-
-    Loads the reports, builds an evaluation report, and prints gate thresholds,
-    observed statistics, and pass/fail reasons in a compact, readable form.
-    """
-    report_path = Path(subject_report)
-    baseline_path = Path(baseline_report)
-    if not report_path.exists() or not baseline_path.exists():
-        console.print("[red]Missing --subject-report or --baseline-report file[/red]")
-        raise typer.Exit(1)
-
-    try:
-        report_data = _load_json_payload(report_path)
-        baseline_data = _load_json_payload(baseline_path)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        console.print(f"[red]Failed to load inputs: {exc}[/red]")
-        raise typer.Exit(1) from exc
-
-    evaluation_report = make_report(report_data, baseline_data)
+    """Explain gate decisions from an already-built evaluation report."""
     if telemetry_output_enabled():
         summary_line = telemetry_summary_line(evaluation_report)
         if summary_line:
@@ -278,7 +253,8 @@ def explain_gates_command(
             console.print("  threshold: " + "; ".join(thr_parts))
 
     # Dataset split visibility from report provenance
-    split_line = _dataset_split_line(report_data)
+    split_source = report_payload if report_payload is not None else evaluation_report
+    split_line = _dataset_split_line(split_source)
     if split_line:
         console.print(split_line)
 
@@ -405,3 +381,37 @@ def explain_gates_command(
             console.print("  observed: N/A")
         console.print(f"  threshold: ≤ +{float(threshold):.1f}%")
         console.print(f"  status: {'PASS' if passed else 'FAIL'}")
+
+
+def explain_gates_command(
+    subject_report: str = typer.Option(
+        ...,
+        "--subject-report",
+        help="Path to the subject run report.json",
+    ),
+    baseline_report: str = typer.Option(
+        ...,
+        "--baseline-report",
+        help="Path to the baseline run report.json",
+    ),
+) -> None:
+    """Explain evaluation report gates for a report vs baseline.
+
+    Loads the reports, builds an evaluation report, and prints gate thresholds,
+    observed statistics, and pass/fail reasons in a compact, readable form.
+    """
+    report_path = Path(subject_report)
+    baseline_path = Path(baseline_report)
+    if not report_path.exists() or not baseline_path.exists():
+        console.print("[red]Missing --subject-report or --baseline-report file[/red]")
+        raise typer.Exit(1)
+
+    try:
+        report_data = _load_json_payload(report_path)
+        baseline_data = _load_json_payload(baseline_path)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        console.print(f"[red]Failed to load inputs: {exc}[/red]")
+        raise typer.Exit(1) from exc
+
+    evaluation_report = make_report(report_data, baseline_data)
+    explain_evaluation_report(evaluation_report, report_payload=report_data)
