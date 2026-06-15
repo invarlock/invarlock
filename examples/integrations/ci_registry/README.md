@@ -29,10 +29,12 @@ jobs:
           runtime-provenance: container
 ```
 
-For repositories outside this source tree, copy
+The `uses: ./.github/actions/invarlock-report-gate` line is a repo-local action
+reference. For repositories outside this source tree, copy/vendor
 `.github/actions/invarlock-report-gate/` into the target repository and keep the
-local `uses: ./.github/actions/invarlock-report-gate` reference. A versioned
-remote action reference is not part of the public contract yet.
+local reference, or switch to a tagged remote action reference after one is
+published. A versioned remote action reference is not part of the public
+contract yet.
 
 The action writes:
 
@@ -77,9 +79,8 @@ mlflow.log_artifact(
 )
 ```
 
-The export sets tags such as `invarlock.status`,
-`invarlock.report_sha256`, `invarlock.policy_profile`,
-`invarlock.baseline`, and `invarlock.subject`.
+The export sets tags for status, report SHA-256, policy profile, baseline, and
+subject.
 
 ## Hugging Face Model Card Block
 
