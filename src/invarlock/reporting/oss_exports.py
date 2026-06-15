@@ -17,6 +17,19 @@ ReportExportFormat = Literal[
 ]
 
 _UNKNOWN = "unknown"
+_REPORT_LOCAL_GATE_KEYS = frozenset(
+    {
+        "guard_overhead_acceptable",
+        "guard_warning_policy_acceptable",
+        "invariants_pass",
+        "moe_identity_ok",
+        "preview_final_drift_acceptable",
+        "primary_metric_acceptable",
+        "primary_metric_tail_acceptable",
+        "rmt_stable",
+        "spectral_stable",
+    }
+)
 
 
 class VerifyResultMismatchError(ValueError):
@@ -173,7 +186,9 @@ def _derive_primary_metric_field(report: Mapping[str, Any], key: str) -> str:
 def _failed_gate_count(report: Mapping[str, Any]) -> int:
     validation = _as_mapping(report.get("validation"))
     return sum(
-        1 for value in validation.values() if isinstance(value, bool) and not value
+        1
+        for key, value in validation.items()
+        if key in _REPORT_LOCAL_GATE_KEYS and isinstance(value, bool) and not value
     )
 
 
@@ -185,18 +200,29 @@ def _verify_result_item(
         return None
     results = verify_result.get("results")
     if not isinstance(results, list) or not results:
-        return None
+        raise VerifyResultMismatchError(
+            "Verify result must contain a non-empty results list for evaluation "
+            f"report {report_path.resolve()}."
+        )
     resolved = str(report_path.resolve())
     mismatched_ids: list[str] = []
+    idless_count = 0
     for item in results:
         if not isinstance(item, Mapping):
+            idless_count += 1
             continue
         item_id = _clean_text(item.get("id"), default="")
         if not item_id:
+            idless_count += 1
             continue
         if str(Path(item_id).expanduser().resolve()) == resolved:
             return item
         mismatched_ids.append(item_id)
+    if idless_count:
+        raise VerifyResultMismatchError(
+            "Verify result item(s) must include an id matching evaluation report "
+            f"{resolved}."
+        )
     if mismatched_ids:
         preview = ", ".join(mismatched_ids[:3])
         suffix = "" if len(mismatched_ids) <= 3 else ", ..."
@@ -366,11 +392,11 @@ def _validation_checklist(report: Mapping[str, Any]) -> list[str]:
     lines: list[str] = []
     for key in sorted(validation):
         value = validation.get(key)
-        if not isinstance(value, bool):
+        if key not in _REPORT_LOCAL_GATE_KEYS or not isinstance(value, bool):
             continue
         marker = "x" if value else " "
         lines.append(f"- [{marker}] `{key}`")
-    return lines or ["- [ ] No boolean validation gates were present in the report."]
+    return lines or ["- [ ] No boolean report-local gates were present in the report."]
 
 
 def render_release_review_packet(

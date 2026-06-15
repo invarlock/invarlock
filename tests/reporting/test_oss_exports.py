@@ -10,6 +10,7 @@ from invarlock.reporting.oss_exports import (
     build_report_export_context,
     render_mlflow_tags_export,
     render_model_card_evidence_block,
+    render_release_review_packet,
 )
 
 
@@ -106,7 +107,7 @@ def test_verify_result_rejects_stale_explicit_id(tmp_path: Path) -> None:
         )
 
 
-def test_verify_result_ignores_single_idless_result(tmp_path: Path) -> None:
+def test_verify_result_rejects_single_idless_result(tmp_path: Path) -> None:
     report = _passing_report()
     report_path = _write_report(tmp_path, report)
     verify_result = {
@@ -120,16 +121,30 @@ def test_verify_result_ignores_single_idless_result(tmp_path: Path) -> None:
         ],
     }
 
-    context = build_report_export_context(
-        report_path,
-        report,
-        policy_profile="ci",
-        verify_result=verify_result,
-    )
+    with pytest.raises(VerifyResultMismatchError, match="must include an id"):
+        build_report_export_context(
+            report_path,
+            report,
+            policy_profile="ci",
+            verify_result=verify_result,
+        )
 
-    assert context.status == "pass"
-    assert context.verifier_status == "not_provided"
-    assert context.verifier_reason == "unknown"
+
+def test_verify_result_rejects_missing_results(tmp_path: Path) -> None:
+    report = _passing_report()
+    report_path = _write_report(tmp_path, report)
+    verify_result = {
+        "format_version": "verify-v1",
+        "summary": {"ok": True, "reason": "ok"},
+    }
+
+    with pytest.raises(VerifyResultMismatchError, match="non-empty results list"):
+        build_report_export_context(
+            report_path,
+            report,
+            policy_profile="ci",
+            verify_result=verify_result,
+        )
 
 
 def test_verify_result_uses_matching_item_from_batch(tmp_path: Path) -> None:
@@ -184,6 +199,32 @@ def test_mlflow_export_includes_registry_search_tags(tmp_path: Path) -> None:
     assert tags["invarlock.primary_metric_ratio_vs_baseline"] == "1.0246"
     assert tags["invarlock.report_url"] == "https://example.test/evaluation.report.json"
     assert tags["invarlock.evidence_url"] == "https://example.test/evidence.zip"
+
+
+def test_release_review_counts_only_report_local_gate_failures(
+    tmp_path: Path,
+) -> None:
+    report = _passing_report()
+    report["validation"] = {
+        "guard_warnings_present": False,
+        "hysteresis_applied": False,
+        "invariants_pass": True,
+        "moe_observed": False,
+        "preview_final_drift_acceptable": True,
+        "primary_metric_acceptable": True,
+        "rmt_stable": True,
+        "spectral_stable": True,
+    }
+    report_path = _write_report(tmp_path, report)
+
+    context = build_report_export_context(report_path, report)
+    markdown = render_release_review_packet(context, report)
+
+    assert context.failed_gate_count == 0
+    assert "Failed report-local validation gates: `0`" in markdown
+    assert "`guard_warnings_present`" not in markdown
+    assert "`hysteresis_applied`" not in markdown
+    assert "`moe_observed`" not in markdown
 
 
 def test_model_card_markdown_escapes_table_cells(tmp_path: Path) -> None:

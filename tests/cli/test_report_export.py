@@ -278,6 +278,42 @@ def test_report_export_rejects_stale_verify_result(tmp_path: Path) -> None:
     assert not output.exists()
 
 
+def test_report_export_rejects_idless_verify_result(tmp_path: Path) -> None:
+    report = _write_evaluation_report(tmp_path, _evaluation_report_payload())
+    output = tmp_path / "mlflow-tags.json"
+    verify_result = tmp_path / "verify.json"
+    verify_result.write_text(
+        json.dumps(
+            {
+                "format_version": "verify-v1",
+                "summary": {"ok": True, "reason": "ok"},
+                "results": [{"ok": True, "reason": "ok"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "report",
+            "export",
+            "-i",
+            str(report),
+            "--format",
+            "mlflow-tags",
+            "--verify-result",
+            str(verify_result),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "must include an id matching evaluation report" in result.stdout
+    assert not output.exists()
+
+
 def test_report_export_rejects_unknown_format(tmp_path: Path) -> None:
     report = _write_evaluation_report(tmp_path, _evaluation_report_payload())
 
