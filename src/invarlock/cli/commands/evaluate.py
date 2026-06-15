@@ -14,7 +14,6 @@ Steps:
 
 from __future__ import annotations
 
-import inspect
 import io
 import json
 import os
@@ -44,7 +43,7 @@ from ...core.evaluate_plan import (
     resolve_evaluate_execution_policy,
     resolve_evaluate_tmp_dir,
 )
-from ...core.exceptions import ConfigError, MetricsError, ValidationError
+from ...core.exceptions import ConfigError, ValidationError
 
 # Use the report group's programmatic entry for report generation
 from ...reporting.report_contract import generate_reports
@@ -65,6 +64,9 @@ from ..evaluate_phases import (
 )
 from ..evaluate_phases import (
     _run_subject_evaluation_phase as _run_subject_evaluation_phase_impl,
+)
+from ..evaluate_report_phase import (
+    emit_evaluation_report_phase as _emit_evaluation_report_phase_impl,
 )
 from ..security_helpers import (
     emit_runtime_manifest,
@@ -620,74 +622,6 @@ def evaluate_command(
 
     _phase(3, 3, "EVALUATION REPORT GENERATION")
 
-    def _emit_evaluation_report() -> None:
-        _info("Emitting evaluation report", tag="EXEC", emoji="📜")
-        with cli_output.timed_step(
-            console=console,
-            style=output_style,
-            timings=timings,
-            key="evaluation_report",
-            tag="EXEC",
-            message="Evaluation Report",
-            emoji="📜",
-        ):
-            try:
-                report_kwargs: dict[str, Any] = {
-                    "run": str(edited_report),
-                    "format": "report",
-                    "baseline": str(baseline_report_path),
-                    "output": str(report_out),
-                }
-                report_signature = inspect.signature(generate_reports)
-                supports_render_optional = (
-                    "render_optional" in report_signature.parameters
-                    or any(
-                        param.kind is inspect.Parameter.VAR_KEYWORD
-                        for param in report_signature.parameters.values()
-                    )
-                )
-                if supports_render_optional:
-                    report_kwargs["render_optional"] = not defer_report_rendering
-                generate_reports(**report_kwargs)
-            except (ConfigError, MetricsError, ValidationError) as exc:
-                _fail(str(getattr(exc, "message", exc)), exit_code=1)
-        emit_runtime_manifest(
-            Path(report_out) / "evaluation.report.json",
-            config_payload={
-                "command": "evaluate",
-                "baseline": baseline,
-                "subject": subject,
-                "baseline_adapter": baseline_eff_adapter,
-                "subject_adapter": subject_eff_adapter,
-                "profile": profile_name,
-                "tier": tier_name,
-                "preset": preset,
-                "out": out,
-                "report_out": report_out,
-                "edit_config": edit_config,
-                "edit_label": edit_label,
-                "allow_network": allow_network,
-                "allow_remote_code": allow_remote_code,
-                "allow_third_party_plugins": allow_third_party_plugins,
-                "execution_mode": execution_mode,
-                "assurance": assurance_mode,
-                "defer_report_rendering": bool(defer_report_rendering),
-            },
-            extra={
-                "command": "evaluate",
-                "profile": profile_name,
-                "tier": tier_name,
-                "execution_mode": execution_mode,
-                "assurance": assurance_mode,
-            },
-            execution=_evaluation_report_manifest_execution(
-                execution_mode=execution_mode,
-                allow_network=allow_network,
-                allow_remote_code=allow_remote_code,
-                allow_third_party_plugins=allow_third_party_plugins,
-            ),
-        )
-
     # CI/Release hard‑abort: fail fast when primary metric is not computable.
     try:
         prof = str(profile or "").strip().lower()
@@ -708,7 +642,35 @@ def evaluate_command(
             )
             raise typer.Exit(resolve_command_exit_code(outcome.error, profile=profile))
 
-    _emit_evaluation_report()
+    _emit_evaluation_report_phase_impl(
+        edited_report=edited_report,
+        baseline_report_path=baseline_report_path,
+        report_out=report_out,
+        baseline=baseline,
+        subject=subject,
+        baseline_eff_adapter=str(baseline_eff_adapter),
+        subject_eff_adapter=str(subject_eff_adapter),
+        profile_name=profile_name,
+        tier_name=tier_name,
+        preset=preset,
+        out=out,
+        edit_config=edit_config,
+        edit_label=edit_label,
+        allow_network=allow_network,
+        allow_remote_code=allow_remote_code,
+        allow_third_party_plugins=allow_third_party_plugins,
+        execution_mode=execution_mode,
+        assurance_mode=assurance_mode,
+        defer_report_rendering=defer_report_rendering,
+        console=console,
+        output_style=output_style,
+        timings=timings,
+        info_fn=_info,
+        fail_fn=_fail,
+        generate_reports_fn=generate_reports,
+        emit_runtime_manifest_fn=emit_runtime_manifest,
+        manifest_execution_fn=_evaluation_report_manifest_execution,
+    )
     if total_start is not None:
         timings["total"] = max(0.0, float(cli_output.perf_counter() - total_start))
     else:

@@ -607,7 +607,7 @@ def test_evaluate_edit_label_is_forwarded_to_subject_run(
     assert run_calls[1]["edit_label"] == "quantized-subject"
 
 
-def test_evaluate_filters_report_kwargs_to_supported_signature(
+def test_evaluate_passes_render_optional_to_report_contract(
     monkeypatch, tmp_path: Path
 ) -> None:
     src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
@@ -624,17 +624,18 @@ def test_evaluate_filters_report_kwargs_to_supported_signature(
         raising=False,
     )
 
-    def limited_report(*, run, format, baseline, output):
+    def report_contract(*, run, format, baseline, output, render_optional):
         report_calls.append(
             {
                 "run": run,
                 "format": format,
                 "baseline": baseline,
                 "output": output,
+                "render_optional": render_optional,
             }
         )
 
-    monkeypatch.setattr(mod, "generate_reports", limited_report, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", report_contract, raising=False)
 
     mod.evaluate_command(
         baseline=str(src),
@@ -653,6 +654,7 @@ def test_evaluate_filters_report_kwargs_to_supported_signature(
             "format": "report",
             "baseline": str(baseline_report),
             "output": str(Path("reports")),
+            "render_optional": True,
         }
     ]
 

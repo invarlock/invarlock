@@ -109,6 +109,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   summary writing onto a shared typed evidence-workflow helper layer as the
   first step toward thinner evidence-pack and model-evidence orchestration
   entrypoints.
+- Moved `evaluate` evaluation-report generation and runtime-manifest emission
+  into a dedicated report-phase helper with injected dependencies, preserving
+  existing report-generation monkeypatch paths while thinning the command body.
 - Updated README branding to the Ledger ink palette, including static
   GitHub/PyPI-compatible Shields badges and refreshed light/dark logo, mark,
   app-icon, and favicon assets synced from the current site brand surface.
