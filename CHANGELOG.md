@@ -114,6 +114,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   summary writing onto a shared typed evidence-workflow helper layer as the
   first step toward thinner evidence-pack and model-evidence orchestration
   entrypoints.
+- Updated model-family lane routing to use a shared catalog/support-matrix
+  registry that resolves presets and adapters from model task role, modality,
+  and evidence metadata instead of a model-evidence-local override table.
 - Moved `evaluate` evaluation-report generation and runtime-manifest emission
   into a dedicated report-phase helper with explicit dependencies and a thinner
   command body.
