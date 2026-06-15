@@ -148,7 +148,7 @@ def test_repo_hygiene_checks_uv_lock_sync() -> None:
 
     uv_step = _find_step_by_name(steps, "Set up uv")
     assert (
-        uv_step["uses"] == "astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b"
+        uv_step["uses"] == "astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39"
     )
     assert uv_step["with"]["version"] == "0.10.10"
 
