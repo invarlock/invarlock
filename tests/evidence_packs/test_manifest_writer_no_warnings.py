@@ -20,6 +20,7 @@ def test_manifest_writer_runs_with_warnings_as_errors(tmp_path: Path) -> None:
 
     # Minimal artifact to ensure artifacts list is non-empty.
     (pack_dir / "results" / "final_verdict.json").write_text("{}", encoding="utf-8")
+    (pack_dir / "checksums.sha256").write_text("checksum\n", encoding="utf-8")
 
     env = os.environ.copy()
     env["PYTHONWARNINGS"] = "error"
@@ -54,6 +55,8 @@ def test_manifest_writer_runs_with_warnings_as_errors(tmp_path: Path) -> None:
     assert str(manifest.get("generated_at", "")).endswith("Z")
     assert manifest.get("builder", {}).get("id") == "invarlock/evidence-pack@v1"
     assert manifest.get("subject", {}).get("path") == "results/final_verdict.json"
+    assert manifest.get("artifacts") == ["results/final_verdict.json"]
+    assert manifest.get("checksums_sha256_digest")
     assert isinstance(manifest.get("materials"), list)
     assert "config_source" in (manifest.get("invocation") or {})
 

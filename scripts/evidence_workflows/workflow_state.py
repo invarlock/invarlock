@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Sequence
+from collections.abc import Sequence, Set
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -66,25 +66,33 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def capture_artifacts(
+def collect_artifact_paths(
     output_root: Path,
     *,
     patterns: Sequence[str],
-) -> list[dict[str, object]]:
+    exclude_names: Set[str] = frozenset(),
+) -> list[str]:
     relpaths: set[Path] = set()
     for pattern in patterns:
         relpaths.update(
             path.relative_to(output_root)
             for path in output_root.glob(pattern)
-            if path.is_file()
+            if path.is_file() and path.name not in exclude_names
         )
+    return [relpath.as_posix() for relpath in sorted(relpaths)]
 
+
+def capture_artifacts(
+    output_root: Path,
+    *,
+    patterns: Sequence[str],
+) -> list[dict[str, object]]:
     artifacts: list[WorkflowArtifact] = []
-    for relpath in sorted(relpaths):
+    for relpath in collect_artifact_paths(output_root, patterns=patterns):
         path = output_root / relpath
         artifacts.append(
             WorkflowArtifact(
-                path=relpath.as_posix(),
+                path=relpath,
                 bytes=path.stat().st_size,
                 sha256=sha256_file(path),
             )
