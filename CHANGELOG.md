@@ -109,9 +109,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   summary writing onto a shared typed evidence-workflow helper layer as the
   first step toward thinner evidence-pack and model-evidence orchestration
   entrypoints.
-- Added a shared report-outline fact table to Markdown reports so the human
-  Markdown and HTML renderers expose the same high-level decision, policy, and
-  guard-signal facts before their detailed sections.
+- Added shared report-outline facts to Markdown reports and `report explain` so
+  the human Markdown, HTML, and CLI explain surfaces expose the same high-level
+  decision, policy, and guard-signal facts before their detailed sections.
 - Updated README branding to the Ledger ink palette, including static
   GitHub/PyPI-compatible Shields badges and refreshed light/dark logo, mark,
   app-icon, and favicon assets synced from the current site brand surface.

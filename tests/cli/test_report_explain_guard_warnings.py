@@ -132,6 +132,8 @@ def test_report_explain_describes_guard_warning_separately_from_policy_failure(
         baseline_report=str(baseline),
     )
     out = capsys.readouterr().out
+    assert "Report Outline" in out
+    assert "Guard Warnings: 1 [warn]; source=guard_warnings.warning_count" in out
     assert "Guard Warnings" in out
     assert "policy: pass" in out
     assert "strict warning mode" in out

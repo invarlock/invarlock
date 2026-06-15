@@ -14,6 +14,7 @@ from invarlock.reporting.report_builder_support import (
     telemetry_summary_line,
 )
 from invarlock.reporting.report_make import make_report
+from invarlock.reporting.report_outline import build_evaluation_report_outline
 from invarlock.reporting.report_policy import PM_DRIFT_BAND_DEFAULT
 
 console = Console()
@@ -65,6 +66,26 @@ def _drift_ratio(preview: object, final: object) -> float | None:
     return final_value / preview_value
 
 
+def _print_report_outline_summary(evaluation_report: dict[str, object]) -> None:
+    outline = build_evaluation_report_outline(evaluation_report)
+    console.print("[bold]Report Outline[/bold]")
+    for section in outline.sections:
+        if section.priority not in {"summary", "review"}:
+            continue
+        console.print(
+            f"  {section.title}: {section.summary}",
+            markup=False,
+        )
+        for fact in section.facts:
+            status = f" [{fact.status}]" if fact.status else ""
+            source = fact.source or "-"
+            console.print(
+                f"    - {fact.label}: {fact.value}{status}; source={source}",
+                markup=False,
+            )
+    console.print("")
+
+
 def explain_gates_command(
     subject_report: str = typer.Option(
         ...,
@@ -100,6 +121,7 @@ def explain_gates_command(
         summary_line = telemetry_summary_line(evaluation_report)
         if summary_line:
             console.print(summary_line, markup=False)
+    _print_report_outline_summary(evaluation_report)
     validation = (
         evaluation_report.get("validation", {})
         if isinstance(evaluation_report.get("validation"), dict)
