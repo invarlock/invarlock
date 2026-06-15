@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Run the shipped-model evidence sweep for supported experimental lanes."""
 
+# ruff: noqa: E402
+
 from __future__ import annotations
 
 import argparse
@@ -11,16 +13,32 @@ import shutil
 import subprocess
 import sys
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+SCRIPTS_DIR = SCRIPT_DIR.parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
 
+from evidence_workflows.workflow_state import (
+    WorkflowLaneResult as LaneResult,
+)
+from evidence_workflows.workflow_state import (
+    WorkflowRunMetadata,
+    sha256_file,
+    write_summary_files,
+)
+from evidence_workflows.workflow_state import (
+    capture_artifacts as _capture_workflow_artifacts,
+)
+from evidence_workflows.workflow_state import (
+    write_artifact_manifest as _write_workflow_artifact_manifest,
+)
 from model_evidence_lanes import (  # noqa: E402
     CURRENT_PUBLISHED_BASIS_LANES,
     CURRENT_SUPPORTED_EXPERIMENTAL_LANES,
@@ -46,6 +64,7 @@ from model_evidence_lanes import (  # noqa: E402
 )
 
 RETRYABLE_EVALUATE_RETURNCODES = {-15}
+_sha256_file = sha256_file
 
 __all__ = [
     "CURRENT_PUBLISHED_BASIS_LANES",
@@ -62,33 +81,26 @@ __all__ = [
     "SUPPORT_MATRIX_BACKLOG_GPU_LANES",
     "SUPPORT_MATRIX_BACKLOG_GPU_SUITE",
     "EvidenceLane",
+    "LaneResult",
     "manifest_lane_ids",
     "select_specs",
     "supported_experimental_lane_ids",
 ]
 
-
-@dataclass(frozen=True)
-class LaneResult:
-    slug: str
-    lane_id: str
-    model_id: str
-    preset: str
-    evaluate_exit: int
-    verify_exit: int | None
-    report_path: str
-    verify_path: str | None
-    status: str = "failed"
-    detail: str | None = None
-
-    @property
-    def ok(self) -> bool:
-        return self.status in {"ok", "skipped"}
-
-    def to_summary_entry(self) -> dict[str, object]:
-        payload = asdict(self)
-        payload["ok"] = self.ok
-        return payload
+MODEL_EVIDENCE_ARTIFACT_PATTERNS = (
+    "manifest.json",
+    "summary.json",
+    "summary.tsv",
+    "status.log",
+    "model_revisions.json",
+    "logs/*.log",
+    "eval/*/dataset/manifest.jsonl",
+    "eval/*/dataset/materialization_summary.json",
+    "eval/*/dataset/images/*",
+    "eval/*/prepared_preset.yaml",
+    "eval/*/report/evaluation.report.json",
+    "eval/*/verify.json",
+)
 
 
 def write_summary(
@@ -100,32 +112,15 @@ def write_summary(
     shard_count: int,
     results: Sequence[LaneResult],
 ) -> None:
-    summary_tsv = output_root / "summary.tsv"
-    with summary_tsv.open("w", encoding="utf-8") as handle:
-        handle.write(
-            "slug\tlane_id\tstatus\tdetail\tevaluate_exit\tverify_exit\treport\n"
-        )
-        for result in results:
-            verify_exit = (
-                "NA" if result.verify_exit is None else str(result.verify_exit)
-            )
-            handle.write(
-                f"{result.slug}\t{result.lane_id}\t{result.status}\t"
-                f"{result.detail or ''}\t{result.evaluate_exit}\t"
-                f"{verify_exit}\t{result.report_path}\n"
-            )
-
-    payload = {
-        "suite": suite,
-        "execution_mode": execution_mode,
-        "shard_index": shard_index,
-        "shard_count": shard_count,
-        "ok": all(result.ok for result in results),
-        "results": [result.to_summary_entry() for result in results],
-    }
-    (output_root / "summary.json").write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    write_summary_files(
+        output_root,
+        metadata=WorkflowRunMetadata(
+            suite=suite,
+            execution_mode=execution_mode,
+            shard_index=shard_index,
+            shard_count=shard_count,
+        ),
+        results=results,
     )
 
 
@@ -148,47 +143,11 @@ def write_manifest(
     )
 
 
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 def _capture_artifacts(output_root: Path) -> list[dict[str, object]]:
-    relpaths: set[Path] = set()
-    for pattern in (
-        "manifest.json",
-        "summary.json",
-        "summary.tsv",
-        "status.log",
-        "model_revisions.json",
-        "logs/*.log",
-        "eval/*/dataset/manifest.jsonl",
-        "eval/*/dataset/materialization_summary.json",
-        "eval/*/dataset/images/*",
-        "eval/*/prepared_preset.yaml",
-        "eval/*/report/evaluation.report.json",
-        "eval/*/verify.json",
-    ):
-        relpaths.update(
-            path.relative_to(output_root)
-            for path in output_root.glob(pattern)
-            if path.is_file()
-        )
-
-    files: list[dict[str, object]] = []
-    for relpath in sorted(relpaths):
-        path = output_root / relpath
-        files.append(
-            {
-                "path": relpath.as_posix(),
-                "bytes": path.stat().st_size,
-                "sha256": _sha256_file(path),
-            }
-        )
-    return files
+    return _capture_workflow_artifacts(
+        output_root,
+        patterns=MODEL_EVIDENCE_ARTIFACT_PATTERNS,
+    )
 
 
 def _default_hf_home() -> Path:
@@ -322,20 +281,17 @@ def write_artifact_manifest(
     shard_count: int,
     results: Sequence[LaneResult],
 ) -> None:
-    payload = {
-        "schema": "invarlock/model-evidence-artifact-manifest-v1",
-        "generated_at": datetime.now(UTC).isoformat(),
-        "suite": suite,
-        "execution_mode": execution_mode,
-        "shard_index": shard_index,
-        "shard_count": shard_count,
-        "ok": all(result.ok for result in results),
-        "lane_results": [result.to_summary_entry() for result in results],
-        "files": _capture_artifacts(output_root),
-    }
-    (output_root / "artifact_manifest.json").write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    _write_workflow_artifact_manifest(
+        output_root,
+        schema="invarlock/model-evidence-artifact-manifest-v1",
+        metadata=WorkflowRunMetadata(
+            suite=suite,
+            execution_mode=execution_mode,
+            shard_index=shard_index,
+            shard_count=shard_count,
+        ),
+        results=results,
+        artifact_patterns=MODEL_EVIDENCE_ARTIFACT_PATTERNS,
     )
 
 
