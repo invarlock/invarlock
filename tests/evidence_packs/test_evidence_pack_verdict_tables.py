@@ -4,6 +4,8 @@ import json
 import subprocess
 from pathlib import Path
 
+from invarlock import __version__
+
 
 def _write_verdict(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -109,3 +111,8 @@ def test_verdict_tables_core_and_without_pm_counts(tmp_path: Path) -> None:
 
     assert tables["non_pm_without_pm"]["any_non_pm_without_pm"] == 1
     assert tables["non_pm_without_pm"]["multi_non_pm_without_pm"] == 0
+
+    markdown = out_md.read_text(encoding="utf-8")
+    assert markdown.startswith("# InvarLock Evidence Pack Verdict Tables")
+    assert f"InvarLock {__version__}" in markdown
+    assert "Auditable verification for edited model checkpoints." in markdown

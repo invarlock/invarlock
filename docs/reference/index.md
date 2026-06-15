@@ -16,6 +16,7 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 | [Public Contracts](contracts.md) | Stable public contracts for reports, verification, and policy artifacts | Tool authors, reviewers |
 | [Datasets](datasets.md) | Dataset providers and pairing | CLI users |
 | [reports](reports.md) | v1 schema, telemetry, and HTML export | Operators, tool authors |
+| [Report Outline](report-outline.md) | Renderer-neutral report information architecture | Renderer authors, reviewers |
 | [Architecture](architecture.md) | System layers, data flow, and dependencies | Builders, reviewers |
 | [Tier Policy Catalog](tier-policy-catalog.md) | Guard threshold explanations | Operators auditing policies |
 | [Environment Variables](env-vars.md) | Runtime toggles and flags | Operators |
@@ -36,7 +37,8 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 ### Understanding reports
 
 1. [reports](reports.md) — v1 schema, telemetry, and HTML export
-2. [Artifact Layout](artifacts.md) — File organization
+2. [Report Outline](report-outline.md) — shared section order for modern renderers
+3. [Artifact Layout](artifacts.md) — File organization
 
 ### Tuning Guards
 

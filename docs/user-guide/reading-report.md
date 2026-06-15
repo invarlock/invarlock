@@ -6,7 +6,7 @@
 | --- | --- |
 | **Purpose** | Understand and interpret InvarLock v1 reports. |
 | **Audience** | Reviewers validating evaluation evidence. |
-| **Key sections** | Executive Summary, Quality Gates, Primary Metric, Provenance, Measurement contracts. |
+| **Key sections** | Decision, Primary Metric, Policy Gates, Guard Signals, Evidence And Provenance, Technical Appendix. |
 | **Validation** | Use `invarlock verify <evaluation.report.json>` to check schema, pairing, and required runtime provenance via `runtime.manifest.json`. |
 | **Source of truth** | [reports](../reference/reports.md) for full schema. |
 
@@ -16,23 +16,30 @@ interpret them.
 Browser-first reading order for the HTML export:
 
 ```text
-1. Summary chips
-2. Quick links rail
-3. Executive Summary
-4. Quality Gates
-5. Provenance / Policy details
+1. Summary ledger row
+2. Sections rail
+3. Decision
+4. Primary Metric
+5. Policy Gates
+6. Guard Signals
+7. Evidence And Provenance
+8. Technical Appendix
 ```
 
-The HTML shell is intentionally thin. It adds navigation and orientation, but
-the evidence still comes from the same canonical report body and should be
-re-checked with `invarlock verify`.
+The HTML export renders the shared report outline directly. The evidence still
+comes from `evaluation.report.json` and should be re-checked with
+`invarlock verify`.
 
-- Executive Summary
-  - First-screen summary of overall PASS/FAIL plus the compact gate table (primary metric, drift, invariants, guards, overhead when evaluated).
-- Summary chips (HTML shell)
-  - Browser-only overview of overall status, primary-metric kind, and whether the bundle still links back to both run reports for `report explain --evaluation-report`.
-- Quick links rail (HTML shell)
-  - Browser-only navigation for jumping to Executive Summary, gates, provenance, and appendix sections without scrolling through the whole report.
+- Decision
+  - First-screen summary of overall PASS/FAIL, evidence mode, subject model,
+    baseline model/run, adapter, edit, primary metric, and guard-warning count.
+- Summary ledger row
+  - Browser overview of verdict, subject, baseline, primary-metric kind, and
+    guard warnings.
+- Sections rail
+  - Browser navigation for jumping to the canonical outline sections without
+    scrolling through the whole report. In HTML, the active section is
+    highlighted using the same measured sticky-row offset as hash navigation.
 - Primary Metric row
   - Shows the task‑appropriate metric (ppl_* or accuracy), its point estimates,
     and paired CI. The ratio/Δpp vs baseline drives the gate.
@@ -57,8 +64,9 @@ re-checked with `invarlock verify`.
     snapshot.
   - `dataset.hash.source` tells you whether dataset hashes were derived from
     explicit preview/final hashes, explicit token IDs, or a config fallback.
-- Policy Configuration
-  - Human-readable tier/digest plus collapsible resolved policy YAML; full details remain in `evaluation.report.json`.
+- Technical Appendix
+  - Capped previews of verbose policy, plugin, and artifact blocks. Full details
+    remain in `evaluation.report.json`.
 - Measurement contract
   - `resolved_policy.spectral.measurement_contract` /
     `resolved_policy.rmt.measurement_contract` pin the estimator + sampling
@@ -79,7 +87,7 @@ link back to raw subject and baseline `report.json` files. Public evidence
 fixtures may omit those raw run reports while still being valid for
 `verify`, `report html`, and `report validate`.
 
-### Executive Summary Interpretation
+### Decision Interpretation
 
 - **Overall** mirrors the canonical gate allow-list. A FAIL means at least one gate failed.
 - **Primary Metric** shows ratio/Δpp vs baseline; compare to tier thresholds in the gate table.

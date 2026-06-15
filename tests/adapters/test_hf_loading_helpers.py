@@ -586,18 +586,18 @@ def test_multimodal_auto_fallback_loader_tries_next_compatible_loader(
 
     strategy = hf_loading.resolve_core_loader_strategy(
         task="multimodal",
-        model_id="google/gemma-3n-E4B-it",
+        model_id="demo/gemma3n-compatible-checkpoint",
         allow_direct_submodule=False,
     )
 
     loaded = strategy.loader.from_pretrained(
-        "google/gemma-3n-E4B-it",
+        "demo/gemma3n-compatible-checkpoint",
         dtype="auto",
     )
 
     assert calls == ["AutoModelForImageTextToText", "AutoModelForMultimodalLM"]
     assert loaded == {
-        "model_id": "google/gemma-3n-E4B-it",
+        "model_id": "demo/gemma3n-compatible-checkpoint",
         "kwargs": {"dtype": "auto"},
     }
 
@@ -634,7 +634,7 @@ def test_resolve_core_loader_strategy_uses_chatglm_remote_loader() -> None:
     with runtime_allowances_scope(allow_remote_code=True):
         strategy = hf_loading.resolve_core_loader_strategy(
             task="causal",
-            model_id="THUDM/glm-4-9b-chat",
+            model_id="local-chatglm-compatible-checkpoint",
             kwargs={"trust_remote_code": True},
             allow_direct_submodule=True,
         )
@@ -668,7 +668,7 @@ def test_chatglm_remote_loader_patches_transformers5_expectations(
     config = FakeConfig()
 
     def fake_config_from_pretrained(model_id: str, **kwargs: object) -> FakeConfig:
-        assert model_id == "THUDM/glm-4-9b-chat"
+        assert model_id == "local-chatglm-compatible-checkpoint"
         assert kwargs["trust_remote_code"] is True
         return config
 
@@ -678,7 +678,7 @@ def test_chatglm_remote_loader_patches_transformers5_expectations(
         **kwargs: object,
     ) -> type[FakeRemoteClass]:
         assert class_ref == "modeling_chatglm.ChatGLM"
-        assert model_id == "THUDM/glm-4-9b-chat"
+        assert model_id == "local-chatglm-compatible-checkpoint"
         assert kwargs["trust_remote_code"] is True
         return FakeRemoteClass
 
@@ -695,7 +695,7 @@ def test_chatglm_remote_loader_patches_transformers5_expectations(
 
     with runtime_allowances_scope(allow_remote_code=True):
         loaded = _ChatGLMRemoteCodeCausalLoader.from_pretrained(
-            "THUDM/glm-4-9b-chat",
+            "local-chatglm-compatible-checkpoint",
             trust_remote_code=True,
             output_loading_info=True,
         )
@@ -706,7 +706,7 @@ def test_chatglm_remote_loader_patches_transformers5_expectations(
     assert FakeRemoteClass.all_tied_weights_keys == {}
     assert FakeRemoteClass.calls == [
         {
-            "model_id": "THUDM/glm-4-9b-chat",
+            "model_id": "local-chatglm-compatible-checkpoint",
             "trust_remote_code": True,
             "output_loading_info": True,
             "config": config,

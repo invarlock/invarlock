@@ -36,37 +36,6 @@
         "status": "selected"
       }
     },
-    "Qwen/Qwen1.5-72B": {
-      "fp8_quant": {
-        "edit_dir_name": "fp8_e5m2_clean",
-        "format": "e5m2",
-        "reason": "selected_by_evaluate_pass:e5m2_ffn",
-        "scope": "ffn",
-        "status": "selected"
-      },
-      "lowrank_svd": {
-        "edit_dir_name": "svd_rank32_clean",
-        "rank": 32,
-        "reason": "selected_by_evaluate_pass:rank32_ffn_layer31",
-        "scope": "ffn@layer=31",
-        "status": "selected"
-      },
-      "magnitude_prune": {
-        "edit_dir_name": "prune_clean",
-        "reason": "selected_by_evaluate_pass:sparsity120_ffn",
-        "scope": "ffn",
-        "sparsity": 0.12,
-        "status": "selected"
-      },
-      "quant_rtn": {
-        "bits": 4,
-        "edit_dir_name": "quant_4bit_clean",
-        "group_size": 32,
-        "reason": "selected_by_evaluate_pass:bits4_g32_ffn",
-        "scope": "ffn",
-        "status": "selected"
-      }
-    },
     "Qwen/Qwen2.5-7B": {
       "fp8_quant": {
         "edit_dir_name": "fp8_e5m2_clean",
@@ -563,37 +532,6 @@
         "status": "selected"
       }
     },
-    "facebook/opt-1.3b": {
-      "fp8_quant": {
-        "edit_dir_name": "fp8_e5m2_clean",
-        "format": "e5m2",
-        "reason": "selected_by_candidate_promotion_seed:e5m2_ffn",
-        "scope": "ffn",
-        "status": "selected"
-      },
-      "lowrank_svd": {
-        "edit_dir_name": "svd_rank32_clean",
-        "rank": 32,
-        "reason": "selected_by_candidate_promotion_seed:rank32_ffn_layer11",
-        "scope": "ffn@layer=11",
-        "status": "selected"
-      },
-      "magnitude_prune": {
-        "edit_dir_name": "prune_clean",
-        "reason": "selected_by_candidate_promotion_seed:sparsity080_ffn",
-        "scope": "ffn",
-        "sparsity": 0.08,
-        "status": "selected"
-      },
-      "quant_rtn": {
-        "bits": 4,
-        "edit_dir_name": "quant_4bit_clean",
-        "group_size": 32,
-        "reason": "selected_by_candidate_promotion_seed:bits4_g32_ffn",
-        "scope": "ffn",
-        "status": "selected"
-      }
-    },
     "tiiuae/falcon-7b": {
       "fp8_quant": {
         "edit_dir_name": "fp8_e5m2_clean",
@@ -607,37 +545,6 @@
         "rank": 32,
         "reason": "selected_by_candidate_promotion_seed:rank32_ffn_layer15",
         "scope": "ffn@layer=15",
-        "status": "selected"
-      },
-      "magnitude_prune": {
-        "edit_dir_name": "prune_clean",
-        "reason": "selected_by_candidate_promotion_seed:sparsity100_ffn",
-        "scope": "ffn",
-        "sparsity": 0.1,
-        "status": "selected"
-      },
-      "quant_rtn": {
-        "bits": 4,
-        "edit_dir_name": "quant_4bit_clean",
-        "group_size": 32,
-        "reason": "selected_by_candidate_promotion_seed:bits4_g32_ffn",
-        "scope": "ffn",
-        "status": "selected"
-      }
-    },
-    "THUDM/glm-4-9b-chat": {
-      "fp8_quant": {
-        "edit_dir_name": "fp8_e5m2_clean",
-        "format": "e5m2",
-        "reason": "selected_by_candidate_promotion_seed:e5m2_ffn",
-        "scope": "ffn",
-        "status": "selected"
-      },
-      "lowrank_svd": {
-        "edit_dir_name": "svd_rank32_clean",
-        "rank": 32,
-        "reason": "selected_by_candidate_promotion_seed:rank32_ffn_layer19",
-        "scope": "ffn@layer=19",
         "status": "selected"
       },
       "magnitude_prune": {

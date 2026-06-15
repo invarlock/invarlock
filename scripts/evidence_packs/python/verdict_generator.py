@@ -8,6 +8,12 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from .report_branding import evidence_pack_text_header
+except ImportError:  # pragma: no cover - direct module load under pytest
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from report_branding import evidence_pack_text_header
+
+try:
     from .verdict.generator_helpers import (
         CORE_GUARDS,
         INTERVENTION_SIGNALS,
@@ -601,7 +607,7 @@ def _render_text(payload: dict[str, Any]) -> str:
     guard_intervention_summary = payload.get("guard_intervention_summary") or {}
 
     lines = [
-        "INVARLOCK EVIDENCE PACK — FINAL VERDICT",
+        *evidence_pack_text_header("Final Verdict"),
         f"Verdict: {payload.get('verdict')}",
         f"Scenarios manifest: {manifest.get('path')}",
         "",

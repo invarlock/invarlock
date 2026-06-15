@@ -99,9 +99,12 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "qwen3-causal-hf",
         "qwen3-5-causal-hf",
         "qwen3-5-2b-image-text-hf",
+        "qwen3-5-4b-image-text-hf",
         "granite-4-1-3b-causal-hf",
         "granite-4-1-8b-causal-hf",
         "gemma4-e2b-text-causal-hf",
+        "gemma4-e2b-image-text-hf",
+        "gemma4-e4b-image-text-hf",
         "gemma4-12b-any-to-any-hf",
         "gemma4-26b-a4b-moe-image-text-hf",
         "deepseek-r1-distill-qwen-causal-hf",
@@ -110,13 +113,12 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "phi-4-text-causal-hf",
         "smollm3-3b-causal-hf",
         "phi-4-mini-causal-hf",
-        "falcon-h1r-7b-causal-hf",
         "flan-t5-base-seq2seq-hf",
     }
 
     family_catalog = contracts.load_model_family_catalog()
     assert family_catalog["format_version"] == "model-family-catalog-v1"
-    assert family_catalog["as_of"] == "2026-06-13"
+    assert family_catalog["as_of"] == "2026-06-14"
     assert family_catalog["declared_support"][0]["display_name"] == "GPT-2 causal LM"
     declared = {item["display_name"] for item in family_catalog["declared_support"]}
     assert declared == {
@@ -140,10 +142,10 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "Falcon 7B causal LM",
         "Qwen3.5 causal LM",
         "Gemma 4 12B any-to-any LM",
+        "Gemma 4 E4B image-text LM",
+        "Gemma 4 E2B image-text LM",
         "Qwen3.5 4B image-text LM",
         "Qwen3.5 2B image-text LM",
-        "Gemma 3n E4B image-text LM",
-        "Gemma 3 4B IT image-text LM",
         "Ministral 3 3B causal LM (text-only eval)",
         "Granite 4.1 3B causal LM",
         "Granite 4.1 8B causal LM",
@@ -151,7 +153,6 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "Phi-4 mini causal LM",
         "DeepSeek-R1-Distill-Qwen 14B causal LM",
         "DeepSeek-R1-0528-Qwen3 8B causal LM",
-        "Falcon-H1R 7B causal LM",
         "FLAN-T5 base seq2seq LM",
     }
     assert all(item["support_groups"] for item in family_catalog["declared_support"])
@@ -172,6 +173,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         evidence == "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack"
         for evidence in gemma4_26b["repo_evidence"]
     )
+    assert "0.555 final accuracy over 400 examples" in gemma4_26b["notes"]
 
     usage_only = {item["display_name"] for item in family_catalog["usage_only"]}
     assert "QwQ 32B reasoning" not in usage_only
@@ -226,29 +228,6 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     assert (
         candidates["Falcon 7B causal LM"]["current_catalog_state"] == "published_basis"
     )
-    for display_name in (
-        "OPT 1.3B causal LM",
-        "GLM 4 9B Chat",
-    ):
-        assert candidates[display_name]["criteria_status"]["included_preset"] == "pass"
-        assert (
-            candidates[display_name]["criteria_status"]["included_calibration_config"]
-            == "pass"
-        )
-        assert (
-            candidates[display_name]["criteria_status"]["cli_smoke_evidence"] == "pass"
-        )
-    assert candidates["Gemma 3 4B IT"]["decision"] == (
-        "redirected_to_image_text_candidate"
-    )
-    assert (
-        candidates["Gemma 3 4B IT"]["current_catalog_state"] == "community_experimental"
-    )
-    assert candidates["Gemma 3 4B IT"]["criteria_status"]["included_preset"] == "pass"
-    assert (
-        candidates["Gemma 3 4B IT"]["criteria_status"]["included_calibration_config"]
-        == "pass"
-    )
     assert (
         candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
             "decision"
@@ -273,9 +252,6 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         ]["cli_smoke_evidence"]
         == "pass"
     )
-    assert (
-        candidates["OPT 1.3B causal LM"]["criteria_status"]["targeted_tests"] == "pass"
-    )
     recommended = {
         item["display_name"] for item in family_catalog["recommended_additions"]
     }
@@ -288,6 +264,15 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     assert catalog["support_matrix"]["format_version"] == "support-matrix-v1"
     assert (
         catalog["model_family_catalog"]["format_version"] == "model-family-catalog-v1"
+    )
+    model_classification = contracts.load_model_classification()
+    assert model_classification["format_version"] == "model-classification-v1"
+    assert model_classification["policy"]["allowed_named_checkpoint_license_ids"] == [
+        "apache-2.0",
+        "mit",
+    ]
+    assert (
+        catalog["model_classification"]["format_version"] == "model-classification-v1"
     )
     assert catalog["plugin_compatibility"]["core_abi"] == "0.1"
     assert catalog["plugin_compatibility"]["match_policy"] == "exact_match"
@@ -418,7 +403,7 @@ def test_readme_surfaces_public_contract_catalog_entries() -> None:
 
     assert "doctor --json" in readme
     assert "advanced plugins ... --json" in readme
-    assert "`validation_keys`, `console_labels`, and `metric_kinds`" in readme
+    assert "`model_classification`, `validation_keys`, `console_labels`, and" in readme
 
 
 def test_contract_reference_records_scalar_payload_kind(

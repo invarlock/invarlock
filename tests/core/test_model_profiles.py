@@ -127,7 +127,7 @@ def test_tokenizer_factory_forwards_remote_code_opt_in(monkeypatch):
     monkeypatch.setattr(mp, "AutoTokenizer", DummyTokenizerFactory, raising=False)
 
     profile = detect_model_profile(
-        model_id="THUDM/glm-4-9b-chat",
+        model_id="local-chatglm-compatible-checkpoint",
         adapter="hf_causal",
         tokenizer_load_kwargs={"trust_remote_code": True},
     )
@@ -164,7 +164,7 @@ def test_run_environment_attaches_config_remote_code_to_profile() -> None:
 
     profile = _detect_model_profile_with_tokenizer_kwargs(
         detector,
-        model_id="THUDM/glm-4-9b-chat",
+        model_id="local-chatglm-compatible-checkpoint",
         adapter="hf_causal",
         tokenizer_load_kwargs={"trust_remote_code": True, "revision": "abc123"},
     )
@@ -176,13 +176,13 @@ def test_run_environment_attaches_config_remote_code_to_profile() -> None:
     assert not hasattr(profile, "tokenizer_load_kwargs")
 
     def legacy_detector(model_id: str, adapter: str) -> SimpleNamespace:
-        assert model_id == "THUDM/glm-4-9b-chat"
+        assert model_id == "local-chatglm-compatible-checkpoint"
         assert adapter == "hf_causal"
         return SimpleNamespace()
 
     legacy_profile = _detect_model_profile_with_tokenizer_kwargs(
         legacy_detector,
-        model_id="THUDM/glm-4-9b-chat",
+        model_id="local-chatglm-compatible-checkpoint",
         adapter="hf_causal",
         tokenizer_load_kwargs={"trust_remote_code": True, "revision": "abc123"},
     )

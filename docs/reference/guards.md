@@ -35,12 +35,9 @@ guards:
 > Most thresholds come from the tier defaults (see `tiers.yaml`). Use overrides
 > sparingly and keep evidence in the report.
 >
-> Assurance scope note: the published assurance basis covers GPT-2, BERT,
-> Mistral 7B, Ministral 3 3B, Ministral 3 8B, Ministral 3 14B,
-> TinyLlama 1.1B, Gemma 4 E2B text-only, Granite 4.1 3B, Granite 4.1 8B,
-> OLMo 2 7B, OLMo 2 13B, Qwen2 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B,
-> Qwen3.5 9B, DeepSeek-R1-Distill-Qwen 7B, DeepSeek-R1-0528-Qwen3 8B,
-> DeepSeek-R1-Distill-Qwen 14B, and Phi-4 text-only profiles.
+> Assurance scope note: the published assurance basis is the set of
+> `published_basis` rows in `contracts/support_matrix.json`, with the readable
+> grouping in `docs/README.md#support-matrix`.
 > Modern published-basis no-op reports are included as null-behavior guard
 > evidence, but transferred attention caps are budgeted sentinels until
 > family-specific calibration re-derives κ.
@@ -49,11 +46,9 @@ guards:
 > accepts the selected edits while clean confirmation reruns record
 > baseline-relative spectral, RMT, and variance/VE movement. Invariants remain
 > structural checks in that package and are required to pass.
-> Additional runnable but
-> unpublished lanes are tracked in `contracts/support_matrix.json`; they expand
-> runnable coverage, not the published assurance basis. Current examples include
-> SmolLM3 3B, Phi-4 mini, and newer DeepSeek variants; the contract file remains
-> authoritative.
+> Additional runnable but unpublished lanes are tracked in
+> `contracts/support_matrix.json`; they expand runnable coverage, not the
+> published assurance basis.
 
 ## Guard Pipeline Flow
 

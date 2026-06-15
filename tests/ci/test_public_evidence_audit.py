@@ -52,6 +52,145 @@ def test_public_evidence_audit_respects_root_override(tmp_path: Path) -> None:
     assert module.check_public_evidence(evidence_root) == []
 
 
+def _write_minimal_evidence_dir(
+    artifact_dir: Path,
+    *,
+    module,
+    report: dict,
+    evidence_class: str = "strict_pass_fixture",
+) -> None:
+    artifact_dir.mkdir(parents=True)
+    (artifact_dir / "evaluation.report.json").write_text(
+        json.dumps(report),
+        encoding="utf-8",
+    )
+    (artifact_dir / "runtime.manifest.json").write_text("{}", encoding="utf-8")
+    (artifact_dir / "evidence.meta.json").write_text(
+        json.dumps(
+            {
+                "schema": module.SCHEMA,
+                "evidence_class": evidence_class,
+                "summary": "fixture report",
+                "artifact_paths": {
+                    "evaluation_report": "evaluation.report.json",
+                    "runtime_manifest": "runtime.manifest.json",
+                },
+                "verifier_commands": ["invarlock verify evaluation.report.json"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_public_evidence_audit_rejects_low_quality_published_image_text(
+    tmp_path: Path,
+) -> None:
+    module = _load_audit_module()
+    evidence_root = tmp_path / "public_evidence"
+    (evidence_root / "README.md").parent.mkdir(parents=True)
+    (evidence_root / "README.md").write_text("# public evidence\n", encoding="utf-8")
+    _write_minimal_evidence_dir(
+        evidence_root / "published_basis" / "weak_vlm",
+        module=module,
+        report={
+            "dataset": {"provider": "vision_text"},
+            "primary_metric": {
+                "kind": "accuracy",
+                "final": 0.03,
+                "n_final": 400,
+                "counts_source": "measured",
+                "estimated": False,
+            },
+            "classification": {
+                "final": {"correct_total": 12, "total": 400},
+            },
+        },
+    )
+
+    errors = module.check_public_evidence(evidence_root)
+
+    assert any("final accuracy 0.0300 is below 0.10" in error for error in errors)
+
+
+def test_public_evidence_audit_accepts_adequate_published_image_text_shape_records(
+    tmp_path: Path,
+) -> None:
+    module = _load_audit_module()
+    evidence_root = tmp_path / "public_evidence"
+    (evidence_root / "README.md").parent.mkdir(parents=True)
+    (evidence_root / "README.md").write_text("# public evidence\n", encoding="utf-8")
+    _write_minimal_evidence_dir(
+        evidence_root / "published_basis" / "adequate_vlm",
+        module=module,
+        report={
+            "dataset": {"provider": "vision_text"},
+            "primary_metric": {
+                "kind": "accuracy",
+                "final": 0.85,
+                "n_final": 400,
+                "counts_source": "measured",
+                "estimated": False,
+            },
+            "classification": {
+                "final": {"correct_total": 340, "total": 400},
+            },
+            "eval_windows": {
+                "final": {
+                    "records": [
+                        {"prediction": '{"answer": "red cup"}'},
+                        {"prediction": '{"answer": "cat"}'},
+                    ]
+                }
+            },
+        },
+    )
+
+    assert module.check_public_evidence(evidence_root) == []
+
+
+def test_public_evidence_audit_rejects_bad_embedded_answer_shape(
+    tmp_path: Path,
+) -> None:
+    module = _load_audit_module()
+    evidence_root = tmp_path / "public_evidence"
+    (evidence_root / "README.md").parent.mkdir(parents=True)
+    (evidence_root / "README.md").write_text("# public evidence\n", encoding="utf-8")
+    _write_minimal_evidence_dir(
+        evidence_root / "published_basis" / "verbose_vlm",
+        module=module,
+        report={
+            "dataset": {"provider": "vision_text"},
+            "primary_metric": {
+                "kind": "accuracy",
+                "final": 0.85,
+                "n_final": 400,
+                "counts_source": "measured",
+                "estimated": False,
+            },
+            "classification": {
+                "final": {"correct_total": 340, "total": 400},
+            },
+            "eval_windows": {
+                "final": {
+                    "records": [
+                        {
+                            "prediction": (
+                                "The user wants me to inspect the image and explain "
+                                "my reasoning before answering red cup."
+                            )
+                        },
+                        {"prediction": '{"answer": "cat"}'},
+                    ]
+                }
+            },
+        },
+    )
+
+    errors = module.check_public_evidence(evidence_root)
+
+    assert any("answer-shape rate 0.5000 is below 0.95" in error for error in errors)
+
+
 def test_real_run_reports_and_signed_packs_verify_release_strict() -> None:
     real_run_dirs = sorted((REPO_ROOT / "public_evidence" / "real_runs").iterdir())
     assert real_run_dirs

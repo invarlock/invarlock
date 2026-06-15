@@ -90,6 +90,7 @@ COVERAGE_TESTS_ADAPTERS := \
 	tests/adapters/test_adapter_auto_runtime.py \
 	tests/adapters/test_hf_loading_helpers.py \
 	tests/adapters/test_hf_multimodal_adapter.py \
+	tests/adapters/test_hf_multimodal_chat_template_kwargs.py \
 	tests/adapters/test_adapter_errors.py \
 	tests/adapters/test_hf_causal_loader_fallback.py \
 	tests/adapters/test_hf_causal_variant_paths.py \
@@ -634,6 +635,7 @@ ci-matrix:  ## Verify CI matrix
 contracts-check:  ## Ensure packaged contracts match the repo contract source
 	$(MAKE) ensure-python
 	$(PYTHON) scripts/checks/sync_packaged_contracts.py --check
+	$(PYTHON) scripts/checks/check_model_classification.py
 	$(PYTHON) scripts/checks/check_model_candidate_compatibility.py
 
 repo-cruft-check:  ## Fail if macOS transport artifacts leaked into repo source paths

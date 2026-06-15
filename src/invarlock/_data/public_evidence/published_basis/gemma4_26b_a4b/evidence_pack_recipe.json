@@ -1,4 +1,8 @@
 {
+  "format_version": "published-basis-evidence-pack-recipe-v1",
+  "lane_id": "gemma4-26b-a4b-moe-image-text-hf",
+  "suite": "support-matrix-backlog-gpu",
+  "network_mode": "online_first_then_offline",
   "artifacts": [
     "public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json",
     "public_evidence/published_basis/gemma4_26b_a4b/runtime.manifest.json",
@@ -9,12 +13,7 @@
     "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack/results/final_verdict.json"
   ],
   "commands": [
-    "make runtime-image-cuda",
-    "uv run python scripts/model_evidence/run_model_evidence_remote.py --host root@31.56.109.46 --remote-repo /root/invarlock-public-promote --branch work/promote-gemma-deepseek --suite support-matrix-backlog-gpu --slug google_gemma_4_26b_a4b_it --gpu-group 0,1,2,3 --remote-output-root /root/model-evidence/20260613Tgemma426ba4bH100A --session-prefix model-evidence-gemma26 --stamp 20260613Tgemma426ba4bH100A --remote-env HF_HUB_DISABLE_XET=1 --remote-env HF_HOME=/root/.cache/huggingface --remote-env HF_HUB_DOWNLOAD_TIMEOUT=300 --remote-env HF_HUB_ETAG_TIMEOUT=300",
-    "uv run invarlock advanced evidence-pack build public_evidence/published_basis/gemma4_26b_a4b/evidence_pack --final-verdict tmp/gemma4_26b_a4b_pack_inputs/final_verdict.json --report public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json --source-repo tmp/gemma4_26b_a4b_pack_inputs/source_repo.json --environment tmp/gemma4_26b_a4b_pack_inputs/environment.json --material model_revisions=artifacts/model-evidence/remote/20260613Tgemma426ba4bH100A/shard-00-gpu-0-1-2-3/model_revisions.json --material artifact_manifest=artifacts/model-evidence/remote/20260613Tgemma426ba4bH100A/shard-00-gpu-0-1-2-3/artifact_manifest.json --material dataset_materialization=artifacts/model-evidence/remote/20260613Tgemma426ba4bH100A/shard-00-gpu-0-1-2-3/eval/google_gemma_4_26b_a4b_it/dataset/materialization_summary.json --signing-key tmp/gemma4_26b_a4b_pack_inputs/evidence-pack-signing-key.pem --profile release --report-assurance strict --release-review"
-  ],
-  "format_version": "published-basis-evidence-pack-recipe-v1",
-  "lane_id": "gemma4-26b-a4b-moe-image-text-hf",
-  "network_mode": "online_first_then_offline",
-  "suite": "support-matrix-backlog-gpu"
+    "uv run python scripts/model_evidence/run_model_evidence_remote.py --host root@31.56.109.46 --remote-repo /root/invarlock-public-promote --branch work/purge-non-apache-qwen35-4b-sanity --skip-sync --suite support-matrix-backlog-gpu --slug google_gemma_4_26b_a4b_it --gpu-group 2,3,4,5 --gpus 2,3,4,5 --session-prefix model-evidence-gemma4-26b-a4b-json-sanity --stamp 20260614Tgemma4_26b_a4b_json_sanity --remote-env HF_HUB_DISABLE_XET=1",
+    "uv run invarlock advanced evidence-pack build public_evidence/published_basis/gemma4_26b_a4b/evidence_pack --final-verdict tmp/gemma4_26b_a4b_pack_inputs/final_verdict.json --report public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json --source-repo tmp/gemma4_26b_a4b_pack_inputs/source_repo.json --environment tmp/gemma4_26b_a4b_pack_inputs/environment.json --material model_revisions=tmp/gemma4_26b_a4b_pack_inputs/model_revisions.json --material artifact_manifest=tmp/gemma4_26b_a4b_pack_inputs/artifact_manifest.json --material dataset_materialization=tmp/gemma4_26b_a4b_pack_inputs/materialization_summary.json --material summary=tmp/gemma4_26b_a4b_pack_inputs/summary.json --signing-key tmp/gemma4_26b_a4b_pack_inputs/evidence-pack-signing-key.pem --profile release --report-assurance strict --release-review"
+  ]
 }

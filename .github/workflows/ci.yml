@@ -20,9 +20,6 @@ on:
         options:
           - "false"
           - "true"
-  schedule:
-    # Weekly full-ish gate to catch regressions without slowing PRs.
-    - cron: "0 2 * * 1"  # Monday 2 AM UTC
 
 permissions:
   contents: read
@@ -30,7 +27,7 @@ permissions:
 jobs:
   # Single test job (Python 3.13)
   tests-docs:
-    if: ${{ github.event_name != 'schedule' && !(github.event_name == 'workflow_dispatch' && inputs.full == 'true') }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full == 'true') }}
     runs-on: ubuntu-latest
     env:
       INVARLOCK_LIGHT_IMPORT: "1"
@@ -102,7 +99,6 @@ jobs:
 
   # Minimum-supported Python (3.12) smoke (small subset).
   tests-min-py312:
-    if: ${{ github.event_name != 'schedule' }}
     runs-on: ubuntu-latest
     env:
       INVARLOCK_LIGHT_IMPORT: "1"
@@ -142,7 +138,7 @@ jobs:
         run: make packaging-smoke-minimal
 
   coverage-enforce:
-    if: ${{ github.event_name != 'schedule' && !(github.event_name == 'workflow_dispatch' && inputs.full == 'true') }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full == 'true') }}
     runs-on: ubuntu-latest
     env:
       INVARLOCK_LIGHT_IMPORT: "1"
@@ -174,7 +170,7 @@ jobs:
         run: make coverage-enforce
 
   typed-surface:
-    if: ${{ github.event_name != 'schedule' && !(github.event_name == 'workflow_dispatch' && inputs.full == 'true') }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full == 'true') }}
     runs-on: ubuntu-latest
     env:
       INVARLOCK_LIGHT_IMPORT: "1"
@@ -205,9 +201,9 @@ jobs:
       - name: Run typed-surface mypy
         run: make mypy-typed-surface
 
-  # Scheduled (or manual full) gate: broader tests + lint/format + docs build.
+  # Manual full gate: broader tests + lint/format + docs build.
   verify-full:
-    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full == 'true') }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.full == 'true' }}
     runs-on: ubuntu-latest
     env:
       INVARLOCK_LIGHT_IMPORT: "1"
@@ -253,11 +249,11 @@ jobs:
           make packaging-smoke-minimal
           mkdocs build --strict
 
-  # Supply-chain security (weekly + tags only to save cost)
+  # Supply-chain security for release tags. PR-time checks live in supply-chain-pr.yml.
   supply-chain:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 

@@ -4002,62 +4002,62 @@
       "sha256": "b454132989802d89d2a493a16a347100228aae98209dca541c3441db75801dc0"
     },
     {
-      "bytes": 414745,
+      "bytes": 478745,
       "path": "eval/google_gemma_4_12b_it/dataset/manifest.jsonl",
-      "sha256": "b9c670d71bd0d0196bd6683a392d3e3efb6defec93810582c160470177457284"
+      "sha256": "b18073e194e812ceeb4ef1a7c2174ecad44136dfe6e299a0733ab159408025a0"
     },
     {
       "bytes": 167887,
       "path": "eval/google_gemma_4_12b_it/dataset/materialization_summary.json",
-      "sha256": "831a14501de70a88d0c63ffd700b227b6a7b26573044a546ce35da28b1f49834"
+      "sha256": "66d978d3bd8c3e3069c290c58abe957fe78c65559e3445a457eb4e27d88059d2"
     },
     {
-      "bytes": 991,
+      "bytes": 1084,
       "path": "eval/google_gemma_4_12b_it/prepared_preset.yaml",
-      "sha256": "5d7c9a4c73be3b60a6da72fc911f91db021b8ba62d9d33b429f211cc7a3e7c0e"
+      "sha256": "4d212c53a36f259e1e7a4ecd5ce429f7bb090ee41b17290a38763db7fcfbf4dd"
     },
     {
-      "bytes": 1289846,
+      "bytes": 1037313,
       "path": "eval/google_gemma_4_12b_it/report/evaluation.report.json",
-      "sha256": "093f4d0cae626b8010855bc2094e86a0f6106907abd6cc0f1730c6b0dd68af9e"
+      "sha256": "16db3277cd79c7b1672a3c23d26c21dc20552486bb3a73a27e1c3928f2c10fca"
     },
     {
-      "bytes": 765,
+      "bytes": 776,
       "path": "eval/google_gemma_4_12b_it/verify.json",
-      "sha256": "6ce8b48c7706c20281b3408f20821d7bfe1de956108cffc8fef90feebed75e3c"
+      "sha256": "ff9c93f8ed8c92abe4d5795f7f22c652db3813a3d44b9e9be5ffb61e256e4afe"
     },
     {
-      "bytes": 146416,
+      "bytes": 150720,
       "path": "logs/google_gemma_4_12b_it.log",
-      "sha256": "09b6c9ef42f55d618b4b5d7fda3b9143f933c8318273008c70c47db8922f0ad8"
+      "sha256": "01ef9dedde96a61b2beea749e142dc61c8c7b981ebfe8e6e9179f3977cb31603"
     },
     {
-      "bytes": 1004,
+      "bytes": 1445,
       "path": "manifest.json",
-      "sha256": "85e1c1056826c5e9e0df6702a22e9dc4d8586da60b3e275cf8d0f3af951a07ba"
+      "sha256": "c923797a32ce4442a83cac55f0fefb8e97dbd41dfd988c6ef6684d5397ddc523"
     },
     {
-      "bytes": 680,
+      "bytes": 797,
       "path": "model_revisions.json",
-      "sha256": "866aac053cf034d25cd46c76972e5b00ad91ffcfd6dd5a8f8a1eb78a5420a7a9"
+      "sha256": "2ae970fd5be3b24788e8f9cd96a44ed0349389322719883c3d59b8bc2b0e7ea5"
     },
     {
       "bytes": 255,
       "path": "status.log",
-      "sha256": "fe170a0bbe53fbc6ee1d07abbcfbe35e4fd3db7d282fff10b3d6062684df41de"
+      "sha256": "cc34781a24a60683ccdaefcbf00018a37531eae85d990476b35948b8f71adac5"
     },
     {
-      "bytes": 752,
+      "bytes": 760,
       "path": "summary.json",
-      "sha256": "9fd6db964857c73c3f51e0a70ffd89e8b598a3c742902f99bb73a541a8b59683"
+      "sha256": "a4937d9ca462e37dad5848f3ed8e2a80e5f37d2de556d484f2ea825baeba1606"
     },
     {
-      "bytes": 236,
+      "bytes": 240,
       "path": "summary.tsv",
-      "sha256": "e503e9b3b156c83f78370190373a97579a6a1a0882a98a9c4ddf42ff4c49fadb"
+      "sha256": "49b226beb2cde53753b7dedde4a0b84a5d82b3bdaceb55b29bb5c2b36eeb425c"
     }
   ],
-  "generated_at": "2026-06-13T07:31:49.823468+00:00",
+  "generated_at": "2026-06-14T09:28:14.821505+00:00",
   "lane_results": [
     {
       "detail": null,
@@ -4066,11 +4066,11 @@
       "model_id": "google/gemma-4-12B-it",
       "ok": true,
       "preset": "configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml",
-      "report_path": "/root/model-evidence/20260613Tgemma12bPublicVqaH/shard-00-gpu-1/eval/google_gemma_4_12b_it/report/evaluation.report.json",
+      "report_path": "/root/model-evidence/20260614Tgemma4_12b_json_sanity/shard-00-gpu-1/eval/google_gemma_4_12b_it/report/evaluation.report.json",
       "slug": "google_gemma_4_12b_it",
       "status": "ok",
       "verify_exit": 0,
-      "verify_path": "/root/model-evidence/20260613Tgemma12bPublicVqaH/shard-00-gpu-1/eval/google_gemma_4_12b_it/verify.json"
+      "verify_path": "/root/model-evidence/20260614Tgemma4_12b_json_sanity/shard-00-gpu-1/eval/google_gemma_4_12b_it/verify.json"
     }
   ],
   "ok": true,

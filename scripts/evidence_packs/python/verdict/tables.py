@@ -3,10 +3,17 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import sys
 from collections import Counter, defaultdict
 from itertools import combinations
 from pathlib import Path
 from typing import Any
+
+try:
+    from ..report_branding import evidence_pack_markdown_header
+except ImportError:  # pragma: no cover - direct script execution
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from report_branding import evidence_pack_markdown_header
 
 DEFAULT_CORE_GUARDS: tuple[str, ...] = (
     "invariants",
@@ -268,7 +275,8 @@ def _render_markdown(payload: dict[str, Any]) -> str:
 
     lines: list[str] = []
     meta = payload.get("meta") or {}
-    lines.append(f"# Evidence Pack Verdict Tables ({meta.get('verdict')})")
+    lines.extend(evidence_pack_markdown_header("Evidence Pack Verdict Tables"))
+    lines.append(f"Verdict: {meta.get('verdict')}")
     if meta.get("source"):
         lines.append(f"- Source: `{meta.get('source')}`")
     lines.append(f"- Records: {meta.get('records_total')}")

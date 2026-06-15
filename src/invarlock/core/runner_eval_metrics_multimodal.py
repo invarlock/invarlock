@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import math
+import re
 import time
 from inspect import getattr_static
 from typing import Any
@@ -39,6 +41,39 @@ def _decode_prediction_text(decoded: Any) -> str:
     if isinstance(decoded, (list, tuple)):
         return str(decoded[0] if decoded else "").strip()
     return str(decoded).strip() if decoded is not None else ""
+
+
+_JSON_ANSWER_RE = re.compile(r'"answer"\s*:\s*"(?P<answer>(?:\\.|[^"\\])*)"', re.DOTALL)
+
+
+def _prediction_answer_text(prediction: Any) -> str:
+    text = _decode_prediction_text(prediction)
+    if not text:
+        return ""
+    candidates = [text]
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = stripped.strip("` \n")
+        if stripped.lower().startswith("json"):
+            stripped = stripped[4:].strip()
+        candidates.append(stripped)
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            answer = parsed.get("answer")
+            if isinstance(answer, str):
+                return answer.strip()
+    match = _JSON_ANSWER_RE.search(text)
+    if match:
+        raw_answer = match.group("answer")
+        try:
+            return str(json.loads(f'"{raw_answer}"')).strip()
+        except json.JSONDecodeError:
+            return raw_answer.strip()
+    return text
 
 
 def _normalize_reference_answers(value: Any) -> list[str]:
@@ -152,10 +187,11 @@ def _evaluate_vision_text_arm(
 
         decoded = decode_generated(generated_ids, generation_inputs)
         prediction = _decode_prediction_text(decoded)
+        prediction_answer = _prediction_answer_text(decoded)
         references = _normalize_reference_answers(
             generation_inputs.get("_reference_answers", [])
         )
-        normalized_prediction = _normalize_answer_text(prediction)
+        normalized_prediction = _normalize_answer_text(prediction_answer)
         correct = int(
             any(
                 normalized_prediction == _normalize_answer_text(reference)
@@ -179,6 +215,7 @@ def _evaluate_vision_text_arm(
             {
                 "id": example_id,
                 "prediction": prediction,
+                "prediction_answer": prediction_answer,
                 "references": references,
                 "correct": bool(correct),
                 "image_sha256": batch.get("image_sha256"),
@@ -344,6 +381,7 @@ __all__ = [
     "_model_kwargs",
     "_normalize_answer_text",
     "_normalize_reference_answers",
+    "_prediction_answer_text",
     "_resolve_adapter_hook",
     "_resolve_metric_kind",
 ]

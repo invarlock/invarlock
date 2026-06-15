@@ -22,6 +22,7 @@ from .runner_eval_metrics_multimodal import (
     _model_kwargs,
     _normalize_answer_text,
     _normalize_reference_answers,
+    _prediction_answer_text,
     _resolve_adapter_hook,
     _resolve_metric_kind,
 )
@@ -789,6 +790,7 @@ __all__ = [
     "_model_kwargs",
     "_normalize_answer_text",
     "_normalize_reference_answers",
+    "_prediction_answer_text",
     "_resolve_adapter_hook",
     "_resolve_metric_kind",
 ]
