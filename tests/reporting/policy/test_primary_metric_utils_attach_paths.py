@@ -474,6 +474,19 @@ def test_attach_primary_metric_classification_numeric_baseline_ref(monkeypatch):
     assert pm["ratio_vs_baseline"] == pytest.approx(10.0)
 
 
+def test_finalize_primary_metric_accuracy_uses_delta_pp_not_ratio() -> None:
+    report = classification_report(0.82)
+    pm = _finalize_primary_metric_snapshot(
+        {"kind": "accuracy", "preview": 0.81, "final": 0.82},
+        report=report,
+        metrics_map=report["metrics"],
+        baseline_ref={"primary_metric": {"kind": "accuracy", "final": 0.80}},
+        ppl_analysis=None,
+    )
+
+    assert pm["ratio_vs_baseline"] == pytest.approx(2.0)
+
+
 def test_attach_primary_metric_ignores_bool_baseline_reference() -> None:
     evaluation_report: dict[str, object] = {}
     report = ppl_report(preview=3.0, final=4.0)

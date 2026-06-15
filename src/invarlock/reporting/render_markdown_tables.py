@@ -103,7 +103,7 @@ def append_outline_fact_summary_section(
     summary_sections = [
         section
         for section in outline.sections
-        if section.priority in {"summary", "review"}
+        if section.priority in {"summary", "review", "audit"}
     ]
     if not summary_sections:
         return

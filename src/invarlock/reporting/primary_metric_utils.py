@@ -225,16 +225,17 @@ def _finalize_primary_metric_snapshot(
         ppl_analysis=ppl_analysis,
     )
     try:
-        if (
-            final_value is not None
-            and baseline_final_value is not None
-            and baseline_final_value > 0
-        ):
-            pm_copy["ratio_vs_baseline"] = final_value / baseline_final_value
         try:
             kind = str(pm_copy.get("kind", "")).lower()
         except _NON_FATAL_EXCEPTIONS:
             kind = ""
+        if final_value is not None and baseline_final_value is not None:
+            if kind == "accuracy":
+                pm_copy["ratio_vs_baseline"] = (
+                    final_value - baseline_final_value
+                ) * 100.0
+            elif baseline_final_value > 0:
+                pm_copy["ratio_vs_baseline"] = final_value / baseline_final_value
         ci = pm_copy.get("ci")
         if kind.startswith("ppl") and isinstance(ci, (list, tuple)) and len(ci) == 2:
             try:

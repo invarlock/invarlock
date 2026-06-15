@@ -156,6 +156,63 @@ def test_report_outline_summarizes_multimodal_accuracy_without_ppl_language() ->
     assert "ppl" not in primary.summary.lower()
 
 
+def test_markdown_accuracy_delta_pp_not_scaled_as_fraction() -> None:
+    cert = make_report(_mk_report(), _mk_report())
+    cert["primary_metric"] = {
+        "kind": "accuracy",
+        "unit": "accuracy",
+        "preview": 0.86,
+        "final": 0.855,
+        "ratio_vs_baseline": -0.50,
+        "baseline_point": 0.860,
+        "display_ci": [-1.0, 0.0],
+    }
+
+    md = render_report_markdown(cert)
+
+    assert "| Δ vs Baseline | -0.50 pp |" in md
+    assert "| Δ vs Baseline | -50.0 |" not in md
+
+
+def test_report_outline_uses_pm_acceptance_range_threshold() -> None:
+    cert = make_report(_mk_report(), _mk_report())
+    cert["meta"]["pm_acceptance_range"] = {"min": 0.95, "max": 1.15}
+    cert["primary_metric"]["ratio_vs_baseline"] = 1.12
+    cert["validation"]["primary_metric_acceptable"] = True
+
+    outline = build_evaluation_report_outline(cert)
+    policy_gates = _section(outline, "policy_gates")
+
+    assert (
+        policy_gates.facts_by_label["Primary Metric Acceptable"].value
+        == "PASS | 1.120x vs 0.95x to 1.15x"
+    )
+
+
+def test_report_outline_accuracy_drift_uses_delta_policy() -> None:
+    cert = make_report(_mk_report(), _mk_report())
+    cert["primary_metric"] = {
+        "kind": "accuracy",
+        "unit": "accuracy",
+        "preview": 0.850,
+        "final": 0.855,
+        "ratio_vs_baseline": +0.00,
+        "display_ci": [-0.01, 0.01],
+    }
+    cert["resolved_policy"] = {
+        "metrics": {"accuracy": {"preview_final_delta_pp_max": 0.01}}
+    }
+    cert["validation"]["preview_final_drift_acceptable"] = True
+
+    outline = build_evaluation_report_outline(cert)
+    policy_gates = _section(outline, "policy_gates")
+
+    assert (
+        policy_gates.facts_by_label["Preview Final Drift Acceptable"].value
+        == "PASS | +0.50 pp vs ≤ ±1.00 pp"
+    )
+
+
 def test_report_outline_uses_policy_threshold_not_auto_target_ratio() -> None:
     cert = make_report(_mk_report(), _mk_report())
     cert.setdefault("auto", {})["tier"] = "balanced"
@@ -212,3 +269,12 @@ def test_markdown_report_outline_uses_shared_summary_facts() -> None:
         "| Policy Gates | Primary Metric Acceptable | PASS \\| 1.000x vs ≤ 1.10x | pass | `validation` |"
         in md
     )
+
+
+def test_markdown_report_outline_includes_evidence_provenance_facts() -> None:
+    cert = make_report(_mk_report(), _mk_report())
+
+    md = render_report_markdown(cert)
+
+    assert "| Evidence And Provenance | Dataset |" in md
+    assert "| Evidence And Provenance | Policy Digest |" in md
