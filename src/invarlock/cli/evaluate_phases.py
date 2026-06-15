@@ -137,14 +137,16 @@ def run_baseline_evaluation_phase(
                 expected_assurance_mode=str(assurance_mode or "off"),
                 expected_dataset=dataset_cfg,
             )
+            runtime.debug_fn(f"Baseline report: {baseline_report_path}")
+            return baseline_report_path
         except typer.BadParameter as exc:
             runtime.fail_fn(str(getattr(exc, "message", exc)), exit_code=2)
+            raise typer.Exit(2) from exc
         except Exception as exc:  # noqa: BLE001 - preserve existing failure surface
             if isinstance(exc, (typer.Exit, SystemExit)):
                 raise
             runtime.fail_fn(str(getattr(exc, "message", exc)), exit_code=2)
-        runtime.debug_fn(f"Baseline report: {baseline_report_path}")
-        return baseline_report_path
+            raise typer.Exit(2) from exc
 
     baseline_yaml = request.tmp_dir / "baseline_noop.yaml"
     runtime.dump_yaml_fn(baseline_yaml, request.baseline_cfg)
@@ -199,10 +201,11 @@ def run_baseline_evaluation_phase(
             baseline_run_result,
             stage="Baseline",
         )
+        runtime.debug_fn(f"Baseline report: {baseline_report_path}")
+        return baseline_report_path
     except Exception as exc:
         runtime.fail_fn(str(getattr(exc, "message", exc)), exit_code=1)
-    runtime.debug_fn(f"Baseline report: {baseline_report_path}")
-    return baseline_report_path
+        raise typer.Exit(1) from exc
 
 
 def run_subject_evaluation_phase(
@@ -370,6 +373,7 @@ def run_subject_evaluation_phase(
         )
     except Exception as exc:
         runtime.fail_fn(str(getattr(exc, "message", exc)), exit_code=1)
+        raise typer.Exit(1) from exc
     runtime.debug_fn(f"Edited report: {edited_report}")
 
     try:
