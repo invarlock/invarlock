@@ -102,6 +102,23 @@ def test_report_export_accepts_canonical_report_directory(tmp_path: Path) -> Non
     report_dir = tmp_path / "report-dir"
     report_dir.mkdir()
     report = _write_evaluation_report(report_dir, _evaluation_report_payload())
+    verify_result = tmp_path / "verify.json"
+    verify_result.write_text(
+        json.dumps(
+            {
+                "format_version": "verify-v1",
+                "summary": {"ok": True, "reason": "ok"},
+                "results": [
+                    {
+                        "id": str(report),
+                        "ok": True,
+                        "reason": "ok",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
 
     result = CliRunner().invoke(
         cli,
@@ -112,12 +129,15 @@ def test_report_export_accepts_canonical_report_directory(tmp_path: Path) -> Non
             str(report_dir),
             "--format",
             "mlflow-tags",
+            "--verify-result",
+            str(verify_result),
         ],
     )
 
     assert result.exit_code == 0, result.stdout
     exported = json.loads(result.stdout)
     assert exported["artifact"]["path"] == str(report.resolve())
+    assert exported["tags"]["invarlock.verifier_status"] == "pass"
 
 
 def test_report_export_release_review_refuses_overwrite(tmp_path: Path) -> None:
@@ -213,6 +233,49 @@ def test_report_export_uses_verify_result_status(tmp_path: Path) -> None:
     assert tags["invarlock.verifier_status"] == "fail"
     assert tags["invarlock.verifier_reason"] == "policy_fail"
     assert tags["invarlock.runtime_provenance_status"] == "failed"
+
+
+def test_report_export_rejects_stale_verify_result(tmp_path: Path) -> None:
+    report = _write_evaluation_report(tmp_path, _evaluation_report_payload())
+    other_report = tmp_path / "other-evaluation.report.json"
+    output = tmp_path / "mlflow-tags.json"
+    verify_result = tmp_path / "verify.json"
+    verify_result.write_text(
+        json.dumps(
+            {
+                "format_version": "verify-v1",
+                "summary": {"ok": True, "reason": "ok"},
+                "results": [
+                    {
+                        "id": str(other_report),
+                        "ok": True,
+                        "reason": "ok",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "report",
+            "export",
+            "-i",
+            str(report),
+            "--format",
+            "mlflow-tags",
+            "--verify-result",
+            str(verify_result),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "does not contain an item for evaluation report" in result.stdout
+    assert not output.exists()
 
 
 def test_report_export_rejects_unknown_format(tmp_path: Path) -> None:

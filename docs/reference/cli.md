@@ -227,6 +227,8 @@ Core subcommands:
   - Options: `-i/--evaluation-report`, `--format`, `-o/--output`,
     `--policy-profile`, `--report-url`, `--evidence-url`, `--verify-result`,
     `--force`
+  - `--verify-result` uses only the verifier result item whose `id` matches
+    the resolved evaluation report path; stale verifier JSON is rejected.
 - `invarlock report validate`
   - Validate a report JSON against the v1 schema
 - Directory inputs are command-specific:

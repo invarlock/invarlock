@@ -28,19 +28,39 @@ def test_report_gate_action_threads_verify_result_into_exports() -> None:
         for step in action["runs"]["steps"]
         if isinstance(step, dict)
     ]
+    steps = action["runs"]["steps"]
     verify_step = "\n".join(run for run in runs if "invarlock verify" in run)
     export_steps = "\n".join(run for run in runs if "report export" in run)
+    fail_step = "\n".join(
+        run for run in runs if "INVARLOCK_VERIFY_EXIT_CODE" in run and "exit" in run
+    )
 
     assert "--assurance" in verify_step
     assert "--runtime-provenance" in verify_step
     assert "--warning-policy" in verify_step
     assert "${{ inputs.verify-output }}" in verify_step
+    assert "INVARLOCK_VERIFY_EXIT_CODE" in verify_step
+    assert 'exit "$status"' not in verify_step
     assert "--verify-result \"${{ inputs.verify-output }}\"" in export_steps
+    assert "INVARLOCK_VERIFY_EXIT_CODE" in fail_step
+    assert "${{ inputs.fail-on-verify }}" in fail_step
 
     upload_step = next(
         step for step in action["runs"]["steps"] if step.get("uses") == "actions/upload-artifact@v4"
     )
     assert "${{ inputs.verify-output }}" in upload_step["with"]["path"]
+
+    upload_index = next(
+        index
+        for index, step in enumerate(steps)
+        if step.get("uses") == "actions/upload-artifact@v4"
+    )
+    fail_index = next(
+        index
+        for index, step in enumerate(steps)
+        if step.get("name") == "Fail on InvarLock verification result"
+    )
+    assert upload_index < fail_index
 
 
 def test_report_gate_command_sequence_smoke(tmp_path: Path) -> None:

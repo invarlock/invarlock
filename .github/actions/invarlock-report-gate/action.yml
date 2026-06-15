@@ -74,9 +74,7 @@ runs:
           --json > "${{ inputs.verify-output }}"
         status=$?
         cat "${{ inputs.verify-output }}"
-        if [ "$status" -ne 0 ] && [ "${{ inputs.fail-on-verify }}" = "true" ]; then
-          exit "$status"
-        fi
+        printf 'INVARLOCK_VERIFY_EXIT_CODE=%s\n' "$status" >> "$GITHUB_ENV"
 
     - name: Render InvarLock HTML report
       shell: bash
@@ -128,3 +126,11 @@ runs:
           ${{ inputs.html-output }}
           ${{ inputs.review-output }}
           ${{ inputs.mlflow-tags-output }}
+
+    - name: Fail on InvarLock verification result
+      shell: bash
+      run: |
+        status="${INVARLOCK_VERIFY_EXIT_CODE:-0}"
+        if [ "$status" -ne 0 ] && [ "${{ inputs.fail-on-verify }}" = "true" ]; then
+          exit "$status"
+        fi

@@ -3,7 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from invarlock.reporting.oss_exports import (
+    VerifyResultMismatchError,
     build_report_export_context,
     render_mlflow_tags_export,
     render_model_card_evidence_block,
@@ -73,6 +76,93 @@ def test_verify_result_overrides_report_local_status(tmp_path: Path) -> None:
     assert tags["invarlock.status"] == "fail"
     assert tags["invarlock.verifier_reason"] == "policy_fail"
     assert tags["invarlock.runtime_provenance_status"] == "failed"
+
+
+def test_verify_result_rejects_stale_explicit_id(tmp_path: Path) -> None:
+    report = _passing_report()
+    report_path = _write_report(tmp_path, report)
+    other_report = tmp_path / "other-evaluation.report.json"
+    verify_result = {
+        "format_version": "verify-v1",
+        "summary": {"ok": True, "reason": "ok"},
+        "results": [
+            {
+                "id": str(other_report),
+                "ok": True,
+                "reason": "ok",
+            }
+        ],
+    }
+
+    with pytest.raises(
+        VerifyResultMismatchError,
+        match="does not contain an item for evaluation report",
+    ):
+        build_report_export_context(
+            report_path,
+            report,
+            policy_profile="ci",
+            verify_result=verify_result,
+        )
+
+
+def test_verify_result_ignores_single_idless_result(tmp_path: Path) -> None:
+    report = _passing_report()
+    report_path = _write_report(tmp_path, report)
+    verify_result = {
+        "format_version": "verify-v1",
+        "summary": {"ok": False, "reason": "policy_fail"},
+        "results": [
+            {
+                "ok": False,
+                "reason": "policy_fail",
+            }
+        ],
+    }
+
+    context = build_report_export_context(
+        report_path,
+        report,
+        policy_profile="ci",
+        verify_result=verify_result,
+    )
+
+    assert context.status == "pass"
+    assert context.verifier_status == "not_provided"
+    assert context.verifier_reason == "unknown"
+
+
+def test_verify_result_uses_matching_item_from_batch(tmp_path: Path) -> None:
+    report = _passing_report()
+    report_path = _write_report(tmp_path, report)
+    other_report = tmp_path / "other-evaluation.report.json"
+    verify_result = {
+        "format_version": "verify-v1",
+        "summary": {"ok": False, "reason": "batch_fail"},
+        "results": [
+            {
+                "id": str(other_report),
+                "ok": False,
+                "reason": "other_policy_fail",
+            },
+            {
+                "id": str(report_path),
+                "ok": True,
+                "reason": "ok",
+            },
+        ],
+    }
+
+    context = build_report_export_context(
+        report_path,
+        report,
+        policy_profile="ci",
+        verify_result=verify_result,
+    )
+
+    assert context.status == "pass"
+    assert context.verifier_status == "pass"
+    assert context.verifier_reason == "ok"
 
 
 def test_mlflow_export_includes_registry_search_tags(tmp_path: Path) -> None:

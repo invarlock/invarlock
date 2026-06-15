@@ -115,7 +115,8 @@ Important action inputs include `report`, `profile`, `assurance`,
 `runtime-provenance`, `warning-policy`, `verify-output`, `html-output`,
 `mlflow-tags-output`, and `review-output`. The generated exports consume the
 same `verify-output` JSON so their pass/fail status reflects the verifier
-result when the action has run verification.
+result item for the same evaluation report when the action has run
+verification.
 
 This integration layer is intentionally small. It exports evidence into CI,
 model cards, and registries; it does not replace MLflow, Hugging Face Hub,

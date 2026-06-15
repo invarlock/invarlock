@@ -516,7 +516,9 @@ Common options:
 - `--report-url`: public report URL for Markdown exports.
 - `--evidence-url`: public evidence-pack URL for Markdown exports.
 - `--verify-result`: path to `invarlock verify --json` output. When supplied,
-  export status and verifier fields come from the verifier result.
+  export status and verifier fields come from the verifier result item whose
+  `id` matches the resolved evaluation report path. A verifier result for a
+  different report is rejected.
 - `--force`: overwrite an existing output file.
 
 ---

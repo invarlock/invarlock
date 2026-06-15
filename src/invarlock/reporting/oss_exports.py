@@ -19,6 +19,10 @@ ReportExportFormat = Literal[
 _UNKNOWN = "unknown"
 
 
+class VerifyResultMismatchError(ValueError):
+    """Raised when a verifier JSON result is for a different report."""
+
+
 @dataclass(frozen=True)
 class ReportExportContext:
     report_path: Path
@@ -183,14 +187,23 @@ def _verify_result_item(
     if not isinstance(results, list) or not results:
         return None
     resolved = str(report_path.resolve())
+    mismatched_ids: list[str] = []
     for item in results:
         if not isinstance(item, Mapping):
             continue
         item_id = _clean_text(item.get("id"), default="")
-        if item_id and str(Path(item_id).expanduser().resolve()) == resolved:
+        if not item_id:
+            continue
+        if str(Path(item_id).expanduser().resolve()) == resolved:
             return item
-    if len(results) == 1 and isinstance(results[0], Mapping):
-        return results[0]
+        mismatched_ids.append(item_id)
+    if mismatched_ids:
+        preview = ", ".join(mismatched_ids[:3])
+        suffix = "" if len(mismatched_ids) <= 3 else ", ..."
+        raise VerifyResultMismatchError(
+            "Verify result does not contain an item for evaluation report "
+            f"{resolved}. Found item id(s): {preview}{suffix}"
+        )
     return None
 
 
@@ -434,6 +447,7 @@ def serialize_report_export(exported: str | dict[str, Any]) -> str:
 __all__ = [
     "ReportExportContext",
     "ReportExportFormat",
+    "VerifyResultMismatchError",
     "build_report_export_context",
     "derive_report_status",
     "render_mlflow_tags_export",
