@@ -187,7 +187,7 @@ Runtime provenance: reports/eval/runtime.manifest.json
 - Runtime-manifest verifier: `invarlock advanced runtime-verify --report <evaluation.report.json> --manifest <runtime.manifest.json>`.
 - The public contract catalog exposed by those JSON surfaces includes
   `model_classification`, `validation_keys`, `console_labels`, and
-  `metric_kinds`.
+  `metric_kinds`, plus the compact `public_evidence_index`.
 - Advanced workflows: `invarlock advanced evidence-pack`, `invarlock advanced policy`,
   `invarlock advanced plugins`, and `invarlock advanced calibrate`.
 - Host execution for the core evaluate path uses `--execution-mode host`.
@@ -209,6 +209,10 @@ Note: `configs/` and most `scripts/` remain repo resources and are not included 
 wheels. Installed wheels include the public contracts and the
 `invarlock advanced evidence-pack verify` verifier, so installed packages can
 check bundles without cloning the repository.
+Full published-basis public evidence artifacts live in the source tree and
+release tags under `public_evidence/`; wheels carry the compact
+`published_basis_index.json` summary with hashes, sizes, coverage, and source
+paths instead of duplicating the full artifact corpus.
 
 ## Installation
 
