@@ -119,6 +119,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed exported HTML report rendering for summary status fallback, policy
   threshold wording, sticky navigation/active-section behavior, and empty table
   detail columns.
+- Fixed the root README CI badge to use Shields' semantic status colors for
+  passing/failing/default states instead of forcing the static brand accent.
 - Fixed evidence-pack queue and GPU-runner stability issues, including memory
   helper resolution, container scratch cleanup, retry handling after interrupted
   evaluate phases, and host/container output publication paths.
