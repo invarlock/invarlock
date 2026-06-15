@@ -51,6 +51,18 @@ class WorkflowArtifact:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class WorkflowVerificationSummary:
+    clean_reports: int
+    error_injection_reports: int
+    expected_failure_reports: int
+    failed_reports: int
+    policy_profile: str
+
+    def to_summary_payload(self) -> dict[str, object]:
+        return asdict(self)
+
+
 def write_json(path: Path, payload: object) -> None:
     path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
@@ -152,3 +164,12 @@ def write_artifact_manifest(
         "files": capture_artifacts(output_root, patterns=artifact_patterns),
     }
     write_json(output_root / "artifact_manifest.json", payload)
+
+
+def write_verification_summary(
+    path: Path,
+    *,
+    summary: WorkflowVerificationSummary,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_json(path, summary.to_summary_payload())

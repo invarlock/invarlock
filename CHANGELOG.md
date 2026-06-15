@@ -105,9 +105,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Aligned the Ruff 0.15.17 bump across the pre-commit hook and hashed workflow
   requirement locks.
 - Moved model-evidence lane results, summary writing, artifact-manifest capture,
-  and evidence-pack manifest artifact collection onto a shared typed
-  evidence-workflow helper layer as the first step toward thinner evidence-pack
-  and model-evidence orchestration entrypoints.
+  evidence-pack manifest artifact collection, and evidence-pack verification
+  summary writing onto a shared typed evidence-workflow helper layer as the
+  first step toward thinner evidence-pack and model-evidence orchestration
+  entrypoints.
 - Updated README branding to the Ledger ink palette, including static
   GitHub/PyPI-compatible Shields badges and refreshed light/dark logo, mark,
   app-icon, and favicon assets synced from the current site brand surface.

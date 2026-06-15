@@ -6,10 +6,12 @@ from pathlib import Path
 from scripts.evidence_workflows.workflow_state import (
     WorkflowLaneResult,
     WorkflowRunMetadata,
+    WorkflowVerificationSummary,
     capture_artifacts,
     collect_artifact_paths,
     write_artifact_manifest,
     write_summary_files,
+    write_verification_summary,
 )
 
 
@@ -125,3 +127,28 @@ def test_collect_artifact_paths_recurses_and_excludes_control_files(
     )
 
     assert relpaths == ["results/final_verdict.json"]
+
+
+def test_write_verification_summary_preserves_evidence_pack_schema(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "results" / "verification_summary.json"
+
+    write_verification_summary(
+        path,
+        summary=WorkflowVerificationSummary(
+            clean_reports=2,
+            error_injection_reports=1,
+            expected_failure_reports=3,
+            failed_reports=0,
+            policy_profile="release",
+        ),
+    )
+
+    assert json.loads(path.read_text(encoding="utf-8")) == {
+        "clean_reports": 2,
+        "error_injection_reports": 1,
+        "expected_failure_reports": 3,
+        "failed_reports": 0,
+        "policy_profile": "release",
+    }
