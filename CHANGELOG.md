@@ -51,6 +51,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   controls, container scratch cleanup, and safer cleanup between phases.
 - Added Gemma 4 12B calibration configuration and documented gated/access
   requirements for Gemma candidate lanes.
+- Added a time-boxed, issue-tracked `pip-audit` allowlist entry for the
+  unfixed Torch `CVE-2025-3000` advisory affecting optional HF and advanced
+  install surfaces.
 - Added production identity assets for the README and external surfaces,
   including light/dark logo and mark variants, app icon, and favicons.
 
@@ -72,17 +75,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and Decision sections.
 - Updated support-matrix organization and evidence grouping so published-basis,
   experimental, multimodal, seq2seq, MoE, and blocked/access-gated lanes are
-  easier to scan without adding a redundant grouping column.
+  easier to scan without adding a redundant grouping column, and normalized
+  hardware wording for published evidence rows.
 - Updated HF adapter support for newer model shapes, including resilient
   multimodal loader fallback, tokenizer remote-code propagation, ChatGLM layout
-  and loader shims, Falcon-H1/Falcon-Mamba projection classification, dense
+  and loader support, Falcon-H1/Falcon-Mamba projection classification, dense
   gate-up FFN classification, and Gemma 4 multimodal runtime extras.
 - Raised the Hugging Face adapter Transformers floor for modern model support
   and refreshed optional Torch requirements to avoid `torch==2.12.0` while the
   current supply-chain advisory has no fixed upstream version.
-- Added a time-boxed, issue-tracked `pip-audit` allowlist entry for the
-  unfixed Torch `CVE-2025-3000` advisory affecting optional HF and advanced
-  install surfaces.
+- Centralized permissive-license model classification so support, calibration,
+  public-evidence, and catalog checks draw from one audited model inventory.
 - Updated adapter examples to reflect the newly published dense, multimodal,
   seq2seq, and MoE model shapes.
 - Updated ordinary CI expectations so long GPU evidence sweeps are treated as
@@ -104,12 +107,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   downloaded model snapshots.
 - Aligned the Ruff 0.15.17 bump across the pre-commit hook and hashed workflow
   requirement locks.
+- Updated Dependabot-managed CI action pins and README public-evidence notes
+  alongside the refreshed packaged public-evidence index.
 - Moved model-evidence lane results, summary writing, artifact-manifest capture,
   evidence-pack manifest artifact collection, and evidence-pack verification
   summary writing onto a shared typed evidence-workflow helper layer as the
   first step toward thinner evidence-pack and model-evidence orchestration
   entrypoints.
-- Added shared report-outline facts to Markdown reports and `report explain` so
+- Moved `evaluate` evaluation-report generation and runtime-manifest emission
+  into a dedicated report-phase helper with explicit dependencies and a thinner
+  command body.
+- Shared report-outline facts with Markdown reports and `report explain` so
   the human Markdown, HTML, and CLI explain surfaces expose the same high-level
   decision, policy, and guard-signal facts before their detailed sections.
 - Made `report explain --evaluation-report` explain the supplied
@@ -121,9 +129,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- Removed automatic scheduled CI and scheduled GPU model-evidence sweep triggers;
-  full verification remains available by manual dispatch, release supply-chain
-  checks remain tag-gated, and model-evidence sweeps remain manually runnable.
+- Removed the broken scheduled full-CI trigger and scheduled GPU model-evidence
+  sweep triggers; full verification remains available by manual dispatch,
+  release supply-chain checks remain part of the release workflow, and
+  model-evidence sweeps remain manually runnable.
 - Removed the stale `tests/fuzzing` owner expectation from the active test-tree
   contract after the fuzzing surface was retired from the repo layout.
 - Removed confirmed non-Apache-2.0/MIT hosted model checkpoints from active
@@ -143,8 +152,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   evaluate phases, and host/container output publication paths.
 - Fixed remote model-evidence branch sync for `work/...` branches by fetching
   the current branch ref explicitly before fast-forwarding the remote checkout.
-- Fixed Mistral guard-demo manifests and public evidence scope notes so the
-  published demo no longer overclaims non-baseline-relative FP8 guard signals.
+- Fixed Mistral guard-demo manifests, run-log tracking, and public evidence
+  scope notes so the published demo no longer overclaims
+  non-baseline-relative FP8 guard signals.
 - Fixed Gemma/Qwen multimodal evaluation gates by using classification-count
   accuracy intervals, delta semantics for accuracy drift, paired multimodal
   window reporting, scarce-window split handling, and a public-basis absolute
@@ -152,6 +162,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed MoE and large-model guard/report behavior, including router warning
   handling, Qwen variance calibration bounds, and variance calibration
   truncation fallbacks.
+- Fixed Gemma 4 26B evidence source provenance after publishing its MoE
+  assurance basis.
 - Fixed `adapter:auto` routing for named image-text Gemma/Qwen candidates and
   Marian/OPUS/MBART/Pegasus seq2seq model IDs.
 - Fixed seq2seq evidence correctness for shuffled splits and preserved labels
@@ -164,9 +176,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enforcement edge-path tests.
 - Fixed the PR-time supply-chain scan to run `gitleaks` over pull request
   changed-file contents instead of timing out on repository-history scans;
-  release and scheduled backstop scans still cover full history.
-- Fixed PR supply-chain scans by raising `cryptography` and security-tool `pip`
-  floors, then refreshing workflow locks past vulnerable pins.
+  release scans still cover full-history secret scanning.
+- Fixed PR supply-chain scans by raising `aiohttp`, `cryptography`, and
+  security-tool `pip` floors, then refreshing workflow locks past vulnerable
+  pins.
 - Fixed `gitleaks` false positives for published evidence tokenizer digest
   fields by adding a narrow config allowlist used by PR and release scans.
 
