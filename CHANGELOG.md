@@ -165,6 +165,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed the PR-time supply-chain scan to run `gitleaks` over pull request
   changed-file contents instead of timing out on repository-history scans;
   release and scheduled backstop scans still cover full history.
+- Fixed PR supply-chain scans by raising `cryptography` and security-tool `pip`
+  floors, then refreshing workflow locks past vulnerable pins.
 - Fixed `gitleaks` false positives for published evidence tokenizer digest
   fields by adding a narrow config allowlist used by PR and release scans.
 

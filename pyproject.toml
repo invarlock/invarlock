@@ -31,7 +31,7 @@ dependencies = [
     "typer>=0.15",
     "click>=8.1",
     "shellingham>=1.5.4",
-    "cryptography>=48.0.0",
+    "cryptography>=48.0.1",
     "pydantic>=2.0",
     "rich>=13.0",
     "pyyaml>=6.0",
@@ -288,6 +288,7 @@ release-ci = [
 ]
 
 security-ci = [
+  "pip>=26.1.2",
   "pip-audit>=2.8",
   "requests>=2.33.0",
   "cyclonedx-bom>=4.1",
