@@ -152,14 +152,20 @@ def _build_decision_section(evaluation_report: dict[str, Any]) -> ReportSection:
     warning_count = _guard_warning_count(evaluation_report)
     facts = (
         ReportFact("Overall", status_value, status, source="validation"),
-        ReportFact("Evidence Mode", _assurance_mode(evaluation_report), source="assurance"),
-        ReportFact("Model", str(meta.get("model_id") or "unknown"), source="meta.model_id"),
+        ReportFact(
+            "Evidence Mode", _assurance_mode(evaluation_report), source="assurance"
+        ),
+        ReportFact(
+            "Model", str(meta.get("model_id") or "unknown"), source="meta.model_id"
+        ),
         ReportFact(
             "Baseline",
             _baseline_summary(evaluation_report),
             source="baseline_ref",
         ),
-        ReportFact("Adapter", str(meta.get("adapter") or "unknown"), source="meta.adapter"),
+        ReportFact(
+            "Adapter", str(meta.get("adapter") or "unknown"), source="meta.adapter"
+        ),
         ReportFact(
             "Edit",
             str(evaluation_report.get("edit_name") or "unknown"),
@@ -213,7 +219,9 @@ def _build_primary_metric_section(evaluation_report: dict[str, Any]) -> ReportSe
                 source="primary_metric_tail.passed",
             )
         else:
-            tail_fact = ReportFact("Tail Gate", "not evaluated", source="primary_metric_tail")
+            tail_fact = ReportFact(
+                "Tail Gate", "not evaluated", source="primary_metric_tail"
+            )
 
     summary = "Task metric and baseline-relative movement."
     if kind.lower() == "accuracy":
@@ -238,8 +246,15 @@ def _build_primary_metric_section(evaluation_report: dict[str, Any]) -> ReportSe
             _format_baseline_comparison(primary_metric),
             source="primary_metric.ratio_vs_baseline",
         ),
-        ReportFact("CI", _format_ci(primary_metric, kind), source="primary_metric.display_ci"),
-        ReportFact("Policy Gate", pm_status, pm_tone, source="validation.primary_metric_acceptable"),
+        ReportFact(
+            "CI", _format_ci(primary_metric, kind), source="primary_metric.display_ci"
+        ),
+        ReportFact(
+            "Policy Gate",
+            pm_status,
+            pm_tone,
+            source="validation.primary_metric_acceptable",
+        ),
         tail_fact,
     )
     return ReportSection(
@@ -258,7 +273,11 @@ def _build_policy_gates_section(evaluation_report: dict[str, Any]) -> ReportSect
         ReportFact(
             row.label,
             f"{_plain_gate_status(row.status)} | {row.measured} vs {row.threshold}",
-            "pass" if "PASS" in row.status else "fail" if "FAIL" in row.status else "info",
+            "pass"
+            if "PASS" in row.status
+            else "fail"
+            if "FAIL" in row.status
+            else "info",
             detail=f"{row.description}; basis={row.basis}",
             source="validation",
         )
@@ -327,7 +346,14 @@ def _build_guard_signals_section(evaluation_report: dict[str, Any]) -> ReportSec
         title="Guard Signals",
         summary="Guard observations separated from hard policy failure semantics.",
         priority="review",
-        source_blocks=("guard_warnings", "invariants", "spectral", "rmt", "variance", "moe"),
+        source_blocks=(
+            "guard_warnings",
+            "invariants",
+            "spectral",
+            "rmt",
+            "variance",
+            "moe",
+        ),
         facts=facts,
     )
 
@@ -377,7 +403,11 @@ def _build_benchmark_section(evaluation_report: dict[str, Any]) -> ReportSection
 
     unique_rmt = sorted(set(rmt_pairs))
     facts = (
-        ReportFact("Profile", str(block.get("profile") or "unknown"), source="benchmark.profile"),
+        ReportFact(
+            "Profile",
+            str(block.get("profile") or "unknown"),
+            source="benchmark.profile",
+        ),
         ReportFact(
             "Scenarios",
             f"{total} total, {passed} passed, {skipped} skipped",
@@ -429,9 +459,17 @@ def _build_evidence_provenance_section(
     if windows:
         window_count = f"{windows.get('preview', 'N/A')} preview, {windows.get('final', 'N/A')} final"
     facts = (
-        ReportFact("Dataset", str(dataset.get("provider") or "unknown"), source="dataset.provider"),
+        ReportFact(
+            "Dataset",
+            str(dataset.get("provider") or "unknown"),
+            source="dataset.provider",
+        ),
         ReportFact("Windows", window_count, source="dataset.windows"),
-        ReportFact("Hash Source", str(hashes.get("source") or "unknown"), source="dataset.hash.source"),
+        ReportFact(
+            "Hash Source",
+            str(hashes.get("source") or "unknown"),
+            source="dataset.hash.source",
+        ),
         ReportFact(
             "Provider Digest",
             "present" if provider_digest else "missing",
@@ -443,7 +481,9 @@ def _build_evidence_provenance_section(
             _short_digest(str(policy_digest.get("thresholds_hash") or "missing")),
             source="policy_digest.thresholds_hash",
         ),
-        ReportFact("Device", str(meta.get("device") or "unknown"), source="meta.device"),
+        ReportFact(
+            "Device", str(meta.get("device") or "unknown"), source="meta.device"
+        ),
         ReportFact("Seed", str(meta.get("seed") or "unknown"), source="meta.seed"),
     )
     return ReportSection(
@@ -456,7 +496,9 @@ def _build_evidence_provenance_section(
     )
 
 
-def _build_technical_appendix_section(evaluation_report: dict[str, Any]) -> ReportSection:
+def _build_technical_appendix_section(
+    evaluation_report: dict[str, Any],
+) -> ReportSection:
     appendix_blocks = [
         key
         for key in (

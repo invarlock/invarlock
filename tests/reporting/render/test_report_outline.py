@@ -128,9 +128,7 @@ def test_report_outline_orders_modern_sections_before_appendix() -> None:
         _section(outline, "primary_metric").facts_by_label["Tail Gate"].value == "PASS"
     )
     assert (
-        _section(outline, "benchmark_comparison")
-        .facts_by_label["Scenarios"]
-        .value
+        _section(outline, "benchmark_comparison").facts_by_label["Scenarios"].value
         == "1 total, 1 passed, 0 skipped"
     )
 

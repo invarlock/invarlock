@@ -58,10 +58,7 @@ def _section(outline: EvaluationReportOutline, key: str) -> ReportSection | None
 
 
 def _render_status(value: str, status: str) -> str:
-    return (
-        f'<span class="status-pill {_tone(status)}">'
-        f"{escape(value)}</span>"
-    )
+    return f'<span class="status-pill {_tone(status)}">{escape(value)}</span>'
 
 
 def _render_summary_strip(outline: EvaluationReportOutline) -> str:
@@ -85,7 +82,9 @@ def _render_summary_strip(outline: EvaluationReportOutline) -> str:
             "warn" if warning_count not in {"0", "N/A"} else "pass",
         ),
     )
-    headings = "".join(f"<th>{escape(label)}</th>" for label, _value, _tone_name in cells)
+    headings = "".join(
+        f"<th>{escape(label)}</th>" for label, _value, _tone_name in cells
+    )
     values = "".join(
         f'<td><strong class="{_tone(tone_name)}">{escape(value)}</strong></td>'
         for _label, value, tone_name in cells
@@ -142,7 +141,7 @@ def _render_fact_table(section: ReportSection) -> str:
         )
         rows.append(
             "<tr>"
-            f"<th scope=\"row\">{escape(fact.label)}</th>"
+            f'<th scope="row">{escape(fact.label)}</th>'
             f"<td>{value}</td>"
             f"{detail_cell}"
             f"<td>{source}</td>"
@@ -242,9 +241,7 @@ def _render_appendix_previews(
     )
 
 
-def _render_section(
-    evaluation_report: dict[str, Any], section: ReportSection
-) -> str:
+def _render_section(evaluation_report: dict[str, Any], section: ReportSection) -> str:
     extras = ""
     if section.key == "guard_signals":
         extras = _render_guard_warnings(evaluation_report)
