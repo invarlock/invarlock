@@ -29,6 +29,9 @@ from .render_markdown_tables import (
     append_accuracy_subgroups as _append_accuracy_subgroups,
 )
 from .render_markdown_tables import (
+    append_outline_fact_summary_section as _append_outline_fact_summary_section,
+)
+from .render_markdown_tables import (
     append_system_overhead_section as _append_system_overhead_section,
 )
 from .report_summary import build_quality_gates_summary, build_safety_dashboard_summary
@@ -682,6 +685,8 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
     _append_plugin_provenance_section(lines, evaluation_report)
 
     _append_executive_summary_section(lines, evaluation_report)
+
+    _append_outline_fact_summary_section(lines, evaluation_report)
 
     _append_quality_gates_section(lines, evaluation_report)
 

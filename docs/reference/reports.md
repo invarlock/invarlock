@@ -43,7 +43,7 @@ invarlock report generate \
 invarlock verify reports/eval/evaluation.report.json
 # expects reports/eval/runtime.manifest.json next to the report
 
-# Explain a bundle directly from report provenance
+# Explain a bundle directly from the evaluation report
 invarlock report explain --evaluation-report reports/eval/evaluation.report.json
 
 # Inspect telemetry fields
@@ -60,12 +60,12 @@ Artifact model:
 | `evaluation.report.json` | `invarlock evaluate`, `invarlock report generate --format report` | `invarlock verify`, `invarlock report html`, `invarlock report validate`, `invarlock report explain --evaluation-report`, `invarlock advanced runtime-verify` |
 | `report.json` | Baseline/subject run directories under `runs/...` | `invarlock report generate`, `invarlock report explain --subject-report ... --baseline-report ...` |
 
-`report explain --evaluation-report` requires provenance links to the raw
-subject and baseline run reports. Some public fixtures intentionally ship only
-`evaluation.report.json`, `runtime.manifest.json`, and evidence metadata; those
-fixtures are still valid inputs for `verify`, `report html`, and
-`report validate`, but they cannot be explained unless the corresponding raw
-run reports are also available.
+`report explain --evaluation-report` reads `evaluation.report.json` directly.
+Raw subject and baseline `report.json` files are still useful when you need to
+regenerate the paired evaluation bundle or inspect low-level run telemetry, but
+portable fixtures that ship only `evaluation.report.json`,
+`runtime.manifest.json`, and evidence metadata can still be verified, rendered,
+validated, and explained.
 
 ## report Layout
 

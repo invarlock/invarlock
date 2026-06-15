@@ -82,10 +82,10 @@ comes from `evaluation.report.json` and should be re-checked with
 Tip: Use `invarlock verify` to recheck schema, pairing, ratio math, and the
 adjacent `runtime.manifest.json`.
 
-`invarlock report explain --evaluation-report` needs the evaluation bundle to
-link back to raw subject and baseline `report.json` files. Public evidence
-fixtures may omit those raw run reports while still being valid for
-`verify`, `report html`, and `report validate`.
+`invarlock report explain --evaluation-report` reads `evaluation.report.json`
+directly. Public evidence fixtures may omit raw subject and baseline
+`report.json` files while still being valid for `verify`, `report html`,
+`report validate`, and `report explain`.
 
 ### Decision Interpretation
 

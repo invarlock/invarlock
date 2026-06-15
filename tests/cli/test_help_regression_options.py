@@ -89,10 +89,11 @@ def test_report_explain_help_mentions_evaluation_bundle(monkeypatch):
     res = runner.invoke(app, ["report", "explain", "--help"])
     assert res.exit_code == 0, res.output
     out = strip_ansi(res.stdout)
+    normalized = " ".join(out.split())
     assert "--evaluation-report" in out
     assert "Preferred reviewer" in out
-    assert "linked subject and" in out
-    assert "baseline run reports" in out
+    assert "explains the evaluation bundle" in normalized
+    assert "directly without requiring linked raw run" in normalized
 
 
 def test_runtime_verify_help_is_single_command_surface(monkeypatch):
