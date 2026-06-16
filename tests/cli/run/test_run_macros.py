@@ -104,13 +104,12 @@ class _CoreRunnerExit:
 
 def _patch_common(monkeypatch, run_mod, provider):
     # Registry and provider (patch source modules to affect inside-function imports)
-    import invarlock.reporting.report_files as report_files_mod
-
     import invarlock.cli.device as dev_mod
     import invarlock.cli.run_runtime_exec as runtime_mod
     import invarlock.core.registry as reg_mod
     import invarlock.core.runner as runner_mod
     import invarlock.eval.data as data_mod
+    import invarlock.reporting.report_files as report_files_mod
 
     monkeypatch.setattr(reg_mod, "get_registry", lambda: _Registry())
     monkeypatch.setattr(data_mod, "get_provider", lambda *a, **k: provider)

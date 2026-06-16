@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from invarlock.reporting.report_files import save_report
-
 from invarlock.reporting.report_types import create_empty_report
 
 

@@ -1,6 +1,5 @@
-from invarlock.reporting.render import render_report_markdown
-
 import invarlock.reporting.report_normalization as report_normalization
+from invarlock.reporting.render import render_report_markdown
 from invarlock.reporting.report_make import make_report
 
 

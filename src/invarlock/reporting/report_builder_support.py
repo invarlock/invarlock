@@ -9,18 +9,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from invarlock.core.assurance_contract import (
-    REPORT_BUILD_EVENT_CATEGORIES,
-    build_assurance_section,
-    report_build_has_blocking_evidence_events,
-    resolve_report_runtime_provenance_declared,
-)
 from invarlock.core.exceptions import MetricsError
 from invarlock.core.metric_kind_contract import is_ppl_metric_kind
 from invarlock.core.retry import RetryDiagnostic
 from invarlock.eval.primary_metric import compute_primary_metric_from_report
 
 from . import report_builder_telemetry as _report_builder_telemetry
+from .report_build_context import EvaluationReportBuilder, ReportBuildContext
+from .report_build_evidence import (
+    ensure_report_build_evidence,
+    record_report_build_event,
+    report_build_has_evidence_events,
+)
 from .report_types import RunReport
 from .utils import _coerce_int, _sanitize_seed_bundle
 
@@ -28,6 +28,28 @@ build_telemetry_payload = _report_builder_telemetry.build_telemetry_payload
 save_telemetry_report = _report_builder_telemetry.save_telemetry_report
 telemetry_summary_line = _report_builder_telemetry.telemetry_summary_line
 telemetry_output_enabled = _report_builder_telemetry.telemetry_output_enabled
+
+__all__ = [
+    "EvaluationReportBuilder",
+    "ReportBuildContext",
+    "RetryReportValidationResult",
+    "attach_schedule_digest",
+    "build_artifacts_payload",
+    "build_baseline_reference",
+    "build_moe_section",
+    "build_telemetry_payload",
+    "ensure_report_build_evidence",
+    "evaluate_primary_metric_tail",
+    "extract_report_meta",
+    "extract_telemetry",
+    "record_report_build_event",
+    "report_build_has_evidence_events",
+    "resolve_capacity_context",
+    "save_telemetry_report",
+    "telemetry_output_enabled",
+    "telemetry_summary_line",
+    "validate_retry_evaluation_report",
+]
 
 _NON_FATAL_EXCEPTIONS = (
     AttributeError,
@@ -133,84 +155,6 @@ def validate_retry_evaluation_report(
                 details={"validation_gates": ("report_error",)},
             ),
         )
-
-
-def ensure_report_build_evidence(report: dict[str, Any]) -> dict[str, Any]:
-    section = report.setdefault("report_build", {})
-    if not isinstance(section, dict):
-        section = {}
-        report["report_build"] = section
-    for category in REPORT_BUILD_EVENT_CATEGORIES:
-        events = section.get(category)
-        if not isinstance(events, list):
-            section[category] = []
-    return section
-
-
-def record_report_build_event(
-    report: dict[str, Any],
-    *,
-    category: str,
-    field: str,
-    reason: str,
-    source: str,
-) -> None:
-    if category not in REPORT_BUILD_EVENT_CATEGORIES:
-        raise ValueError(f"Unknown report-build event category: {category}")
-    section = ensure_report_build_evidence(report)
-    events = section[category]
-    events.append(
-        {
-            "field": str(field),
-            "reason": str(reason),
-            "source": str(source),
-        }
-    )
-
-
-def report_build_has_evidence_events(report: dict[str, Any]) -> bool:
-    section = report.get("report_build")
-    if not isinstance(section, dict):
-        return False
-    for category in REPORT_BUILD_EVENT_CATEGORIES:
-        events = section.get(category)
-        if isinstance(events, list) and bool(events):
-            return True
-    return False
-
-
-@dataclass
-class ReportBuildContext:
-    evaluation_report: dict[str, Any]
-
-    def ensure_evidence(self) -> dict[str, Any]:
-        return ensure_report_build_evidence(self.evaluation_report)
-
-    def has_repair_or_fallback_events(self) -> bool:
-        self.ensure_evidence()
-        return report_build_has_blocking_evidence_events(self.evaluation_report)
-
-    def attach_pending_assurance(self) -> dict[str, Any]:
-        self.ensure_evidence()
-        assurance = build_assurance_section(
-            self.evaluation_report,
-            fallback_fields_used=self.has_repair_or_fallback_events(),
-            runtime_provenance_verified=None,
-            runtime_provenance_declared=resolve_report_runtime_provenance_declared(
-                self.evaluation_report
-            ),
-            runtime_provenance_verification_status="pending",
-        )
-        self.evaluation_report["assurance"] = assurance
-        return assurance
-
-
-class EvaluationReportBuilder:
-    def __init__(self, evaluation_report: dict[str, Any]) -> None:
-        self.context = ReportBuildContext(evaluation_report=evaluation_report)
-
-    def finalize_assurance(self) -> dict[str, Any]:
-        return self.context.attach_pending_assurance()
 
 
 def extract_telemetry(report: RunReport, device_name: Any) -> dict[str, Any]:
