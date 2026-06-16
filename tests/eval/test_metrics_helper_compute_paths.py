@@ -411,25 +411,27 @@ def test_validate_perplexity_paths():
     assert not ok and status == "invalid"
 
 
-def test_mi_gini_gpu_oom_fallback_to_cpu_path():
+def test_mi_gini_gpu_oom_fallback_to_cpu_path(monkeypatch: pytest.MonkeyPatch):
     # Patch lens2_mi to be available, and force GPU path to raise OOM to hit CPU fallback
     import sys
     import types
 
     fake_lens2 = types.ModuleType("invarlock.eval.lens2_mi")
 
-    def mi_scores(x: torch.Tensor, y: torch.Tensor):
-        # CPU fallback path receives 2D x: [N,D]; return vector [D]
-        if x.ndim == 3:
-            # Simulate GPU path raising OOM
-            raise RuntimeError("CUDA out of memory")
-        # Alternate raise on first call to hit j-level exception path when L>1
-        if getattr(mi_scores, "_called", False):
-            return x.float().mean(dim=0)
-        mi_scores._called = True
-        raise RuntimeError("fail in j loop")
+    def make_mi_scores():
+        def mi_scores(x: torch.Tensor, y: torch.Tensor):
+            # CPU fallback path receives 2D x: [N,D]; return vector [D]
+            if x.ndim == 3:
+                # Simulate GPU path raising OOM
+                raise RuntimeError("CUDA out of memory")
+            # Alternate raise on first call to hit j-level exception path when L>1
+            if getattr(mi_scores, "_called", False):
+                return x.float().mean(dim=0)
+            mi_scores._called = True
+            raise RuntimeError("fail in j loop")
 
-    fake_lens2.mi_scores = mi_scores
+        return mi_scores
+
     with patch.dict(sys.modules, {"invarlock.eval.lens2_mi": fake_lens2}):
         # Minimal activation_data to exercise the path
         L, N, T, D = 2, 1, 4, 3
@@ -439,12 +441,30 @@ def test_mi_gini_gpu_oom_fallback_to_cpu_path():
         cfg = MetricsConfig(max_tokens=8)
         from invarlock.eval.metrics import DependencyManager
 
-        dm = DependencyManager()
-        val = _calculate_mi_gini(
-            DummyCausalLM(), activation_data, dm, cfg, torch.device("cpu")
-        )
-        # When mi_scores is available and CPU fallback runs, we should get a finite float
-        assert isinstance(val, float) and math.isfinite(val)
+        for cuda_available in (False, True):
+            empty_cache_calls: list[bool] = []
+            fake_lens2.mi_scores = make_mi_scores()
+
+            def mark_empty_cache(calls: list[bool] = empty_cache_calls) -> None:
+                calls.append(True)
+
+            monkeypatch.setattr(
+                torch.cuda,
+                "is_available",
+                lambda available=cuda_available: available,
+            )
+            monkeypatch.setattr(
+                torch.cuda,
+                "empty_cache",
+                mark_empty_cache,
+            )
+            dm = DependencyManager()
+            val = _calculate_mi_gini(
+                DummyCausalLM(), activation_data, dm, cfg, torch.device("cpu")
+            )
+            # When mi_scores is available and CPU fallback runs, we should get a finite float
+            assert isinstance(val, float) and math.isfinite(val)
+            assert empty_cache_calls == ([True] if cuda_available else [])
 
 
 def test_resource_manager_and_pre_eval_checks_and_gini_zero():

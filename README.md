@@ -145,7 +145,8 @@ Wheel-only verification path:
 `pip install invarlock`, `invarlock doctor`,
 `invarlock verify /path/to/evaluation.report.json`,
 `invarlock report html -i /path/to/evaluation.report.json -o /path/to/evaluation.html`,
-and `invarlock report explain --evaluation-report /path/to/evaluation.report.json`.
+`invarlock report explain --evaluation-report /path/to/evaluation.report.json`,
+and `invarlock report export -i /path/to/evaluation.report.json --format mlflow-tags`.
 
 Repo maintainers can build the local runtime image once with `make runtime-image`;
 InvarLock automatically prefers `invarlock-runtime:local` when it is present.
@@ -154,7 +155,7 @@ Artifact model:
 
 | Artifact | Produced by | Primary consumers |
 | --- | --- | --- |
-| `evaluation.report.json` | `invarlock evaluate`, `invarlock report generate --format report` | `invarlock verify`, `invarlock report html`, `invarlock report validate`, `invarlock report explain --evaluation-report`, `invarlock advanced runtime-verify` |
+| `evaluation.report.json` | `invarlock evaluate`, `invarlock report generate --format report` | `invarlock verify`, `invarlock report html`, `invarlock report export`, `invarlock report validate`, `invarlock report explain --evaluation-report`, `invarlock advanced runtime-verify` |
 | `report.json` | Baseline/subject run directories under `runs/...` | `invarlock report generate`, `invarlock report explain --subject-report ... --baseline-report ...` |
 
 `invarlock verify` expects `evaluation.report.json`; if you only have a raw
@@ -181,7 +182,8 @@ Runtime provenance: reports/eval/runtime.manifest.json
 - Core workflow: `invarlock evaluate` -> `invarlock verify` ->
   `invarlock report html`.
 - Follow-on report analysis after the core loop: `invarlock report generate`,
-  `invarlock report explain`, and `invarlock report validate`.
+  `invarlock report explain`, `invarlock report export`, and
+  `invarlock report validate`.
 - Environment and release checks: `invarlock doctor` plus the JSON surfaces
   emitted by `doctor --json` and `advanced plugins ... --json`.
 - Runtime-manifest verifier: `invarlock advanced runtime-verify --report <evaluation.report.json> --manifest <runtime.manifest.json>`.

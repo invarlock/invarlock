@@ -14,7 +14,7 @@ prerequisites, commands, and generated artifact list.
 
 ## Shared Assets
 
-- `_shared/evidence-scope.md` defines the claim boundary for integration
+- `_shared/evidence-scope.md` defines the evidence scope for integration
   examples.
 - `_shared/expected-artifacts.md` lists the artifacts each runnable example
   should produce.
@@ -25,6 +25,9 @@ prerequisites, commands, and generated artifact list.
   labeling helpers.
 - `_shared/run_invarlock_compare.sh` is a reusable baseline-vs-subject wrapper
   for HF-loadable checkpoints and adapter-backed subject paths.
+- `ci_registry/` shows how to attach report verification, HTML, MLflow tags,
+  Hugging Face model-card evidence, and release-review packets to existing CI
+  and registry workflows.
 - `_shared/validate_source_matrix_artifacts.py` checks generated strict-lane
   artifact directories against `source_matrix.json`.
 - `_runtime_images/` contains example-only CUDA image definitions for optional
@@ -60,5 +63,6 @@ prerequisites, commands, and generated artifact list.
 7. Record the output paths and any backend limitations in the example README.
 
 Use these examples as public, reproducible reference flows when discussing
-integrations with upstream projects. Each README should make the runnable status
-explicit: `runnable`, `exploratory-host`, or `compatibility-investigation`.
+integrations with upstream projects. Each README should make the status
+explicit: `runnable`, `reference-pattern`, `exploratory-host`, or
+`compatibility-investigation`.

@@ -30,6 +30,8 @@ from invarlock.core.report_inputs import (
     load_run_report_input_json,
 )
 
+from .report_export import register_report_export_command
+
 if TYPE_CHECKING:
     from invarlock.reporting.report_contract import ReportGenerationResult
 
@@ -346,7 +348,7 @@ def _render_generation_result(
 report_app = typer.Typer(
     help=(
         "Operations on evaluation bundles and run reports "
-        "(generate, explain, html, validate)."
+        "(generate, explain, html, export, validate)."
     ),
     invoke_without_command=False,
     no_args_is_help=False,
@@ -700,6 +702,9 @@ def report_html(
         embed_css=embed_css,
         force=force,
     )
+
+
+register_report_export_command(report_app)
 
 
 @report_app.command("validate")

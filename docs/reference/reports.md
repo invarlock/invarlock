@@ -25,6 +25,7 @@ telemetry fields, and HTML export.
   - [Primary Metric Tail Gate](#primary-metric-tail-gate-optional)
 - [Telemetry Fields](#telemetry-fields)
 - [HTML Export](#html-export)
+- [CI and Registry Exports](#ci-and-registry-exports)
 - [Troubleshooting](#troubleshooting)
 - [Related Documentation](#related-documentation)
 
@@ -51,13 +52,18 @@ jq '.telemetry' reports/eval/evaluation.report.json
 
 # Export to HTML
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
+
+# Export CI/model-registry handoff artifacts
+invarlock report export -i reports/eval/evaluation.report.json --format mlflow-tags
+invarlock report export -i reports/eval/evaluation.report.json --format model-card-md
+invarlock report export -i reports/eval/evaluation.report.json --format release-review-md
 ```
 
 Artifact model:
 
 | Artifact | Produced by | Primary consumers |
 | --- | --- | --- |
-| `evaluation.report.json` | `invarlock evaluate`, `invarlock report generate --format report` | `invarlock verify`, `invarlock report html`, `invarlock report validate`, `invarlock report explain --evaluation-report`, `invarlock advanced runtime-verify` |
+| `evaluation.report.json` | `invarlock evaluate`, `invarlock report generate --format report` | `invarlock verify`, `invarlock report html`, `invarlock report export`, `invarlock report validate`, `invarlock report explain --evaluation-report`, `invarlock advanced runtime-verify` |
 | `report.json` | Baseline/subject run directories under `runs/...` | `invarlock report generate`, `invarlock report explain --subject-report ... --baseline-report ...` |
 
 `report explain --evaluation-report` reads `evaluation.report.json` directly.
@@ -477,6 +483,43 @@ from invarlock.reporting.html import render_report_html
 
 html = render_report_html(report)
 ```
+
+---
+
+## CI and Registry Exports
+
+`invarlock report export` converts an existing `evaluation.report.json` into
+small handoff artifacts for systems that already own CI, registry, model-card,
+or release-review workflows.
+
+```bash
+invarlock report export \
+  --evaluation-report reports/eval/evaluation.report.json \
+  --format mlflow-tags \
+  --policy-profile ci \
+  --verify-result reports/eval/invarlock-verify.json \
+  --output reports/eval/mlflow-tags.json
+```
+
+| Format | Output | Purpose |
+| --- | --- | --- |
+| `mlflow-tags` | JSON with `tags` and report artifact path | Set registry tags and log the report as an MLflow artifact from an MLflow-enabled environment. |
+| `model-card-md` | Markdown block | Paste InvarLock evidence into a Hugging Face model card or equivalent model README. |
+| `release-review-md` | Markdown packet | Attach pass/fail, baseline/subject identity, report hash, policy profile, and reviewer checklist to release review. |
+
+These exports summarize regression evidence only. They do not change verifier
+semantics, replace `invarlock verify`, or provide deployment approval.
+
+Common options:
+
+- `--policy-profile`: profile label to use when the report does not record one.
+- `--report-url`: public report URL for Markdown exports.
+- `--evidence-url`: public evidence-pack URL for Markdown exports.
+- `--verify-result`: path to `invarlock verify --json` output. When supplied,
+  export status and verifier fields come from the verifier result item whose
+  `id` matches the resolved evaluation report path. A verifier result for a
+  different report is rejected.
+- `--force`: overwrite an existing output file.
 
 ---
 
