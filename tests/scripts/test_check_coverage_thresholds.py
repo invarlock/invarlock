@@ -247,6 +247,36 @@ def test_summary_reports_measured_vs_configured_threshold_counts(
     assert len(payload["missing_threshold_files"]) == CONFIGURED_THRESHOLD_FILES - 1
 
 
+def test_script_workflow_bare_filenames_resolve_to_threshold_paths(
+    tmp_path: Path,
+) -> None:
+    xml = tmp_path / "cov.xml"
+    json_out = tmp_path / "out.json"
+    _write_cov_xml(
+        xml,
+        [
+            ("workflow_frontdoor.py", 1.0, 1.0),
+            ("workflow_plan.py", 1.0, 1.0),
+            ("workflow_runner.py", 1.0, 1.0),
+            ("workflow_state.py", 1.0, 1.0),
+        ],
+    )
+
+    proc = _run_checker(xml, json_out)
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(json_out.read_text())
+    files = {record["path"] for record in payload["files"]}
+    for path in (
+        "scripts/evidence_packs/python/workflow_frontdoor.py",
+        "scripts/evidence_workflows/workflow_plan.py",
+        "scripts/evidence_workflows/workflow_runner.py",
+        "scripts/evidence_workflows/workflow_state.py",
+    ):
+        assert path in files
+        assert path not in payload["missing_threshold_files"]
+
+
 def test_selected_critical_files_reject_subcomplete_branch_coverage(
     tmp_path: Path,
 ) -> None:
@@ -479,6 +509,11 @@ def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
             ("src/invarlock/reporting/run_report_contract.py", 0.949, 1.0),
             ("src/invarlock/reporting/report_builder_support.py", 0.909, 1.0),
             ("src/invarlock/reporting/report_builder_telemetry.py", 0.909, 1.0),
+            ("scripts/evidence_packs/python/workflow_frontdoor.py", 0.909, 1.0),
+            ("src/invarlock/reporting/guards_common.py", 0.909, 1.0),
+            ("src/invarlock/reporting/report_build_context.py", 0.909, 1.0),
+            ("src/invarlock/reporting/report_build_evidence.py", 0.909, 1.0),
+            ("src/invarlock/reporting/run_metric_utils.py", 0.909, 1.0),
         ],
     )
 
@@ -504,6 +539,11 @@ def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
         "src/invarlock/reporting/run_report_contract.py",
         "src/invarlock/reporting/report_builder_support.py",
         "src/invarlock/reporting/report_builder_telemetry.py",
+        "scripts/evidence_packs/python/workflow_frontdoor.py",
+        "src/invarlock/reporting/guards_common.py",
+        "src/invarlock/reporting/report_build_context.py",
+        "src/invarlock/reporting/report_build_evidence.py",
+        "src/invarlock/reporting/run_metric_utils.py",
     ):
         assert path in proc.stderr
 

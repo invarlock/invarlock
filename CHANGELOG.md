@@ -109,16 +109,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   requirement locks.
 - Updated Dependabot-managed CI action pins and README public-evidence notes
   alongside the refreshed packaged public-evidence index.
-- Moved model-evidence lane results, summary writing, artifact-manifest capture,
-  evidence-pack manifest artifact collection, and evidence-pack verification
-  summary writing onto a shared typed evidence-workflow helper layer as the
-  first step toward thinner evidence-pack and model-evidence orchestration
-  entrypoints.
+- Moved model-evidence lane execution, remote launches, evidence-pack direct
+  front doors, status logs, summaries, retries, and artifact manifests onto a
+  shared typed evidence-workflow layer while keeping shell scripts as thin
+  process/worker dispatch entrypoints.
 - Updated model-family lane routing to use a shared catalog/support-matrix route
   index that resolves presets and adapters from model task role, modality, and
   evidence metadata instead of rebuilding model-evidence-local override tables.
 - Moved `evaluate` baseline, subject, and report-generation phases onto typed
   request/runtime helpers with explicit dependencies and a thinner command body.
+- Moved `CoreRunner.execute` onto an explicit typed execution plan with named
+  prepare, guard-preparation, edit, guard-collection, evaluation, and finalize
+  phase owners.
 - Updated report summaries, Markdown output, schema validation, and
   `report explain` to share primary-metric interpretation, honor configured
   acceptance ranges, and render accuracy deltas consistently in percentage

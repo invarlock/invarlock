@@ -532,7 +532,12 @@ filterwarnings = [
 
 [tool.coverage.run]
 branch = true
-source = ["src", "scripts/release"]
+source = [
+    "src",
+    "scripts/release",
+    "scripts/evidence_workflows",
+    "scripts/evidence_packs/python",
+]
 omit = [
     "*/tests/*",
     "*/test_*",
@@ -545,6 +550,8 @@ show_missing = true
 precision = 2
 include = [
     "scripts/release/*.py",
+    "scripts/evidence_workflows/*.py",
+    "scripts/evidence_packs/python/workflow_frontdoor.py",
     "src/invarlock/eval/*",
     "src/invarlock/guards/*",
     "src/invarlock/calibration.py",
