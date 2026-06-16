@@ -25,6 +25,8 @@ prerequisites, commands, and generated artifact list.
   labeling helpers.
 - `_shared/run_invarlock_compare.sh` is a reusable baseline-vs-subject wrapper
   for HF-loadable checkpoints and adapter-backed subject paths.
+- `public_e2e/` turns the shipped external-edit public evidence into verifier,
+  HTML, MLflow tag, model-card, release-review, and CI summary artifacts.
 - `ci_registry/` shows how to attach report verification, HTML, MLflow tags,
   Hugging Face model-card evidence, and release-review packets to existing CI
   and registry workflows.

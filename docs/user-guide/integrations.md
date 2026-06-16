@@ -17,6 +17,7 @@ runtime package and should not add required dependencies to the core install.
 | Shared evidence wording | Present under `examples/integrations/_shared/evidence-scope.md`. |
 | Expected artifact checklist | Present under `examples/integrations/_shared/expected-artifacts.md`. |
 | Shared compare wrapper | Present under `examples/integrations/_shared/run_invarlock_compare.sh`. |
+| Public end-to-end handoff | Present under `examples/integrations/public_e2e/`. |
 | CI and registry evidence | Present under `examples/integrations/ci_registry/`. |
 | Target-specific examples | Added one target at a time after backend compatibility is validated. |
 
@@ -79,6 +80,12 @@ Generated reports, models, runs, HTML, and artifacts under
 
 ## CI and Registry Handoff
 
+For a source-only public walkthrough, run the script under
+`examples/integrations/public_e2e/`. It copies the checked-in external-edit
+public report into a local output directory, verifies that local copy, renders
+HTML, exports MLflow tags, writes a model-card block, writes a release-review
+packet, and writes a CI summary Markdown file.
+
 Use `invarlock report export` when the report already exists and you need to
 attach the evidence to systems users already operate:
 
@@ -136,6 +143,9 @@ invarlock verify --profile release --assurance strict \
 
 invarlock verify --profile release --assurance strict \
   public_evidence/real_runs/tiny_gpt2_quant_rtn/evaluation.report.json
+
+invarlock verify --profile release --assurance strict \
+  public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json
 ```
 
 See the [Public Evidence Walkthrough](public-evidence-walkthrough.md) for the
