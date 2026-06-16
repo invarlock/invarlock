@@ -580,7 +580,8 @@ def report_explain(
                 (f"Explaining evaluation bundle directly: {evaluation_path}"),
                 style=output_style,
             )
-            return _explain_evaluation_report(evaluation_payload)
+            _explain_evaluation_report(evaluation_payload)
+            return
         else:
             if not subject_report or not baseline_report:
                 raise typer.BadParameter(
@@ -600,7 +601,7 @@ def report_explain(
         _raise_report_input_failure(detail)
     except typer.BadParameter as exc:
         _raise_report_input_failure(str(exc))
-    return _explain(
+    _explain(
         subject_report=str(report_path),
         baseline_report=str(baseline_path),
     )
