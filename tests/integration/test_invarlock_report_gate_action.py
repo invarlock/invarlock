@@ -11,7 +11,9 @@ import yaml
 
 def test_report_gate_action_threads_verify_result_into_exports() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    action_path = repo_root / ".github" / "actions" / "invarlock-report-gate" / "action.yml"
+    action_path = (
+        repo_root / ".github" / "actions" / "invarlock-report-gate" / "action.yml"
+    )
     action = yaml.safe_load(action_path.read_text(encoding="utf-8"))
 
     inputs = action["inputs"]
@@ -41,12 +43,14 @@ def test_report_gate_action_threads_verify_result_into_exports() -> None:
     assert "${{ inputs.verify-output }}" in verify_step
     assert "INVARLOCK_VERIFY_EXIT_CODE" in verify_step
     assert 'exit "$status"' not in verify_step
-    assert "--verify-result \"${{ inputs.verify-output }}\"" in export_steps
+    assert '--verify-result "${{ inputs.verify-output }}"' in export_steps
     assert "INVARLOCK_VERIFY_EXIT_CODE" in fail_step
     assert "${{ inputs.fail-on-verify }}" in fail_step
 
     upload_step = next(
-        step for step in action["runs"]["steps"] if step.get("uses") == "actions/upload-artifact@v4"
+        step
+        for step in action["runs"]["steps"]
+        if step.get("uses") == "actions/upload-artifact@v4"
     )
     assert "${{ inputs.verify-output }}" in upload_step["with"]["path"]
 

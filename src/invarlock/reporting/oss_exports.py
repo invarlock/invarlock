@@ -310,9 +310,7 @@ def render_mlflow_tags_export(context: ReportExportContext) -> dict[str, Any]:
     if context.policy_digest != _UNKNOWN:
         tags["invarlock.policy_digest"] = context.policy_digest
     if context.runtime_provenance_status != _UNKNOWN:
-        tags["invarlock.runtime_provenance_status"] = (
-            context.runtime_provenance_status
-        )
+        tags["invarlock.runtime_provenance_status"] = context.runtime_provenance_status
     if context.report_url:
         tags["invarlock.report_url"] = context.report_url
     if context.evidence_url:
