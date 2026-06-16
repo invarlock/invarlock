@@ -22,7 +22,7 @@
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -32,6 +32,9 @@
     
     
       <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -45,10 +48,12 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -59,7 +64,12 @@
   </head>
   
   
-    <body dir="ltr">
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -84,8 +94,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -109,8 +118,8 @@
       </div>
     </div>
     
+      
     
-      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
     
     
     
@@ -326,8 +335,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     InvarLock Documentation
@@ -1440,6 +1448,34 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/report-outline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Outline
   
 
     
@@ -3033,7 +3069,7 @@ models via <code>MODEL_1</code>–<code>MODEL_8</code>.</p>
 </tr>
 <tr>
 <td><code>full</code></td>
-<td><code>mistralai/Mistral-7B-v0.1</code>, <code>Qwen/Qwen2.5-14B</code>, <code>Qwen/Qwen2.5-32B</code>, <code>01-ai/Yi-34B</code>, <code>mistralai/Mixtral-8x7B-v0.1</code>, <code>Qwen/Qwen1.5-72B</code></td>
+<td><code>mistralai/Mistral-7B-v0.1</code>, <code>Qwen/Qwen2.5-14B</code>, <code>Qwen/Qwen2.5-32B</code>, <code>01-ai/Yi-34B</code>, <code>mistralai/Mixtral-8x7B-v0.1</code>, <code>Qwen/Qwen3-8B</code></td>
 <td>Multi-GPU recommended</td>
 </tr>
 </tbody>
@@ -3152,6 +3188,10 @@ or run with <code>PYTHONPATH=src</code> so <code>invarlock</code> uses the inten
 <li><code>reports/&lt;model&gt;/&lt;edit&gt;/&lt;run&gt;/edit_metadata.json</code></li>
 <li><code>reports/**/rmt_probe.json</code> (optional sidecar; emitted by some scenarios, e.g. <code>rmt_norm_noise</code>)</li>
 <li><code>reports/**/ve_probe.json</code> (optional sidecar; emitted by VE demo scenarios, e.g. <code>ve_mlp_scale_skew</code>)</li>
+<li>public guard-value packages may also include
+  <code>reports/guard_value_all_guard_probe_sweep.json</code>; the Mistral 7B public
+  package uses this file to record PM-pass, baseline-relative spectral, RMT, and
+  variance/VE evidence from clean confirmation reruns</li>
 <li><code>reports/**/deployable_artifact_validation.json</code>, <code>backend_inventory.json</code>, <code>memory_report.json</code>, <code>load_smoke.json</code>, and <code>inference_smoke.json</code> for deployable scenarios</li>
 <li><code>reports/**/evaluation.html</code> + <code>reports/**/verify.json</code></li>
 <li><code>README.md</code> (reviewer summary), <code>manifest.json</code>, <code>checksums.sha256</code></li>

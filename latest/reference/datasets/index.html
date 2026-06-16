@@ -22,7 +22,7 @@
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -32,6 +32,9 @@
     
     
       <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -45,10 +48,12 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -59,7 +64,12 @@
   </head>
   
   
-    <body dir="ltr">
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -84,8 +94,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -109,8 +118,8 @@
       </div>
     </div>
     
+      
     
-      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
     
     
     
@@ -326,8 +335,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     InvarLock Documentation
@@ -1226,6 +1234,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../report-outline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Outline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../env-vars/" class="md-nav__link">
         
   
@@ -1575,6 +1611,17 @@
     <span class="md-ellipsis">
       
         Vision-text provider example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#public-vqa-materialization-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public VQA materialization example
       
     </span>
   </a>
@@ -2742,6 +2789,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#public-vqa-materialization-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public VQA materialization example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#seq2seq-provider-example-hf" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2890,6 +2948,15 @@
   expects JSONL records with <code>id</code>, <code>image_path</code>, <code>prompt</code>, and either <code>answer</code>
   or <code>answers</code>. Records are single-image examples; provider batching can still
   group multiple records when callers request <code>batch_size &gt; 1</code>.</li>
+<li><strong>Public image-text datasets</strong>: public Hugging Face datasets can be used by
+  materializing them first into a local <code>vision_text</code> manifest. The model
+  evidence workflow uses
+  <code>scripts/model_evidence/materialize_vision_text_dataset.py</code> for this pattern,
+  so evaluation remains offline/hashable after the download step.</li>
+<li><strong>Image-text primary metric</strong>: <code>vision_text</code> uses answer accuracy as the
+  primary metric because the evidence claim is whether the generated answer
+  matches the image question. Token log loss is still recorded as supporting
+  telemetry, but perplexity is not the public VQA gate.</li>
 <li><strong>Tokenizer contract</strong>: dataset providers expect either a callable tokenizer
   that returns <code>input_ids</code> plus optional <code>attention_mask</code>, or an <code>encode(...)</code>
   method that accepts <code>truncation=True</code>, <code>max_length=...</code>, and
@@ -2986,7 +3053,7 @@
 <td>seq2seq</td>
 <td>Cache/Net</td>
 <td><code>dataset_name</code>, <code>src_field</code>, <code>tgt_field</code></td>
-<td>Provides encoder ids + decoder labels.</td>
+<td>Provides encoder ids + decoder labels; supports pinned dataset <code>revision</code> and source/target prefixes.</td>
 </tr>
 <tr>
 <td><code>local_jsonl_pairs</code></td>
@@ -3126,16 +3193,50 @@
 <span class="w">  </span><span class="nt">final_n</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 </code></pre></div>
 
+<h3 id="public-vqa-materialization-example">Public VQA materialization example<a class="headerlink" href="#public-vqa-materialization-example" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>scripts/model_evidence/materialize_vision_text_dataset.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dataset<span class="w"> </span>Multimodal-Fatima/VQAv2_sample_validation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--split<span class="w"> </span>validation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--revision<span class="w"> </span>99487d2651df3799002b2fb3e455741744514a02<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output-dir<span class="w"> </span>artifacts/model-evidence/public_datasets/vqav2_sample_validation_800<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--max-samples<span class="w"> </span><span class="m">800</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--image-field<span class="w"> </span>image<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--prompt-field<span class="w"> </span>question<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--answer-field<span class="w"> </span>multiple_choice_answer<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--answers-field<span class="w"> </span>answers<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--id-field<span class="w"> </span>question_id<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--prompt-template<span class="w"> </span><span class="s1">&#39;{question}</span>
+<span class="s1">Return exactly one JSON object like {{&quot;answer&quot;:&quot;short phrase&quot;}}. Use a short phrase only. Do not explain.&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--overwrite
+</code></pre></div>
+
+<p>The generated <code>manifest.jsonl</code>, <code>images/</code>, and
+<code>materialization_summary.json</code> are then consumed by <code>vision_text</code>. For evidence
+promotion, pin the dataset revision and keep the materialization summary with
+the run artifacts. Public VQA evidence prompts should prefer a structured
+answer field such as <code>{"answer":"..."}</code>; the evaluator extracts that field
+before exact-answer scoring and falls back to the raw generation when no JSON
+answer is present.</p>
 <h3 id="seq2seq-provider-example-hf">Seq2seq provider example (HF)<a class="headerlink" href="#seq2seq-provider-example-hf" title="Permanent link">&para;</a></h3>
 <div class="codehilite"><pre><span></span><code><span class="nt">dataset</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hf_seq2seq</span>
-<span class="w">  </span><span class="nt">dataset_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wmt14</span>
-<span class="w">  </span><span class="nt">src_field</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">translation.en</span>
-<span class="w">  </span><span class="nt">tgt_field</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">translation.de</span>
+<span class="w">  </span><span class="nt">provider</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hf_seq2seq</span>
+<span class="w">    </span><span class="nt">dataset_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">abisee/cnn_dailymail</span>
+<span class="w">    </span><span class="nt">config_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.0.0</span>
+<span class="w">    </span><span class="nt">revision</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">96df5e686bee6baa90b8bee7c28b81fa3fa6223d</span>
+<span class="w">    </span><span class="nt">src_field</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">article</span>
+<span class="w">    </span><span class="nt">tgt_field</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">highlights</span>
+<span class="w">    </span><span class="nt">src_prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;summarize:</span><span class="nv"> </span><span class="s">&quot;</span>
+<span class="w">    </span><span class="nt">max_samples</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1024</span>
+<span class="w">  </span><span class="nt">split</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">validation</span>
+<span class="w">  </span><span class="nt">seq_len</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">256</span>
 <span class="w">  </span><span class="nt">preview_n</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32</span>
 <span class="w">  </span><span class="nt">final_n</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32</span>
 </code></pre></div>
 
+<p>The FLAN-T5 public seq2seq basis uses this provider shape with
+<code>google/flan-t5-base</code> pinned to model revision
+<code>7bcac572ce56db69c1ea7c8af255c5d7c9672fc2</code>.</p>
 <h3 id="environment-variables">Environment variables<a class="headerlink" href="#environment-variables" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>INVARLOCK_ALLOW_NETWORK=1</code> — allow dataset downloads.</li>

@@ -22,7 +22,7 @@
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -32,6 +32,9 @@
     
     
       <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -45,10 +48,12 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -59,7 +64,12 @@
   </head>
   
   
-    <body dir="ltr">
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -84,8 +94,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -109,8 +118,8 @@
       </div>
     </div>
     
+      
     
-      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
     
     
     
@@ -326,8 +335,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     InvarLock Documentation
@@ -684,6 +692,17 @@
     <span class="md-ellipsis">
       
         Shared Workflow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ci-and-registry-handoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI and Registry Handoff
       
     </span>
   </a>
@@ -1319,6 +1338,34 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/report-outline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Outline
   
 
     
@@ -2547,6 +2594,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#ci-and-registry-handoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI and Registry Handoff
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#public-evidence-anchors" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2607,6 +2665,14 @@ runtime package and should not add required dependencies to the core install.</p
 <td>Present under <code>examples/integrations/_shared/run_invarlock_compare.sh</code>.</td>
 </tr>
 <tr>
+<td>Public end-to-end handoff</td>
+<td>Present under <code>examples/integrations/public_e2e/</code>.</td>
+</tr>
+<tr>
+<td>CI and registry evidence</td>
+<td>Present under <code>examples/integrations/ci_registry/</code>.</td>
+</tr>
+<tr>
 <td>Target-specific examples</td>
 <td>Added one target at a time after backend compatibility is validated.</td>
 </tr>
@@ -2627,6 +2693,10 @@ runtime package and should not add required dependencies to the core install.</p
 <tr>
 <td><code>runnable</code></td>
 <td>Commands are expected to generate <code>evaluation.report.json</code>, <code>verify.json</code>, and <code>evaluation.html</code> in the documented environment.</td>
+</tr>
+<tr>
+<td><code>reference-pattern</code></td>
+<td>Commands show how to attach existing reports to CI or registry surfaces without producing a new subject checkpoint.</td>
 </tr>
 <tr>
 <td><code>exploratory-host</code></td>
@@ -2692,6 +2762,50 @@ adapter:</p>
 </table>
 <p>Generated reports, models, runs, HTML, and artifacts under
 <code>examples/integrations/**</code> are ignored by git.</p>
+<h2 id="ci-and-registry-handoff">CI and Registry Handoff<a class="headerlink" href="#ci-and-registry-handoff" title="Permanent link">&para;</a></h2>
+<p>For a source-only public walkthrough, run the script under
+<code>examples/integrations/public_e2e/</code>. It copies the checked-in external-edit
+public report into a local output directory, verifies that local copy, renders
+HTML, exports MLflow tags, writes a model-card block, writes a release-review
+packet, and writes a CI summary Markdown file.</p>
+<p>Use <code>invarlock report export</code> when the report already exists and you need to
+attach the evidence to systems users already operate:</p>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>report<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--evaluation-report<span class="w"> </span>reports/eval/evaluation.report.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--format<span class="w"> </span>mlflow-tags<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--policy-profile<span class="w"> </span>ci<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--verify-result<span class="w"> </span>reports/eval/invarlock-verify.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>reports/eval/mlflow-tags.json
+
+invarlock<span class="w"> </span>report<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--evaluation-report<span class="w"> </span>reports/eval/evaluation.report.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--format<span class="w"> </span>model-card-md<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--report-url<span class="w"> </span>https://example.test/evaluation.report.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--evidence-url<span class="w"> </span>https://example.test/evidence.zip<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--verify-result<span class="w"> </span>reports/eval/invarlock-verify.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>reports/eval/model-card-invarlock.md
+
+invarlock<span class="w"> </span>report<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--evaluation-report<span class="w"> </span>reports/eval/evaluation.report.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--format<span class="w"> </span>release-review-md<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--policy-profile<span class="w"> </span>release<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--verify-result<span class="w"> </span>reports/eval/invarlock-verify.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>reports/eval/release-review.md
+</code></pre></div>
+
+<p>For GitHub Actions, the repository ships a composite action at
+<code>.github/actions/invarlock-report-gate</code>. It verifies the evaluation report,
+renders HTML, writes MLflow tags, writes a release-review packet, appends a PR
+summary, and uploads the evidence as a workflow artifact.</p>
+<p>Important action inputs include <code>report</code>, <code>profile</code>, <code>assurance</code>,
+<code>runtime-provenance</code>, <code>warning-policy</code>, <code>verify-output</code>, <code>html-output</code>,
+<code>mlflow-tags-output</code>, and <code>review-output</code>. The generated exports consume the
+same <code>verify-output</code> JSON so their pass/fail status reflects the verifier
+result item for the same evaluation report when the action has run
+verification.</p>
+<p>This integration layer is intentionally small. It exports evidence into CI,
+model cards, and registries; it does not replace MLflow, Hugging Face Hub,
+Databricks, SageMaker, Vertex, or an organization's approval workflow.</p>
 <h2 id="public-evidence-anchors">Public Evidence Anchors<a class="headerlink" href="#public-evidence-anchors" title="Permanent link">&para;</a></h2>
 <p>Use the shipped public evidence as the credibility floor while target examples
 are being built:</p>
@@ -2703,6 +2817,9 @@ invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span cl
 
 invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span class="w"> </span>release<span class="w"> </span>--assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>public_evidence/real_runs/tiny_gpt2_quant_rtn/evaluation.report.json
+
+invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span class="w"> </span>release<span class="w"> </span>--assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json
 </code></pre></div>
 
 <p>See the <a href="../public-evidence-walkthrough/">Public Evidence Walkthrough</a> for the

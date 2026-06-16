@@ -20,7 +20,7 @@
         
       
       
-      <link rel="icon" href="assets/images/favicon.png">
+      <link rel="icon" href="assets/invarlock-app-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -30,6 +30,9 @@
     
     
       <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -43,10 +46,12 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="stylesheets/extra.css">
     
     <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -57,7 +62,12 @@
   </head>
   
   
-    <body dir="ltr">
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -82,8 +92,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -107,8 +116,8 @@
       </div>
     </div>
     
+      
     
-      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
     
     
     
@@ -324,8 +333,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     InvarLock Documentation
@@ -563,6 +571,89 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Support Matrix">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#baseline-fixture-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Baseline Fixture Evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#published-smalllocal-decoder-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Published Small/Local Decoder Evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#published-7b-9b-decoder-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Published 7B-9B Decoder Evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#published-13b-14b-and-reasoning-decoder-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Published 13B-14B And Reasoning Decoder Evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multimodal-published-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multimodal Published Evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#largemoe-published-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Large/MoE Published Evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#seq2seq-published-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Seq2Seq Published Evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1464,6 +1555,34 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="reference/report-outline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Outline
   
 
     
@@ -2789,6 +2908,89 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Support Matrix">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#baseline-fixture-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Baseline Fixture Evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#published-smalllocal-decoder-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Published Small/Local Decoder Evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#published-7b-9b-decoder-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Published 7B-9B Decoder Evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#published-13b-14b-and-reasoning-decoder-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Published 13B-14B And Reasoning Decoder Evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multimodal-published-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multimodal Published Evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#largemoe-published-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Large/MoE Published Evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#seq2seq-published-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Seq2Seq Published Evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3001,7 +3203,7 @@ to change proposals or releases when you update calibration.</p>
 </ul>
 <h3 id="governance">Governance<a class="headerlink" href="#governance" title="Permanent link">&para;</a></h3>
 <ul>
-<li><a href="https://github.com/invarlock/invarlock/blob/v0.10.0/CONTRIBUTING.md">Contribution Guidelines</a></li>
+<li><a href="https://github.com/invarlock/invarlock/blob/v0.11.0/CONTRIBUTING.md">Contribution Guidelines</a></li>
 </ul>
 <hr />
 <h2 id="core-concepts">Core Concepts<a class="headerlink" href="#core-concepts" title="Permanent link">&para;</a></h2>
@@ -3068,6 +3270,7 @@ configured acceptance envelopes even when aggressive compression is attempted.</
 </ul>
 <hr />
 <h2 id="support-matrix">Support Matrix<a class="headerlink" href="#support-matrix" title="Permanent link">&para;</a></h2>
+<h3 id="baseline-fixture-evidence">Baseline Fixture Evidence<a class="headerlink" href="#baseline-fixture-evidence" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -3093,132 +3296,422 @@ configured acceptance envelopes even when aggressive compression is attempted.</
 <td>Yes</td>
 <td>Yes</td>
 </tr>
+</tbody>
+</table>
+<h3 id="published-smalllocal-decoder-evidence">Published Small/Local Decoder Evidence<a class="headerlink" href="#published-smalllocal-decoder-evidence" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
 <tr>
-<td>Mistral 7B causal LM</td>
+<th>Surface</th>
+<th>Preset included</th>
+<th>Adapter available</th>
+<th>Pilot calibration config present</th>
+<th>Published assurance basis</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TinyLlama 1.1B causal LM</td>
 <td>Yes</td>
 <td>Yes</td>
 <td>Yes</td>
-<td>No, repo-included pilot config only</td>
+<td>Yes</td>
 </tr>
 <tr>
-<td>Ministral 3 causal LM (text-only eval)</td>
+<td>SmolLM3 3B causal LM</td>
 <td>Yes</td>
 <td>Yes</td>
 <td>Yes</td>
-<td>No, repo-included pilot config only</td>
-</tr>
-<tr>
-<td>Qwen2 7B causal LM</td>
 <td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>No, repo-included pilot config only</td>
-</tr>
-<tr>
-<td>Qwen2.5 7B causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>No, repo-included pilot config only</td>
-</tr>
-<tr>
-<td>Qwen2.5 14B causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>No, repo-included pilot config only</td>
-</tr>
-<tr>
-<td>Qwen3 causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>No, repo-included pilot config only</td>
-</tr>
-<tr>
-<td>DeepSeek-R1-Distill-Qwen causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>No, repo-included pilot config only</td>
-</tr>
-<tr>
-<td>Phi-4 causal LM (text-only eval)</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>No, repo-included pilot config only</td>
 </tr>
 <tr>
 <td>Gemma 4 E2B causal LM (text-only eval)</td>
 <td>Yes</td>
 <td>Yes</td>
 <td>Yes</td>
-<td>No, repo-included pilot config only</td>
+<td>Yes</td>
 </tr>
 <tr>
-<td>TinyLlama 1.1B causal LM</td>
+<td>Ministral 3 3B causal LM (text-only eval)</td>
 <td>Yes</td>
 <td>Yes</td>
 <td>Yes</td>
-<td>No, repo-included pilot config only</td>
+<td>Yes</td>
 </tr>
 <tr>
-<td>OLMo 2 causal LM</td>
+<td>Phi-4 mini causal LM</td>
 <td>Yes</td>
 <td>Yes</td>
 <td>Yes</td>
-<td>No, repo-included pilot config only</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Granite 4.1 3B causal LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<h3 id="published-7b-9b-decoder-evidence">Published 7B-9B Decoder Evidence<a class="headerlink" href="#published-7b-9b-decoder-evidence" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Preset included</th>
+<th>Adapter available</th>
+<th>Pilot calibration config present</th>
+<th>Published assurance basis</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mistral 7B causal LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Ministral 3 8B causal LM (text-only eval)</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Qwen2 7B causal LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Qwen2.5 7B causal LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Qwen3 causal LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
 </tr>
 <tr>
 <td>Qwen3.5 causal LM</td>
 <td>Yes</td>
 <td>Yes</td>
 <td>Yes</td>
-<td>No, repo-included pilot config only</td>
+<td>Yes</td>
 </tr>
 <tr>
-<td>Seq2Seq / local pairs</td>
+<td>DeepSeek-R1-Distill-Qwen causal LM</td>
 <td>Yes</td>
 <td>Yes</td>
-<td>No</td>
-<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>DeepSeek-R1-0528-Qwen3 8B causal LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>OLMo 2 7B causal LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>OpenLLaMA 7B causal LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Falcon 7B causal LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Granite 4.1 8B causal LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
 </tr>
 </tbody>
 </table>
-<p>Published assurance basis covers GPT-2 and BERT profiles. Repo-included
-presets and pilot calibration configs for additional experimental families,
-including Mistral 7B, Ministral 3 text-only, Qwen2 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3,
-DeepSeek-R1-Distill-Qwen, Phi-4 text-only, Gemma 4 E2B text-only, TinyLlama
-1.1B, OLMo 2, and Qwen3.5, do not become part of the published
-assurance basis until supporting artifacts are attached. Access-gated vendor
-checkpoints are intentionally excluded from the included support matrix and
-preset inventory, and ungated families without clean pilot lanes remain in the
-model family backlog rather than the support matrix.</p>
+<h3 id="published-13b-14b-and-reasoning-decoder-evidence">Published 13B-14B And Reasoning Decoder Evidence<a class="headerlink" href="#published-13b-14b-and-reasoning-decoder-evidence" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Preset included</th>
+<th>Adapter available</th>
+<th>Pilot calibration config present</th>
+<th>Published assurance basis</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ministral 3 14B causal LM (text-only eval)</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>OLMo 2 13B causal LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Qwen2.5 14B causal LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>DeepSeek-R1-Distill-Qwen 14B causal LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Phi-4 causal LM (text-only eval)</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<h3 id="multimodal-published-evidence">Multimodal Published Evidence<a class="headerlink" href="#multimodal-published-evidence" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Preset included</th>
+<th>Adapter available</th>
+<th>Pilot calibration config present</th>
+<th>Published assurance basis</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Qwen3.5 2B image-text LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Qwen3.5 4B image-text LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Gemma 4 E2B image-text LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Gemma 4 E4B image-text LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Gemma 4 12B any-to-any LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Gemma 4 26B-A4B MoE image-text LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<h3 id="largemoe-published-evidence">Large/MoE Published Evidence<a class="headerlink" href="#largemoe-published-evidence" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Preset included</th>
+<th>Adapter available</th>
+<th>Pilot calibration config present</th>
+<th>Published assurance basis</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OLMoE 1B-active/7B-total causal LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Mixtral 8x7B MoE causal LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Qwen3 30B-A3B MoE causal LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<h3 id="seq2seq-published-evidence">Seq2Seq Published Evidence<a class="headerlink" href="#seq2seq-published-evidence" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Preset included</th>
+<th>Adapter available</th>
+<th>Pilot calibration config present</th>
+<th>Published assurance basis</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FLAN-T5 base seq2seq LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<p>Published assurance basis covers GPT-2, BERT, Mistral 7B, Ministral 3 3B,
+Ministral 3 8B, Ministral 3 14B, TinyLlama 1.1B, Gemma 4 E2B text-only,
+Gemma 4 E2B image-text, Gemma 4 E4B image-text, Granite 4.1 3B,
+Granite 4.1 8B, OLMo 2 7B, OLMo 2 13B, Qwen2 7B, OpenLLaMA 7B,
+Falcon 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B,
+Qwen3.5 2B image-text, DeepSeek-R1-Distill-Qwen 7B,
+DeepSeek-R1-0528-Qwen3 8B,
+DeepSeek-R1-Distill-Qwen 14B, Phi-4 text-only, Qwen3.5 4B image-text,
+Gemma 4 12B image-text, Gemma 4 26B-A4B image-text MoE, OLMoE
+1B-active/7B-total MoE, Mixtral 8x7B MoE, Qwen3 30B-A3B MoE, and FLAN-T5 base
+seq2seq profiles.
+Repo-included presets and pilot calibration configs for prepared practical-pick
+lanes do not become part of the published assurance basis until supporting
+artifacts are attached. OLMoE is the smaller MoE published-basis validation
+lane; Mixtral 8x7B and Qwen3 30B-A3B are larger no-op preservation
+bases. Gemma 4 26B-A4B is a multimodal MoE image-text preservation basis; it is
+not audio, exhaustive expert-bank, or MoE routing-quality evidence. The Qwen3
+30B-A3B fixture requires all-8 80GB-GPU sharding and uses scoped
+attention/router/shared-expert guard scans; it is not an exhaustive expert-bank
+or MoE routing-quality claim.
+The empirical guard manifest includes no-op published-basis summaries for the
+modern promoted families. They are null-behavior evidence and calibration
+inputs, but they do not re-derive the packaged spectral/RMT/variance tier
+constants; transferred attention caps remain budgeted sentinels until a
+family-specific null sweep supports an FPR interpretation.
+Mistral 7B additionally ships the current real guard-value scenario package:
+<code>public_evidence/published_basis/mistral_7b/guard_value_demo/</code> records PM-pass,
+baseline-relative spectral, RMT, and variance/VE evidence from clean
+confirmation reruns.
+Practical-pick families without tuned edit params or public evidence fixtures
+are tracked as <code>community_experimental</code> rows, even when a repo pilot preset and
+calibration config are already present. Access-gated vendor checkpoints are
+intentionally excluded from the included preset inventory.
+The Phi-4 public fixture is text-only and skips guard-overhead measurement by
+preset policy; strict release verification accepts that declared skip.
+The FLAN-T5 base public fixture uses pinned CNN/DailyMail validation data via
+<code>hf_seq2seq</code>; strict release verification accepts one advisory guard warning
+while the hard policy gates pass.
+The Qwen3.5 4B image-text lane now includes a public VQAv2 preset, null-sweep
+config, strict public report, runtime manifest, and signed evidence pack after
+the structured JSON-answer prompt fix.</p>
 <p><code>published_basis</code> remains the narrow public evidence floor, while
 <code>supported_experimental</code> means the repo ships the preset, calibration config,
-targeted tests, and smoke/evidence path for the lane without claiming a
-published-basis fixture set.</p>
+targeted tests, smoke/evidence path, and tuned edit-param coverage for the lane
+without claiming a published-basis fixture set. <code>community_experimental</code> rows
+are candidate inventory entries; some already have repo pilot presets and
+calibration configs, but still need the remaining promotion artifacts before
+they become release-supported lanes.</p>
 <p>Image-text evaluation uses the built-in
-<code>hf_multimodal</code> adapter and the <code>vision_text</code> provider. Public support remains
-text-only for the Gemma 4 lane, and audio evaluation is deferred.</p>
+<code>hf_multimodal</code> adapter and the <code>vision_text</code> provider. Install
+<code>invarlock[multimodal]</code> for this path; Gemma 4 unified checkpoints require
+<code>transformers&gt;=5.12.0</code> and <code>torchvision&gt;=0.26.0</code>. Gemma 4 E2B has separate
+text-only and image-text public bases; Qwen3.5 2B, Qwen3.5 4B, Gemma 4 E4B,
+Gemma 4 12B, and Gemma 4 26B-A4B also have public image-text bases. Audio
+evaluation is deferred. Public
+image-text basis promotion requires
+measured accuracy on a pinned public dataset above the repo floor; preservation
+passing alone is not sufficient.</p>
 <p>Machine-readable support metadata lives in <code>contracts/support_matrix.json</code>. It is
 the canonical source of truth for normalized support tiers
 (<code>published_basis</code>, <code>supported_experimental</code>, <code>community_experimental</code>) and for
-published-basis evidence references.</p>
+published-basis evidence references. Model lifecycle decisions live in
+<code>contracts/model_classification.json</code>: that file records whether a lane or
+family is published, backlog, blocked, smoke-only, usage-only, or out of scope,
+and centralizes blocked named checkpoints for future license/access changes.</p>
 <p>Model evidence automation lives in
 <code>scripts/model_evidence/model_evidence_sweep.py</code>, with tmux-based remote launch support in
-<code>scripts/model_evidence/run_model_evidence_remote.py</code> and a nightly/manual runner workflow in
+<code>scripts/model_evidence/run_model_evidence_remote.py</code> and a manual runner workflow in
 <code>.github/workflows/model-evidence-sweep.yml</code>.
+For large MoE lanes that do not fit comfortably on one GPU, the remote helper
+supports grouped CUDA visibility, for example
+<code>--gpu-group 0,1,2,3</code> to launch one sweep shard with all four GPUs exposed
+instead of one shard per GPU.
 Repo-prepared-but-not-yet-promoted lanes are tracked in
-<code>contracts/model_family_catalog.json</code>.
-For the new Gemma 4 text lane, the repo-maintained local smoke is the included
-manifest dry-run (<code>scripts/model_evidence/model_evidence_sweep.py --slug gemma4_e2b --dry-run</code>).
+<code>contracts/model_family_catalog.json</code>; promotion eligibility and blockers are
+tracked in <code>contracts/model_classification.json</code>.
+For the Gemma 4 text lane, the repo-maintained local smoke is the included
+manifest dry-run (<code>scripts/model_evidence/model_evidence_sweep.py --suite repo-mentioned-gpu --slug gemma4_e2b_public --dry-run</code>).
 The image-text path also includes an offline demo preset at
-<code>configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml</code> plus
-<code>tests/fixtures/vision_text/demo_manifest.jsonl</code> for provider/config validation;
-live multimodal model execution requires an installed HF stack and model
-weights.</p>
+<code>configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml</code> and a Gemma
+4 12B pilot at <code>configs/presets/multimodal/gemma4_12b_vision_text_256.yaml</code> plus
+<code>tests/fixtures/vision_text/demo_manifest.jsonl</code> for provider/config validation.
+Gemma 4 E2B, Gemma 4 E4B, and Gemma 4 12B use
+<code>configs/presets/multimodal/gemma4_e2b_public_vqav2_256.yaml</code>,
+<code>configs/presets/multimodal/gemma4_e4b_public_vqav2_256.yaml</code>, and
+<code>configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml</code> and
+matching <code>configs/calibration/null_sweep_gemma4_*.yaml</code> files together with the
+model-evidence materializer for pinned public VQAv2 sample-validation data. Their
+public fixtures live under <code>public_evidence/published_basis/gemma4_e2b_image_text/</code>,
+<code>public_evidence/published_basis/gemma4_e4b/</code>, and
+<code>public_evidence/published_basis/gemma4_12b/</code>, and the local smoke manifest
+remains provider/config validation only. Gemma 4 26B-A4B uses the analogous
+<code>configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml</code> and
+<code>configs/calibration/null_sweep_gemma4_26b_a4b.yaml</code> path; its public fixture
+lives under <code>public_evidence/published_basis/gemma4_26b_a4b/</code>. The Qwen3.5 2B
+and Qwen3.5 4B public image-text bases use the same pinned VQAv2
+materialization pattern through
+<code>configs/presets/multimodal/*_public_vqav2_256.yaml</code> and matching
+<code>configs/calibration/null_sweep_*.yaml</code> files.</p>
 <p>For the broader inventory of declared support, implemented-but-not-public
 coverage, usage-only checkpoint families, and recommended additions, see
 <a href="reference/model-family-catalog/">Model Family Catalog</a>.</p>
@@ -3297,7 +3790,7 @@ invarlock<span class="w"> </span>verify<span class="w"> </span>reports/eval/eval
 <a href="reference/cli/">CLI Reference</a> ·
 <a href="user-guide/primary-metric-smoke/">Primary Metric Smoke</a> ·
 <a href="user-guide/example-reports/">Example Reports</a> ·
-<a href="https://github.com/invarlock/invarlock/blob/v0.10.0/CONTRIBUTING.md">Contributing</a></p>
+<a href="https://github.com/invarlock/invarlock/blob/v0.11.0/CONTRIBUTING.md">Contributing</a></p>
 
 
 

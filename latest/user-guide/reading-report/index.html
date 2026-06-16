@@ -22,7 +22,7 @@
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -32,6 +32,9 @@
     
     
       <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -45,10 +48,12 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -59,7 +64,12 @@
   </head>
   
   
-    <body dir="ltr">
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -84,8 +94,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -109,8 +118,8 @@
       </div>
     </div>
     
+      
     
-      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
     
     
     
@@ -326,8 +335,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     InvarLock Documentation
@@ -844,10 +852,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#executive-summary-interpretation" class="md-nav__link">
+  <a href="#decision-interpretation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Executive Summary Interpretation
+        Decision Interpretation
       
     </span>
   </a>
@@ -1292,6 +1300,34 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/report-outline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Outline
   
 
     
@@ -2477,10 +2513,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#executive-summary-interpretation" class="md-nav__link">
+  <a href="#decision-interpretation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Executive Summary Interpretation
+        Decision Interpretation
       
     </span>
   </a>
@@ -2543,7 +2579,7 @@
 </tr>
 <tr>
 <td><strong>Key sections</strong></td>
-<td>Executive Summary, Quality Gates, Primary Metric, Provenance, Measurement contracts.</td>
+<td>Decision, Primary Metric, Policy Gates, Guard Signals, Evidence And Provenance, Technical Appendix.</td>
 </tr>
 <tr>
 <td><strong>Validation</strong></td>
@@ -2558,23 +2594,30 @@
 <p>This guide highlights the key sections of a v1 report and how to
 interpret them.</p>
 <p>Browser-first reading order for the HTML export:</p>
-<div class="codehilite"><pre><span></span><code>1. Summary chips
-2. Quick links rail
-3. Executive Summary
-4. Quality Gates
-5. Provenance / Policy details
+<div class="codehilite"><pre><span></span><code>1. Summary ledger row
+2. Sections rail
+3. Decision
+4. Primary Metric
+5. Policy Gates
+6. Guard Signals
+7. Evidence And Provenance
+8. Technical Appendix
 </code></pre></div>
 
-<p>The HTML shell is intentionally thin. It adds navigation and orientation, but
-the evidence still comes from the same canonical report body and should be
-re-checked with <code>invarlock verify</code>.</p>
+<p>The HTML export renders the shared report outline directly. The evidence still
+comes from <code>evaluation.report.json</code> and should be re-checked with
+<code>invarlock verify</code>.</p>
 <ul>
-<li>Executive Summary</li>
-<li>First-screen summary of overall PASS/FAIL plus the compact gate table (primary metric, drift, invariants, guards, overhead when evaluated).</li>
-<li>Summary chips (HTML shell)</li>
-<li>Browser-only overview of overall status, primary-metric kind, and whether the bundle still links back to both run reports for <code>report explain --evaluation-report</code>.</li>
-<li>Quick links rail (HTML shell)</li>
-<li>Browser-only navigation for jumping to Executive Summary, gates, provenance, and appendix sections without scrolling through the whole report.</li>
+<li>Decision</li>
+<li>First-screen summary of overall PASS/FAIL, evidence mode, subject model,
+    baseline model/run, adapter, edit, primary metric, and guard-warning count.</li>
+<li>Summary ledger row</li>
+<li>Browser overview of verdict, subject, baseline, primary-metric kind, and
+    guard warnings.</li>
+<li>Sections rail</li>
+<li>Browser navigation for jumping to the canonical outline sections without
+    scrolling through the whole report. In HTML, the active section is
+    highlighted using the same measured sticky-row offset as hash navigation.</li>
 <li>Primary Metric row</li>
 <li>Shows the task‑appropriate metric (ppl_* or accuracy), its point estimates,
     and paired CI. The ratio/Δpp vs baseline drives the gate.</li>
@@ -2585,6 +2628,11 @@ re-checked with <code>invarlock verify</code>.</p>
     <code>validation.primary_metric_tail_acceptable = false</code>.</li>
 <li>System Overhead row (when available)</li>
 <li>Latency and throughput stats appear separate from quality and reflect the guarded run.</li>
+<li>Guard Warnings (when present)</li>
+<li>Shows baseline-relative guard-signal changes that are still inside the hard
+    policy budget. These are warnings by default, not verification failures.</li>
+<li>Use <code>invarlock verify --fail-on-warnings &lt;evaluation.report.json&gt;</code> when your
+    workflow wants any guard warning to fail the verification step.</li>
 <li>pPL identity (ppl families)</li>
 <li>Confirms <code>exp(mean Δlog)</code> ≈ <code>ratio_vs_baseline</code>; Δlog CI maps to ratio CI
     when reported.</li>
@@ -2594,8 +2642,9 @@ re-checked with <code>invarlock verify</code>.</p>
     snapshot.</li>
 <li><code>dataset.hash.source</code> tells you whether dataset hashes were derived from
     explicit preview/final hashes, explicit token IDs, or a config fallback.</li>
-<li>Policy Configuration</li>
-<li>Human-readable tier/digest plus collapsible resolved policy YAML; full details remain in <code>evaluation.report.json</code>.</li>
+<li>Technical Appendix</li>
+<li>Capped previews of verbose policy, plugin, and artifact blocks. Full details
+    remain in <code>evaluation.report.json</code>.</li>
 <li>Measurement contract</li>
 <li><code>resolved_policy.spectral.measurement_contract</code> /
     <code>resolved_policy.rmt.measurement_contract</code> pin the estimator + sampling
@@ -2610,11 +2659,18 @@ re-checked with <code>invarlock verify</code>.</p>
 </ul>
 <p>Tip: Use <code>invarlock verify</code> to recheck schema, pairing, ratio math, and the
 adjacent <code>runtime.manifest.json</code>.</p>
-<h3 id="executive-summary-interpretation">Executive Summary Interpretation<a class="headerlink" href="#executive-summary-interpretation" title="Permanent link">&para;</a></h3>
+<p><code>invarlock report explain --evaluation-report</code> reads <code>evaluation.report.json</code>
+directly. Public evidence fixtures may omit raw subject and baseline
+<code>report.json</code> files while still being valid for <code>verify</code>, <code>report html</code>,
+<code>report validate</code>, and <code>report explain</code>.</p>
+<h3 id="decision-interpretation">Decision Interpretation<a class="headerlink" href="#decision-interpretation" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Overall</strong> mirrors the canonical gate allow-list. A FAIL means at least one gate failed.</li>
 <li><strong>Primary Metric</strong> shows ratio/Δpp vs baseline; compare to tier thresholds in the gate table.</li>
 <li><strong>Drift</strong> is final/preview; large drift usually indicates dataset/device instability.</li>
+<li><strong>Guard Warnings</strong> mean the edit moved a guard signal relative to the
+  baseline while remaining within hard policy. They become failures only under
+  strict warning mode.</li>
 <li><strong>Overhead</strong> appears only when guard overhead is evaluated; skipped in some profiles.</li>
 </ul>
 <h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>

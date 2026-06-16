@@ -22,7 +22,7 @@
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -32,6 +32,9 @@
     
     
       <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -45,10 +48,12 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -59,7 +64,12 @@
   </head>
   
   
-    <body dir="ltr">
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -84,8 +94,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -109,8 +118,8 @@
       </div>
     </div>
     
+      
     
-      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
     
     
     
@@ -326,8 +335,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     InvarLock Documentation
@@ -1206,6 +1214,34 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../report-outline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Outline
   
 
     
@@ -2674,12 +2710,23 @@ of the support matrix:</p>
 <td>Repo implementation maturity outside the public support matrix, such as <code>profile_first_class</code>, <code>profile_shared_alias</code>, <code>auto_or_loader_only</code>, <code>loader_only</code>, or backlog states.</td>
 <td><code>contracts/model_family_catalog.json</code></td>
 </tr>
+<tr>
+<td><code>lifecycle classification</code></td>
+<td>Whether a lane, catalog family, or candidate is published, backlog, blocked, smoke-only, usage-only, or out of scope.</td>
+<td><code>contracts/model_classification.json</code></td>
+</tr>
 </tbody>
 </table>
 <p>The support matrix remains strict. The model family catalog is broader by
 design and records code-level visibility, usage-only checkpoints, and
-recommended additions. Access-gated vendor checkpoints are intentionally kept
-out of declared support lanes and included preset inventory.</p>
+recommended additions. The model classification contract records the promotion
+decision and blocker state for those entries, including the blocked named
+checkpoint list used by repo checks. The support matrix is ordered by evidence readiness:
+baseline fixtures, published modern decoder evidence, repo-maintained
+experimental lanes, community candidate backlog, and concrete task-family
+bases. Within those sections, related families and scale points stay adjacent
+without adding another visible column. Access-gated vendor checkpoints are
+intentionally kept out of included preset inventory.</p>
 <h2 id="declared-support">Declared Support<a class="headerlink" href="#declared-support" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2705,81 +2752,183 @@ out of declared support lanes and included preset inventory.</p>
 </tr>
 <tr>
 <td>Mistral 7B causal LM</td>
-<td><code>supported_experimental</code></td>
+<td><code>published_basis</code></td>
 <td><code>mistralai/Mistral-7B-v0.1</code></td>
-<td>Pilot preset and calibration config are included.</td>
+<td>Public container-backed evidence fixture is included, plus a real guard-value scenario package with PM-pass, baseline-relative spectral/RMT/variance evidence.</td>
 </tr>
 <tr>
-<td>Ministral 3 causal LM (text-only eval)</td>
-<td><code>supported_experimental</code></td>
-<td><code>mistralai/Ministral-3-8B-Instruct-2512-BF16</code>, <code>mistralai/Ministral-3-14B-Instruct-2512-BF16</code></td>
-<td>Text-only pilot presets and calibration configs are included for both 8B and 14B checkpoints.</td>
+<td>Ministral 3 8B causal LM (text-only eval)</td>
+<td><code>published_basis</code></td>
+<td><code>mistralai/Ministral-3-8B-Instruct-2512-BF16</code></td>
+<td>Public container-backed evidence fixture is included.</td>
 </tr>
 <tr>
-<td>Qwen2 7B causal LM</td>
-<td><code>supported_experimental</code></td>
-<td><code>Qwen/Qwen2-7B</code></td>
-<td>Pilot preset and calibration config are included.</td>
-</tr>
-<tr>
-<td>Qwen2.5 7B causal LM</td>
-<td><code>supported_experimental</code></td>
-<td><code>Qwen/Qwen2.5-7B</code></td>
-<td>Pilot preset and calibration config are included.</td>
-</tr>
-<tr>
-<td>Qwen2.5 14B causal LM</td>
-<td><code>supported_experimental</code></td>
-<td><code>Qwen/Qwen2.5-14B</code></td>
-<td>Pilot preset and calibration config are included.</td>
-</tr>
-<tr>
-<td>Qwen3 causal LM</td>
-<td><code>supported_experimental</code></td>
-<td><code>Qwen/Qwen3-8B</code></td>
-<td>Pilot preset and calibration config are included.</td>
-</tr>
-<tr>
-<td>DeepSeek-R1-Distill-Qwen causal LM</td>
-<td><code>supported_experimental</code></td>
-<td><code>deepseek-ai/DeepSeek-R1-Distill-Qwen-7B</code></td>
-<td>Pilot preset and calibration config are included.</td>
-</tr>
-<tr>
-<td>Phi-4 causal LM (text-only eval)</td>
-<td><code>supported_experimental</code></td>
-<td><code>microsoft/Phi-4-reasoning-plus</code></td>
-<td>Text-only pilot preset and calibration config are included. Current HF runtime validation closes cleanly when the lane opts into <code>trust_remote_code</code>.</td>
-</tr>
-<tr>
-<td>Gemma 4 E2B causal LM (text-only eval)</td>
-<td><code>supported_experimental</code></td>
-<td><code>google/gemma-4-E2B-it</code></td>
-<td>Text-only pilot preset and calibration config are included. Image-text evaluation uses the explicit <code>hf_multimodal</code> + <code>vision_text</code> path.</td>
+<td>Ministral 3 14B causal LM (text-only eval)</td>
+<td><code>published_basis</code></td>
+<td><code>mistralai/Ministral-3-14B-Instruct-2512-BF16</code></td>
+<td>Public container-backed evidence fixture is included.</td>
 </tr>
 <tr>
 <td>TinyLlama 1.1B causal LM</td>
-<td><code>supported_experimental</code></td>
+<td><code>published_basis</code></td>
 <td><code>TinyLlama/TinyLlama-1.1B-Chat-v1.0</code></td>
-<td>Ungated Llama-family pilot lane with included preset and calibration config.</td>
+<td>Public container-backed evidence fixture is included.</td>
 </tr>
 <tr>
-<td>OLMo 2 causal LM</td>
-<td><code>supported_experimental</code></td>
-<td><code>allenai/OLMo-2-1124-7B</code>, <code>allenai/OLMo-2-1124-13B-Instruct</code></td>
-<td>Pilot presets and calibration configs are included for both 7B and 13B scale points.</td>
+<td>OLMo 2 7B causal LM</td>
+<td><code>published_basis</code></td>
+<td><code>allenai/OLMo-2-1124-7B</code></td>
+<td>Public container-backed evidence fixture is included.</td>
+</tr>
+<tr>
+<td>OLMo 2 13B causal LM</td>
+<td><code>published_basis</code></td>
+<td><code>allenai/OLMo-2-1124-13B-Instruct</code></td>
+<td>Public container-backed evidence fixture is included.</td>
+</tr>
+<tr>
+<td>OLMoE 1B-active/7B-total causal LM</td>
+<td><code>published_basis</code></td>
+<td><code>allenai/OLMoE-1B-7B-0924</code></td>
+<td>Public release-profile container-backed evidence fixture is included for the smaller MoE validation basis.</td>
+</tr>
+<tr>
+<td>OpenLLaMA 7B causal LM</td>
+<td><code>published_basis</code></td>
+<td><code>openlm-research/open_llama_7b</code></td>
+<td>Public release-profile container-backed evidence fixture is included.</td>
+</tr>
+<tr>
+<td>Falcon 7B causal LM</td>
+<td><code>published_basis</code></td>
+<td><code>tiiuae/falcon-7b</code></td>
+<td>Public release-profile container-backed evidence fixture is included.</td>
+</tr>
+<tr>
+<td>Qwen2 7B causal LM</td>
+<td><code>published_basis</code></td>
+<td><code>Qwen/Qwen2-7B</code></td>
+<td>Public container-backed evidence fixture is included.</td>
+</tr>
+<tr>
+<td>Qwen2.5 7B causal LM</td>
+<td><code>published_basis</code></td>
+<td><code>Qwen/Qwen2.5-7B</code></td>
+<td>Public container-backed evidence fixture is included.</td>
+</tr>
+<tr>
+<td>Qwen2.5 14B causal LM</td>
+<td><code>published_basis</code></td>
+<td><code>Qwen/Qwen2.5-14B</code></td>
+<td>Public container-backed evidence fixture is included.</td>
+</tr>
+<tr>
+<td>Qwen3 causal LM</td>
+<td><code>published_basis</code></td>
+<td><code>Qwen/Qwen3-8B</code></td>
+<td>Public container-backed evidence fixture is included.</td>
+</tr>
+<tr>
+<td>DeepSeek-R1-Distill-Qwen causal LM</td>
+<td><code>published_basis</code></td>
+<td><code>deepseek-ai/DeepSeek-R1-Distill-Qwen-7B</code></td>
+<td>Public container-backed evidence fixture is included.</td>
+</tr>
+<tr>
+<td>DeepSeek-R1-0528-Qwen3 8B causal LM</td>
+<td><code>published_basis</code></td>
+<td><code>deepseek-ai/DeepSeek-R1-0528-Qwen3-8B</code></td>
+<td>Container-backed public report, runtime manifest, and signed evidence pack are included.</td>
+</tr>
+<tr>
+<td>DeepSeek-R1-Distill-Qwen 14B causal LM</td>
+<td><code>published_basis</code></td>
+<td><code>deepseek-ai/DeepSeek-R1-Distill-Qwen-14B</code></td>
+<td>Public release-profile container-backed evidence fixture is included.</td>
+</tr>
+<tr>
+<td>Phi-4 causal LM (text-only eval)</td>
+<td><code>published_basis</code></td>
+<td><code>microsoft/Phi-4-reasoning-plus</code></td>
+<td>Public text-only container-backed evidence fixture is included; guard-overhead measurement is skipped by preset policy.</td>
+</tr>
+<tr>
+<td>Gemma 4 E2B causal LM (text-only eval)</td>
+<td><code>published_basis</code></td>
+<td><code>google/gemma-4-E2B-it</code></td>
+<td>Public release-profile container-backed evidence fixture is included. Image-text evaluation uses the explicit <code>hf_multimodal</code> + <code>vision_text</code> path.</td>
 </tr>
 <tr>
 <td>Qwen3.5 causal LM</td>
-<td><code>supported_experimental</code></td>
+<td><code>published_basis</code></td>
 <td><code>Qwen/Qwen3.5-9B</code></td>
-<td>Pilot preset and calibration config are included.</td>
+<td>Public container-backed evidence fixture is included.</td>
 </tr>
 <tr>
-<td>Seq2Seq / local pairs</td>
-<td><code>community_experimental</code></td>
-<td><code>t5-small</code>, <code>facebook/bart-base</code></td>
-<td>Generic seq2seq lane without a published-basis claim.</td>
+<td>Ministral 3 3B causal LM (text-only eval)</td>
+<td><code>published_basis</code></td>
+<td><code>mistralai/Ministral-3-3B-Instruct-2512-BF16</code></td>
+<td>Public release-profile container-backed evidence fixture is included.</td>
+</tr>
+<tr>
+<td>Granite 4.1 3B causal LM</td>
+<td><code>published_basis</code></td>
+<td><code>ibm-granite/granite-4.1-3b</code></td>
+<td>Public release-profile container-backed evidence fixture is included.</td>
+</tr>
+<tr>
+<td>Granite 4.1 8B causal LM</td>
+<td><code>published_basis</code></td>
+<td><code>ibm-granite/granite-4.1-8b</code></td>
+<td>Public release-profile container-backed evidence fixture is included.</td>
+</tr>
+<tr>
+<td>Gemma 4 12B any-to-any LM</td>
+<td><code>published_basis</code></td>
+<td><code>google/gemma-4-12B-it</code></td>
+<td>Public release-profile image-text evidence fixture is included on pinned public VQAv2 materialization. The no-op report passes strict policy with 0.565 final accuracy over 400 examples and no guard warnings; audio and broader any-to-any behavior remain out of scope.</td>
+</tr>
+<tr>
+<td>Gemma 4 E4B image-text LM</td>
+<td><code>published_basis</code></td>
+<td><code>google/gemma-4-E4B-it</code></td>
+<td>Public release-profile image-text evidence fixture is included on pinned public VQAv2 materialization. The no-op report passes strict policy with 0.500 final accuracy over 400 examples and no guard warnings.</td>
+</tr>
+<tr>
+<td>Gemma 4 E2B image-text LM</td>
+<td><code>published_basis</code></td>
+<td><code>google/gemma-4-E2B-it</code></td>
+<td>Public release-profile image-text evidence fixture is included on pinned public VQAv2 materialization. The no-op report passes strict policy with 0.388 final accuracy over 400 examples and no guard warnings.</td>
+</tr>
+<tr>
+<td>Qwen3.5 4B image-text LM</td>
+<td><code>published_basis</code></td>
+<td><code>Qwen/Qwen3.5-4B</code></td>
+<td>Public release-profile image-text evidence fixture is included on pinned public VQAv2 materialization. The no-op report passes strict policy with 0.855 final accuracy over 400 examples and no guard warnings.</td>
+</tr>
+<tr>
+<td>Qwen3.5 2B image-text LM</td>
+<td><code>published_basis</code></td>
+<td><code>Qwen/Qwen3.5-2B</code></td>
+<td>Public release-profile container-backed image-text evidence fixture is included on pinned public VQAv2 materialization; it is no-op preservation/null-behavior evidence, not guard-value proof.</td>
+</tr>
+<tr>
+<td>SmolLM3 3B causal LM</td>
+<td><code>published_basis</code></td>
+<td><code>HuggingFaceTB/SmolLM3-3B</code></td>
+<td>Public release-profile container-backed evidence fixture is included; guard-overhead measurement is skipped by preset policy.</td>
+</tr>
+<tr>
+<td>Phi-4 mini causal LM</td>
+<td><code>published_basis</code></td>
+<td><code>microsoft/Phi-4-mini-instruct</code></td>
+<td>Public release-profile container-backed evidence fixture is included.</td>
+</tr>
+<tr>
+<td>FLAN-T5 base seq2seq LM</td>
+<td><code>published_basis</code></td>
+<td><code>google/flan-t5-base</code></td>
+<td>Public release-profile container-backed evidence fixture is included on pinned CNN/DailyMail validation data through <code>hf_seq2seq</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -2795,22 +2944,34 @@ out of declared support lanes and included preset inventory.</p>
 </thead>
 <tbody>
 <tr>
-<td>Mixtral</td>
-<td><code>profile_first_class</code></td>
+<td>Qwen3 30B-A3B MoE causal LM</td>
+<td><code>published_basis</code></td>
+<td><code>Qwen/Qwen3-30B-A3B-Instruct-2507</code></td>
+<td>Public release-profile evidence fixture is included on public WikiText-103 with all-8 80GB-GPU sharding and scoped attention/router/shared-expert guard scans; it is no-op preservation evidence, not benchmark-quality, exhaustive expert-bank, or MoE routing-quality assurance.</td>
+</tr>
+<tr>
+<td>Gemma 4 26B-A4B MoE image-text LM</td>
+<td><code>published_basis</code></td>
+<td><code>google/gemma-4-26B-A4B-it</code></td>
+<td>Public release-profile image-text evidence fixture is included on pinned public VQAv2 materialization. The no-op report passes strict policy with 0.555 final accuracy over 400 examples and no guard warnings; it is not audio, exhaustive expert-bank, or MoE routing-quality evidence.</td>
+</tr>
+<tr>
+<td>Mixtral 8x7B MoE causal LM</td>
+<td><code>published_basis</code></td>
 <td><code>mistralai/Mixtral-8x7B-v0.1</code></td>
-<td>Profile and loader code recognize the family directly.</td>
+<td>Public release-profile evidence fixture is included as a no-op preservation basis with full guard scans; it is not a benchmark-quality or MoE routing-quality claim, and guard-overhead measurement is skipped by preset policy.</td>
 </tr>
 <tr>
 <td>Llama</td>
 <td><code>profile_first_class</code></td>
-<td><code>openlm-research/open_llama_7b</code>, <code>TinyLlama/TinyLlama-1.1B-Chat-v1.0</code></td>
-<td>Generic Llama-family profile handling is first-class. TinyLlama provides the ungated declared support lane, while access-gated vendor checkpoints remain omitted.</td>
+<td><code>TinyLlama/TinyLlama-1.1B-Chat-v1.0</code></td>
+<td>Generic Llama-family profile handling is first-class. OpenLLaMA and TinyLlama provide ungated declared support lanes, while access-gated vendor checkpoints remain omitted.</td>
 </tr>
 <tr>
 <td>Qwen family aliases (Qwen1.5/Qwen2.5/Qwen3 naming)</td>
 <td><code>profile_first_class</code></td>
-<td><code>Qwen/Qwen2.5-14B</code>, <code>Qwen/Qwen3.5-9B</code></td>
-<td>Shared qwen-family heuristics cover aliases beyond the declared Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 lanes, including usage-only Qwen2.5 checkpoints.</td>
+<td><code>Qwen/Qwen2.5-14B</code>, <code>Qwen/Qwen3.5-9B</code>, <code>Qwen/Qwen3.5-4B</code></td>
+<td>Shared qwen-family heuristics cover aliases beyond the declared text-only Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 9B public lanes. Qwen3.5 2B and Qwen3.5 4B have published image-text evidence through <code>hf_multimodal</code> and pinned public VQAv2 materialization.</td>
 </tr>
 <tr>
 <td>Yi</td>
@@ -2822,19 +2983,19 @@ out of declared support lanes and included preset inventory.</p>
 <td>Phi family</td>
 <td><code>profile_first_class</code></td>
 <td><code>microsoft/Phi-3-mini-4k-instruct</code>, <code>microsoft/Phi-4-reasoning-plus</code></td>
-<td>Dedicated phi-family selectors exist. Phi-4 has a declared text-only lane, while multimodal Phi-4 remains backlog-only.</td>
+<td>Dedicated phi-family selectors exist. Phi-4 has a declared published text-only lane, while multimodal Phi-4 remains backlog-only.</td>
 </tr>
 <tr>
 <td>Gemma family</td>
 <td><code>profile_first_class</code></td>
-<td><code>google/gemma-3-4b-it</code>, <code>google/gemma-4-E2B-it</code></td>
-<td>Gemma 3/4 selectors and loaders are first-class. Gemma 4 E2B has a declared text-only lane, image-text evaluation uses <code>hf_multimodal</code> + <code>vision_text</code>, and audio remains deferred.</td>
+<td><code>google/gemma-4-E2B-it</code>, <code>google/gemma-4-E4B-it</code>, <code>google/gemma-4-12B-it</code>, <code>google/gemma-4-26B-A4B-it</code></td>
+<td>Gemma-family selectors and loaders remain first-class for compatible local or user-supplied checkpoints. Repo-declared published Gemma support includes Gemma 4 E2B text-only plus Gemma 4 E2B, E4B, 12B, and 26B-A4B image-text published-basis evidence.</td>
 </tr>
 <tr>
 <td>OPT / GPT-NeoX / GPT-J</td>
 <td><code>profile_shared_alias</code></td>
-<td><code>facebook/opt-1.3b</code>, <code>EleutherAI/gpt-neox-20b</code></td>
-<td>Available through shared GPT-style paths.</td>
+<td><code>EleutherAI/gpt-neox-20b</code></td>
+<td>Available through shared GPT-style paths. The common OPT-1.3B hosted checkpoint is intentionally not named in repo support inventory because its license is not Apache-2.0 or MIT.</td>
 </tr>
 <tr>
 <td>GPT-OSS</td>
@@ -2844,21 +3005,21 @@ out of declared support lanes and included preset inventory.</p>
 </tr>
 <tr>
 <td>Falcon</td>
-<td><code>auto_or_loader_only</code></td>
+<td><code>profile_shared_alias</code></td>
 <td><code>tiiuae/falcon-7b</code></td>
-<td>Visible through adapter-auto heuristics only.</td>
+<td>Falcon 7B now has a declared support lane; remaining Falcon-family coverage is available through adapter-auto heuristics and variant-path tests.</td>
 </tr>
 <tr>
 <td>GLM</td>
 <td><code>auto_or_loader_only</code></td>
-<td><code>THUDM/glm-4-9b-chat</code></td>
-<td>Visible through adapter-auto heuristics only.</td>
+<td><code>local-glm-compatible-checkpoint</code></td>
+<td>Visible through adapter-auto heuristics only. The public catalog intentionally avoids naming hosted GLM chat checkpoints that fall outside the repo's Apache-2.0/MIT named-checkpoint policy.</td>
 </tr>
 <tr>
 <td>DeepSeek</td>
 <td><code>profile_first_class</code></td>
 <td><code>deepseek-ai/DeepSeek-R1-Distill-Qwen-7B</code></td>
-<td>DeepSeek distill checkpoints share the qwen-family route. Oversized FP8 checkpoint-specific repo hooks and included configs are omitted because they do not fit the supported hardware/runtime path.</td>
+<td>DeepSeek distill checkpoints share the qwen-family route. DeepSeek-R1-Distill-Qwen 7B has a declared published lane; oversized FP8 checkpoint-specific repo hooks and included configs are omitted because they do not fit the supported hardware/runtime path.</td>
 </tr>
 <tr>
 <td>Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)</td>
@@ -2869,8 +3030,8 @@ out of declared support lanes and included preset inventory.</p>
 <tr>
 <td>Broader seq2seq families (mBART/PEGASUS/Marian)</td>
 <td><code>auto_or_loader_only</code></td>
-<td><code>facebook/mbart-large-50</code>, <code>Helsinki-NLP/opus-mt-en-de</code></td>
-<td>Loader support is broader than the generic seq2seq public lane.</td>
+<td><code>facebook/mbart-large-50</code></td>
+<td>Loader support is broader than the FLAN-T5 public seq2seq basis. CC-BY-4.0-only hosted checkpoints are intentionally not named because they are outside the repo's strict Apache-2.0/MIT named-checkpoint policy.</td>
 </tr>
 </tbody>
 </table>
@@ -2892,22 +3053,10 @@ out of declared support lanes and included preset inventory.</p>
 <td>Used in evidence-pack suites and validation defaults outside the declared Qwen2.5 14B support lane.</td>
 </tr>
 <tr>
-<td>Qwen1.5 72B</td>
-<td><code>usage_only</code></td>
-<td><code>Qwen/Qwen1.5-72B</code></td>
-<td>Used concretely in evidence-pack suites.</td>
-</tr>
-<tr>
 <td>Yi 34B</td>
 <td><code>usage_only</code></td>
 <td><code>01-ai/Yi-34B</code></td>
 <td>Used in workshop and full evidence-pack suites.</td>
-</tr>
-<tr>
-<td>Mixtral 8x7B</td>
-<td><code>usage_only</code></td>
-<td><code>mistralai/Mixtral-8x7B-v0.1</code></td>
-<td>Used in evidence-pack flows without a public support lane.</td>
 </tr>
 </tbody>
 </table>
@@ -2932,16 +3081,44 @@ decision codes live under <code>promotion_candidates_text_le_14b</code> in
 <tr>
 <td>Qwen2.5 7B causal LM</td>
 <td><code>Qwen/Qwen2.5-7B</code></td>
-<td><code>promote_now</code></td>
-<td><code>supported_experimental</code></td>
-<td>This candidate already graduated into declared support and remains listed here because the contract tracks the reviewed candidate set.</td>
+<td><code>promoted_published_basis</code></td>
+<td><code>published_basis</code></td>
+<td>Promoted with container-backed public report, runtime manifest, and signed evidence pack.</td>
+</tr>
+<tr>
+<td>Qwen2.5 14B causal LM</td>
+<td><code>Qwen/Qwen2.5-14B</code></td>
+<td><code>promoted_published_basis</code></td>
+<td><code>published_basis</code></td>
+<td>Promoted with container-backed public report, runtime manifest, and signed evidence pack.</td>
+</tr>
+<tr>
+<td>Qwen3 8B causal LM</td>
+<td><code>Qwen/Qwen3-8B</code></td>
+<td><code>promoted_published_basis</code></td>
+<td><code>published_basis</code></td>
+<td>Promoted with container-backed public report, runtime manifest, and signed evidence pack.</td>
+</tr>
+<tr>
+<td>DeepSeek-R1-Distill-Qwen causal LM</td>
+<td><code>deepseek-ai/DeepSeek-R1-Distill-Qwen-7B</code></td>
+<td><code>promoted_published_basis</code></td>
+<td><code>published_basis</code></td>
+<td>Promoted with container-backed public report, runtime manifest, and signed evidence pack.</td>
+</tr>
+<tr>
+<td>Phi-4 reasoning-plus causal LM</td>
+<td><code>microsoft/Phi-4-reasoning-plus</code></td>
+<td><code>promoted_published_basis</code></td>
+<td><code>published_basis</code></td>
+<td>Promoted with container-backed public report, runtime manifest, and signed evidence pack; this fixture is text-only and skips guard-overhead measurement by preset policy.</td>
 </tr>
 <tr>
 <td>OpenLLaMA 7B causal LM</td>
 <td><code>openlm-research/open_llama_7b</code></td>
-<td><code>blocked_missing_artifacts</code></td>
-<td><code>implemented_coverage</code></td>
-<td>Recognition and targeted tests exist, and the repo ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing.</td>
+<td><code>promoted_published_basis</code></td>
+<td><code>published_basis</code></td>
+<td>Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack.</td>
 </tr>
 <tr>
 <td>Phi-3 Mini 4K Instruct causal LM</td>
@@ -2951,32 +3128,11 @@ decision codes live under <code>promotion_candidates_text_le_14b</code> in
 <td>The current declared Phi support surface remains the shipped Phi-4 text-only lane.</td>
 </tr>
 <tr>
-<td>Gemma 3 4B IT</td>
-<td><code>google/gemma-3-4b-it</code></td>
-<td><code>explicitly_out_of_scope</code></td>
-<td><code>implemented_coverage</code></td>
-<td>The broader Gemma family remains multimodal/audio-capable, so this text-only candidate is not part of the tracked promotion set.</td>
-</tr>
-<tr>
-<td>OPT 1.3B causal LM</td>
-<td><code>facebook/opt-1.3b</code></td>
-<td><code>blocked_missing_artifacts</code></td>
-<td><code>implemented_coverage</code></td>
-<td>Shared GPT-style recognition exists, and the repo ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing.</td>
-</tr>
-<tr>
 <td>Falcon 7B causal LM</td>
 <td><code>tiiuae/falcon-7b</code></td>
-<td><code>blocked_missing_artifacts</code></td>
-<td><code>implemented_coverage</code></td>
-<td>Recognition and targeted variant-path tests exist, and the repo ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing.</td>
-</tr>
-<tr>
-<td>GLM 4 9B Chat</td>
-<td><code>THUDM/glm-4-9b-chat</code></td>
-<td><code>blocked_missing_artifacts</code></td>
-<td><code>implemented_coverage</code></td>
-<td>Recognition and targeted variant-path tests exist, and the repo ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing.</td>
+<td><code>promoted_published_basis</code></td>
+<td><code>published_basis</code></td>
+<td>Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack.</td>
 </tr>
 <tr>
 <td>Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)</td>
@@ -2990,7 +3146,7 @@ decision codes live under <code>promotion_candidates_text_le_14b</code> in
 <td><code>facebook/mbart-large-50</code></td>
 <td><code>explicitly_out_of_scope</code></td>
 <td><code>implemented_coverage</code></td>
-<td>Generic seq2seq and community lanes remain outside this tracked candidate set.</td>
+<td>FLAN-T5 base now supplies the concrete public seq2seq basis; mBART still needs its own evidence.</td>
 </tr>
 </tbody>
 </table>

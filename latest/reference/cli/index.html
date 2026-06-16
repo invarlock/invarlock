@@ -22,7 +22,7 @@
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -32,6 +32,9 @@
     
     
       <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -45,10 +48,12 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -59,7 +64,12 @@
   </head>
   
   
-    <body dir="ltr">
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -84,8 +94,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -109,8 +118,8 @@
       </div>
     </div>
     
+      
     
-      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
     
     
     
@@ -326,8 +335,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     InvarLock Documentation
@@ -1451,6 +1459,34 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../report-outline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Outline
   
 
     
@@ -2944,6 +2980,7 @@ invarlock<span class="w"> </span>verify<span class="w"> </span>--assurance<span 
 <span class="c1"># Render shareable HTML</span>
 invarlock<span class="w"> </span>report<span class="w"> </span>html<span class="w"> </span>-i<span class="w"> </span>reports/eval/evaluation.report.json<span class="w"> </span>-o<span class="w"> </span>reports/eval/evaluation.html
 invarlock<span class="w"> </span>report<span class="w"> </span>explain<span class="w"> </span>--evaluation-report<span class="w"> </span>reports/eval/evaluation.report.json
+invarlock<span class="w"> </span>report<span class="w"> </span><span class="nb">export</span><span class="w"> </span>-i<span class="w"> </span>reports/eval/evaluation.report.json<span class="w"> </span>--format<span class="w"> </span>mlflow-tags
 </code></pre></div>
 
 <h2 id="security-defaults">Security Defaults<a class="headerlink" href="#security-defaults" title="Permanent link">&para;</a></h2>
@@ -2994,6 +3031,11 @@ invarlock<span class="w"> </span>report<span class="w"> </span>explain<span clas
 <td>Human-readable explanation</td>
 </tr>
 <tr>
+<td>Export evidence to CI and registry handoff formats</td>
+<td><code>invarlock report export</code></td>
+<td>MLflow tag JSON, model-card Markdown, or release-review Markdown</td>
+</tr>
+<tr>
 <td>Inspect environment health</td>
 <td><code>invarlock doctor</code></td>
 <td>Human or JSON diagnostics</td>
@@ -3038,7 +3080,13 @@ invarlock<span class="w"> </span>report<span class="w"> </span>explain<span clas
 <td><code>invarlock report explain</code></td>
 <td>No</td>
 <td>No</td>
-<td>Prefers <code>evaluation.report.json</code>, then auto-resolves linked run reports; also accepts explicit <code>--subject-report</code> and <code>--baseline-report</code></td>
+<td>Explains <code>evaluation.report.json</code> directly; also accepts explicit <code>--subject-report</code> and <code>--baseline-report</code> when you need to rebuild from raw run artifacts</td>
+</tr>
+<tr>
+<td><code>invarlock report export</code></td>
+<td>No</td>
+<td>Optional (<code>--output</code>)</td>
+<td>Exports MLflow tags, model-card Markdown, or release-review Markdown from an existing evaluation report</td>
 </tr>
 <tr>
 <td><code>invarlock doctor</code></td>
@@ -3125,7 +3173,7 @@ invarlock<span class="w"> </span>report<span class="w"> </span>explain<span clas
 <tbody>
 <tr>
 <td>Stable core workflow</td>
-<td><code>invarlock evaluate</code>, <code>invarlock verify</code>, <code>invarlock report html</code>, <code>invarlock report explain</code>, <code>invarlock report validate</code>, <code>invarlock doctor</code>, <code>invarlock version</code></td>
+<td><code>invarlock evaluate</code>, <code>invarlock verify</code>, <code>invarlock report html</code>, <code>invarlock report explain</code>, <code>invarlock report export</code>, <code>invarlock report validate</code>, <code>invarlock doctor</code>, <code>invarlock version</code></td>
 <td>Documented command names, documented options, exit-code meaning, and artifact paths are stable within the current CLI policy.</td>
 </tr>
 <tr>
@@ -3197,12 +3245,20 @@ through the report's sibling <code>runtime.manifest.json</code>.</p>
 <li><code>--assurance report|strict|off</code>: <code>report</code> enforces strict only for reports
   claiming strict; <code>strict</code> requires every input to claim and pass strict;
   <code>off</code> skips strict assurance policy checks.</li>
+<li><code>--warning-policy pass|fail</code>: keep guard warnings advisory (<code>pass</code>, default)
+  or fail verification when baseline-relative guard warnings are present (<code>fail</code>).</li>
+<li><code>--fail-on-warnings</code>: alias for <code>--warning-policy fail</code>.</li>
 <li><code>--runtime-provenance container|host</code>: runtime provenance policy for
   the supplied report artifacts</li>
 <li><code>--json</code>: emit a single JSON envelope</li>
 </ul>
 <p>Example:</p>
 <div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>verify<span class="w"> </span>--json<span class="w"> </span>reports/eval/evaluation.report.json
+</code></pre></div>
+
+<p>Use strict warning mode when you want to fail an otherwise policy-passing edit
+because a guard signal changed relative to the baseline:</p>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>verify<span class="w"> </span>--fail-on-warnings<span class="w"> </span>reports/eval/evaluation.report.json
 </code></pre></div>
 
 <h2 id="invarlock-report"><code>invarlock report</code><a class="headerlink" href="#invarlock-report" title="Permanent link">&para;</a></h2>
@@ -3220,6 +3276,14 @@ through the report's sibling <code>runtime.manifest.json</code>.</p>
 <li>Explain gates and primary-metric behavior from the preferred evaluation
     bundle input, or from explicit subject/baseline run reports when needed</li>
 <li>Options: <code>--evaluation-report</code>, <code>--subject-report</code>, <code>--baseline-report</code></li>
+<li><code>invarlock report export</code></li>
+<li>Export an existing evaluation report for CI and registry handoff surfaces</li>
+<li>Formats: <code>mlflow-tags</code>, <code>model-card-md</code>, <code>release-review-md</code></li>
+<li>Options: <code>-i/--evaluation-report</code>, <code>--format</code>, <code>-o/--output</code>,
+    <code>--policy-profile</code>, <code>--report-url</code>, <code>--evidence-url</code>, <code>--verify-result</code>,
+    <code>--force</code></li>
+<li><code>--verify-result</code> uses only the verifier result item whose <code>id</code> matches
+    the resolved evaluation report path; stale verifier JSON is rejected.</li>
 <li><code>invarlock report validate</code></li>
 <li>Validate a report JSON against the v1 schema</li>
 <li>Directory inputs are command-specific:</li>

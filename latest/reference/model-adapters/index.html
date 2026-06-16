@@ -22,7 +22,7 @@
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -32,6 +32,9 @@
     
     
       <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -45,10 +48,12 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -59,7 +64,12 @@
   </head>
   
   
-    <body dir="ltr">
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -84,8 +94,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -109,8 +118,8 @@
       </div>
     </div>
     
+      
     
-      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
     
     
     
@@ -326,8 +335,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     InvarLock Documentation
@@ -1206,6 +1214,34 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../report-outline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Outline
   
 
     
@@ -2845,7 +2881,7 @@
 </tr>
 <tr>
 <td><strong>Requires</strong></td>
-<td><code>invarlock[adapters]</code> or <code>invarlock[hf]</code> for core HF adapters; <code>invarlock[gpu]</code>, <code>invarlock[awq]</code>, <code>invarlock[gptq]</code>, <code>invarlock[torchao]</code>, <code>invarlock[hqq]</code>, <code>invarlock[quanto]</code>, or <code>invarlock[compressed-tensors]</code> for quantized adapters.</td>
+<td><code>invarlock[adapters]</code> or <code>invarlock[hf]</code> for core HF text adapters; <code>invarlock[multimodal]</code> for image-text adapters such as Gemma 4 unified checkpoints; <code>invarlock[gpu]</code>, <code>invarlock[awq]</code>, <code>invarlock[gptq]</code>, <code>invarlock[torchao]</code>, <code>invarlock[hqq]</code>, <code>invarlock[quanto]</code>, or <code>invarlock[compressed-tensors]</code> for quantized adapters. All HF-backed extras require <code>transformers&gt;=5.12.0</code>.</td>
 </tr>
 <tr>
 <td><strong>Network</strong></td>
@@ -2869,6 +2905,9 @@
 <div class="codehilite"><pre><span></span><code><span class="c1"># Install core HF adapters + evaluation stack</span>
 pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;invarlock[hf]&quot;</span>
 
+<span class="c1"># Install HF image-text / multimodal support</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;invarlock[multimodal]&quot;</span>
+
 <span class="c1"># Inspect adapter availability</span>
 invarlock<span class="w"> </span>advanced<span class="w"> </span>plugins<span class="w"> </span>adapters
 
@@ -2890,11 +2929,14 @@ intentionally bypass that boundary.</p>
 </code></pre></div>
 
 <blockquote>
-<p>Adapter availability is broader than the published assurance basis. GPT-2 and
-BERT back the published calibrated basis; current experimental lanes are
-enumerated in <code>contracts/support_matrix.json</code>, with broader inventory in the
-Model Family Catalog. Examples include Mistral 7B, Qwen2 7B, Qwen2.5 7B, and
-Qwen2.5 14B; treat the contract files as authoritative for the complete list.</p>
+<p>Adapter availability is broader than the published evidence basis. Current
+<code>published_basis</code> lanes span GPT-2/BERT fixtures, dense decoder families
+(Mistral, Ministral, TinyLlama, Granite, OLMo, OpenLLaMA, Falcon, Qwen,
+DeepSeek, Phi, Gemma text-only, and SmolLM), FLAN-T5 through <code>hf_seq2seq</code>,
+Gemma 4 image-text through <code>hf_multimodal</code> plus <code>vision_text</code>, and MoE causal
+lanes such as OLMoE, Mixtral, and Qwen3 30B-A3B. Treat
+<code>contracts/support_matrix.json</code> as authoritative for model-lane status and the
+Model Family Catalog as the broader inventory of adapter/profile coverage.</p>
 </blockquote>
 <h2 id="support-tiers">Support Tiers<a class="headerlink" href="#support-tiers" title="Permanent link">&para;</a></h2>
 <p>Adapter capability and model-lane support are related but separate contracts.
@@ -2968,7 +3010,7 @@ public evidence support.</p>
 </thead>
 <tbody>
 <tr>
-<td>llama / mistral / mistral3 / mixtral / qwen / gemma / OLMo / yi</td>
+<td>llama / mistral / mistral3 / mixtral / qwen / gemma / OLMo / OLMoE / yi</td>
 <td><code>hf_causal</code></td>
 </tr>
 <tr>
@@ -3079,10 +3121,10 @@ public evidence support.</p>
 </tr>
 <tr>
 <td><code>hf_multimodal</code></td>
-<td>Image-text generation models exposed through HF <code>AutoModelForImageTextToText</code></td>
-<td><code>invarlock[adapters]</code></td>
+<td>Image-text and unified multimodal generation models exposed through HF <code>AutoModelForImageTextToText</code> or <code>AutoModelForMultimodalLM</code></td>
+<td><code>invarlock[multimodal]</code></td>
 <td>All platforms with torch</td>
-<td>Single-image <code>vision_text</code> evaluation with explicit adapter selection.</td>
+<td>Single-image <code>vision_text</code> evaluation with explicit adapter selection; Gemma 4 unified checkpoints require <code>transformers&gt;=5.12.0</code> and <code>torchvision&gt;=0.26.0</code>.</td>
 </tr>
 <tr>
 <td><code>hf_seq2seq</code></td>
@@ -3196,6 +3238,53 @@ simple heuristics to choose a concrete built-in adapter name.</p>
 <span class="w">  </span><span class="nt">device</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
 </code></pre></div>
 
+<div class="codehilite"><pre><span></span><code><span class="c1"># Seq2seq text-to-text run</span>
+<span class="nt">model</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">google/flan-t5-base</span>
+<span class="w">  </span><span class="nt">adapter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hf_seq2seq</span>
+<span class="w">  </span><span class="nt">device</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
+
+<span class="nt">dataset</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">provider</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hf_seq2seq</span>
+<span class="w">    </span><span class="nt">dataset_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">abisee/cnn_dailymail</span>
+<span class="w">    </span><span class="nt">config_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.0.0</span>
+<span class="w">    </span><span class="nt">src_field</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">article</span>
+<span class="w">    </span><span class="nt">tgt_field</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">highlights</span>
+<span class="w">    </span><span class="nt">src_prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;summarize:</span><span class="nv"> </span><span class="s">&quot;</span>
+<span class="w">  </span><span class="nt">split</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">validation</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Gemma 4 image-text run; use explicit hf_multimodal, not adapter auto</span>
+<span class="nt">model</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">google/gemma-4-12B-it</span>
+<span class="w">  </span><span class="nt">adapter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hf_multimodal</span>
+<span class="w">  </span><span class="nt">device</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
+<span class="w">  </span><span class="nt">dtype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bfloat16</span>
+<span class="w">  </span><span class="nt">device_map</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
+<span class="w">  </span><span class="nt">low_cpu_mem_usage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+
+<span class="nt">dataset</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">provider</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vision_text</span>
+<span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tests/fixtures/vision_text/demo_manifest.jsonl</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Large/MoE causal LM load; shard across the visible accelerator set</span>
+<span class="nt">model</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Qwen/Qwen3-30B-A3B-Instruct-2507</span>
+<span class="w">  </span><span class="nt">adapter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hf_causal</span>
+<span class="w">  </span><span class="nt">device</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cuda</span>
+<span class="w">  </span><span class="nt">dtype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bfloat16</span>
+<span class="w">  </span><span class="nt">device_map</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
+<span class="w">  </span><span class="nt">low_cpu_mem_usage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+
+<p>The <code>vision_text</code> path above is a local smoke fixture. Public promotion evidence
+uses materialized, pinned public datasets with dataset materialization summaries
+stored alongside the run artifacts, and image-text published-basis promotion
+requires a measured primary-metric floor rather than preservation pass/fail
+alone.</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># Bitsandbytes quantized load (Linux + gpu extra)</span>
 <span class="nt">model</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mistralai/Mistral-7B-v0.1</span>
@@ -3227,6 +3316,16 @@ simple heuristics to choose a concrete built-in adapter name.</p>
 <td>HF adapters</td>
 </tr>
 <tr>
+<td><code>low_cpu_mem_usage</code></td>
+<td>Reduce CPU peak during Hugging Face loads</td>
+<td>HF adapters</td>
+</tr>
+<tr>
+<td><code>memory_efficient_load</code></td>
+<td>Set <code>false</code> to opt out of InvarLock's automatic HF memory defaults</td>
+<td>HF adapters</td>
+</tr>
+<tr>
 <td><code>trust_remote_code</code></td>
 <td>Enable custom model code only with <code>INVARLOCK_ALLOW_REMOTE_CODE=1</code> for public <code>evaluate</code>; advanced model-loading commands also expose <code>--allow-remote-code</code></td>
 <td>HF adapters</td>
@@ -3243,6 +3342,10 @@ simple heuristics to choose a concrete built-in adapter name.</p>
 </tr>
 </tbody>
 </table>
+<p>By default, HF adapters apply safe memory defaults at load time. Accelerated
+loads get a hardware-aware <code>dtype</code> when one is not configured, all HF loads use
+<code>low_cpu_mem_usage=True</code> unless overridden, and large/MoE model IDs get
+<code>device_map="auto"</code> on accelerated devices. Explicit config values always win.</p>
 <h3 id="adapter-describe-fields">Adapter describe fields<a class="headerlink" href="#adapter-describe-fields" title="Permanent link">&para;</a></h3>
 <p><code>adapter.describe(model)</code> returns a dictionary containing:</p>
 <ul>
@@ -3271,7 +3374,12 @@ simple heuristics to choose a concrete built-in adapter name.</p>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Adapter missing from <code>invarlock advanced plugins adapters</code></strong>: install the required extra
-  (<code>invarlock[adapters]</code>, <code>invarlock[gpu]</code>, <code>invarlock[gptq]</code>, <code>invarlock[awq]</code>).</li>
+  (<code>invarlock[adapters]</code>, <code>invarlock[multimodal]</code>, <code>invarlock[gpu]</code>,
+  <code>invarlock[gptq]</code>, <code>invarlock[awq]</code>).</li>
+<li><strong>Gemma 4 unified or image-text load fails</strong>: use the explicit
+  <code>hf_multimodal</code> adapter and install <code>invarlock[multimodal]</code>, which pins the
+  Transformers and torchvision floor required by current Gemma 4 unified
+  checkpoints.</li>
 <li><strong>GPTQModel-backed adapters unavailable</strong>: <code>hf_awq</code> and <code>hf_gptq</code> use
   GPTQModel-backed loading; verify the selected GPTQModel wheel supports your
   Python, PyTorch, and accelerator stack.</li>

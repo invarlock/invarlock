@@ -16,13 +16,13 @@
         <link rel="prev" href="../guards/">
       
       
-        <link rel="next" href="../env-vars/">
+        <link rel="next" href="../report-outline/">
       
       
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -32,6 +32,9 @@
     
     
       <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -45,10 +48,12 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -59,7 +64,12 @@
   </head>
   
   
-    <body dir="ltr">
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -84,8 +94,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -109,8 +118,8 @@
       </div>
     </div>
     
+      
     
-      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
     
     
     
@@ -326,8 +335,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     InvarLock Documentation
@@ -1474,6 +1482,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#ci-and-registry-exports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI and Registry Exports
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1549,6 +1568,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../report-outline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Outline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -2930,6 +2977,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#ci-and-registry-exports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI and Registry Exports
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3056,6 +3114,7 @@ telemetry fields, and HTML export.</p>
 <li><a href="#quick-start">Quick Start</a></li>
 <li><a href="#report-layout">report Layout</a></li>
 <li><a href="#executive-summary-interpretation">Executive Summary Interpretation</a></li>
+<li><a href="../report-outline/">Report Outline</a></li>
 <li><a href="#schema">Schema</a></li>
 <li><a href="#minimal-v1-report-example">Minimal v1 report Example</a></li>
 <li><a href="#schema-summary-validator-view">Schema Summary</a></li>
@@ -3063,6 +3122,7 @@ telemetry fields, and HTML export.</p>
 <li><a href="#primary-metric-tail-gate-optional">Primary Metric Tail Gate</a></li>
 <li><a href="#telemetry-fields">Telemetry Fields</a></li>
 <li><a href="#html-export">HTML Export</a></li>
+<li><a href="#ci-and-registry-exports">CI and Registry Exports</a></li>
 <li><a href="#troubleshooting">Troubleshooting</a></li>
 <li><a href="#related-documentation">Related Documentation</a></li>
 </ul>
@@ -3078,7 +3138,7 @@ invarlock<span class="w"> </span>report<span class="w"> </span>generate<span cla
 invarlock<span class="w"> </span>verify<span class="w"> </span>reports/eval/evaluation.report.json
 <span class="c1"># expects reports/eval/runtime.manifest.json next to the report</span>
 
-<span class="c1"># Explain a bundle directly from report provenance</span>
+<span class="c1"># Explain a bundle directly from the evaluation report</span>
 invarlock<span class="w"> </span>report<span class="w"> </span>explain<span class="w"> </span>--evaluation-report<span class="w"> </span>reports/eval/evaluation.report.json
 
 <span class="c1"># Inspect telemetry fields</span>
@@ -3086,6 +3146,11 @@ jq<span class="w"> </span><span class="s1">&#39;.telemetry&#39;</span><span clas
 
 <span class="c1"># Export to HTML</span>
 invarlock<span class="w"> </span>report<span class="w"> </span>html<span class="w"> </span>-i<span class="w"> </span>reports/eval/evaluation.report.json<span class="w"> </span>-o<span class="w"> </span>reports/eval/evaluation.html
+
+<span class="c1"># Export CI/model-registry handoff artifacts</span>
+invarlock<span class="w"> </span>report<span class="w"> </span><span class="nb">export</span><span class="w"> </span>-i<span class="w"> </span>reports/eval/evaluation.report.json<span class="w"> </span>--format<span class="w"> </span>mlflow-tags
+invarlock<span class="w"> </span>report<span class="w"> </span><span class="nb">export</span><span class="w"> </span>-i<span class="w"> </span>reports/eval/evaluation.report.json<span class="w"> </span>--format<span class="w"> </span>model-card-md
+invarlock<span class="w"> </span>report<span class="w"> </span><span class="nb">export</span><span class="w"> </span>-i<span class="w"> </span>reports/eval/evaluation.report.json<span class="w"> </span>--format<span class="w"> </span>release-review-md
 </code></pre></div>
 
 <p>Artifact model:</p>
@@ -3101,7 +3166,7 @@ invarlock<span class="w"> </span>report<span class="w"> </span>html<span class="
 <tr>
 <td><code>evaluation.report.json</code></td>
 <td><code>invarlock evaluate</code>, <code>invarlock report generate --format report</code></td>
-<td><code>invarlock verify</code>, <code>invarlock report html</code>, <code>invarlock report validate</code>, <code>invarlock report explain --evaluation-report</code>, <code>invarlock advanced runtime-verify</code></td>
+<td><code>invarlock verify</code>, <code>invarlock report html</code>, <code>invarlock report export</code>, <code>invarlock report validate</code>, <code>invarlock report explain --evaluation-report</code>, <code>invarlock advanced runtime-verify</code></td>
 </tr>
 <tr>
 <td><code>report.json</code></td>
@@ -3110,20 +3175,43 @@ invarlock<span class="w"> </span>report<span class="w"> </span>html<span class="
 </tr>
 </tbody>
 </table>
+<p><code>report explain --evaluation-report</code> reads <code>evaluation.report.json</code> directly.
+Raw subject and baseline <code>report.json</code> files are still useful when you need to
+regenerate the paired evaluation bundle or inspect low-level run telemetry, but
+portable fixtures that ship only <code>evaluation.report.json</code>,
+<code>runtime.manifest.json</code>, and evidence metadata can still be verified, rendered,
+validated, and explained.</p>
 <h2 id="report-layout">report Layout<a class="headerlink" href="#report-layout" title="Permanent link">&para;</a></h2>
 <p>The markdown report is structured to highlight evaluation outcomes first:</p>
+<p>New renderers should use the shared renderer-neutral
+<a href="../report-outline/">Report Outline</a> rather than deriving their own section
+order from the historical Markdown body. The outline groups modern report
+evidence as Decision, Primary Metric, Policy Gates, Guard Signals, optional
+Benchmark Comparison, Evidence And Provenance, and Technical Appendix.</p>
 <p>Container-backed evaluations emit <code>runtime.manifest.json</code> next to
 <code>evaluation.report.json</code>. Archive and verify them together.</p>
-<p>The HTML export keeps that same body content but adds a browser shell with:</p>
+<p>The HTML export renders that shared outline directly instead of converting the
+historical Markdown body. It adds:</p>
 <ul>
-<li>summary chips for the overall status, primary-metric kind, and linked-run readiness</li>
-<li>quick links for the major report sections</li>
-<li>
-<p>anchored section headings so reviews can deep-link directly into the report</p>
-</li>
-<li>
-<p><strong>Executive Summary</strong>: one-line PASS/FAIL + compact gate table (primary metric, drift, invariants, spectral, RMT, overhead).</p>
-</li>
+<li>a summary ledger row for verdict, subject model, baseline model/run, metric,
+  and guard warnings</li>
+<li>a sticky brand/theme row with a light/dark toggle</li>
+<li>quick links for the outline sections, with hash anchors and the active
+  section highlight aligned to the sticky row while scrolling</li>
+<li>task-aware primary-metric wording, including ratio output for ppl-like tasks
+  and percentage-point deltas for accuracy tasks</li>
+<li>guard-warning detail tables when baseline-relative warning data is present</li>
+<li>an optional Benchmark Comparison section when benchmark/scenario data is
+  embedded in the report</li>
+<li>capped appendix previews for raw policy/plugin/artifact blocks, with
+  <code>evaluation.report.json</code> remaining the complete audit artifact</li>
+</ul>
+<p>The embedded stylesheet follows the current InvarLock site Ledger ink token
+map: warm paper/ink in light mode, warm-black/cream in dark mode, blue as the
+brand accent, oxblood as the editorial signal, and green/red/yellow reserved
+for verdict states.</p>
+<ul>
+<li><strong>Decision</strong>: PASS/FAIL, evidence mode, subject model, baseline model/run, edit, primary metric, and warning count.</li>
 <li><strong>Quality Gates</strong>: table of canonical gating checks with measured values.</li>
 <li><strong>Guard Check Details</strong>: invariants, spectral stability, RMT health, and pairing snapshots.</li>
 <li><strong>Primary Metric</strong>: task-specific metric summary with CI + baseline comparison.</li>
@@ -3408,6 +3496,8 @@ fields while enforcing a small, stable core:</p>
 <li><code>primary_metric_tail_acceptable</code></li>
 <li><code>preview_final_drift_acceptable</code></li>
 <li><code>guard_overhead_acceptable</code></li>
+<li><code>guard_warnings_present</code></li>
+<li><code>guard_warning_policy_acceptable</code></li>
 <li><code>invariants_pass</code></li>
 <li><code>spectral_stable</code></li>
 <li><code>rmt_stable</code></li>
@@ -3416,6 +3506,17 @@ fields while enforcing a small, stable core:</p>
 <li><code>moe_identity_ok</code></li>
 <li>The validator rejects reports that contain non‑boolean values under
   any of these keys.</li>
+</ul>
+<p><strong>Guard warnings (optional):</strong></p>
+<ul>
+<li><code>guard_warnings.present</code>: <code>true</code> when the subject has guard-signal movement
+  relative to the baseline while the hard policy may still pass.</li>
+<li><code>guard_warnings.warning_count</code>: number of warning records.</li>
+<li><code>guard_warnings.warnings[]</code>: structured warnings with <code>guard</code>, <code>kind</code>,
+  optional <code>family</code>/<code>module</code>, <code>baseline</code>, <code>subject</code>, <code>policy_gate</code>, and
+  <code>message</code>.</li>
+<li>Warnings are advisory by default. <code>invarlock verify --warning-policy fail</code> or
+  <code>--fail-on-warnings</code> treats any warning as a verification failure.</li>
 </ul>
 <p><strong>Policy and structure:</strong></p>
 <ul>
@@ -3464,6 +3565,11 @@ fields while enforcing a small, stable core:</p>
 <td><code>validation</code></td>
 <td><code>report.metrics</code> + policy thresholds</td>
 <td>Schema allow‑list only.</td>
+</tr>
+<tr>
+<td><code>guard_warnings</code></td>
+<td>Baseline/subject guard evidence</td>
+<td>Advisory by default; fail only under strict warning policy.</td>
 </tr>
 <tr>
 <td><code>spectral</code> / <code>rmt</code> / <code>variance</code></td>
@@ -3629,12 +3735,11 @@ include the execution device. CPU telemetry sweeps are collected via
 </ul>
 <hr />
 <h2 id="html-export">HTML Export<a class="headerlink" href="#html-export" title="Permanent link">&para;</a></h2>
-<p>The HTML renderer converts the Markdown report into structured HTML
-tables (via the <code>markdown</code> library when available) and preserves the same
-numeric values (ratios, CIs, deltas). When the dependency is unavailable, the
-renderer falls back to a <code>&lt;pre&gt;</code> block. Use <code>--embed-css</code> (default) to inline
-a minimal stylesheet for standalone use, including status badges and
-print-friendly rules.</p>
+<p>The HTML renderer builds a browser-readable report from the shared
+renderer-neutral <a href="../report-outline/">Report Outline</a>. It does not depend on the
+Markdown renderer or the optional <code>markdown</code> Python package. Use <code>--embed-css</code>
+(default) to inline the standalone stylesheet; use <code>--no-embed-css</code> only when
+an external publishing system supplies its own styles.</p>
 <h3 id="cli">CLI<a class="headerlink" href="#cli" title="Permanent link">&para;</a></h3>
 <div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>report<span class="w"> </span>html<span class="w"> </span>-i<span class="w"> </span>&lt;evaluation.report.json&gt;<span class="w"> </span>-o<span class="w"> </span>&lt;out.html&gt;
 </code></pre></div>
@@ -3650,6 +3755,58 @@ print-friendly rules.</p>
 <span class="n">html</span> <span class="o">=</span> <span class="n">render_report_html</span><span class="p">(</span><span class="n">report</span><span class="p">)</span>
 </code></pre></div>
 
+<hr />
+<h2 id="ci-and-registry-exports">CI and Registry Exports<a class="headerlink" href="#ci-and-registry-exports" title="Permanent link">&para;</a></h2>
+<p><code>invarlock report export</code> converts an existing <code>evaluation.report.json</code> into
+small handoff artifacts for systems that already own CI, registry, model-card,
+or release-review workflows.</p>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>report<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--evaluation-report<span class="w"> </span>reports/eval/evaluation.report.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--format<span class="w"> </span>mlflow-tags<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--policy-profile<span class="w"> </span>ci<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--verify-result<span class="w"> </span>reports/eval/invarlock-verify.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>reports/eval/mlflow-tags.json
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>Format</th>
+<th>Output</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mlflow-tags</code></td>
+<td>JSON with <code>tags</code> and report artifact path</td>
+<td>Set registry tags and log the report as an MLflow artifact from an MLflow-enabled environment.</td>
+</tr>
+<tr>
+<td><code>model-card-md</code></td>
+<td>Markdown block</td>
+<td>Paste InvarLock evidence into a Hugging Face model card or equivalent model README.</td>
+</tr>
+<tr>
+<td><code>release-review-md</code></td>
+<td>Markdown packet</td>
+<td>Attach pass/fail, baseline/subject identity, report hash, policy profile, and reviewer checklist to release review.</td>
+</tr>
+</tbody>
+</table>
+<p>These exports summarize regression evidence only. They do not change verifier
+semantics, replace <code>invarlock verify</code>, or provide deployment approval.</p>
+<p>Common options:</p>
+<ul>
+<li><code>--policy-profile</code>: profile label to use when the report does not record one.</li>
+<li><code>--report-url</code>: public report URL for Markdown exports.</li>
+<li><code>--evidence-url</code>: public evidence-pack URL for Markdown exports.</li>
+<li><code>--verify-result</code>: path to <code>invarlock verify --json</code> output. When supplied,
+  export status and verifier fields come from the verifier result item whose
+  <code>id</code> matches the resolved evaluation report path. A verifier result for a
+  different report is rejected.</li>
+<li><code>--force</code>: overwrite an existing output file.</li>
+</ul>
 <hr />
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <h3 id="schema-issues">Schema Issues<a class="headerlink" href="#schema-issues" title="Permanent link">&para;</a></h3>

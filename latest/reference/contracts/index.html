@@ -22,7 +22,7 @@
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -32,6 +32,9 @@
     
     
       <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -45,10 +48,12 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -59,7 +64,12 @@
   </head>
   
   
-    <body dir="ltr">
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -84,8 +94,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -109,8 +118,8 @@
       </div>
     </div>
     
+      
     
-      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
     
     
     
@@ -326,8 +335,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     InvarLock Documentation
@@ -1206,6 +1214,34 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../report-outline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Outline
   
 
     
@@ -2699,6 +2735,11 @@ versioned and intended to be stable within their declared contract versions.</p>
 <td>Broader inventory for declared support, code-level coverage, usage-only checkpoints, and recommended additions</td>
 </tr>
 <tr>
+<td>Model classification</td>
+<td><code>contracts/model_classification.json</code></td>
+<td>Lifecycle classification for published, backlog, blocked, smoke-only, usage-only, and out-of-scope model inventory, plus blocked named checkpoints</td>
+</tr>
+<tr>
 <td>Adapter capabilities</td>
 <td><code>contracts/adapter_capabilities.json</code></td>
 <td>Snapshot/restore, guard coverage, runtime limits, extras</td>
@@ -2749,11 +2790,11 @@ versioned and intended to be stable within their declared contract versions.</p>
 <code>invarlock/_data/contracts/*.json</code>. The logical public contract names remain
 <code>contracts/&lt;name&gt;.json</code>, and <code>invarlock.public_contracts</code> resolves them from the
 repo checkout when present or from packaged wheel data otherwise.</p>
-<p>The public contract catalog exposes the list-shaped files as first-class
-entries too: <code>validation_keys</code>, <code>console_labels</code>, and <code>metric_kinds</code> are
-surfaced by <code>invarlock.public_contracts.contract_catalog()</code> and embedded in the
-JSON payloads emitted by <code>invarlock doctor --json</code> and <code>invarlock advanced
-plugins ... --json</code>.</p>
+<p>The public contract catalog exposes the model lifecycle ledger and list-shaped
+files as first-class entries too: <code>model_classification</code>, <code>validation_keys</code>,
+<code>console_labels</code>, and <code>metric_kinds</code> are surfaced by
+<code>invarlock.public_contracts.contract_catalog()</code> and embedded in the JSON payloads
+emitted by <code>invarlock doctor --json</code> and <code>invarlock advanced plugins ... --json</code>.</p>
 <h2 id="cli-surfaces">CLI surfaces<a class="headerlink" href="#cli-surfaces" title="Permanent link">&para;</a></h2>
 <p>The CLI exposes these contracts directly:</p>
 <ul>
@@ -2778,8 +2819,12 @@ guards must declare <code>INVARLOCK_CORE_ABI</code>, and the value must match th
 core ABI published in <code>contracts/plugin_compatibility.json</code>.</p>
 <p>For support-related automation, <code>plugins adapters --json</code> and <code>doctor --json</code>
 expose both the strict <code>support_matrix</code> contract and the broader
-<code>model_family_catalog</code> contract, plus the <code>validation_keys</code>, <code>console_labels</code>,
-and <code>metric_kinds</code> entries from the public contract catalog.</p>
+<code>model_family_catalog</code> contract. Lifecycle decisions such as <code>published</code>,
+<code>backlog</code>, <code>blocked</code>, <code>usage_only</code>, and <code>out_of_scope</code> live in
+<code>model_classification</code>, so license/access changes can be handled by editing the
+manifest and rerunning <code>make contracts-check</code> instead of searching every support
+surface by hand. The same JSON surfaces also include the <code>validation_keys</code>,
+<code>console_labels</code>, and <code>metric_kinds</code> entries from the public contract catalog.</p>
 <p>The versioned JSON surfaces are intentionally explicit:</p>
 <ul>
 <li><code>invarlock doctor --json</code> emits <code>format_version: "doctor-v1"</code></li>
@@ -2837,14 +2882,18 @@ three tier values.</p>
 <p>Repo tags and installed wheels are the only maintained public contract
 carriers.</p>
 <p>The support-matrix published-basis evidence paths remain logical
-<code>public_evidence/published_basis/...</code> references. Installed wheels resolve those
-logical paths from packaged files under
-<code>invarlock/_data/public_evidence/published_basis/...</code>, so installed packages can
-render and verify the shipped published-basis <code>evaluation.report.json</code> examples
-with their sibling <code>runtime.manifest.json</code> files, and load the paired
-<code>evidence_pack_recipe.json</code> data without cloning the repo. The GPT-2
-published-basis lane also packages a signed <code>evidence_pack/</code> directory for
-strict offline evidence-pack verification.</p>
+<code>public_evidence/published_basis/...</code> references. Source repository tags carry
+the full public evidence artifacts at those paths: reports, runtime manifests,
+evidence-pack recipes, signed packs where present, and guard-value demo
+packages.</p>
+<p>Installed wheels intentionally do not duplicate the full published-basis
+artifact tree. Instead, they ship the compact generated index at
+<code>invarlock/_data/public_evidence/published_basis_index.json</code>. That index records
+the published-basis entries, logical source paths, lane IDs, file hashes, sizes,
+directory control-file hashes, and the carrier policy. Wheel users can inspect
+which public evidence exists and where it lives in the source tag; verifying or
+rendering the full public evidence artifacts requires the repository source
+tree or an explicit artifact copy.</p>
 <h2 id="policy-packs">Policy packs<a class="headerlink" href="#policy-packs" title="Permanent link">&para;</a></h2>
 <p>Policy packs are Git-native artifacts that bind:</p>
 <ul>

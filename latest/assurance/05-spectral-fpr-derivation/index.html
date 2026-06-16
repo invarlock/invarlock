@@ -22,7 +22,7 @@
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -32,6 +32,9 @@
     
     
       <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -45,10 +48,12 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -59,7 +64,12 @@
   </head>
   
   
-    <body dir="ltr">
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -84,8 +94,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -109,8 +118,8 @@
       </div>
     </div>
     
+      
     
-      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
     
     
     
@@ -326,8 +335,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
 
     </a>
     InvarLock Documentation
@@ -1203,6 +1211,34 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/report-outline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Outline
   
 
     
@@ -2659,9 +2695,11 @@
 <blockquote>
 <p><strong>Plain language:</strong> The spectral guard records a calibrated multiple-testing
 policy for per-family singular-value drift. Gaussian-tail FPR math applies to
-the families whose kappas were calibrated for that model; low Balanced
-<code>embed</code>/<code>other</code> caps are operational sentinels, not standalone &lt;=5% FPR
-claims.</p>
+the families whose kappas were calibrated for that model. Published-basis
+no-op reports for newer families are null-behavior evidence, but their
+transferred caps are budgeted sentinels until a family-specific calibration
+re-derives κ. Low Balanced <code>embed</code>/<code>other</code> caps are operational sentinels,
+not standalone &lt;=5% FPR claims.</p>
 </blockquote>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <table>
@@ -2729,10 +2767,13 @@ rate.</p>
   0.05, m = 4 families) with per-family caps <code>{ffn: 3.849, attn: 3.018, embed: 1.05,
   other: 0.0}</code>, <code>sigma_quantile = 0.95</code>, and <code>max_caps = 5</code>. Scope is <code>all</code>, so
   FFN, attention, embeddings, and other 2-D weights are all monitored. The
-  Gaussian-tail FPR interpretation is defensible for the calibrated high-kappa
-  families (<code>ffn</code>, <code>attn</code> in the packaged policy). The lower <code>embed</code> and <code>other</code>
-  caps are sentinel thresholds and can exceed a 5% Gaussian tail if interpreted
-  alone.</li>
+  Gaussian-tail FPR interpretation is defensible only for families with a
+  matching null calibration basis. In the packaged pilot basis that means the
+  GPT-2/BERT-calibrated high-kappa families; newly promoted published-basis
+  causal LMs may expose <code>attn</code> cap hits in no-op reports and should treat the
+  transferred attention cap as a budgeted sentinel until κ is recalibrated for
+  that family. The lower <code>embed</code> and <code>other</code> caps are sentinel thresholds and
+  can exceed a 5% Gaussian tail if interpreted alone.</li>
 <li>Conservative tier applies <strong>Bonferroni</strong> (<code>method = "bonferroni"</code>, α = 0.000625,
   m = 4) with caps <code>{ffn: 3.849, attn: 2.6, embed: 2.8, other: 2.8}</code>,
   <code>sigma_quantile = 0.90</code>, and <code>max_caps = 3</code>, keeping WARNs within the
@@ -2746,8 +2787,8 @@ rate.</p>
   <code>spectral.summary.{sigma_quantile,max_caps,deadband}</code>, and
   <code>spectral.family_caps[*].kappa</code>.</li>
 <li>The FPR story is a calibration assumption under the chosen null model for the
-  calibrated families, not a theorem about arbitrary transformer weights or all
-  sentinel thresholds.</li>
+  calibrated families, not a theorem about arbitrary transformer weights,
+  transferred published-basis lanes, or sentinel thresholds.</li>
 <li>Empirical histograms of <span class="arithmatex">\(z\)</span> should be approximately standard normal; heavy
   tails → raise <span class="arithmatex">\(\kappa_f\)</span> or use robust <span class="arithmatex">\(\sigma\)</span> (MAD-scaled).</li>
 </ul>
@@ -2763,8 +2804,9 @@ summary.</p>
   count, violations, kappa}</code>. <code>sigma_quantile</code> is the calibrated baseline
   percentile used to derive the reference target.</li>
 <li>Tier files document multiple-testing metadata and the mapping from
-  <span class="arithmatex">\(\kappa_f\)</span> to modeled Gaussian tails. Sentinel caps should be audited
-  as operational thresholds, not as FPR-controlled family caps.</li>
+  <span class="arithmatex">\(\kappa_f\)</span> to modeled Gaussian tails for calibrated families. Transferred
+  caps and sentinel caps should be audited as operational thresholds, not as
+  FPR-controlled family caps.</li>
 <li>Policy metadata records the multiple-testing method
   (<code>spectral.multiple_testing</code>) and the cap limit (<code>spectral.max_caps</code>, mirrored
   in <code>spectral.summary.max_caps</code> where present).</li>
@@ -2772,13 +2814,17 @@ summary.</p>
 <h2 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>spectral.summary.{sigma_quantile,deadband,modules_checked,max_caps,caps_exceeded}</code></li>
-<li><code>spectral.family_caps[*].kappa</code> and <code>spectral.families[*].{kappa,violations}</code></li>
+<li><code>spectral.family_caps[*].kappa</code> and per-family cap counters in
+  <code>spectral.families[*]</code> (<code>violations</code> is the raw counter key for modules whose
+  z-score crossed the family cap)</li>
 <li><code>spectral.multiple_testing.{method,alpha,m}</code> and <code>spectral.max_caps</code></li>
 </ul>
 <h3 id="worked-example-balanced-tier">Worked example (Balanced tier)<a class="headerlink" href="#worked-example-balanced-tier" title="Permanent link">&para;</a></h3>
 <ul>
 <li>For FFN modules, <code>family_caps.ffn.kappa = 3.849</code>. Suppose a layer reports <span class="arithmatex">\(z = 3.90\)</span>.</li>
-<li>report records a WARN in <code>spectral.families.ffn.violations += 1</code>; <code>spectral.caps_applied</code> increments.</li>
+<li>report records a WARN, increments the raw
+  <code>spectral.families[*].violations</code> cap counter for the affected family, and
+  increments <code>spectral.caps_applied</code>.</li>
 <li>Balanced <code>max_caps = 5</code>. After the fifth WARN the guard continues to WARN;
   the sixth triggers <code>spectral.caps_exceeded=true</code> and the run aborts.</li>
 <li>Multiple-testing metadata shows <code>spectral.multiple_testing = {method: "bh",
