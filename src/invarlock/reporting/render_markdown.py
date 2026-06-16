@@ -34,6 +34,7 @@ from .render_markdown_tables import (
 from .render_markdown_tables import (
     append_system_overhead_section as _append_system_overhead_section,
 )
+from .report_outline import build_evaluation_report_outline
 from .report_summary import build_quality_gates_summary, build_safety_dashboard_summary
 from .report_summary import (
     compute_report_hash as _compute_report_hash,
@@ -672,40 +673,12 @@ def _append_plugin_provenance_section(
     lines.append("")
 
 
-def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
-    """
-    Render an evaluation report as a formatted Markdown report with pretty tables.
-
-    Render an already-normalized evaluation report into Markdown.
-    """
-    lines: list[str] = []
-    appendix_lines: list[str] = []
-
-    _append_report_header(lines, evaluation_report)
-
-    _append_report_warning_banners(lines, evaluation_report)
-
+def _append_technical_appendix_outline_section(
+    lines: list[str],
+    appendix_lines: list[str],
+    evaluation_report: dict[str, Any],
+) -> None:
     _append_plugin_provenance_section(lines, evaluation_report)
-
-    _append_executive_summary_section(lines, evaluation_report)
-
-    _append_outline_fact_summary_section(lines, evaluation_report)
-
-    _append_quality_gates_section(lines, evaluation_report)
-
-    append_guard_check_details_section(lines, evaluation_report)
-
-    append_guard_warnings_section(lines, evaluation_report)
-
-    _append_primary_metric_section(lines, evaluation_report)
-
-    append_guard_observability_sections(lines, evaluation_report)
-
-    _append_model_context_sections(lines, evaluation_report)
-
-    _append_dataset_and_provenance_section(lines, evaluation_report)
-
-    # Structural Changes heading is printed with content later; avoid empty header here
 
     sys_over = evaluation_report.get("system_overhead", {}) or {}
     if isinstance(sys_over, dict) and sys_over:
@@ -737,16 +710,57 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
         lines.append(f"| Rank Changes | {len(structure['ranks'])} layers |")
 
     lines.append("")
-
     lines.append("")
 
     _append_compression_diagnostics_section(lines, evaluation_report)
-
     _append_moe_observability_section(lines, evaluation_report)
-
     _append_policy_configuration_section(lines, evaluation_report)
-
     _append_appendix_sections(lines, appendix_lines, evaluation_report)
+
+
+def _append_outline_ordered_sections(
+    lines: list[str],
+    appendix_lines: list[str],
+    evaluation_report: dict[str, Any],
+) -> None:
+    outline = build_evaluation_report_outline(evaluation_report)
+    for section in outline.sections:
+        if section.key == "decision":
+            _append_executive_summary_section(lines, evaluation_report)
+            _append_outline_fact_summary_section(lines, evaluation_report)
+        elif section.key == "primary_metric":
+            _append_primary_metric_section(lines, evaluation_report)
+        elif section.key == "policy_gates":
+            _append_quality_gates_section(lines, evaluation_report)
+        elif section.key == "guard_signals":
+            append_guard_check_details_section(lines, evaluation_report)
+            append_guard_warnings_section(lines, evaluation_report)
+            append_guard_observability_sections(lines, evaluation_report)
+        elif section.key == "evidence_provenance":
+            _append_model_context_sections(lines, evaluation_report)
+            _append_dataset_and_provenance_section(lines, evaluation_report)
+        elif section.key == "technical_appendix":
+            _append_technical_appendix_outline_section(
+                lines,
+                appendix_lines,
+                evaluation_report,
+            )
+
+
+def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
+    """
+    Render an evaluation report as a formatted Markdown report with pretty tables.
+
+    Render an already-normalized evaluation report into Markdown.
+    """
+    lines: list[str] = []
+    appendix_lines: list[str] = []
+
+    _append_report_header(lines, evaluation_report)
+
+    _append_report_warning_banners(lines, evaluation_report)
+
+    _append_outline_ordered_sections(lines, appendix_lines, evaluation_report)
 
     cert_hash = _compute_report_hash(evaluation_report)
     lines.append("## Evaluation Report Integrity")

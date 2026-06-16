@@ -16,6 +16,7 @@ from invarlock.core.report_inputs import ReportInputError, resolve_report_input_
 from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 
 from .render_markdown import render_report_markdown
+from .report_outline import build_evaluation_report_outline
 from .report_schema import validate_report
 from .report_summary import (
     ReportManifestSummary,
@@ -45,8 +46,10 @@ def render_evaluation_bundle_reviewer_summary(
     *,
     evidence_level: str,
     has_guard_evidence: bool,
+    outline_facts: list[dict[str, str]] | None = None,
 ) -> str:
     """Render a short plain-text audit summary for evaluation bundles."""
+    outline_facts = list(outline_facts or [])
     lines = [
         "InvarLock Evaluation Bundle Reviewer Summary",
         "",
@@ -58,8 +61,20 @@ def render_evaluation_bundle_reviewer_summary(
             f"gates={summary.gates_passed}/{summary.gates_total}."
         ),
         "",
-        "Why it might be wrong:",
     ]
+    if outline_facts:
+        lines.append("Shared report outline facts:")
+        for fact in outline_facts[:10]:
+            source = fact.get("source") or "-"
+            status = fact.get("status")
+            status_text = f" [{status}]" if status else ""
+            lines.append(
+                "- "
+                f"{fact.get('section', 'Report')} / {fact.get('label', 'Fact')}: "
+                f"{fact.get('value', 'N/A')}{status_text}; source={source}"
+            )
+        lines.append("")
+    lines.append("Why it might be wrong:")
     if has_guard_evidence:
         lines.append(
             "- Guard evidence sidecar is present, but reviewers should still compare it against the canonical evaluation report."
@@ -83,6 +98,25 @@ def render_evaluation_bundle_reviewer_summary(
     return "\n".join(lines) + "\n"
 
 
+def _outline_fact_entries(evaluation_report: dict[str, Any]) -> list[dict[str, str]]:
+    outline = build_evaluation_report_outline(evaluation_report)
+    entries: list[dict[str, str]] = []
+    for section in outline.sections:
+        if section.priority not in {"summary", "review", "audit"}:
+            continue
+        for fact in section.facts:
+            entry = {
+                "section": section.title,
+                "label": fact.label,
+                "value": str(fact.value),
+                "source": fact.source or "",
+            }
+            if fact.status:
+                entry["status"] = fact.status
+            entries.append(entry)
+    return entries
+
+
 def write_report_manifest(
     *,
     report: RunReport,
@@ -97,6 +131,7 @@ def write_report_manifest(
         summary = build_report_manifest_summary(
             cast(dict[str, Any], report), evaluation_report
         )
+        outline_facts = _outline_fact_entries(evaluation_report)
         manifest: dict[str, Any] = {
             "generated_at": datetime.now().isoformat(),
             "files": {
@@ -113,6 +148,8 @@ def write_report_manifest(
                 "gates_total": summary.gates_total,
             },
         }
+        if outline_facts:
+            manifest["summary"]["outline_facts"] = outline_facts
 
         guard_payload = build_guard_evidence_payload(report)
         ev_file = maybe_dump_guard_evidence(output_path, guard_payload)
@@ -130,6 +167,7 @@ def write_report_manifest(
                 summary,
                 evidence_level=evidence_level,
                 has_guard_evidence=has_guard_evidence,
+                outline_facts=outline_facts,
             ),
             encoding="utf-8",
         )

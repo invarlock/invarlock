@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 from invarlock.reporting.render import render_report_markdown
-
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_outline import build_evaluation_report_outline
 

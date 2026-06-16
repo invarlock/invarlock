@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# queue_manager.sh - Compatibility facade for queue management modules
+# queue_manager.sh - Queue management module aggregator
 # Version: evidence-packs-v1 (InvarLock Evidence Pack Suite)
 # Dependencies: task_serialization.sh, jq
 # Usage: sourced by gpu_worker.sh and scheduler to manage task lifecycle
@@ -16,6 +16,6 @@ QUEUE_MANAGER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=queue_generation.sh
 [[ -z "${QUEUE_GENERATION_LOADED:-}" ]] && source "${QUEUE_MANAGER_SCRIPT_DIR}/queue_generation.sh" && export QUEUE_GENERATION_LOADED=1
 
-# Keep the facade safe to source from strict callers when the final guarded
+# Keep the aggregator safe to source from strict callers when the final guarded
 # source is skipped because the module was already loaded.
 true

@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 
 import pytest
-from invarlock.reporting.render import render_report_markdown
 
 from invarlock.core.exceptions import ValidationError
+from invarlock.reporting.render import render_report_markdown
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
 

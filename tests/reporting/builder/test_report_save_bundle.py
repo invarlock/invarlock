@@ -5,10 +5,10 @@ import json
 from pathlib import Path
 
 import pytest
-from invarlock.reporting.report_files import save_report
 
 from invarlock.reporting import report_bundle as report_bundle_mod
 from invarlock.reporting.report_bundle import save_evaluation_bundle
+from invarlock.reporting.report_files import save_report
 from invarlock.reporting.report_make import make_report
 from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 

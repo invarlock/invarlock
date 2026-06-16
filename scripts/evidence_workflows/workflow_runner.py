@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import subprocess
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+
+from .workflow_plan import WorkflowCommandStep, WorkflowLanePlan, WorkflowSweepPlan
+from .workflow_state import (
+    WorkflowLaneResult,
+    WorkflowLaneRunState,
+    WorkflowPhaseResult,
+)
 
 
 @dataclass(frozen=True)
@@ -22,6 +29,39 @@ class WorkflowCommandRun:
 
     def to_payload(self) -> dict[str, object]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class WorkflowLaneExecutionRequest:
+    """Runtime inputs for executing one planned evidence lane."""
+
+    plan: WorkflowLanePlan
+    cwd: Path
+    env: Mapping[str, str]
+    log_path: Path
+
+
+@dataclass(frozen=True)
+class WorkflowSweepExecutionRequest:
+    """Runtime inputs for executing a planned evidence sweep."""
+
+    plan: WorkflowSweepPlan
+    cwd: Path
+    env: Mapping[str, str]
+    fail_fast: bool = False
+    status_log_path: Path | None = None
+    log_dir: Path | None = None
+
+
+AfterStepHook = Callable[
+    [WorkflowLanePlan, WorkflowCommandStep, WorkflowCommandRun],
+    None,
+]
+AfterLaneHook = Callable[[WorkflowLanePlan, WorkflowLaneRunState], None]
+LaneResultHook = Callable[
+    [WorkflowLanePlan, WorkflowLaneRunState, Path],
+    WorkflowLaneResult,
+]
 
 
 def workflow_return_code(results: Sequence[object]) -> int:
@@ -49,6 +89,14 @@ def write_status_event(
         parts.append(f"{key}={rendered}")
     handle.write(" ".join(parts) + "\n")
     handle.flush()
+
+
+def _default_lane_result(
+    plan: WorkflowLanePlan,
+    state: WorkflowLaneRunState,
+    _log_path: Path,
+) -> WorkflowLaneResult:
+    return state.to_lane_result()
 
 
 def run_logged_command(
@@ -145,8 +193,159 @@ def run_logged_command_with_retry(
     )
 
 
+def execute_workflow_lane(
+    request: WorkflowLaneExecutionRequest,
+    *,
+    after_successful_step: AfterStepHook | None = None,
+    after_lane: AfterLaneHook | None = None,
+    lane_result: LaneResultHook | None = None,
+) -> WorkflowLaneResult:
+    """Execute a planned evidence lane and return a typed lane result.
+
+    Domain scripts own command construction and domain-specific failure
+    classification. This function owns command sequencing, retry handling,
+    report-dependent step gating, and phase rollup.
+    """
+
+    plan = request.plan
+    plan.lane_root.mkdir(parents=True, exist_ok=True)
+    phases: list[WorkflowPhaseResult] = []
+
+    for step in plan.steps:
+        if step.requires_report and not plan.report_path.is_file():
+            phases.append(
+                WorkflowPhaseResult(
+                    step.name,
+                    None,
+                    "failed",
+                    "report_missing",
+                )
+            )
+            break
+
+        if step.retry_returncodes:
+            command_run = run_logged_command_with_retry(
+                name=step.name,
+                command=step.command,
+                cwd=request.cwd,
+                env=request.env,
+                log_path=request.log_path,
+                log_mode=step.log_mode,
+                output_path=step.output_path,
+                retry_returncodes=step.retry_returncodes,
+                retry_message=step.retry_message,
+            )
+        else:
+            command_run = run_logged_command(
+                name=step.name,
+                command=step.command,
+                cwd=request.cwd,
+                env=request.env,
+                log_path=request.log_path,
+                log_mode=step.log_mode,
+                output_path=step.output_path,
+            )
+        phase_status = "ok" if command_run.ok else "failed"
+        phases.append(
+            WorkflowPhaseResult(
+                step.name,
+                command_run.returncode,
+                phase_status,
+            )
+        )
+        if command_run.ok and after_successful_step is not None:
+            after_successful_step(plan, step, command_run)
+        if not command_run.ok:
+            break
+
+    state = WorkflowLaneRunState(
+        slug=plan.slug,
+        lane_id=plan.lane_id,
+        model_id=plan.model_id,
+        preset=plan.preset,
+        report_path=str(plan.report_path),
+        verify_path=str(plan.verify_path) if plan.verify_path else None,
+        phases=tuple(phases),
+    )
+    if after_lane is not None:
+        after_lane(plan, state)
+    result_factory = lane_result or _default_lane_result
+    return result_factory(plan, state, request.log_path)
+
+
+def execute_workflow_sweep(
+    request: WorkflowSweepExecutionRequest,
+    *,
+    lane_env: Callable[[WorkflowLanePlan, Mapping[str, str]], Mapping[str, str]]
+    | None = None,
+    after_successful_step: AfterStepHook | None = None,
+    after_lane: AfterLaneHook | None = None,
+    lane_result: LaneResultHook | None = None,
+) -> list[WorkflowLaneResult]:
+    """Execute all lanes in a planned evidence sweep."""
+
+    plan = request.plan
+    status_log_path = request.status_log_path or (plan.output_root / "status.log")
+    log_dir = request.log_dir or (plan.output_root / "logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    results: list[WorkflowLaneResult] = []
+
+    with status_log_path.open("w", encoding="utf-8") as handle:
+        write_status_event(handle, "START")
+        for lane_plan in plan.lanes:
+            preflight = lane_plan.resource_preflight
+            if preflight and preflight.get("warning"):
+                write_status_event(
+                    handle,
+                    "WARN",
+                    slug=lane_plan.slug,
+                    fields={"resource_preflight": preflight["warning"]},
+                )
+            write_status_event(handle, "START", slug=lane_plan.slug)
+            effective_env = (
+                lane_env(lane_plan, request.env) if lane_env else dict(request.env)
+            )
+            result = execute_workflow_lane(
+                WorkflowLaneExecutionRequest(
+                    plan=lane_plan,
+                    cwd=request.cwd,
+                    env=effective_env,
+                    log_path=log_dir / f"{lane_plan.slug}.log",
+                ),
+                after_successful_step=after_successful_step,
+                after_lane=after_lane,
+                lane_result=lane_result,
+            )
+            results.append(result)
+            verify_repr = (
+                "NA" if result.verify_exit is None else str(result.verify_exit)
+            )
+            write_status_event(
+                handle,
+                "DONE",
+                slug=result.slug,
+                fields={
+                    "status": result.status,
+                    "detail": result.detail or "-",
+                    "eval": result.evaluate_exit,
+                    "verify": verify_repr,
+                },
+            )
+            if request.fail_fast and not result.ok:
+                break
+        write_status_event(handle, "ALL_TASKS_COMPLETE")
+    return results
+
+
 __all__ = [
+    "AfterLaneHook",
+    "AfterStepHook",
+    "LaneResultHook",
     "WorkflowCommandRun",
+    "WorkflowLaneExecutionRequest",
+    "WorkflowSweepExecutionRequest",
+    "execute_workflow_lane",
+    "execute_workflow_sweep",
     "run_logged_command",
     "run_logged_command_with_retry",
     "workflow_return_code",

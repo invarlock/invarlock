@@ -5,13 +5,29 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shlex
-import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+
+SCRIPTS_DIR = Path(__file__).resolve().parents[1]
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from evidence_workflows.workflow_plan import (  # noqa: E402
+    WorkflowCommandStep,
+    WorkflowLanePlan,
+    WorkflowSweepPlan,
+)
+from evidence_workflows.workflow_runner import (  # noqa: E402
+    WorkflowSweepExecutionRequest,
+    execute_workflow_sweep,
+    workflow_return_code,
+)
+from evidence_workflows.workflow_state import WorkflowRunMetadata  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_REMOTE_REPO = "/root/invarlock-public"
@@ -46,6 +62,22 @@ class RemoteLaunch:
             "output_root": self.output_root,
             "remote_command": self.remote_command,
             "ssh_command": self.ssh_command,
+        }
+
+
+@dataclass(frozen=True)
+class RemoteWorkflowPlan:
+    """Typed workflow representation for remote evidence launch commands."""
+
+    workflow: WorkflowSweepPlan
+    sync_command: str | None
+    launches: tuple[RemoteLaunch, ...]
+
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "workflow": self.workflow.to_dry_run_payload(),
+            "sync_command": self.sync_command,
+            "launches": [launch.to_payload() for launch in self.launches],
         }
 
 
@@ -142,7 +174,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "Comma-separated GPU ids that should be exposed to one tmux shard, "
             "for example 0,1,2,3 for a sharded MoE load. Repeat for multiple "
             "groups. When set, these groups define the shards and --gpus is "
-            "used only for payload visibility/backwards-compatible dry runs."
+            "used only for payload visibility in dry-run output."
         ),
     )
     parser.add_argument(
@@ -436,6 +468,81 @@ def _monitor_commands(host: str, launches: list[RemoteLaunch]) -> dict[str, obje
     }
 
 
+def _remote_workflow_output_root(stamp: str) -> Path:
+    return REPO_ROOT / "tmp" / "model_evidence_remote_launches" / stamp
+
+
+def build_remote_workflow_plan(
+    *,
+    host: str,
+    stamp: str,
+    sync_command: str | None,
+    launches: list[RemoteLaunch],
+) -> RemoteWorkflowPlan:
+    output_root = _remote_workflow_output_root(stamp)
+    lanes: list[WorkflowLanePlan] = []
+    if sync_command is not None:
+        lane_root = output_root / "sync"
+        lanes.append(
+            WorkflowLanePlan(
+                slug="remote-sync",
+                lane_id="remote-sync",
+                model_id=host,
+                execution_mode="remote",
+                preset="remote-sync",
+                lane_root=lane_root,
+                published_lane_root=lane_root,
+                report_path=lane_root / "report" / "evaluation.report.json",
+                verify_path=lane_root / "verify.json",
+                profile="remote",
+                steps=(
+                    WorkflowCommandStep(
+                        name="sync",
+                        command=("ssh", host, sync_command),
+                        log_mode="w",
+                    ),
+                ),
+            )
+        )
+    for launch in launches:
+        lane_root = output_root / launch.session
+        lanes.append(
+            WorkflowLanePlan(
+                slug=launch.session,
+                lane_id=launch.session,
+                model_id=host,
+                execution_mode="remote",
+                preset="remote-launch",
+                lane_root=lane_root,
+                published_lane_root=lane_root,
+                report_path=lane_root / "report" / "evaluation.report.json",
+                verify_path=lane_root / "verify.json",
+                profile="remote",
+                steps=(
+                    WorkflowCommandStep(
+                        name="launch",
+                        command=tuple(launch.ssh_command),
+                        log_mode="w",
+                    ),
+                ),
+            )
+        )
+    workflow = WorkflowSweepPlan(
+        metadata=WorkflowRunMetadata(
+            suite="model-evidence-remote",
+            execution_mode="remote",
+        ),
+        output_root=output_root,
+        execution_root=output_root,
+        lanes=tuple(lanes),
+    )
+    return RemoteWorkflowPlan(
+        workflow=workflow,
+        sync_command=sync_command,
+        launches=tuple(launches),
+    )
+
+
 def run_remote(args: argparse.Namespace) -> int:
     stamp = _stamp(args.stamp)
     remote_repo, repo_setup, remote_repo_candidates = _remote_repo(args.remote_repo)
@@ -477,6 +584,12 @@ def run_remote(args: argparse.Namespace) -> int:
         repo_setup=repo_setup,
         python_setup=python_setup,
     )
+    remote_workflow = build_remote_workflow_plan(
+        host=args.host,
+        stamp=stamp,
+        sync_command=sync_command,
+        launches=launches,
+    )
     payload = {
         "host": args.host,
         "branch": args.branch,
@@ -493,26 +606,24 @@ def run_remote(args: argparse.Namespace) -> int:
         "preset_overrides": args.preset_override,
         "sync_command": sync_command,
         "launches": [launch.to_payload() for launch in launches],
+        "workflow": remote_workflow.to_payload()["workflow"],
         "monitor": _monitor_commands(args.host, launches),
     }
     if args.dry_run:
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 0
 
-    if sync_command is not None:
-        sync_proc = subprocess.run(
-            ["ssh", args.host, sync_command],
+    results = execute_workflow_sweep(
+        WorkflowSweepExecutionRequest(
+            plan=remote_workflow.workflow,
             cwd=REPO_ROOT,
-            check=False,
-            text=True,
+            env=os.environ,
+            fail_fast=True,
         )
-        if sync_proc.returncode != 0:
-            return sync_proc.returncode
-
-    for launch in launches:
-        proc = subprocess.run(launch.ssh_command, cwd=REPO_ROOT, check=False, text=True)
-        if proc.returncode != 0:
-            return proc.returncode
+    )
+    exit_code = workflow_return_code(results)
+    if exit_code != 0:
+        return exit_code
 
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0

@@ -30,15 +30,17 @@ from evidence_workflows.workflow_plan import (
     WorkflowSweepPlan,
 )
 from evidence_workflows.workflow_runner import (
-    run_logged_command,
-    run_logged_command_with_retry,
+    WorkflowLaneExecutionRequest,
+    WorkflowSweepExecutionRequest,
+    execute_workflow_lane,
+    execute_workflow_sweep,
     workflow_return_code,
-    write_status_event,
 )
 from evidence_workflows.workflow_state import (
     WorkflowLaneResult as LaneResult,
 )
 from evidence_workflows.workflow_state import (
+    WorkflowLaneRunState,
     WorkflowRunMetadata,
     sha256_file,
     write_summary_files,
@@ -827,6 +829,7 @@ def build_lane_plan(
                 )
             ),
             output_path=verify_path,
+            requires_report=True,
         )
     )
     return WorkflowLanePlan(
@@ -834,6 +837,7 @@ def build_lane_plan(
         lane_id=spec.lane_id,
         model_id=spec.model_id,
         execution_mode=execution_mode,
+        preset=spec.preset_relpath,
         lane_root=lane_root,
         published_lane_root=published_lane_root,
         report_path=report_path,
@@ -930,6 +934,93 @@ def _classify_failure(
     return ("failed", None)
 
 
+def _lane_env_for_spec(spec: EvidenceLane, env: dict[str, str]) -> dict[str, str]:
+    lane_env = dict(env)
+    if lane_requires_remote_code(spec):
+        lane_env["INVARLOCK_ALLOW_REMOTE_CODE"] = "1"
+    return lane_env
+
+
+def _after_successful_model_step(
+    spec: EvidenceLane,
+    plan: WorkflowLanePlan,
+    step: WorkflowCommandStep,
+) -> None:
+    if step.name != "materialize_dataset":
+        return
+    write_prepared_preset(
+        spec,
+        lane_root=plan.lane_root,
+        execution_mode=plan.execution_mode,
+    )
+
+
+def _after_model_lane(
+    plan: WorkflowLanePlan,
+    *,
+    output_root: Path,
+    execution_root: Path,
+) -> None:
+    _publish_and_cleanup_lane_artifacts(
+        lane_root=plan.lane_root,
+        published_lane_root=plan.published_lane_root,
+        execution_root=execution_root,
+        output_root=output_root,
+    )
+
+
+def _model_lane_result_from_state(
+    plan: WorkflowLanePlan,
+    state: WorkflowLaneRunState,
+    log_path: Path,
+) -> LaneResult:
+    base = state.to_lane_result()
+    published_report_path = (
+        plan.published_lane_root / "report" / "evaluation.report.json"
+    )
+    published_verify_path = plan.published_lane_root / "verify.json"
+    failed_phase = next((phase for phase in state.phases if not phase.ok), None)
+
+    if failed_phase is None:
+        status, detail = _classify_failure(
+            log_path=log_path,
+            evaluate_exit=base.evaluate_exit,
+            verify_exit=base.verify_exit,
+            phase="evaluate",
+        )
+    elif failed_phase.name == "materialize_dataset":
+        status, detail = ("failed", "dataset_materialize_failed")
+    elif failed_phase.name == "verify" and failed_phase.detail == "report_missing":
+        status, detail = ("failed", "report_missing")
+    else:
+        phase_exit = (
+            base.evaluate_exit
+            if failed_phase.returncode is None
+            else int(failed_phase.returncode)
+        )
+        status, detail = _classify_failure(
+            log_path=log_path,
+            evaluate_exit=phase_exit,
+            verify_exit=base.verify_exit,
+            phase=failed_phase.name,
+        )
+
+    return LaneResult(
+        slug=plan.slug,
+        lane_id=plan.lane_id,
+        model_id=plan.model_id,
+        preset=plan.preset,
+        evaluate_exit=base.evaluate_exit,
+        verify_exit=base.verify_exit,
+        report_path=str(published_report_path),
+        verify_path=(
+            str(published_verify_path) if published_verify_path.is_file() else None
+        ),
+        status=status,
+        detail=detail,
+    )
+
+
 def run_lane(
     spec: EvidenceLane,
     *,
@@ -955,158 +1046,25 @@ def run_lane(
             env=env,
             preset_overrides=preset_overrides,
         )
-    lane_root = plan.lane_root
-    lane_root.mkdir(parents=True, exist_ok=True)
-    published_lane_root = plan.published_lane_root
     log_dir = output_root / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"{spec.slug}.log"
-    lane_env = dict(env)
-    if lane_requires_remote_code(spec):
-        lane_env["INVARLOCK_ALLOW_REMOTE_CODE"] = "1"
-
-    materialize_step = plan.optional_step("materialize_dataset")
-    if materialize_step is not None:
-        materialize_run = run_logged_command(
-            name=materialize_step.name,
-            command=materialize_step.command,
+    return execute_workflow_lane(
+        WorkflowLaneExecutionRequest(
+            plan=plan,
             cwd=REPO_ROOT,
-            env=lane_env,
+            env=_lane_env_for_spec(spec, env),
             log_path=log_path,
-            log_mode=materialize_step.log_mode,
-        )
-        if not materialize_run.ok:
-            _publish_and_cleanup_lane_artifacts(
-                lane_root=lane_root,
-                published_lane_root=published_lane_root,
-                execution_root=execution_root,
-                output_root=output_root,
-            )
-            published_report_path = (
-                published_lane_root / "report" / "evaluation.report.json"
-            )
-            published_verify_path = published_lane_root / "verify.json"
-            return LaneResult(
-                slug=spec.slug,
-                lane_id=spec.lane_id,
-                model_id=spec.model_id,
-                preset=spec.preset_relpath,
-                evaluate_exit=materialize_run.returncode,
-                verify_exit=None,
-                report_path=str(published_report_path),
-                verify_path=(
-                    str(published_verify_path)
-                    if published_verify_path.is_file()
-                    else None
-                ),
-                status="failed",
-                detail="dataset_materialize_failed",
-            )
-        write_prepared_preset(
-            spec,
-            lane_root=lane_root,
-            execution_mode=execution_mode,
-        )
-
-    prefetch_step = plan.optional_step("prefetch")
-    if prefetch_step is not None:
-        prefetch_run = run_logged_command(
-            name=prefetch_step.name,
-            command=prefetch_step.command,
-            cwd=REPO_ROOT,
-            env=lane_env,
-            log_path=log_path,
-            log_mode=prefetch_step.log_mode,
-        )
-        if not prefetch_run.ok:
-            status, detail = _classify_failure(
-                log_path=log_path,
-                evaluate_exit=prefetch_run.returncode,
-                verify_exit=None,
-                phase="prefetch",
-            )
-            _publish_and_cleanup_lane_artifacts(
-                lane_root=lane_root,
-                published_lane_root=published_lane_root,
-                execution_root=execution_root,
-                output_root=output_root,
-            )
-            published_report_path = (
-                published_lane_root / "report" / "evaluation.report.json"
-            )
-            published_verify_path = published_lane_root / "verify.json"
-            return LaneResult(
-                slug=spec.slug,
-                lane_id=spec.lane_id,
-                model_id=spec.model_id,
-                preset=spec.preset_relpath,
-                evaluate_exit=prefetch_run.returncode,
-                verify_exit=None,
-                report_path=str(published_report_path),
-                verify_path=(
-                    str(published_verify_path)
-                    if published_verify_path.is_file()
-                    else None
-                ),
-                status=status,
-                detail=detail,
-            )
-
-    evaluate_step = plan.evaluate_step
-    evaluate_run = run_logged_command_with_retry(
-        name=evaluate_step.name,
-        command=evaluate_step.command,
-        cwd=REPO_ROOT,
-        env=lane_env,
-        log_path=log_path,
-        log_mode=evaluate_step.log_mode,
-        retry_returncodes=evaluate_step.retry_returncodes,
-        retry_message=evaluate_step.retry_message,
-    )
-    eval_returncode = evaluate_run.returncode
-
-    verify_exit: int | None = None
-    if eval_returncode == 0 and plan.report_path.is_file():
-        verify_step = plan.verify_step
-        verify_run = run_logged_command(
-            name=verify_step.name,
-            command=verify_step.command,
-            cwd=REPO_ROOT,
-            env=lane_env,
-            log_path=log_path,
-            log_mode="a",
-            output_path=verify_step.output_path,
-        )
-        verify_exit = verify_run.returncode
-
-    _publish_and_cleanup_lane_artifacts(
-        lane_root=lane_root,
-        published_lane_root=published_lane_root,
-        execution_root=execution_root,
-        output_root=output_root,
-    )
-    published_report_path = published_lane_root / "report" / "evaluation.report.json"
-    published_verify_path = published_lane_root / "verify.json"
-    status, detail = _classify_failure(
-        log_path=log_path,
-        evaluate_exit=eval_returncode,
-        verify_exit=verify_exit,
-        phase="evaluate",
-    )
-
-    return LaneResult(
-        slug=spec.slug,
-        lane_id=spec.lane_id,
-        model_id=spec.model_id,
-        preset=spec.preset_relpath,
-        evaluate_exit=eval_returncode,
-        verify_exit=verify_exit,
-        report_path=str(published_report_path),
-        verify_path=(
-            str(published_verify_path) if published_verify_path.is_file() else None
         ),
-        status=status,
-        detail=detail,
+        after_successful_step=lambda lane_plan, step, _run: (
+            _after_successful_model_step(spec, lane_plan, step)
+        ),
+        after_lane=lambda lane_plan, _state: _after_model_lane(
+            lane_plan,
+            output_root=output_root,
+            execution_root=execution_root,
+        ),
+        lane_result=_model_lane_result_from_state,
     )
 
 
@@ -1168,50 +1126,30 @@ def run_sweep(args: argparse.Namespace) -> int:
         print(json.dumps(plan.to_dry_run_payload(), indent=2))
         return 0
 
-    status_log = output_root / "status.log"
-    results: list[LaneResult] = []
-    with status_log.open("w", encoding="utf-8") as handle:
-        write_status_event(handle, "START")
-        for spec, lane_plan in zip(specs, plan.lanes, strict=True):
-            preflight = lane_plan.resource_preflight
-            if preflight and preflight.get("warning"):
-                write_status_event(
-                    handle,
-                    "WARN",
-                    slug=spec.slug,
-                    fields={"resource_preflight": preflight["warning"]},
-                )
-            write_status_event(handle, "START", slug=spec.slug)
-            result = run_lane(
-                spec,
-                output_root=output_root,
-                execution_root=execution_root,
-                python_exe=args.python,
-                profile=args.profile,
-                device=args.device,
-                execution_mode=args.execution_mode,
-                env=env,
-                preset_overrides=preset_overrides,
-                plan=lane_plan,
-            )
-            results.append(result)
-            verify_repr = (
-                "NA" if result.verify_exit is None else str(result.verify_exit)
-            )
-            write_status_event(
-                handle,
-                "DONE",
-                slug=result.slug,
-                fields={
-                    "status": result.status,
-                    "detail": result.detail or "-",
-                    "eval": result.evaluate_exit,
-                    "verify": verify_repr,
-                },
-            )
-            if args.fail_fast and not result.ok:
-                break
-        write_status_event(handle, "ALL_TASKS_COMPLETE")
+    specs_by_slug = {spec.slug: spec for spec in specs}
+    results = execute_workflow_sweep(
+        WorkflowSweepExecutionRequest(
+            plan=plan,
+            cwd=REPO_ROOT,
+            env=env,
+            fail_fast=bool(args.fail_fast),
+            status_log_path=output_root / "status.log",
+            log_dir=output_root / "logs",
+        ),
+        lane_env=lambda lane_plan, base_env: _lane_env_for_spec(
+            specs_by_slug[lane_plan.slug],
+            dict(base_env),
+        ),
+        after_successful_step=lambda lane_plan, step, _run: (
+            _after_successful_model_step(specs_by_slug[lane_plan.slug], lane_plan, step)
+        ),
+        after_lane=lambda lane_plan, _state: _after_model_lane(
+            lane_plan,
+            output_root=output_root,
+            execution_root=execution_root,
+        ),
+        lane_result=_model_lane_result_from_state,
+    )
     write_summary(
         output_root,
         suite=args.suite,

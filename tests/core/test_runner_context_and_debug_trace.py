@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-import invarlock.core.runner as runner_mod
+import invarlock.core.runner_execution_plan as runner_exec_mod
 from invarlock.core.api import Guard, ModelAdapter, ModelEdit, RunConfig, RunReport
 from invarlock.core.runner import CoreRunner
 
@@ -94,7 +94,7 @@ def test_execute_falls_back_when_report_context_update_raises(monkeypatch) -> No
             super().__init__()
             self.context = _BadContext()
 
-    monkeypatch.setattr(runner_mod, "RunReport", _BadReport)
+    monkeypatch.setattr(runner_exec_mod, "RunReport", _BadReport)
 
     runner = CoreRunner()
     cfg = RunConfig(context={"run_id": "x"})

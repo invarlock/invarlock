@@ -15,8 +15,6 @@ from typing import Any
 from invarlock.eval.tail_stats import evaluate_metric_tail
 from invarlock.observability.metrics import (
     capture_memory_snapshot,
-    reset_peak_memory_stats,
-    summarize_memory_snapshots,
 )
 
 from .api import (
@@ -47,7 +45,7 @@ from .runner_guards import (
     resolve_guard_policies,
 )
 from .runner_pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
-from .types import LogLevel, RunStatus
+from .types import LogLevel
 
 __all__ = ["CoreRunner"]
 
@@ -385,156 +383,35 @@ class CoreRunner:
         final_n: int | None = None,
     ) -> RunReport:
         """Execute the full InvarLock pipeline."""
-        self._initialize_services(config)
-        self._active_model = model
-        self._active_adapter = adapter
-
-        report = initialize_run_report(
-            config=config,
-            serialized_config=self._serialize_config(config),
-            cuda_flags=collect_cuda_flags(),
-            auto_config=auto_config,
-            report_factory=RunReport,
+        from .runner_execution_plan import (
+            RunnerExecutionRequest,
+            execute_runner_execution_plan,
         )
 
-        report.status = RunStatus.RUNNING.value
-        timings: dict[str, float] = {}
-        guard_timings: dict[str, float] = {}
-        memory_snapshots: list[dict[str, Any]] = []
-        if edit_runtime is None:
-            edit_runtime = EditRuntime(
-                profile=_profile_from_context(config.context),
-                verbose=bool(config.verbose),
-            )
-        total_start = time.perf_counter()
-
-        try:
-            self._log_event(
-                "runner",
-                "start",
-                LogLevel.INFO,
-                {
-                    "edit": edit.name,
-                    "guards": [guard.name for guard in guards],
-                    "context": report.context,
-                },
-            )
-
-            reset_peak_memory_stats()
-            phase_start = time.perf_counter()
-            try:
-                model_desc = self._prepare_phase(model, adapter, report)
-            finally:
-                record_timing(timings, "prepare", phase_start)
-                capture_memory(
-                    memory_snapshots, "prepare", capture_fn=capture_memory_snapshot
-                )
-
-            reset_peak_memory_stats()
-            phase_start = time.perf_counter()
-            try:
-                self._prepare_guards_phase(
-                    model,
-                    adapter,
-                    guards,
-                    calibration_data,
-                    report,
-                    auto_config,
-                    config,
-                )
-            finally:
-                record_timing(timings, "prepare_guards", phase_start)
-                capture_memory(
-                    memory_snapshots,
-                    "prepare_guards",
-                    capture_fn=capture_memory_snapshot,
-                )
-
-            reset_peak_memory_stats()
-            phase_start = time.perf_counter()
-            try:
-                self._edit_phase(
-                    model,
-                    adapter,
-                    edit,
-                    model_desc,
-                    report,
-                    edit_config,
-                    edit_runtime,
-                )
-            finally:
-                record_timing(timings, "edit", phase_start)
-                capture_memory(
-                    memory_snapshots, "edit", capture_fn=capture_memory_snapshot
-                )
-
-            reset_peak_memory_stats()
-            phase_start = time.perf_counter()
-            try:
-                guard_results = self._guard_phase(
-                    model, adapter, guards, report, guard_timings=guard_timings
-                )
-            finally:
-                record_timing(timings, "guards", phase_start)
-                capture_memory(
-                    memory_snapshots, "guards", capture_fn=capture_memory_snapshot
-                )
-
-            reset_peak_memory_stats()
-            phase_start = time.perf_counter()
-            try:
-                metrics = self._eval_phase(
-                    model,
-                    adapter,
-                    calibration_data,
-                    report,
-                    preview_n,
-                    final_n,
-                    config,
-                )
-            finally:
-                record_timing(timings, "eval", phase_start)
-                capture_memory(
-                    memory_snapshots, "eval", capture_fn=capture_memory_snapshot
-                )
-
-            reset_peak_memory_stats()
-            phase_start = time.perf_counter()
-            try:
-                final_status = self._finalize_phase(
-                    model, adapter, guard_results, metrics, config, report
-                )
-            finally:
-                record_timing(timings, "finalize", phase_start)
-                capture_memory(
-                    memory_snapshots, "finalize", capture_fn=capture_memory_snapshot
-                )
-
-            finalize_run_report(report, final_status=final_status)
-            self._log_event(
-                "runner",
-                "complete",
-                LogLevel.INFO,
-                {"status": final_status, "duration": report.meta["duration"]},
-            )
-            return report
-        except _RUNNER_EXECUTION_ERRORS as error:
-            self._handle_error(error, report, model=model, adapter=adapter)
-            return report
-        finally:
-            record_timing(timings, "total", total_start)
-            merge_execution_metrics(
-                report,
-                timings=timings,
-                guard_timings=guard_timings,
-                memory_snapshots=memory_snapshots,
-                memory_summary=summarize_memory_snapshots(memory_snapshots)
-                if memory_snapshots
-                else {},
-            )
-            self._active_model = None
-            self._active_adapter = None
-            self._cleanup_services()
+        return execute_runner_execution_plan(
+            self,
+            RunnerExecutionRequest(
+                model=model,
+                adapter=adapter,
+                edit=edit,
+                guards=guards,
+                config=config,
+                calibration_data=calibration_data,
+                auto_config=auto_config,
+                edit_config=edit_config,
+                edit_runtime=edit_runtime,
+                preview_n=preview_n,
+                final_n=final_n,
+            ),
+            initialize_run_report_fn=initialize_run_report,
+            collect_cuda_flags_fn=collect_cuda_flags,
+            profile_from_context_fn=_profile_from_context,
+            record_timing_fn=record_timing,
+            capture_memory_fn=capture_memory,
+            finalize_run_report_fn=finalize_run_report,
+            merge_execution_metrics_fn=merge_execution_metrics,
+            runner_execution_errors=_RUNNER_EXECUTION_ERRORS,
+        )
 
     def _initialize_services(self, config: RunConfig) -> None:
         initialize_services(

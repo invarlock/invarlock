@@ -35,7 +35,7 @@ from . import report_provenance as report_provenance_mod
 from . import report_schema as report_schema_mod
 from .guards_rmt import _extract_rmt_analysis
 from .guards_variance import _extract_variance_analysis
-from .report_builder_support import EvaluationReportBuilder
+from .report_build_context import EvaluationReportBuilder
 from .report_types import RunReport
 
 POLICY_VERSION = report_provenance_mod.POLICY_VERSION

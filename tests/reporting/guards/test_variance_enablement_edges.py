@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import invarlock.reporting.guards_common as guards_common_mod
 import invarlock.reporting.verify_check_helpers_consistency as verify_helpers_mod
 
 
@@ -20,9 +21,9 @@ def _report(
 
 
 def test_baseline_guard_payload_edge_branches() -> None:
-    assert verify_helpers_mod._baseline_guard_payload(None, "variance") == {}  # noqa: SLF001
+    assert guards_common_mod._baseline_guard_payload(None, "variance") == {}  # noqa: SLF001
     assert (
-        verify_helpers_mod._baseline_guard_payload(  # noqa: SLF001
+        guards_common_mod._baseline_guard_payload(  # noqa: SLF001
             {
                 "guards": [
                     "not-a-guard",
@@ -34,7 +35,7 @@ def test_baseline_guard_payload_edge_branches() -> None:
         )
         == {}
     )
-    assert verify_helpers_mod._baseline_guard_payload(  # noqa: SLF001
+    assert guards_common_mod._baseline_guard_payload(  # noqa: SLF001
         {"guards": [{"name": "variance", "metrics": {"enabled": True}}]},
         "variance",
     ) == {"enabled": True}
@@ -44,7 +45,7 @@ def test_baseline_guard_payload_edge_branches() -> None:
             raise RuntimeError("broken")
 
     assert (
-        verify_helpers_mod._baseline_guard_payload(  # noqa: SLF001
+        guards_common_mod._baseline_guard_payload(  # noqa: SLF001
             BrokenBaseline(),
             "variance",
         )

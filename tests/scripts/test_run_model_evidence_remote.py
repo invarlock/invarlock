@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from tests.scripts._support_model_evidence_sweep import load_script_module
+
 
 def test_run_model_evidence_remote_dry_run_emits_tmux_launch_plan(
     tmp_path: Path,
@@ -85,6 +87,8 @@ def test_run_model_evidence_remote_dry_run_emits_tmux_launch_plan(
     assert "--shard-count 2" in payload["launches"][0]["remote_command"]
     assert payload["launches"][1]["session"] == "model-evidence-20260319T120000Z-g1"
     assert "tmux list-sessions" in " ".join(payload["monitor"]["tmux_list"])
+    assert [step["name"] for step in payload["workflow"][0]["steps"]] == ["sync"]
+    assert [step["name"] for step in payload["workflow"][1]["steps"]] == ["launch"]
 
 
 def test_run_model_evidence_remote_sync_handles_work_branch_names() -> None:
@@ -388,3 +392,54 @@ def test_run_model_evidence_remote_dry_run_respects_explicit_remote_repo() -> No
     assert (
         "/srv/invarlock-custom/.venv/bin/python" in payload["remote_python_candidates"]
     )
+
+
+def test_run_model_evidence_remote_executes_through_shared_workflow_runner(
+    monkeypatch,
+) -> None:
+    mod = load_script_module("run_model_evidence_remote")
+    calls: list[list[str]] = []
+
+    def fake_run(
+        cmd: list[str],
+        *,
+        cwd: Path,
+        env: dict[str, str],
+        stdout=None,
+        stderr=None,
+        text: bool,
+        check: bool,
+    ):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0)
+
+    from evidence_workflows import workflow_runner
+
+    monkeypatch.setattr(workflow_runner.subprocess, "run", fake_run)
+    args = mod._parse_args(
+        [
+            "--host",
+            "root@example.test",
+            "--gpus",
+            "0,1",
+            "--stamp",
+            "20260319T120000Z",
+            "--remote-output-root",
+            "/root/evidence",
+        ]
+    )
+
+    assert mod.run_remote(args) == 0
+    assert calls[0][:2] == ["ssh", "root@example.test"]
+    assert "sync_packaged_contracts.py --check" in calls[0][2]
+    assert calls[1][:2] == ["ssh", "root@example.test"]
+    assert "tmux new-session" in calls[1][2]
+    assert calls[2][:2] == ["ssh", "root@example.test"]
+    status_log = (
+        mod.REPO_ROOT
+        / "tmp"
+        / "model_evidence_remote_launches"
+        / "20260319T120000Z"
+        / "status.log"
+    )
+    assert "START remote-sync" in status_log.read_text(encoding="utf-8")

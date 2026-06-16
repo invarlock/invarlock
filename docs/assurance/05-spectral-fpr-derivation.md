@@ -112,13 +112,17 @@ summary.
 ## Observability
 
 - `spectral.summary.{sigma_quantile,deadband,modules_checked,max_caps,caps_exceeded}`
-- `spectral.family_caps[*].kappa` and `spectral.families[*].{kappa,violations}`
+- `spectral.family_caps[*].kappa` and per-family cap counters in
+  `spectral.families[*]` (`violations` is the raw counter key for modules whose
+  z-score crossed the family cap)
 - `spectral.multiple_testing.{method,alpha,m}` and `spectral.max_caps`
 
 ### Worked example (Balanced tier)
 
 - For FFN modules, `family_caps.ffn.kappa = 3.849`. Suppose a layer reports $z = 3.90$.
-- report records a WARN in `spectral.families.ffn.violations += 1`; `spectral.caps_applied` increments.
+- report records a WARN, increments the raw
+  `spectral.families[*].violations` cap counter for the affected family, and
+  increments `spectral.caps_applied`.
 - Balanced `max_caps = 5`. After the fifth WARN the guard continues to WARN;
   the sixth triggers `spectral.caps_exceeded=true` and the run aborts.
 - Multiple-testing metadata shows `spectral.multiple_testing = {method: "bh",

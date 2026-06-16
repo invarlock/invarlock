@@ -6,7 +6,6 @@ import importlib.util
 import sys
 
 from invarlock.reporting.render import render_report_markdown
-
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_schema import REPORT_SCHEMA_VERSION, validate_report
 
