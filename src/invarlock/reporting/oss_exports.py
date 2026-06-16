@@ -230,7 +230,7 @@ def _verify_result_item(
             "Verify result does not contain an item for evaluation report "
             f"{resolved}. Found item id(s): {preview}{suffix}"
         )
-    return None
+    return None  # pragma: no cover - all result shapes exit via match/mismatch/idless paths.
 
 
 def _verifier_fields(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 import hashlib
 import json
 from pathlib import Path
@@ -7,6 +8,8 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from invarlock.cli.app import app as cli
+from invarlock.cli.commands import report_export as report_export_command
+from invarlock.reporting import oss_exports
 
 
 def _evaluation_report_payload() -> dict[str, object]:
@@ -140,6 +143,53 @@ def test_report_export_accepts_canonical_report_directory(tmp_path: Path) -> Non
     assert exported["tags"]["invarlock.verifier_status"] == "pass"
 
 
+def test_report_export_rejects_missing_evaluation_report(tmp_path: Path) -> None:
+    result = CliRunner().invoke(
+        cli,
+        [
+            "report",
+            "export",
+            "-i",
+            str(tmp_path / "missing.report.json"),
+            "--format",
+            "mlflow-tags",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "FAIL" in result.stdout
+
+
+def test_report_export_handles_exporter_import_error(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    report = _write_evaluation_report(tmp_path, _evaluation_report_payload())
+    real_import = builtins.__import__
+
+    def fail_oss_exports_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "invarlock.reporting.oss_exports":
+            raise ImportError("exporter unavailable")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fail_oss_exports_import)
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "report",
+            "export",
+            "-i",
+            str(report),
+            "--format",
+            "mlflow-tags",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Failed to load report exporter" in result.stdout
+
+
 def test_report_export_release_review_refuses_overwrite(tmp_path: Path) -> None:
     report = _write_evaluation_report(tmp_path, _evaluation_report_payload())
     output = tmp_path / "release-review.md"
@@ -235,6 +285,52 @@ def test_report_export_uses_verify_result_status(tmp_path: Path) -> None:
     assert tags["invarlock.runtime_provenance_status"] == "failed"
 
 
+def test_report_export_rejects_unreadable_verify_result(tmp_path: Path) -> None:
+    report = _write_evaluation_report(tmp_path, _evaluation_report_payload())
+    verify_result = tmp_path / "verify.json"
+    verify_result.write_text("{", encoding="utf-8")
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "report",
+            "export",
+            "-i",
+            str(report),
+            "--format",
+            "mlflow-tags",
+            "--verify-result",
+            str(verify_result),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "Failed to read verify result" in result.stdout
+
+
+def test_report_export_rejects_non_object_verify_result(tmp_path: Path) -> None:
+    report = _write_evaluation_report(tmp_path, _evaluation_report_payload())
+    verify_result = tmp_path / "verify.json"
+    verify_result.write_text("[]", encoding="utf-8")
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "report",
+            "export",
+            "-i",
+            str(report),
+            "--format",
+            "mlflow-tags",
+            "--verify-result",
+            str(verify_result),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "Verify result must decode to a JSON object" in result.stdout
+
+
 def test_report_export_rejects_stale_verify_result(tmp_path: Path) -> None:
     report = _write_evaluation_report(tmp_path, _evaluation_report_payload())
     other_report = tmp_path / "other-evaluation.report.json"
@@ -314,6 +410,56 @@ def test_report_export_rejects_idless_verify_result(tmp_path: Path) -> None:
     assert not output.exists()
 
 
+def test_report_export_handles_render_error(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    report = _write_evaluation_report(tmp_path, _evaluation_report_payload())
+
+    def fail_render(*args, **kwargs):
+        raise RuntimeError("render boom")
+
+    monkeypatch.setattr(oss_exports, "render_report_export", fail_render)
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "report",
+            "export",
+            "-i",
+            str(report),
+            "--format",
+            "mlflow-tags",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Failed to export report: render boom" in result.stdout
+
+
+def test_report_export_handles_output_write_error(tmp_path: Path) -> None:
+    report = _write_evaluation_report(tmp_path, _evaluation_report_payload())
+    output_parent = tmp_path / "not-a-dir"
+    output_parent.write_text("blocker", encoding="utf-8")
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "report",
+            "export",
+            "-i",
+            str(report),
+            "--format",
+            "mlflow-tags",
+            "--output",
+            str(output_parent / "mlflow-tags.json"),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Failed to write export file" in result.stdout
+
+
 def test_report_export_rejects_unknown_format(tmp_path: Path) -> None:
     report = _write_evaluation_report(tmp_path, _evaluation_report_payload())
 
@@ -331,3 +477,64 @@ def test_report_export_rejects_unknown_format(tmp_path: Path) -> None:
 
     assert result.exit_code == 2
     assert "Unsupported export format" in result.stdout
+
+
+def test_export_report_command_registers_export_subcommand(monkeypatch) -> None:
+    class FakeReportApp:
+        def __init__(self) -> None:
+            self.registered = []
+
+        def command(self, name: str, **kwargs):
+            def decorator(func):
+                self.registered.append((name, kwargs, func))
+                return func
+
+            return decorator
+
+    fake_app = FakeReportApp()
+    calls = []
+
+    def fake_export_report_command(**kwargs):
+        calls.append(kwargs)
+
+    monkeypatch.setattr(
+        report_export_command,
+        "export_report_command",
+        fake_export_report_command,
+    )
+
+    report_export_command.register_report_export_command(fake_app)
+
+    assert len(fake_app.registered) == 1
+    name, kwargs, registered = fake_app.registered[0]
+    assert name == "export"
+    assert kwargs == {
+        "help": (
+            "Export evaluation evidence for MLflow tags, model cards, "
+            "or release review."
+        )
+    }
+
+    registered(
+        evaluation_report="evaluation.report.json",
+        format="mlflow-tags",
+        output="-",
+        policy_profile="ci",
+        report_url="https://example.test/report.json",
+        evidence_url="https://example.test/evidence.zip",
+        verify_result="verify.json",
+        force=True,
+    )
+
+    assert calls == [
+        {
+            "evaluation_report": "evaluation.report.json",
+            "format": "mlflow-tags",
+            "output": "-",
+            "policy_profile": "ci",
+            "report_url": "https://example.test/report.json",
+            "evidence_url": "https://example.test/evidence.zip",
+            "verify_result": "verify.json",
+            "force": True,
+        }
+    ]

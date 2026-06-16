@@ -130,6 +130,24 @@ def test_verify_result_rejects_single_idless_result(tmp_path: Path) -> None:
         )
 
 
+def test_verify_result_rejects_non_object_result_item(tmp_path: Path) -> None:
+    report = _passing_report()
+    report_path = _write_report(tmp_path, report)
+    verify_result = {
+        "format_version": "verify-v1",
+        "summary": {"ok": False, "reason": "policy_fail"},
+        "results": ["not-an-object"],
+    }
+
+    with pytest.raises(VerifyResultMismatchError, match="must include an id"):
+        build_report_export_context(
+            report_path,
+            report,
+            policy_profile="ci",
+            verify_result=verify_result,
+        )
+
+
 def test_verify_result_rejects_missing_results(tmp_path: Path) -> None:
     report = _passing_report()
     report_path = _write_report(tmp_path, report)
@@ -201,6 +219,50 @@ def test_mlflow_export_includes_registry_search_tags(tmp_path: Path) -> None:
     assert tags["invarlock.evidence_url"] == "https://example.test/evidence.zip"
 
 
+def test_mlflow_export_formats_optional_policy_and_metric_fields(
+    tmp_path: Path,
+) -> None:
+    report = _passing_report()
+    report["policy_provenance"] = {"policy_digest": "sha256:policy"}
+    report["primary_metric"] = {
+        "kind": "accuracy",
+        "preview": True,
+        "final": float("inf"),
+    }
+    report_path = _write_report(tmp_path, report)
+
+    context = build_report_export_context(report_path, report)
+    tags = render_mlflow_tags_export(context)["tags"]
+
+    assert context.primary_metric == "accuracy preview=true final=inf"
+    assert tags["invarlock.policy_digest"] == "sha256:policy"
+    assert tags["invarlock.primary_metric_final"] == "inf"
+
+
+def test_mlflow_export_formats_text_metric_values(tmp_path: Path) -> None:
+    report = _passing_report()
+    report["primary_metric"] = {
+        "kind": "accuracy",
+        "final": "n/a",
+    }
+    report_path = _write_report(tmp_path, report)
+
+    context = build_report_export_context(report_path, report)
+
+    assert context.primary_metric == "accuracy final=n/a"
+    assert context.primary_metric_final == "n/a"
+
+
+def test_context_handles_missing_primary_metric(tmp_path: Path) -> None:
+    report = _passing_report()
+    report.pop("primary_metric")
+    report_path = _write_report(tmp_path, report)
+
+    context = build_report_export_context(report_path, report)
+
+    assert context.primary_metric == "unknown"
+
+
 def test_release_review_counts_only_report_local_gate_failures(
     tmp_path: Path,
 ) -> None:
@@ -225,6 +287,17 @@ def test_release_review_counts_only_report_local_gate_failures(
     assert "`guard_warnings_present`" not in markdown
     assert "`hysteresis_applied`" not in markdown
     assert "`moe_observed`" not in markdown
+
+
+def test_release_review_handles_missing_validation_block(tmp_path: Path) -> None:
+    report = _passing_report()
+    report.pop("validation")
+    report_path = _write_report(tmp_path, report)
+
+    context = build_report_export_context(report_path, report)
+    markdown = render_release_review_packet(context, report)
+
+    assert "- [ ] No validation gates were present in the report." in markdown
 
 
 def test_model_card_markdown_escapes_table_cells(tmp_path: Path) -> None:
