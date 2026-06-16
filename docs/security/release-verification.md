@@ -15,8 +15,9 @@ For a tagged release, treat these surfaces as authoritative:
 
 The release workflow validates release tags before publishing, resolves the
 requested tag to a resolved commit SHA, rebuilds from that commit, generates an
-SBOM from the installed release surface, records gitleaks output, and publishes
-the distributions through trusted publishing.
+SBOM from the installed release surface, records gitleaks output for the release
+delta, and publishes the distributions through trusted publishing. A separate
+scheduled workflow runs the slower full-history gitleaks scan.
 
 ## Recommended verification flow
 
