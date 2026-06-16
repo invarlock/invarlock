@@ -6,9 +6,10 @@ useDefault = true
 [[allowlists]]
 description = "Tokenizer digest fields in published evidence reports are hashes, not secrets."
 condition = "AND"
+regexTarget = "match"
 paths = [
   '''public_evidence/published_basis/.*/(?:evaluation\.report\.json|evidence_pack/reports/report-[0-9]+/evaluation\.report\.json)$''',
 ]
 regexes = [
-  '''"tokenizer_(?:hash|sha256)"\s*:\s*"[0-9A-Fa-f]{32,128}"''',
+  '''tokenizer_(?:hash|sha256)"\s*:\s*"[0-9A-Fa-f]{32,128}"''',
 ]
