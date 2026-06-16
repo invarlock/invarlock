@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# task_functions.sh - Compatibility facade and task dispatcher
+# task_functions.sh - Task module aggregator and dispatcher
 # Version: evidence-packs-v1 (InvarLock Evidence Pack Suite)
 # Dependencies: jq, python3, invarlock CLI, task_serialization.sh
 # Usage: sourced by gpu_worker.sh/validation_suite.sh for per-task execution

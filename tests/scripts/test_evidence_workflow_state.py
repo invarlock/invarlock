@@ -41,7 +41,7 @@ def test_workflow_lane_run_state_rolls_up_phase_results() -> None:
     assert state.to_summary_entry()["phases"][-1]["ok"] is False
 
 
-def test_workflow_lane_run_state_preserves_skip_as_legacy_ok_result() -> None:
+def test_workflow_lane_run_state_preserves_skip_as_success_result() -> None:
     state = WorkflowLaneRunState(
         slug="lane",
         lane_id="lane-id",
@@ -77,6 +77,49 @@ def test_workflow_lane_result_marks_skipped_as_ok() -> None:
 
     assert result.ok is True
     assert result.to_summary_entry()["ok"] is True
+
+
+def test_workflow_lane_run_state_handles_empty_and_nonzero_fallback() -> None:
+    empty = WorkflowLaneRunState(
+        slug="empty",
+        lane_id="lane-id",
+        model_id="org/model",
+        preset="configs/preset.yaml",
+        report_path="report.json",
+        verify_path=None,
+        phases=(),
+    )
+    assert empty.status == "failed"
+    assert empty.to_lane_result().evaluate_exit == 0
+
+    state = WorkflowLaneRunState(
+        slug="lane",
+        lane_id="lane-id",
+        model_id="org/model",
+        preset="configs/preset.yaml",
+        report_path="report.json",
+        verify_path=None,
+        phases=(
+            WorkflowPhaseResult("prefetch", None, "ok"),
+            WorkflowPhaseResult("materialize_dataset", 0, "ok"),
+            WorkflowPhaseResult("evaluate", 5, "failed"),
+        ),
+    )
+    assert state.to_lane_result().evaluate_exit == 5
+
+    zero_fallback = WorkflowLaneRunState(
+        slug="lane",
+        lane_id="lane-id",
+        model_id="org/model",
+        preset="configs/preset.yaml",
+        report_path="report.json",
+        verify_path=None,
+        phases=(
+            WorkflowPhaseResult("prefetch", None, "ok"),
+            WorkflowPhaseResult("materialize_dataset", 0, "ok"),
+        ),
+    )
+    assert zero_fallback.to_lane_result().evaluate_exit == 0
 
 
 def test_workflow_summary_and_artifact_manifest_are_deterministic(

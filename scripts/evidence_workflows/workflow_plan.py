@@ -20,6 +20,7 @@ class WorkflowCommandStep:
     output_path: Path | None = None
     retry_returncodes: tuple[int, ...] = ()
     retry_message: str | None = None
+    requires_report: bool = False
 
     def to_payload(self) -> dict[str, object]:
         payload: dict[str, object] = {
@@ -32,6 +33,8 @@ class WorkflowCommandStep:
             payload["retry_returncodes"] = list(self.retry_returncodes)
         if self.retry_message:
             payload["retry_message"] = self.retry_message
+        if self.requires_report:
+            payload["requires_report"] = True
         return payload
 
 
@@ -43,6 +46,7 @@ class WorkflowLanePlan:
     lane_id: str
     model_id: str
     execution_mode: str
+    preset: str
     lane_root: Path
     published_lane_root: Path
     report_path: Path
@@ -78,14 +82,19 @@ class WorkflowLanePlan:
             "lane_id": self.lane_id,
             "model_id": self.model_id,
             "execution_mode": self.execution_mode,
+            "preset": self.preset,
             "profile": self.profile,
             "resource_preflight": (
                 dict(self.resource_preflight) if self.resource_preflight else None
             ),
             "steps": [step.to_payload() for step in self.steps],
-            "evaluate": list(self.evaluate_step.command),
-            "verify": list(self.verify_step.command),
         }
+        evaluate = self.optional_step("evaluate")
+        if evaluate is not None:
+            payload["evaluate"] = list(evaluate.command)
+        verify = self.optional_step("verify")
+        if verify is not None:
+            payload["verify"] = list(verify.command)
         prefetch = self.optional_step("prefetch")
         if prefetch is not None:
             payload["prefetch"] = list(prefetch.command)
