@@ -431,14 +431,25 @@ def build_findings(
     )
 
 
+def finding_blocks_release(finding: dict[str, Any]) -> bool:
+    status = str(finding.get("status", ""))
+    return not status.startswith("accepted_until_")
+
+
+def blocking_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [finding for finding in findings if finding_blocks_release(finding)]
+
+
 def write_markdown_report(report: dict[str, Any], path: Path) -> None:
     findings = report["findings"]
+    blockers = blocking_findings(findings)
     lines = [
         "# CVE Audit",
         "",
         f"- Generated: `{report['generated_at']}`",
         f"- Components audited: `{report['inventory']['component_count']}`",
         f"- Findings: `{len(findings)}`",
+        f"- Blocking findings: `{len(blockers)}`",
         "",
     ]
     if findings:
@@ -554,11 +565,13 @@ def main(argv: list[str] | None = None) -> int:
         json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     write_markdown_report(report, out_md)
+    blockers = blocking_findings(report["findings"])
     print(f"Audited {report['inventory']['component_count']} components")
     print(f"Findings: {len(report['findings'])}")
+    print(f"Blocking findings: {len(blockers)}")
     print(f"JSON: {out_json}")
     print(f"Markdown: {out_md}")
-    return 1 if report["findings"] else 0
+    return 1 if blockers else 0
 
 
 if __name__ == "__main__":

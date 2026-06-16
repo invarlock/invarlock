@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.11.0] - 2026-06-16
+
+### Added
+
 - Added restrained InvarLock branding and version metadata to human-readable
   Markdown/HTML reports and evidence-pack verdict summaries while keeping JSON
   reports, manifests, and signed metadata machine-stable.
