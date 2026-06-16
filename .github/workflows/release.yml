@@ -97,6 +97,7 @@ jobs:
   build_check:
     needs: resolve_release_ref
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: read
     steps:
@@ -109,31 +110,62 @@ jobs:
           python-version: '3.13'
       - name: Install build tooling
         run: python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt
+      - name: Cache gitleaks binary
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        with:
+          path: ~/go/bin/gitleaks
+          key: gitleaks-v8.30.0-${{ runner.os }}-${{ runner.arch }}
       - name: Install gitleaks
         run: |
-          go install github.com/zricethezav/gitleaks/v8@v8.30.0
+          gitleaks_bin="$(go env GOPATH)/bin/gitleaks"
+          if [ ! -x "${gitleaks_bin}" ]; then
+            go install github.com/zricethezav/gitleaks/v8@v8.30.0
+          fi
+          "${gitleaks_bin}" version
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-      - name: Run gitleaks history scan
+      - name: Resolve gitleaks release range
+        id: gitleaks_range
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_sha="${{ needs.resolve_release_ref.outputs.release_sha }}"
+          git fetch --force --tags origin "refs/tags/v*:refs/tags/v*"
+          previous_tag="$(git describe --tags --match 'v[0-9]*' --abbrev=0 "${release_sha}^" 2>/dev/null || true)"
+          echo "previous_tag=${previous_tag}" >> "$GITHUB_OUTPUT"
+          if [ -n "${previous_tag}" ]; then
+            echo "log_opts=${previous_tag}..${release_sha}" >> "$GITHUB_OUTPUT"
+          else
+            echo "log_opts=" >> "$GITHUB_OUTPUT"
+            echo "No previous release tag found; scanning full reachable history."
+          fi
+      - name: Run gitleaks release delta scan
         id: gitleaks_scan
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p artifacts/supply-chain
-          set +e
-          gitleaks git . \
-            --config .gitleaks.toml \
-            --redact \
-            --no-banner \
-            --report-format json \
+          log_opts="${{ steps.gitleaks_range.outputs.log_opts }}"
+          cmd=(
+            gitleaks git .
+            --config .gitleaks.toml
+            --redact
+            --no-banner
+            --report-format json
             --report-path artifacts/supply-chain/gitleaks.json
+          )
+          if [ -n "${log_opts}" ]; then
+            echo "Scanning release commit range: ${log_opts}"
+            cmd+=(--log-opts "${log_opts}")
+          else
+            echo "Scanning full reachable release history."
+          fi
+          set +e
+          "${cmd[@]}"
           exit_code=$?
-          gitleaks git . \
-            --config .gitleaks.toml \
-            --redact \
-            --no-banner \
-            --report-format sarif \
-            --report-path artifacts/supply-chain/gitleaks.sarif
           set -e
+          if [ ! -s artifacts/supply-chain/gitleaks.json ]; then
+            printf '[]\n' > artifacts/supply-chain/gitleaks.json
+          fi
           echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
       - name: Build wheel/sdist
         run: |
@@ -204,16 +236,19 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-gitleaks
-          path: |
-            artifacts/supply-chain/gitleaks.json
-            artifacts/supply-chain/gitleaks.sarif
+          path: artifacts/supply-chain/gitleaks.json
           if-no-files-found: error
           retention-days: 3
       - name: Fail on secret findings
         if: always()
         shell: bash
         run: |
-          if [ "${{ steps.gitleaks_scan.outputs.exit_code }}" != "0" ]; then
+          exit_code="${{ steps.gitleaks_scan.outputs.exit_code }}"
+          if [ -z "${exit_code}" ]; then
+            echo "gitleaks scan did not publish an exit code" >&2
+            exit 1
+          fi
+          if [ "${exit_code}" != "0" ]; then
             echo "gitleaks detected secrets; see uploaded artifact for details" >&2
             exit 1
           fi
@@ -221,6 +256,7 @@ jobs:
   publish:
     needs: [build_check, resolve_release_ref]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment: ${{ github.event_name == 'push' && 'pypi' || inputs.target }}
     permissions:
       contents: read
@@ -288,6 +324,7 @@ jobs:
     if: >-
       ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true && inputs.target == 'testpypi' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
