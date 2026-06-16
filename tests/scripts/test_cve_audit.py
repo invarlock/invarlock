@@ -112,6 +112,19 @@ def test_findings_include_all_matched_advisories_and_allowlist_classified() -> N
     assert len(findings) == 1
     assert findings[0]["status"] == "accepted_until_2026-06-01"
     assert findings[0]["fixed_versions"] == ["2.7.0"]
+    assert module.blocking_findings(findings) == []
+
+
+def test_blocking_findings_excludes_only_current_acceptances() -> None:
+    module = _load_script_module()
+    accepted = {"status": "accepted_until_2026-07-13", "component": "torch"}
+    expired = {"status": "unpatched_allowlist_expired", "component": "torch"}
+    unpatched = {"status": "unpatched", "component": "urllib3"}
+
+    assert module.blocking_findings([accepted, expired, unpatched]) == [
+        expired,
+        unpatched,
+    ]
 
 
 def test_load_allowlist_uses_strict_pip_audit_policy(tmp_path: Path) -> None:
