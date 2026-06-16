@@ -1,0 +1,3272 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Official documentation for the InvarLock toolkit">
+      
+      
+      
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/assurance/04-guard-contracts/">
+      
+      
+        <link rel="prev" href="../03-bca-bootstrap/">
+      
+      
+        <link rel="next" href="../05-spectral-fpr-derivation/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Guard Contracts & Primer - InvarLock Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#guard-contracts-statistical-primer" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            InvarLock Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Guard Contracts & Primer
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/getting-started/" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/cli/" class="md-tabs__link">
+          
+  
+  
+  CLI Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../00-assurance-case/" class="md-tabs__link">
+          
+  
+  
+  Assurance
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../security/best-practices/" class="md-tabs__link">
+          
+  
+  
+  Security
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    InvarLock Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/primary-metric-smoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Primary Metric Smoke
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/compare-and-evaluate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/live-examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/bring-your-own-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bring Your Own Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/plugins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/config-gallery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Gallery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/example-reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/failure-examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Failure Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/reading-report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading a Report
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/evidence-packs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence Packs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/evidence-packs-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence Pack Internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    CLI Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/one-run-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    One Run Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/programmatic-quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Programmatic Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/guards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/report-outline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Outline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/model-adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/model-family-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Family Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/config-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/tier-policy-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tier Policy Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifact Layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/calibration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/alternatives-comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternatives Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Assurance
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../00-assurance-case/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance Case
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14-trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15-strict-assurance-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strict Assurance Checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-eval-math-derivation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Math Derivation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-coverage-and-pairing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coverage & Pairing Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-bca-bootstrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BCa Bootstrap (Paired Δlog)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Contracts & Primer
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Contracts & Primer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-guard-contracts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Guard Contracts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Guard Contracts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invariants-what-is-checked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invariants: what is checked
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#catastrophic-limits-and-aborts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Catastrophic limits and aborts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invariants-coverage-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invariants coverage checklist
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quality-gates-acceptance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quality Gates (Acceptance)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-statistical-method-primer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Statistical Method Primer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calibration-evaluation-slice-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calibration Evaluation Slice Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-reproducibility-kit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Reproducibility Kit
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-device-tolerance-guidance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Device Tolerance Guidance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-threshold-rationale-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Threshold Rationale (Defaults)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-scope-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Scope Boundaries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-coverage-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Coverage Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-spectral-fpr-derivation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral False-Positive Control
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-rmt-epsilon-rule/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RMT ε-Rule
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-ve-gate-power/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VE Predictive Gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-determinism-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Determinism Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09-tier-v1-calibration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tier Policy v1 Calibration (Pilot)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10-guard-overhead-method/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Overhead Method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11-policy-provenance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy Provenance & Digest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12-device-drift-bands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Device Drift Bands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13-gpu-mps-first-guards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GPU/MPS-First Guard Measurement Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16-guard-validation-smoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Validation Smoke
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17-empirical-guard-evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Empirical Guard Evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best Practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/release-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threat Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/runtime-provenance-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Provenance Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/pip-audit-allowlist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pip Audit Allowlist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-guard-contracts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Guard Contracts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Guard Contracts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invariants-what-is-checked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invariants: what is checked
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#catastrophic-limits-and-aborts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Catastrophic limits and aborts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invariants-coverage-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invariants coverage checklist
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quality-gates-acceptance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quality Gates (Acceptance)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-statistical-method-primer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Statistical Method Primer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calibration-evaluation-slice-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calibration Evaluation Slice Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-reproducibility-kit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Reproducibility Kit
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-device-tolerance-guidance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Device Tolerance Guidance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-threshold-rationale-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Threshold Rationale (Defaults)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-scope-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Scope Boundaries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-coverage-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Coverage Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="guard-contracts-statistical-primer">Guard Contracts &amp; Statistical Primer<a class="headerlink" href="#guard-contracts-statistical-primer" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>Plain language:</strong> This handbook explains what each guard checks, the
+thresholds we enforce, and how those decisions appear in the report so
+reviewers can trace every PASS or FAIL.</p>
+</blockquote>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Purpose</strong></td>
+<td>Consolidate guard contracts, statistical assumptions, thresholds, and report evidence fields.</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>Guard maintainers, release reviewers, and contributors changing guard policy or reporting.</td>
+</tr>
+<tr>
+<td><strong>Contract scope</strong></td>
+<td>Invariants, Spectral, RMT, Variance, bootstrap sanity, calibration expectations, and report observability.</td>
+</tr>
+<tr>
+<td><strong>Source of truth</strong></td>
+<td>Guard modules under <code>src/invarlock/guards/</code>, report guard renderers, packaged tiers, and assurance-contract tests.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Contents:</strong></p>
+<ul>
+<li><a href="#1-guard-contracts">1. Guard Contracts</a> — what each guard checks and how it fails</li>
+<li><a href="#2-statistical-method-primer">2. Statistical Method Primer</a> — paired Δlog perplexity and bootstrap CIs</li>
+<li><a href="#calibration-evaluation-slice-requirements">3. Calibration &amp; Evaluation Slice Requirements</a> — acceptance criteria for evaluation schedules</li>
+<li><a href="#4-reproducibility-kit">4. Reproducibility Kit</a> — how to reproduce a report</li>
+<li><a href="#5-device-tolerance-guidance">5. Device Tolerance Guidance</a> — expected drift across backends</li>
+<li><a href="#6-threshold-rationale-defaults">6. Threshold Rationale (Defaults)</a> — why the defaults are what they are</li>
+<li><a href="#7-scope-boundaries">7. Scope Boundaries</a> — where the guard contract applies</li>
+<li><a href="#8-coverage-reference">8. Coverage Reference</a> — tests that underpin this handbook</li>
+</ul>
+<p>This handbook captures the evidence claims that underpin InvarLock's guard
+pipeline. It consolidates the guard contracts, statistical assumptions, and
+calibration data that accompany the InvarLock assurance notes.</p>
+<h2 id="1-guard-contracts">1. Guard Contracts<a class="headerlink" href="#1-guard-contracts" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Guard</th>
+<th>Inputs</th>
+<th>Check &amp; Threshold</th>
+<th>Failure behavior</th>
+<th>Code reference</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Invariants</strong></td>
+<td>Model weights, adapter metadata</td>
+<td>Fatal invariants (non-finite scan, tokenizer alignment) plus structural checks (weight tying, embedding dims, layer norms)</td>
+<td>Fatal invariant types block before evaluation; structural drift warns in monitor mode unless strict/block policy is configured</td>
+<td><code>invarlock.guards.invariants</code></td>
+</tr>
+<tr>
+<td><strong>Spectral</strong></td>
+<td>2‑D layer weights (FFN, attention proj, embeddings)</td>
+<td>Compute the spectral z-score under the fixed measurement contract; pass while <code>abs(z) ≤ κ_f</code> under the published family caps. Gaussian-tail FPR applies to calibrated high-kappa families; low sentinel caps are operational thresholds. Optional degeneracy proxies (stable-rank drift, norm collapse) may add WARN/ABORT depending on policy.</td>
+<td>WARN when <code>abs(z) &gt; κ_f</code>; abort if the cap budget would exceed <code>max_caps</code> (and for configured fatal degeneracy thresholds).</td>
+<td><code>invarlock.guards.spectral</code></td>
+</tr>
+<tr>
+<td><strong>RMT</strong></td>
+<td>Token‑weighted activations (sampled)</td>
+<td>Compute a per‑module edge risk score on whitened activations under a fixed measurement contract; accept when baseline-relative growth stays within the calibrated ε-band per family.</td>
+<td>report fails on ε‑band violations; catastrophic spikes in the primary metric are gated separately (<code>spike_threshold</code> = 2.0× for ppl‑like metrics).</td>
+<td><code>invarlock.guards.rmt</code></td>
+</tr>
+<tr>
+<td><strong>Variance (VE)</strong></td>
+<td>Paired ΔlogNLL with calibration windows</td>
+<td>Enable VE only if the predictive CI upper bound ≤ −<code>min_effect_lognll</code> <strong>and</strong> mean Δ ≤ −<code>min_effect_lognll</code> (Balanced uses one‑sided CI; Conservative uses two‑sided CI). A CI entirely above +<code>min_effect_lognll</code> is treated as regression and VE stays off.</td>
+<td>VE disabled, guard records reason; edit continues</td>
+<td><code>invarlock.guards.variance</code></td>
+</tr>
+<tr>
+<td><strong>Bootstrap sanity</strong></td>
+<td>Evaluation windows, token counts</td>
+<td>Matching window IDs, zero overlap; BCa replicates ≥ selected tier floor</td>
+<td>Abort or fail verification and surface reason</td>
+<td><code>invarlock.reporting.report_make</code></td>
+</tr>
+</tbody>
+</table>
+<p>Reports record a report-level policy digest plus guard metrics. Spectral and RMT
+carry explicit measurement-contract evidence, and variance may include a
+variance-policy digest; these fields are mirrored under <code>resolved_policy.*</code> and
+the <code>spectral</code>/<code>rmt</code>/<code>variance</code> blocks.</p>
+<p>For the two guard formulas that are easiest to misread in a table:</p>
+<div class="arithmatex">\[
+z = \frac{\hat{s} - \mu_f}{\sigma_f}
+\]</div>
+<p>where <span class="arithmatex">\(\hat{s}\)</span> is an iterative estimate of the largest singular value under the
+spectral measurement contract.</p>
+<div class="arithmatex">\[
+r = \frac{\hat{\sigma}_{\max}(A')}{\sigma_{\mathrm{MP}}(m,n)}
+\]</div>
+<p>where <span class="arithmatex">\(A'\)</span> is the centered and standardized activation matrix and
+<span class="arithmatex">\(\sigma_{\mathrm{MP}}(m,n)\)</span> is the Marchenko-Pastur edge for the same shape.</p>
+<h3 id="invariants-what-is-checked">Invariants: what is checked<a class="headerlink" href="#invariants-what-is-checked" title="Permanent link">&para;</a></h3>
+<ul>
+<li>No non‑finite tensors (NaN/Inf) in model parameters.</li>
+<li>Weight‑tying relationships preserved (e.g., tied embeddings/output projection).</li>
+<li>Embedding/output dimensions consistent with tokenizer and adapter descriptors.</li>
+<li>Expected LayerNorm modules present; shape sanity checks across layers.</li>
+<li>Tokenizer alignment: when both baseline and edited tokenizers are available, mismatches abort.</li>
+</ul>
+<h3 id="catastrophic-limits-and-aborts">Catastrophic limits and aborts<a class="headerlink" href="#catastrophic-limits-and-aborts" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Spike stop: a large primary‑metric spike (for ppl‑like metrics, ≥ 2.0× ratio) triggers a hard abort/fail independent of guard WARNs.</li>
+<li>Pairing/coverage: preview/final counts must match, pairing must be 1.0, overlap 0.0 in CI/Release; violations abort evaluation.</li>
+</ul>
+<h3 id="invariants-coverage-checklist">Invariants coverage checklist<a class="headerlink" href="#invariants-coverage-checklist" title="Permanent link">&para;</a></h3>
+<p>The invariants guard has default fatal checks and policy-controlled structural
+checks. In default monitor mode, only fatal invariant types block the run:</p>
+<ul>
+<li><strong>Non-finite tensors:</strong> weights, buffers, or activations contain <code>NaN</code>/<code>Inf</code>.</li>
+<li><strong>Tokenizer alignment:</strong> embedding and output projection dimensions disagree
+  with the tokenizer vocabulary.</li>
+</ul>
+<p>The following invariants are still reported, but default to warnings unless the
+guard is configured with strict mode or <code>on_fail=block</code>:</p>
+<ul>
+<li><strong>Weight tying:</strong> adapters that declare tied weights must expose identical
+  tensors for each alias.</li>
+<li><strong>Shape compatibility:</strong> edited modules preserve expected shapes (e.g.,
+  attention head dims, FFN hidden widths) before the pipeline runs evaluation.</li>
+<li><strong>Checkpoint hygiene/evidence gaps:</strong> missing or drifting structural evidence
+  such as LayerNorm or positional-encoding checks is surfaced for audit.</li>
+</ul>
+<p><strong>Deadband (δ)</strong> provides a z-score buffer that suppresses WARN “flicker” when
+values hover near the cap. For example, if the relative change in a module’s
+spectral norm is within ±0.10 (Balanced), the guard reports a neutral score.
+The chosen δ is published in reports as <code>spectral.summary.deadband</code>.</p>
+<p><strong>Caps and <code>max_caps</code></strong>: every time a module breaches its family cap the guard
+records a cap. Runs may continue while <code>caps_applied ≤ max_caps</code>. Once the
+limit is exceeded the guard emits a blocking decision, and the report stores
+both the count and the limit under
+<code>spectral.{caps_applied,max_caps}</code>.</p>
+<h3 id="quality-gates-acceptance">Quality Gates (Acceptance)<a class="headerlink" href="#quality-gates-acceptance" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Primary metric (canonical gate in report):</li>
+<li>ppl-like kinds (ppl_causal, ppl_mlm, ppl_seq2seq): require the canonical
+    report point estimate
+    <code>ratio_vs_baseline ≤ tier_limit + hysteresis_ratio</code> where base tier limits
+    are 1.05 (Conservative), 1.10 (Balanced), 1.20 (Aggressive). The packaged
+    <code>tiers.yaml</code> currently publishes <code>metrics.pm_ratio.hysteresis_ratio = 0.002</code>
+    to avoid PASS/FAIL flapping at the boundary. The lower-level <code>ppl.ratio_ci</code>
+    analysis path also checks its upper bound when that block is populated. If
+    the run exceeds the base limit but passes only because of hysteresis, the
+    report marks <code>validation.hysteresis_applied</code>. Gate flag:
+    <code>validation.primary_metric_acceptable</code>.</li>
+<li>accuracy kinds (accuracy): gate on Δ accuracy vs baseline
+    (percentage points) with minimum coverage. Defaults (policy‑controlled):<ul>
+<li>Balanced: Δ ≥ −1.0 pp and <code>n_final ≥ 200</code></li>
+<li>Conservative: Δ ≥ −0.5 pp and <code>n_final ≥ 200</code></li>
+<li>Aggressive: Δ ≥ −2.0 pp and <code>n_final ≥ 200</code>
+<code>metrics.accuracy.hysteresis_delta_pp</code> applies the same boundary-stability
+logic to the accuracy delta floor.
+Thresholds come from the calibrated tier configuration in the packaged
+<code>tiers.yaml</code> (see <code>metrics.accuracy</code> for each tier) and are surfaced at
+runtime under <code>resolved_policy.metrics.accuracy</code>.</li>
+</ul>
+</li>
+<li>Primary metric tail (ppl-like kinds): a warn/fail gate on <strong>per-window</strong>
+  ΔlogNLL vs the paired baseline. The tail statistic (default P95) must stay
+  under <code>metrics.pm_tail.quantile_max</code>, and (optionally) the mass above ε must
+  stay under <code>metrics.pm_tail.mass_max</code>. Gate flag: <code>validation.primary_metric_tail_acceptable</code>
+  (only flips false when <code>metrics.pm_tail.mode = fail</code>).</li>
+<li>Preview→final drift: require 0.95–1.05 for the guarded run’s final/preview
+  ratio. Gate flag: <code>validation.preview_final_drift_acceptable</code>.</li>
+<li>Spectral stability: caps applied must not exceed the tier’s <code>max_caps</code>
+  (default 5 for Balanced; 3 for Conservative). Gate flag: <code>validation.spectral_stable</code>.</li>
+<li>RMT ε‑band stability: per‑family activation edge risk must satisfy
+  <code>edge_cur ≤ edge_base · (1+ε_f)</code> for each family with a non-zero baseline.
+  Gate flag: <code>validation.rmt_stable</code>.</li>
+<li>Guard overhead: guard/bare runtime overhead must stay within budget when
+  evaluated. Gate flag: <code>validation.guard_overhead_acceptable</code>.</li>
+</ul>
+<p>Exceeding any gate flips the corresponding <code>validation.*</code> flag to false and the
+report fails overall, <strong>except</strong> that the Primary Metric Tail gate can run
+in <code>mode: warn</code> (staged rollout) where it emits a warning but keeps
+<code>validation.primary_metric_tail_acceptable = true</code>. Catastrophic spikes are
+handled during the run: the <code>spike_threshold</code> (default 2.0× PPL) triggers
+immediate abort/fail regardless of other gates. See also
+<code>src/invarlock/core/runner_finalize.py</code>.</p>
+<p><strong>Sigma quantile (qσ)</strong> controls the target sigma used for spectral monitoring.
+Balanced uses <code>sigma_quantile = 0.95</code>, Conservative <code>0.90</code> (see
+the packaged tiers configuration at
+<code>runtime/tiers.yaml</code>; overrides use
+<code>INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml</code>). Reports expose this under
+<code>spectral.summary.sigma_quantile</code>.
+Per-family z-caps use <span class="arithmatex">\(\kappa_f\)</span>; defaults are defined in the packaged tiers
+configuration and summarized in the Threshold Rationale table below.</p>
+<h2 id="2-statistical-method-primer">2. Statistical Method Primer<a class="headerlink" href="#2-statistical-method-primer" title="Permanent link">&para;</a></h2>
+<p>InvarLock evaluates edits using <strong>paired Δlog perplexity</strong> against the baseline:</p>
+<blockquote>
+<p>See <a href="#quality-gates-acceptance">Quality Gates (Acceptance)</a> for the run-level thresholds the CLI enforces on these statistics.</p>
+</blockquote>
+<div class="arithmatex">\[
+\Delta_i = \log(\text{PPL}_{\text{subject final}, i}) - \log(\text{PPL}_{\text{baseline final}, i})
+\]</div>
+<div class="arithmatex">\[
+\overline{\Delta} = \frac{\sum_i w_i \Delta_i}{\sum_i w_i},\quad
+\text{ratio} = \exp(\overline{\Delta})
+\]</div>
+<p>All logarithms are natural (<code>ln</code>); see ln/log for the convention used across InvarLock.</p>
+<p>Perplexity (PPL = exp(mean NLL)) uses the standard language-model
+definition; see the
+<a href="https://huggingface.co/docs/transformers/perplexity">Transformers perplexity guide</a>.</p>
+<p>Preview→final drift is a separate guarded-run stability check; it does not
+define the primary edited-vs-baseline ratio.</p>
+<p>Primary metric confidence intervals use the <strong>BCa bootstrap</strong> (1.2k to 3.2k
+replicates by profile, α=0.05). The half-width approximation for planning is:</p>
+<div class="arithmatex">\[
+\text{half-width} \approx z \cdot \frac{\hat{\sigma}}{\sqrt{n}}
+\]</div>
+<p>Use <code>z = 1.96</code> for two-sided 95% intervals. Balanced tiers use one-sided CI for
+VE gating; Conservative uses two-sided. VE predictive A/B evidence uses its own
+predictive bootstrap surface recorded under <code>variance.predictive_gate</code>; do not
+read primary-metric replicate floors as VE replicate counts.</p>
+<p><strong>Bootstrap defaults</strong></p>
+<ul>
+<li><strong>Replicates:</strong> floors are 1,200 (Balanced), 1,500 (Conservative), and 800
+  (Aggressive). Release profile uses 3,200; tiny smoke profiles often use
+  800-1,200.</li>
+<li><strong>Paired windows:</strong> floors are 180/180 (Balanced), 220/220 (Conservative),
+  140/140 (Aggressive); profiles may request higher counts.</li>
+</ul>
+<p>These values are linted by <code>tests/eval/test_assurance_contracts.py</code> and surfaced
+in reports so reviewers can audit reproducibility.</p>
+<h2 id="calibration-evaluation-slice-requirements">Calibration Evaluation Slice Requirements<a class="headerlink" href="#calibration-evaluation-slice-requirements" title="Permanent link">&para;</a></h2>
+<p>An evaluation schedule is accepted when:</p>
+<ul>
+<li><code>meta.tokenizer_hash</code>, provider digest, and token totals are present.</li>
+<li>Preview/final windows share the same window IDs (pairing).</li>
+<li>Masked-token counts are non-zero for masked-LM baselines (see
+  <code>tests/eval/test_metrics_masked_lm.py</code>).</li>
+<li>Window overlap = 0 and coverage ≥ requested counts; CI/Release profiles treat
+  violations as hard errors during report assembly and verification (see
+  <code>src/invarlock/reporting/report_make.py</code> and
+  <code>src/invarlock/reporting/report_validation.py</code>).</li>
+<li>Predictive VE calibration windows are drawn from the same schedule; provenance
+  appears under <code>variance.ab_test.provenance.window_ids</code>.</li>
+</ul>
+<p>Baseline pairing schedules record the exact windows to preserve determinism.</p>
+<h2 id="4-reproducibility-kit">4. Reproducibility Kit<a class="headerlink" href="#4-reproducibility-kit" title="Permanent link">&para;</a></h2>
+<p>To reproduce a report:</p>
+<ol>
+<li>Persist the run config (<code>config.yaml</code>), <code>window_plan</code>, and <code>evaluation_windows</code>.</li>
+<li>Record dataset/hash/tokenizer metadata (<code>invarlock report generate --run &lt;run_report.json&gt; --format json</code> already saves this).</li>
+<li>Capture the seed bundle (<code>meta.seeds</code>) and policy digests.</li>
+<li>Use <code>invarlock report generate --run &lt;subject_report.json&gt; --baseline-run-report &lt;baseline_report.json&gt; --format report</code>
+   to regenerate the report; when seeds, config, and backend match, numeric
+   evidence and provenance fields should match after normalizing volatile
+   artifact paths and timestamps.</li>
+</ol>
+<p>Explainers for each field live in <a href="../../reference/reports/"><code>docs/reference/reports.md</code></a>.</p>
+<h2 id="5-device-tolerance-guidance">5. Device Tolerance Guidance<a class="headerlink" href="#5-device-tolerance-guidance" title="Permanent link">&para;</a></h2>
+<p>Device drift budgets are calibrated relative to CPU evidence. We expect:</p>
+<table>
+<thead>
+<tr>
+<th>Backend</th>
+<th>Expected drift (vs CPU)</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CPU (float32)</td>
+<td>baseline</td>
+<td>Reference</td>
+</tr>
+<tr>
+<td>MPS</td>
+<td>≤ 0.5% PM ratio</td>
+<td>Uses Apple Accelerate; deterministic seeds supported</td>
+</tr>
+<tr>
+<td>CUDA (TensorFloat-32 off)</td>
+<td>≤ 1.0% PM ratio</td>
+<td>Enable deterministic algorithms; ensure <code>CUBLAS_WORKSPACE_CONFIG</code> set</td>
+</tr>
+</tbody>
+</table>
+<p>Automate the check with:</p>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>scripts/smoke/check_device_drift.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>artifacts/ci-pack-*/baseline_cpu/evaluation.report.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>artifacts/ci-pack-*/baseline_mps/evaluation.report.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--tolerance<span class="w"> </span><span class="m">0</span>.005
+</code></pre></div>
+
+<p>The regression lives in <code>tests/integration/scripts/test_device_drift_linter.py</code>
+and is available for CI/release evidence packs. The repository tests the checker
+on fixtures; real device drift fails fast only when CI or release evidence
+provides comparable CPU/MPS/CUDA reports.</p>
+<p>If drift exceeds these bands, re-tune VE thresholds or increase window counts.</p>
+<h2 id="6-threshold-rationale-defaults">6. Threshold Rationale (Defaults)<a class="headerlink" href="#6-threshold-rationale-defaults" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PM ratio gate (Balanced)</td>
+<td>subject final / baseline final ≤ 1.10 (+ published hysteresis)</td>
+<td>Tier acceptance; exceeding the effective gate fails the run</td>
+</tr>
+<tr>
+<td>PM ratio gate (Conservative)</td>
+<td>subject final / baseline final ≤ 1.05 (+ published hysteresis)</td>
+<td>Stricter release acceptance; exceeding the effective gate fails the run</td>
+</tr>
+<tr>
+<td>Bootstrap α</td>
+<td>0.05</td>
+<td>95 % CI for ΔlogNLL</td>
+</tr>
+<tr>
+<td>Spectral κ</td>
+<td>Balanced caps <code>{ffn: 3.849, attn: 3.018, embed: 1.05, other: 0.0}</code>; Conservative <code>{ffn: 3.849, attn: 2.6, embed: 2.8, other: 2.8}</code> (from <code>tiers.yaml</code>)</td>
+<td>Keeps WARN rate within the calibrated null budget</td>
+</tr>
+<tr>
+<td>RMT ε</td>
+<td><code>{ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01}</code></td>
+<td>q95–q97 of null ratio (+ margin)</td>
+</tr>
+<tr>
+<td>VE min_effect</td>
+<td>0.0 (balanced), 0.016 (conservative)</td>
+<td>Calibrated from paired ΔlogNLL window sweeps</td>
+</tr>
+</tbody>
+</table>
+<p>Detailed derivations are in the calibration appendix (<code>09-tier-v1-calibration.md</code>).</p>
+<p><strong>Examples</strong></p>
+<ul>
+<li><strong>ε-band corner case:</strong> if <code>rmt.families.attn.edge_base = 1.20</code> and
+  <code>rmt.families.attn.epsilon = 0.01</code>, the guard allows
+  <code>rmt.families.attn.edge_cur ≤ (1+0.01) × 1.20 = 1.212</code>.</li>
+<li><strong>Predictive gate:</strong> on Balanced, if <code>mean_delta = -0.002</code> and the one-sided CI is
+  <code>[-0.003, -0.001]</code>, VE enables (<code>mean_delta</code> and the CI upper bound both beat
+  <code>-min_effect_lognll</code>).</li>
+<li><strong>Spectral caps:</strong> Balanced permits at most five caps (<code>max_caps = 5</code>). If the
+  sixth violation fires, <code>spectral.summary.caps_exceeded = true</code> and the guard
+  aborts the run.</li>
+</ul>
+<h2 id="7-scope-boundaries">7. Scope Boundaries<a class="headerlink" href="#7-scope-boundaries" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Claims apply to configured evaluation slices; task-level accuracy requires
+  task-specific evidence.</li>
+<li>Dataset shift or tokenizer changes invalidate pairing schedules.</li>
+<li>Adversarial robustness and gradient masking require separate evidence.</li>
+<li>CUDA kernels outside deterministic mode may exceed drift tolerances.</li>
+<li>Reference mask-based flows are conservative; stronger compression requires plugins.</li>
+<li>The published assurance basis is the set of <code>published_basis</code> rows in
+  <code>contracts/support_matrix.json</code>, with the readable grouping in
+  <code>docs/README.md#support-matrix</code>.</li>
+<li>Modern published-basis no-op reports are null-behavior evidence for guard
+  observations. They do not by themselves re-derive packaged tier constants;
+  transferred attention caps are budgeted sentinels until family-specific
+  calibration supports an FPR interpretation.</li>
+<li>Additional supported-experimental lanes are defined in
+  <code>contracts/support_matrix.json</code>; those lanes are not part of the published
+  assurance basis until supporting artifacts are attached. Current examples
+  include SmolLM3 3B, Phi-4 mini, and newer DeepSeek variants; the contract
+  file remains authoritative and may include additional lanes.</li>
+<li>Contributions for additional model families are welcome; attach pilot reports
+  and summary CSVs (typically written under <code>reports/calibration/</code> when running
+  the calibration scripts) to change proposals or release artifacts.</li>
+</ul>
+<h2 id="8-coverage-reference">8. Coverage Reference<a class="headerlink" href="#8-coverage-reference" title="Permanent link">&para;</a></h2>
+<p>The following tests underpin this handbook:</p>
+<ul>
+<li>tests/eval/test_assurance_contracts.py</li>
+<li>tests/eval/test_metrics_masked_lm.py</li>
+<li>tests/edits/test_quant_rtn.py</li>
+<li>tests/cli/test_verify.py: test_verify_command_passes</li>
+</ul>
+<p>Run them collectively with <code>make test</code> or the narrower <code>make test-assurance</code>
+target.</p>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Evaluation math and paired ratios: <a href="../01-eval-math-derivation/">01-eval-math-derivation.md</a></li>
+<li>Paired BCa bootstrap details: <a href="../03-bca-bootstrap/">03-bca-bootstrap.md</a></li>
+<li>Spectral FPR and multiple-testing control: <a href="../05-spectral-fpr-derivation/">05-spectral-fpr-derivation.md</a></li>
+<li>RMT ε‑rule and outlier bands: <a href="../06-rmt-epsilon-rule/">06-rmt-epsilon-rule.md</a></li>
+<li>VE predictive gate power and thresholds: <a href="../07-ve-gate-power/">07-ve-gate-power.md</a></li>
+<li>Perplexity background: <a href="https://huggingface.co/docs/transformers/perplexity">Hugging Face Transformers perplexity guide</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.expand", "navigation.tabs"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
