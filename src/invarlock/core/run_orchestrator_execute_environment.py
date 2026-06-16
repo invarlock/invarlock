@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import inspect
 import os
 from collections.abc import Callable
+from dataclasses import is_dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
@@ -69,6 +71,96 @@ def _validate_removed_edit_keys(
             message="CONFIG-KEY-REMOVED: edit.parameters. Use edit.plan.",
             details={"removed_keys": ["edit.parameters"]},
         )
+
+
+def _extract_tokenizer_load_kwargs_from_cfg(cfg: Any) -> dict[str, Any]:
+    model_section: Any = None
+    try:
+        cfg_dump = cfg.model_dump()
+    except (AttributeError, TypeError, ValueError):
+        cfg_dump = None
+    if isinstance(cfg_dump, dict):
+        candidate = cfg_dump.get("model")
+        if isinstance(candidate, dict):
+            model_section = candidate
+    if model_section is None:
+        try:
+            model_section = getattr(cfg, "model", None)
+        except (AttributeError, TypeError, ValueError):
+            model_section = None
+
+    trust_remote_code: Any = None
+    revision: Any = None
+    if isinstance(model_section, dict):
+        trust_remote_code = model_section.get("trust_remote_code")
+        revision = model_section.get("revision")
+    elif model_section is not None:
+        try:
+            trust_remote_code = getattr(model_section, "trust_remote_code", None)
+        except (AttributeError, TypeError, ValueError):
+            trust_remote_code = None
+        try:
+            revision = getattr(model_section, "revision", None)
+        except (AttributeError, TypeError, ValueError):
+            revision = None
+
+    kwargs: dict[str, Any] = {}
+    if isinstance(trust_remote_code, bool):
+        kwargs["trust_remote_code"] = trust_remote_code
+    if isinstance(revision, str) and revision:
+        kwargs["revision"] = revision
+    return kwargs
+
+
+def _attach_tokenizer_load_kwargs(
+    model_profile: Any,
+    tokenizer_load_kwargs: dict[str, Any],
+) -> Any:
+    if not tokenizer_load_kwargs:
+        return model_profile
+    if is_dataclass(model_profile) and not isinstance(model_profile, type):
+        try:
+            return replace(
+                cast(Any, model_profile),
+                tokenizer_load_kwargs=dict(tokenizer_load_kwargs),
+            )
+        except (TypeError, ValueError):
+            pass
+    try:
+        model_profile.tokenizer_load_kwargs = dict(tokenizer_load_kwargs)
+    except (AttributeError, TypeError, ValueError):
+        return model_profile
+    return model_profile
+
+
+def _detect_model_profile_with_tokenizer_kwargs(
+    detect_model_profile_fn: Any,
+    *,
+    model_id: str,
+    adapter: str,
+    tokenizer_load_kwargs: dict[str, Any],
+) -> Any:
+    supports_tokenizer_kwargs = False
+    try:
+        signature = inspect.signature(detect_model_profile_fn)
+    except (TypeError, ValueError):
+        signature = None
+    if signature is not None:
+        supports_tokenizer_kwargs = any(
+            parameter.kind is inspect.Parameter.VAR_KEYWORD
+            or parameter.name == "tokenizer_load_kwargs"
+            for parameter in signature.parameters.values()
+        )
+
+    if supports_tokenizer_kwargs:
+        return detect_model_profile_fn(
+            model_id=model_id,
+            adapter=adapter,
+            tokenizer_load_kwargs=tokenizer_load_kwargs,
+        )
+
+    model_profile = detect_model_profile_fn(model_id=model_id, adapter=adapter)
+    return _attach_tokenizer_load_kwargs(model_profile, tokenizer_load_kwargs)
 
 
 def _resolve_loss_seed_and_determinism_state(
@@ -333,7 +425,12 @@ def _prepare_run_environment(
     )
     adapter_name = str(getattr(cfg.model, "adapter", "")).lower()
     model_id_raw = str(getattr(cfg.model, "id", ""))
-    model_profile = detect_model_profile_fn(model_id=model_id_raw, adapter=adapter_name)
+    model_profile = _detect_model_profile_with_tokenizer_kwargs(
+        detect_model_profile_fn,
+        model_id=model_id_raw,
+        adapter=adapter_name,
+        tokenizer_load_kwargs=_extract_tokenizer_load_kwargs_from_cfg(cfg),
+    )
     tokenizer_hash: str | None = None
     tokenizer: Any | None = None
     loss_seed_state = _resolve_loss_seed_and_determinism_state(

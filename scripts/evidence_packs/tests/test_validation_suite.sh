@@ -455,9 +455,8 @@ test_pack_validation_estimate_model_weights_covers_known_patterns_and_local_path
     assert_ne "0" "${rc}" "local model path returns unknown"
 
     assert_eq "90" "$(estimate_model_weights_gb "mistralai/Mixtral-8x7B-v0.1")" "MoE special-case"
-    assert_eq "144" "$(estimate_model_weights_gb "Qwen/Qwen1.5-72B")" "72B"
-    assert_eq "144" "$(estimate_model_weights_gb "Qwen/Qwen2.5-72B")" "72B alt"
-    assert_eq "140" "$(estimate_model_weights_gb "Qwen/Qwen2.5-70B")" "70B"
+    assert_eq "144" "$(estimate_model_weights_gb "org/Thing-72B")" "72B"
+    assert_eq "140" "$(estimate_model_weights_gb "org/Thing-70B")" "70B"
     assert_eq "68" "$(estimate_model_weights_gb "01-ai/Yi-34B")" "34B"
     assert_eq "64" "$(estimate_model_weights_gb "Qwen/Qwen2.5-32B")" "32B"
     assert_eq "28" "$(estimate_model_weights_gb "Qwen/Qwen2.5-14B")" "14B"

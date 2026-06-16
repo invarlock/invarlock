@@ -111,8 +111,8 @@ the evaluation hot path.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `INVARLOCK_SNAPSHOT_MODE` | `auto` | `auto`, `bytes`, or `chunked` snapshot strategy. |
-| `INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION` | `0.4` | RAM fraction threshold for `auto` mode. |
-| `INVARLOCK_SNAPSHOT_THRESHOLD_MB` | `768` | Size threshold for chunked snapshots. |
+| `INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION` | `0.4` | RAM fraction threshold for `auto` mode; the lower of this and the absolute threshold selects chunked snapshots. |
+| `INVARLOCK_SNAPSHOT_THRESHOLD_MB` | `768` | Absolute model-size threshold for chunked snapshots, used even on high-RAM hosts. |
 
 ### Model export
 

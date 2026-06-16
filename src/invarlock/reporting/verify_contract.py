@@ -88,6 +88,7 @@ class VerifyRequest:
     allow_unverified_provenance: bool = False
     json_mode: bool = False
     assurance_mode: str = "report"
+    warning_policy: str = "pass"
 
     @classmethod
     def from_args(
@@ -100,6 +101,7 @@ class VerifyRequest:
         allow_unverified_provenance: bool = False,
         json_mode: bool = False,
         assurance_mode: str = "report",
+        warning_policy: str = "pass",
     ) -> VerifyRequest:
         return cls(
             reports=tuple(reports),
@@ -109,6 +111,7 @@ class VerifyRequest:
             allow_unverified_provenance=allow_unverified_provenance,
             json_mode=json_mode,
             assurance_mode=assurance_mode,
+            warning_policy=warning_policy,
         )
 
     @property
@@ -118,6 +121,10 @@ class VerifyRequest:
     @property
     def normalized_assurance_mode(self) -> str:
         return normalize_verify_assurance_mode(self.assurance_mode)
+
+    @property
+    def normalized_warning_policy(self) -> str:
+        return _normalize_warning_policy(self.warning_policy)
 
 
 @dataclass(frozen=True)
@@ -311,6 +318,58 @@ def _resolve_profile_name(profile: str | None) -> str:
         return "dev"
 
 
+def _normalize_warning_policy(value: str | None) -> str:
+    policy = str(value or "pass").strip().lower()
+    if policy in {"pass", "warn", "advisory"}:
+        return "pass"
+    if policy in {"fail", "strict"}:
+        return "fail"
+    raise ValueError("warning_policy must be one of: pass, fail.")
+
+
+def _guard_warning_count(report: dict[str, Any]) -> int:
+    guard_warnings = report.get("guard_warnings")
+    if not isinstance(guard_warnings, dict):
+        return 0
+    try:
+        return int(guard_warnings.get("warning_count") or 0)
+    except _VERIFY_RECOVERABLE_EXCEPTIONS:
+        warnings = guard_warnings.get("warnings")
+        return len(warnings) if isinstance(warnings, list) else 0
+
+
+def _guard_warning_diagnostics(report: dict[str, Any]) -> tuple[VerifyDiagnostic, ...]:
+    guard_warnings = report.get("guard_warnings")
+    if not isinstance(guard_warnings, dict):
+        return ()
+    warning_count = _guard_warning_count(report)
+    if warning_count <= 0:
+        return ()
+    diagnostics: list[VerifyDiagnostic] = [
+        VerifyDiagnostic(
+            level="warning",
+            message=f"Guard warnings present: {warning_count}",
+        )
+    ]
+    warnings = guard_warnings.get("warnings")
+    if isinstance(warnings, list):
+        for entry_raw in warnings[:5]:
+            if not isinstance(entry_raw, dict):
+                continue
+            guard = str(entry_raw.get("guard") or "guard")
+            kind = str(entry_raw.get("kind") or "warning")
+            module = entry_raw.get("module")
+            location = f" ({module})" if isinstance(module, str) and module else ""
+            policy_gate = str(entry_raw.get("policy_gate") or "unknown")
+            diagnostics.append(
+                VerifyDiagnostic(
+                    level="warning",
+                    message=f"{guard}.{kind}{location}; policy={policy_gate}",
+                )
+            )
+    return tuple(diagnostics)
+
+
 def _append_recompute_errors(
     errors: list[str],
     *,
@@ -457,6 +516,7 @@ def _verify_single_report(
     profile: str | None,
     allow_unverified_provenance: bool,
     assurance_mode: str,
+    warning_policy: str,
     json_mode: bool,
 ) -> VerifyReportResult:
     cert_obj = _load_evaluation_report(cert_path)
@@ -524,6 +584,12 @@ def _verify_single_report(
         tol=tolerance,
         json_mode=json_mode,
     )
+    guard_warning_count = _guard_warning_count(cert_obj)
+    if warning_policy == "fail" and guard_warning_count > 0:
+        errors.append(
+            "Guard warning policy failed: "
+            f"{guard_warning_count} guard warning(s) present."
+        )
     if (
         errors
         and prof in {"ci", "release"}
@@ -559,6 +625,7 @@ def _verify_single_report(
     try:
         diagnostics = (
             VerifyDiagnostic(level="pass", message=str(cert_path)),
+            *_guard_warning_diagnostics(cert_obj),
             *_warn_adapter_family_mismatch(
                 cert_path,
                 cert_obj,
@@ -566,7 +633,10 @@ def _verify_single_report(
             ),
         )
     except _VERIFY_RECOVERABLE_EXCEPTIONS:
-        diagnostics = (VerifyDiagnostic(level="pass", message=str(cert_path)),)
+        diagnostics = (
+            VerifyDiagnostic(level="pass", message=str(cert_path)),
+            *_guard_warning_diagnostics(cert_obj),
+        )
     return VerifyReportResult(
         report=cert_obj,
         errors=tuple(errors),
@@ -581,6 +651,7 @@ def _run_verify_request(request: VerifyRequest) -> VerifyExecutionResult:
     diagnostics: list[VerifyDiagnostic] = []
     tol = request.normalized_tolerance
     normalized_assurance_mode = request.normalized_assurance_mode
+    normalized_warning_policy = request.normalized_warning_policy
     baseline_digest = _load_baseline_digest(request.baseline)
     malformed_any = False
     loaded_any_report = False
@@ -602,6 +673,7 @@ def _run_verify_request(request: VerifyRequest) -> VerifyExecutionResult:
                 profile=request.profile,
                 allow_unverified_provenance=request.allow_unverified_provenance,
                 assurance_mode=normalized_assurance_mode,
+                warning_policy=normalized_warning_policy,
                 json_mode=request.json_mode,
             )
             verification_by_path[str(cert_path)] = report_result.verification
@@ -713,6 +785,7 @@ def run_verify_reports(
     allow_unverified_provenance: bool = False,
     json_mode: bool = False,
     assurance_mode: str = "report",
+    warning_policy: str = "pass",
 ) -> VerifyExecutionResult:
     """Verify reports and return structured machine + human output."""
 
@@ -724,6 +797,7 @@ def run_verify_reports(
         allow_unverified_provenance=allow_unverified_provenance,
         json_mode=json_mode,
         assurance_mode=assurance_mode,
+        warning_policy=warning_policy,
     )
     return _run_verify_request(request)
 
@@ -737,6 +811,7 @@ def verify_reports_contract(
     allow_unverified_provenance: bool = False,
     json_mode: bool = False,
     assurance_mode: str = "report",
+    warning_policy: str = "pass",
 ) -> VerifyExecutionResult:
     """Verify reports and return a structured result without relying on CLI output."""
     return run_verify_reports(
@@ -747,6 +822,7 @@ def verify_reports_contract(
         allow_unverified_provenance=allow_unverified_provenance,
         json_mode=json_mode,
         assurance_mode=assurance_mode,
+        warning_policy=warning_policy,
     )
 
 

@@ -240,7 +240,7 @@
       ],
       "category": "stress",
       "failure_class": "stress_edit.fp8_quant",
-      "strictness": "informational",
+      "strictness": "must_detect",
       "intent": "subtle_detectable",
       "primary_guard": "spectral",
       "generation": {
@@ -249,20 +249,17 @@
         "version": "stress"
       },
       "requirements": {
-        "detectors_any_of": [
+        "primary_guard_required": true,
+        "detectors_all_of": [
           {
             "kind": "validation_flag",
             "flag": "primary_metric_acceptable",
-            "expected": false
+            "expected": true
           },
           {
-            "kind": "validation_flag",
-            "flag": "spectral_stable",
-            "expected": false
-          },
-          {
-            "kind": "spectral_caps_applied",
-            "min": 1
+            "kind": "guard_signal_baseline_relative",
+            "guard": "spectral",
+            "min_new_modules": 1
           }
         ]
       },
@@ -918,6 +915,228 @@
             "expected": false
           }
         ]
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
+    },
+    {
+      "id": "spectral_moderate_scale_mlp_l31_up_s112",
+      "suites": [
+        "mistral_guard_value"
+      ],
+      "category": "error_injection",
+      "failure_class": "spectral.targeted_mlp_scale",
+      "strictness": "informational",
+      "intent": "subtle_detectable",
+      "primary_guard": "spectral",
+      "generation": {
+        "kind": "error",
+        "error_type": "spectral_moderate_scale_mlp_l31_up_s112",
+        "env": {
+          "INVARLOCK_SPECTRAL_SCALE_FACTOR": "1.12",
+          "INVARLOCK_SPECTRAL_TARGET_FAMILY": "mlp",
+          "INVARLOCK_SPECTRAL_TARGET_LAYERS": "31",
+          "INVARLOCK_SPECTRAL_TARGET_PARAMS": "up_proj",
+          "INVARLOCK_SPECTRAL_MAX_PARAMS": "1",
+          "INVARLOCK_SPECTRAL_SEED": "11"
+        }
+      },
+      "requirements": {
+        "detectors_all_of": [
+          {
+            "kind": "validation_flag",
+            "flag": "primary_metric_acceptable",
+            "expected": true
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "invariants_pass",
+            "expected": true
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "rmt_stable",
+            "expected": true
+          },
+          {
+            "kind": "guard_signal_baseline_relative",
+            "guard": "spectral",
+            "min_new_modules": 1,
+            "min_delta_count": 1
+          }
+        ],
+        "notes": "Model-specific Mistral guard-value probe. Published package state promotes this scenario to must_detect for the curated demo; the global manifest keeps it informational so ordinary suites are not forced to run a Mistral-specific layer target."
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
+    },
+    {
+      "id": "spectral_moderate_scale_attn_l31_o_s112",
+      "suites": [
+        "mistral_guard_value"
+      ],
+      "category": "error_injection",
+      "failure_class": "spectral.targeted_attn_scale",
+      "strictness": "informational",
+      "intent": "subtle_detectable",
+      "primary_guard": "spectral",
+      "generation": {
+        "kind": "error",
+        "error_type": "spectral_moderate_scale_attn_l31_o_s112",
+        "env": {
+          "INVARLOCK_SPECTRAL_SCALE_FACTOR": "1.12",
+          "INVARLOCK_SPECTRAL_TARGET_FAMILY": "attn",
+          "INVARLOCK_SPECTRAL_TARGET_LAYERS": "31",
+          "INVARLOCK_SPECTRAL_TARGET_PARAMS": "o_proj",
+          "INVARLOCK_SPECTRAL_MAX_PARAMS": "1",
+          "INVARLOCK_SPECTRAL_INCLUDE_QKV": "0",
+          "INVARLOCK_SPECTRAL_SEED": "11"
+        }
+      },
+      "requirements": {
+        "detectors_all_of": [
+          {
+            "kind": "validation_flag",
+            "flag": "primary_metric_acceptable",
+            "expected": true
+          }
+        ],
+        "notes": "Negative control for the Mistral guard-value sweep: same scale as the FFN positive, selected from the nearest non-baseline attention module, and expected not to add a baseline-relative cap."
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
+    },
+    {
+      "id": "rmt_norm_noise_l31_ffn_up_b030",
+      "suites": [
+        "mistral_guard_value"
+      ],
+      "category": "error_injection",
+      "failure_class": "rmt.targeted_ffn_anisotropy",
+      "strictness": "informational",
+      "intent": "subtle_detectable",
+      "primary_guard": "rmt",
+      "generation": {
+        "kind": "error",
+        "error_type": "rmt_norm_noise_l31_ffn_up_b030",
+        "env": {
+          "INVARLOCK_RMT_PROBE_MODE": "anisotropy",
+          "INVARLOCK_RMT_ANISO_BLEND": "0.30",
+          "INVARLOCK_RMT_ANISO_ROW_FRAC": "0.20",
+          "INVARLOCK_RMT_ANISO_MAX_ROWS": "192",
+          "INVARLOCK_RMT_ANISO_MAX_PARAMS": "1",
+          "INVARLOCK_RMT_ANISO_TARGET_FAMILY": "ffn",
+          "INVARLOCK_RMT_ANISO_TARGET_PARAMS": "up_proj",
+          "INVARLOCK_RMT_ANISO_TARGET_LAYERS": "31",
+          "INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS": "1",
+          "INVARLOCK_RMT_ANISO_JITTER": "0.01",
+          "INVARLOCK_RMT_ANISO_ROW_SELECTION": "random",
+          "INVARLOCK_RMT_ANISO_SEED": "42"
+        }
+      },
+      "requirements": {
+        "detectors_all_of": [
+          {
+            "kind": "validation_flag",
+            "flag": "primary_metric_acceptable",
+            "expected": true
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "invariants_pass",
+            "expected": true
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "spectral_stable",
+            "expected": true
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "rmt_stable",
+            "expected": true
+          },
+          {
+            "kind": "rmt_probe",
+            "field": "stable",
+            "expected": false
+          },
+          {
+            "kind": "guard_signal_baseline_relative",
+            "guard": "rmt"
+          }
+        ],
+        "notes": "Model-specific Mistral guard-value probe. The normal compare-mode RMT report remains stable; the sidecar rmt_probe compares the same baseline and subject modules and records the baseline-relative edge-risk movement."
+      },
+      "artifact_class": "fault_injection_fixture",
+      "deployable_as_hf_checkpoint": false,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
+    },
+    {
+      "id": "ve_mlp_scale_skew_l31_down_s090",
+      "suites": [
+        "mistral_guard_value"
+      ],
+      "category": "error_injection",
+      "failure_class": "variance.targeted_mlp_scale_skew",
+      "strictness": "informational",
+      "intent": "subtle_detectable",
+      "primary_guard": "variance",
+      "generation": {
+        "kind": "error",
+        "error_type": "ve_mlp_scale_skew_l31_down_s090",
+        "env": {
+          "INVARLOCK_VE_SCALE_FACTOR": "0.90",
+          "INVARLOCK_VE_MAX_PARAMS": "1",
+          "INVARLOCK_VE_TARGET_LAYERS": "31",
+          "INVARLOCK_VE_TARGET_FAMILY": "mlp",
+          "INVARLOCK_VE_SEED": "42"
+        }
+      },
+      "requirements": {
+        "detectors_all_of": [
+          {
+            "kind": "validation_flag",
+            "flag": "primary_metric_acceptable",
+            "expected": true
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "invariants_pass",
+            "expected": true
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "spectral_stable",
+            "expected": true
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "rmt_stable",
+            "expected": true
+          },
+          {
+            "kind": "ve_probe",
+            "field": "signal",
+            "expected": true
+          },
+          {
+            "kind": "guard_signal_baseline_relative",
+            "guard": "variance"
+          }
+        ],
+        "notes": "Model-specific Mistral guard-value probe. Public evidence also ships a baseline self-probe showing no VE signal, so the positive subject probe is interpreted baseline-relatively."
       },
       "artifact_class": "fault_injection_fixture",
       "deployable_as_hf_checkpoint": false,

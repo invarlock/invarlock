@@ -49,6 +49,7 @@ Compatibility rules:
 | --- | --- | --- |
 | Support matrix | `contracts/support_matrix.json` | Normalized support tiers and public evidence references |
 | Model family catalog | `contracts/model_family_catalog.json` | Broader inventory for declared support, code-level coverage, usage-only checkpoints, and recommended additions |
+| Model classification | `contracts/model_classification.json` | Lifecycle classification for published, backlog, blocked, smoke-only, usage-only, and out-of-scope model inventory, plus blocked named checkpoints |
 | Adapter capabilities | `contracts/adapter_capabilities.json` | Snapshot/restore, guard coverage, runtime limits, extras |
 | Plugin compatibility | `contracts/plugin_compatibility.json` | Core ABI policy and failure mode |
 | Runtime manifest | `contracts/runtime_manifest.schema.json` | Runtime provenance schema for `runtime.manifest.json` sidecars |
@@ -64,11 +65,11 @@ These JSON files are included in installed wheels under
 `contracts/<name>.json`, and `invarlock.public_contracts` resolves them from the
 repo checkout when present or from packaged wheel data otherwise.
 
-The public contract catalog exposes the list-shaped files as first-class
-entries too: `validation_keys`, `console_labels`, and `metric_kinds` are
-surfaced by `invarlock.public_contracts.contract_catalog()` and embedded in the
-JSON payloads emitted by `invarlock doctor --json` and `invarlock advanced
-plugins ... --json`.
+The public contract catalog exposes the model lifecycle ledger and list-shaped
+files as first-class entries too: `model_classification`, `validation_keys`,
+`console_labels`, and `metric_kinds` are surfaced by
+`invarlock.public_contracts.contract_catalog()` and embedded in the JSON payloads
+emitted by `invarlock doctor --json` and `invarlock advanced plugins ... --json`.
 
 ## CLI surfaces
 
@@ -97,8 +98,12 @@ core ABI published in `contracts/plugin_compatibility.json`.
 
 For support-related automation, `plugins adapters --json` and `doctor --json`
 expose both the strict `support_matrix` contract and the broader
-`model_family_catalog` contract, plus the `validation_keys`, `console_labels`,
-and `metric_kinds` entries from the public contract catalog.
+`model_family_catalog` contract. Lifecycle decisions such as `published`,
+`backlog`, `blocked`, `usage_only`, and `out_of_scope` live in
+`model_classification`, so license/access changes can be handled by editing the
+manifest and rerunning `make contracts-check` instead of searching every support
+surface by hand. The same JSON surfaces also include the `validation_keys`,
+`console_labels`, and `metric_kinds` entries from the public contract catalog.
 
 The versioned JSON surfaces are intentionally explicit:
 
@@ -147,14 +152,19 @@ Repo tags and installed wheels are the only maintained public contract
 carriers.
 
 The support-matrix published-basis evidence paths remain logical
-`public_evidence/published_basis/...` references. Installed wheels resolve those
-logical paths from packaged files under
-`invarlock/_data/public_evidence/published_basis/...`, so installed packages can
-render and verify the shipped published-basis `evaluation.report.json` examples
-with their sibling `runtime.manifest.json` files, and load the paired
-`evidence_pack_recipe.json` data without cloning the repo. The GPT-2
-published-basis lane also packages a signed `evidence_pack/` directory for
-strict offline evidence-pack verification.
+`public_evidence/published_basis/...` references. Source repository tags carry
+the full public evidence artifacts at those paths: reports, runtime manifests,
+evidence-pack recipes, signed packs where present, and guard-value demo
+packages.
+
+Installed wheels intentionally do not duplicate the full published-basis
+artifact tree. Instead, they ship the compact generated index at
+`invarlock/_data/public_evidence/published_basis_index.json`. That index records
+the published-basis entries, logical source paths, lane IDs, file hashes, sizes,
+directory control-file hashes, and the carrier policy. Wheel users can inspect
+which public evidence exists and where it lives in the source tag; verifying or
+rendering the full public evidence artifacts requires the repository source
+tree or an explicit artifact copy.
 
 ## Policy packs
 

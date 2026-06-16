@@ -198,10 +198,11 @@ def test_build_container_python_command_uses_python_entrypoint_for_repo_script(
         "docker",
         "run",
         "--rm",
+        "--init",
         "--entrypoint",
         "python",
-        "--gpus",
     ]
+    assert command[6:8] == ["--gpus", "all"]
     assert "all" in command
     assert "--network" in command
     assert "none" in command
@@ -347,10 +348,11 @@ def test_build_container_python_module_command_uses_module_entrypoint(
         "docker",
         "run",
         "--rm",
+        "--init",
         "--entrypoint",
         "python",
-        "--gpus",
     ]
+    assert command[6:8] == ["--gpus", "all"]
     assert "all" in command
     assert "ghcr.io/invarlock/runtime:test" in command
     assert "-m" in command
@@ -675,7 +677,7 @@ def test_build_container_command_uses_launch_plan_and_deduplicates_mounts(
         )
     )
 
-    assert command[:3] == [engine, "run", "--rm"]
+    assert command[:4] == [engine, "run", "--rm", "--init"]
     assert "--gpus" in command
     assert "all" in command
     assert "--network" in command

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from importlib import metadata as importlib_metadata
@@ -9,14 +10,30 @@ from typing import Any
 OPTIONAL_DEPENDENCIES: tuple[tuple[str, str], ...] = (
     ("datasets", "Dataset loading (WikiText-2, etc.)"),
     ("transformers", "Hugging Face model support"),
+    ("torchvision", "Hugging Face image-text / multimodal processor support"),
     ("gptqmodel", "GPTQ/AWQ quantization backend loading"),
     ("bitsandbytes", "8/4-bit loading (GPU)"),
 )
 _OPTIONAL_DEP_HINTS = {
     "datasets": "eval",
     "transformers": "adapters",
+    "torchvision": "multimodal",
     "gptqmodel": "gptq,awq",
     "bitsandbytes": "gpu",
+}
+_HF_TRANSFORMERS_EXTRA_HINTS = {
+    "hf_causal": "invarlock[adapters]",
+    "hf_mlm": "invarlock[adapters]",
+    "hf_seq2seq": "invarlock[adapters]",
+    "hf_auto": "invarlock[adapters]",
+    "hf_multimodal": "invarlock[multimodal]",
+    "hf_gptq": "invarlock[gptq]",
+    "hf_awq": "invarlock[awq]",
+    "hf_bnb": "invarlock[gpu]",
+    "hf_torchao": "invarlock[torchao]",
+    "hf_hqq": "invarlock[hqq]",
+    "hf_quanto": "invarlock[quanto]",
+    "hf_ct": "invarlock[compressed-tensors]",
 }
 
 
@@ -77,6 +94,18 @@ def _package_version(package_name: str) -> str | None:
         return None
     except (TypeError, ValueError, OSError, RuntimeError):
         return None
+
+
+def _version_key(value: str) -> tuple[int, int, int]:
+    parts = [int(match.group(0)) for match in re.finditer(r"\d+", value)]
+    padded = (parts + [0, 0, 0])[:3]
+    return (padded[0], padded[1], padded[2])
+
+
+def _version_at_least(version: str | None, minimum: str) -> bool:
+    if version is None:
+        return False
+    return _version_key(version) >= _version_key(minimum)
 
 
 def probe_module_spec(
@@ -267,6 +296,23 @@ def build_adapter_inventory_rows(
                 }.get(name)
                 if hint:
                     required_extra = hint
+
+        transformers_ready = _version_at_least(transformers_version, "5.12.0")
+        if name in _HF_TRANSFORMERS_EXTRA_HINTS and not transformers_ready:
+            status = "needs_extra"
+            required_extra = _HF_TRANSFORMERS_EXTRA_HINTS[name]
+            detail = "Requires transformers>=5.12.0"
+
+        if name == "hf_multimodal":
+            torchvision_version = _package_version("torchvision")
+            if (
+                not transformers_ready
+                or find_spec_safe("torchvision") is None
+                or not _version_at_least(torchvision_version, "0.26.0")
+            ):
+                status = "needs_extra"
+                required_extra = "invarlock[multimodal]"
+                detail = "Requires transformers>=5.12.0 and torchvision>=0.26.0"
 
         if (
             backend == "bitsandbytes"

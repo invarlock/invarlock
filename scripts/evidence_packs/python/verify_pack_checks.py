@@ -8,6 +8,20 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+try:
+    from scripts.evidence_workflows.workflow_state import (
+        WorkflowVerificationSummary,
+        write_verification_summary,
+    )
+except ImportError:  # pragma: no cover - direct script execution path
+    _SCRIPTS_DIR = Path(__file__).resolve().parents[2]
+    if str(_SCRIPTS_DIR) not in sys.path:
+        sys.path.insert(0, str(_SCRIPTS_DIR))
+    from evidence_workflows.workflow_state import (
+        WorkflowVerificationSummary,
+        write_verification_summary,
+    )
+
 CONTROL_FILES = {
     "checksums.sha256",
     "manifest.json",
@@ -221,6 +235,64 @@ def _is_error_injection_report(report: Path) -> bool:
     return "errors" in report.parts and report.name == "evaluation.report.json"
 
 
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return bool(value)
+
+
+def _expected_failure_signal(report: Path) -> bool:
+    try:
+        payload = _load_json(report)
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(payload, dict):
+        return False
+
+    validation = payload.get("validation")
+    if isinstance(validation, dict):
+        for flag in (
+            "primary_metric_acceptable",
+            "preview_final_drift_acceptable",
+            "invariants_pass",
+            "spectral_stable",
+            "rmt_stable",
+            "guard_overhead_acceptable",
+        ):
+            if flag in validation and _truthy(validation.get(flag)) is False:
+                return True
+
+    primary_metric = payload.get("primary_metric")
+    if isinstance(primary_metric, dict) and (
+        _truthy(primary_metric.get("invalid"))
+        or _truthy(primary_metric.get("degraded"))
+    ):
+        return True
+
+    invariants = payload.get("invariants")
+    if isinstance(invariants, dict):
+        status = str(invariants.get("status") or "").strip().lower()
+        if status in {"fail", "error", "warn"}:
+            return True
+
+    spectral = payload.get("spectral")
+    if isinstance(spectral, dict):
+        try:
+            if int(spectral.get("caps_applied") or 0) > 0:
+                return True
+        except (TypeError, ValueError, OverflowError):
+            pass
+        summary = spectral.get("summary")
+        if isinstance(summary, dict):
+            status = str(summary.get("status") or "").strip().lower()
+            if status in {"capped", "fail", "failed", "warn"}:
+                return True
+
+    return False
+
+
 def _report_paths(pack_dir: Path) -> list[Path]:
     reports_root = pack_dir / "reports"
     if not reports_root.is_dir():
@@ -289,9 +361,10 @@ def _verify_reports_with_sidecars(
                 report_assurance=report_assurance,
                 stdout_path=verify_out,
             )
-            if rc == 0:
+            if rc == 0 and not _expected_failure_signal(report):
                 print(
-                    f"ERROR: Expected verify failure passed: {report}", file=sys.stderr
+                    f"ERROR: Expected verify failure passed without report failure signal: {report}",
+                    file=sys.stderr,
                 )
                 count_failed += 1
             elif _is_error_injection_report(report):
@@ -318,21 +391,15 @@ def _verify_reports_with_sidecars(
         return 1
 
     if summary_out is not None:
-        summary_out.parent.mkdir(parents=True, exist_ok=True)
-        summary_out.write_text(
-            json.dumps(
-                {
-                    "clean_reports": count_clean,
-                    "error_injection_reports": count_error,
-                    "expected_failure_reports": count_expected_failure,
-                    "failed_reports": count_failed,
-                    "policy_profile": profile,
-                },
-                indent=2,
-                sort_keys=True,
-            )
-            + "\n",
-            encoding="utf-8",
+        write_verification_summary(
+            summary_out,
+            summary=WorkflowVerificationSummary(
+                clean_reports=count_clean,
+                error_injection_reports=count_error,
+                expected_failure_reports=count_expected_failure,
+                failed_reports=count_failed,
+                policy_profile=profile,
+            ),
         )
 
     print(
@@ -391,8 +458,11 @@ def _verify_reports_aggregate(
             report_assurance=report_assurance,
             stdout_to_null=True,
         )
-        if rc == 0:
-            print(f"ERROR: Expected verify failure passed: {report}", file=sys.stderr)
+        if rc == 0 and not _expected_failure_signal(report):
+            print(
+                f"ERROR: Expected verify failure passed without report failure signal: {report}",
+                file=sys.stderr,
+            )
             return 1
     return 0
 

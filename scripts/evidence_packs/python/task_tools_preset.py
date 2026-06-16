@@ -147,6 +147,9 @@ def _validate_baseline_report(args: argparse.Namespace) -> int:
     expected_adapter = str(args.expected_adapter)
     expected_profile = str(args.expected_profile)
     expected_tier = str(args.expected_tier)
+    expected_assurance = str(getattr(args, "expected_assurance", "off"))
+    expected_preview_n = getattr(args, "expected_preview_n", None)
+    expected_final_n = getattr(args, "expected_final_n", None)
 
     try:
         payload = json.loads(report_path.read_text(encoding="utf-8"))
@@ -204,6 +207,24 @@ def _validate_baseline_report(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 1
+    context_assurance = context.get("assurance")
+    assurance = (
+        context_assurance.get("mode") if isinstance(context_assurance, dict) else None
+    )
+    if not isinstance(assurance, str) or not assurance:
+        report_assurance = payload.get("assurance")
+        assurance = (
+            report_assurance.get("mode") if isinstance(report_assurance, dict) else None
+        )
+    if not isinstance(assurance, str) or not assurance:
+        print("baseline_report_missing_assurance", file=sys.stderr)
+        return 1
+    if assurance.strip().lower() != expected_assurance.strip().lower():
+        print(
+            f"baseline_report_assurance_mismatch:{assurance!r}!={expected_assurance!r}",
+            file=sys.stderr,
+        )
+        return 1
 
     windows = payload.get("evaluation_windows")
     if not isinstance(windows, dict):
@@ -226,7 +247,38 @@ def _validate_baseline_report(args: argparse.Namespace) -> int:
         if len(window_ids) != len(input_ids):
             print(f"baseline_report_mismatched_windows:{phase_name}", file=sys.stderr)
             return 1
+        expected_count = (
+            expected_preview_n if phase_name == "preview" else expected_final_n
+        )
+        if expected_count is not None and len(window_ids) != expected_count:
+            print(
+                "baseline_report_window_count_mismatch:"
+                f"{phase_name}:{len(window_ids)}!={expected_count}",
+                file=sys.stderr,
+            )
+            return 1
 
+    return 0
+
+
+def stamp_baseline_report_seed(report_path: Path, *, seed: int) -> None:
+    try:
+        payload = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"failed to load baseline report JSON: {report_path}") from exc
+    if not isinstance(payload, dict):
+        raise SystemExit(f"baseline report must be a JSON object: {report_path}")
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        data = {}
+        payload["data"] = data
+    if data.get("seed") is None:
+        data["seed"] = int(seed)
+    report_path.write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n")
+
+
+def _stamp_baseline_report_seed(args: argparse.Namespace) -> int:
+    stamp_baseline_report_seed(Path(args.report), seed=int(args.seed))
     return 0
 
 

@@ -6,11 +6,11 @@ from typing import Any
 from invarlock.core.auto_tuning import get_tier_policies
 
 from . import policy_utils as report_policy_utils_mod
-from .report_types import RunReport
-from .verify_check_helpers_consistency import (
+from .guards_common import (
     _baseline_guard_payload,
     _measurement_contract_digest,
 )
+from .report_types import RunReport
 
 _GUARD_PARSE_EXCEPTIONS = (
     AttributeError,

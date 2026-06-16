@@ -1,0 +1,53 @@
+{
+  "execution_mode": "container",
+  "generated_at": "2026-06-12T03:00:49.646324+00:00",
+  "models": [
+    {
+      "model_id": "allenai/OLMo-2-1124-7B",
+      "revisions": [
+        {
+          "commit_hash": "7df9a82518afdecae4e8c026b27adccc8c1f0032",
+          "refs": [
+            "main"
+          ],
+          "size_on_disk": 29201682534,
+          "snapshot_path": "/root/.cache/huggingface/hub/models--allenai--OLMo-2-1124-7B/snapshots/7df9a82518afdecae4e8c026b27adccc8c1f0032"
+        }
+      ],
+      "slug": "olmo2_7b",
+      "status": "observed"
+    },
+    {
+      "model_id": "Qwen/Qwen3.5-9B",
+      "revisions": [
+        {
+          "commit_hash": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+          "refs": [
+            "main"
+          ],
+          "size_on_disk": 19319226111,
+          "snapshot_path": "/root/.cache/huggingface/hub/models--Qwen--Qwen3.5-9B/snapshots/c202236235762e1c871ad0ccb60c8ee5ba337b9a"
+        }
+      ],
+      "slug": "qwen3_5_9b",
+      "status": "observed"
+    },
+    {
+      "model_id": "mistralai/Ministral-3-8B-Instruct-2512-BF16",
+      "revisions": [
+        {
+          "commit_hash": "8ad60471ac9865280da0c6b29de387a183c8db73",
+          "refs": [
+            "main"
+          ],
+          "size_on_disk": 17853608601,
+          "snapshot_path": "/root/.cache/huggingface/hub/models--mistralai--Ministral-3-8B-Instruct-2512-BF16/snapshots/8ad60471ac9865280da0c6b29de387a183c8db73"
+        }
+      ],
+      "slug": "ministral3_8b",
+      "status": "observed"
+    }
+  ],
+  "schema": "invarlock/model-evidence-model-revisions-v1",
+  "suite": "current-supported-experimental"
+}

@@ -87,6 +87,8 @@ def test_runner_eval_metrics_small_helpers_filter_and_normalize_inputs() -> None
     )
     assert rem._is_multimodal_batch({"example_id": "ex-1"}) is True
     assert rem._is_multimodal_batch({"input_ids": [1, 2, 3]}) is False
+    assert rem._has_multimodal_batches([], [{"answers": ["cat"]}]) is True
+    assert rem._has_multimodal_batches([], [{"input_ids": [1, 2, 3]}]) is False
 
 
 def test_runner_eval_metrics_multimodal_hook_resolution_rejects_noncallable_attr() -> (

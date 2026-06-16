@@ -54,6 +54,14 @@ def test_should_process_module_scope_ffn_proj():
     assert (
         spectral_detection.should_process_module("layer.attn.c_proj", m, "attn") is True
     )
+    assert (
+        spectral_detection.should_process_module(
+            "encoder.block.0.layer.1.DenseReluDense.wo",
+            m,
+            "ffn",
+        )
+        is True
+    )
 
 
 def test_spectral_prepare_with_aliases(monkeypatch):
@@ -261,8 +269,39 @@ def test_classify_module_family_moe_and_module_type_branches() -> None:
     )
     assert spectral_detection.classify_module_family("layer.mlp.c_fc", linear) == "ffn"
     assert (
+        spectral_detection.classify_module_family(
+            "encoder.block.0.layer.1.DenseReluDense.wo",
+            linear,
+        )
+        == "ffn"
+    )
+    assert (
         spectral_detection.classify_module_family("layer.mlp.gate_proj", linear)
         == "ffn"
+    )
+    assert (
+        spectral_detection.classify_module_family(
+            "model.layers.0.mlp.gate_up_proj", linear
+        )
+        == "ffn"
+    )
+    assert (
+        spectral_detection.classify_module_family(
+            "model.layers.0.mamba.in_proj", linear
+        )
+        == "ffn"
+    )
+    assert (
+        spectral_detection.classify_module_family(
+            "model.layers.0.mamba.out_proj", linear
+        )
+        == "ffn"
+    )
+    assert (
+        spectral_detection.classify_module_family(
+            "model.layers.0.block_sparse_moe.gate", linear
+        )
+        == "router"
     )
 
     # module type based embedding classification

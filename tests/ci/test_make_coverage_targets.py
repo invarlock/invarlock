@@ -67,7 +67,7 @@ def test_coverage_target_includes_probe_suite_for_plain_coverage_run() -> None:
         "tests/eval/test_post_attention_probe_paths.py",
     ):
         assert pattern in text
-    assert "$(COVERAGE) run --append -m pytest -q -p no:cov" in text
+    assert "$(COVERAGE) run --branch --append -m pytest -q -p no:cov" in text
 
 
 def test_coverage_target_includes_core_cli_surface_and_runtime_security_tests() -> None:
@@ -114,6 +114,16 @@ def test_coverage_policy_is_shared_with_makefile_and_expanded_surface() -> None:
     assert "scripts/release/evidence_contracts.py" in policy.CORE_FILES
     assert "src/invarlock/calibration.py" in policy.CORE_FILES
     assert "src/invarlock/calibration.py" in policy.THRESHOLDS
+    assert "scripts/evidence_packs/python/workflow_frontdoor.py" in policy.CORE_FILES
+    assert "scripts/evidence_packs/python/workflow_frontdoor.py" in policy.THRESHOLDS
+    assert "src/invarlock/reporting/guards_common.py" in policy.CORE_FILES
+    assert "src/invarlock/reporting/guards_common.py" in policy.THRESHOLDS
+    assert "src/invarlock/reporting/report_build_context.py" in policy.CORE_FILES
+    assert "src/invarlock/reporting/report_build_context.py" in policy.THRESHOLDS
+    assert "src/invarlock/reporting/report_build_evidence.py" in policy.CORE_FILES
+    assert "src/invarlock/reporting/report_build_evidence.py" in policy.THRESHOLDS
+    assert "src/invarlock/reporting/run_metric_utils.py" in policy.CORE_FILES
+    assert "src/invarlock/reporting/run_metric_utils.py" in policy.THRESHOLDS
     assert "src/invarlock/eval/data_local.py" in policy.CORE_FILES
     assert "src/invarlock/eval/data_local.py" in policy.THRESHOLDS
     assert "src/invarlock/eval/metrics_runtime_resources.py" in policy.CORE_FILES
@@ -141,10 +151,12 @@ def test_coverage_policy_is_shared_with_makefile_and_expanded_surface() -> None:
         "src/invarlock/calibration.py",
         "src/invarlock/adapters/auto.py",
         "scripts/release/*.py",
+        "scripts/evidence_packs/python/workflow_frontdoor.py",
         "invarlock/observability/*",
         "invarlock/__init__.py",
         "invarlock/calibration.py",
         "invarlock/adapters/auto.py",
+        "evidence_packs/python/workflow_frontdoor.py",
     ):
         assert pattern in policy.COVERAGE_INCLUDE_PATTERNS
 

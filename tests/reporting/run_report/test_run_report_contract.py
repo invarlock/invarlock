@@ -5,7 +5,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import invarlock.reporting.report_files as report_files
-
 from invarlock.reporting.report_types import create_empty_report
 from invarlock.reporting.run_report_contract import (
     assemble_run_report,

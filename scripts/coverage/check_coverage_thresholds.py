@@ -17,6 +17,10 @@ from typing import Any
 
 THRESHOLDS = {
     "scripts/release/evidence_contracts.py": 1.00,
+    "scripts/evidence_packs/python/workflow_frontdoor.py": 1.00,
+    "scripts/evidence_workflows/workflow_plan.py": 1.00,
+    "scripts/evidence_workflows/workflow_runner.py": 1.00,
+    "scripts/evidence_workflows/workflow_state.py": 1.00,
     "src/invarlock/eval/data.py": 1.00,
     "src/invarlock/eval/data_local.py": 1.00,
     "src/invarlock/eval/probes/importance.py": 1.00,
@@ -34,8 +38,11 @@ THRESHOLDS = {
     "src/invarlock/reporting/validate.py": 1.00,
     "src/invarlock/reporting/report_types.py": 1.00,
     "src/invarlock/reporting/dataset_hashing.py": 1.00,
+    "src/invarlock/reporting/guards_common.py": 1.00,
     "src/invarlock/reporting/guards_rmt.py": 1.00,
     "src/invarlock/reporting/guards_variance.py": 1.00,
+    "src/invarlock/reporting/report_build_context.py": 1.00,
+    "src/invarlock/reporting/report_build_evidence.py": 1.00,
     "src/invarlock/reporting/report_make.py": 1.00,
     "src/invarlock/reporting/report_primary_metric_policy.py": 1.00,
     "src/invarlock/reporting/primary_metric_utils.py": 1.00,
@@ -48,8 +55,10 @@ THRESHOLDS = {
     "src/invarlock/evidence_pack.py": 1.00,
     "src/invarlock/evidence_pack_edit_metadata.py": 1.00,
     "src/invarlock/reporting/verify_output.py": 1.00,
+    "src/invarlock/reporting/oss_exports.py": 1.00,
     "src/invarlock/cli/commands/policy.py": 1.00,
     "src/invarlock/cli/commands/evidence_pack.py": 1.00,
+    "src/invarlock/cli/commands/report_export.py": 1.00,
     "src/invarlock/core/runner_pairing.py": 1.00,
     "src/invarlock/guards/variance_policy.py": 1.00,
     "src/invarlock/guards/variance_results.py": 1.00,
@@ -91,6 +100,7 @@ THRESHOLDS = {
     "src/invarlock/reporting/report_contract.py": 1.00,
     "src/invarlock/cli/commands/calibrate.py": 1.00,
     "src/invarlock/reporting/report_bundle.py": 1.00,
+    "src/invarlock/reporting/report_explanation.py": 1.00,
     "src/invarlock/reporting/verify_contract.py": 1.00,
     "src/invarlock/runtime_verify.py": 1.00,
     "src/invarlock/runtime_security.py": 1.00,
@@ -114,6 +124,7 @@ THRESHOLDS = {
     "src/invarlock/reporting/report_validation.py": 1.00,
     "src/invarlock/core/run_orchestrator_execute.py": 1.00,
     "src/invarlock/reporting/verify_check_helpers_consistency.py": 1.00,
+    "src/invarlock/reporting/run_metric_utils.py": 1.00,
     "src/invarlock/cli/run_execution_output.py": 1.0,
     "src/invarlock/reporting/run_report_contract.py": 1.00,
     "src/invarlock/reporting/report_builder_support.py": 1.00,
@@ -131,6 +142,7 @@ THRESHOLDS = {
     "src/invarlock/core/run_provider_dataset_materialization.py": 1.00,
     "src/invarlock/core/run_provider_dataset_plan.py": 1.00,
     "src/invarlock/core/run_snapshot_contract.py": 1.00,
+    "src/invarlock/core/runner_execution_plan.py": 1.00,
     "src/invarlock/core/runner_eval_metrics_multimodal.py": 1.00,
     "src/invarlock/core/runner_eval_metrics_stats.py": 1.00,
     "src/invarlock/core/doctor_preflight.py": 1.00,
@@ -155,6 +167,10 @@ CORE_PREFIXES = (
 
 CORE_FILES = (
     "scripts/release/evidence_contracts.py",
+    "scripts/evidence_packs/python/workflow_frontdoor.py",
+    "scripts/evidence_workflows/workflow_plan.py",
+    "scripts/evidence_workflows/workflow_runner.py",
+    "scripts/evidence_workflows/workflow_state.py",
     "src/invarlock/eval/data.py",
     "src/invarlock/eval/data_local.py",
     "src/invarlock/eval/probes/importance.py",
@@ -172,13 +188,18 @@ CORE_FILES = (
     "src/invarlock/reporting/validate.py",
     "src/invarlock/reporting/report_types.py",
     "src/invarlock/reporting/dataset_hashing.py",
+    "src/invarlock/reporting/guards_common.py",
     "src/invarlock/reporting/guards_rmt.py",
     "src/invarlock/reporting/guards_variance.py",
     "src/invarlock/reporting/report_schema.py",
+    "src/invarlock/reporting/report_explanation.py",
+    "src/invarlock/reporting/report_build_context.py",
+    "src/invarlock/reporting/report_build_evidence.py",
     "src/invarlock/reporting/report_make.py",
     "src/invarlock/reporting/report_primary_metric_policy.py",
     "src/invarlock/reporting/primary_metric_utils.py",
     "src/invarlock/reporting/utils.py",
+    "src/invarlock/reporting/run_metric_utils.py",
     "src/invarlock/edits/quant_rtn.py",
     "src/invarlock/edits/quant_rtn_kernels.py",
     "src/invarlock/cli/commands/run.py",
@@ -199,6 +220,7 @@ CORE_FILES = (
     "src/invarlock/evidence_pack_edit_metadata.py",
     "src/invarlock/runtime_verify.py",
     "src/invarlock/cli/commands/evidence_pack.py",
+    "src/invarlock/core/runner_execution_plan.py",
     "src/invarlock/runtime_security.py",
     "src/invarlock/cli/run_config.py",
     "src/invarlock/cli/run_pairing.py",
@@ -210,6 +232,8 @@ COVERAGE_MODULE_FLAGS = ("--cov",)
 
 COVERAGE_INCLUDE_PATTERNS = (
     "scripts/release/*.py",
+    "scripts/evidence_packs/python/workflow_frontdoor.py",
+    "scripts/evidence_workflows/*.py",
     "src/invarlock/eval/*",
     "src/invarlock/guards/*",
     "src/invarlock/calibration.py",
@@ -258,7 +282,16 @@ COVERAGE_INCLUDE_PATTERNS = (
     "invarlock/runtime_security.py",
     "invarlock/runtime_security_helpers.py",
     "invarlock/runtime_verify.py",
+    "evidence_packs/python/workflow_frontdoor.py",
+    "evidence_workflows/*.py",
 )
+
+BARE_SCRIPT_MODULE_PATHS = {
+    "workflow_frontdoor.py": "scripts/evidence_packs/python/workflow_frontdoor.py",
+    "workflow_plan.py": "scripts/evidence_workflows/workflow_plan.py",
+    "workflow_runner.py": "scripts/evidence_workflows/workflow_runner.py",
+    "workflow_state.py": "scripts/evidence_workflows/workflow_state.py",
+}
 
 _POLICY_ITEMS = (
     "coverage-modules",
@@ -392,6 +425,8 @@ def _collect_branch_rates(root: ET.Element) -> dict[str, float]:
         # Map these directly to project-relative under src/.
         if filename.startswith("invarlock/"):
             return f"src/{filename}"
+        if "/" not in filename and filename in BARE_SCRIPT_MODULE_PATHS:
+            return BARE_SCRIPT_MODULE_PATHS[filename]
         # Coverage XML may emit bare basenames for multiple modules (e.g., older
         # eval/core bootstrap layouts).
         # In those cases, mapping is ambiguous and can mis-attribute rates.

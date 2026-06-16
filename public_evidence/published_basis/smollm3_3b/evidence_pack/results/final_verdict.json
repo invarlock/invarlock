@@ -1,0 +1,9 @@
+{
+  "assurance": "strict",
+  "basis": "public_evidence/published_basis/smollm3_3b/evaluation.report.json",
+  "evidence_run": "20260613Tsmollm3Release400SkipA",
+  "model_id": "HuggingFaceTB/SmolLM3-3B",
+  "note": "Container-backed release-profile SmolLM3 no-op preservation evidence run with explicit guard-overhead skip policy.",
+  "profile": "release",
+  "verdict": "PASS"
+}

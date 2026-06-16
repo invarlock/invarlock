@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint typecheck mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync repo-cruft-check public-evidence-audit scripts-inventory-check scripts-audit architecture-fragmentation-check guard-fallback-audit model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda-quant runtime-image-cuda-quant-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-smoke-cuda-quant runtime-smoke-cuda-quant-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-evidence-check
+.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint typecheck mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-dry contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync scripts-inventory-check scripts-audit architecture-fragmentation-check guard-fallback-audit model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda-quant runtime-image-cuda-quant-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-smoke-cuda-quant runtime-smoke-cuda-quant-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-evidence-check
 
 PYTHON ?= $(shell bash scripts/select_workspace_python.sh)
 PIP := $(PYTHON) -m pip
@@ -90,6 +90,7 @@ COVERAGE_TESTS_ADAPTERS := \
 	tests/adapters/test_adapter_auto_runtime.py \
 	tests/adapters/test_hf_loading_helpers.py \
 	tests/adapters/test_hf_multimodal_adapter.py \
+	tests/adapters/test_hf_multimodal_chat_template_kwargs.py \
 	tests/adapters/test_adapter_errors.py \
 	tests/adapters/test_hf_causal_loader_fallback.py \
 	tests/adapters/test_hf_causal_variant_paths.py \
@@ -218,11 +219,11 @@ coverage:  ## Run tests with coverage and generate XML
 		$(COVERAGE_MODULES) \
 		--cov-branch \
 		--cov-report=term --cov-report=xml:reports/cov.xml --cov-fail-under=90
-	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
+	PYTHONPATH=src $(COVERAGE) run --branch --append -m pytest -q -p no:cov \
 		$(COVERAGE_TESTS_EVAL_PROBES)
-	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
+	PYTHONPATH=src $(COVERAGE) run --branch --append -m pytest -q -p no:cov \
 		$(COVERAGE_TESTS_RUNTIME)
-	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
+	PYTHONPATH=src $(COVERAGE) run --branch --append -m pytest -q -p no:cov \
 		$(COVERAGE_TESTS_ADAPTERS)
 	$(COVERAGE) report --include="$(COVERAGE_INCLUDE)" --fail-under=90
 	$(COVERAGE) xml --include="$(COVERAGE_INCLUDE)" -o reports/cov.xml
@@ -634,6 +635,8 @@ ci-matrix:  ## Verify CI matrix
 contracts-check:  ## Ensure packaged contracts match the repo contract source
 	$(MAKE) ensure-python
 	$(PYTHON) scripts/checks/sync_packaged_contracts.py --check
+	$(PYTHON) scripts/checks/check_model_classification.py
+	$(PYTHON) scripts/checks/check_model_candidate_compatibility.py
 
 repo-cruft-check:  ## Fail if macOS transport artifacts leaked into repo source paths
 	$(MAKE) ensure-python
@@ -642,6 +645,11 @@ repo-cruft-check:  ## Fail if macOS transport artifacts leaked into repo source 
 public-evidence-audit:  ## Ensure public evidence is classified and not overclaimed
 	$(MAKE) ensure-python
 	$(PYTHON) scripts/checks/check_public_evidence.py
+	$(PYTHON) scripts/checks/sync_packaged_public_evidence.py --check
+
+public-evidence-sync:  ## Build the compact packaged public evidence index
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/checks/sync_packaged_public_evidence.py --write
 
 scripts-inventory-check:  ## Ensure scripts/ files are classified by maintained family
 	$(MAKE) ensure-python

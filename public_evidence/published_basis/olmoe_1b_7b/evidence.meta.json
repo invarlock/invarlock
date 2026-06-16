@@ -1,0 +1,24 @@
+{
+  "artifact_paths": {
+    "evaluation_report": "evaluation.report.json",
+    "evidence_pack": "evidence_pack",
+    "evidence_pack_recipe": "evidence_pack_recipe.json",
+    "evidence_run_preset": "evidence_run_preset.yaml",
+    "runtime_manifest": "runtime.manifest.json"
+  },
+  "evidence_class": "strict_pass_fixture",
+  "expected_fingerprint": "sha256:9951bf26e79ad969862e33fc9525eb5b3d82cca1b2625ae6dc81e5fb64b9bcef",
+  "generated_by": "model evidence remote sweep",
+  "model_revision": "unresolved_by_huggingface_cache_scan",
+  "non_goals": [
+    "Model weights and source dataset are external Hugging Face references.",
+    "This fixture is a no-op preservation basis, not a fine-tuning, benchmark-quality, or routing-quality claim.",
+    "This fixture validates the smaller MoE lane and does not replace the larger Mixtral/Qwen/Gemma MoE evidence runs."
+  ],
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "Release-strict verifier fixture for the OLMoE 1B-active/7B-total published-basis lane.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/published_basis/olmoe_1b_7b/evaluation.report.json --profile release --assurance strict",
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/olmoe_1b_7b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:9951bf26e79ad969862e33fc9525eb5b3d82cca1b2625ae6dc81e5fb64b9bcef"
+  ]
+}

@@ -16,6 +16,8 @@ class ValidationAllowlistContractError(RuntimeError):
 
 
 DEFAULT_VALIDATION_ALLOWLIST = {
+    "guard_warning_policy_acceptable",
+    "guard_warnings_present",
     "primary_metric_acceptable",
     "primary_metric_tail_acceptable",
     "preview_final_drift_acceptable",
@@ -259,6 +261,45 @@ REPORT_JSON_SCHEMA: dict[str, Any] = {
             },
             "additionalProperties": True,
         },
+        "guard_warnings": {
+            "type": "object",
+            "properties": {
+                "present": {"type": "boolean"},
+                "warning_count": {"type": "integer", "minimum": 0},
+                "warnings": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "guard": {"type": "string"},
+                            "kind": {"type": "string"},
+                            "severity": {"type": "string"},
+                            "family": {"type": "string"},
+                            "module": {"type": "string"},
+                            "policy_gate": {"type": "string"},
+                            "baseline": {"type": "object"},
+                            "subject": {"type": "object"},
+                            "message": {"type": "string"},
+                        },
+                        "additionalProperties": True,
+                    },
+                },
+            },
+            "additionalProperties": True,
+        },
+        "primary_metric_tail": {
+            "type": "object",
+            "properties": {
+                "evaluated": {"type": "boolean"},
+                "passed": {"type": "boolean"},
+                "warned": {"type": "boolean"},
+                "mode": {"type": "string"},
+                "policy": {"type": "object"},
+                "stats": {"type": "object"},
+                "reason": {"type": "string"},
+            },
+            "additionalProperties": True,
+        },
         "artifacts": {"type": "object"},
         "provenance": {"type": "object"},
         "resolved_policy": {"type": "object"},
@@ -382,6 +423,8 @@ def validate_report(report: object) -> bool:
             "spectral_stable",
             "rmt_stable",
             "guard_overhead_acceptable",
+            "guard_warnings_present",
+            "guard_warning_policy_acceptable",
         ]:
             # If present, must be boolean; tolerate missing opt-in flags
             if flag in validation and not isinstance(validation.get(flag), bool):

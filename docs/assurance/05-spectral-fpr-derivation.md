@@ -2,9 +2,11 @@
 
 > **Plain language:** The spectral guard records a calibrated multiple-testing
 > policy for per-family singular-value drift. Gaussian-tail FPR math applies to
-> the families whose kappas were calibrated for that model; low Balanced
-> `embed`/`other` caps are operational sentinels, not standalone <=5% FPR
-> claims.
+> the families whose kappas were calibrated for that model. Published-basis
+> no-op reports for newer families are null-behavior evidence, but their
+> transferred caps are budgeted sentinels until a family-specific calibration
+> re-derives κ. Low Balanced `embed`/`other` caps are operational sentinels,
+> not standalone <=5% FPR claims.
 
 ## Overview
 
@@ -62,10 +64,13 @@ rate.
   0.05, m = 4 families) with per-family caps `{ffn: 3.849, attn: 3.018, embed: 1.05,
   other: 0.0}`, `sigma_quantile = 0.95`, and `max_caps = 5`. Scope is `all`, so
   FFN, attention, embeddings, and other 2-D weights are all monitored. The
-  Gaussian-tail FPR interpretation is defensible for the calibrated high-kappa
-  families (`ffn`, `attn` in the packaged policy). The lower `embed` and `other`
-  caps are sentinel thresholds and can exceed a 5% Gaussian tail if interpreted
-  alone.
+  Gaussian-tail FPR interpretation is defensible only for families with a
+  matching null calibration basis. In the packaged pilot basis that means the
+  GPT-2/BERT-calibrated high-kappa families; newly promoted published-basis
+  causal LMs may expose `attn` cap hits in no-op reports and should treat the
+  transferred attention cap as a budgeted sentinel until κ is recalibrated for
+  that family. The lower `embed` and `other` caps are sentinel thresholds and
+  can exceed a 5% Gaussian tail if interpreted alone.
 - Conservative tier applies **Bonferroni** (`method = "bonferroni"`, α = 0.000625,
   m = 4) with caps `{ffn: 3.849, attn: 2.6, embed: 2.8, other: 2.8}`,
   `sigma_quantile = 0.90`, and `max_caps = 3`, keeping WARNs within the
@@ -79,8 +84,8 @@ rate.
   `spectral.summary.{sigma_quantile,max_caps,deadband}`, and
   `spectral.family_caps[*].kappa`.
 - The FPR story is a calibration assumption under the chosen null model for the
-  calibrated families, not a theorem about arbitrary transformer weights or all
-  sentinel thresholds.
+  calibrated families, not a theorem about arbitrary transformer weights,
+  transferred published-basis lanes, or sentinel thresholds.
 - Empirical histograms of $z$ should be approximately standard normal; heavy
   tails → raise $\kappa_f$ or use robust $\sigma$ (MAD-scaled).
 
@@ -97,8 +102,9 @@ summary.
   count, violations, kappa}`. `sigma_quantile` is the calibrated baseline
   percentile used to derive the reference target.
 - Tier files document multiple-testing metadata and the mapping from
-  $\kappa_f$ to modeled Gaussian tails. Sentinel caps should be audited
-  as operational thresholds, not as FPR-controlled family caps.
+  $\kappa_f$ to modeled Gaussian tails for calibrated families. Transferred
+  caps and sentinel caps should be audited as operational thresholds, not as
+  FPR-controlled family caps.
 - Policy metadata records the multiple-testing method
   (`spectral.multiple_testing`) and the cap limit (`spectral.max_caps`, mirrored
   in `spectral.summary.max_caps` where present).
@@ -106,13 +112,17 @@ summary.
 ## Observability
 
 - `spectral.summary.{sigma_quantile,deadband,modules_checked,max_caps,caps_exceeded}`
-- `spectral.family_caps[*].kappa` and `spectral.families[*].{kappa,violations}`
+- `spectral.family_caps[*].kappa` and per-family cap counters in
+  `spectral.families[*]` (`violations` is the raw counter key for modules whose
+  z-score crossed the family cap)
 - `spectral.multiple_testing.{method,alpha,m}` and `spectral.max_caps`
 
 ### Worked example (Balanced tier)
 
 - For FFN modules, `family_caps.ffn.kappa = 3.849`. Suppose a layer reports $z = 3.90$.
-- report records a WARN in `spectral.families.ffn.violations += 1`; `spectral.caps_applied` increments.
+- report records a WARN, increments the raw
+  `spectral.families[*].violations` cap counter for the affected family, and
+  increments `spectral.caps_applied`.
 - Balanced `max_caps = 5`. After the fifth WARN the guard continues to WARN;
   the sixth triggers `spectral.caps_exceeded=true` and the run aborts.
 - Multiple-testing metadata shows `spectral.multiple_testing = {method: "bh",

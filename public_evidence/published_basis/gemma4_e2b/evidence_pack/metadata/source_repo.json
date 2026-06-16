@@ -1,0 +1,26 @@
+{
+  "artifact_class": "public_evidence_fixture",
+  "fixture_paths": [
+    "public_evidence/published_basis/gemma4_e2b/evaluation.report.json",
+    "public_evidence/published_basis/gemma4_e2b/runtime.manifest.json"
+  ],
+  "repo": "invarlock-public",
+  "source_ref": "15ef967f91893988fbd1b3676392ae683b7fdcff",
+  "worktree_branch": "work/evidence-sweep-stabilization",
+  "worktree_sync_note": "Remote /root/invarlock-public was patched by scp with the listed file hashes before running with --skip-sync.",
+  "synced_file_hashes": {
+    "src/invarlock/guards/spectral.py": "sha256:d53bc3faa2887cc0c81d18698f5db45c1230873a8266283aa1943b61f39004ed",
+    "src/invarlock/guards/spectral_policy.py": "sha256:3f5182f786d3f05ffe0f54570c3718099faef1d9ea5ed6b889179585bb9824b9",
+    "src/invarlock/guards/rmt.py": "sha256:d4b8cf42443d56524b350171596f9a2d6bf116fc797433159c089e1bc708e7ff",
+    "src/invarlock/guards/rmt_policy.py": "sha256:4fa2df32c699a30674cdd2452720935a5cc3e3c8f47625d3e24f265a0f7e210c",
+    "src/invarlock/guards/rmt_activation_runtime.py": "sha256:581f6c9be535d8b16feb915f6484630cc2f3e1fa0ec5047ec45d8feaaf0e5c8b",
+    "src/invarlock/model_profile.py": "sha256:556adae9fc9eacd7838b4f484e444023277d9a8c8184cb1ee65f5faad9fe03df",
+    "configs/presets/causal_lm/gemma4_e2b_512.yaml": "sha256:7bf22de4feff8656ab629b4d179bb0454fcae6e9b6ee6bb88a00cdeb8355a0d3",
+    "configs/calibration/null_sweep_gemma4_e2b.yaml": "sha256:fe529afcf10b1bec2a642cc05e77e3e86f45d509464d8e4d548a63dabcf571db"
+  },
+  "remote_artifacts": {
+    "artifact_manifest": "artifacts/model-evidence/remote/20260612TgemmaTextScopeReleaseB/shard-00-gpu-0/artifact_manifest.json",
+    "model_revisions": "artifacts/model-evidence/remote/20260612TgemmaTextScopeReleaseB/shard-00-gpu-0/model_revisions.json",
+    "summary": "artifacts/model-evidence/remote/20260612TgemmaTextScopeReleaseB/shard-00-gpu-0/summary.json"
+  }
+}

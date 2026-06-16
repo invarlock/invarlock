@@ -14,7 +14,6 @@ Steps:
 
 from __future__ import annotations
 
-import inspect
 import io
 import json
 import os
@@ -44,7 +43,7 @@ from ...core.evaluate_plan import (
     resolve_evaluate_execution_policy,
     resolve_evaluate_tmp_dir,
 )
-from ...core.exceptions import ConfigError, MetricsError, ValidationError
+from ...core.exceptions import ConfigError, ValidationError
 
 # Use the report group's programmatic entry for report generation
 from ...reporting.report_contract import generate_reports
@@ -61,10 +60,16 @@ from ..evaluate_output import _render_banner_lines as _render_banner_lines_impl
 from ..evaluate_output import _resolve_verbosity as _resolve_verbosity_impl
 from ..evaluate_output import _suppress_child_output as _suppress_child_output_impl
 from ..evaluate_phases import (
-    _run_baseline_evaluation_phase as _run_baseline_evaluation_phase_impl,
+    BaselineEvaluationRequest,
+    EvaluatePhaseRuntime,
+    SubjectEvaluationRequest,
+    run_baseline_evaluation_phase,
+    run_subject_evaluation_phase,
 )
-from ..evaluate_phases import (
-    _run_subject_evaluation_phase as _run_subject_evaluation_phase_impl,
+from ..evaluate_report_phase import (
+    EvaluationReportRequest,
+    EvaluationReportRuntime,
+    emit_evaluation_report_phase,
 )
 from ..security_helpers import (
     emit_runtime_manifest,
@@ -261,24 +266,8 @@ def _dump_yaml(path: Path, data: dict[str, Any]) -> None:
         yaml.safe_dump(data, fh, sort_keys=False)
 
 
-def _run_baseline_evaluation_phase(
+def _build_evaluate_phase_runtime(
     *,
-    baseline_report: str | None,
-    profile_name: str,
-    tier_name: str,
-    eff_adapter: str,
-    out: str,
-    device: str | None,
-    allow_network: bool,
-    allow_host_execution: bool,
-    allow_third_party_plugins: bool,
-    allow_remote_code: bool,
-    allow_unverified_provenance: bool,
-    prefer_local_files_only: bool,
-    no_color: bool,
-    baseline_cfg: dict[str, Any],
-    baseline_label: str,
-    tmp_dir: Path,
     console: Console,
     output_style: Any,
     timings: dict[str, float],
@@ -288,26 +277,10 @@ def _run_baseline_evaluation_phase(
     debug_fn: Any,
     phase_fn: Any,
     fail_fn: Any,
-) -> Path:
+) -> EvaluatePhaseRuntime:
     from . import run as run_mod
 
-    return _run_baseline_evaluation_phase_impl(
-        baseline_report=baseline_report,
-        profile_name=profile_name,
-        tier_name=tier_name,
-        eff_adapter=eff_adapter,
-        out=out,
-        device=device,
-        allow_network=allow_network,
-        allow_host_execution=allow_host_execution,
-        allow_third_party_plugins=allow_third_party_plugins,
-        allow_remote_code=allow_remote_code,
-        allow_unverified_provenance=allow_unverified_provenance,
-        prefer_local_files_only=prefer_local_files_only,
-        no_color=no_color,
-        baseline_cfg=baseline_cfg,
-        baseline_label=baseline_label,
-        tmp_dir=tmp_dir,
+    return EvaluatePhaseRuntime(
         console=console,
         output_style=output_style,
         timings=timings,
@@ -318,82 +291,8 @@ def _run_baseline_evaluation_phase(
         phase_fn=phase_fn,
         fail_fn=fail_fn,
         suppress_child_output_fn=_suppress_child_output,
-        dump_yaml_fn=_dump_yaml,
-        run_command_fn=run_mod.run_command,
-    )
-
-
-def _run_subject_evaluation_phase(
-    *,
-    baseline_report_path: Path,
-    preset_data: dict[str, Any],
-    norm_edt_id: str,
-    eff_adapter: str,
-    out: str,
-    device: str | None,
-    profile_name: str,
-    tier_name: str,
-    guards_order: Any,
-    assurance_mode: str,
-    subject_label: str | None,
-    edit_config: str | None,
-    edit_label: str | None,
-    console: Console,
-    output_style: Any,
-    timings: dict[str, float],
-    verbosity: int,
-    progress: bool,
-    execution_mode: str,
-    allow_network: bool,
-    allow_host_execution: bool,
-    allow_third_party_plugins: bool,
-    allow_remote_code: bool,
-    allow_unverified_provenance: bool,
-    prefer_local_files_only: bool,
-    no_color: bool,
-    tmp_dir: Path,
-    info_fn: Any,
-    debug_fn: Any,
-    phase_fn: Any,
-    fail_fn: Any,
-) -> tuple[Path, dict[str, Any]]:
-    from . import run as run_mod
-
-    return _run_subject_evaluation_phase_impl(
-        baseline_report_path=baseline_report_path,
-        preset_data=preset_data,
-        norm_edt_id=norm_edt_id,
-        eff_adapter=eff_adapter,
-        out=out,
-        device=device,
-        profile_name=profile_name,
-        tier_name=tier_name,
-        guards_order=guards_order,
-        assurance_mode=assurance_mode,
-        subject_label=subject_label,
-        edit_config=edit_config,
-        edit_label=edit_label,
-        console=console,
-        output_style=output_style,
-        timings=timings,
-        verbosity=verbosity,
-        progress=progress,
-        execution_mode=execution_mode,
-        allow_network=allow_network,
-        allow_host_execution=allow_host_execution,
-        allow_third_party_plugins=allow_third_party_plugins,
-        allow_remote_code=allow_remote_code,
-        allow_unverified_provenance=allow_unverified_provenance,
-        prefer_local_files_only=prefer_local_files_only,
-        no_color=no_color,
-        tmp_dir=tmp_dir,
-        info_fn=info_fn,
-        debug_fn=debug_fn,
-        phase_fn=phase_fn,
-        fail_fn=fail_fn,
         load_yaml_fn=_load_yaml,
         dump_yaml_fn=_dump_yaml,
-        suppress_child_output_fn=_suppress_child_output,
         run_command_fn=run_mod.run_command,
         json_load_fn=json.load,
     )
@@ -554,23 +453,7 @@ def evaluate_command(
     assurance_mode = plan.assurance_mode
     tmp_dir = plan.tmp_dir
 
-    baseline_report_path = _run_baseline_evaluation_phase(
-        baseline_report=baseline_report,
-        profile_name=profile_name,
-        tier_name=tier_name,
-        eff_adapter=str(baseline_eff_adapter),
-        out=out,
-        device=device,
-        allow_network=allow_network,
-        allow_host_execution=allow_host_execution,
-        allow_third_party_plugins=allow_third_party_plugins,
-        allow_remote_code=allow_remote_code,
-        allow_unverified_provenance=allow_unverified_provenance,
-        prefer_local_files_only=prefer_local_files_only,
-        no_color=no_color,
-        baseline_cfg=baseline_cfg,
-        baseline_label=baseline_label,
-        tmp_dir=tmp_dir,
+    phase_runtime = _build_evaluate_phase_runtime(
         console=console,
         output_style=output_style,
         timings=timings,
@@ -581,112 +464,60 @@ def evaluate_command(
         phase_fn=_phase,
         fail_fn=_fail,
     )
+
+    baseline_report_path = run_baseline_evaluation_phase(
+        BaselineEvaluationRequest(
+            baseline_report=baseline_report,
+            profile_name=profile_name,
+            tier_name=tier_name,
+            adapter=str(baseline_eff_adapter),
+            out=out,
+            device=device,
+            allow_network=allow_network,
+            allow_host_execution=allow_host_execution,
+            allow_third_party_plugins=allow_third_party_plugins,
+            allow_remote_code=allow_remote_code,
+            allow_unverified_provenance=allow_unverified_provenance,
+            prefer_local_files_only=prefer_local_files_only,
+            no_color=no_color,
+            baseline_cfg=baseline_cfg,
+            baseline_label=baseline_label,
+            tmp_dir=tmp_dir,
+        ),
+        phase_runtime,
+    )
     _release_phase_memory()
 
-    edited_report, edited_payload = _run_subject_evaluation_phase(
-        baseline_report_path=baseline_report_path,
-        preset_data=preset_data,
-        norm_edt_id=norm_edt_id,
-        eff_adapter=str(subject_eff_adapter),
-        out=out,
-        device=device,
-        profile_name=profile_name,
-        tier_name=tier_name,
-        guards_order=guards_order,
-        assurance_mode=assurance_mode,
-        subject_label=subject_label,
-        edit_config=edit_config,
-        edit_label=edit_label,
-        console=console,
-        output_style=output_style,
-        timings=timings,
-        verbosity=verbosity,
-        progress=progress,
-        execution_mode=execution_mode,
-        allow_network=allow_network,
-        allow_host_execution=allow_host_execution,
-        allow_third_party_plugins=allow_third_party_plugins,
-        allow_remote_code=allow_remote_code,
-        allow_unverified_provenance=allow_unverified_provenance,
-        prefer_local_files_only=prefer_local_files_only,
-        no_color=no_color,
-        tmp_dir=tmp_dir,
-        info_fn=_info,
-        debug_fn=_debug,
-        phase_fn=_phase,
-        fail_fn=_fail,
+    edited_report, edited_payload = run_subject_evaluation_phase(
+        SubjectEvaluationRequest(
+            baseline_report_path=baseline_report_path,
+            preset_data=preset_data,
+            subject_model_id=norm_edt_id,
+            adapter=str(subject_eff_adapter),
+            out=out,
+            device=device,
+            profile_name=profile_name,
+            tier_name=tier_name,
+            guards_order=guards_order,
+            assurance_mode=assurance_mode,
+            subject_label=subject_label,
+            edit_config=edit_config,
+            edit_label=edit_label,
+            execution_mode=execution_mode,
+            allow_network=allow_network,
+            allow_host_execution=allow_host_execution,
+            allow_third_party_plugins=allow_third_party_plugins,
+            allow_remote_code=allow_remote_code,
+            allow_unverified_provenance=allow_unverified_provenance,
+            prefer_local_files_only=prefer_local_files_only,
+            no_color=no_color,
+            tmp_dir=tmp_dir,
+        ),
+        phase_runtime,
     )
     _release_phase_memory()
 
     _phase(3, 3, "EVALUATION REPORT GENERATION")
-
-    def _emit_evaluation_report() -> None:
-        _info("Emitting evaluation report", tag="EXEC", emoji="📜")
-        with cli_output.timed_step(
-            console=console,
-            style=output_style,
-            timings=timings,
-            key="evaluation_report",
-            tag="EXEC",
-            message="Evaluation Report",
-            emoji="📜",
-        ):
-            try:
-                report_kwargs: dict[str, Any] = {
-                    "run": str(edited_report),
-                    "format": "report",
-                    "baseline": str(baseline_report_path),
-                    "output": str(report_out),
-                }
-                report_signature = inspect.signature(generate_reports)
-                supports_render_optional = (
-                    "render_optional" in report_signature.parameters
-                    or any(
-                        param.kind is inspect.Parameter.VAR_KEYWORD
-                        for param in report_signature.parameters.values()
-                    )
-                )
-                if supports_render_optional:
-                    report_kwargs["render_optional"] = not defer_report_rendering
-                generate_reports(**report_kwargs)
-            except (ConfigError, MetricsError, ValidationError) as exc:
-                _fail(str(getattr(exc, "message", exc)), exit_code=1)
-        emit_runtime_manifest(
-            Path(report_out) / "evaluation.report.json",
-            config_payload={
-                "command": "evaluate",
-                "baseline": baseline,
-                "subject": subject,
-                "baseline_adapter": baseline_eff_adapter,
-                "subject_adapter": subject_eff_adapter,
-                "profile": profile_name,
-                "tier": tier_name,
-                "preset": preset,
-                "out": out,
-                "report_out": report_out,
-                "edit_config": edit_config,
-                "edit_label": edit_label,
-                "allow_network": allow_network,
-                "allow_remote_code": allow_remote_code,
-                "allow_third_party_plugins": allow_third_party_plugins,
-                "execution_mode": execution_mode,
-                "assurance": assurance_mode,
-                "defer_report_rendering": bool(defer_report_rendering),
-            },
-            extra={
-                "command": "evaluate",
-                "profile": profile_name,
-                "tier": tier_name,
-                "execution_mode": execution_mode,
-                "assurance": assurance_mode,
-            },
-            execution=_evaluation_report_manifest_execution(
-                execution_mode=execution_mode,
-                allow_network=allow_network,
-                allow_remote_code=allow_remote_code,
-                allow_third_party_plugins=allow_third_party_plugins,
-            ),
-        )
 
     # CI/Release hard‑abort: fail fast when primary metric is not computable.
     try:
@@ -708,7 +539,39 @@ def evaluate_command(
             )
             raise typer.Exit(resolve_command_exit_code(outcome.error, profile=profile))
 
-    _emit_evaluation_report()
+    emit_evaluation_report_phase(
+        EvaluationReportRequest(
+            edited_report=edited_report,
+            baseline_report_path=baseline_report_path,
+            report_out=report_out,
+            baseline=baseline,
+            subject=subject,
+            baseline_eff_adapter=str(baseline_eff_adapter),
+            subject_eff_adapter=str(subject_eff_adapter),
+            profile_name=profile_name,
+            tier_name=tier_name,
+            preset=preset,
+            out=out,
+            edit_config=edit_config,
+            edit_label=edit_label,
+            allow_network=allow_network,
+            allow_remote_code=allow_remote_code,
+            allow_third_party_plugins=allow_third_party_plugins,
+            execution_mode=execution_mode,
+            assurance_mode=assurance_mode,
+            defer_report_rendering=defer_report_rendering,
+        ),
+        EvaluationReportRuntime(
+            console=console,
+            output_style=output_style,
+            timings=timings,
+            info_fn=_info,
+            fail_fn=_fail,
+            generate_reports_fn=generate_reports,
+            emit_runtime_manifest_fn=emit_runtime_manifest,
+            manifest_execution_fn=_evaluation_report_manifest_execution,
+        ),
+    )
     if total_start is not None:
         timings["total"] = max(0.0, float(cli_output.perf_counter() - total_start))
     else:

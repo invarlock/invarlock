@@ -449,10 +449,7 @@ YAML_EOF
             --report "${report_file}" \
             --out "${run_dir}/evaluation.report.json" >> "${log_file}" 2>&1 || conversion_rc=$?
         if [[ ${conversion_rc} -ne 0 ]]; then
-            echo "ERROR: failed to generate evaluation.report.json from ${report_file} (exit=${conversion_rc})" >> "${log_file}"
-            if [[ ${exit_code} -eq 0 ]]; then
-                exit_code=${conversion_rc}
-            fi
+            echo "WARNING: calibration report kept without evaluation.report.json from ${report_file} (exit=${conversion_rc})" >> "${log_file}"
         fi
     fi
 

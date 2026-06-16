@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import types
+from types import SimpleNamespace
 
 import pytest
 
@@ -108,3 +109,28 @@ def test_hf_gptq_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
     with runtime_allowances_scope(allow_remote_code=True):
         loaded = adapter.load_model("demo/model", trust_remote_code=True)
         assert loaded["kwargs"]["trust_remote_code"] is True
+
+
+@pytest.mark.unit
+def test_gptqmodel_hub_compat_patch_bridges_transformers_512_namespace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transformers = types.ModuleType("transformers")
+    transformers.utils = SimpleNamespace(hub=SimpleNamespace())
+    huggingface_hub = types.ModuleType("huggingface_hub")
+    huggingface_hub.create_repo = object()
+
+    class _Api:
+        def list_repo_tree(self) -> list[object]:
+            return []
+
+    huggingface_hub.HfApi = _Api
+    monkeypatch.setitem(sys.modules, "transformers", transformers)
+    monkeypatch.setitem(sys.modules, "huggingface_hub", huggingface_hub)
+
+    from invarlock.plugins import _patch_gptqmodel_transformers_hub_compat
+
+    _patch_gptqmodel_transformers_hub_compat()
+
+    assert transformers.utils.hub.create_repo is huggingface_hub.create_repo
+    assert transformers.utils.hub.list_repo_tree.__self__.__class__ is _Api

@@ -873,6 +873,49 @@ EOF
     PATH="${original_path}"
 }
 
+test_verify_pack_verify_reports_accepts_error_injection_report_failure_signal() {
+    mock_reset
+
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/reports/modelA/edit/run_1" "${pack_dir}/reports/modelA/errors/scale_explosion"
+    echo '{"validation":{"primary_metric_acceptable":true,"preview_final_drift_acceptable":true,"invariants_pass":true,"spectral_stable":true,"rmt_stable":true,"guard_overhead_acceptable":true}}' > "${pack_dir}/reports/modelA/edit/run_1/evaluation.report.json"
+    cat > "${pack_dir}/reports/modelA/errors/scale_explosion/evaluation.report.json" <<'JSON'
+{
+  "validation": {
+    "primary_metric_acceptable": false,
+    "preview_final_drift_acceptable": true,
+    "invariants_pass": true,
+    "spectral_stable": true,
+    "rmt_stable": true,
+    "guard_overhead_acceptable": true
+  }
+}
+JSON
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "$*" >> "${TEST_TMPDIR}/invarlock.calls"
+echo '{"ok": true}'
+exit 0
+EOF
+    chmod +x "${bin_dir}/invarlock"
+
+    local original_path="${PATH}"
+    PATH="${bin_dir}:${PATH}"
+
+    run pack_verify_reports "${pack_dir}" ""
+    assert_rc "0" "${RUN_RC}" "verify accepts expected-failure reports with report failure signal"
+    assert_match "edit/run_1/evaluation\\.report\\.json" "$(cat "${TEST_TMPDIR}/invarlock.calls")" "expected-pass report is verified"
+    assert_match "errors/scale_explosion/evaluation\\.report\\.json" "$(cat "${TEST_TMPDIR}/invarlock.calls")" "error-injection report is verified"
+
+    PATH="${original_path}"
+}
+
 test_verify_pack_verify_reports_accepts_scenario_expected_failures() {
     mock_reset
 

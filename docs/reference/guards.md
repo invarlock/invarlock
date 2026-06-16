@@ -35,11 +35,20 @@ guards:
 > Most thresholds come from the tier defaults (see `tiers.yaml`). Use overrides
 > sparingly and keep evidence in the report.
 >
-> Assurance scope note: the published assurance basis covers GPT-2
-> and BERT profiles. Additional runnable but unpublished lanes are tracked in
+> Assurance scope note: the published assurance basis is the set of
+> `published_basis` rows in `contracts/support_matrix.json`, with the readable
+> grouping in `docs/README.md#support-matrix`.
+> Modern published-basis no-op reports are included as null-behavior guard
+> evidence, but transferred attention caps are budgeted sentinels until
+> family-specific calibration re-derives κ.
+> The strongest public guard-value evidence is the Mistral 7B scenario package
+> under `public_evidence/published_basis/mistral_7b/guard_value_demo/`: PM-only
+> accepts the selected edits while clean confirmation reruns record
+> baseline-relative spectral, RMT, and variance/VE movement. Invariants remain
+> structural checks in that package and are required to pass.
+> Additional runnable but unpublished lanes are tracked in
 > `contracts/support_matrix.json`; they expand runnable coverage, not the
-> published assurance basis. Examples include Mistral 7B, Qwen2 7B, Qwen2.5 7B,
-> and Qwen2.5 14B; the contract file remains authoritative.
+> published assurance basis.
 
 ## Guard Pipeline Flow
 
@@ -209,6 +218,13 @@ packaged presets include it by default; remove a guard from the list to skip it.
   blocks (`spectral.*`, `rmt.*`, `variance.*`).
 - Validation flags are recorded under `validation.*` (`invariants_pass`,
   `spectral_stable`, `rmt_stable`).
+- Reports may include `guard_warnings`. These are baseline-relative guard-signal
+  changes that still pass the hard policy, such as a new capped spectral module
+  while `caps_applied <= max_caps`. They are advisory by default and become
+  verification failures only with `invarlock verify --fail-on-warnings`.
+- Evidence packs use the same guard observations but apply stricter scenario
+  semantics. A public guard-value claim requires reproduced baseline-relative
+  scenario evidence; an ordinary warning alone is not enough.
 
 ## Related Documentation
 

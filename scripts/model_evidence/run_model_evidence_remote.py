@@ -5,12 +5,29 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import re
 import shlex
-import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+
+SCRIPTS_DIR = Path(__file__).resolve().parents[1]
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from evidence_workflows.workflow_plan import (  # noqa: E402
+    WorkflowCommandStep,
+    WorkflowLanePlan,
+    WorkflowSweepPlan,
+)
+from evidence_workflows.workflow_runner import (  # noqa: E402
+    WorkflowSweepExecutionRequest,
+    execute_workflow_sweep,
+    workflow_return_code,
+)
+from evidence_workflows.workflow_state import WorkflowRunMetadata  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_REMOTE_REPO = "/root/invarlock-public"
@@ -21,12 +38,14 @@ DEFAULT_REMOTE_VENV_CANDIDATES = (
     "/root/venvs/invarlock/bin/python",
 )
 EXECUTION_MODES = ("container", "host")
+REMOTE_ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 @dataclass(frozen=True)
 class RemoteLaunch:
     session: str
     gpu: str
+    gpu_group: tuple[str, ...]
     shard_index: int
     shard_count: int
     output_root: str
@@ -37,11 +56,28 @@ class RemoteLaunch:
         return {
             "session": self.session,
             "gpu": self.gpu,
+            "gpu_group": list(self.gpu_group),
             "shard_index": self.shard_index,
             "shard_count": self.shard_count,
             "output_root": self.output_root,
             "remote_command": self.remote_command,
             "ssh_command": self.ssh_command,
+        }
+
+
+@dataclass(frozen=True)
+class RemoteWorkflowPlan:
+    """Typed workflow representation for remote evidence launch commands."""
+
+    workflow: WorkflowSweepPlan
+    sync_command: str | None
+    launches: tuple[RemoteLaunch, ...]
+
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "workflow": self.workflow.to_dry_run_payload(),
+            "sync_command": self.sync_command,
+            "launches": [launch.to_payload() for launch in self.launches],
         }
 
 
@@ -92,6 +128,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Repeat to restrict the sweep to specific support_matrix lane_ids.",
     )
     parser.add_argument(
+        "--preset-override",
+        action="append",
+        default=[],
+        metavar="SLUG=PATH",
+        help=(
+            "Pass a SLUG=PATH preset override through to the remote sweep. "
+            "Repeat for multiple lanes."
+        ),
+    )
+    parser.add_argument(
         "--profile",
         default=None,
         help=(
@@ -118,6 +164,28 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--gpus",
         default="0",
         help="Comma-separated GPU ids. One tmux shard is launched per GPU id.",
+    )
+    parser.add_argument(
+        "--gpu-group",
+        action="append",
+        default=[],
+        metavar="IDS",
+        help=(
+            "Comma-separated GPU ids that should be exposed to one tmux shard, "
+            "for example 0,1,2,3 for a sharded MoE load. Repeat for multiple "
+            "groups. When set, these groups define the shards and --gpus is "
+            "used only for payload visibility in dry-run output."
+        ),
+    )
+    parser.add_argument(
+        "--remote-env",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help=(
+            "Repeat to export an extra environment variable inside each remote "
+            "tmux shard, for example HF_HUB_DISABLE_XET=1."
+        ),
     )
     parser.add_argument(
         "--session-prefix",
@@ -155,7 +223,7 @@ def _remote_repo(remote_repo: str) -> tuple[str, list[str], list[str]]:
         'REPO_DIR=""',
         "for candidate in "
         + " ".join(shlex.quote(path) for path in candidate_paths)
-        + '; do if [ -d "$candidate/.git" ]; then REPO_DIR="$candidate"; break; fi; done',
+        + '; do if [ -d "$candidate/.git" ] || [ -f "$candidate/.git" ]; then REPO_DIR="$candidate"; break; fi; done',
         f'if [ -z "$REPO_DIR" ]; then REPO_DIR={shlex.quote(remote_repo)}; fi',
     ]
     return "$REPO_DIR", setup, candidate_paths
@@ -203,6 +271,44 @@ def _parse_gpus(raw: str) -> list[str]:
     return gpus
 
 
+def _parse_gpu_groups(
+    raw_items: list[str], fallback_gpus: list[str]
+) -> list[tuple[str, ...]]:
+    if not raw_items:
+        return [(gpu,) for gpu in fallback_gpus]
+    groups: list[tuple[str, ...]] = []
+    seen: set[tuple[str, ...]] = set()
+    for raw in raw_items:
+        group = tuple(item.strip() for item in raw.split(",") if item.strip())
+        if not group:
+            raise ValueError("--gpu-group entries must contain at least one GPU id")
+        if group in seen:
+            raise ValueError("--gpu-group entries must be unique")
+        seen.add(group)
+        groups.append(group)
+    return groups
+
+
+def _gpu_group_label(group: tuple[str, ...]) -> str:
+    return "-".join(re.sub(r"[^A-Za-z0-9_.-]+", "-", item) for item in group)
+
+
+def _flatten_gpu_groups(gpu_groups: list[tuple[str, ...]]) -> list[str]:
+    return list(dict.fromkeys(gpu for group in gpu_groups for gpu in group))
+
+
+def _parse_remote_env(raw_items: list[str]) -> list[tuple[str, str]]:
+    parsed: list[tuple[str, str]] = []
+    for raw in raw_items:
+        if "=" not in raw:
+            raise ValueError("--remote-env entries must use KEY=VALUE")
+        key, value = raw.split("=", 1)
+        if not REMOTE_ENV_KEY_RE.fullmatch(key):
+            raise ValueError(f"--remote-env key is not a valid shell name: {key!r}")
+        parsed.append((key, value))
+    return parsed
+
+
 def _shell_join(args: list[str]) -> str:
     return shlex.join(args)
 
@@ -225,13 +331,20 @@ def build_sync_command(
     repo_setup: list[str],
     python_setup: list[str],
 ) -> str:
+    quoted_branch = shlex.quote(branch)
+    origin_ref = f"origin/{branch}"
+    quoted_origin_ref = shlex.quote(origin_ref)
+    quoted_fetch_refspec = shlex.quote(f"refs/heads/{branch}:refs/remotes/{origin_ref}")
     return " && ".join(
         [
             *repo_setup,
             f"cd {_shell_path(remote_repo)}",
-            "git fetch origin",
-            f"git checkout {shlex.quote(branch)}",
-            f"git pull --ff-only origin {shlex.quote(branch)}",
+            f"git fetch origin {quoted_fetch_refspec}",
+            (
+                f"git checkout {quoted_branch} "
+                f"|| git checkout -b {quoted_branch} --track {quoted_origin_ref}"
+            ),
+            f"git merge --ff-only {quoted_origin_ref}",
             *python_setup,
             _shell_command(
                 [remote_python, "scripts/checks/sync_packaged_contracts.py", "--check"]
@@ -249,21 +362,25 @@ def build_launches(
     suite: str,
     slugs: list[str],
     lane_ids: list[str],
+    preset_overrides: list[str],
     profile: str | None,
     device: str,
     execution_mode: str,
-    gpus: list[str],
+    gpu_groups: list[tuple[str, ...]],
+    remote_env: list[tuple[str, str]],
     session_prefix: str,
     stamp: str,
     repo_setup: list[str],
     python_setup: list[str],
 ) -> list[RemoteLaunch]:
     launches: list[RemoteLaunch] = []
-    shard_count = len(gpus)
-    for shard_index, gpu in enumerate(gpus):
-        session = f"{session_prefix}-{stamp}-g{gpu}"
+    shard_count = len(gpu_groups)
+    for shard_index, gpu_group in enumerate(gpu_groups):
+        gpu = ",".join(gpu_group)
+        gpu_label = _gpu_group_label(gpu_group)
+        session = f"{session_prefix}-{stamp}-g{gpu_label}"
         shard_output_root = (
-            f"{remote_output_root.rstrip('/')}/shard-{shard_index:02d}-gpu-{gpu}"
+            f"{remote_output_root.rstrip('/')}/shard-{shard_index:02d}-gpu-{gpu_label}"
         )
         sweep_cmd = [
             remote_python,
@@ -287,6 +404,18 @@ def build_launches(
             sweep_cmd.extend(["--slug", slug])
         for lane_id in lane_ids:
             sweep_cmd.extend(["--lane-id", lane_id])
+        for preset_override in preset_overrides:
+            sweep_cmd.extend(["--preset-override", preset_override])
+
+        export_pairs = [
+            ("PYTHONPATH", "src"),
+            ("INVARLOCK_ALLOW_NETWORK", "1"),
+            *remote_env,
+            ("CUDA_VISIBLE_DEVICES", gpu),
+        ]
+        export_command = "export " + " ".join(
+            f"{key}={shlex.quote(value)}" for key, value in export_pairs
+        )
 
         inner_command = " && ".join(
             [
@@ -294,10 +423,7 @@ def build_launches(
                 f"cd {_shell_path(remote_repo)}",
                 f"mkdir -p {shlex.quote(shard_output_root)}",
                 *python_setup,
-                (
-                    "export PYTHONPATH=src INVARLOCK_ALLOW_NETWORK=1 "
-                    f"CUDA_VISIBLE_DEVICES={shlex.quote(gpu)}"
-                ),
+                export_command,
                 _shell_command(sweep_cmd),
             ]
         )
@@ -309,6 +435,7 @@ def build_launches(
             RemoteLaunch(
                 session=session,
                 gpu=gpu,
+                gpu_group=gpu_group,
                 shard_index=shard_index,
                 shard_count=shard_count,
                 output_root=shard_output_root,
@@ -341,6 +468,81 @@ def _monitor_commands(host: str, launches: list[RemoteLaunch]) -> dict[str, obje
     }
 
 
+def _remote_workflow_output_root(stamp: str) -> Path:
+    return REPO_ROOT / "tmp" / "model_evidence_remote_launches" / stamp
+
+
+def build_remote_workflow_plan(
+    *,
+    host: str,
+    stamp: str,
+    sync_command: str | None,
+    launches: list[RemoteLaunch],
+) -> RemoteWorkflowPlan:
+    output_root = _remote_workflow_output_root(stamp)
+    lanes: list[WorkflowLanePlan] = []
+    if sync_command is not None:
+        lane_root = output_root / "sync"
+        lanes.append(
+            WorkflowLanePlan(
+                slug="remote-sync",
+                lane_id="remote-sync",
+                model_id=host,
+                execution_mode="remote",
+                preset="remote-sync",
+                lane_root=lane_root,
+                published_lane_root=lane_root,
+                report_path=lane_root / "report" / "evaluation.report.json",
+                verify_path=lane_root / "verify.json",
+                profile="remote",
+                steps=(
+                    WorkflowCommandStep(
+                        name="sync",
+                        command=("ssh", host, sync_command),
+                        log_mode="w",
+                    ),
+                ),
+            )
+        )
+    for launch in launches:
+        lane_root = output_root / launch.session
+        lanes.append(
+            WorkflowLanePlan(
+                slug=launch.session,
+                lane_id=launch.session,
+                model_id=host,
+                execution_mode="remote",
+                preset="remote-launch",
+                lane_root=lane_root,
+                published_lane_root=lane_root,
+                report_path=lane_root / "report" / "evaluation.report.json",
+                verify_path=lane_root / "verify.json",
+                profile="remote",
+                steps=(
+                    WorkflowCommandStep(
+                        name="launch",
+                        command=tuple(launch.ssh_command),
+                        log_mode="w",
+                    ),
+                ),
+            )
+        )
+    workflow = WorkflowSweepPlan(
+        metadata=WorkflowRunMetadata(
+            suite="model-evidence-remote",
+            execution_mode="remote",
+        ),
+        output_root=output_root,
+        execution_root=output_root,
+        lanes=tuple(lanes),
+    )
+    return RemoteWorkflowPlan(
+        workflow=workflow,
+        sync_command=sync_command,
+        launches=tuple(launches),
+    )
+
+
 def run_remote(args: argparse.Namespace) -> int:
     stamp = _stamp(args.stamp)
     remote_repo, repo_setup, remote_repo_candidates = _remote_repo(args.remote_repo)
@@ -349,6 +551,9 @@ def run_remote(args: argparse.Namespace) -> int:
     )
     remote_output_root = args.remote_output_root or _default_remote_output_root(stamp)
     gpus = _parse_gpus(args.gpus)
+    gpu_groups = _parse_gpu_groups(args.gpu_group, gpus)
+    payload_gpus = _flatten_gpu_groups(gpu_groups)
+    remote_env = _parse_remote_env(args.remote_env)
 
     sync_command = None
     if not args.skip_sync:
@@ -368,14 +573,22 @@ def run_remote(args: argparse.Namespace) -> int:
         suite=args.suite,
         slugs=args.slug,
         lane_ids=args.lane_id,
+        preset_overrides=args.preset_override,
         profile=args.profile,
         device=args.device,
         execution_mode=args.execution_mode,
-        gpus=gpus,
+        gpu_groups=gpu_groups,
+        remote_env=remote_env,
         session_prefix=args.session_prefix,
         stamp=stamp,
         repo_setup=repo_setup,
         python_setup=python_setup,
+    )
+    remote_workflow = build_remote_workflow_plan(
+        host=args.host,
+        stamp=stamp,
+        sync_command=sync_command,
+        launches=launches,
     )
     payload = {
         "host": args.host,
@@ -387,29 +600,30 @@ def run_remote(args: argparse.Namespace) -> int:
         "remote_output_root": remote_output_root,
         "suite": args.suite,
         "execution_mode": args.execution_mode,
-        "gpus": gpus,
+        "gpus": payload_gpus,
+        "gpu_groups": [list(group) for group in gpu_groups],
+        "remote_env": [{"name": key, "value": value} for key, value in remote_env],
+        "preset_overrides": args.preset_override,
         "sync_command": sync_command,
         "launches": [launch.to_payload() for launch in launches],
+        "workflow": remote_workflow.to_payload()["workflow"],
         "monitor": _monitor_commands(args.host, launches),
     }
     if args.dry_run:
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 0
 
-    if sync_command is not None:
-        sync_proc = subprocess.run(
-            ["ssh", args.host, sync_command],
+    results = execute_workflow_sweep(
+        WorkflowSweepExecutionRequest(
+            plan=remote_workflow.workflow,
             cwd=REPO_ROOT,
-            check=False,
-            text=True,
+            env=os.environ,
+            fail_fast=True,
         )
-        if sync_proc.returncode != 0:
-            return sync_proc.returncode
-
-    for launch in launches:
-        proc = subprocess.run(launch.ssh_command, cwd=REPO_ROOT, check=False, text=True)
-        if proc.returncode != 0:
-            return proc.returncode
+    )
+    exit_code = workflow_return_code(results)
+    if exit_code != 0:
+        return exit_code
 
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0

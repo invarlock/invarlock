@@ -133,8 +133,6 @@ update_model_task_memory() {
             task_type=$(get_task_type "${task_file}")
 
             local result
-            local pack_root
-            pack_root="$(_pack_queue_pack_root)"
             result=$(TASK_TYPE="${task_type}" MODEL_ID="${model_id}" PROFILE_PATH="${profile_path}" \
                 EVAL_BATCH_SIZE_SMALL="${EVAL_BATCH_SIZE_SMALL:-auto:16}" \
                 EVAL_BATCH_SIZE_MEDIUM="${EVAL_BATCH_SIZE_MEDIUM:-auto:8}" \
@@ -148,7 +146,7 @@ update_model_task_memory() {
                 INVARLOCK_OVERHEAD_GB="${INVARLOCK_OVERHEAD_GB:-6}" \
                 GPU_MEMORY_PER_DEVICE="${GPU_MEMORY_PER_DEVICE:-${GPU_MEMORY_GB:-180}}" \
                 NUM_GPUS="${NUM_GPUS:-8}" \
-                _cmd_python "${pack_root}/python/queue_state.py" estimate-task-memory
+                _runtime_python queue_state.py estimate-task-memory
             )
 
             local required_mem=""

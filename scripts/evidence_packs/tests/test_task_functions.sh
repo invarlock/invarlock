@@ -98,6 +98,29 @@ write_minimal_validation_edit_artifact() {
     write_validation_edit_metadata "${edit_path}" "${edit_type}"
 }
 
+write_minimal_evaluate_baseline_report() {
+    local report_path="$1"
+    local seq_len="${2:-128}"
+    local stride="${3:-128}"
+    local preview_n="${4:-192}"
+    local final_n="${5:-192}"
+    cat > "${report_path}" <<JSON
+{
+  "data": {
+    "seq_len": ${seq_len},
+    "stride": ${stride},
+    "preview_n": ${preview_n},
+    "final_n": ${final_n}
+  },
+  "evaluation_windows": {
+    "preview": {"window_ids": [1], "input_ids": [[1]]},
+    "final": {"window_ids": [1], "input_ids": [[1]]}
+  },
+  "edit": {"name": "noop"}
+}
+JSON
+}
+
 test_default_ci_min_windows_accounts_for_padding() {
     mock_reset
     # shellcheck source=../task_functions.sh
@@ -686,7 +709,7 @@ test_task_evaluate_tasks_treat_nonzero_cli_rc_as_success_when_report_written() {
 
     _estimate_model_size() { echo "7"; }
     _ensure_evaluate_baseline_report() { echo "${TEST_TMPDIR}/baseline_report.json"; }
-    echo "{}" > "${TEST_TMPDIR}/baseline_report.json"
+    write_minimal_evaluate_baseline_report "${TEST_TMPDIR}/baseline_report.json"
 
     # evaluate_EDIT: rc!=0 but report exists -> treat as success
     local edit_dir="${model_output_dir}/models/quant_4bit_clean"
@@ -728,7 +751,7 @@ test_task_evaluate_tasks_generate_evaluation_report_when_only_report_json_writte
 
     _estimate_model_size() { echo "7"; }
     _ensure_evaluate_baseline_report() { echo "${TEST_TMPDIR}/baseline_report.json"; }
-    echo "{}" > "${TEST_TMPDIR}/baseline_report.json"
+    write_minimal_evaluate_baseline_report "${TEST_TMPDIR}/baseline_report.json"
 
     _cmd_python() {
         local script="$1"
@@ -790,7 +813,7 @@ test_task_evaluate_tasks_return_conversion_failure_when_report_generation_fails(
 
     _estimate_model_size() { echo "7"; }
     _ensure_evaluate_baseline_report() { echo "${TEST_TMPDIR}/baseline_report.json"; }
-    echo "{}" > "${TEST_TMPDIR}/baseline_report.json"
+    write_minimal_evaluate_baseline_report "${TEST_TMPDIR}/baseline_report.json"
     _cmd_python() {
         local script="$1"
         shift || true
@@ -1029,7 +1052,7 @@ test_task_evaluate_error_probe_warning_branches() {
 
     _estimate_model_size() { echo "7"; }
     _ensure_evaluate_baseline_report() { echo "${TEST_TMPDIR}/baseline_report.json"; }
-    echo "{}" > "${TEST_TMPDIR}/baseline_report.json"
+    write_minimal_evaluate_baseline_report "${TEST_TMPDIR}/baseline_report.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -1091,7 +1114,7 @@ EOF
     run task_evaluate_error "${model_name}" 0 "ve_mlp_scale_skew_skip" "${out}" "${log_file}"
     assert_rc "0" "${RUN_RC}" "missing ve probe prerequisites do not fail evaluate_error"
 
-    echo "{}" > "${TEST_TMPDIR}/baseline_report.json"
+    write_minimal_evaluate_baseline_report "${TEST_TMPDIR}/baseline_report.json"
     local ve_dir="${model_output_dir}/models/error_ve_mlp_scale_skew_case"
     mkdir -p "${ve_dir}"
     echo "{}" > "${ve_dir}/config.json"
@@ -1513,6 +1536,7 @@ EOF
 
     assert_eq "${baseline_report}" "${generated}" "baseline report path returned"
     assert_file_exists "${baseline_report}" "baseline report generated"
+    assert_match '"seed": 42' "$(cat "${baseline_report}")" "baseline report seed is stamped for evaluate reuse"
     assert_match "Generating reusable baseline report" "$(cat "${log_file}")" "generation logged"
     local env_capture
     env_capture="$(cat "${TEST_TMPDIR}/fixtures/python3.env")"
@@ -1524,6 +1548,10 @@ EOF
     local profile_contents
     profile_contents="$(cat "${baseline_root}/config_root/runtime/profiles/ci.yaml")"
     assert_match "skip_overhead_check: true" "${profile_contents}" "large-model baseline report profile carries skip_overhead policy"
+    local baseline_yaml_contents
+    baseline_yaml_contents="$(cat "${baseline_root}/baseline_noop.yaml")"
+    assert_match "assurance:" "${baseline_yaml_contents}" "baseline report config carries assurance section"
+    assert_match "mode: \"off\"" "${baseline_yaml_contents}" "baseline report config defaults evaluate assurance to off"
 }
 
 test_task_baseline_report_helpers_return_runner_failure() {
@@ -1660,7 +1688,7 @@ EOF
     export INVARLOCK_CERT_MIN_WINDOWS="192"
 
     local baseline_report="${TEST_TMPDIR}/baseline_report.json"
-    echo '{"evaluation_windows":{"preview":{"window_ids":[1],"input_ids":[[1]]},"final":{"window_ids":[1],"input_ids":[[1]]}},"edit":{"name":"noop"}}' > "${baseline_report}"
+    write_minimal_evaluate_baseline_report "${baseline_report}" 128 128 192 192
     _ensure_evaluate_baseline_report() { echo "${baseline_report}"; }
 
     resolve_edit_params() {
@@ -1678,7 +1706,7 @@ EOF
     assert_match "Reusing baseline report" "$(cat "${log_file}")" "baseline report reused"
     assert_match "Staged baseline report for evaluate runtime" "$(cat "${log_file}")" "baseline report staged into cert dir"
     assert_match "Staged preset for evaluate runtime" "$(cat "${log_file}")" "preset staged into cert dir"
-    assert_match "Normalized staged preset dataset for evaluate runtime: seq=128, stride=128, preview=192, final=192" "$(cat "${log_file}")" "preset dataset normalized for evaluate edit"
+    assert_match "Normalized staged preset dataset for evaluate runtime from baseline report" "$(cat "${log_file}")" "preset dataset normalized from reused baseline report for evaluate edit"
     assert_file_exists "${model_output_dir}/reports/_clean/run_1/runtime_inputs/baseline_report.json" "staged baseline report exists for evaluate edit"
     assert_file_exists "${model_output_dir}/reports/_clean/run_1/runtime_inputs/calibrated_preset_${model_name}.yaml" "staged preset exists for evaluate edit"
     local staged_preset_contents
@@ -1695,6 +1723,7 @@ EOF
     assert_match "INVARLOCK_STORE_EVAL_WINDOWS=1" "${calls}" "evaluate enables stored windows"
     assert_match "HF_HOME=${HF_HOME}" "${calls}" "evaluate preserves inherited HF cache root"
     assert_match "--baseline-report" "${calls}" "baseline report forwarded to invarlock evaluate"
+    assert_match "--assurance off" "${calls}" "evaluate forwards default assurance mode"
     assert_match "--edit-label custom" "${calls}" "empty edit label falls back to custom"
     assert_match "/reports/_clean/run_1/runtime_inputs/baseline_report\\.json" "${calls}" "staged baseline report path forwarded to evaluate"
     assert_match "/reports/_clean/run_1/runtime_inputs/calibrated_preset_${model_name}\\.yaml" "${calls}" "staged preset path forwarded to evaluate"
@@ -1739,6 +1768,19 @@ YAML
     assert_match "stride: 256" "${json_contents}" "json preset gets stride"
     assert_match "preview_n: 200" "${json_contents}" "json preset gets preview_n"
     assert_match "final_n: 220" "${json_contents}" "json preset gets final_n"
+
+    local report_backed_preset="${TEST_TMPDIR}/report-backed.yaml"
+    echo '{}' > "${report_backed_preset}"
+    local report_backed_baseline="${TEST_TMPDIR}/report-backed-baseline.json"
+    write_minimal_evaluate_baseline_report "${report_backed_baseline}" 512 512 218 218
+    _normalize_staged_preset_for_eval "${report_backed_preset}" 512 512 400 400 0 "${log_file}" "${report_backed_baseline}"
+    local report_backed_contents
+    report_backed_contents="$(cat "${report_backed_preset}")"
+    assert_match "seq_len: 512" "${report_backed_contents}" "baseline-report backed preset keeps seq_len"
+    assert_match "stride: 512" "${report_backed_contents}" "baseline-report backed preset keeps stride"
+    assert_match "preview_n: 218" "${report_backed_contents}" "baseline-report backed preset uses actual preview_n"
+    assert_match "final_n: 218" "${report_backed_contents}" "baseline-report backed preset uses actual final_n"
+    assert_match "from baseline report" "$(cat "${log_file}")" "normalization logs baseline-report source"
     pop_active_python_bin
 }
 
@@ -1767,7 +1809,7 @@ test_task_evaluate_error_reuses_baseline_report_for_nonstructural_errors_and_app
     export INVARLOCK_CERT_MIN_WINDOWS="192"
 
     local baseline_report="${TEST_TMPDIR}/baseline_report.json"
-    echo '{"evaluation_windows":{"preview":{"window_ids":[1],"input_ids":[[1]]},"final":{"window_ids":[1],"input_ids":[[1]]}},"edit":{"name":"noop"}}' > "${baseline_report}"
+    write_minimal_evaluate_baseline_report "${baseline_report}" 128 128 192 192
     _ensure_evaluate_baseline_report() { echo "${baseline_report}"; }
 
     mkdir -p "${out}/presets"
@@ -1781,7 +1823,7 @@ test_task_evaluate_error_reuses_baseline_report_for_nonstructural_errors_and_app
     assert_match "Reusing baseline report" "$(cat "${log_file}")" "baseline report reused"
     assert_match "Staged baseline report for evaluate runtime" "$(cat "${log_file}")" "baseline report staged into error cert dir"
     assert_match "Staged preset for evaluate runtime" "$(cat "${log_file}")" "preset staged into error cert dir"
-    assert_match "Normalized staged preset dataset for evaluate runtime: seq=128, stride=128, preview=192, final=192" "$(cat "${log_file}")" "preset dataset normalized for evaluate error"
+    assert_match "Normalized staged preset dataset for evaluate runtime from baseline report" "$(cat "${log_file}")" "preset dataset normalized from reused baseline report for evaluate error"
     assert_file_exists "${model_output_dir}/reports/errors/norm_collapse/evaluation.report.json" "error cert written"
     assert_file_exists "${model_output_dir}/reports/errors/norm_collapse/runtime_inputs/baseline_report.json" "staged baseline report exists for evaluate error"
     assert_file_exists "${model_output_dir}/reports/errors/norm_collapse/runtime_inputs/calibrated_preset_${model_name}.yaml" "staged preset exists for evaluate error"
@@ -1791,6 +1833,9 @@ test_task_evaluate_error_reuses_baseline_report_for_nonstructural_errors_and_app
     assert_match "stride: 128" "${staged_error_preset_contents}" "staged preset stride normalized for evaluate error"
     assert_match "preview_n: 192" "${staged_error_preset_contents}" "staged preset preview_n normalized for evaluate error"
     assert_match "final_n: 192" "${staged_error_preset_contents}" "staged preset final_n normalized for evaluate error"
+    local calls
+    calls="$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")"
+    assert_match "--assurance off" "${calls}" "error evaluate forwards default assurance mode"
     pop_active_python_bin
 }
 
@@ -1850,6 +1895,7 @@ test_task_evaluate_error_skips_baseline_report_reuse_for_structural_errors() {
     local calls
     calls="$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")"
     assert_match "--defer-report-rendering" "${calls}" "deferred optional report rendering flag forwarded for error evaluation"
+    assert_match "--assurance off" "${calls}" "structural error evaluate forwards default assurance mode"
     if [[ "${calls}" =~ --baseline-report ]]; then
         t_fail "expected structural error evaluate call to omit --baseline-report"
     fi
@@ -2617,7 +2663,7 @@ test_task_calibration_run_returns_config_runner_failure() {
     assert_rc "8" "${RUN_RC}" "calibration run returns config-runner failure"
 }
 
-test_task_calibration_run_returns_report_conversion_failure() {
+test_task_calibration_run_keeps_raw_report_when_report_conversion_fails() {
     mock_reset
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
@@ -2658,8 +2704,9 @@ test_task_calibration_run_returns_report_conversion_failure() {
     _cmd_python() { return 10; }
 
     run task_calibration_run "${model_name}" 0 "1" "42" "${out}" "${log_file}"
-    assert_rc "10" "${RUN_RC}" "calibration run returns report conversion failure"
-    assert_match "failed to generate evaluation\\.report\\.json" "$(cat "${log_file}")" "calibration conversion failure is logged"
+    assert_rc "0" "${RUN_RC}" "calibration run keeps raw report despite conversion failure"
+    assert_file_exists "${model_output_dir}/reports/calibration/run_1/baseline_report.json" "raw calibration report is retained"
+    assert_match "WARNING: calibration report kept without evaluation\\.report\\.json" "$(cat "${log_file}")" "calibration conversion warning is logged"
 }
 
 test_task_evaluate_edit_covers_effective_ci_and_staging_failure_branches() {

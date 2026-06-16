@@ -28,11 +28,15 @@ on:
         required: false
         default: "1"
         type: string
-  schedule:
-    - cron: "0 5 * * *"
 
 permissions:
   contents: read
+
+concurrency:
+  # Manual launches keep unique groups so maintainers can run explicit shards
+  # without canceling each other.
+  group: ${{ github.workflow }}-${{ github.run_id }}
+  cancel-in-progress: false
 
 jobs:
   model-evidence-sweep:

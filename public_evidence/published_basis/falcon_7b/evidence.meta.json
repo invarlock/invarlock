@@ -1,0 +1,22 @@
+{
+  "artifact_paths": {
+    "evaluation_report": "evaluation.report.json",
+    "evidence_pack": "evidence_pack",
+    "evidence_pack_recipe": "evidence_pack_recipe.json",
+    "runtime_manifest": "runtime.manifest.json"
+  },
+  "evidence_class": "strict_pass_fixture",
+  "expected_fingerprint": "sha256:9c4d57fa720129487b65e922acbba9484112d5f3c85beac3ce67d543bbc645c8",
+  "generated_by": "model evidence remote sweep",
+  "model_revision": "ec89142b67d748a1865ea4451372db8313ada0d8",
+  "non_goals": [
+    "Model weights are external Hugging Face references.",
+    "This fixture is a no-op preservation basis, not a fine-tuning or compression benchmark."
+  ],
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "Release-strict verifier fixture for the Falcon 7B published-basis lane.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/published_basis/falcon_7b/evaluation.report.json --profile release --assurance strict",
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/falcon_7b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:9c4d57fa720129487b65e922acbba9484112d5f3c85beac3ce67d543bbc645c8"
+  ]
+}

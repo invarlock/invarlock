@@ -21,6 +21,15 @@ __all__ = [
 ]
 
 
+def _release_activation_batch_memory(device: torch.device | None) -> None:
+    if device is None or device.type != "cuda":
+        return
+    try:
+        torch.cuda.empty_cache()
+    except (AttributeError, RuntimeError):
+        pass
+
+
 def collect_calibration_batches(
     calib: Any,
     max_windows: int,
@@ -197,6 +206,7 @@ def get_activation_modules(
                     "attention",
                     "mlp",
                     "ffn",
+                    "densereludense",
                     "router",
                     "expert",
                     "moe",
@@ -324,7 +334,7 @@ def activation_svd_outliers(
         return 0, 0.0, 0.0
 
     try:
-        mat = activations.detach().float().cpu()
+        mat = activations.detach().cpu().float()
     except (AttributeError, RuntimeError, TypeError, ValueError):
         # guard-fallback-ok: activation outlier helper has no report context; caller treats zero samples as not evaluated.
         return 0, 0.0, 0.0
@@ -370,12 +380,15 @@ def compute_activation_edge_risk(
     margin: float,
     classify_family_fn: Callable[[str], str],
     adapter: Any | None = None,
+    module_filter_fn: Callable[[str], bool] | None = None,
 ) -> dict[str, Any] | None:
     """Compute token-weighted activation edge-risk scores per module/family."""
     if not batches:
         return None
 
     modules = get_activation_modules(model, allowed_suffixes=allowed_suffixes)
+    if module_filter_fn is not None:
+        modules = [(name, module) for name, module in modules if module_filter_fn(name)]
     if not modules:
         return None
 
@@ -423,37 +436,46 @@ def compute_activation_edge_risk(
             return None
         with torch.inference_mode():
             for batch in batches:
+                prepared = None
+                inputs = None
+                attention_mask = None
+                model_inputs = None
                 prepare_generation_inputs = _resolve_adapter_hook(
                     adapter, "prepare_generation_inputs"
                 )
-                if callable(prepare_generation_inputs) and isinstance(batch, dict):
-                    prepared = prepare_generation_inputs(batch, device)
-                    inputs = prepared.get("input_ids")
-                    attention_mask = prepared.get("attention_mask")
-                    model_inputs = _model_kwargs(prepared)
-                else:
-                    inputs, attention_mask = prepare_activation_inputs(batch, device)
-                    model_inputs = None
-                if inputs is None:
-                    continue
-                batch_weight = batch_token_weight(inputs, attention_mask)
-                batch_weight_holder["weight"] = batch_weight
                 try:
-                    if model_inputs is not None:
-                        model(**model_inputs)
-                    elif attention_mask is not None:
-                        model(inputs, attention_mask=attention_mask)
+                    if callable(prepare_generation_inputs) and isinstance(batch, dict):
+                        prepared = prepare_generation_inputs(batch, device)
+                        inputs = prepared.get("input_ids")
+                        attention_mask = prepared.get("attention_mask")
+                        model_inputs = _model_kwargs(prepared)
                     else:
-                        model(inputs)
-                except TypeError:
-                    try:
-                        model(inputs)
-                    except (AttributeError, RuntimeError, TypeError, ValueError):
+                        inputs, attention_mask = prepare_activation_inputs(
+                            batch, device
+                        )
+                    if inputs is None:
                         continue
-                except (AttributeError, RuntimeError, ValueError):
-                    continue
-                batches_used += 1
-                token_weight_total += batch_weight
+                    batch_weight = batch_token_weight(inputs, attention_mask)
+                    batch_weight_holder["weight"] = batch_weight
+                    try:
+                        if model_inputs is not None:
+                            model(**model_inputs)
+                        elif attention_mask is not None:
+                            model(inputs, attention_mask=attention_mask)
+                        else:
+                            model(inputs)
+                    except TypeError:
+                        try:
+                            model(inputs)
+                        except (AttributeError, RuntimeError, TypeError, ValueError):
+                            continue
+                    except (AttributeError, RuntimeError, ValueError):
+                        continue
+                    batches_used += 1
+                    token_weight_total += batch_weight
+                finally:
+                    del prepared, inputs, attention_mask, model_inputs
+                    _release_activation_batch_memory(device)
     finally:
         for handle in handles:
             try:
@@ -564,42 +586,49 @@ def compute_activation_outliers(
             return None
         with torch.inference_mode():
             for batch in batches:
+                prepared = None
+                inputs = None
+                attention_mask = None
+                model_inputs = None
                 prepare_generation_inputs = _resolve_adapter_hook(
                     getattr(guard, "adapter", None),
                     "prepare_generation_inputs",
                 )
-                if callable(prepare_generation_inputs) and isinstance(batch, dict):
-                    prepared = prepare_generation_inputs(batch, device)
-                    inputs = prepared.get("input_ids")
-                    attention_mask = prepared.get("attention_mask")
-                    model_inputs = _model_kwargs(prepared)
-                else:
-                    inputs, attention_mask = guard._prepare_activation_inputs(
-                        batch, device
-                    )
-                    model_inputs = None
-                if inputs is None:
-                    continue
-                batch_weight = guard._batch_token_weight(inputs, attention_mask)
-                batch_weight_holder["weight"] = batch_weight
                 try:
-                    if model_inputs is not None:
-                        model(**model_inputs)
-                    elif attention_mask is not None:
-                        model(inputs, attention_mask=attention_mask)
+                    if callable(prepare_generation_inputs) and isinstance(batch, dict):
+                        prepared = prepare_generation_inputs(batch, device)
+                        inputs = prepared.get("input_ids")
+                        attention_mask = prepared.get("attention_mask")
+                        model_inputs = _model_kwargs(prepared)
                     else:
-                        model(inputs)
-                    batches_used += 1
-                    token_weight_total += batch_weight
-                except TypeError:
+                        inputs, attention_mask = guard._prepare_activation_inputs(
+                            batch, device
+                        )
+                    if inputs is None:
+                        continue
+                    batch_weight = guard._batch_token_weight(inputs, attention_mask)
+                    batch_weight_holder["weight"] = batch_weight
                     try:
-                        model(inputs)
+                        if model_inputs is not None:
+                            model(**model_inputs)
+                        elif attention_mask is not None:
+                            model(inputs, attention_mask=attention_mask)
+                        else:
+                            model(inputs)
                         batches_used += 1
                         token_weight_total += batch_weight
-                    except (AttributeError, RuntimeError, TypeError, ValueError):
+                    except TypeError:
+                        try:
+                            model(inputs)
+                            batches_used += 1
+                            token_weight_total += batch_weight
+                        except (AttributeError, RuntimeError, TypeError, ValueError):
+                            continue
+                    except (AttributeError, RuntimeError, ValueError):
                         continue
-                except (AttributeError, RuntimeError, ValueError):
-                    continue
+                finally:
+                    del prepared, inputs, attention_mask, model_inputs
+                    _release_activation_batch_memory(device)
     finally:
         for handle in handles:
             try:

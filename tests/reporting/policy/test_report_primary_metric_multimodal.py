@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from invarlock.reporting.render import render_report_markdown
-
 from invarlock.reporting.report_validation import compute_validation_flags
 
 
@@ -80,3 +79,51 @@ def test_primary_metric_accuracy_gating_and_render():
     }
     md = render_report_markdown(cert)
     assert "## Primary Metric" in md
+
+
+def test_accuracy_zero_to_zero_preview_final_drift_passes():
+    flags = compute_validation_flags(
+        {"preview_final_ratio": 0.0, "ratio_vs_baseline": 0.0},
+        {"caps_applied": 0, "max_caps": 5},
+        {"stable": True},
+        {"status": "pass"},
+        tier="balanced",
+        _ppl_metrics=None,
+        target_ratio=None,
+        guard_overhead=None,
+        primary_metric={
+            "kind": "accuracy",
+            "preview": 0.0,
+            "final": 0.0,
+            "ratio_vs_baseline": 0.0,
+            "counts_source": "measured",
+            "n_final": 400,
+        },
+    )
+
+    assert flags["preview_final_drift_acceptable"] is True
+    assert flags["primary_metric_acceptable"] is True
+
+
+def test_accuracy_preview_final_split_delta_uses_accuracy_tolerance():
+    flags = compute_validation_flags(
+        {"preview_final_ratio": 0.0, "ratio_vs_baseline": 1.0},
+        {"caps_applied": 0, "max_caps": 5},
+        {"stable": True},
+        {"status": "pass"},
+        tier="balanced",
+        _ppl_metrics=None,
+        target_ratio=None,
+        guard_overhead=None,
+        primary_metric={
+            "kind": "accuracy",
+            "preview": 0.0125,
+            "final": 0.035,
+            "ratio_vs_baseline": 1.0,
+            "counts_source": "measured",
+            "n_final": 400,
+        },
+    )
+
+    assert flags["preview_final_drift_acceptable"] is True
+    assert flags["primary_metric_acceptable"] is True

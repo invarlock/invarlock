@@ -391,13 +391,31 @@ _validate_evaluate_baseline_report() {
     local expected_adapter="$2"
     local expected_profile="$3"
     local expected_tier="$4"
+    local expected_assurance="${5:-off}"
+    local expected_preview_n="${6:-}"
+    local expected_final_n="${7:-}"
 
     if [[ -z "${report_path}" || ! -f "${report_path}" ]]; then
         return 1
     fi
 
-    _cmd_python "${SCRIPT_DIR}/../../python/task_tools.py" validate-baseline-report \
-        "${report_path}" "${expected_adapter}" "${expected_profile}" "${expected_tier}"
+    local -a validate_args=(
+        "${SCRIPT_DIR}/../../python/task_tools.py"
+        validate-baseline-report
+        "${report_path}"
+        "${expected_adapter}"
+        "${expected_profile}"
+        "${expected_tier}"
+        "${expected_assurance}"
+    )
+    if [[ "${expected_preview_n}" =~ ^[0-9]+$ ]]; then
+        validate_args+=(--expected-preview-n "${expected_preview_n}")
+    fi
+    if [[ "${expected_final_n}" =~ ^[0-9]+$ ]]; then
+        validate_args+=(--expected-final-n "${expected_final_n}")
+    fi
+
+    _cmd_python "${validate_args[@]}"
 }
 
 _stage_runtime_input_for_eval() {
@@ -441,6 +459,19 @@ _pack_defer_report_rendering_enabled() {
     esac
 }
 
+_pack_evaluate_assurance_mode() {
+    local value="${PACK_EVALUATE_ASSURANCE:-off}"
+    case "${value}" in
+        strict|off)
+            printf '%s\n' "${value}"
+            ;;
+        *)
+            echo "ERROR: PACK_EVALUATE_ASSURANCE must be strict or off, got: ${value}" >&2
+            return 1
+            ;;
+    esac
+}
+
 _normalize_staged_preset_for_eval() {
     local staged_preset="$1"
     local seq_len="$2"
@@ -449,6 +480,7 @@ _normalize_staged_preset_for_eval() {
     local final_n="$5"
     local skip_overhead="$6"
     local log_file="$7"
+    local baseline_report="${8:-}"
 
     if [[ -z "${staged_preset}" || ! -f "${staged_preset}" ]]; then
         return 1
@@ -458,11 +490,17 @@ _normalize_staged_preset_for_eval() {
         "task_tools.py"
         "normalize-staged-preset"
         --preset "${staged_preset}"
-        --seq-len "${seq_len}"
-        --stride "${stride}"
-        --preview-n "${preview_n}"
-        --final-n "${final_n}"
     )
+    if [[ -n "${baseline_report}" && -f "${baseline_report}" ]]; then
+        normalize_args+=(--baseline-report "${baseline_report}")
+    else
+        normalize_args+=(
+            --seq-len "${seq_len}"
+            --stride "${stride}"
+            --preview-n "${preview_n}"
+            --final-n "${final_n}"
+        )
+    fi
     if [[ "${skip_overhead}" == "1" ]]; then
         normalize_args+=(--skip-overhead-check)
     fi
@@ -493,7 +531,11 @@ _normalize_staged_preset_for_eval() {
     else
         unset PYTHON_BIN
     fi
-    echo "  Normalized staged preset dataset for evaluate runtime: seq=${seq_len}, stride=${stride}, preview=${preview_n}, final=${final_n}" >> "${log_file}"
+    if [[ -n "${baseline_report}" && -f "${baseline_report}" ]]; then
+        echo "  Normalized staged preset dataset for evaluate runtime from baseline report: ${baseline_report}" >> "${log_file}"
+    else
+        echo "  Normalized staged preset dataset for evaluate runtime: seq=${seq_len}, stride=${stride}, preview=${preview_n}, final=${final_n}" >> "${log_file}"
+    fi
     if [[ "${skip_overhead}" == "1" ]]; then
         echo "  Injected context.run.skip_overhead_check=true into staged preset" >> "${log_file}"
     fi
@@ -526,9 +568,11 @@ _ensure_evaluate_baseline_report() {
         # Fallback for odd environments; must match what invarlock evaluate will resolve.
         adapter_name="hf_causal"
     fi
+    local evaluate_assurance
+    evaluate_assurance="$(_pack_evaluate_assurance_mode)" || return 1
 
     if [[ -f "${baseline_report_file}" ]]; then
-        if _validate_evaluate_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" 2>/dev/null; then
+        if _validate_evaluate_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" "${evaluate_assurance}" "${preview_n}" "${final_n}" 2>/dev/null; then
             echo "${baseline_report_file}"
             return 0
         fi
@@ -539,7 +583,7 @@ _ensure_evaluate_baseline_report() {
     if mkdir "${lock_dir}" 2>/dev/null; then
         # Re-check after acquiring the lock.
         if [[ -f "${baseline_report_file}" ]]; then
-            if _validate_evaluate_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" 2>/dev/null; then
+            if _validate_evaluate_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" "${evaluate_assurance}" "${preview_n}" "${final_n}" 2>/dev/null; then
                 rmdir "${lock_dir}" 2>/dev/null || true
                 echo "${baseline_report_file}"
                 return 0
@@ -621,6 +665,13 @@ edit:
   name: "noop"
   plan: {}
 
+context:
+  assurance:
+    mode: "${evaluate_assurance}"
+
+assurance:
+  mode: "${evaluate_assurance}"
+
 guards:
   order:
 ${guards_order_yaml}
@@ -668,6 +719,11 @@ YAML
                 local tmp_report="${baseline_report_file}.tmp"
                 cp "${report_file}" "${tmp_report}" 2>/dev/null || true
                 if [[ -f "${tmp_report}" ]]; then
+                    _cmd_python "${SCRIPT_DIR}/../../python/task_tools.py" stamp-baseline-report-seed \
+                        --report "${tmp_report}" \
+                        --seed 42 >> "${log_file}" 2>&1 || {
+                        echo "  WARNING: Failed to stamp baseline report seed into ${tmp_report}" >> "${log_file}"
+                    }
                     mv "${tmp_report}" "${baseline_report_file}" 2>/dev/null || true
                 fi
             fi
@@ -675,7 +731,7 @@ YAML
 
         rmdir "${lock_dir}" 2>/dev/null || true
 
-        if [[ -f "${baseline_report_file}" ]] && _validate_evaluate_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" 2>/dev/null; then
+        if [[ -f "${baseline_report_file}" ]] && _validate_evaluate_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" "${evaluate_assurance}" "${preview_n}" "${final_n}" 2>/dev/null; then
             echo "${baseline_report_file}"
             return 0
         fi
@@ -696,7 +752,7 @@ YAML
 
     echo "  Waiting for baseline report to be generated by another worker... (timeout=${wait_secs}s)" >> "${log_file}"
     for _ in $(seq 1 "${wait_iters}"); do
-        if [[ -f "${baseline_report_file}" ]] && _validate_evaluate_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" 2>/dev/null; then
+        if [[ -f "${baseline_report_file}" ]] && _validate_evaluate_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" "${evaluate_assurance}" "${preview_n}" "${final_n}" 2>/dev/null; then
             echo "${baseline_report_file}"
             return 0
         fi

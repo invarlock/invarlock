@@ -1,0 +1,9 @@
+{
+  "assurance": "strict",
+  "basis": "public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json",
+  "evidence_run": "20260614Tgemma4_26b_a4b_json_sanity",
+  "model_id": "google/gemma-4-26B-A4B-it",
+  "note": "Container-backed release-profile Gemma 4 26B-A4B MoE image-text published-basis evidence run with structured JSON answer prompt.",
+  "profile": "release",
+  "verdict": "PASS"
+}

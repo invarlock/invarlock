@@ -60,6 +60,91 @@ def test_compute_validation_flags_accuracy_hysteresis(monkeypatch):
     assert flags["primary_metric_tail_acceptable"] is True
 
 
+def test_compute_validation_flags_accuracy_uses_default_preview_final_limit(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
+
+    flags = validation_mod.compute_validation_flags(
+        ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
+        spectral={"caps_applied": 0},
+        rmt={"stable": True},
+        invariants={"status": "pass"},
+        tier="balanced",
+        primary_metric={
+            "kind": "accuracy",
+            "preview": 0.9,
+            "final": 0.75,
+            "ratio_vs_baseline": 1.0,
+            "n_final": 20,
+        },
+        dataset_capacity={"examples_available": 20},
+        get_tier_policies_fn=lambda: {
+            "balanced": {
+                "metrics": {
+                    "pm_ratio": {
+                        "hysteresis_ratio": 0.0,
+                        "min_tokens": 0,
+                        "min_token_fraction": 0.0,
+                    },
+                    "accuracy": {
+                        "delta_min_pp": -1.0,
+                        "min_examples": 0,
+                        "min_examples_fraction": 0.0,
+                    },
+                },
+                "spectral": {"max_caps": 3},
+            }
+        },
+    )
+
+    assert flags["primary_metric_acceptable"] is True
+    assert flags["preview_final_drift_acceptable"] is False
+
+
+def test_compute_validation_flags_accuracy_uses_configured_preview_final_limit(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
+
+    flags = validation_mod.compute_validation_flags(
+        ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
+        spectral={"caps_applied": 0},
+        rmt={"stable": True},
+        invariants={"status": "pass"},
+        tier="balanced",
+        primary_metric={
+            "kind": "accuracy",
+            "preview": 0.9,
+            "final": 0.75,
+            "ratio_vs_baseline": 1.0,
+            "n_final": 20,
+        },
+        dataset_capacity={"examples_available": 20},
+        get_tier_policies_fn=lambda: {
+            "balanced": {
+                "metrics": {
+                    "pm_ratio": {
+                        "hysteresis_ratio": 0.0,
+                        "min_tokens": 0,
+                        "min_token_fraction": 0.0,
+                    },
+                    "accuracy": {
+                        "delta_min_pp": -1.0,
+                        "min_examples": 0,
+                        "min_examples_fraction": 0.0,
+                        "preview_final_delta_pp_max": 0.2,
+                    },
+                },
+                "spectral": {"max_caps": 3},
+            }
+        },
+    )
+
+    assert flags["primary_metric_acceptable"] is True
+    assert flags["preview_final_drift_acceptable"] is True
+
+
 def test_compute_validation_flags_core_gates_ppl_and_tail_fail(monkeypatch):
     fake_policies = {
         "balanced": {

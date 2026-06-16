@@ -252,5 +252,11 @@ pack_mini_pack_entrypoint() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    if [[ "${PACK_WORKFLOW_SUBPROCESS:-0}" != "1" \
+        && "${PACK_USE_WORKFLOW_FRONTDOOR:-1}" != "0" \
+        && "${1:-}" != "--help" \
+        && "${1:-}" != "-h" ]]; then
+        exec python3 "${SCRIPT_DIR}/python/workflow_frontdoor.py" mini-pack -- "$@"
+    fi
     pack_mini_pack_entrypoint "$@"
 fi

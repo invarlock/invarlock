@@ -170,6 +170,57 @@ def test_build_verify_json_result_item_and_payload() -> None:
     assert payload["results"][1]["recompute"] is None
 
 
+def test_build_verify_json_result_item_counts_guard_warnings_fallback() -> None:
+    class _BadWarningCount:
+        def __int__(self) -> int:
+            raise TypeError("bad warning count")
+
+    item = verify_output.build_verify_json_result_item(
+        Path("report.json"),
+        {
+            "guard_warnings": {
+                "present": False,
+                "warning_count": _BadWarningCount(),
+                "warnings": [{"guard": "spectral"}, {"guard": "rmt"}],
+            }
+        },
+        ok=True,
+        reason="ok",
+        tolerance=1e-9,
+    )
+
+    assert item["guard_warnings_present"] is True
+    assert item["warning_count"] == 2
+
+
+def test_build_verify_json_result_item_handles_non_dict_report_object() -> None:
+    item = verify_output.build_verify_json_result_item(
+        Path("report.json"),
+        object(),  # type: ignore[arg-type]
+        ok=True,
+        reason="ok",
+        tolerance=1e-9,
+    )
+
+    assert item["kind"] == ""
+    assert item["guard_warnings_present"] is False
+    assert item["warning_count"] == 0
+    assert item["recompute"] is None
+
+
+def test_build_verify_json_result_item_ignores_malformed_guard_warnings() -> None:
+    item = verify_output.build_verify_json_result_item(
+        Path("report.json"),
+        {"guard_warnings": "bad"},
+        ok=True,
+        reason="ok",
+        tolerance=1e-9,
+    )
+
+    assert item["guard_warnings_present"] is False
+    assert item["warning_count"] == 0
+
+
 def test_build_verify_error_payload_and_success_line() -> None:
     payload = verify_output.build_verify_error_payload(
         Path("cert.json"),

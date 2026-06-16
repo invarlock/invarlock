@@ -15,7 +15,11 @@ def _baseline_payload() -> dict[str, Any]:
     return {
         "edit": {"name": "noop"},
         "meta": {"adapter": "hf_causal"},
-        "context": {"profile": "ci", "auto": {"tier": "balanced"}},
+        "context": {
+            "profile": "ci",
+            "auto": {"tier": "balanced"},
+            "assurance": {"mode": "off"},
+        },
         "evaluation_windows": {
             "preview": {"window_ids": ["p1"], "input_ids": [[1, 2]]},
             "final": {"window_ids": ["f1"], "input_ids": [[3, 4]]},
@@ -23,10 +27,18 @@ def _baseline_payload() -> dict[str, Any]:
     }
 
 
-def _validate(path: Path) -> int:
-    return task_tools.main(
-        ["validate-baseline-report", str(path), "hf_causal", "ci", "balanced"]
-    )
+def _validate(
+    path: Path,
+    *,
+    expected_preview_n: int | None = None,
+    expected_final_n: int | None = None,
+) -> int:
+    args = ["validate-baseline-report", str(path), "hf_causal", "ci", "balanced"]
+    if expected_preview_n is not None:
+        args.extend(["--expected-preview-n", str(expected_preview_n)])
+    if expected_final_n is not None:
+        args.extend(["--expected-final-n", str(expected_final_n)])
+    return task_tools.main(args)
 
 
 def test_validate_baseline_report_accepts_expected_contract(tmp_path: Path) -> None:
@@ -34,6 +46,15 @@ def test_validate_baseline_report_accepts_expected_contract(tmp_path: Path) -> N
     _write_report(report_path, _baseline_payload())
 
     assert _validate(report_path) == 0
+
+
+def test_validate_baseline_report_rejects_window_count_mismatch(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "baseline.report.json"
+    _write_report(report_path, _baseline_payload())
+
+    assert _validate(report_path, expected_preview_n=400, expected_final_n=400) == 1
 
 
 def test_validate_baseline_report_requires_expected_metadata(

@@ -21,6 +21,7 @@ invarlock evaluate --allow-network \
 # Render HTML from the emitted evaluation bundle
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 invarlock report explain --evaluation-report reports/eval/evaluation.report.json
+invarlock report export -i reports/eval/evaluation.report.json --format release-review-md
 ```
 
 Model-loading commands use the runtime container by default unless a
@@ -35,8 +36,10 @@ quick-start path above stays wheel-compatible by using direct flags only.
 - `runs/` is scratch space: evaluate emits baseline/subject working artifacts there.
 - `reports/` is evidence: archive `evaluation.report.json` and `runtime.manifest.json`
   for audit, plus any HTML or evidence-pack outputs you distribute.
-- evaluation bundles reference baseline/subject report artifacts; keep them
-  together to preserve pairing and make later review easier.
+- evaluation bundles may reference baseline/subject report artifacts; keep them
+  together when you want regeneration, deeper provenance review, or low-level
+  run telemetry, but `evaluation.report.json` is the canonical portable artifact
+  for verification, rendering, validation, and explanation.
 
 ### Command outputs
 
@@ -44,6 +47,7 @@ quick-start path above stays wheel-compatible by using direct flags only.
 | --- | --- | --- |
 | `invarlock evaluate` | `runs/`, `reports/<name>/evaluation.report.json`, `runtime.manifest.json` | Evaluation report bundle plus runtime provenance for container-backed runs. |
 | `invarlock report html` | `reports/<name>/evaluation.html` | Optional (can be rebuilt). |
+| `invarlock report export` | Optional output path for `mlflow-tags.json`, `model-card-invarlock.md`, or `release-review.md` | Optional reviewer/registry convenience output (can be rebuilt). |
 
 ## Reference
 
@@ -65,6 +69,10 @@ reports/
     evaluation.report.json
     runtime.manifest.json
     evaluation.html
+    mlflow-tags.json
+    model-card-invarlock.md
+    release-review.md
+    invarlock-verify.json
 ```
 
 ### Archive checklist
@@ -80,6 +88,10 @@ reports/
 | `runtime.manifest.json` | Runtime provenance for container-backed outputs | Yes |
 | `events.jsonl` | Debugging timeline | No |
 | `evaluation.html` | Human review | No |
+| `mlflow-tags.json` | Registry tag handoff | No |
+| `model-card-invarlock.md` | Model-card evidence block | No |
+| `release-review.md` | Reviewer packet | No |
+| `invarlock-verify.json` | Stored CI verify output | No |
 
 ### Seeds, hashes, and policy digests
 
@@ -91,14 +103,15 @@ reports/
 
 1. Copy `evaluation.report.json` and `runtime.manifest.json` into `reports/`
    for retention.
-2. Keep any referenced baseline/subject artifacts alongside derived reports for
-   pairing checks and `report explain`.
+2. Keep any referenced baseline/subject artifacts alongside derived reports when
+   you need regeneration or low-level run telemetry.
 3. Remove stale timestamped runs once evidence is archived.
 
 ## Troubleshooting
 
-- **Missing pairing artifacts**: `report explain` and some advanced workflows
-  need the baseline/subject artifacts referenced by the evaluation bundle.
+- **Missing pairing artifacts**: `report explain --evaluation-report` works from
+  `evaluation.report.json`; use explicit `--subject-report`/`--baseline-report`
+  only when you need to rebuild the explanation from raw run artifacts.
 - **Large run dirs**: prune old timestamped runs after archiving reports.
 
 ## Observability

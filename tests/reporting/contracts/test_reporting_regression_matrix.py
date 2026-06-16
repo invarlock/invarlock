@@ -457,6 +457,53 @@ def test_verify_helpers_cover_report_loading_primary_metric_and_validation_edges
     )
     assert any("drift ratio out of band" in err for err in drift_parse_band_errors)
 
+    class _BrokenResolvedPolicy(dict):
+        def get(self, key, default=None):  # noqa: ANN001
+            raise RuntimeError(f"broken:{key}")
+
+    accuracy_default_errors = verify_helpers_mod._validate_drift_band(  # noqa: SLF001
+        {
+            "primary_metric": {
+                "kind": "accuracy",
+                "preview": 0.9,
+                "final": 0.75,
+            },
+            "resolved_policy": _BrokenResolvedPolicy({"metrics": {}}),
+        }
+    )
+    assert any("≤ 0.100000" in err for err in accuracy_default_errors)
+    assert verify_helpers_mod._validate_drift_band(  # noqa: SLF001
+        {
+            "primary_metric": {
+                "kind": "accuracy",
+                "preview": 0.9,
+                "final": 0.75,
+            },
+            "resolved_policy": {"metrics": {"accuracy": "not-a-dict"}},
+        }
+    )
+    assert (
+        verify_helpers_mod._validate_drift_band(  # noqa: SLF001
+            {
+                "primary_metric": {
+                    "kind": "accuracy",
+                    "preview": 0.9,
+                    "final": 0.75,
+                },
+                "resolved_policy": {
+                    "metrics": {"accuracy": {"preview_final_delta_pp_max": 0.2}}
+                },
+            }
+        )
+        == []
+    )
+    assert (
+        verify_helpers_mod._validate_drift_band(  # noqa: SLF001
+            {"primary_metric": {"kind": "bleu"}}
+        )
+        == []
+    )
+
 
 def test_verify_contract_profile_resolution_and_baseline_digest_fallbacks(
     tmp_path: Path,
@@ -473,6 +520,38 @@ def test_verify_contract_profile_resolution_and_baseline_digest_fallbacks(
         verify_contract_mod._load_baseline_digest(baseline_path)  # noqa: SLF001
         is None
     )
+
+    assert verify_contract_mod._normalize_warning_policy("strict") == "fail"  # noqa: SLF001
+    with pytest.raises(ValueError, match="warning_policy"):
+        verify_contract_mod._normalize_warning_policy("bad")  # noqa: SLF001
+
+    class _BadWarningCount:
+        def __int__(self) -> int:
+            raise TypeError("not an int")
+
+    diagnostics = verify_contract_mod._guard_warning_diagnostics(  # noqa: SLF001
+        {
+            "guard_warnings": {
+                "warning_count": _BadWarningCount(),
+                "warnings": [
+                    "bad-entry",
+                    {
+                        "guard": "spectral",
+                        "kind": "new_capped_module",
+                        "module": "layers.0.mlp",
+                        "policy_gate": "pass",
+                    },
+                ],
+            }
+        }
+    )
+    assert [diagnostic.level for diagnostic in diagnostics] == ["warning", "warning"]
+    assert "layers.0.mlp" in diagnostics[1].message
+    summary_only = verify_contract_mod._guard_warning_diagnostics(  # noqa: SLF001
+        {"guard_warnings": {"warning_count": 2, "warnings": "not-a-list"}}
+    )
+    assert len(summary_only) == 1
+    assert summary_only[0].message == "Guard warnings present: 2"
 
 
 def test_verify_helpers_and_contract_cover_profile_parse_and_recompute_edges(

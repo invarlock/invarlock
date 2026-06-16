@@ -6,7 +6,7 @@ from typing import Any
 from invarlock.core.metric_kind_contract import is_ppl_metric_kind
 from invarlock.core.runner_pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
 
-from .report_builder_support import record_report_build_event
+from .report_build_evidence import record_report_build_event
 
 _NON_FATAL_EXCEPTIONS = (
     AttributeError,

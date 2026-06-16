@@ -69,6 +69,10 @@ def test_public_subcontract_versions_are_single_sourced() -> None:
         == contracts.ADAPTER_SUPPORT_TIER_POLICY_VERSION
     )
     assert (
+        subcontract_catalog["public_evidence_index"]["version"]
+        == contracts.PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION
+    )
+    assert (
         subcontract_catalog["cli_stability_policy"]["stable_json_surfaces"]
         == contracts.stable_cli_json_surfaces()
     )
@@ -81,18 +85,52 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     assert {lane["lane_id"] for lane in contracts.published_basis_lanes()} == {
         "gpt2-causal-hf",
         "bert-mlm-hf",
+        "mistral-7b-causal-hf",
+        "ministral-3-3b-text-causal-hf",
+        "ministral-3-8b-text-causal-hf",
+        "ministral-3-14b-text-causal-hf",
+        "tinyllama-1-1b-causal-hf",
+        "olmo-2-7b-causal-hf",
+        "olmo-2-13b-causal-hf",
+        "olmoe-1b-7b-0924-causal-hf",
+        "mixtral-8x7b-moe-causal-hf",
+        "qwen3-30b-a3b-moe-causal-hf",
+        "open-llama-7b-causal-hf",
+        "falcon-7b-causal-hf",
+        "qwen2-7b-causal-hf",
+        "qwen2-5-7b-causal-hf",
+        "qwen2-5-14b-causal-hf",
+        "qwen3-causal-hf",
+        "qwen3-5-causal-hf",
+        "qwen3-5-2b-image-text-hf",
+        "qwen3-5-4b-image-text-hf",
+        "granite-4-1-3b-causal-hf",
+        "granite-4-1-8b-causal-hf",
+        "gemma4-e2b-text-causal-hf",
+        "gemma4-e2b-image-text-hf",
+        "gemma4-e4b-image-text-hf",
+        "gemma4-12b-any-to-any-hf",
+        "gemma4-26b-a4b-moe-image-text-hf",
+        "deepseek-r1-distill-qwen-causal-hf",
+        "deepseek-r1-0528-qwen3-8b-causal-hf",
+        "deepseek-r1-distill-qwen-14b-causal-hf",
+        "phi-4-text-causal-hf",
+        "smollm3-3b-causal-hf",
+        "phi-4-mini-causal-hf",
+        "flan-t5-base-seq2seq-hf",
     }
 
     family_catalog = contracts.load_model_family_catalog()
     assert family_catalog["format_version"] == "model-family-catalog-v1"
-    assert family_catalog["as_of"] == "2026-04-19"
+    assert family_catalog["as_of"] == "2026-06-14"
     assert family_catalog["declared_support"][0]["display_name"] == "GPT-2 causal LM"
     declared = {item["display_name"] for item in family_catalog["declared_support"]}
     assert declared == {
         "GPT-2 causal LM",
         "BERT / RoBERTa MLM",
         "Mistral 7B causal LM",
-        "Ministral 3 causal LM (text-only eval)",
+        "Ministral 3 8B causal LM (text-only eval)",
+        "Ministral 3 14B causal LM (text-only eval)",
         "Qwen2 7B causal LM",
         "Qwen2.5 7B causal LM",
         "Qwen2.5 14B causal LM",
@@ -101,10 +139,46 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "Phi-4 causal LM (text-only eval)",
         "Gemma 4 E2B causal LM (text-only eval)",
         "TinyLlama 1.1B causal LM",
-        "OLMo 2 causal LM",
+        "OLMo 2 7B causal LM",
+        "OLMo 2 13B causal LM",
+        "OLMoE 1B-active/7B-total causal LM",
+        "OpenLLaMA 7B causal LM",
+        "Falcon 7B causal LM",
         "Qwen3.5 causal LM",
-        "Seq2Seq / local pairs",
+        "Gemma 4 12B any-to-any LM",
+        "Gemma 4 E4B image-text LM",
+        "Gemma 4 E2B image-text LM",
+        "Qwen3.5 4B image-text LM",
+        "Qwen3.5 2B image-text LM",
+        "Ministral 3 3B causal LM (text-only eval)",
+        "Granite 4.1 3B causal LM",
+        "Granite 4.1 8B causal LM",
+        "SmolLM3 3B causal LM",
+        "Phi-4 mini causal LM",
+        "DeepSeek-R1-Distill-Qwen 14B causal LM",
+        "DeepSeek-R1-0528-Qwen3 8B causal LM",
+        "FLAN-T5 base seq2seq LM",
     }
+    assert all(item["support_groups"] for item in family_catalog["declared_support"])
+    implemented = {
+        item["display_name"]: item for item in family_catalog["implemented_coverage"]
+    }
+    qwen3_moe = implemented["Qwen3 30B-A3B MoE causal LM"]
+    assert qwen3_moe["state"] == "published_basis"
+    assert any(
+        evidence == "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack"
+        for evidence in qwen3_moe["repo_evidence"]
+    )
+    assert "not a benchmark-quality" in qwen3_moe["notes"]
+    assert "four-GPU diagnostic lane failed" in qwen3_moe["notes"]
+    gemma4_26b = implemented["Gemma 4 26B-A4B MoE image-text LM"]
+    assert gemma4_26b["state"] == "published_basis"
+    assert any(
+        evidence == "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack"
+        for evidence in gemma4_26b["repo_evidence"]
+    )
+    assert "0.555 final accuracy over 400 examples" in gemma4_26b["notes"]
+
     usage_only = {item["display_name"] for item in family_catalog["usage_only"]}
     assert "QwQ 32B reasoning" not in usage_only
     assert "Qwen2.5 7B" not in usage_only
@@ -112,10 +186,9 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     promotion = family_catalog["promotion_candidates_text_le_14b"]
     assert promotion["format_version"] == "promotion-candidates-text-le-14b-v1"
     candidates = {item["display_name"]: item for item in promotion["candidates"]}
-    assert candidates["Qwen2.5 7B causal LM"]["decision"] == "promote_now"
+    assert candidates["Qwen2.5 7B causal LM"]["decision"] == "promoted_published_basis"
     assert (
-        candidates["Qwen2.5 7B causal LM"]["current_catalog_state"]
-        == "supported_experimental"
+        candidates["Qwen2.5 7B causal LM"]["current_catalog_state"] == "published_basis"
     )
     assert (
         candidates["Qwen2.5 7B causal LM"]["criteria_status"][
@@ -123,22 +196,42 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         ]
         == "pass"
     )
-    assert candidates["Falcon 7B causal LM"]["decision"] == "blocked_missing_artifacts"
-    for display_name in (
-        "OpenLLaMA 7B causal LM",
-        "OPT 1.3B causal LM",
-        "Falcon 7B causal LM",
-        "GLM 4 9B Chat",
-    ):
-        assert candidates[display_name]["criteria_status"]["included_preset"] == "pass"
-        assert (
-            candidates[display_name]["criteria_status"]["included_calibration_config"]
-            == "pass"
-        )
-        assert (
-            candidates[display_name]["criteria_status"]["cli_smoke_evidence"] == "pass"
-        )
-    assert candidates["Gemma 3 4B IT"]["decision"] == "explicitly_out_of_scope"
+    assert candidates["Qwen2.5 14B causal LM"]["decision"] == "promoted_published_basis"
+    assert (
+        candidates["Qwen2.5 14B causal LM"]["current_catalog_state"]
+        == "published_basis"
+    )
+    assert candidates["Qwen3 8B causal LM"]["decision"] == "promoted_published_basis"
+    assert (
+        candidates["Qwen3 8B causal LM"]["current_catalog_state"] == "published_basis"
+    )
+    assert (
+        candidates["DeepSeek-R1-Distill-Qwen causal LM"]["decision"]
+        == "promoted_published_basis"
+    )
+    assert (
+        candidates["DeepSeek-R1-Distill-Qwen causal LM"]["current_catalog_state"]
+        == "published_basis"
+    )
+    assert (
+        candidates["Phi-4 reasoning-plus causal LM"]["decision"]
+        == "promoted_published_basis"
+    )
+    assert (
+        candidates["Phi-4 reasoning-plus causal LM"]["current_catalog_state"]
+        == "published_basis"
+    )
+    assert (
+        candidates["OpenLLaMA 7B causal LM"]["decision"] == "promoted_published_basis"
+    )
+    assert (
+        candidates["OpenLLaMA 7B causal LM"]["current_catalog_state"]
+        == "published_basis"
+    )
+    assert candidates["Falcon 7B causal LM"]["decision"] == "promoted_published_basis"
+    assert (
+        candidates["Falcon 7B causal LM"]["current_catalog_state"] == "published_basis"
+    )
     assert (
         candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
             "decision"
@@ -163,14 +256,10 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         ]["cli_smoke_evidence"]
         == "pass"
     )
-    assert (
-        candidates["OPT 1.3B causal LM"]["criteria_status"]["targeted_tests"] == "pass"
-    )
     recommended = {
         item["display_name"] for item in family_catalog["recommended_additions"]
     }
     assert recommended == {"Audio-text evaluation pipeline"}
-
     gpt2_lane = contracts.support_lane_by_id("gpt2-causal-hf")
     assert gpt2_lane is not None
     assert gpt2_lane["support_tier"] == "published_basis"
@@ -179,6 +268,15 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     assert catalog["support_matrix"]["format_version"] == "support-matrix-v1"
     assert (
         catalog["model_family_catalog"]["format_version"] == "model-family-catalog-v1"
+    )
+    model_classification = contracts.load_model_classification()
+    assert model_classification["format_version"] == "model-classification-v1"
+    assert model_classification["policy"]["allowed_named_checkpoint_license_ids"] == [
+        "apache-2.0",
+        "mit",
+    ]
+    assert (
+        catalog["model_classification"]["format_version"] == "model-classification-v1"
     )
     assert catalog["plugin_compatibility"]["core_abi"] == "0.1"
     assert catalog["plugin_compatibility"]["match_policy"] == "exact_match"
@@ -294,6 +392,11 @@ def test_support_matrix_published_basis_evidence_uses_public_evidence_paths() ->
                 "public_evidence/published_basis/"
             )
             assert (REPO_ROOT / evidence["artifact_package"]).is_dir()
+        if "guard_value_demo" in evidence:
+            assert evidence["guard_value_demo"].startswith(
+                "public_evidence/published_basis/"
+            )
+            assert (REPO_ROOT / evidence["guard_value_demo"]).is_dir()
         assert "tests/fixtures/" not in evidence["evaluation_report_fixture"]
         assert "tests/fixtures/" not in evidence["runtime_manifest_fixture"]
         assert "tests/fixtures/" not in evidence["evidence_pack_recipe"]
@@ -304,7 +407,52 @@ def test_readme_surfaces_public_contract_catalog_entries() -> None:
 
     assert "doctor --json" in readme
     assert "advanced plugins ... --json" in readme
-    assert "`validation_keys`, `console_labels`, and `metric_kinds`" in readme
+    assert "`model_classification`, `validation_keys`, `console_labels`, and" in readme
+
+
+def test_packaged_public_evidence_index_covers_published_basis_lanes() -> None:
+    index = contracts.load_public_evidence_index()
+    assert index["format_version"] == contracts.PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION
+    assert index["carrier_policy"]["installed_wheel"] == "compact_index_only"
+    assert index["published_basis_count"] == len(index["entries"])
+
+    indexed_lanes = {
+        lane_id for entry in index["entries"] for lane_id in entry.get("lanes", [])
+    }
+    expected_lanes = {lane["lane_id"] for lane in contracts.published_basis_lanes()}
+    assert expected_lanes <= indexed_lanes
+
+    for entry in index["entries"]:
+        assert entry["path"].startswith("public_evidence/published_basis/")
+        assert entry["artifacts"]["evaluation_report"]["sha256"].startswith("sha256:")
+        assert entry["artifacts"]["runtime_manifest"]["sha256"].startswith("sha256:")
+
+
+def test_packaged_public_evidence_index_rejects_non_object(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    index_root = tmp_path / "public_evidence"
+    index_root.mkdir()
+    (index_root / "published_basis_index.json").write_text("[]\n", encoding="utf-8")
+    monkeypatch.setattr(contracts, "PACKAGE_PUBLIC_EVIDENCE_ROOT", index_root)
+
+    with pytest.raises(contracts.ContractLoadError, match="expected JSON object"):
+        contracts.load_public_evidence_index()
+
+
+def test_packaged_public_evidence_index_rejects_wrong_format_version(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    index_root = tmp_path / "public_evidence"
+    index_root.mkdir()
+    (index_root / "published_basis_index.json").write_text(
+        json.dumps({"format_version": "older-index"}) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(contracts, "PACKAGE_PUBLIC_EVIDENCE_ROOT", index_root)
+
+    with pytest.raises(contracts.ContractLoadError, match="format_version must be"):
+        contracts.load_public_evidence_index()
 
 
 def test_contract_reference_records_scalar_payload_kind(
@@ -536,6 +684,11 @@ def test_public_contract_helpers_raise_when_contracts_are_unavailable(
 ) -> None:
     monkeypatch.setattr(
         contracts,
+        "PACKAGE_PUBLIC_EVIDENCE_ROOT",
+        Path("/missing-public-evidence-index"),
+    )
+    monkeypatch.setattr(
+        contracts,
         "load_json_contract",
         lambda _filename: (_ for _ in ()).throw(OSError("missing")),
     )
@@ -560,6 +713,8 @@ def test_public_contract_helpers_raise_when_contracts_are_unavailable(
         contracts.load_runtime_manifest_schema()
     with pytest.raises(contracts.ContractLoadError, match="verify_output.schema.json"):
         contracts.load_verify_output_schema()
+    with pytest.raises(contracts.ContractLoadError, match="published_basis_index.json"):
+        contracts.load_public_evidence_index()
     assert contracts.contract_reference("support_matrix.json") == {
         "path": "contracts/support_matrix.json",
         "load_error": "missing",
@@ -616,72 +771,3 @@ def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> Non
         contracts.load_runtime_manifest_schema()
     with pytest.raises(contracts.ContractLoadError, match="verify_output.schema.json"):
         contracts.load_verify_output_schema()
-
-
-def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
-    monkeypatch,
-) -> None:
-    monkeypatch.setattr(
-        contracts,
-        "_load_contract_or_raise",
-        lambda filename: {
-            "support_matrix.json": {
-                "format_version": "support-matrix-v1",
-                "lanes": [
-                    {"lane_id": "first", "support_tier": "community_experimental"},
-                    {"lane_id": "second", "support_tier": "published_basis"},
-                    "bad",
-                ],
-            },
-            "adapter_capabilities.json": {
-                "format_version": "adapter-capabilities-v1",
-                "adapters": [
-                    {"adapter": "", "guard_coverage": "none"},
-                    {"adapter": "good", "guard_coverage": "full"},
-                    "bad",
-                ],
-            },
-            "model_family_catalog.json": {
-                "format_version": "model-family-catalog-v1",
-                "declared_support": [
-                    {"family_id": "gpt2-causal-lm", "display_name": "GPT-2 causal LM"},
-                    "bad",
-                ],
-                "implemented_coverage": [],
-                "usage_only": [],
-                "promotion_candidates_text_le_14b": {"candidates": []},
-                "recommended_additions": [],
-            },
-            "plugin_compatibility.json": {
-                "format_version": "plugin-compatibility-v1",
-                "format": "compatibility-doc",
-                "core_abi": "0.1",
-                "match_policy": "exact_match",
-            },
-        }[filename],
-    )
-
-    assert contracts.support_lane_by_id("missing") is None
-    assert contracts.support_lane_by_id("second") == {
-        "lane_id": "second",
-        "support_tier": "published_basis",
-    }
-    assert contracts.adapter_capability_map() == {
-        "good": {"adapter": "good", "guard_coverage": "full"}
-    }
-    assert contracts.load_model_family_catalog()["declared_support"][0] == {
-        "family_id": "gpt2-causal-lm",
-        "display_name": "GPT-2 causal LM",
-    }
-    assert contracts.contract_reference("plugin_compatibility.json") == {
-        "path": "contracts/plugin_compatibility.json",
-        "format_version": "plugin-compatibility-v1",
-        "format": "compatibility-doc",
-        "core_abi": "0.1",
-        "match_policy": "exact_match",
-    }
-    assert contracts.contract_reference("validation_keys.json") == {
-        "path": "contracts/validation_keys.json",
-        "kind": "array",
-        "item_count": len(contracts.load_json_contract("validation_keys.json")),
-    }

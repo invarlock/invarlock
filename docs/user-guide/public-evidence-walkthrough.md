@@ -127,6 +127,45 @@ That artifact is the concrete real-run evidence for BYOE/custom subjects: the
 checkpoint weights are not vendored, `checkpoint_refs.json` records the external
 edit type and file hashes, and the report records `edit_name = custom`.
 
+## Export evidence for reviewers
+
+Existing public reports can be converted into CI and registry handoff artifacts
+without adding generated files to `public_evidence/`:
+
+```bash
+mkdir -p reports/public-evidence-export
+
+invarlock verify --json \
+  public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json \
+  --profile release \
+  --assurance strict \
+  > reports/public-evidence-export/invarlock-verify.json
+
+invarlock report export \
+  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json \
+  --format mlflow-tags \
+  --policy-profile release \
+  --verify-result reports/public-evidence-export/invarlock-verify.json \
+  --output reports/public-evidence-export/mlflow-tags.json
+
+invarlock report export \
+  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json \
+  --format model-card-md \
+  --verify-result reports/public-evidence-export/invarlock-verify.json \
+  --output reports/public-evidence-export/model-card-invarlock.md
+
+invarlock report export \
+  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json \
+  --format release-review-md \
+  --policy-profile release \
+  --verify-result reports/public-evidence-export/invarlock-verify.json \
+  --output reports/public-evidence-export/release-review.md
+```
+
+These generated files are reviewer conveniences. The canonical evidence remains
+the checked-in `evaluation.report.json`, `runtime.manifest.json`, and evidence
+pack.
+
 ## BYOE edit examples
 
 The repository also ships small strict-verifiable BYOE examples for multiple
@@ -176,6 +215,34 @@ spectral did not pass
 
 That is the intended strict-verification behavior: guard stability is required even
 when the summary metric is clean.
+
+## Real guard-value demo
+
+The Mistral 7B published basis also ships a real scenario-pack artifact, separate
+from the fixture-only caught regressions:
+
+```bash
+invarlock verify --profile release --assurance report \
+  public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json
+```
+
+Expected outcome: verification passes for the selected report itself. The
+packaged `guard_value_summary.json` records the guard-value comparison:
+PM-only accepts `spectral_moderate_scale_mlp_l31_up_s112`
+(`ratio_vs_baseline = 1.0076338080085065`), while the evidence-pack PM+guards
+comparison finds one new spectral cap relative to the Mistral noop basis:
+`model.layers.31.mlp.up_proj`.
+
+The same artifact includes `spectral_moderate_scale_attn_l31_o_s112` as a
+negative control: the same 1.12x scale on the closest non-baseline attention
+module passes PM and does not add a new baseline-relative cap. The compact sweep
+summary records adjacent scale points showing that the attention target starts
+triggering at 1.18 and the FFN target remains PM-accepted through 1.20.
+
+This is not a strict spectral-failure example: `validation.spectral_stable`
+remains true because the spectral cap budget is not exceeded. It is an
+evidence-pack guard-value demonstration: baseline-only guard signals do not count
+as new guard catches, but a PM-passing run that adds a new capped module does.
 
 ## Policy failures
 

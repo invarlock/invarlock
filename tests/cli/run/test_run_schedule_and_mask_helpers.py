@@ -304,6 +304,66 @@ def test_extract_pairing_schedule_supports_multimodal_records() -> None:
     )
 
 
+def test_extract_pairing_schedule_prefers_multimodal_input_records() -> None:
+    report = {
+        "evaluation_windows": {
+            "preview": {
+                "example_ids": ["ex-1"],
+                "records": [{"id": "ex-1", "prediction": "red", "references": ["red"]}],
+                "input_records": [
+                    {
+                        "id": "ex-1",
+                        "image_path": "/tmp/red.ppm",
+                        "prompt": "what color?",
+                        "answers": ["red"],
+                    }
+                ],
+            },
+            "final": {
+                "example_ids": ["ex-2"],
+                "records": [
+                    {"id": "ex-2", "prediction": "green", "references": ["green"]}
+                ],
+                "input_records": [
+                    {
+                        "id": "ex-2",
+                        "image_path": "/tmp/green.ppm",
+                        "prompt": "what color?",
+                        "answers": ["green"],
+                    }
+                ],
+            },
+        }
+    }
+
+    sched = extract_pairing_schedule(report)
+
+    assert sched == {
+        "preview": {
+            "example_ids": ["ex-1"],
+            "records": [
+                {
+                    "id": "ex-1",
+                    "image_path": "/tmp/red.ppm",
+                    "prompt": "what color?",
+                    "answers": ["red"],
+                }
+            ],
+        },
+        "final": {
+            "example_ids": ["ex-2"],
+            "records": [
+                {
+                    "id": "ex-2",
+                    "image_path": "/tmp/green.ppm",
+                    "prompt": "what color?",
+                    "answers": ["green"],
+                }
+            ],
+        },
+    }
+
+
 def test_compute_provider_digest_uses_meta_processor_fallback() -> None:
     digest = compute_provider_digest(
         {

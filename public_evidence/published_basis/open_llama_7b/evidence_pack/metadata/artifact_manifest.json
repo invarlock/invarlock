@@ -1,0 +1,122 @@
+{
+  "execution_mode": "container",
+  "files": [
+    {
+      "bytes": 2579534,
+      "path": "eval/distilbert_base_uncased/report/evaluation.report.json",
+      "sha256": "3382dc3337e5c1b23ea5187b705a684ba3d839f5f85408e056fb60ccbf4ca13d"
+    },
+    {
+      "bytes": 748,
+      "path": "eval/distilbert_base_uncased/verify.json",
+      "sha256": "167576127e4920fc6acf3678253af36fba1d23b983f230b3ed9fbe23aca4ebf6"
+    },
+    {
+      "bytes": 9711765,
+      "path": "eval/openlm_research_open_llama_7b/report/evaluation.report.json",
+      "sha256": "6bf5dbb4a4d8409d421ee5408169a3bfb968e209dd22c52a5c73dbdb80237a5c"
+    },
+    {
+      "bytes": 737,
+      "path": "eval/openlm_research_open_llama_7b/verify.json",
+      "sha256": "16a996f2f859d5200bd07ed7654db193a4c90f631dcfc2095d8bb0f05ea0eba9"
+    },
+    {
+      "bytes": 9825323,
+      "path": "eval/tiiuae_falcon_7b/report/evaluation.report.json",
+      "sha256": "a62961b5993f57cc257557ce0fce2ae6a590ac238825d33b42fafdd2e228c449"
+    },
+    {
+      "bytes": 724,
+      "path": "eval/tiiuae_falcon_7b/verify.json",
+      "sha256": "5f31beab46e0632303cef8366af8a67503587306032aacbac6d1f523b5758238"
+    },
+    {
+      "bytes": 6713,
+      "path": "logs/distilbert_base_uncased.log",
+      "sha256": "e7d8ff4e0d3aeedd54a3deeb18e7c8c2f6b5d719e55c7d6dece4ab146a7e2c7e"
+    },
+    {
+      "bytes": 6832,
+      "path": "logs/openlm_research_open_llama_7b.log",
+      "sha256": "c20f07fee2b3a4e28850587bcd014bc3fdb5541cabe03960d01f58e940ef496f"
+    },
+    {
+      "bytes": 6816,
+      "path": "logs/tiiuae_falcon_7b.log",
+      "sha256": "89c638da0c9436dedd9a669d5b6266e34f35ee1028aba60b2b9e7aaccd47a546"
+    },
+    {
+      "bytes": 1156,
+      "path": "manifest.json",
+      "sha256": "1f5ffa0cb99a63d14c3b29dfae9e495f27c45ca8025251e1088f87fe15b212cc"
+    },
+    {
+      "bytes": 1955,
+      "path": "model_revisions.json",
+      "sha256": "48cfa503f50e91cfc8fd48f4d12937b7810a845c6f7f88581808d61ac679734d"
+    },
+    {
+      "bytes": 601,
+      "path": "status.log",
+      "sha256": "f2df376815483949173767beea4e96895530ec236bf87235f22979b7883ea1a4"
+    },
+    {
+      "bytes": 2052,
+      "path": "summary.json",
+      "sha256": "0b0fcb8ba1d4326dbfb5c619271a75f15d16600a9d333b90abc94675969400d2"
+    },
+    {
+      "bytes": 683,
+      "path": "summary.tsv",
+      "sha256": "2f24b21306abf0335ab78566b992a15195e8505a14dc8b9882ac32176fafdf23"
+    }
+  ],
+  "generated_at": "2026-06-13T02:56:34.133039+00:00",
+  "lane_results": [
+    {
+      "detail": null,
+      "evaluate_exit": 0,
+      "lane_id": "promotion-gap::openlm_research_open_llama_7b",
+      "model_id": "openlm-research/open_llama_7b",
+      "ok": true,
+      "preset": "configs/presets/causal_lm/open_llama_7b_512.yaml",
+      "report_path": "/root/model-evidence/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/eval/openlm_research_open_llama_7b/report/evaluation.report.json",
+      "slug": "openlm_research_open_llama_7b",
+      "status": "ok",
+      "verify_exit": 0,
+      "verify_path": "/root/model-evidence/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/eval/openlm_research_open_llama_7b/verify.json"
+    },
+    {
+      "detail": null,
+      "evaluate_exit": 0,
+      "lane_id": "promotion-gap::tiiuae_falcon_7b",
+      "model_id": "tiiuae/falcon-7b",
+      "ok": true,
+      "preset": "configs/presets/causal_lm/falcon_7b_512.yaml",
+      "report_path": "/root/model-evidence/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/eval/tiiuae_falcon_7b/report/evaluation.report.json",
+      "slug": "tiiuae_falcon_7b",
+      "status": "ok",
+      "verify_exit": 0,
+      "verify_path": "/root/model-evidence/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/eval/tiiuae_falcon_7b/verify.json"
+    },
+    {
+      "detail": "verify_failed",
+      "evaluate_exit": 0,
+      "lane_id": "promotion-gap::distilbert_base_uncased",
+      "model_id": "distilbert-base-uncased",
+      "ok": false,
+      "preset": "configs/presets/masked_lm/distilbert_base_uncased_128.yaml",
+      "report_path": "/root/model-evidence/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/eval/distilbert_base_uncased/report/evaluation.report.json",
+      "slug": "distilbert_base_uncased",
+      "status": "failed",
+      "verify_exit": 1,
+      "verify_path": "/root/model-evidence/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/eval/distilbert_base_uncased/verify.json"
+    }
+  ],
+  "ok": false,
+  "schema": "invarlock/model-evidence-artifact-manifest-v1",
+  "shard_count": 2,
+  "shard_index": 0,
+  "suite": "promotion-gap-gpu"
+}

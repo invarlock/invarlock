@@ -1,0 +1,9 @@
+{
+  "assurance": "strict",
+  "basis": "public_evidence/published_basis/olmoe_1b_7b/evaluation.report.json",
+  "evidence_run": "20260613Tolmoe1b7bH100A",
+  "model_id": "allenai/OLMoE-1B-7B-0924",
+  "note": "Container-backed release-profile OLMoE 1B-active/7B-total no-op preservation evidence run on pinned WikiText-103 text data after the smaller-MoE validation pass.",
+  "profile": "release",
+  "verdict": "PASS"
+}

@@ -1,0 +1,23 @@
+{
+  "execution_mode": "container",
+  "generated_at": "2026-06-12T01:31:48.630135+00:00",
+  "models": [
+    {
+      "model_id": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+      "revisions": [
+        {
+          "commit_hash": "916b56a44061fd5cd7d6a8fb632557ed4f724f60",
+          "refs": [
+            "main"
+          ],
+          "size_on_disk": 15238335532,
+          "snapshot_path": "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-7B/snapshots/916b56a44061fd5cd7d6a8fb632557ed4f724f60"
+        }
+      ],
+      "slug": "deepseek_r1_distill_qwen_7b",
+      "status": "observed"
+    }
+  ],
+  "schema": "invarlock/model-evidence-model-revisions-v1",
+  "suite": "current-supported-experimental"
+}

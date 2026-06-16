@@ -98,11 +98,13 @@ def test_evaluate_cli_forwards_execution_mode(monkeypatch):
             "subject",
             "--execution-mode",
             "host",
+            "--allow-remote-code",
         ],
     )
 
     assert result.exit_code == 0, result.output
     assert seen["execution_mode"] == "host"
+    assert seen["allow_remote_code"] is True
 
 
 def test_ordered_group_handles_advanced_and_unknown_lazy_subapps():

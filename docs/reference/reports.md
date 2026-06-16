@@ -17,6 +17,7 @@ telemetry fields, and HTML export.
 - [Quick Start](#quick-start)
 - [report Layout](#report-layout)
   - [Executive Summary Interpretation](#executive-summary-interpretation)
+- [Report Outline](report-outline.md)
 - [Schema](#schema)
   - [Minimal v1 report Example](#minimal-v1-report-example)
   - [Schema Summary](#schema-summary-validator-view)
@@ -24,6 +25,7 @@ telemetry fields, and HTML export.
   - [Primary Metric Tail Gate](#primary-metric-tail-gate-optional)
 - [Telemetry Fields](#telemetry-fields)
 - [HTML Export](#html-export)
+- [CI and Registry Exports](#ci-and-registry-exports)
 - [Troubleshooting](#troubleshooting)
 - [Related Documentation](#related-documentation)
 
@@ -42,7 +44,7 @@ invarlock report generate \
 invarlock verify reports/eval/evaluation.report.json
 # expects reports/eval/runtime.manifest.json next to the report
 
-# Explain a bundle directly from report provenance
+# Explain a bundle directly from the evaluation report
 invarlock report explain --evaluation-report reports/eval/evaluation.report.json
 
 # Inspect telemetry fields
@@ -50,29 +52,62 @@ jq '.telemetry' reports/eval/evaluation.report.json
 
 # Export to HTML
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
+
+# Export CI/model-registry handoff artifacts
+invarlock report export -i reports/eval/evaluation.report.json --format mlflow-tags
+invarlock report export -i reports/eval/evaluation.report.json --format model-card-md
+invarlock report export -i reports/eval/evaluation.report.json --format release-review-md
 ```
 
 Artifact model:
 
 | Artifact | Produced by | Primary consumers |
 | --- | --- | --- |
-| `evaluation.report.json` | `invarlock evaluate`, `invarlock report generate --format report` | `invarlock verify`, `invarlock report html`, `invarlock report validate`, `invarlock report explain --evaluation-report`, `invarlock advanced runtime-verify` |
+| `evaluation.report.json` | `invarlock evaluate`, `invarlock report generate --format report` | `invarlock verify`, `invarlock report html`, `invarlock report export`, `invarlock report validate`, `invarlock report explain --evaluation-report`, `invarlock advanced runtime-verify` |
 | `report.json` | Baseline/subject run directories under `runs/...` | `invarlock report generate`, `invarlock report explain --subject-report ... --baseline-report ...` |
+
+`report explain --evaluation-report` reads `evaluation.report.json` directly.
+Raw subject and baseline `report.json` files are still useful when you need to
+regenerate the paired evaluation bundle or inspect low-level run telemetry, but
+portable fixtures that ship only `evaluation.report.json`,
+`runtime.manifest.json`, and evidence metadata can still be verified, rendered,
+validated, and explained.
 
 ## report Layout
 
 The markdown report is structured to highlight evaluation outcomes first:
 
+New renderers should use the shared renderer-neutral
+[Report Outline](report-outline.md) rather than deriving their own section
+order from the historical Markdown body. The outline groups modern report
+evidence as Decision, Primary Metric, Policy Gates, Guard Signals, optional
+Benchmark Comparison, Evidence And Provenance, and Technical Appendix.
+
 Container-backed evaluations emit `runtime.manifest.json` next to
 `evaluation.report.json`. Archive and verify them together.
 
-The HTML export keeps that same body content but adds a browser shell with:
+The HTML export renders that shared outline directly instead of converting the
+historical Markdown body. It adds:
 
-- summary chips for the overall status, primary-metric kind, and linked-run readiness
-- quick links for the major report sections
-- anchored section headings so reviews can deep-link directly into the report
+- a summary ledger row for verdict, subject model, baseline model/run, metric,
+  and guard warnings
+- a sticky brand/theme row with a light/dark toggle
+- quick links for the outline sections, with hash anchors and the active
+  section highlight aligned to the sticky row while scrolling
+- task-aware primary-metric wording, including ratio output for ppl-like tasks
+  and percentage-point deltas for accuracy tasks
+- guard-warning detail tables when baseline-relative warning data is present
+- an optional Benchmark Comparison section when benchmark/scenario data is
+  embedded in the report
+- capped appendix previews for raw policy/plugin/artifact blocks, with
+  `evaluation.report.json` remaining the complete audit artifact
 
-- **Executive Summary**: one-line PASS/FAIL + compact gate table (primary metric, drift, invariants, spectral, RMT, overhead).
+The embedded stylesheet follows the current InvarLock site Ledger ink token
+map: warm paper/ink in light mode, warm-black/cream in dark mode, blue as the
+brand accent, oxblood as the editorial signal, and green/red/yellow reserved
+for verdict states.
+
+- **Decision**: PASS/FAIL, evidence mode, subject model, baseline model/run, edit, primary metric, and warning count.
 - **Quality Gates**: table of canonical gating checks with measured values.
 - **Guard Check Details**: invariants, spectral stability, RMT health, and pairing snapshots.
 - **Primary Metric**: task-specific metric summary with CI + baseline comparison.
@@ -312,6 +347,8 @@ fields while enforcing a small, stable core:
   - `primary_metric_tail_acceptable`
   - `preview_final_drift_acceptable`
   - `guard_overhead_acceptable`
+  - `guard_warnings_present`
+  - `guard_warning_policy_acceptable`
   - `invariants_pass`
   - `spectral_stable`
   - `rmt_stable`
@@ -320,6 +357,17 @@ fields while enforcing a small, stable core:
   - `moe_identity_ok`
 - The validator rejects reports that contain non‑boolean values under
   any of these keys.
+
+**Guard warnings (optional):**
+
+- `guard_warnings.present`: `true` when the subject has guard-signal movement
+  relative to the baseline while the hard policy may still pass.
+- `guard_warnings.warning_count`: number of warning records.
+- `guard_warnings.warnings[]`: structured warnings with `guard`, `kind`,
+  optional `family`/`module`, `baseline`, `subject`, `policy_gate`, and
+  `message`.
+- Warnings are advisory by default. `invarlock verify --warning-policy fail` or
+  `--fail-on-warnings` treats any warning as a verification failure.
 
 **Policy and structure:**
 
@@ -348,6 +396,7 @@ The full machine‑readable schema is available at runtime via
 | `dataset` / `evaluation_windows` | `report.data`, `report.dataset.windows.stats` | Pairing + count checks. |
 | `primary_metric` | `report.metrics.primary_metric` | Ratio + drift band (CI/Release). |
 | `validation` | `report.metrics` + policy thresholds | Schema allow‑list only. |
+| `guard_warnings` | Baseline/subject guard evidence | Advisory by default; fail only under strict warning policy. |
 | `spectral` / `rmt` / `variance` | `report.guards[]` | Measurement contracts (CI/Release). |
 | `guard_overhead` | `report.guard_overhead` | Required in Release unless skipped. |
 | `provenance.provider_digest` | `report.provenance.provider_digest` | Required in CI/Release. |
@@ -410,12 +459,11 @@ include the execution device. CPU telemetry sweeps are collected via
 
 ## HTML Export
 
-The HTML renderer converts the Markdown report into structured HTML
-tables (via the `markdown` library when available) and preserves the same
-numeric values (ratios, CIs, deltas). When the dependency is unavailable, the
-renderer falls back to a `<pre>` block. Use `--embed-css` (default) to inline
-a minimal stylesheet for standalone use, including status badges and
-print-friendly rules.
+The HTML renderer builds a browser-readable report from the shared
+renderer-neutral [Report Outline](report-outline.md). It does not depend on the
+Markdown renderer or the optional `markdown` Python package. Use `--embed-css`
+(default) to inline the standalone stylesheet; use `--no-embed-css` only when
+an external publishing system supplies its own styles.
 
 ### CLI
 
@@ -435,6 +483,43 @@ from invarlock.reporting.html import render_report_html
 
 html = render_report_html(report)
 ```
+
+---
+
+## CI and Registry Exports
+
+`invarlock report export` converts an existing `evaluation.report.json` into
+small handoff artifacts for systems that already own CI, registry, model-card,
+or release-review workflows.
+
+```bash
+invarlock report export \
+  --evaluation-report reports/eval/evaluation.report.json \
+  --format mlflow-tags \
+  --policy-profile ci \
+  --verify-result reports/eval/invarlock-verify.json \
+  --output reports/eval/mlflow-tags.json
+```
+
+| Format | Output | Purpose |
+| --- | --- | --- |
+| `mlflow-tags` | JSON with `tags` and report artifact path | Set registry tags and log the report as an MLflow artifact from an MLflow-enabled environment. |
+| `model-card-md` | Markdown block | Paste InvarLock evidence into a Hugging Face model card or equivalent model README. |
+| `release-review-md` | Markdown packet | Attach pass/fail, baseline/subject identity, report hash, policy profile, and reviewer checklist to release review. |
+
+These exports summarize regression evidence only. They do not change verifier
+semantics, replace `invarlock verify`, or provide deployment approval.
+
+Common options:
+
+- `--policy-profile`: profile label to use when the report does not record one.
+- `--report-url`: public report URL for Markdown exports.
+- `--evidence-url`: public evidence-pack URL for Markdown exports.
+- `--verify-result`: path to `invarlock verify --json` output. When supplied,
+  export status and verifier fields come from the verifier result item whose
+  `id` matches the resolved evaluation report path. A verifier result for a
+  different report is rejected.
+- `--force`: overwrite an existing output file.
 
 ---
 

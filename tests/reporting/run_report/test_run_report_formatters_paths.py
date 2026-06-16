@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 
+from invarlock import __version__
 from invarlock.reporting import run_report_formatters as formatters
 from invarlock.reporting.report_types import create_empty_report
 
@@ -286,9 +287,20 @@ def test_to_markdown_and_to_html_cover_top_level_single_and_comparison_paths() -
     comparison_html = formatters.to_html(report1, compare=report2, include_css=False)
 
     assert markdown.startswith("# InvarLock Evaluation Report Comparison")
+    assert f"InvarLock {__version__} · schema v1" in markdown
     assert "| Primary Metric | 1.000 | 0.950 | 📉 -0.050 |" in markdown
     assert "**Violations:**" in markdown
     assert "<style>" in single_html
+    assert "brand-lockup" in single_html
+    assert "brand-mark-svg" in single_html
+    assert "--color-background: #fcfbf7" in single_html
+    assert "--color-accent: #1f3a7a" in single_html
+    assert "--color-signal: #8d2433" in single_html
+    assert "--color-background: #11130f" in single_html
+    assert "--color-accent: #9fb7ff" in single_html
+    assert ">IL<" not in single_html
+    assert f"InvarLock {__version__}" in single_html
+    assert "Auditable verification for edited model checkpoints." in single_html
     assert "<h1>HTML Title</h1>" in single_html
     assert "<style>" not in comparison_html
     assert "InvarLock Report Comparison" in comparison_html

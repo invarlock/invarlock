@@ -4,9 +4,9 @@ import builtins
 from pathlib import Path
 from types import SimpleNamespace
 
-import invarlock.reporting.report_files as report_files
 import pytest
 
+import invarlock.reporting.report_files as report_files
 from invarlock.core.exceptions import MetricsError
 from invarlock.reporting import report_builder_support, run_report_contract
 from invarlock.reporting.report_types import create_empty_report

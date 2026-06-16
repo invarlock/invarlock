@@ -23,6 +23,20 @@ def test_ensure_report_build_evidence_replaces_non_dict_section() -> None:
     }
 
 
+def test_ensure_report_build_evidence_preserves_existing_event_lists() -> None:
+    report: dict[str, object] = {
+        "report_build": {
+            "synthesized_fields": [{"field": "x"}],
+            "repaired_fields": [],
+            "fallback_fields": [],
+        }
+    }
+
+    section = ensure_report_build_evidence(report)
+
+    assert section["synthesized_fields"] == [{"field": "x"}]
+
+
 def test_record_report_build_event_rejects_unknown_category() -> None:
     with pytest.raises(ValueError, match="Unknown report-build event category"):
         record_report_build_event(

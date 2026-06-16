@@ -133,6 +133,7 @@ class VariancePolicyDict(VariancePolicyRequired, total=False):
     topk_backstop: NotRequired[int]
     predictive_gate: NotRequired[bool]
     monitor_only: NotRequired[bool]
+    calibration_max_seq_len: NotRequired[int]
     target_modules: NotRequired[list[str]]
     tap: NotRequired[str | list[str]]
 

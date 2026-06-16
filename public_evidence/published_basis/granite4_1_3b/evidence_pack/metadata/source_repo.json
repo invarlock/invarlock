@@ -1,0 +1,14 @@
+{
+  "artifact_class": "public_evidence_fixture",
+  "fixture_paths": [
+    "public_evidence/published_basis/granite4_1_3b/evaluation.report.json",
+    "public_evidence/published_basis/granite4_1_3b/runtime.manifest.json"
+  ],
+  "repo": "invarlock-public",
+  "source_ref": "15ef967f91893988fbd1b3676392ae683b7fdcff",
+  "remote_artifacts": {
+    "artifact_manifest": "artifacts/model-evidence/remote/20260612TgraniteReleaseProfileA/shard-01-gpu-1/artifact_manifest.json",
+    "model_revisions": "artifacts/model-evidence/remote/20260612TgraniteReleaseProfileA/shard-01-gpu-1/model_revisions.json",
+    "summary": "artifacts/model-evidence/remote/20260612TgraniteReleaseProfileA/shard-01-gpu-1/summary.json"
+  }
+}

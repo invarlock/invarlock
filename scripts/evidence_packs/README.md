@@ -19,7 +19,11 @@ implementation helper for those entry points. `lib/` is split by concern:
 
 New JSON/state/path validation logic should be Python-first under
 `scripts/evidence_packs/python/`; shell wrappers should stay thin and
-orchestration-focused. Shared verification parsing now lives in
+process-focused. Direct non-help invocations of `run_pack.sh`, `run_suite.sh`,
+and `run_mini_pack_gate.sh` route through
+`scripts/evidence_packs/python/workflow_frontdoor.py`, which builds the typed
+`scripts/evidence_workflows` plan used for dry-run/execution, status logs,
+summaries, and artifact manifests. Shared verification parsing now lives in
 `scripts/evidence_packs/python/verify_pack_checks.py` instead of inline shell
 heredocs.
 
@@ -48,12 +52,31 @@ Workflow boundaries:
 
 | Area | Owner | Notes |
 | --- | --- | --- |
-| Local smoke | `run_mini_pack_gate.sh`, shell tests | Must support `--dry-run`. |
-| Release evidence build | `run_pack.sh`, `run_suite.sh` | Use explicit suite/scenario manifests. |
+| Local smoke | `workflow_frontdoor.py` -> `run_mini_pack_gate.sh` | Must support `--dry-run`; shell owns scenario selection and worker dispatch only after workflow launch. |
+| Release evidence build | `workflow_frontdoor.py` -> `run_pack.sh`/`run_suite.sh` | Use explicit suite/scenario manifests; workflow layer owns command plan, status log, summary, and artifact manifest. |
 | Verification | `verify_pack.sh`, Python verification helpers | Offline-first; signing-key pinning is forwarded when supplied. |
 | Remote/GPU campaigns | scenario manifests and model evidence sweep callers | Keep campaign-specific state out of root `scripts/`. |
 
+Guard-value publishing rule:
+
+- PM-only acceptance is necessary but not enough.
+- A public guard-value case must compare against the matching noop baseline and
+  count only baseline-relative guard movement, such as a new capped spectral
+  module, an increased cap count, an RMT epsilon violation relative to baseline,
+  or a VE sidecar signal absent from the baseline self-probe.
+- This is stricter than ordinary paired evaluation: the primary metric already
+  compares baseline and subject, while guard-value publishing also requires the
+  guard signal itself to move beyond the no-op basis.
+- Evaluation reports may also carry `guard_warnings`. Evidence-pack summaries
+  preserve those warnings for review, but guard-value publishing still requires
+  reproduced scenario evidence and clean confirmation reruns.
+- Clean confirmation reruns are required before publishing a case as guard-value
+  evidence.
+- The current reference package is
+  `public_evidence/published_basis/mistral_7b/guard_value_demo/`, especially
+  `artifact_package/reports/guard_value_all_guard_probe_sweep.json`.
+
 Breaking cleanup rule: scripts under `python/` are not public package APIs. If a
-helper is unreferenced or only exists as an internal compatibility shim, remove
+helper is unreferenced or only preserves an obsolete internal call path, remove
 or move it in the same change that updates repo-owned shell callers, docs, and
 tests.

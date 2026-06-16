@@ -1,0 +1,9 @@
+{
+  "assurance": "strict",
+  "basis": "public_evidence/published_basis/ministral3_3b/evaluation.report.json",
+  "evidence_run": "20260612Tministral3bReleaseA",
+  "model_id": "mistralai/Ministral-3-3B-Instruct-2512-BF16",
+  "note": "Container-backed release-profile Ministral 3 3B text-only published-basis no-op preservation evidence run.",
+  "profile": "release",
+  "verdict": "PASS"
+}

@@ -28,8 +28,9 @@ from invarlock.core.report_inputs import (
     ReportInputError,
     load_evaluation_report_input_json,
     load_run_report_input_json,
-    resolve_run_reports_from_evaluation_input,
 )
+
+from .report_export import register_report_export_command
 
 if TYPE_CHECKING:
     from invarlock.reporting.report_contract import ReportGenerationResult
@@ -347,7 +348,7 @@ def _render_generation_result(
 report_app = typer.Typer(
     help=(
         "Operations on evaluation bundles and run reports "
-        "(generate, explain, html, validate)."
+        "(generate, explain, html, export, validate)."
     ),
     invoke_without_command=False,
     no_args_is_help=False,
@@ -523,8 +524,8 @@ def report_explain(
         "--evaluation-report",
         help=(
             "Path to evaluation report JSON file or directory containing "
-            "canonical evaluation.report.json. Preferred reviewer input; "
-            "auto-resolves linked subject and baseline run reports from provenance."
+            "canonical evaluation.report.json. Preferred reviewer input; explains "
+            "the evaluation bundle directly without requiring linked raw run reports."
         ),
     ),
     subject_report: str | None = typer.Option(
@@ -546,7 +547,12 @@ def report_explain(
     ),
 ):  # pragma: no cover - thin wrapper
     """Explain gate decisions for evaluation bundles or explicit run reports."""
-    from .explain_gates import explain_gates_command as _explain
+    from .explain_gates import (
+        explain_evaluation_report as _explain_evaluation_report,
+    )
+    from .explain_gates import (
+        explain_gates_command as _explain,
+    )
 
     output_style = resolve_output_style(
         style="audit",
@@ -565,20 +571,17 @@ def report_explain(
                 raise typer.BadParameter(
                     "Use either --evaluation-report or the --subject-report/--baseline-report pair, not both."
                 )
-            (
-                evaluation_path,
-                report_path,
-                baseline_path,
-            ) = resolve_run_reports_from_evaluation_input(evaluation_report)
+            evaluation_path, evaluation_payload = load_evaluation_report_input_json(
+                evaluation_report
+            )
             print_event(
                 console,
                 "INFO",
-                (
-                    "Resolved linked run reports from evaluation bundle provenance: "
-                    f"{evaluation_path}"
-                ),
+                (f"Explaining evaluation bundle directly: {evaluation_path}"),
                 style=output_style,
             )
+            _explain_evaluation_report(evaluation_payload)
+            return
         else:
             if not subject_report or not baseline_report:
                 raise typer.BadParameter(
@@ -598,7 +601,7 @@ def report_explain(
         _raise_report_input_failure(detail)
     except typer.BadParameter as exc:
         _raise_report_input_failure(str(exc))
-    return _explain(
+    _explain(
         subject_report=str(report_path),
         baseline_report=str(baseline_path),
     )
@@ -700,6 +703,9 @@ def report_html(
         embed_css=embed_css,
         force=force,
     )
+
+
+register_report_export_command(report_app)
 
 
 @report_app.command("validate")

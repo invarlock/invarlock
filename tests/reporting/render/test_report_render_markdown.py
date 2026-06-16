@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from invarlock import __version__
+from invarlock.reporting import render_markdown as render_markdown_mod
+from invarlock.reporting import report_summary as report_summary_mod
 from invarlock.reporting.render import (
     render_report_markdown,
 )
-
-from invarlock.reporting import render_markdown as render_markdown_mod
-from invarlock.reporting import report_summary as report_summary_mod
 from invarlock.reporting.report_schema import validate_report
 
 
@@ -63,6 +63,8 @@ def test_render_report_markdown_tolerates_missing_generated_at() -> None:
     md = render_report_markdown(cert)
 
     assert "**Generated:** (not recorded)" in md
+    assert f"InvarLock {__version__} · schema v1" in md
+    assert "Auditable verification for edited model checkpoints." in md
     assert "## Contents" not in md
     assert "## Evaluation Dashboard" not in md
     assert "## Executive Summary" in md

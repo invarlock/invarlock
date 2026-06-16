@@ -3,40 +3,16 @@
 from __future__ import annotations
 
 import random
-import sys
 from collections.abc import Sequence
 from typing import Any
 
 from invarlock.core.exceptions import DataError as _DataErr
 from invarlock.core.exceptions import ValidationError as _ValErr
 
-from .data_support import (
-    EvaluationWindow,
-    _require_load_dataset,
-    load_dataset_with_cache_fallback,
-    split_labels_by_index,
-    split_window_by_index,
-)
-from .data_tokenization import tokenize_combined_pairs, tokenize_texts_padded
-
-
-def _facade_attr(name: str, fallback: Any) -> Any:
-    facade = sys.modules.get("invarlock.eval.data_providers")
-    if facade is None:
-        return fallback
-    return getattr(facade, name, fallback)
-
-
-def _require_dataset(message: str) -> None:
-    require_fn = _facade_attr("_require_load_dataset", _require_load_dataset)
-    require_fn(message)
-
-
-def _load_dataset_with_cache_fallback(*args: Any, **kwargs: Any) -> Any:
-    load_fn = _facade_attr(
-        "load_dataset_with_cache_fallback", load_dataset_with_cache_fallback
-    )
-    return load_fn(*args, **kwargs)
+from .data_hf_common import facade_attr, load_dataset_from_facade, require_dataset
+from .data_hf_seq2seq import HFSeq2SeqProvider
+from .data_support import EvaluationWindow
+from .data_tokenization import tokenize_texts_padded
 
 
 class HFTextProvider:
@@ -51,7 +27,7 @@ class HFTextProvider:
         trust_remote_code: bool = False,
         max_samples: int = 2000,
     ):
-        _require_dataset(
+        require_dataset(
             "DEPENDENCY-MISSING: datasets library required for hf_text provider"
         )
         self.dataset_name = dataset_name or "Salesforce/wikitext"
@@ -66,7 +42,7 @@ class HFTextProvider:
         cached = self._texts_cache.get(split)
         if cached is not None:
             return cached
-        ds = _load_dataset_with_cache_fallback(
+        ds = load_dataset_from_facade(
             path=self.dataset_name,
             name=self.config_name,
             split=split,
@@ -181,7 +157,7 @@ class HFTextProvider:
                 message="VALIDATION-FAILED: preview/final must be positive",
             )
         selected_positions = list(range(len(texts)))
-        random_mod = _facade_attr("random", random)
+        random_mod = facade_attr("random", random)
         random_mod.Random(int(seed)).shuffle(selected_positions)
         unique_samples = self._collect_unique_window_samples(
             texts,
@@ -236,126 +212,6 @@ class HFTextProvider:
             "seq_len": seq_len,
             "candidate_unique": len(texts),
             "candidate_limit": min(len(texts), self.max_samples),
-        }
-
-
-class HFSeq2SeqProvider:
-    name = "hf_seq2seq"
-
-    def __init__(
-        self,
-        dataset_name: str,
-        config_name: str | None = None,
-        src_field: str = "source",
-        tgt_field: str = "target",
-        cache_dir: str | None = None,
-        max_samples: int = 2000,
-    ) -> None:
-        _require_dataset(
-            "DEPENDENCY-MISSING: datasets library required for hf_seq2seq provider"
-        )
-        self.dataset_name = dataset_name
-        self.config_name = config_name
-        self.src_field = src_field
-        self.tgt_field = tgt_field
-        self.cache_dir = cache_dir
-        self.max_samples = int(max_samples)
-        self.last_preview_labels: list[list[int]] | None = None
-        self.last_final_labels: list[list[int]] | None = None
-        self._pairs_cache: dict[str, list[tuple[str, str]]] = {}
-
-    def _load_pairs(self, split: str) -> list[tuple[str, str]]:
-        cached = self._pairs_cache.get(split)
-        if cached is not None:
-            return cached
-        ds = _load_dataset_with_cache_fallback(
-            path=self.dataset_name,
-            name=self.config_name,
-            split=split,
-            cache_dir=self.cache_dir,
-        )
-        out: list[tuple[str, str]] = []
-        count = 0
-        for row in ds:
-            src = row.get(self.src_field)
-            tgt = row.get(self.tgt_field)
-            if (
-                isinstance(src, str)
-                and src.strip()
-                and isinstance(tgt, str)
-                and tgt.strip()
-            ):
-                out.append((src, tgt))
-                count += 1
-                if count >= self.max_samples:
-                    break
-        self._pairs_cache[split] = out
-        return out
-
-    def windows(
-        self,
-        tokenizer: Any,
-        *,
-        seq_len: int = 128,
-        stride: int = 64,
-        preview_n: int = 100,
-        final_n: int = 100,
-        seed: int = 42,
-        split: str = "validation",
-    ) -> tuple[EvaluationWindow, EvaluationWindow]:
-        pairs = self._load_pairs(split)
-        if not pairs:
-            raise _DataErr(
-                code="E307",
-                message=(
-                    "NO-PAIRS: hf_seq2seq produced no pairs; check src_field/tgt_field"
-                ),
-            )
-        prev_pairs = pairs[:preview_n]
-        fin_pairs = pairs[preview_n : preview_n + final_n]
-        combined_pairs = prev_pairs + fin_pairs
-        combined_positions = list(range(len(prev_pairs))) + list(
-            range(preview_n, preview_n + len(fin_pairs))
-        )
-        combined_window, combined_labels = tokenize_combined_pairs(
-            combined_pairs,
-            tokenizer=tokenizer,
-            seq_len=seq_len,
-            positions=combined_positions,
-        )
-        preview_window, final_window = split_window_by_index(
-            combined_window, split_index=preview_n
-        )
-        self.last_preview_labels, self.last_final_labels = split_labels_by_index(
-            combined_labels,
-            combined_window.indices,
-            split_index=preview_n,
-        )
-        return preview_window, final_window
-
-    def estimate_capacity(
-        self,
-        tokenizer: Any,
-        *,
-        seq_len: int,
-        stride: int,
-        split: str = "validation",
-        target_total: int | None = None,
-        fast_mode: bool = False,
-    ) -> dict[str, Any]:
-        pairs = self._load_pairs(split)
-        n = len(pairs)
-        return {
-            "total_tokens": int(n * seq_len),
-            "available_nonoverlap": n,
-            "available_unique": n,
-            "dedupe_rate": 0.0,
-            "stride": stride,
-            "seq_len": seq_len,
-            "candidate_unique": n,
-            "candidate_limit": n,
-            "tokens_available": int(n * seq_len),
-            "examples_available": n,
         }
 
 

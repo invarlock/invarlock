@@ -38,6 +38,31 @@ _BNB_MODEL_LOAD_ERRORS = (
 )
 
 
+def _patch_gptqmodel_transformers_hub_compat() -> None:
+    """Bridge GPTQModel 7.0.0 hub imports on newer Transformers releases."""
+    try:
+        transformers = importlib.import_module("transformers")
+        huggingface_hub = importlib.import_module("huggingface_hub")
+    except ImportError:
+        return
+
+    transformers_utils = getattr(transformers, "utils", None)
+    transformers_hub = getattr(transformers_utils, "hub", None)
+    if transformers_hub is None:
+        return
+
+    if not hasattr(transformers_hub, "create_repo") and hasattr(
+        huggingface_hub, "create_repo"
+    ):
+        transformers_hub.create_repo = huggingface_hub.create_repo
+
+    if not hasattr(transformers_hub, "list_repo_tree") and hasattr(
+        huggingface_hub, "HfApi"
+    ):
+        api = huggingface_hub.HfApi()
+        transformers_hub.list_repo_tree = api.list_repo_tree
+
+
 def _fallback_causal_description(model: Any) -> dict[str, Any]:
     cfg = getattr(model, "config", None)
     n_layer = int(getattr(cfg, "n_layer", getattr(cfg, "num_hidden_layers", 0)) or 0)
@@ -147,6 +172,7 @@ class HF_AWQ_Adapter(_QuantizedCausalIntrospectionMixin, HFAdapterMixin, ModelAd
             "DEPENDENCY-MISSING: transformers/gptqmodel",
             lambda e: {"dependency": "transformers/gptqmodel"},
         ):
+            _patch_gptqmodel_transformers_hub_compat()
             import gptqmodel  # noqa: F401
             from transformers import AutoModelForCausalLM
 
@@ -199,6 +225,7 @@ class HF_GPTQ_Adapter(_QuantizedCausalIntrospectionMixin, HFAdapterMixin, ModelA
             "DEPENDENCY-MISSING: gptqmodel/transformers",
             lambda e: {"dependency": "gptqmodel"},
         ):
+            _patch_gptqmodel_transformers_hub_compat()
             from gptqmodel import GPTQModel
 
         with wrap_errors(

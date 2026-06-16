@@ -93,7 +93,7 @@ def test_build_adapter_inventory_rows_marks_auto_adapter_and_optional_awq(
     monkeypatch.setattr(
         mod.importlib_metadata,
         "version",
-        lambda package_name: "4.0.0" if package_name == "transformers" else "0.0.0",
+        lambda package_name: "5.12.0" if package_name == "transformers" else "0.0.0",
     )
 
     rows = build_adapter_inventory_rows(
@@ -106,10 +106,61 @@ def test_build_adapter_inventory_rows_marks_auto_adapter_and_optional_awq(
 
     assert rows[0].mode == "auto-matcher"
     assert rows[0].origin == "core"
-    assert rows[0].version == "4.0.0"
+    assert rows[0].version == "5.12.0"
     assert rows[1].backend == "gptqmodel"
     assert rows[1].status == "ready"
     assert rows[1].detail is None
+
+
+def test_build_adapter_inventory_rows_marks_old_transformers_for_hf_adapters(
+    monkeypatch,
+) -> None:
+    registry = _FakeRegistry(adapters=["hf_causal", "hf_gptq"], edits=[], guards=[])
+
+    monkeypatch.setattr(
+        mod.importlib_metadata,
+        "version",
+        lambda package_name: "5.5.0" if package_name == "transformers" else "7.0.0",
+    )
+
+    rows = build_adapter_inventory_rows(
+        registry,
+        has_cuda=False,
+        is_linux=False,
+        find_spec_safe=lambda name: SimpleNamespace(name=name),
+        bitsandbytes_runtime_ready=True,
+    )
+
+    assert rows[0].status == "needs_extra"
+    assert rows[0].required_extra == "invarlock[adapters]"
+    assert rows[0].detail == "Requires transformers>=5.12.0"
+    assert rows[1].status == "needs_extra"
+    assert rows[1].required_extra == "invarlock[gptq]"
+    assert rows[1].detail == "Requires transformers>=5.12.0"
+
+
+def test_build_adapter_inventory_rows_marks_multimodal_stack_requirement(
+    monkeypatch,
+) -> None:
+    registry = _FakeRegistry(adapters=["hf_multimodal"], edits=[], guards=[])
+
+    monkeypatch.setattr(
+        mod.importlib_metadata,
+        "version",
+        lambda package_name: "5.5.0" if package_name == "transformers" else "0.26.0",
+    )
+
+    rows = build_adapter_inventory_rows(
+        registry,
+        has_cuda=False,
+        is_linux=True,
+        find_spec_safe=lambda name: SimpleNamespace(name=name),
+        bitsandbytes_runtime_ready=True,
+    )
+
+    assert rows[0].status == "needs_extra"
+    assert rows[0].required_extra == "invarlock[multimodal]"
+    assert rows[0].detail == "Requires transformers>=5.12.0 and torchvision>=0.26.0"
 
 
 def test_build_adapter_inventory_rows_marks_optional_torchao() -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -70,7 +71,7 @@ def test_compute_real_metrics_supports_vision_text_classification() -> None:
                 "id": "ex-1",
                 "image_path": "/tmp/a.png",
                 "answers": ["cat"],
-                "prediction": "cat",
+                "prediction": '{"answer": "cat"}',
             },
             {
                 "id": "ex-2",
@@ -89,10 +90,40 @@ def test_compute_real_metrics_supports_vision_text_classification() -> None:
     assert metrics["classification"]["preview"]["correct_total"] == 1
     assert metrics["classification"]["final"]["correct_total"] == 0
     assert metrics["classification"]["counts_source"] == "measured"
+    assert metrics["paired_windows"] == 1
+    assert metrics["window_match_fraction"] == 1.0
+    assert metrics["window_pairing_reason"] is None
+    assert metrics["window_pairing_preview"] == {
+        "matched": 1,
+        "expected": 1,
+        "reason": None,
+    }
     assert eval_windows["preview"]["example_ids"] == ["ex-1"]
+    assert eval_windows["preview"]["records"][0]["prediction"] == '{"answer": "cat"}'
+    assert eval_windows["preview"]["records"][0]["prediction_answer"] == "cat"
     assert eval_windows["final"]["records"][0]["correct"] is False
+    assert eval_windows["preview"]["input_records"][0]["image_path"] == "/tmp/a.png"
+    assert eval_windows["preview"]["input_records"][0]["answers"] == ["cat"]
+    assert "prediction" not in eval_windows["preview"]["input_records"][0]
     assert metrics["primary_metric"]["preview"] == 1.0
     assert metrics["primary_metric"]["final"] == 0.0
+
+
+@pytest.mark.parametrize(
+    ("prediction", "expected"),
+    [
+        ("", ""),
+        ('```json\n{"answer": "blue shirt"}\n```', "blue shirt"),
+        ('```\n{"answer": "green"}\n```', "green"),
+        ('{"not_answer": "cat"}', '{"not_answer": "cat"}'),
+        ('["cat"]', '["cat"]'),
+        (r'The result is {"answer": "red\q cup"} today.', r"red\q cup"),
+    ],
+)
+def test_prediction_answer_text_extracts_structured_answers(
+    prediction: str, expected: str
+) -> None:
+    assert rem._prediction_answer_text(prediction) == expected
 
 
 def test_multimodal_metric_kind_rejects_unknown_config_value() -> None:
@@ -225,6 +256,9 @@ def test_compute_real_metrics_retries_multimodal_processor_without_truncation(
     assert metrics["classification"]["estimated"] is False
     assert eval_windows["preview"]["records"][0]["correct"] is True
     assert eval_windows["final"]["records"][0]["correct"] is False
+    assert eval_windows["preview"]["input_records"][0]["image_path"] == str(image_path)
+    assert eval_windows["preview"]["input_records"][0]["prompt"] == "what is shown?"
+    assert eval_windows["preview"]["input_records"][0]["answers"] == ["cat"]
     assert any(
         truncation is False and max_length is None
         for _text, truncation, max_length in processor.calls
@@ -329,6 +363,31 @@ def test_evaluate_vision_text_arm_skips_zero_answer_tokens_and_blank_processor_s
     assert payload["records"][0]["references"] == []
     assert payload["records"][0]["correct"] is False
     assert "processor_sha256" not in payload
+
+
+def test_evaluate_vision_text_arm_empty_batches_omit_input_records() -> None:
+    class _Adapter:
+        def prepare_model_inputs(self, batch, device, include_labels):  # noqa: ANN001
+            raise AssertionError("empty arm should not prepare inputs")
+
+        def prepare_generation_inputs(self, batch, device):  # noqa: ANN001
+            raise AssertionError("empty arm should not prepare generation")
+
+        def decode_generated(self, generated_ids, generation_inputs):  # noqa: ANN001
+            raise AssertionError("empty arm should not decode")
+
+    payload, latency_ms = rem._evaluate_vision_text_arm(
+        _FakeModel(),
+        [],
+        adapter=_Adapter(),
+        device="cpu",
+    )
+
+    assert latency_ms == 0.0
+    assert payload["total"] == 0
+    assert math.isnan(payload["accuracy"])
+    assert math.isnan(payload["mean_logloss"])
+    assert "input_records" not in payload
 
 
 def test_evaluate_vision_text_arm_keeps_first_processor_sha_across_multiple_batches() -> (

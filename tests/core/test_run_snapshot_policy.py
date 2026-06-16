@@ -184,6 +184,22 @@ def test_choose_snapshot_mode_auto_prefers_bytes_for_small_models() -> None:
     assert out == "bytes"
 
 
+def test_choose_snapshot_mode_auto_caps_byte_snapshots_on_high_ram_hosts() -> None:
+    out = choose_snapshot_mode(
+        snapshot_config={},
+        env_mode="auto",
+        supports_bytes=True,
+        supports_chunked=True,
+        estimated_model_mb=90_000.0,
+        available_ram_mb=1_000_000.0,
+        disk_free_mb=200_000.0,
+        env_ram_fraction="0.4",
+        env_threshold_mb="8192",
+    )
+
+    assert out == "chunked"
+
+
 def test_choose_snapshot_mode_returns_reload_when_no_snapshot_support_exists() -> None:
     out = choose_snapshot_mode(
         snapshot_config={"mode": "bytes"},
@@ -294,7 +310,7 @@ def test_choose_snapshot_mode_uses_cfg_ram_fraction_and_bytes_fallback_chunked_p
     None
 ):
     out = choose_snapshot_mode(
-        snapshot_config={"ram_fraction": "0.9"},
+        snapshot_config={"ram_fraction": "0.9", "threshold_mb": 2000.0},
         env_mode="auto",
         supports_bytes=True,
         supports_chunked=True,

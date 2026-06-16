@@ -1,7 +1,6 @@
 from unittest.mock import patch
 
 from invarlock.reporting.render import render_report_markdown
-
 from invarlock.reporting.report_make import make_report
 
 
@@ -39,11 +38,13 @@ def test_render_markdown_uses_point_basis_when_no_ratio_ci():
         "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
         cert = make_report(report, baseline)
-    # Lower the auto target ratio to exercise the ratio_limit=min(...) path
+    # Auto target is informational and must not tighten the displayed hard gate.
     cert.setdefault("auto", {})["tier"] = "balanced"
-    cert["auto"]["target_pm_ratio"] = 1.05
+    cert["auto"]["target_pm_ratio"] = 1.0
 
     md = render_report_markdown(cert)
     # Quality gates section present; row headings may vary across versions
     assert "Quality Gates" in md
     assert "| point |" in md
+    assert "≤ 1.10x" in md
+    assert "≤ 1.00x" not in md

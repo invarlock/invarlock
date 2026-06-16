@@ -51,7 +51,7 @@ def _write_run_report(
                 "ratio_vs_baseline": ratio_vs_baseline,
                 "display_ci": (pm_final, pm_final),
             },
-            # Legacy fields kept in run reports for CLI printing paths; evaluation reports are PM-only
+            # Direct run-report metric fields used by CLI printing paths.
             "ppl_preview": pm_preview,
             "ppl_final": pm_final,
             "ppl_ratio": ratio_vs_baseline,
@@ -135,6 +135,7 @@ def test_evaluate_local_paths_pm_and_digests(monkeypatch, tmp_path: Path):
         format: str,
         baseline: str | None,
         output: str,
+        render_optional: bool,
         compare: str | None = None,
     ):
         from invarlock.reporting.report_bundle import (
@@ -267,6 +268,7 @@ def test_evaluate_local_paths_quantized_subject_overheads(monkeypatch, tmp_path:
         format: str,
         baseline: str | None,
         output: str,
+        render_optional: bool,
         compare: str | None = None,
     ):
         from invarlock.reporting.report_bundle import (

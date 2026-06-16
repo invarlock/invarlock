@@ -101,6 +101,13 @@
               "null"
             ]
           },
+          "guard_warnings_present": {
+            "type": "boolean"
+          },
+          "warning_count": {
+            "type": "integer",
+            "minimum": 0
+          },
           "verification": {
             "type": "object"
           }

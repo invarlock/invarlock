@@ -294,12 +294,18 @@ Detailed derivations are in the calibration appendix (`09-tier-v1-calibration.md
 - Adversarial robustness and gradient masking require separate evidence.
 - CUDA kernels outside deterministic mode may exceed drift tolerances.
 - Reference mask-based flows are conservative; stronger compression requires plugins.
-- Published assurance basis covers GPT-2 and BERT profiles.
+- The published assurance basis is the set of `published_basis` rows in
+  `contracts/support_matrix.json`, with the readable grouping in
+  `docs/README.md#support-matrix`.
+- Modern published-basis no-op reports are null-behavior evidence for guard
+  observations. They do not by themselves re-derive packaged tier constants;
+  transferred attention caps are budgeted sentinels until family-specific
+  calibration supports an FPR interpretation.
 - Additional supported-experimental lanes are defined in
   `contracts/support_matrix.json`; those lanes are not part of the published
-  assurance basis until supporting artifacts are attached. Examples include
-  Mistral 7B, Qwen2 7B, Qwen2.5 7B, and Qwen2.5 14B; the contract file remains
-  authoritative and may include additional lanes.
+  assurance basis until supporting artifacts are attached. Current examples
+  include SmolLM3 3B, Phi-4 mini, and newer DeepSeek variants; the contract
+  file remains authoritative and may include additional lanes.
 - Contributions for additional model families are welcome; attach pilot reports
   and summary CSVs (typically written under `reports/calibration/` when running
   the calibration scripts) to change proposals or release artifacts.

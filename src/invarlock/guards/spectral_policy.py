@@ -121,6 +121,23 @@ def multiple_testing_alpha(value: Any | None) -> float:
     return float(normalize_multiple_testing_config(value).get("alpha", 0.05))
 
 
+def normalize_module_patterns(value: Any | None) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    raw_values = value if isinstance(value, list | tuple) else (value,)
+    patterns: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_values:
+        if not isinstance(raw, str):
+            raise _policy_invalid("module_patterns", "entries must be strings")
+        pattern = raw.strip()
+        if not pattern or pattern in seen:
+            continue
+        patterns.append(pattern)
+        seen.add(pattern)
+    return tuple(patterns)
+
+
 def normalize_estimator_config(value: Any | None) -> dict[str, Any]:
     estimator_policy = _require_policy_mapping("estimator", value)
     iters = _require_policy_int(
@@ -187,6 +204,8 @@ def serialize_policy(guard: Any) -> dict[str, Any]:
         "degeneracy": guard.degeneracy,
         "correction_enabled": bool(guard.correction_enabled),
         "ignore_preview_inflation": bool(guard.ignore_preview_inflation),
+        "module_include_patterns": list(getattr(guard, "module_include_patterns", ())),
+        "module_exclude_patterns": list(getattr(guard, "module_exclude_patterns", ())),
     }
 
 
@@ -232,6 +251,19 @@ def apply_policy_overrides(guard: Any, policy: dict[str, Any]) -> None:
     if "max_caps" in policy:
         guard.max_caps = _require_policy_int("max_caps", policy["max_caps"], minimum=0)
         guard.config["max_caps"] = guard.max_caps
+
+    if "module_include_patterns" in policy:
+        guard.module_include_patterns = normalize_module_patterns(
+            policy["module_include_patterns"]
+        )
+        guard.config["module_include_patterns"] = list(guard.module_include_patterns)
+        guard._scoped_modules_model_id = None
+    if "module_exclude_patterns" in policy:
+        guard.module_exclude_patterns = normalize_module_patterns(
+            policy["module_exclude_patterns"]
+        )
+        guard.config["module_exclude_patterns"] = list(guard.module_exclude_patterns)
+        guard._scoped_modules_model_id = None
 
     if "family_caps" in policy:
         guard.family_caps = normalize_family_caps(policy["family_caps"], default=True)
@@ -285,6 +317,7 @@ __all__ = [
     "normalize_degeneracy_config",
     "normalize_estimator_config",
     "normalize_family_caps",
+    "normalize_module_patterns",
     "normalize_multiple_testing_config",
     "serialize_policy",
 ]

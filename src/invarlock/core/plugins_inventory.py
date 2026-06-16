@@ -218,10 +218,22 @@ def gather_adapter_inventory_rows(
             hint = extras_status.split("missing", 1)[-1].strip()
             if hint:
                 enable = f"pip install '{hint}'"
+        if (
+            name == "hf_multimodal"
+            and extras_status.startswith("⚠️")
+            and "missing" in extras_status
+        ):
+            status = "needs_extra"
+            hint = extras_status.split("missing", 1)[-1].strip()
+            if hint:
+                enable = f"pip install '{hint}'"
 
         if backend_name == "bitsandbytes" and present:
             backend_present = bitsandbytes_runtime_available()
-            if not backend_present:
+            if backend_present:
+                status = "ready"
+                enable = ""
+            else:
                 status = "unsupported"
                 if has_cuda:
                     enable = "bitsandbytes unavailable on this host"
@@ -236,6 +248,7 @@ def gather_adapter_inventory_rows(
             "hf_hqq": "invarlock[hqq]",
             "hf_quanto": "invarlock[quanto]",
             "hf_ct": "invarlock[compressed-tensors]",
+            "hf_multimodal": "invarlock[multimodal]",
         }.get(name)
         if status == "needs_extra" and extra_hint:
             enable = f"pip install '{extra_hint}'"

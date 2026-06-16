@@ -26,6 +26,13 @@ def test_measurement_contract_digest_success_and_empty() -> None:
     assert isinstance(digest, str) and len(digest) == 16
 
 
+def test_baseline_guard_payload_reads_direct_evaluation_block() -> None:
+    assert gc_mod._baseline_guard_payload(
+        {"variance": {"enabled": True}},
+        "variance",
+    ) == {"enabled": True}
+
+
 def test_extract_invariants_covers_fail_and_warn_paths() -> None:
     report_fail = {
         "metrics": {

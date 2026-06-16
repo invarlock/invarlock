@@ -1,0 +1,9 @@
+{
+  "assurance": "strict",
+  "basis": "public_evidence/published_basis/flan_t5_base/evaluation.report.json",
+  "evidence_run": "20260613TflanT5Seq2SeqReleaseE",
+  "model_id": "google/flan-t5-base",
+  "note": "Container-backed release-profile FLAN-T5 base no-op preservation evidence run on pinned CNN/DailyMail seq2seq data after seq2seq split and decoder-label fixes.",
+  "profile": "release",
+  "verdict": "PASS"
+}

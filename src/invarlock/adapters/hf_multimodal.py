@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,25 @@ def _hash_json(payload: dict[str, Any]) -> str:
     ).hexdigest()
 
 
+def _json_safe_processor_value(value: Any) -> Any:
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    if isinstance(value, Mapping):
+        return {
+            str(key): _json_safe_processor_value(item)
+            for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
+        }
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        try:
+            return _json_safe_processor_value(to_dict())
+        except (TypeError, ValueError, RuntimeError):
+            pass
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe_processor_value(item) for item in value]
+    return str(value)
+
+
 class HF_Multimodal_Adapter(HF_Causal_Adapter):
     name = "hf_multimodal"
 
@@ -42,9 +62,18 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
         self._processor: Any | None = None
         self._processor_digest: str | None = None
         self._last_model_id: str | None = None
+        self._chat_template_kwargs: dict[str, Any] = {}
 
     def load_model(self, model_id: str, device: str = "auto", **kwargs: Any) -> Any:
         self._last_model_id = str(model_id)
+        chat_template_kwargs = kwargs.pop("chat_template_kwargs", None)
+        if chat_template_kwargs is None:
+            self._chat_template_kwargs = {}
+        elif isinstance(chat_template_kwargs, Mapping):
+            self._chat_template_kwargs = dict(chat_template_kwargs)
+        else:
+            raise ValueError("model.chat_template_kwargs must be a mapping")
+        self._processor_digest = None
         try:
             with wrap_errors(
                 DependencyError,
@@ -81,6 +110,7 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
                     model = self._load_pretrained_model(
                         strategy.loader,
                         model_id,
+                        load_device=device,
                         **kwargs,
                     )
             except ModelLoadError:
@@ -97,6 +127,7 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
                     model = self._load_pretrained_model(
                         auto_strategy.loader,
                         model_id,
+                        load_device=device,
                         **kwargs,
                     )
 
@@ -154,17 +185,26 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
             image_std = getattr(image_processor, "image_std", None)
             payload["image_processor"] = {
                 "class": image_processor.__class__.__name__,
-                "size": size,
-                "image_mean": image_mean,
-                "image_std": image_std,
+                "size": _json_safe_processor_value(size),
+                "image_mean": _json_safe_processor_value(image_mean),
+                "image_std": _json_safe_processor_value(image_std),
             }
+        if self._chat_template_kwargs:
+            payload["chat_template_kwargs"] = _json_safe_processor_value(
+                self._chat_template_kwargs
+            )
         return _hash_json(payload)
 
     @property
     def processor_digest(self) -> str | None:
         if self._processor_digest is None:
             try:
-                self._require_processor()
+                if self._processor is not None:
+                    self._processor_digest = self._compute_processor_digest(
+                        self._processor
+                    )
+                else:
+                    self._require_processor()
             except _PROCESSOR_DIGEST_ERRORS:
                 return None
         return self._processor_digest
@@ -209,6 +249,7 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
                 self._chat_messages(prompt=prompt, answer=answer),
                 tokenize=False,
                 add_generation_prompt=answer is None,
+                **self._chat_template_kwargs,
             )
         if answer is None:
             return prompt

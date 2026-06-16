@@ -1,0 +1,31 @@
+{
+  "config": {
+    "path": null,
+    "sha256": "b5bf6bd07ee2f60fd54c9b075a7a41fa464038193af92510206329011763d2ec",
+    "source": "inline"
+  },
+  "context": {
+    "assurance": "strict",
+    "command": "evaluate",
+    "execution_mode": "container",
+    "profile": "release",
+    "tier": "balanced"
+  },
+  "execution_mode": "container",
+  "generated_at_utc": "2026-06-14T10:53:10.615476+00:00",
+  "manifest_version": 1,
+  "report": {
+    "filename": "evaluation.report.json",
+    "path": "/workspace/tmp/model_evidence_container/08c4eae534edb9ae/eval/google_gemma_4_e2b_it_image_text/report/evaluation.report.json",
+    "sha256": "1edc1325aa0807ac0516a8906552561790f2dc4aa10714fedf75fd5c387f35e8"
+  },
+  "runtime": {
+    "allow_network": true,
+    "allow_remote_code": false,
+    "allow_third_party_plugins": false,
+    "container_execution": true,
+    "image_digest": "sha256:f1cf9be3fd7223a7290596268d789cda4ffcf8d731e3cbc1585281e5e18214bf",
+    "image_ref": "ghcr.io/invarlock/invarlock-runtime:latest@sha256:f1cf9be3fd7223a7290596268d789cda4ffcf8d731e3cbc1585281e5e18214bf"
+  },
+  "verifier_contract_version": "runtime-manifest-v1"
+}

@@ -13,16 +13,16 @@
   },
   "entries": [
     {
-      "path": "src/invarlock/cli/evaluate_phases.py",
-      "lines": [
-        76,
-        126,
-        136,
-        202,
-        266,
-        324,
-        334
-      ],
+            "path": "src/invarlock/cli/evaluate_phases.py",
+            "lines": [
+                145,
+                194,
+                206,
+                238,
+                304,
+                364,
+                374
+            ],
       "bucket": "acceptable",
       "rationale": "Phase-shell wrappers preserve buffered child output, normalize CLI exit codes, and isolate heterogeneous failures while orchestration and report-contract helpers still raise mixed exception types."
     }

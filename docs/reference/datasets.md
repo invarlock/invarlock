@@ -41,6 +41,15 @@ For Compare & evaluate, reuse the same `dataset` block in baseline and subject r
   expects JSONL records with `id`, `image_path`, `prompt`, and either `answer`
   or `answers`. Records are single-image examples; provider batching can still
   group multiple records when callers request `batch_size > 1`.
+- **Public image-text datasets**: public Hugging Face datasets can be used by
+  materializing them first into a local `vision_text` manifest. The model
+  evidence workflow uses
+  `scripts/model_evidence/materialize_vision_text_dataset.py` for this pattern,
+  so evaluation remains offline/hashable after the download step.
+- **Image-text primary metric**: `vision_text` uses answer accuracy as the
+  primary metric because the evidence claim is whether the generated answer
+  matches the image question. Token log loss is still recorded as supporting
+  telemetry, but perplexity is not the public VQA gate.
 - **Tokenizer contract**: dataset providers expect either a callable tokenizer
   that returns `input_ids` plus optional `attention_mask`, or an `encode(...)`
   method that accepts `truncation=True`, `max_length=...`, and
@@ -78,7 +87,7 @@ Counts mismatches are enforced via `coverage.preview.used`,
 | `hf_text` | text | Cache/Net | `dataset_name`, `text_field` | Generic HF dataset loader; uses first N rows. |
 | `local_jsonl` | text | Offline | `file`/`path`/`data_files`, `text_field` | Reads JSONL from disk; default `text_field: text`. |
 | `vision_text` | image-text | Offline | `file`/`path`/`data_files` | Local JSONL manifest of single-image VQA-style examples; `stride` is ignored. |
-| `hf_seq2seq` | seq2seq | Cache/Net | `dataset_name`, `src_field`, `tgt_field` | Provides encoder ids + decoder labels. |
+| `hf_seq2seq` | seq2seq | Cache/Net | `dataset_name`, `src_field`, `tgt_field` | Provides encoder ids + decoder labels; supports pinned dataset `revision` and source/target prefixes. |
 | `local_jsonl_pairs` | seq2seq | Offline | `file`/`path`/`data_files`, `src_field`, `tgt_field` | Paired JSONL for seq2seq. |
 | `seq2seq` | seq2seq | Offline | optional `n`, `src_len`, `tgt_len` | Synthetic seq2seq generator. |
 
@@ -144,17 +153,55 @@ dataset:
   final_n: 1
 ```
 
+### Public VQA materialization example
+
+```bash
+python scripts/model_evidence/materialize_vision_text_dataset.py \
+  --dataset Multimodal-Fatima/VQAv2_sample_validation \
+  --split validation \
+  --revision 99487d2651df3799002b2fb3e455741744514a02 \
+  --output-dir artifacts/model-evidence/public_datasets/vqav2_sample_validation_800 \
+  --max-samples 800 \
+  --image-field image \
+  --prompt-field question \
+  --answer-field multiple_choice_answer \
+  --answers-field answers \
+  --id-field question_id \
+  --prompt-template '{question}
+Return exactly one JSON object like {{"answer":"short phrase"}}. Use a short phrase only. Do not explain.' \
+  --overwrite
+```
+
+The generated `manifest.jsonl`, `images/`, and
+`materialization_summary.json` are then consumed by `vision_text`. For evidence
+promotion, pin the dataset revision and keep the materialization summary with
+the run artifacts. Public VQA evidence prompts should prefer a structured
+answer field such as `{"answer":"..."}`; the evaluator extracts that field
+before exact-answer scoring and falls back to the raw generation when no JSON
+answer is present.
+
 ### Seq2seq provider example (HF)
 
 ```yaml
 dataset:
-  provider: hf_seq2seq
-  dataset_name: wmt14
-  src_field: translation.en
-  tgt_field: translation.de
+  provider:
+    kind: hf_seq2seq
+    dataset_name: abisee/cnn_dailymail
+    config_name: 3.0.0
+    revision: 96df5e686bee6baa90b8bee7c28b81fa3fa6223d
+    src_field: article
+    tgt_field: highlights
+    src_prefix: "summarize: "
+    max_samples: 1024
+  split: validation
+  seq_len: 256
   preview_n: 32
   final_n: 32
 ```
+
+The FLAN-T5 public seq2seq basis uses this provider shape with
+`google/flan-t5-base` pinned to model revision
+`7bcac572ce56db69c1ea7c8af255c5d7c9672fc2`.
 
 ### Environment variables
 

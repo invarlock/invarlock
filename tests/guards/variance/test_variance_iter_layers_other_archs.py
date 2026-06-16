@@ -1,6 +1,9 @@
 import torch.nn as nn
 
-from invarlock.guards.variance_scaling import equalise_residual_variance
+from invarlock.guards.variance_scaling import (
+    equalise_residual_variance,
+    iter_transformer_layers,
+)
 
 
 class DummyAttn(nn.Module):
@@ -42,6 +45,15 @@ class BertStyle(nn.Module):
         self.encoder.layer = nn.ModuleList([DummyBlock()])
 
 
+class T5Style(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.encoder = nn.Module()
+        self.decoder = nn.Module()
+        self.encoder.block = nn.ModuleList([DummyBlock()])
+        self.decoder.block = nn.ModuleList([DummyBlock()])
+
+
 def test_iter_layers_model_layers_and_bert_styles_allow_empty():
     # Both architectures should be iterable; allow_empty skips data collection
     out1 = equalise_residual_variance(
@@ -51,3 +63,7 @@ def test_iter_layers_model_layers_and_bert_styles_allow_empty():
         BertStyle(), dataloader=[], allow_empty=True, windows=1
     )
     assert out1 == {} and out2 == {}
+
+
+def test_iter_layers_t5_encoder_decoder_blocks():
+    assert len(list(iter_transformer_layers(T5Style()))) == 2

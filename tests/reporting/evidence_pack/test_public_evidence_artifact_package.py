@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from invarlock.public_contracts import load_public_evidence_index
 from tests._repo_root import REPO_ROOT
 
 
@@ -63,22 +64,21 @@ def test_gpt2_public_artifact_package_binds_checkpoint_refs_and_verifiers() -> N
     assert signed_pack_commands[0]["expected_authenticity"] == "pinned"
 
 
-def test_packaged_gpt2_public_artifact_package_matches_repo_copy() -> None:
+def test_packaged_gpt2_public_artifact_package_is_indexed() -> None:
     repo_package = (
         REPO_ROOT / "public_evidence" / "published_basis" / "gpt2" / "artifact_package"
     )
-    packaged_package = (
-        REPO_ROOT
-        / "src"
-        / "invarlock"
-        / "_data"
-        / "public_evidence"
-        / "published_basis"
-        / "gpt2"
-        / "artifact_package"
-    )
+    index = load_public_evidence_index()
+    gpt2 = next(entry for entry in index["entries"] if entry["slug"] == "gpt2")
+    artifact_package = gpt2["artifacts"]["artifact_package"]
 
-    for name in ("README.md", "artifact_package.json", "checkpoint_refs.json"):
-        assert (packaged_package / name).read_bytes() == (
-            repo_package / name
-        ).read_bytes()
+    assert artifact_package["kind"] == "directory"
+    assert artifact_package["path"] == (
+        "public_evidence/published_basis/gpt2/artifact_package"
+    )
+    assert artifact_package["file_count"] == len(
+        [path for path in repo_package.rglob("*") if path.is_file()]
+    )
+    assert artifact_package["size_bytes"] == sum(
+        path.stat().st_size for path in repo_package.rglob("*") if path.is_file()
+    )

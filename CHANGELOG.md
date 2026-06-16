@@ -15,6 +15,192 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.11.0] - 2026-06-16
+
+### Added
+
+- Added restrained InvarLock branding and version metadata to human-readable
+  Markdown/HTML reports and evidence-pack verdict summaries while keeping JSON
+  reports, manifests, and signed metadata machine-stable.
+- Added first-class baseline-relative guard warnings in reports and verification,
+  including strict warning-policy handling so users can treat guard movement as
+  advisory by default or fail verification when warnings are present.
+- Added published guard-value evidence for Mistral 7B with clean reruns covering
+  spectral, RMT, and variance/VE guard movement, plus scenario-backed PM-only
+  versus PM+guards comparison artifacts.
+- Added modern published-basis evidence for expanded dense causal model
+  families, including Mistral/Ministral, Qwen2/Qwen2.5/Qwen3/Qwen3.5,
+  Granite 4.1, DeepSeek R1 Qwen variants, Phi-4, SmolLM3, TinyLlama,
+  OLMo 2, OpenLLaMA, and Falcon lanes.
+- Added published-basis coverage for additional architecture families,
+  including FLAN-T5 seq2seq, OLMoE, Mixtral, Qwen3 30B-A3B MoE, Qwen3.5 4B
+  image-text, Gemma 4 E2B image-text, Gemma 4 E4B image-text, Gemma 4 12B
+  image-text, and Gemma 4 26B-A4B image-text MoE evidence lanes.
+- Added public VQAv2 materialization support, scarce vision-text evidence
+  window splitting, multimodal replay preservation, and processor digest
+  evidence for image-text model runs.
+- Added a public image-text published-basis adequacy gate requiring measured
+  accuracy, enough final examples, and concise answer-shaped generations when
+  prediction records are embedded.
+- Added JSON-answer extraction for `vision_text` evaluation so public VQA runs
+  can prompt models for `{"answer": "..."}` structured output without breaking
+  exact-answer scoring.
+- Added a renderer-neutral report outline view model that groups modern
+  evaluation evidence into decision, primary-metric, policy-gate, guard-signal,
+  benchmark-comparison, provenance, and appendix sections before renderer work.
+- Added seq2seq evidence-run support for FLAN-T5, including label preservation,
+  shuffled split handling, T5 guard targets, and calibration preview labels.
+- Added model-evidence GPU backlog lanes, preset overrides, remote-code
+  opt-in propagation, worktree-aware remote launch handling, and GPU preflight
+  warnings for underprovisioned MoE lanes.
+- Added an offline model-candidate compatibility audit to `contracts-check` so
+  named lanes and catalog candidates must have coherent adapter routes, presets,
+  materialization metadata, and large-model loading hints before GPU launch.
+- Added large-model and MoE memory controls for evidence runs, including
+  memory-sensitive HF loads, bounded calibration windows, snapshot policy
+  controls, container scratch cleanup, and safer cleanup between phases.
+- Added Gemma 4 12B calibration configuration and documented gated/access
+  requirements for Gemma candidate lanes.
+- Added a time-boxed, issue-tracked `pip-audit` allowlist entry for the
+  unfixed Torch `CVE-2025-3000` advisory affecting optional HF and advanced
+  install surfaces.
+- Added production identity assets for the README and external surfaces,
+  including light/dark logo and mark variants, app icon, and favicons.
+
+### Changed
+
+- Tightened evidence-pack guard-value detection so published guard claims must
+  be baseline-relative and scenario-backed rather than relying on guard signals
+  that already appear in the no-edit baseline.
+- Updated guard-value claim wording across evidence-pack docs, public evidence,
+  and support-matrix surfaces to distinguish policy failures, guard warnings,
+  and published guard-value proof.
+- Updated evaluation-report HTML export to render directly from the shared
+  report outline, including benchmark-comparison and guard-warning sections,
+  instead of converting the historical Markdown body, and aligned report HTML
+  colors with the site Ledger ink branding tokens.
+- Updated evaluation-report HTML layout to use a flatter ledger-style document
+  treatment with a sticky brand/theme row, light/dark toggle, and active-section
+  highlighting in the left rail, and surfaced baseline identity in the summary
+  and Decision sections.
+- Updated support-matrix organization and evidence grouping so published-basis,
+  experimental, multimodal, seq2seq, MoE, and blocked/access-gated lanes are
+  easier to scan without adding a redundant grouping column, and normalized
+  hardware wording for published evidence rows.
+- Updated HF adapter support for newer model shapes, including resilient
+  multimodal loader fallback, tokenizer remote-code propagation, ChatGLM layout
+  and loader support, Falcon-H1/Falcon-Mamba projection classification, dense
+  gate-up FFN classification, and Gemma 4 multimodal runtime extras.
+- Raised the Hugging Face adapter Transformers floor for modern model support
+  and refreshed optional Torch requirements to avoid `torch==2.12.0` while the
+  current supply-chain advisory has no fixed upstream version.
+- Centralized permissive-license model classification so support, calibration,
+  public-evidence, and catalog checks draw from one audited model inventory.
+- Updated adapter examples to reflect the newly published dense, multimodal,
+  seq2seq, and MoE model shapes.
+- Updated ordinary CI expectations so long GPU evidence sweeps are treated as
+  manually dispatched model-evidence work instead of blocking the standard
+  green-main gate.
+- Updated public evidence packaging to use compact evaluation reports for large
+  published-basis artifacts while retaining the evidence manifests, runtime
+  manifests, model revisions, and provenance needed for audit.
+- Updated installed-wheel public evidence packaging to ship a compact
+  `published_basis_index.json` with hashes, sizes, lane coverage, and carrier
+  policy instead of duplicating the full source-tree public evidence artifact
+  corpus.
+- Updated Qwen3.5 4B, Gemma 4 E2B, Gemma 4 E4B, Gemma 4 12B, and Gemma 4
+  26B-A4B image-text evidence status to published basis after structured
+  JSON-answer reruns passed the public VQAv2 quality floor with strict
+  verification and no guard warnings.
+- Updated model-evidence sweeps to use an explicit repo-visible Hugging Face
+  cache by default so container GPU runs and revision capture inspect the same
+  downloaded model snapshots.
+- Aligned the Ruff 0.15.17 bump across the pre-commit hook and hashed workflow
+  requirement locks.
+- Updated Dependabot-managed CI action pins and README public-evidence notes
+  alongside the refreshed packaged public-evidence index.
+- Moved model-evidence lane execution, remote launches, evidence-pack direct
+  front doors, status logs, summaries, retries, and artifact manifests onto a
+  shared typed evidence-workflow layer while keeping shell scripts as thin
+  process/worker dispatch entrypoints.
+- Updated model-family lane routing to use a shared catalog/support-matrix route
+  index that resolves presets and adapters from model task role, modality, and
+  evidence metadata instead of rebuilding model-evidence-local override tables.
+- Moved `evaluate` baseline, subject, and report-generation phases onto typed
+  request/runtime helpers with explicit dependencies and a thinner command body.
+- Moved `CoreRunner.execute` onto an explicit typed execution plan with named
+  prepare, guard-preparation, edit, guard-collection, evaluation, and finalize
+  phase owners.
+- Updated report summaries, Markdown output, schema validation, and
+  `report explain` to share primary-metric interpretation, honor configured
+  acceptance ranges, and render accuracy deltas consistently in percentage
+  points.
+- Shared report-outline facts with Markdown reports and `report explain` so
+  the human Markdown, HTML, and CLI explain surfaces expose the same high-level
+  decision, policy, and guard-signal facts before their detailed sections.
+- Made `report explain --evaluation-report` explain the supplied
+  `evaluation.report.json` directly so portable reviewer bundles no longer need
+  linked raw baseline/subject run artifacts for the explain path.
+- Updated README branding to the Ledger ink palette, including static
+  GitHub/PyPI-compatible Shields badges and refreshed light/dark logo, mark,
+  app-icon, and favicon assets synced from the current site brand surface.
+
+### Removed
+
+- Removed the broken scheduled full-CI trigger and scheduled GPU model-evidence
+  sweep triggers; full verification remains available by manual dispatch,
+  release supply-chain checks remain part of the release workflow, and
+  model-evidence sweeps remain manually runnable.
+- Removed the stale `tests/fuzzing` owner expectation from the active test-tree
+  contract after the fuzzing surface was retired from the repo layout.
+- Removed confirmed non-Apache-2.0/MIT hosted model checkpoints from active
+  support, calibration, and public-evidence surfaces.
+
+### Fixed
+
+- Fixed exported HTML reports to use the packaged InvarLock bracket-and-signal
+  mark instead of the temporary `IL` text fallback.
+- Fixed exported HTML report rendering for summary status fallback, policy
+  threshold wording, sticky navigation/active-section behavior, and empty table
+  detail columns.
+- Fixed the root README CI badge to use Shields' semantic status colors for
+  passing/failing/default states instead of forcing the static brand accent.
+- Fixed evidence-pack queue and GPU-runner stability issues, including memory
+  helper resolution, container scratch cleanup, retry handling after interrupted
+  evaluate phases, and host/container output publication paths.
+- Fixed remote model-evidence branch sync for `work/...` branches by fetching
+  the current branch ref explicitly before fast-forwarding the remote checkout.
+- Fixed Mistral guard-demo manifests, run-log tracking, and public evidence
+  scope notes so the published demo no longer overclaims
+  non-baseline-relative FP8 guard signals.
+- Fixed Gemma/Qwen multimodal evaluation gates by using classification-count
+  accuracy intervals, delta semantics for accuracy drift, paired multimodal
+  window reporting, scarce-window split handling, and a public-basis absolute
+  image-text quality floor.
+- Fixed MoE and large-model guard/report behavior, including router warning
+  handling, Qwen variance calibration bounds, and variance calibration
+  truncation fallbacks.
+- Fixed Gemma 4 26B evidence source provenance after publishing its MoE
+  assurance basis.
+- Fixed `adapter:auto` routing for named image-text Gemma/Qwen candidates and
+  Marian/OPUS/MBART/Pegasus seq2seq model IDs.
+- Fixed seq2seq evidence correctness for shuffled splits and preserved labels
+  in paired evidence runs.
+- Fixed GPTQModel compatibility with newer Transformers imports.
+- Fixed typed-surface checking for tokenizer load kwargs attached to dataclass
+  model profiles.
+- Fixed local verification hygiene after the published-basis expansion by
+  keeping test files under the repository size guideline and restoring coverage
+  enforcement edge-path tests.
+- Fixed the PR-time supply-chain scan to run `gitleaks` over pull request
+  changed-file contents instead of timing out on repository-history scans;
+  release scans still cover full-history secret scanning.
+- Fixed PR supply-chain scans by raising `aiohttp`, `cryptography`, and
+  security-tool `pip` floors, then refreshing workflow locks past vulnerable
+  pins.
+- Fixed `gitleaks` false positives for published evidence tokenizer digest
+  fields by adding a narrow config allowlist used by PR and release scans.
+
 ## [0.10.0] - 2026-06-03
 
 ### Added

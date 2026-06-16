@@ -19,14 +19,23 @@ self-hosted-runner:
 
 ### Core CI Workflows (Tracked in Git)
 
-- **`ci.yml`** - Main CI (curated tests, docs build, PR-time `coverage-enforce`, typed-surface `mypy`, scheduled full verify, scheduled/tag supply-chain backstop)
+- **`ci.yml`** - Main CI (curated tests, docs build, PR-time `coverage-enforce`, typed-surface `mypy`, manual full verify, and tag-gated supply-chain backstop)
 - **`pre-commit.yml`** - Pre-commit hook validation
 - **`repo-hygiene.yml`** - PR hygiene checks (no generated artifacts, no large files, no duplicate tests)
+
+### Local Composite Actions
+
+- **`actions/invarlock-report-gate`** - Verifies an existing
+  `evaluation.report.json`, renders HTML, writes `invarlock-verify.json`,
+  exports MLflow tags, exports a release-review Markdown packet, appends a PR
+  summary, and uploads those files as an Actions artifact. The action exposes
+  `profile`, `assurance`, `runtime-provenance`, and `warning-policy` inputs so
+  workflows can keep verification policy explicit.
 
 ### Security Workflows
 
 - **`codeql.yml`** - CodeQL static analysis (SAST) for security vulnerabilities
-- **`supply-chain-pr.yml`** - PR-time supply-chain checks (install-surface SBOM, `pip-audit` on base/`hf`/`advanced` shipped surfaces, `gitleaks` history-scan JSON/SARIF artifacts)
+- **`supply-chain-pr.yml`** - PR-time supply-chain checks (install-surface SBOM, `pip-audit` on base/`hf`/`advanced` shipped surfaces, `gitleaks` changed-file JSON/SARIF artifacts)
 - **`dependabot-main-guard.yml`** - Blocks direct Dependabot PRs to `main`; maintainers must land equivalent dependency fixes on `staging/next` first
 - **`dependabot.yml`** (config file) - Automated dependency updates (Python, GitHub Actions, npm)
 
@@ -67,9 +76,11 @@ job or step, emit container-backed outputs, and verify them without bypasses.
 - The `dependabot-main-guard.yml` workflow intentionally fails direct Dependabot PRs to `main`.
 - Maintainers must land the equivalent dependency fix on `staging/next`, validate it there, and let it reach `main` through the normal promotion/release flow.
 - `github/codeql-action` is tracked by Dependabot again; maintainers should review the resulting PRs like any other security-sensitive workflow change.
-- The PR supply-chain workflow scans repository history with `gitleaks`, uploads JSON/SARIF artifacts, audits the built wheel install surface for SBOM generation, and runs `pip-audit` against the base, `hf`, and `advanced` shipped dependency surfaces.
+- The PR supply-chain workflow scans pull request changed-file contents with
+  `gitleaks`, uploads JSON/SARIF artifacts, audits the built wheel install
+  surface for SBOM generation, and runs `pip-audit` against the base, `hf`, and `advanced` shipped dependency surfaces.
 - The release workflow peels annotated tags to immutable commit SHAs before checkout/publish, uses an installed-wheel environment for its release SBOM, and publishes distributions without a separate public release-asset upload step.
-- The scheduled/tag CI supply-chain job remains the slower backstop and keeps the tool-environment SBOM.
+- The tag-gated CI supply-chain job remains the slower release backstop and keeps the tool-environment SBOM.
 - The PR typed-surface lane covers observability, config loading/runtime, metric resolution, report schema/verification helpers, MI probes, registry metadata including the built-in plugin catalog, runtime-security modules, the split run-orchestrator owner modules, and CLI entrypoints.
 
 ## Troubleshooting

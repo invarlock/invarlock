@@ -2,9 +2,12 @@
   <picture>
     <source
       media="(prefers-color-scheme: dark)"
-      srcset="docs/assets/invarlock-logo-dark.svg"
+      srcset="https://raw.githubusercontent.com/invarlock/invarlock/main/docs/assets/invarlock-logo-dark.svg"
     />
-    <img src="docs/assets/invarlock-logo.svg" alt="InvarLock" />
+    <img
+      src="https://raw.githubusercontent.com/invarlock/invarlock/main/docs/assets/invarlock-logo.svg"
+      alt="InvarLock"
+    />
   </picture>
 </p>
 
@@ -12,19 +15,19 @@
 
 <p align="center">
   <a href="https://github.com/invarlock/invarlock/actions/workflows/ci.yml">
-    <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&logo=github&label=CI" />
+    <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&label=CI&logo=github&labelColor=18150f" />
   </a>
   <a href="https://pypi.org/project/invarlock/">
-    <img alt="PyPI" src="https://badge.fury.io/py/invarlock.svg" />
+    <img alt="PyPI" src="https://img.shields.io/pypi/v/invarlock?label=PyPI&logo=pypi&labelColor=18150f&color=1f3a7a" />
   </a>
-  <a href="https://invarlock.github.io/invarlock/0.10.0/">
-    <img alt="Docs" src="https://img.shields.io/badge/docs-quickstart-blue.svg" />
+  <a href="https://invarlock.github.io/invarlock/0.11.0/">
+    <img alt="Docs" src="https://img.shields.io/badge/docs-quickstart-1f3a7a?labelColor=18150f" />
   </a>
   <a href="LICENSE">
-    <img alt="License: Apache-2.0" src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" />
+    <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-1f3a7a?labelColor=18150f" />
   </a>
   <a href="https://www.python.org/downloads/release/python-3120/">
-    <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12+-blue.svg" />
+    <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-1f3a7a?logo=python&logoColor=f4efe3&labelColor=18150f" />
   </a>
 </p>
 
@@ -52,6 +55,11 @@ The `public_evidence/` tree separates verifier fixtures from real runs. Fixtures
 validate report, runtime-manifest, failure-policy, and evidence-pack contracts;
 `public_evidence/real_runs/` contains concrete GPT-2-family `invarlock evaluate`
 runs with signed, fingerprint-pinned evidence packs.
+The strongest public guard-value artifact is the Mistral 7B scenario package at
+`public_evidence/published_basis/mistral_7b/guard_value_demo/`: PM-only accepts
+the selected edits, while the evidence-pack PM+guards comparison records
+baseline-relative spectral, RMT, and variance/VE guard movement from clean
+reruns.
 
 ## Why InvarLock?
 
@@ -73,7 +81,7 @@ runs with signed, fingerprint-pinned evidence packs.
 
 <p align="center">
   <img
-    src="docs/assets/evaluation-verification-flow.svg"
+    src="https://raw.githubusercontent.com/invarlock/invarlock/main/docs/assets/evaluation-verification-flow.svg"
     alt="InvarLock evaluation and verification flow"
     width="100%"
   />
@@ -88,7 +96,7 @@ runtime provenance; passing reports can then be rendered with
 ## Quick Start
 
 Colab (CPU-friendly):
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/v0.10.0/notebooks/invarlock_quickstart_cpu.ipynb)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/v0.11.0/notebooks/invarlock_quickstart_cpu.ipynb)
 
 The public front door is `evaluate -> verify -> report html`. The README keeps
 the three common onboarding paths separate:
@@ -137,7 +145,8 @@ Wheel-only verification path:
 `pip install invarlock`, `invarlock doctor`,
 `invarlock verify /path/to/evaluation.report.json`,
 `invarlock report html -i /path/to/evaluation.report.json -o /path/to/evaluation.html`,
-and `invarlock report explain --evaluation-report /path/to/evaluation.report.json`.
+`invarlock report explain --evaluation-report /path/to/evaluation.report.json`,
+and `invarlock report export -i /path/to/evaluation.report.json --format mlflow-tags`.
 
 Repo maintainers can build the local runtime image once with `make runtime-image`;
 InvarLock automatically prefers `invarlock-runtime:local` when it is present.
@@ -146,7 +155,7 @@ Artifact model:
 
 | Artifact | Produced by | Primary consumers |
 | --- | --- | --- |
-| `evaluation.report.json` | `invarlock evaluate`, `invarlock report generate --format report` | `invarlock verify`, `invarlock report html`, `invarlock report validate`, `invarlock report explain --evaluation-report`, `invarlock advanced runtime-verify` |
+| `evaluation.report.json` | `invarlock evaluate`, `invarlock report generate --format report` | `invarlock verify`, `invarlock report html`, `invarlock report export`, `invarlock report validate`, `invarlock report explain --evaluation-report`, `invarlock advanced runtime-verify` |
 | `report.json` | Baseline/subject run directories under `runs/...` | `invarlock report generate`, `invarlock report explain --subject-report ... --baseline-report ...` |
 
 `invarlock verify` expects `evaluation.report.json`; if you only have a raw
@@ -173,12 +182,14 @@ Runtime provenance: reports/eval/runtime.manifest.json
 - Core workflow: `invarlock evaluate` -> `invarlock verify` ->
   `invarlock report html`.
 - Follow-on report analysis after the core loop: `invarlock report generate`,
-  `invarlock report explain`, and `invarlock report validate`.
+  `invarlock report explain`, `invarlock report export`, and
+  `invarlock report validate`.
 - Environment and release checks: `invarlock doctor` plus the JSON surfaces
   emitted by `doctor --json` and `advanced plugins ... --json`.
 - Runtime-manifest verifier: `invarlock advanced runtime-verify --report <evaluation.report.json> --manifest <runtime.manifest.json>`.
 - The public contract catalog exposed by those JSON surfaces includes
-  `validation_keys`, `console_labels`, and `metric_kinds`.
+  `model_classification`, `validation_keys`, `console_labels`, and
+  `metric_kinds`, plus the compact `public_evidence_index`.
 - Advanced workflows: `invarlock advanced evidence-pack`, `invarlock advanced policy`,
   `invarlock advanced plugins`, and `invarlock advanced calibrate`.
 - Host execution for the core evaluate path uses `--execution-mode host`.
@@ -189,7 +200,7 @@ Runtime provenance: reports/eval/runtime.manifest.json
 
 Evidence packs bundle reports + verification metadata into a distributable artifact.
 
-- Guide: <https://invarlock.github.io/invarlock/0.10.0/user-guide/evidence-packs/>
+- Guide: <https://invarlock.github.io/invarlock/0.11.0/user-guide/evidence-packs/>
 - Verify from an installed wheel:
   `invarlock advanced evidence-pack verify <dir> --strict --report-assurance strict --expected-fingerprint sha256:<64-hex-chars>`
 - Repo harness alternative: `scripts/evidence_packs/verify_pack.sh --pack <dir> --strict --report-assurance strict --expected-fingerprint sha256:<64-hex-chars>`
@@ -200,6 +211,10 @@ Note: `configs/` and most `scripts/` remain repo resources and are not included 
 wheels. Installed wheels include the public contracts and the
 `invarlock advanced evidence-pack verify` verifier, so installed packages can
 check bundles without cloning the repository.
+Full published-basis public evidence artifacts live in the source tree and
+release tags under `public_evidence/`; wheels carry the compact
+`published_basis_index.json` summary with hashes, sizes, coverage, and source
+paths instead of duplicating the full artifact corpus.
 
 ## Installation
 
@@ -211,11 +226,14 @@ pip install invarlock
 pip install "invarlock[hf]"
 ```
 
+HF-backed extras require `transformers>=5.12.0`; this covers text, multimodal,
+and quantized adapter loading through one tested HF runtime floor.
+
 Optional extras: `invarlock[probes]`, `invarlock[gpu]`,
 `invarlock[awq,gptq]`, `invarlock[torchao]`, `invarlock[hqq]`,
 `invarlock[quanto]`, and `invarlock[compressed-tensors]`. The `awq` and
 `gptq` extras use GPTQModel-backed subject loading. Full setup:
-<https://invarlock.github.io/invarlock/0.10.0/user-guide/getting-started/>.
+<https://invarlock.github.io/invarlock/0.11.0/user-guide/getting-started/>.
 
 The minimal install covers the core verification and reporting flows. Add
 `invarlock[hf]` only for model-loading evaluate runs, and use the installed
@@ -224,14 +242,14 @@ the repository.
 
 ## Documentation
 
-- Docs home: <https://invarlock.github.io/invarlock/0.10.0/>
-- Quickstart: <https://invarlock.github.io/invarlock/0.10.0/user-guide/quickstart/>
-- Compare & evaluate (BYOE): <https://invarlock.github.io/invarlock/0.10.0/user-guide/compare-and-evaluate/>
-- Reading a report: <https://invarlock.github.io/invarlock/0.10.0/user-guide/reading-report/>
-- CLI reference: <https://invarlock.github.io/invarlock/0.10.0/reference/cli/>
-- Assurance case: <https://invarlock.github.io/invarlock/0.10.0/assurance/00-assurance-case/>
+- Docs home: <https://invarlock.github.io/invarlock/0.11.0/>
+- Quickstart: <https://invarlock.github.io/invarlock/0.11.0/user-guide/quickstart/>
+- Compare & evaluate (BYOE): <https://invarlock.github.io/invarlock/0.11.0/user-guide/compare-and-evaluate/>
+- Reading a report: <https://invarlock.github.io/invarlock/0.11.0/user-guide/reading-report/>
+- CLI reference: <https://invarlock.github.io/invarlock/0.11.0/reference/cli/>
+- Assurance case: <https://invarlock.github.io/invarlock/0.11.0/assurance/00-assurance-case/>
   (repo source: `docs/assurance/00-assurance-case.md`)
-- Threat model: <https://invarlock.github.io/invarlock/0.10.0/security/threat-model/>
+- Threat model: <https://invarlock.github.io/invarlock/0.11.0/security/threat-model/>
 
 ## Community
 

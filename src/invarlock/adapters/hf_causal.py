@@ -96,6 +96,7 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
                     model = self._load_pretrained_model(
                         strategy.loader,
                         model_id,
+                        load_device=device,
                         **kwargs,
                     )
             except ModelLoadError:
@@ -114,6 +115,7 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
                         model = self._load_pretrained_model(
                             direct_strategy.loader,
                             model_id,
+                            load_device=device,
                             **kwargs,
                         )
                     return self._safe_to_device(model, device)
@@ -130,6 +132,7 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
                     model = self._load_pretrained_model(
                         auto_strategy.loader,
                         model_id,
+                        load_device=device,
                         **kwargs,
                     )
 
@@ -155,6 +158,11 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
             return model.model, model.model.layers, config
         if hasattr(model, "gpt_neox") and hasattr(model.gpt_neox, "layers"):
             return model.gpt_neox, model.gpt_neox.layers, config
+        if hasattr(model, "transformer"):
+            transformer = getattr(model, "transformer", None)
+            encoder = getattr(transformer, "encoder", None)
+            if encoder is not None and hasattr(encoder, "layers"):
+                return encoder, encoder.layers, config
         if hasattr(model, "transformer") and hasattr(model.transformer, "h"):
             return model.transformer, model.transformer.h, config
         if hasattr(model, "layers"):
@@ -219,7 +227,7 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
 
         n_heads = _cfg_int("num_attention_heads", "n_head")
         hidden_size = _cfg_int("hidden_size", "n_embd")
-        vocab_size = _cfg_int("vocab_size")
+        vocab_size = _cfg_int("vocab_size", "padded_vocab_size")
 
         if n_heads is None or hidden_size is None:
             raise AdapterError(

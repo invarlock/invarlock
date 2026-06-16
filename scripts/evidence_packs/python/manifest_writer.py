@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import importlib
 import json
 import os
@@ -14,6 +13,22 @@ try:
     from scripts.evidence_packs.python import manifest_writer_provenance as _provenance
 except ImportError:  # pragma: no cover - direct script execution path
     import manifest_writer_provenance as _provenance
+
+try:
+    from scripts.evidence_workflows.workflow_state import (
+        collect_artifact_paths,
+        sha256_file,
+        write_json,
+    )
+except ImportError:  # pragma: no cover - direct script execution path
+    _SCRIPTS_DIR = Path(__file__).resolve().parents[2]
+    if str(_SCRIPTS_DIR) not in sys.path:
+        sys.path.insert(0, str(_SCRIPTS_DIR))
+    from evidence_workflows.workflow_state import (
+        collect_artifact_paths,
+        sha256_file,
+        write_json,
+    )
 
 SourceRepoMetadataError = _provenance.SourceRepoMetadataError
 _ensure_repo_src_path = _provenance._ensure_repo_src_path
@@ -106,23 +121,19 @@ def _collect_model_revisions(pack_dir: Path) -> tuple[list[str], list[dict[str, 
 
 
 def _collect_artifacts(pack_dir: Path) -> list[str]:
-    artifacts: list[str] = []
-    for path in pack_dir.rglob("*"):
-        if not path.is_file():
-            continue
-        rel = path.relative_to(pack_dir)
-        if rel.name in {
+    return collect_artifact_paths(
+        pack_dir,
+        patterns=["**/*"],
+        exclude_names={
             "manifest.json",
             "manifest.signature.json",
             "checksums.sha256",
-        }:
-            continue
-        artifacts.append(str(rel))
-    return sorted(artifacts)
+        },
+    )
 
 
 def _sha256_hex(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return sha256_file(path)
 
 
 def _sha256_prefixed(path: Path) -> str:
@@ -437,7 +448,7 @@ def write_manifest(
         payload["verification"] = verification_summary
 
     out_path = pack_dir / "manifest.json"
-    out_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    write_json(out_path, payload)
 
 
 def _render_pack_readme(

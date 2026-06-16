@@ -48,6 +48,13 @@ floor. Empirical evidence is required when a release claims new or expanded
 guard calibration, model-family calibration, or support promotion beyond the
 currently published basis.
 
+The included empirical manifest may also index published-basis no-op
+model-evidence reports under `families/*.json`. Those summaries are real
+null-behavior evidence for spectral, RMT, and variance observations, but they
+are marked as observed evidence rather than tier-constant derivations. A
+family-specific FPR claim still requires a null-sweep calibration artifact that
+recommends or validates κ for that family.
+
 ## Manifest Contract
 
 An empirical bundle uses this shape:
@@ -89,6 +96,28 @@ An empirical bundle uses this shape:
       "status": "observed",
       "artifact": "families/gpt2.json"
     }
+  ],
+  "calibration_corpus": {
+    "schema": "invarlock/empirical-published-basis-null-corpus-v1",
+    "status": "observed_not_rederived",
+    "model_count": 12
+  }
+}
+```
+
+The optional `calibration_corpus` block summarizes promoted-family no-op
+published-basis reports that are present in-tree and hash-linked from the
+family summaries. It is a calibration input surface, not proof that the
+packaged tier constants were re-derived for those families.
+
+```json
+{
+  "model_family_rows": [
+    {
+      "model_family": "mistral_7b",
+      "status": "observed",
+      "artifact": "families/mistral_7b.json"
+    }
   ]
 }
 ```
@@ -105,8 +134,9 @@ manifest references that self-declare non-synthetic evidence with the required
 guard coverage. The checker validates manifest shape, required guard/model rows,
 declared evidence kinds/statuses, command markers, and relative nonempty
 artifact paths. Artifact content review, producer authentication, statistical
-finality, and strict report acceptance are handled by their dedicated evidence
-and verifier gates.
+finality, strict report acceptance, and whether an observed no-op corpus
+re-derives any tier constant are handled by their dedicated evidence and
+verifier gates.
 
 ## Related Documentation
 

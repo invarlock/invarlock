@@ -28,6 +28,11 @@ A green exit from this command satisfies the report/manifest checks that are
 machine-checkable from the submitted evidence. The remaining items are reviewer
 judgment about policy allowances and bundle contents.
 
+`invarlock report export --format release-review-md` can generate a reviewer
+packet from the same report and an optional `invarlock verify --json` result.
+Use it as a checklist wrapper; it does not replace this checklist or change the
+strict assurance contract.
+
 ## Machine-Checked Command Surface
 
 - [ ] `invarlock evaluate` ran with `--assurance strict` or the default strict mode.
@@ -99,7 +104,7 @@ judgment about policy allowances and bundle contents.
 - [Trust Model](14-trust-model.md) — Strict pass scope
 - [Assurance Case Overview](00-assurance-case.md) — Claims, evidence, and tests
 - [Runtime Provenance Guide](../security/runtime-provenance-guide.md) — Manifest requirements
+- [Reports Reference](../reference/reports.md) — Release-review export format
 - [Failure Examples](../user-guide/failure-examples.md) — Common non-pass shapes
 - [Troubleshooting](../user-guide/troubleshooting.md) — Numbered error codes
-- [Reports Reference](../reference/reports.md) — Full v1 schema
 - [One Run Lifecycle](../reference/one-run-lifecycle.md) — Where each gate runs

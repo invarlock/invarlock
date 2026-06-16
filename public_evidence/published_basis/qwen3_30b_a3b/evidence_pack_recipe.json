@@ -1,0 +1,20 @@
+{
+  "artifacts": [
+    "public_evidence/published_basis/qwen3_30b_a3b/evaluation.report.json",
+    "public_evidence/published_basis/qwen3_30b_a3b/runtime.manifest.json",
+    "public_evidence/published_basis/qwen3_30b_a3b/evidence_run_preset.yaml",
+    "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack/manifest.json",
+    "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack/manifest.signature.json",
+    "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack/checksums.sha256",
+    "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack/results/final_verdict.json"
+  ],
+  "commands": [
+    "make runtime-image-cuda",
+    "ssh root@31.56.109.46 'cd /root/invarlock-public-promote-qwen3 && CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 INVARLOCK_DEBUG_TRACE=1 .venv/bin/python -m invarlock evaluate --baseline Qwen/Qwen3-30B-A3B-Instruct-2507 --subject Qwen/Qwen3-30B-A3B-Instruct-2507 --baseline-adapter hf_causal --subject-adapter hf_causal --preset configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml --profile release --allow-network --device cuda --assurance strict --out /root/model-evidence/qwen3-strict-all8-current/runs --report-out /root/model-evidence/qwen3-strict-all8-current/report'",
+    "uv run invarlock advanced evidence-pack build public_evidence/published_basis/qwen3_30b_a3b/evidence_pack --final-verdict tmp/qwen3_30b_a3b_pack_inputs/final_verdict.json --report public_evidence/published_basis/qwen3_30b_a3b/evaluation.report.json --source-repo tmp/qwen3_30b_a3b_pack_inputs/source_repo.json --environment tmp/qwen3_30b_a3b_pack_inputs/environment.json --material model_revisions=artifacts/model-evidence/remote/20260613Tqwen330ba3bH100All8/shard-00-gpu-0-1-2-3-4-5-6-7/model_revisions.json --material artifact_manifest=artifacts/model-evidence/remote/20260613Tqwen330ba3bH100All8/shard-00-gpu-0-1-2-3-4-5-6-7/artifact_manifest.json --readme tmp/qwen3_30b_a3b_pack_inputs/README.md --signing-key tmp/qwen3_30b_a3b_pack_inputs/evidence-pack-signing-key.pem --profile release --report-assurance strict --release-review"
+  ],
+  "format_version": "published-basis-evidence-pack-recipe-v1",
+  "lane_id": "qwen3-30b-a3b-moe-causal-lm",
+  "network_mode": "online_first_then_offline",
+  "suite": "support-matrix-backlog-gpu"
+}

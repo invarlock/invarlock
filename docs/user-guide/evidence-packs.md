@@ -145,7 +145,7 @@ models via `MODEL_1`–`MODEL_8`.
 | `subset` | `mistralai/Mistral-7B-v0.1` | Single-GPU friendly |
 | `showcase` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B` | Multi-GPU recommended; adds guard-focused scenarios |
 | `workshop3` | `mistralai/Mistral-7B-v0.1`, `mistralai/Mixtral-8x7B-v0.1`, `01-ai/Yi-34B` | Workshop-friendly 3-model suite (architecture diversity) |
-| `full` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B`, `01-ai/Yi-34B`, `mistralai/Mixtral-8x7B-v0.1`, `Qwen/Qwen1.5-72B` | Multi-GPU recommended |
+| `full` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B`, `01-ai/Yi-34B`, `mistralai/Mixtral-8x7B-v0.1`, `Qwen/Qwen3-8B` | Multi-GPU recommended |
 
 Storage note: a default `subset` run on Mistral-7B typically needs about 56 GB
 of model-weight space on the output filesystem with the wrapper default
@@ -253,6 +253,10 @@ A suite run writes artifacts under `OUTPUT_DIR` (default: `./evidence_pack_runs/
 - `reports/<model>/<edit>/<run>/edit_metadata.json`
 - `reports/**/rmt_probe.json` (optional sidecar; emitted by some scenarios, e.g. `rmt_norm_noise`)
 - `reports/**/ve_probe.json` (optional sidecar; emitted by VE demo scenarios, e.g. `ve_mlp_scale_skew`)
+- public guard-value packages may also include
+  `reports/guard_value_all_guard_probe_sweep.json`; the Mistral 7B public
+  package uses this file to record PM-pass, baseline-relative spectral, RMT, and
+  variance/VE evidence from clean confirmation reruns
 - `reports/**/deployable_artifact_validation.json`, `backend_inventory.json`, `memory_report.json`, `load_smoke.json`, and `inference_smoke.json` for deployable scenarios
 - `reports/**/evaluation.html` + `reports/**/verify.json`
 - `README.md` (reviewer summary), `manifest.json`, `checksums.sha256`

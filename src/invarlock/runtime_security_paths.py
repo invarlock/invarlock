@@ -30,6 +30,7 @@ _PATH_ENV_VARS = {
 _FORWARDED_ENV_VARS = {
     "CUDA_VISIBLE_DEVICES",
     "HF_DATASETS_OFFLINE",
+    "HF_HUB_DISABLE_XET",
     "INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE",
     "INVARLOCK_DETERMINISM",
     "INVARLOCK_DETERMINISM_WARN_ONLY",
@@ -355,7 +356,7 @@ def _compose_container_run_args(
     argv: tuple[str, ...],
 ) -> list[str]:
     helpers = _helpers()
-    command = [context.engine, "run", "--rm", *entrypoint]
+    command = [context.engine, "run", "--rm", "--init", *entrypoint]
     if plan.gpu_passthrough:
         command.extend(["--gpus", "all"])
     if not helpers.network_allowed():

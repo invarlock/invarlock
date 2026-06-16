@@ -461,7 +461,7 @@ def test_plugins_command_unknown_category(monkeypatch):
 
 
 def test_check_plugin_extras_missing(monkeypatch):
-    def fake_import(name):
+    def fake_import(name, *args, **kwargs):
         raise ImportError("missing")
 
     monkeypatch.setattr("builtins.__import__", fake_import)
@@ -475,6 +475,40 @@ def test_check_plugin_extras_missing(monkeypatch):
     assert "invarlock[quanto]" in result
     result = plugins_mod._check_plugin_extras("hf_ct", "adapters")
     assert "invarlock[compressed-tensors]" in result
+
+
+def test_check_plugin_extras_flags_old_multimodal_stack(monkeypatch):
+    monkeypatch.setattr(
+        plugins_mod,
+        "_plugin_package_importable",
+        lambda package_name: package_name in {"transformers", "torchvision", "PIL"},
+    )
+    monkeypatch.setattr(
+        plugins_mod,
+        "_package_version_at_least",
+        lambda package_name, _minimum: package_name != "transformers",
+    )
+
+    result = plugins_mod._check_plugin_extras("hf_multimodal", "adapters")
+
+    assert "invarlock[multimodal]" in result
+
+
+def test_check_plugin_extras_flags_old_core_hf_stack(monkeypatch):
+    monkeypatch.setattr(
+        plugins_mod,
+        "_plugin_package_importable",
+        lambda package_name: package_name == "transformers",
+    )
+    monkeypatch.setattr(
+        plugins_mod,
+        "_package_version_at_least",
+        lambda package_name, _minimum: package_name != "transformers",
+    )
+
+    result = plugins_mod._check_plugin_extras("hf_causal", "adapters")
+
+    assert "invarlock[adapters]" in result
 
 
 def test_plugins_adapters_verbose_console(monkeypatch):

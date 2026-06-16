@@ -33,6 +33,7 @@ nav:
       - Programmatic Quickstart: reference/programmatic-quickstart.md
       - Guards: reference/guards.md
       - Reports: reference/reports.md
+      - Report Outline: reference/report-outline.md
       - Environment Variables: reference/env-vars.md
       - Model Adapters: reference/model-adapters.md
       - Model Family Catalog: reference/model-family-catalog.md
@@ -75,6 +76,15 @@ nav:
 theme:
   name: material
   language: en
+  logo: assets/invarlock-mark-dark.svg
+  favicon: assets/invarlock-app-icon.svg
+  font:
+    text: Sora
+    code: JetBrains Mono
+  palette:
+    scheme: slate
+    primary: custom
+    accent: custom
   features:
     - navigation.expand
     - navigation.tabs
@@ -102,3 +112,6 @@ plugins:
 extra_javascript:
   - javascripts/mathjax.js
   - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js
+
+extra_css:
+  - stylesheets/extra.css

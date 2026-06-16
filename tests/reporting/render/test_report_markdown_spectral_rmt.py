@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from invarlock.reporting.render import render_report_markdown
-
 from invarlock.reporting import report_make as C
+from invarlock.reporting.render import render_report_markdown
 from invarlock.reporting.report_make import make_report
 
 
@@ -111,3 +110,35 @@ def test_render_report_markdown_general_sections() -> None:
     assert "InvarLock Evaluation Report" in out
     assert "Executive Summary" in out
     assert "Primary Metric" in out
+
+
+def test_guard_markdown_uses_caps_language_and_warning_section() -> None:
+    cert = _cert_skeleton()
+    cert["spectral"] = {"caps_applied": 1, "max_caps": 5}
+    cert["guard_warnings"] = {
+        "present": True,
+        "warning_count": 1,
+        "warnings": [
+            {
+                "guard": "spectral",
+                "kind": "new_capped_module",
+                "severity": "warning",
+                "family": "ffn",
+                "module": "layers.31.mlp.up_proj",
+                "policy_gate": "pass",
+                "message": (
+                    "Policy passes, but subject has a new capped module versus baseline."
+                ),
+            }
+        ],
+    }
+    cert["validation"]["guard_warnings_present"] = True
+    cert["validation"]["guard_warning_policy_acceptable"] = True
+
+    out = render_report_markdown(cert)
+
+    assert "1 caps applied" in out
+    assert "<= 5" in out
+    assert "1 violations" not in out
+    assert "## Guard Warnings" in out
+    assert "Policy passes" in out

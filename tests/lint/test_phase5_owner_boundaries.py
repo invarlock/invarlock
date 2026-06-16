@@ -66,7 +66,8 @@ def test_phase5_owner_modules_keep_split_imports() -> None:
         ),
         REPO_ROOT / "src/invarlock/cli/commands/evaluate.py": (
             (2, "evaluate_output", "_evaluation_report_manifest_execution"),
-            (2, "evaluate_phases", "_run_baseline_evaluation_phase"),
+            (2, "evaluate_phases", "BaselineEvaluationRequest"),
+            (2, "evaluate_phases", "run_baseline_evaluation_phase"),
         ),
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute.py": (
             (
@@ -121,6 +122,10 @@ def test_phase5_owner_modules_keep_split_imports() -> None:
                 "_RunExecutionState",
             ),
         ),
+        REPO_ROOT / "src/invarlock/core/runner.py": (
+            (1, "runner_execution_plan", "RunnerExecutionRequest"),
+            (1, "runner_execution_plan", "execute_runner_execution_plan"),
+        ),
     }
 
     for path, expected_aliases in expectations.items():
@@ -136,6 +141,12 @@ def test_phase5_split_modules_exist() -> None:
         REPO_ROOT / "src/invarlock/reporting/report_make.py",
         REPO_ROOT / "src/invarlock/reporting/report_make_assembly.py",
         REPO_ROOT / "src/invarlock/reporting/report_builder_telemetry.py",
+        REPO_ROOT / "src/invarlock/reporting/render.py",
+        REPO_ROOT / "src/invarlock/reporting/report_files.py",
+        REPO_ROOT / "src/invarlock/reporting/report_build_evidence.py",
+        REPO_ROOT / "src/invarlock/reporting/report_build_context.py",
+        REPO_ROOT / "src/invarlock/reporting/run_metric_utils.py",
+        REPO_ROOT / "src/invarlock/reporting/guards_common.py",
         REPO_ROOT / "src/invarlock/reporting/render_markdown_tables.py",
         REPO_ROOT / "src/invarlock/guards/invariants_standard.py",
         REPO_ROOT / "src/invarlock/eval/data_local.py",
@@ -151,6 +162,7 @@ def test_phase5_split_modules_exist() -> None:
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempt_results.py",
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_helpers.py",
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_execution.py",
+        REPO_ROOT / "src/invarlock/core/runner_execution_plan.py",
         REPO_ROOT / "src/invarlock/core/builtin_plugin_catalog.py",
         REPO_ROOT / "src/invarlock/evidence_pack_support.py",
         REPO_ROOT / "src/invarlock/cli/commands/plugins_rendering.py",
@@ -170,6 +182,9 @@ def test_phase5_legacy_facades_are_removed() -> None:
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_pipeline.py"
     ).exists()
     assert not (REPO_ROOT / "src/invarlock/core/run_orchestrator_types.py").exists()
+    reporting_init = _read_text(REPO_ROOT / "src/invarlock/reporting/__init__.py")
+    assert "_install_compat_module" not in reporting_init
+    assert "sys.modules" not in reporting_init
 
 
 def test_phase5_split_modules_stay_in_owner_layers() -> None:
@@ -250,6 +265,7 @@ def test_phase5_large_modules_do_not_regrow() -> None:
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts.py": 480,
         REPO_ROOT
         / "src/invarlock/core/run_orchestrator_execute_attempt_results.py": 540,
+        REPO_ROOT / "src/invarlock/core/runner_execution_plan.py": 320,
         REPO_ROOT / "src/invarlock/reporting/report_builder_support.py": 790,
         REPO_ROOT / "src/invarlock/reporting/report_builder_telemetry.py": 150,
         REPO_ROOT / "src/invarlock/reporting/render_markdown.py": 790,

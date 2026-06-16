@@ -1,0 +1,16 @@
+{
+  "artifact_class": "public_evidence_fixture",
+  "fixture_paths": [
+    "public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json",
+    "public_evidence/published_basis/gemma4_26b_a4b/runtime.manifest.json",
+    "public_evidence/published_basis/gemma4_26b_a4b/evidence_run_preset.yaml"
+  ],
+  "remote_artifacts": {
+    "artifact_manifest": "artifacts/model-evidence/remote/20260614Tgemma4_26b_a4b_json_sanity/shard-00-gpu-2-3-4-5/artifact_manifest.json",
+    "materialization_summary": "artifacts/model-evidence/remote/20260614Tgemma4_26b_a4b_json_sanity/shard-00-gpu-2-3-4-5/materialization_summary.json",
+    "model_revisions": "artifacts/model-evidence/remote/20260614Tgemma4_26b_a4b_json_sanity/shard-00-gpu-2-3-4-5/model_revisions.json",
+    "summary": "artifacts/model-evidence/remote/20260614Tgemma4_26b_a4b_json_sanity/shard-00-gpu-2-3-4-5/summary.json"
+  },
+  "repo": "invarlock-public",
+  "source_ref": "730949e0349d61842ff3ed57b94c4df10ecea713"
+}

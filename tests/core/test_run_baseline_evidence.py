@@ -212,6 +212,48 @@ def test_materialize_baseline_pairing_schedule_preserves_mask_counts_and_hashes(
     assert result.dataset_meta["masked_tokens_total"] == 2
 
 
+def test_materialize_baseline_pairing_schedule_preserves_seq2seq_labels_without_mlm_masks() -> (
+    None
+):
+    result = materialize_baseline_pairing_schedule(
+        pairing_schedule={
+            "preview": {
+                "window_ids": [10],
+                "input_ids": [[1, 2, 3]],
+                "attention_masks": [[1, 1, 1]],
+                "labels": [[101, 102, 1]],
+            },
+            "final": {
+                "window_ids": [20],
+                "input_ids": [[4, 5, 6, 7]],
+                "attention_masks": [[1, 1, 1, 1]],
+                "labels": [[201, 202, 203, 1]],
+            },
+        },
+        calibration_data=[],
+        dataset_meta={},
+        window_plan=None,
+        tokenizer=None,
+        use_mlm=False,
+        mask_prob=0.0,
+        mask_seed=43,
+        random_token_prob=0.0,
+        original_token_prob=0.0,
+        resolved_tier="balanced",
+        profile="release",
+        apply_mlm_masks_fn=lambda *args, **kwargs: (0, []),
+        resolve_pm_min_tokens_target_fn=lambda **kwargs: 4,
+        hash_sequences_fn=lambda seqs: f"hash-{len(list(seqs))}",
+        tensor_or_list_to_ints_fn=lambda values: list(values),
+    )
+
+    assert result.preview_records[0]["labels"] == [101, 102, 1]
+    assert result.final_records[0]["labels"] == [201, 202, 203, 1]
+    assert "mlm_masked" not in result.preview_records[0]
+    assert "mlm_masked" not in result.final_records[0]
+    assert "masked_tokens_total" not in result.dataset_meta
+
+
 def test_materialize_baseline_pairing_schedule_fails_when_masks_missing() -> None:
     try:
         materialize_baseline_pairing_schedule(

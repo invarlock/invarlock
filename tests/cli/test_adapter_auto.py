@@ -47,12 +47,12 @@ def test_resolve_auto_adapter_llama(tmp_path):
 
 def test_resolve_auto_adapter_gemma3(tmp_path):
     model_dir = _write_cfg(tmp_path, "gemma3", "Gemma3ForConditionalGeneration")
-    assert resolve_auto_adapter(str(model_dir)) == "hf_causal"
+    assert resolve_auto_adapter(str(model_dir)) == "hf_multimodal"
 
 
 def test_resolve_auto_adapter_gemma4(tmp_path):
     model_dir = _write_cfg(tmp_path, "gemma4", "Gemma4ForConditionalGeneration")
-    assert resolve_auto_adapter(str(model_dir)) == "hf_causal"
+    assert resolve_auto_adapter(str(model_dir)) == "hf_multimodal"
 
 
 def test_resolve_auto_adapter_bert(tmp_path):

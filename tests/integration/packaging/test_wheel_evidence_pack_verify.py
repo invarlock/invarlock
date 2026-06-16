@@ -118,15 +118,14 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
                 "import json; "
                 "from importlib import resources; "
                 "import invarlock.public_contracts as public_contracts; "
-                "data_root = resources.files('invarlock').joinpath('_data'); "
-                "resolved = {"
-                "lane['lane_id']: {"
-                "key: str(data_root.joinpath(*path.split('/')))"
-                "for key, path in lane.get('evidence', {}).items()"
-                "} "
-                "for lane in public_contracts.published_basis_lanes()"
-                "}; "
-                "print(json.dumps(resolved, sort_keys=True))"
+                "index = public_contracts.load_public_evidence_index(); "
+                "legacy_tree = resources.files('invarlock').joinpath("
+                "'_data', 'public_evidence', 'published_basis'"
+                "); "
+                "print(json.dumps({"
+                "'index': index, "
+                "'legacy_tree_exists': legacy_tree.is_dir()"
+                "}, sort_keys=True))"
             ),
         ],
         cwd=tmp_path,
@@ -134,37 +133,17 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
     assert installed_public_evidence.returncode == 0, (
         installed_public_evidence.stdout + installed_public_evidence.stderr
     )
-    resolved_public_evidence = json.loads(installed_public_evidence.stdout.strip())
-    assert resolved_public_evidence
-    for evidence in resolved_public_evidence.values():
-        for key, path in evidence.items():
-            if key in {"artifact_package", "evidence_pack_fixture"}:
-                assert Path(path).is_dir(), path
-            else:
-                assert Path(path).is_file(), path
-
-    published_report = Path(
-        resolved_public_evidence["gpt2-causal-hf"]["evaluation_report_fixture"]
-    )
-    public_html = tmp_path / "published-basis.html"
-    render_public_html = _run(
-        installed_wheel_env.cli_exe,
-        [
-            "report",
-            "html",
-            "-i",
-            str(published_report),
-            "-o",
-            str(public_html),
-            "--force",
-        ],
-        cwd=tmp_path,
-    )
-    assert render_public_html.returncode == 0, (
-        render_public_html.stdout + render_public_html.stderr
-    )
-    assert public_html.is_file()
-    assert "<html" in public_html.read_text(encoding="utf-8").lower()
+    public_evidence_payload = json.loads(installed_public_evidence.stdout.strip())
+    index = public_evidence_payload["index"]
+    assert index["format_version"] == "public-evidence-index-v1"
+    assert index["carrier_policy"]["installed_wheel"] == "compact_index_only"
+    assert index["published_basis_count"] == len(index["entries"])
+    indexed_lanes = {
+        lane_id for entry in index["entries"] for lane_id in entry.get("lanes", [])
+    }
+    assert "gpt2-causal-hf" in indexed_lanes
+    assert "bert-mlm-hf" in indexed_lanes
+    assert public_evidence_payload["legacy_tree_exists"] is False
 
 
 @pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")

@@ -1,0 +1,11 @@
+[2026-06-12 07:24:16] Starting task: mistralai__mistral-7b-v01_CLEANUP_ERROR_018_0821
+  Type: CLEANUP_ERROR
+  Model: mistralai/Mistral-7B-v0.1
+  GPU(s): 0
+  Params: {
+  "error_type": "rank_collapse",
+  "error_env": {}
+}
+[2026-06-12 07:24:16] Cleaning up error model: rank_collapse
+  Removed: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/models/error_rank_collapse
+[2026-06-12 07:24:19] Task mistralai__mistral-7b-v01_CLEANUP_ERROR_018_0821 finished with exit code: 0

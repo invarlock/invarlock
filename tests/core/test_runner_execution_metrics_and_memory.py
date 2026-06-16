@@ -130,7 +130,7 @@ def test_runner_records_timing_and_guard_timings(tmp_path):
 
 
 def test_runner_merges_memory_snapshots_into_metrics(monkeypatch, tmp_path):
-    import invarlock.core.runner as runner_mod
+    import invarlock.core.runner_execution_plan as runner_exec_mod
 
     runner = CoreRunner()
     model = DummyModel()
@@ -139,12 +139,12 @@ def test_runner_merges_memory_snapshots_into_metrics(monkeypatch, tmp_path):
     cfg = make_config(tmp_path, checkpoint_interval=0)
 
     monkeypatch.setattr(
-        runner_mod,
+        runner_exec_mod,
         "capture_memory_snapshot",
         lambda phase: {"phase": phase, "rss_mb": 1.0},
     )
     monkeypatch.setattr(
-        runner_mod,
+        runner_exec_mod,
         "summarize_memory_snapshots",
         lambda _snaps: {"memory_mb_peak": 0.5},
     )
@@ -155,7 +155,7 @@ def test_runner_merges_memory_snapshots_into_metrics(monkeypatch, tmp_path):
 
 
 def test_runner_skips_empty_memory_snapshots(monkeypatch, tmp_path):
-    import invarlock.core.runner as runner_mod
+    import invarlock.core.runner_execution_plan as runner_exec_mod
 
     runner = CoreRunner()
     model = DummyModel()
@@ -163,15 +163,17 @@ def test_runner_skips_empty_memory_snapshots(monkeypatch, tmp_path):
     edit = DummyEdit()
     cfg = make_config(tmp_path, checkpoint_interval=0)
 
-    monkeypatch.setattr(runner_mod, "capture_memory_snapshot", lambda phase: {})
-    monkeypatch.setattr(runner_mod, "summarize_memory_snapshots", lambda _snaps: {})
+    monkeypatch.setattr(runner_exec_mod, "capture_memory_snapshot", lambda phase: {})
+    monkeypatch.setattr(
+        runner_exec_mod, "summarize_memory_snapshots", lambda _snaps: {}
+    )
 
     report = runner.execute(model, adapter, edit, [], cfg, calibration_data=None)
     assert "memory_snapshots" not in report.metrics
 
 
 def test_runner_memory_snapshot_summary_empty(monkeypatch, tmp_path):
-    import invarlock.core.runner as runner_mod
+    import invarlock.core.runner_execution_plan as runner_exec_mod
 
     called = {"summary": 0}
 
@@ -182,12 +184,12 @@ def test_runner_memory_snapshot_summary_empty(monkeypatch, tmp_path):
     cfg = make_config(tmp_path, checkpoint_interval=0)
 
     monkeypatch.setattr(
-        runner_mod,
+        runner_exec_mod,
         "capture_memory_snapshot",
         lambda phase: {"phase": phase, "rss_mb": 1.0},
     )
     monkeypatch.setattr(
-        runner_mod,
+        runner_exec_mod,
         "summarize_memory_snapshots",
         lambda _snaps: called.__setitem__("summary", called["summary"] + 1) or {},
     )

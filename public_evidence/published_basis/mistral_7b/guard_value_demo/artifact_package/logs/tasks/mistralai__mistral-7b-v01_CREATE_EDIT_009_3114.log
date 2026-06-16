@@ -1,0 +1,46 @@
+[2026-06-12 07:00:04] Starting task: mistralai__mistral-7b-v01_CREATE_EDIT_009_3114
+  Type: CREATE_EDIT
+  Model: mistralai/Mistral-7B-v0.1
+  GPU(s): 1
+  Params: {
+  "edit_spec": "fp8_quant:e5m2:all",
+  "version": "stress",
+  "model_idx": 1
+}
+[2026-06-12 07:00:07] Creating edit: fp8_e5m2_stress
+[2026-06-12 07:00:07] Creating FP8 model (GPU 1):
+[2026-06-12 07:00:07]   Baseline: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/models/mistralai__mistral-7b-v01/baseline
+[2026-06-12 07:00:07]   Output: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/models/fp8_e5m2_stress
+[2026-06-12 07:00:07]   Format: e5m2, Scope: all
+Loading baseline from /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/models/mistralai__mistral-7b-v01/baseline...
+
+Loading weights:   0%|          | 0/291 [00:00<?, ?it/s]
+Loading weights:   3%|▎         | 10/291 [00:00<00:02, 99.91it/s]
+Loading weights:  10%|▉         | 28/291 [00:00<00:01, 144.08it/s]
+Loading weights:  16%|█▌        | 46/291 [00:00<00:01, 159.91it/s]
+Loading weights:  22%|██▏       | 64/291 [00:00<00:01, 167.68it/s]
+Loading weights:  28%|██▊       | 82/291 [00:00<00:01, 171.27it/s]
+Loading weights:  34%|███▍      | 100/291 [00:00<00:01, 172.94it/s]
+Loading weights:  41%|████      | 118/291 [00:00<00:00, 174.08it/s]
+Loading weights:  47%|████▋     | 136/291 [00:00<00:00, 175.00it/s]
+Loading weights:  53%|█████▎    | 154/291 [00:00<00:00, 175.06it/s]
+Loading weights:  59%|█████▉    | 172/291 [00:01<00:00, 175.90it/s]
+Loading weights:  65%|██████▌   | 190/291 [00:01<00:00, 177.10it/s]
+Loading weights:  71%|███████▏  | 208/291 [00:01<00:00, 176.00it/s]
+Loading weights:  78%|███████▊  | 226/291 [00:01<00:00, 174.68it/s]
+Loading weights:  84%|████████▍ | 244/291 [00:01<00:00, 174.61it/s]
+Loading weights:  90%|█████████ | 262/291 [00:01<00:00, 175.26it/s]
+Loading weights:  96%|█████████▌| 280/291 [00:01<00:00, 176.33it/s]
+Loading weights: 100%|██████████| 291/291 [00:01<00:00, 173.05it/s]
+Applying FP8 quantization (format=e5m2, scope=all)...
+  FP8: model.layers.0.self_attn.q_proj.weight
+  FP8: model.layers.0.self_attn.k_proj.weight
+  FP8: model.layers.0.self_attn.v_proj.weight
+Quantized 224 tensors, avg relative error: 0.0448
+
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]
+Writing model shards: 100%|██████████| 1/1 [00:19<00:00, 19.51s/it]
+Writing model shards: 100%|██████████| 1/1 [00:19<00:00, 19.51s/it]
+Saved FP8-quantized model to /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/models/fp8_e5m2_stress
+  Created: /root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/models/fp8_e5m2_stress
+[2026-06-12 07:00:45] Task mistralai__mistral-7b-v01_CREATE_EDIT_009_3114 finished with exit code: 0

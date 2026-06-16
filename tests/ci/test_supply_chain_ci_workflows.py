@@ -17,12 +17,12 @@ TRANSFORMERS_LOCKFILES = (
     Path("requirements/workflows/runtime-image-py312.txt"),
     Path("requirements/workflows/runtime-image-py312-aarch64.txt"),
 )
-TRANSFORMERS_550_HASHES = {
-    "821a9ff0961abbb29eb1eb686d78df1c85929fdf213a3fe49dc6bd94f9efa944",
-    "c8db656cf51c600cd8c75f06b20ef85c72e8b8ff9abc880c5d3e8bc70e0ddcbd",
+TRANSFORMERS_512_HASHES = {
+    "500be9eb644ede81c3103eee7687fc36d05dd75d1c76686c3820b26396fe7c7c",
+    "f0cf42ae1464c2eb41e7e0e66d7fd4b66145f48af17093b4cc0b2e9781faa7f4",
 }
-TRANSFORMERS_550_RE = re.compile(
-    r"transformers==5\.5\.0 \\\n"
+TRANSFORMERS_512_RE = re.compile(
+    r"transformers==5\.12\.0 \\\n"
     r"(?P<hash1>\s+--hash=sha256:(?P<digest1>[0-9a-f]{64}) \\\n)"
     r"(?P<hash2>\s+--hash=sha256:(?P<digest2>[0-9a-f]{64}))",
     re.MULTILINE,
@@ -93,9 +93,9 @@ def _iter_pip_install_commands(workflow: dict[str, Any]) -> list[str]:
     return commands
 
 
-def _extract_transformers_550_hashes(path: Path) -> set[str]:
-    match = TRANSFORMERS_550_RE.search(path.read_text(encoding="utf-8"))
-    assert match is not None, f"transformers==5.5.0 stanza missing in {path}"
+def _extract_transformers_512_hashes(path: Path) -> set[str]:
+    match = TRANSFORMERS_512_RE.search(path.read_text(encoding="utf-8"))
+    assert match is not None, f"transformers==5.12.0 stanza missing in {path}"
     return {match.group("digest1"), match.group("digest2")}
 
 
@@ -148,7 +148,7 @@ def test_repo_hygiene_checks_uv_lock_sync() -> None:
 
     uv_step = _find_step_by_name(steps, "Set up uv")
     assert (
-        uv_step["uses"] == "astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b"
+        uv_step["uses"] == "astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39"
     )
     assert uv_step["with"]["version"] == "0.10.10"
 
@@ -186,7 +186,7 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
         "Remove HF surface venv",
         "Create advanced surface venv",
         "Run advanced surface pip-audit",
-        "Run gitleaks history scan",
+        "Run gitleaks PR file scan",
         "Upload supply-chain artifacts",
         "Fail on secret findings",
     ]
@@ -275,10 +275,28 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
         in advanced_audit_step["run"]
     )
 
-    secret_scan_step = _find_step_by_name(steps, "Run gitleaks history scan")
-    assert "gitleaks git ." in secret_scan_step["run"]
+    secret_scan_step = _find_step_by_name(steps, "Run gitleaks PR file scan")
+    assert (
+        secret_scan_step["env"]["PR_BASE_SHA"]
+        == "${{ github.event.pull_request.base.sha }}"
+    )
+    assert (
+        secret_scan_step["env"]["PR_HEAD_SHA"]
+        == "${{ github.event.pull_request.head.sha }}"
+    )
+    assert (
+        'git diff --name-only --diff-filter=ACMRT "${PR_BASE_SHA}" "${PR_HEAD_SHA}"'
+        in secret_scan_step["run"]
+    )
+    assert 'scan_root="artifacts/supply-chain/pr-files"' in secret_scan_step["run"]
+    assert 'gitleaks dir "${scan_root}"' in secret_scan_step["run"]
+    assert "--config .gitleaks.toml" in secret_scan_step["run"]
+    assert 'scan_range="${PR_BASE_SHA}..${PR_HEAD_SHA}"' in secret_scan_step["run"]
+    assert 'scan_range="-1 HEAD"' in secret_scan_step["run"]
+    assert "scanned_file_count=" in secret_scan_step["run"]
     assert "--report-format json" in secret_scan_step["run"]
     assert "--report-format sarif" in secret_scan_step["run"]
+    assert "artifacts/supply-chain/gitleaks.changed-files" in secret_scan_step["run"]
     assert "artifacts/supply-chain/gitleaks.json" in secret_scan_step["run"]
     assert "artifacts/supply-chain/gitleaks.sarif" in secret_scan_step["run"]
 
@@ -286,10 +304,14 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
     assert upload_step["uses"].startswith("actions/upload-artifact@")
     assert upload_step["with"]["name"] == "supply-chain-pr-artifacts"
     assert "artifacts/supply-chain/sbom.json" in upload_step["with"]["path"]
+    assert (
+        "artifacts/supply-chain/gitleaks.changed-files" in upload_step["with"]["path"]
+    )
     assert "artifacts/supply-chain/gitleaks.json" in upload_step["with"]["path"]
     assert "artifacts/supply-chain/gitleaks.sarif" in upload_step["with"]["path"]
 
     fail_step = _find_step_by_name(steps, "Fail on secret findings")
+    assert "gitleaks scan did not publish an exit code" in fail_step["run"]
     assert "gitleaks detected secrets" in fail_step["run"]
 
 
@@ -464,15 +486,15 @@ def test_workflows_pin_pip_installs_by_hash() -> None:
     assert not offenders, "Unhashed workflow pip installs:\n" + "\n".join(offenders)
 
 
-def test_transformers_550_hashes_match_pypi_across_requirement_locks() -> None:
+def test_transformers_512_hashes_match_pypi_across_requirement_locks() -> None:
     mismatches = {
-        str(path): sorted(_extract_transformers_550_hashes(path))
+        str(path): sorted(_extract_transformers_512_hashes(path))
         for path in TRANSFORMERS_LOCKFILES
-        if _extract_transformers_550_hashes(path) != TRANSFORMERS_550_HASHES
+        if _extract_transformers_512_hashes(path) != TRANSFORMERS_512_HASHES
     }
 
     assert not mismatches, (
-        "transformers==5.5.0 hashes drifted from the current PyPI wheel/sdist:\n"
+        "transformers==5.12.0 hashes drifted from the current PyPI wheel/sdist:\n"
         + "\n".join(f"{path}: {hashes}" for path, hashes in mismatches.items())
     )
 
@@ -597,10 +619,15 @@ def test_release_workflow_builds_and_publishes_tag_only_artifacts():
 
     gitleaks_scan = _find_step_by_name(build_steps, "Run gitleaks history scan")
     assert "gitleaks git ." in gitleaks_scan["run"]
+    assert "--config .gitleaks.toml" in gitleaks_scan["run"]
     assert "artifacts/supply-chain/gitleaks.json" in gitleaks_scan["run"]
     assert "artifacts/supply-chain/gitleaks.sarif" in gitleaks_scan["run"]
     assert "--report-format json" in gitleaks_scan["run"]
     assert "--report-format sarif" in gitleaks_scan["run"]
+
+    config_text = Path(".gitleaks.toml").read_text(encoding="utf-8")
+    assert "tokenizer_(?:hash|sha256)" in config_text
+    assert "public_evidence/published_basis" in config_text
 
     smoke_step = _find_step_by_name(build_steps, "Install smoke from wheel")
     assert (

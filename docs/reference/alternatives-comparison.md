@@ -24,8 +24,8 @@ weights.
 
 ## When To Reach For Something Else
 
-- You want broad downstream benchmark scores (use lm-evaluation-harness or
-  LightEval).
+- You want broad downstream benchmark scores (use lm-evaluation-harness,
+  LightEval, or an in-house evaluation stack).
 - You want production drift monitoring, dashboards, or experiment tracking
   (use MLflow, Evidently, Deepchecks).
 - You need the tool to *produce* the compressed checkpoint (use Optimum,
@@ -36,7 +36,7 @@ weights.
 
 | Tool family | Use it for | How InvarLock differs |
 | --- | --- | --- |
-| lm-evaluation-harness, LightEval | Broad benchmark quality and task scores. | InvarLock focuses on paired baseline-vs-subject windows, guard evidence, runtime provenance, and a standalone report verifier. |
+| lm-evaluation-harness, LightEval, custom eval runners | Broad benchmark quality and task scores. | InvarLock focuses on paired baseline-vs-subject windows, guard evidence, runtime provenance, and a standalone report verifier. |
 | OpenAI Evals | Custom LLM and system evaluations. | InvarLock operates on local checkpoint comparisons and weight-edit evidence. |
 | MLflow, Evidently, Deepchecks | Experiment validation, monitoring, drift, and dashboards. | InvarLock ships a narrow fail-closed artifact contract for weight edits rather than a broad observability platform. |
 | Hugging Face Optimum, Intel Neural Compressor, GPTQModel | Producing optimized or compressed model artifacts. | InvarLock validates the artifact after the edit instead of performing the compression. |
@@ -44,11 +44,14 @@ weights.
 ## Recommended Combined Workflow
 
 1. Use compression or edit tooling to produce the subject checkpoint.
-2. Use lm-eval / LightEval for broad downstream benchmark confidence.
+2. Use lm-eval, LightEval, or a custom eval stack for broad downstream benchmark confidence.
 3. Use an MLOps platform for tracking, monitoring, and dashboards.
 4. Use InvarLock in the strict verification workflow to produce a machine-verifiable report
    that says a specific edited checkpoint stayed within configured regression
    and guard thresholds relative to a fixed baseline.
+5. Export the InvarLock result into existing workflow surfaces with
+   `invarlock report export --format mlflow-tags`,
+   `--format model-card-md`, or `--format release-review-md`.
 
 ## Related Documentation
 

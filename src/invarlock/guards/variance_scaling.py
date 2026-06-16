@@ -72,6 +72,10 @@ def iter_transformer_layers(model: nn.Module):
         yield from model.model.model.layers
     elif hasattr(model, "encoder") and hasattr(model.encoder, "layer"):
         yield from model.encoder.layer
+    elif hasattr(model, "encoder") and hasattr(model.encoder, "block"):
+        yield from model.encoder.block
+        if hasattr(model, "decoder") and hasattr(model.decoder, "block"):
+            yield from model.decoder.block
     elif hasattr(model, "decoder") and hasattr(model.decoder, "layers"):
         yield from model.decoder.layers
     elif hasattr(model, "layers"):
@@ -83,6 +87,19 @@ def iter_transformer_layers(model: nn.Module):
                 and (hasattr(module, "mlp") or hasattr(module, "block_sparse_moe"))
             ):
                 yield module
+
+
+def _t5_dense_relu_dense(block: nn.Module) -> nn.Module | None:
+    layers = getattr(block, "layer", None)
+    if layers is not None:
+        try:
+            for layer in layers:
+                dense = getattr(layer, "DenseReluDense", None)
+                if dense is not None:
+                    return dense
+        except (AttributeError, TypeError):
+            pass
+    return getattr(block, "DenseReluDense", None)
 
 
 @torch.no_grad()
@@ -217,12 +234,15 @@ def equalise_residual_variance(
         mlp_container = getattr(block, "mlp", None)
         if mlp_container is None:
             mlp_container = getattr(block, "block_sparse_moe", None)
+        if mlp_container is None:
+            mlp_container = _t5_dense_relu_dense(block)
 
         if mlp_container is not None:
             mlp_proj = (
                 getattr(mlp_container, "c_proj", None)
                 or getattr(mlp_container, "down_proj", None)
                 or getattr(mlp_container, "fc2", None)
+                or getattr(mlp_container, "wo", None)
             )
             if mlp_proj is not None:
                 name = f"block{index}.mlp"
@@ -250,8 +270,12 @@ def equalise_residual_variance(
 
     total_batches = len(batches)
     for idx, batch in enumerate(batches, start=1):
+        attention_mask = None
+        labels = None
         if isinstance(batch, dict):
             input_ids = batch.get("input_ids", batch.get("inputs", None))
+            attention_mask = batch.get("attention_mask")
+            labels = batch.get("labels")
         elif isinstance(batch, tuple | list):
             input_ids = batch[0] if len(batch) > 0 else None
         else:
@@ -262,8 +286,33 @@ def equalise_residual_variance(
                 input_ids = torch.as_tensor(input_ids)
             if input_ids.dim() == 1:
                 input_ids = input_ids.unsqueeze(0)
+            input_ids = input_ids.to(device)
+            if attention_mask is not None:
+                if not isinstance(attention_mask, torch.Tensor):
+                    attention_mask = torch.as_tensor(attention_mask)
+                if attention_mask.dim() == 1:
+                    attention_mask = attention_mask.unsqueeze(0)
+                attention_mask = attention_mask.to(device)
+            if labels is not None:
+                if not isinstance(labels, torch.Tensor):
+                    labels = torch.as_tensor(labels)
+                if labels.dim() == 1:
+                    labels = labels.unsqueeze(0)
+                labels = labels.to(device)
             with torch.no_grad():
-                model(input_ids.to(device))
+                try:
+                    if labels is not None:
+                        model(
+                            input_ids=input_ids,
+                            attention_mask=attention_mask,
+                            labels=labels,
+                        )
+                    elif attention_mask is not None:
+                        model(input_ids=input_ids, attention_mask=attention_mask)
+                    else:
+                        model(input_ids)
+                except TypeError:
+                    model(input_ids)
         _emit_progress(progress_callback, completed=idx, total=total_batches)
 
     for hook in hooks.values():
@@ -295,6 +344,8 @@ def equalise_residual_variance(
         mlp_container = getattr(block, "mlp", None)
         if mlp_container is None:
             mlp_container = getattr(block, "block_sparse_moe", None)
+        if mlp_container is None:
+            mlp_container = _t5_dense_relu_dense(block)
 
         if mlp_container is None:
             continue
@@ -303,6 +354,7 @@ def equalise_residual_variance(
             getattr(mlp_container, "c_proj", None)
             or getattr(mlp_container, "down_proj", None)
             or getattr(mlp_container, "fc2", None)
+            or getattr(mlp_container, "wo", None)
         )
         name = f"block{index}.mlp"
         alpha = compute_alpha(sample_values.get(name, []))

@@ -14,6 +14,7 @@ from typing import Any
 import typer
 from rich.console import Console
 
+from invarlock.cli.commands import plugins_extras as _plugins_extras
 from invarlock.core.plugins_inventory import (
     bitsandbytes_runtime_available,
     detect_cuda_available,
@@ -47,6 +48,20 @@ _PLUGIN_COMMAND_ERRORS = (
 plugins_app = typer.Typer(
     help="Inspect available adapters, guards, edits, and datasets.",
 )
+_plugin_package_importable = _plugins_extras._plugin_package_importable
+_package_version_at_least = _plugins_extras._package_version_at_least
+
+
+def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
+    original_importable = _plugins_extras._plugin_package_importable
+    original_version_check = _plugins_extras._package_version_at_least
+    try:
+        _plugins_extras._plugin_package_importable = _plugin_package_importable
+        _plugins_extras._package_version_at_least = _package_version_at_least
+        return _plugins_extras.check_plugin_extras(plugin_name, plugin_type)
+    finally:
+        _plugins_extras._plugin_package_importable = original_importable
+        _plugins_extras._package_version_at_least = original_version_check
 
 
 def _load_provider_registry_map() -> dict[str, Any]:
@@ -161,73 +176,6 @@ def plugins_command(
     except _PLUGIN_COMMAND_ERRORS as e:
         console.print(f"[red]❌ Plugin listing failed: {e}[/red]")
         raise typer.Exit(1) from e
-
-
-def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
-    """Check if plugin requires missing optional extras."""
-    # Enhanced extras checking without importing heavy modules (avoid noisy warnings)
-    # Only include baked-in plugins that are available through entry points
-    extras_map = {
-        # Edit plugins (baked-in only)
-        "quant_rtn": {"packages": [], "extra": ""},
-        # Guard plugins (no extra deps typically)
-        "invariants": {"packages": [], "extra": ""},
-        "spectral": {"packages": [], "extra": ""},
-        "variance": {"packages": [], "extra": ""},
-        "rmt": {"packages": [], "extra": ""},
-        "demo_hello_guard": {"packages": [], "extra": ""},
-        # Adapter plugins (baked-in only)
-        "hf_causal": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
-        "hf_mlm": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
-        "hf_seq2seq": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
-        "hf_auto": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
-        # Optional adapter plugins
-        "hf_gptq": {"packages": ["gptqmodel"], "extra": "invarlock[gptq]"},
-        "hf_awq": {"packages": ["gptqmodel"], "extra": "invarlock[awq]"},
-        "hf_bnb": {"packages": ["bitsandbytes"], "extra": "invarlock[gpu]"},
-        "hf_torchao": {"packages": ["torchao"], "extra": "invarlock[torchao]"},
-        "hf_hqq": {"packages": ["hqq"], "extra": "invarlock[hqq]"},
-        "hf_quanto": {
-            "packages": ["optimum.quanto"],
-            "extra": "invarlock[quanto]",
-        },
-        "hf_ct": {
-            "packages": ["compressed_tensors"],
-            "extra": "invarlock[compressed-tensors]",
-        },
-    }
-
-    plugin_info = extras_map.get(plugin_name)
-    if not plugin_info or not plugin_info["packages"]:
-        return ""  # No extra dependencies needed
-
-    # Check each required package. For most packages we use a light import so
-    # tests can monkeypatch __import__. For GPU-only stacks (bitsandbytes), we
-    # probe runtime readiness instead of importing.
-    missing_packages: list[str] = []
-    for pkg in plugin_info["packages"]:
-        try:
-            if pkg == "bitsandbytes":
-                if not bitsandbytes_runtime_available():
-                    raise ImportError("bitsandbytes not importable")
-            else:
-                __import__(pkg)
-        except ImportError:
-            missing_packages.append(pkg)
-
-    # Format the result
-    if not missing_packages:
-        # All dependencies available
-        if plugin_info["extra"]:
-            return f"✓ {plugin_info['extra']}"
-        else:
-            return "✓ Available"
-    else:
-        # Some dependencies missing
-        if plugin_info["extra"]:
-            return f"⚠️ missing {plugin_info['extra']}"
-        else:
-            return f"⚠️ missing {', '.join(missing_packages)}"
 
 
 # Wire subcommands under group

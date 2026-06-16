@@ -1,6 +1,0 @@
-{
-  "execution_environment": "public-fixture",
-  "gpu": "not_used",
-  "network": "not_used",
-  "pack_builder": "invarlock advanced evidence-pack build"
-}

@@ -3,7 +3,6 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from invarlock.reporting.render import render_report_markdown
-
 from invarlock.reporting.report_make import make_report
 
 

@@ -30,6 +30,7 @@
     "Docstrings",
     "cuda",
     "CUDA",
+    "dtype",
     "pyproject",
     "isort",
     "exponentiated",
@@ -113,6 +114,9 @@
     "mistralai",
     "Ministral",
     "Mixtral",
+    "OLMoE",
+    "Olmoe",
+    "olmoe",
     "perplexity",
     "subshells",
     "BLAS",
@@ -122,7 +126,9 @@
     "TFLOPS",
     "ONNX",
     "standardised",
+    "recalibrated",
     "matvec",
+    "materializer",
     "unprofiled",
     "ungated",
     "Thresholding",
@@ -141,6 +147,7 @@
     "Arithmatex",
     "Sbornik",
     "Silverstein",
+    "Smol",
     "checksummed"
   ]
 }

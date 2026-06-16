@@ -1,7 +1,6 @@
 from unittest.mock import patch
 
 from invarlock.reporting.render import render_report_markdown
-
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_schema import validate_report
 

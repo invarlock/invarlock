@@ -1,0 +1,31 @@
+{
+  "config": {
+    "path": null,
+    "sha256": "0971d86defbd15d1829f516618b699152eaa1761c0206eaa424c5b1903a6b64d",
+    "source": "inline"
+  },
+  "context": {
+    "assurance": "off",
+    "command": "evaluate",
+    "execution_mode": "container",
+    "profile": "ci",
+    "tier": "balanced"
+  },
+  "execution_mode": "container",
+  "generated_at_utc": "2026-06-12T15:23:17.866107+00:00",
+  "manifest_version": 1,
+  "report": {
+    "filename": "evaluation.report.json",
+    "path": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json",
+    "sha256": "37bc145c7a23c055ae29039673ec2eaf99cec3d5d5eedea8d6010f844a6c4859"
+  },
+  "runtime": {
+    "allow_network": false,
+    "allow_remote_code": false,
+    "allow_third_party_plugins": false,
+    "container_execution": true,
+    "image_digest": "sha256:dc735a60fad29fc02681bd86dec92c23f4e7388f00414d3ffc97e6c33b3fa773",
+    "image_ref": "invarlock-runtime:cuda-local"
+  },
+  "verifier_contract_version": "runtime-manifest-v1"
+}

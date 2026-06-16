@@ -46,7 +46,7 @@ pack_apply_suite() {
             MODEL_3="Qwen/Qwen2.5-32B"
             MODEL_4="01-ai/Yi-34B"
             MODEL_5="mistralai/Mixtral-8x7B-v0.1"
-            MODEL_6="Qwen/Qwen1.5-72B"
+            MODEL_6="Qwen/Qwen3-8B"
             MODEL_7=""
             MODEL_8=""
             ;;
@@ -345,5 +345,11 @@ pack_entrypoint() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    if [[ "${PACK_WORKFLOW_SUBPROCESS:-0}" != "1" \
+        && "${PACK_USE_WORKFLOW_FRONTDOOR:-1}" != "0" \
+        && "${1:-}" != "--help" \
+        && "${1:-}" != "-h" ]]; then
+        exec python3 "${SCRIPT_DIR}/python/workflow_frontdoor.py" run-suite -- "$@"
+    fi
     pack_entrypoint "$@"
 fi

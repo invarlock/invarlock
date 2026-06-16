@@ -16,6 +16,33 @@ class _AdapterDescribeDict:
         }
 
 
+class _T5DenseReluDense(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.wi_0 = nn.Linear(2, 2, bias=False)
+        self.wi_1 = nn.Linear(2, 2, bias=False)
+        self.wo = nn.Linear(2, 2, bias=False)
+
+
+class _T5Layer(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.DenseReluDense = _T5DenseReluDense()
+
+
+class _T5Block(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.layer = nn.ModuleList([nn.Module(), _T5Layer()])
+
+
+class _T5StyleModel(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.encoder = nn.Module()
+        self.encoder.block = nn.ModuleList([_T5Block()])
+
+
 def test_refresh_calibration_defaults_coerces_non_dict_calibration() -> None:
     g = VarianceGuard(policy={"calibration": ["bad"]})
     calibration = g._policy.get("calibration")
@@ -69,6 +96,15 @@ def test_resolve_target_modules_adapter_describe_dict_path_populates_targets() -
     targets = g._resolve_target_modules(nn.Module(), adapter=_AdapterDescribeDict())
     assert "transformer.h.0.attn.c_proj" in targets
     assert "transformer.h.1.mlp.c_proj" in targets
+
+
+def test_resolve_target_modules_finds_t5_dense_relu_dense_output_projection() -> None:
+    g = VarianceGuard(policy={"scope": "ffn", "tap": "transformer.h.*.mlp.c_proj"})
+
+    targets = g._resolve_target_modules(_T5StyleModel(), adapter=None)
+
+    assert "transformer.h.0.mlp.c_proj" in targets
+    assert targets["transformer.h.0.mlp.c_proj"].__class__.__name__ == "Linear"
 
 
 def test_compute_variance_scales_topk_backstop_injects_best_candidate(

@@ -1,0 +1,22 @@
+{
+  "artifact_paths": {
+    "evaluation_report": "evaluation.report.json",
+    "evidence_pack": "evidence_pack",
+    "evidence_pack_recipe": "evidence_pack_recipe.json",
+    "runtime_manifest": "runtime.manifest.json"
+  },
+  "evidence_class": "strict_pass_fixture",
+  "expected_fingerprint": "sha256:75798fd4fad6525f20f8d01fce1a61369cb0fc985f7b1552a4014d247b413350",
+  "generated_by": "model evidence remote sweep",
+  "model_revision": "6e8885a6ff5c1dc5201574c8fd700323f23c25fa",
+  "non_goals": [
+    "Model weights are external Hugging Face references.",
+    "This fixture is a no-op preservation basis, not a fine-tuning or compression benchmark."
+  ],
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "Release-strict verifier fixture for the DeepSeek-R1-0528-Qwen3-8B published-basis lane.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evaluation.report.json --profile release --assurance strict",
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:75798fd4fad6525f20f8d01fce1a61369cb0fc985f7b1552a4014d247b413350"
+  ]
+}

@@ -327,6 +327,6 @@ def test_explain_gates_hysteresis_warn_tail_and_drift_defaults(
     assert "status: WARN" in joined
     assert "observed: P95=0.3000" in joined
     assert "tail_mass: Pr[ΔlogNLL > ε]=0.2000" in joined
-    assert "threshold: 0.950-1.050" in joined
+    assert "threshold: 0.95–1.05x" in joined
     assert "observed: N/A" in joined
     assert "status: FAIL" in joined

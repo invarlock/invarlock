@@ -29,6 +29,23 @@ if [[ "${1:-}" == "-c" ]]; then
   exit 0
 fi
 
+if [[ "${1:-}" == "scripts/model_evidence/materialize_vision_text_dataset.py" ]]; then
+  output_dir=""
+  while [[ $# -gt 0 ]]; do
+    if [[ "$1" == "--output-dir" ]]; then
+      output_dir="$2"
+      shift 2
+      continue
+    fi
+    shift
+  done
+  mkdir -p "$output_dir/images"
+  printf 'fake-image\\n' > "$output_dir/images/000000-fake.png"
+  printf '{"id":"fake","image_path":"images/000000-fake.png","prompt":"what?","answer":"cat","answers":["cat"]}\\n' > "$output_dir/manifest.jsonl"
+  printf '{"record_count":1}\\n' > "$output_dir/materialization_summary.json"
+  exit 0
+fi
+
 if [[ "${1:-}" == "-m" && "${2:-}" == "invarlock" && "${3:-}" == "evaluate" ]]; then
   report_dir=""
   while [[ $# -gt 0 ]]; do
@@ -65,6 +82,23 @@ if [[ -n "${FAKE_PYTHON_LOG:-}" ]]; then
 fi
 
 if [[ "${1:-}" == "-c" ]]; then
+  exit 0
+fi
+
+if [[ "${1:-}" == "scripts/model_evidence/materialize_vision_text_dataset.py" ]]; then
+  output_dir=""
+  while [[ $# -gt 0 ]]; do
+    if [[ "$1" == "--output-dir" ]]; then
+      output_dir="$2"
+      shift 2
+      continue
+    fi
+    shift
+  done
+  mkdir -p "$output_dir/images"
+  printf 'fake-image\\n' > "$output_dir/images/000000-fake.png"
+  printf '{"id":"fake","image_path":"images/000000-fake.png","prompt":"what?","answer":"cat","answers":["cat"]}\\n' > "$output_dir/manifest.jsonl"
+  printf '{"record_count":1}\\n' > "$output_dir/materialization_summary.json"
   exit 0
 fi
 

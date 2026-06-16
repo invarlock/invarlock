@@ -424,7 +424,7 @@ PRESET_YAML
         echo "ERROR: Failed to stage preset for evaluate runtime: ${preset_file}" >> "${log_file}"
         return 1
     }
-    _normalize_staged_preset_for_eval "${abs_preset_file}" "${seq_len}" "${stride}" "${preview_n}" "${final_n}" "${skip_overhead_in_preset}" "${log_file}" || {
+    _normalize_staged_preset_for_eval "${abs_preset_file}" "${seq_len}" "${stride}" "${preview_n}" "${final_n}" "${skip_overhead_in_preset}" "${log_file}" "${abs_baseline_report_file:-}" || {
         echo "ERROR: Failed to normalize staged preset for evaluate runtime: ${abs_preset_file}" >> "${log_file}"
         return 1
     }
@@ -443,6 +443,11 @@ PRESET_YAML
     if _pack_defer_report_rendering_enabled; then
         evaluate_extra_args+=(--defer-report-rendering)
     fi
+    local evaluate_assurance
+    evaluate_assurance="$(_pack_evaluate_assurance_mode)" || {
+        echo "ERROR: Invalid evaluate assurance mode" >> "${log_file}"
+        return 1
+    }
     (
         cd "${work_dir}" || exit 1
         env "${extra_env[@]}" invarlock evaluate \
@@ -455,6 +460,7 @@ PRESET_YAML
             --out "${cert_dir}" \
             --report-out "${cert_dir}" \
             --preset "${abs_preset_file}" \
+            --assurance "${evaluate_assurance}" \
             "${evaluate_extra_args[@]}" >> "${log_file}" 2>&1
     ) || exit_code=$?
 
