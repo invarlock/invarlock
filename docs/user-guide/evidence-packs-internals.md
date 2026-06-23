@@ -6,8 +6,8 @@ task graph, scheduling, and artifact generation. It complements
 
 > Scope note: in this guide, `CALIBRATION_RUN -> GENERATE_PRESET` is called
 > **Preset Derivation**. It produces run-scoped
-> `calibrated_preset_<model>.yaml/json` files and does not directly modify
-> global `runtime/tiers.yaml`.
+> `calibrated_preset_<model>.yaml/json` files. Global `runtime/tiers.yaml`
+> tuning remains part of the calibration workflow.
 
 ## Overview
 

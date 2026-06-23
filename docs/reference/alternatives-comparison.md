@@ -6,12 +6,12 @@
 | --- | --- |
 | **Purpose** | Position InvarLock against adjacent evaluation, MLOps, and compression tools. |
 | **Audience** | Prospective users, evaluators, maintainers writing integration guidance. |
-| **Scope** | Current project positioning; not a vendor compatibility contract. |
+| **Scope** | Current project positioning and handoff guidance for adjacent toolchains. |
 | **Source of truth** | `docs/assurance/14-trust-model.md`, `docs/reference/reports.md`, `docs/reference/guards.md`. |
 
-InvarLock is not a general model benchmark harness or MLOps monitoring system.
-It is a paired, verifier-friendly regression assurance workflow for edited
-weights.
+InvarLock is a paired, verifier-friendly regression assurance workflow for
+edited weights. It fits after edit or compression tooling has produced a subject
+checkpoint and alongside broader benchmark, monitoring, and registry systems.
 
 ## When To Use InvarLock
 
@@ -38,8 +38,8 @@ weights.
 | --- | --- | --- |
 | lm-evaluation-harness, LightEval, custom eval runners | Broad benchmark quality and task scores. | InvarLock focuses on paired baseline-vs-subject windows, guard evidence, runtime provenance, and a standalone report verifier. |
 | OpenAI Evals | Custom LLM and system evaluations. | InvarLock operates on local checkpoint comparisons and weight-edit evidence. |
-| MLflow, Evidently, Deepchecks | Experiment validation, monitoring, drift, and dashboards. | InvarLock ships a narrow fail-closed artifact contract for weight edits rather than a broad observability platform. |
-| Hugging Face Optimum, Intel Neural Compressor, GPTQModel | Producing optimized or compressed model artifacts. | InvarLock validates the artifact after the edit instead of performing the compression. |
+| MLflow, Evidently, Deepchecks | Experiment validation, monitoring, drift, and dashboards. | InvarLock adds a narrow fail-closed artifact contract for weight edits. |
+| Hugging Face Optimum, Intel Neural Compressor, GPTQModel | Producing optimized or compressed model artifacts. | InvarLock validates the produced artifact after the edit. |
 
 ## Recommended Combined Workflow
 

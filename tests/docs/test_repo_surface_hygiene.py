@@ -25,6 +25,7 @@ def test_markdownlintignore_curated_docs_use_current_existing_paths() -> None:
         "docs/assurance/08-determinism-contracts.md",
         "docs/reference/reports.md",
         "docs/user-guide/compare-and-evaluate.md",
+        "docs/user-guide/knowledge-and-self-edit-workflows.md",
         "docs/user-guide/reading-report.md",
     ]
 
