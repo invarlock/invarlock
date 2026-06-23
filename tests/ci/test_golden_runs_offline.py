@@ -567,6 +567,23 @@ def test_byoe_examples_verify_release_strict() -> None:
         assert refs["weights_vendored"] is False
         assert refs["subject_checkpoint"]["external_edit_type"] == edit_type
         assert refs["subject_checkpoint"]["built_in_edit_plugin"] is False
+        if directory == "lora_merge_byoe":
+            edit = report["edit"]
+            assert edit["edit_provenance"]["edit_family"] == "lora_merge"
+            assert edit["edit_provenance"]["edit_method"] == "custom"
+            assert edit["edit_provenance"]["edit_count"] == 1
+            assert edit["edit_provenance"]["dynamic_runtime_required"] is False
+            assert edit["edit_impact"]["scenario_types"] == [
+                "target_success",
+                "near_neighbor",
+                "unrelated_locality",
+                "general_ability_sentinel",
+            ]
+            assert (
+                refs["subject_checkpoint"]["edit_provenance"]
+                == (edit["edit_provenance"])
+            )
+            assert refs["subject_checkpoint"]["edit_impact"] == edit["edit_impact"]
 
         result = run_verify_reports(
             [report_path],

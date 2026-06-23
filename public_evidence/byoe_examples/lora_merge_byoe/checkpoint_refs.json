@@ -15,6 +15,23 @@
   "schema": "invarlock.public_evidence.checkpoint_refs.v1",
   "subject_checkpoint": {
     "built_in_edit_plugin": false,
+    "edit_impact": {
+      "scenario_types": [
+        "target_success",
+        "near_neighbor",
+        "unrelated_locality",
+        "general_ability_sentinel"
+      ]
+    },
+    "edit_provenance": {
+      "dynamic_runtime_required": false,
+      "edit_count": 1,
+      "edit_family": "lora_merge",
+      "edit_method": "custom",
+      "editor_artifact_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "self_edit_data_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "target_set_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
     "edit_workflow": "BYOE external subject checkpoint",
     "external_edit_type": "lora_merge",
     "kind": "byoe_checkpoint_ref",
