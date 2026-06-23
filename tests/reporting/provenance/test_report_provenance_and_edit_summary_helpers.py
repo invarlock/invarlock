@@ -119,6 +119,41 @@ def test_extract_edit_metadata_preserves_quant_rtn_plan_payload():
     assert metadata["scope"] == "attn"
 
 
+def test_extract_edit_metadata_preserves_optional_edit_provenance_and_impact():
+    report = {
+        "edit": {
+            "name": "custom",
+            "plan_digest": "sha256:abc",
+            "edit_provenance": {
+                "edit_family": "knowledge_edit",
+                "edit_method": "custom",
+                "edit_count": 3,
+                "target_set_digest": "sha256:" + "a" * 64,
+                "editor_artifact_digest": "sha256:" + "b" * 64,
+                "self_edit_data_digest": "sha256:" + "c" * 64,
+                "dynamic_runtime_required": False,
+            },
+            "edit_impact": {
+                "scenario_types": [
+                    "target_success",
+                    "near_neighbor",
+                    "unrelated_locality",
+                ]
+            },
+        }
+    }
+
+    metadata = report_edit_summary_mod.extract_edit_metadata(report, {})
+
+    assert metadata["edit_provenance"]["edit_family"] == "knowledge_edit"
+    assert metadata["edit_provenance"]["edit_count"] == 3
+    assert metadata["edit_impact"]["scenario_types"] == [
+        "target_success",
+        "near_neighbor",
+        "unrelated_locality",
+    ]
+
+
 def test_compute_report_digest_returns_none_for_non_dict():
     assert provenance_mod.compute_report_digest(None) is None
 

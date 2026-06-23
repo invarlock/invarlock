@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any, cast
 
@@ -26,6 +27,32 @@ DEPLOYABLE_SIDECAR_SCHEMAS = {
     "load_smoke.json": "invarlock/deployable-load-smoke-v1",
     "inference_smoke.json": "invarlock/deployable-inference-smoke-v1",
 }
+EDIT_PROVENANCE_FAMILIES = {
+    "custom",
+    "deployable_backend_quantization",
+    "dynamic_adapter",
+    "fault_injection",
+    "fine_tune",
+    "knowledge_edit",
+    "lora_merge",
+    "lowrank_approximation",
+    "magnitude_prune",
+    "noop",
+    "pruning",
+    "quantization",
+    "quantization_dequantized",
+    "self_edit",
+}
+EDIT_IMPACT_SCENARIO_TYPES = {
+    "target_success",
+    "near_neighbor",
+    "near_confuser",
+    "unrelated_locality",
+    "general_ability_sentinel",
+    "multilingual_portability",
+    "sequential_edit_stress",
+}
+_SHA256_RE = re.compile(r"^sha256:[a-f0-9]{64}$")
 
 
 def _load_json(path: Path) -> Any:
@@ -153,6 +180,85 @@ def _metadata_consistency_errors(
             errors.append(
                 prefix
                 + "quant_rtn validation metadata must set packed_quantized_storage=false"
+            )
+    errors.extend(_optional_edit_provenance_errors(prefix, metadata))
+    errors.extend(_optional_edit_impact_errors(prefix, metadata))
+    return errors
+
+
+def _optional_edit_provenance_errors(
+    prefix: str, metadata: dict[str, Any]
+) -> list[str]:
+    errors: list[str] = []
+    provenance = metadata.get("edit_provenance")
+    if provenance is None:
+        return errors
+    if not isinstance(provenance, dict):
+        return [prefix + "edit_provenance must be an object when present"]
+
+    family = provenance.get("edit_family")
+    if family is not None and (
+        not isinstance(family, str) or family not in EDIT_PROVENANCE_FAMILIES
+    ):
+        errors.append(prefix + f"edit_provenance.edit_family unsupported: {family!r}")
+
+    method = provenance.get("edit_method")
+    if method is not None and (not isinstance(method, str) or not method.strip()):
+        errors.append(prefix + "edit_provenance.edit_method must be a non-empty string")
+
+    edit_count = provenance.get("edit_count")
+    if edit_count is not None and (
+        not isinstance(edit_count, int)
+        or isinstance(edit_count, bool)
+        or edit_count < 1
+    ):
+        errors.append(prefix + "edit_provenance.edit_count must be a positive integer")
+
+    for key in (
+        "target_set_digest",
+        "editor_artifact_digest",
+        "self_edit_data_digest",
+    ):
+        digest = provenance.get(key)
+        if digest is not None and (
+            not isinstance(digest, str) or _SHA256_RE.fullmatch(digest) is None
+        ):
+            errors.append(
+                prefix
+                + f"edit_provenance.{key} must be a sha256:<64 lowercase hex> digest"
+            )
+
+    dynamic_required = provenance.get("dynamic_runtime_required")
+    if dynamic_required is not None and not isinstance(dynamic_required, bool):
+        errors.append(
+            prefix + "edit_provenance.dynamic_runtime_required must be boolean"
+        )
+    return errors
+
+
+def _optional_edit_impact_errors(prefix: str, metadata: dict[str, Any]) -> list[str]:
+    impact = metadata.get("edit_impact")
+    if impact is None:
+        return []
+    if not isinstance(impact, dict):
+        return [prefix + "edit_impact must be an object when present"]
+
+    scenario_types = impact.get("scenario_types")
+    if scenario_types is None:
+        return []
+    if not isinstance(scenario_types, list):
+        return [prefix + "edit_impact.scenario_types must be a list when present"]
+
+    errors: list[str] = []
+    for index, scenario_type in enumerate(scenario_types):
+        if (
+            not isinstance(scenario_type, str)
+            or scenario_type not in EDIT_IMPACT_SCENARIO_TYPES
+        ):
+            errors.append(
+                prefix
+                + f"edit_impact.scenario_types[{index}] unsupported: "
+                + f"{scenario_type!r}"
             )
     return errors
 
@@ -283,6 +389,8 @@ __all__ = [
     "DEPLOYABLE_OPTIMIZED_SUBJECT",
     "DEPLOYABLE_SIDECARS",
     "EDIT_METADATA_SCHEMA",
+    "EDIT_IMPACT_SCENARIO_TYPES",
+    "EDIT_PROVENANCE_FAMILIES",
     "FAULT_INJECTION_FIXTURE",
     "VALIDATION_SUBJECT_CHECKPOINT",
     "_expected_edit_type",

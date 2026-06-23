@@ -530,6 +530,61 @@ def _build_technical_appendix_section(
     )
 
 
+def _build_edit_provenance_section(
+    evaluation_report: dict[str, Any],
+) -> ReportSection | None:
+    edit = _mapping(evaluation_report.get("edit"))
+    provenance = _mapping(edit.get("edit_provenance"))
+    impact = _mapping(edit.get("edit_impact"))
+    if not provenance and not impact:
+        return None
+
+    scenario_types = impact.get("scenario_types")
+    scenario_display = (
+        ", ".join(str(item) for item in scenario_types)
+        if isinstance(scenario_types, list)
+        else "N/A"
+    )
+    facts = (
+        ReportFact(
+            "Edit Family",
+            str(provenance.get("edit_family") or "N/A"),
+            source="edit.edit_provenance.edit_family",
+        ),
+        ReportFact(
+            "Edit Method",
+            str(provenance.get("edit_method") or "N/A"),
+            source="edit.edit_provenance.edit_method",
+        ),
+        ReportFact(
+            "Edit Count",
+            str(provenance.get("edit_count") or "N/A"),
+            source="edit.edit_provenance.edit_count",
+        ),
+        ReportFact(
+            "Dynamic Runtime",
+            str(provenance.get("dynamic_runtime_required", "N/A")),
+            source="edit.edit_provenance.dynamic_runtime_required",
+        ),
+        ReportFact(
+            "Scenario Types",
+            scenario_display,
+            source="edit.edit_impact.scenario_types",
+        ),
+    )
+    return ReportSection(
+        key="edit_provenance",
+        title="Edit Provenance",
+        summary=(
+            "Optional descriptive metadata about the upstream subject-generation "
+            "workflow."
+        ),
+        priority="review",
+        source_blocks=("edit",),
+        facts=facts,
+    )
+
+
 def build_evaluation_report_outline(
     evaluation_report: dict[str, Any],
 ) -> EvaluationReportOutline:
@@ -546,6 +601,9 @@ def build_evaluation_report_outline(
     benchmark = _build_benchmark_section(evaluation_report)
     if benchmark is not None:
         sections.append(benchmark)
+    edit_provenance = _build_edit_provenance_section(evaluation_report)
+    if edit_provenance is not None:
+        sections.append(edit_provenance)
     sections.extend(
         [
             _build_evidence_provenance_section(evaluation_report),

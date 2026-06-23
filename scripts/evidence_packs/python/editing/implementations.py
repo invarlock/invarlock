@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -42,6 +43,32 @@ VALIDATION_STORAGE_FORMATS = {
 
 EDIT_SEMANTICS_EXTERNAL_SUBJECT = "external_subject_validation_edit"
 EDIT_SEMANTICS_DEPLOYABLE = "backend_deployable_edit"
+EDIT_PROVENANCE_FAMILIES = {
+    "custom",
+    "deployable_backend_quantization",
+    "dynamic_adapter",
+    "fault_injection",
+    "fine_tune",
+    "knowledge_edit",
+    "lora_merge",
+    "lowrank_approximation",
+    "magnitude_prune",
+    "noop",
+    "pruning",
+    "quantization",
+    "quantization_dequantized",
+    "self_edit",
+}
+EDIT_IMPACT_SCENARIO_TYPES = {
+    "target_success",
+    "near_neighbor",
+    "near_confuser",
+    "unrelated_locality",
+    "general_ability_sentinel",
+    "multilingual_portability",
+    "sequential_edit_stress",
+}
+_SHA256_RE = re.compile(r"^sha256:[a-f0-9]{64}$")
 
 
 @dataclass(frozen=True)
@@ -397,6 +424,8 @@ def build_edit_metadata(
     runtime_memory_reduction: bool = False,
     runtime_memory_reduction_expected: bool | None = None,
     run_directory_contains_edit_artifacts: bool = True,
+    edit_provenance: dict[str, object] | None = None,
+    edit_impact: dict[str, object] | None = None,
     extra: dict[str, object] | None = None,
 ) -> dict[str, object]:
     resolved_storage = storage_format or storage_format_for_edit(edit_type)
@@ -424,6 +453,10 @@ def build_edit_metadata(
         "parameters": dict(parameters or {}),
         "coverage": normalize_coverage(coverage),
     }
+    if edit_provenance is not None:
+        metadata["edit_provenance"] = dict(edit_provenance)
+    if edit_impact is not None:
+        metadata["edit_impact"] = dict(edit_impact)
     if extra:
         metadata.update(extra)
     return metadata
@@ -435,6 +468,8 @@ def build_validation_edit_metadata(
     scope: str,
     parameters: dict[str, object] | None = None,
     coverage: dict[str, object] | None = None,
+    edit_provenance: dict[str, object] | None = None,
+    edit_impact: dict[str, object] | None = None,
     extra: dict[str, object] | None = None,
 ) -> dict[str, object]:
     return build_edit_metadata(
@@ -452,6 +487,8 @@ def build_validation_edit_metadata(
         packed_quantized_storage=False,
         runtime_memory_reduction=False,
         runtime_memory_reduction_expected=False,
+        edit_provenance=edit_provenance,
+        edit_impact=edit_impact,
         extra=extra,
     )
 
@@ -558,6 +595,78 @@ def validate_edit_metadata(
             "subject checkpoint artifacts must set deployable_as_hf_checkpoint=true"
         )
 
+    errors.extend(_validate_optional_edit_provenance(metadata))
+    errors.extend(_validate_optional_edit_impact(metadata))
+    return errors
+
+
+def _validate_optional_edit_provenance(metadata: dict[str, object]) -> list[str]:
+    provenance = metadata.get("edit_provenance")
+    if provenance is None:
+        return []
+    if not isinstance(provenance, dict):
+        return ["edit_provenance must be an object when present"]
+
+    errors: list[str] = []
+    family = provenance.get("edit_family")
+    if family is not None and (
+        not isinstance(family, str) or family not in EDIT_PROVENANCE_FAMILIES
+    ):
+        errors.append(f"edit_provenance.edit_family unsupported: {family!r}")
+
+    method = provenance.get("edit_method")
+    if method is not None and (not isinstance(method, str) or not method.strip()):
+        errors.append("edit_provenance.edit_method must be a non-empty string")
+
+    edit_count = provenance.get("edit_count")
+    if edit_count is not None and (
+        not isinstance(edit_count, int)
+        or isinstance(edit_count, bool)
+        or edit_count < 1
+    ):
+        errors.append("edit_provenance.edit_count must be a positive integer")
+
+    for key in (
+        "target_set_digest",
+        "editor_artifact_digest",
+        "self_edit_data_digest",
+    ):
+        digest = provenance.get(key)
+        if digest is not None and (
+            not isinstance(digest, str) or _SHA256_RE.fullmatch(digest) is None
+        ):
+            errors.append(
+                f"edit_provenance.{key} must be a sha256:<64 lowercase hex> digest"
+            )
+
+    dynamic_required = provenance.get("dynamic_runtime_required")
+    if dynamic_required is not None and not isinstance(dynamic_required, bool):
+        errors.append("edit_provenance.dynamic_runtime_required must be boolean")
+    return errors
+
+
+def _validate_optional_edit_impact(metadata: dict[str, object]) -> list[str]:
+    impact = metadata.get("edit_impact")
+    if impact is None:
+        return []
+    if not isinstance(impact, dict):
+        return ["edit_impact must be an object when present"]
+
+    scenario_types = impact.get("scenario_types")
+    if scenario_types is None:
+        return []
+    if not isinstance(scenario_types, list):
+        return ["edit_impact.scenario_types must be a list when present"]
+
+    errors: list[str] = []
+    for index, scenario_type in enumerate(scenario_types):
+        if (
+            not isinstance(scenario_type, str)
+            or scenario_type not in EDIT_IMPACT_SCENARIO_TYPES
+        ):
+            errors.append(
+                f"edit_impact.scenario_types[{index}] unsupported: {scenario_type!r}"
+            )
     return errors
 
 
@@ -688,6 +797,8 @@ __all__ = [
     "ALLOWED_ARTIFACT_CLASSES",
     "DEPLOYABLE_OPTIMIZED_SUBJECT",
     "EDIT_METADATA_SCHEMA",
+    "EDIT_IMPACT_SCENARIO_TYPES",
+    "EDIT_PROVENANCE_FAMILIES",
     "EDIT_SEMANTICS_DEPLOYABLE",
     "EDIT_SEMANTICS_EXTERNAL_SUBJECT",
     "EditStats",

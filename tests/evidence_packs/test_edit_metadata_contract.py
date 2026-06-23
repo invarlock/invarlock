@@ -54,6 +54,73 @@ def test_validation_edit_metadata_has_contract_fields() -> None:
     assert validate_edit_metadata(metadata) == []
 
 
+def test_validation_edit_metadata_accepts_optional_provenance_and_impact() -> None:
+    metadata = build_validation_edit_metadata(
+        edit_type="lora_merge",
+        scope="attn",
+        parameters={"rank": 4},
+        coverage={"edited_tensors": 2, "edited_params": 10, "total_params": 100},
+        edit_provenance={
+            "edit_family": "lora_merge",
+            "edit_method": "custom",
+            "edit_count": 1,
+            "target_set_digest": "sha256:" + "a" * 64,
+            "dynamic_runtime_required": False,
+        },
+        edit_impact={
+            "scenario_types": [
+                "target_success",
+                "near_neighbor",
+                "unrelated_locality",
+            ]
+        },
+    )
+
+    assert metadata["edit_provenance"]["edit_family"] == "lora_merge"
+    assert metadata["edit_impact"]["scenario_types"] == [
+        "target_success",
+        "near_neighbor",
+        "unrelated_locality",
+    ]
+    assert validate_edit_metadata(metadata) == []
+
+
+def test_validate_edit_metadata_rejects_malformed_optional_provenance() -> None:
+    metadata = build_validation_edit_metadata(
+        edit_type="custom",
+        scope="all",
+        edit_provenance={
+            "edit_family": "unsupported_edit_family",
+            "edit_count": 0,
+            "target_set_digest": "bad",
+            "dynamic_runtime_required": "false",
+        },
+        edit_impact={"scenario_types": ["target_success", "unsupported_scenario_type"]},
+    )
+
+    errors = validate_edit_metadata(metadata)
+
+    assert any("edit_provenance.edit_family" in error for error in errors)
+    assert any("edit_provenance.edit_count" in error for error in errors)
+    assert any("edit_provenance.target_set_digest" in error for error in errors)
+    assert any("edit_provenance.dynamic_runtime_required" in error for error in errors)
+    assert any("edit_impact.scenario_types[1]" in error for error in errors)
+
+
+def test_validate_edit_metadata_rejects_non_string_optional_taxonomy_values() -> None:
+    metadata = build_validation_edit_metadata(
+        edit_type="custom",
+        scope="all",
+        edit_provenance={"edit_family": ["lora_merge"]},
+        edit_impact={"scenario_types": ["target_success", {"kind": "bad"}]},
+    )
+
+    errors = validate_edit_metadata(metadata)
+
+    assert any("edit_provenance.edit_family" in error for error in errors)
+    assert any("edit_impact.scenario_types[1]" in error for error in errors)
+
+
 def test_validate_edit_artifact_require_metadata_json(tmp_path: Path) -> None:
     artifact = tmp_path / "artifact"
     metadata = build_validation_edit_metadata(
