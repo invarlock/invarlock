@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from typing import cast
 
 from invarlock.core.auto_tuning import get_tier_policies as default_tier_policies
 
@@ -27,7 +28,7 @@ def _mapping_dict(value: object) -> dict[str, object]:
 
 def _coerce_optional_float(value: object) -> float | None:
     try:
-        coerced = float(value)
+        coerced = float(cast(str | bytes | bytearray | int | float, value))
     except (TypeError, ValueError, OverflowError):
         return None
     if not math.isfinite(coerced):
@@ -37,9 +38,10 @@ def _coerce_optional_float(value: object) -> float | None:
 
 def _coerce_int(value: object, default: int = 0) -> int:
     try:
-        return int(value)
+        coerced = int(cast(str | bytes | bytearray | int | float, value))
     except (TypeError, ValueError, OverflowError):
         return default
+    return coerced
 
 
 def _dataset_split_line(report_payload: object) -> str | None:
@@ -93,55 +95,31 @@ def build_evaluation_report_explanation(
     lines: list[str] = []
     _append_report_outline_summary(lines, evaluation_report)
 
-    validation = (
-        evaluation_report.get("validation", {})
-        if isinstance(evaluation_report.get("validation"), dict)
-        else {}
-    )
+    validation = _mapping_dict(evaluation_report.get("validation"))
     quality_gates = build_quality_gates_summary(evaluation_report)
     quality_by_label = {row.label: row for row in quality_gates.rows}
-    auto = (
-        evaluation_report.get("auto", {})
-        if isinstance(evaluation_report.get("auto"), dict)
-        else {}
-    )
+    auto = _mapping_dict(evaluation_report.get("auto"))
     tiny_relax = bool(auto.get("tiny_relax"))
 
     tier = str(auto.get("tier", "balanced")).lower()
     effective_tier = "aggressive" if tiny_relax else tier
     tier_policies = tier_policies_getter()
-    tier_defaults = tier_policies.get(effective_tier, tier_policies.get("balanced", {}))
-    resolved_policy = (
-        evaluation_report.get("resolved_policy", {})
-        if isinstance(evaluation_report.get("resolved_policy"), dict)
-        else {}
+    tier_defaults = _mapping_dict(
+        tier_policies.get(effective_tier, tier_policies.get("balanced", {}))
     )
+    resolved_policy = _mapping_dict(evaluation_report.get("resolved_policy"))
     metrics_policy: dict[str, object] = {}
     if not tiny_relax:
-        metrics_policy = (
-            resolved_policy.get("metrics", {})
-            if isinstance(resolved_policy.get("metrics"), dict)
-            else {}
-        )
+        metrics_policy = _mapping_dict(resolved_policy.get("metrics"))
     if not metrics_policy:
-        metrics_policy = (
-            tier_defaults.get("metrics", {}) if isinstance(tier_defaults, dict) else {}
-        )
-        if not isinstance(metrics_policy, dict):
-            metrics_policy = {}
-    pm_policy = (
-        metrics_policy.get("pm_ratio", {})
-        if isinstance(metrics_policy.get("pm_ratio"), dict)
-        else {}
-    )
-    hysteresis_ratio = float(pm_policy.get("hysteresis_ratio", 0.0))
-    min_tokens = int(pm_policy.get("min_tokens", 0))
+        metrics_policy = _mapping_dict(tier_defaults.get("metrics"))
+    pm_policy = _mapping_dict(metrics_policy.get("pm_ratio"))
+    hysteresis_ratio = _coerce_optional_float(pm_policy.get("hysteresis_ratio")) or 0.0
+    min_tokens = _coerce_int(pm_policy.get("min_tokens"))
     limit_base = _coerce_optional_float(pm_policy.get("ratio_limit_base"))
     if limit_base is None:
-        fallback = (
-            tier_defaults.get("metrics", {}) if isinstance(tier_defaults, dict) else {}
-        )
-        fallback_pm = fallback.get("pm_ratio", {}) if isinstance(fallback, dict) else {}
+        fallback = _mapping_dict(tier_defaults.get("metrics"))
+        fallback_pm = _mapping_dict(fallback.get("pm_ratio"))
         limit_base = _coerce_optional_float(fallback_pm.get("ratio_limit_base"))
     limit_with_hyst = (
         float(limit_base) + max(0.0, hysteresis_ratio)
@@ -155,10 +133,8 @@ def build_evaluation_report_explanation(
     tokens_ok = (min_tokens == 0) or (total_tokens >= min_tokens) or tiny_relax
 
     ratio_ci = None
-    pm: dict[str, object] = {}
-    if isinstance(evaluation_report.get("primary_metric"), dict):
-        pm = evaluation_report.get("primary_metric", {})
-        ratio_ci = pm.get("display_ci")
+    pm = _mapping_dict(evaluation_report.get("primary_metric"))
+    ratio_ci = pm.get("display_ci")
     hysteresis_applied = bool(validation.get("hysteresis_applied"))
     status = "PASS" if bool(validation.get("primary_metric_acceptable")) else "FAIL"
     primary_row = quality_by_label.get("Primary Metric Acceptable")
@@ -200,21 +176,13 @@ def build_evaluation_report_explanation(
             f"  note: hysteresis applied → effective threshold = {float(limit_with_hyst):.3f}x"
         )
 
-    pm_tail = (
-        evaluation_report.get("primary_metric_tail", {})
-        if isinstance(evaluation_report.get("primary_metric_tail"), dict)
-        else {}
-    )
+    pm_tail = _mapping_dict(evaluation_report.get("primary_metric_tail"))
     if pm_tail:
         mode = str(pm_tail.get("mode", "warn") or "warn").strip().lower()
         evaluated = bool(pm_tail.get("evaluated", False))
         passed = bool(pm_tail.get("passed", True))
-        policy = (
-            pm_tail.get("policy", {}) if isinstance(pm_tail.get("policy"), dict) else {}
-        )
-        stats = (
-            pm_tail.get("stats", {}) if isinstance(pm_tail.get("stats"), dict) else {}
-        )
+        policy = _mapping_dict(pm_tail.get("policy"))
+        stats = _mapping_dict(pm_tail.get("stats"))
 
         q = policy.get("quantile", 0.95)
         qf = _coerce_optional_float(q)
@@ -282,11 +250,7 @@ def build_evaluation_report_explanation(
             lines.append("  threshold: unavailable")
         lines.append(f"  status: {drift_status}")
 
-    spectral = (
-        evaluation_report.get("spectral", {})
-        if isinstance(evaluation_report.get("spectral"), dict)
-        else {}
-    )
+    spectral = _mapping_dict(evaluation_report.get("spectral"))
     if spectral:
         spectral_status = "PASS" if bool(validation.get("spectral_stable")) else "FAIL"
         caps_applied = spectral.get("caps_applied")
@@ -306,11 +270,7 @@ def build_evaluation_report_explanation(
             "  note: budgeted caps are guard observations; they are hard failures only when the policy budget is exceeded."
         )
 
-    rmt = (
-        evaluation_report.get("rmt", {})
-        if isinstance(evaluation_report.get("rmt"), dict)
-        else {}
-    )
+    rmt = _mapping_dict(evaluation_report.get("rmt"))
     if rmt:
         rmt_status = "PASS" if bool(validation.get("rmt_stable")) else "FAIL"
         epsilon_violations = rmt.get("epsilon_violations")
@@ -325,11 +285,7 @@ def build_evaluation_report_explanation(
         lines.append("  threshold: ε-rule")
         lines.append(f"  status: {rmt_status}")
 
-    guard_warnings = (
-        evaluation_report.get("guard_warnings", {})
-        if isinstance(evaluation_report.get("guard_warnings"), dict)
-        else {}
-    )
+    guard_warnings = _mapping_dict(evaluation_report.get("guard_warnings"))
     warnings = guard_warnings.get("warnings")
     if isinstance(warnings, list) and warnings:
         lines.append("")
@@ -348,16 +304,13 @@ def build_evaluation_report_explanation(
                 f"  - {guard_name}.{kind_name}{location}; policy: {entry.get('policy_gate', 'unknown')}"
             )
 
-    overhead = (
-        evaluation_report.get("guard_overhead", {})
-        if isinstance(evaluation_report.get("guard_overhead"), dict)
-        else {}
-    )
+    overhead = _mapping_dict(evaluation_report.get("guard_overhead"))
     if overhead:
         passed = bool(validation.get("guard_overhead_acceptable", True))
         threshold = overhead.get("threshold_percent")
         if not isinstance(threshold, int | float):
-            threshold = float(overhead.get("overhead_threshold", 0.01)) * 100.0
+            threshold_base = _coerce_optional_float(overhead.get("overhead_threshold"))
+            threshold = (threshold_base if threshold_base is not None else 0.01) * 100.0
         pct = overhead.get("overhead_percent")
         ratio = overhead.get("overhead_ratio")
         lines.append("")

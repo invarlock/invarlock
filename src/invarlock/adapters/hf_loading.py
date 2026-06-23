@@ -244,7 +244,7 @@ class _ChatGLMRemoteCodeCausalLoader:
             auto_model = _resolve_auto_loader("causal")[0]
             return auto_model.from_pretrained(model_id, **loader_kwargs)
 
-        model_cls = get_class_from_dynamic_module(
+        model_cls: Any = get_class_from_dynamic_module(
             class_ref,
             model_id,
             trust_remote_code=trust_remote_code,

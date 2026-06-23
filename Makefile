@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint typecheck mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-dry contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync scripts-inventory-check scripts-audit architecture-fragmentation-check guard-fallback-audit model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda-quant runtime-image-cuda-quant-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-smoke-cuda-quant runtime-smoke-cuda-quant-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-evidence-check
+.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint typecheck mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-fast verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-dry contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync scripts-inventory-check scripts-audit architecture-fragmentation-check guard-fallback-audit model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda-quant runtime-image-cuda-quant-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-smoke-cuda-quant runtime-smoke-cuda-quant-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-evidence-check
 
 PYTHON ?= $(shell bash scripts/select_workspace_python.sh)
 PIP := $(PYTHON) -m pip
@@ -344,6 +344,17 @@ verify:  ## Run verification (pytest -q, runtime verifier, lint, format, strict 
 		$(PYTHON) scripts/docs/docs_check.py --api-refs; \
 	fi
 	@echo "Verification completed successfully"
+
+verify-fast:  ## Run fast local verification without model downloads
+	@echo "Running fast verification..."
+	$(MAKE) ensure-python
+	$(MAKE) public-evidence-audit
+	PYTHONPATH=src $(PYTEST) -q -m "not integration and not slow and not manual" \
+		tests/docs tests/reporting tests/evidence_packs \
+		tests/ci/test_golden_runs_offline.py::test_byoe_examples_verify_release_strict
+	$(MAKE) verify-ruff
+	$(MAKE) docs-lint-strict
+	@echo "Fast verification completed successfully"
 
 verify-ruff:  ## Run the Ruff checks used by make verify
 	$(MAKE) ensure-ruff

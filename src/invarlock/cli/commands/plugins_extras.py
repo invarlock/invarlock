@@ -9,15 +9,22 @@ import io
 import re
 import warnings
 from contextlib import redirect_stderr, redirect_stdout
+from typing import NotRequired, TypedDict
 
 from invarlock.core.plugins_inventory import bitsandbytes_runtime_available
 
 _EXTRA_CHECK_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, ValueError)
 
 
+class _PluginExtraInfo(TypedDict):
+    packages: list[str]
+    extra: str
+    minimum_versions: NotRequired[dict[str, str]]
+
+
 def check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
     """Check if plugin requires missing optional extras."""
-    extras_map = {
+    extras_map: dict[str, _PluginExtraInfo] = {
         "quant_rtn": {"packages": [], "extra": ""},
         "invariants": {"packages": [], "extra": ""},
         "spectral": {"packages": [], "extra": ""},

@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from invarlock.observability.metrics import (
     capture_memory_snapshot,
@@ -210,12 +210,15 @@ def execute_runner_execution_plan(
     runner._active_model = request.model
     runner._active_adapter = request.adapter
 
-    report = initialize_run_report_fn(
-        config=request.config,
-        serialized_config=runner._serialize_config(request.config),
-        cuda_flags=collect_cuda_flags_fn(),
-        auto_config=request.auto_config,
-        report_factory=RunReport,
+    report = cast(
+        RunReport,
+        initialize_run_report_fn(
+            config=request.config,
+            serialized_config=runner._serialize_config(request.config),
+            cuda_flags=collect_cuda_flags_fn(),
+            auto_config=request.auto_config,
+            report_factory=RunReport,
+        ),
     )
     report.status = RunStatus.RUNNING.value
     state = build_runner_execution_state(

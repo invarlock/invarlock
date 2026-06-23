@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 from invarlock.core.assurance_contract import REPORT_BUILD_EVENT_CATEGORIES
 
 
@@ -26,7 +28,7 @@ def record_report_build_event(
     if category not in REPORT_BUILD_EVENT_CATEGORIES:
         raise ValueError(f"Unknown report-build event category: {category}")
     section = ensure_report_build_evidence(report)
-    events = section[category]
+    events = cast(list[dict[str, str]], section[category])
     events.append(
         {
             "field": str(field),
