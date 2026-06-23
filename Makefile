@@ -351,7 +351,8 @@ verify-fast:  ## Run fast local verification without model downloads
 	$(MAKE) public-evidence-audit
 	PYTHONPATH=src $(PYTEST) -q -m "not integration and not slow and not manual" \
 		tests/docs tests/reporting tests/evidence_packs \
-		tests/ci/test_golden_runs_offline.py::test_byoe_examples_verify_release_strict
+		tests/ci/test_golden_runs_offline.py::test_byoe_examples_verify_release_strict \
+		tests/ci/test_golden_runs_offline.py::test_lora_byoe_metadata_builds_and_verifies_signed_evidence_pack
 	$(MAKE) verify-ruff
 	$(MAKE) docs-lint-strict
 	@echo "Fast verification completed successfully"
