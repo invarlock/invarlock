@@ -559,6 +559,7 @@ def test_byoe_examples_verify_release_strict() -> None:
     examples = {
         "magnitude_prune_byoe": "magnitude_prune",
         "lora_merge_byoe": "lora_merge",
+        "fine_tune_byoe": "fine_tune",
     }
 
     for directory, edit_type in examples.items():
@@ -576,23 +577,74 @@ def test_byoe_examples_verify_release_strict() -> None:
         assert refs["weights_vendored"] is False
         assert refs["subject_checkpoint"]["external_edit_type"] == edit_type
         assert refs["subject_checkpoint"]["built_in_edit_plugin"] is False
-        if directory == "lora_merge_byoe":
+        if directory in {"lora_merge_byoe", "fine_tune_byoe"}:
             edit = report["edit"]
-            assert edit["edit_provenance"]["edit_family"] == "lora_merge"
-            assert edit["edit_provenance"]["edit_method"] == "custom"
+            assert edit["edit_provenance"]["edit_family"] == edit_type
             assert edit["edit_provenance"]["edit_count"] == 1
             assert edit["edit_provenance"]["dynamic_runtime_required"] is False
-            assert edit["edit_impact"]["scenario_types"] == [
-                "target_success",
-                "near_neighbor",
-                "unrelated_locality",
-                "general_ability_sentinel",
-            ]
+            if directory == "lora_merge_byoe":
+                assert edit["edit_provenance"]["edit_method"] == "custom"
+                assert edit["edit_impact"]["scenario_types"] == [
+                    "target_success",
+                    "near_neighbor",
+                    "unrelated_locality",
+                    "general_ability_sentinel",
+                ]
+            else:
+                assert (
+                    edit["edit_provenance"]["edit_method"]
+                    == "external_cpu_tiny_fine_tune"
+                )
             assert (
                 refs["subject_checkpoint"]["edit_provenance"]
                 == (edit["edit_provenance"])
             )
-            assert refs["subject_checkpoint"]["edit_impact"] == edit["edit_impact"]
+            if "edit_impact" in edit:
+                assert refs["subject_checkpoint"]["edit_impact"] == edit["edit_impact"]
+
+        result = run_verify_reports(
+            [report_path],
+            profile="release",
+            assurance_mode="strict",
+        )
+
+        assert result.outcome == VerifyOutcome.OK
+        verification = result.payload["results"][0]["verification"]
+        assert verification["runtime_provenance"]["status"] == "verified"
+
+
+def test_model_editing_evidence_bundle_v0_lanes_verify_release_strict() -> None:
+    bundle_dir = REPO_ROOT / "public_evidence" / "model_editing_evidence_bundle_v0"
+    manifest_path = bundle_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    expected_families = {"quantization", "magnitude_prune", "lora_merge", "fine_tune"}
+    lanes = manifest["lanes"]
+    assert {lane["edit_family"] for lane in lanes} == expected_families
+    assert manifest["claim_boundary"] == "release-evidence wiring only"
+
+    for lane in lanes:
+        report_path = REPO_ROOT / lane["evaluation_report"]
+        refs_path = REPO_ROOT / lane["checkpoint_refs"]
+        note_path = REPO_ROOT / lane["reviewer_note"]
+
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        refs = json.loads(refs_path.read_text(encoding="utf-8"))
+        note = " ".join(note_path.read_text(encoding="utf-8").split())
+
+        assert validate_report(report) is True
+        assert (
+            refs["subject_checkpoint"]["external_edit_type"]
+            == lane["external_edit_type"]
+        )
+        assert "Edit success" in note
+        assert "model safety" in note
+        assert "require separate evidence" in note
+
+        if lane["edit_family"] in {"lora_merge", "fine_tune"}:
+            assert (
+                report["edit"]["edit_provenance"]["edit_family"] == lane["edit_family"]
+            )
 
         result = run_verify_reports(
             [report_path],

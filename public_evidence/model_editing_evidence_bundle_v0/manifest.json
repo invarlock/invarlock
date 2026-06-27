@@ -1,0 +1,40 @@
+{
+  "bundle_id": "invarlock-model-editing-evidence-bundle-v0",
+  "claim_boundary": "release-evidence wiring only",
+  "description": "Public-safe curated evidence lanes for edited subject artifacts.",
+  "lanes": [
+    {
+      "checkpoint_refs": "public_evidence/real_runs/tiny_gpt2_quant_rtn/checkpoint_refs.json",
+      "edit_family": "quantization",
+      "evaluation_report": "public_evidence/real_runs/tiny_gpt2_quant_rtn/evaluation.report.json",
+      "external_edit_type": "quant_rtn",
+      "reviewer_note": "public_evidence/model_editing_evidence_bundle_v0/reviewer_notes/quantization.md",
+      "runtime_manifest": "public_evidence/real_runs/tiny_gpt2_quant_rtn/runtime.manifest.json"
+    },
+    {
+      "checkpoint_refs": "public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/checkpoint_refs.json",
+      "edit_family": "magnitude_prune",
+      "evaluation_report": "public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json",
+      "external_edit_type": "magnitude_prune",
+      "reviewer_note": "public_evidence/model_editing_evidence_bundle_v0/reviewer_notes/magnitude_prune.md",
+      "runtime_manifest": "public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/runtime.manifest.json"
+    },
+    {
+      "checkpoint_refs": "public_evidence/byoe_examples/lora_merge_byoe/checkpoint_refs.json",
+      "edit_family": "lora_merge",
+      "evaluation_report": "public_evidence/byoe_examples/lora_merge_byoe/evaluation.report.json",
+      "external_edit_type": "lora_merge",
+      "reviewer_note": "public_evidence/model_editing_evidence_bundle_v0/reviewer_notes/lora_merge.md",
+      "runtime_manifest": "public_evidence/byoe_examples/lora_merge_byoe/runtime.manifest.json"
+    },
+    {
+      "checkpoint_refs": "public_evidence/byoe_examples/fine_tune_byoe/checkpoint_refs.json",
+      "edit_family": "fine_tune",
+      "evaluation_report": "public_evidence/byoe_examples/fine_tune_byoe/evaluation.report.json",
+      "external_edit_type": "fine_tune",
+      "reviewer_note": "public_evidence/model_editing_evidence_bundle_v0/reviewer_notes/fine_tune.md",
+      "runtime_manifest": "public_evidence/byoe_examples/fine_tune_byoe/runtime.manifest.json"
+    }
+  ],
+  "schema": "invarlock.public_evidence.model_editing_bundle.v0"
+}
