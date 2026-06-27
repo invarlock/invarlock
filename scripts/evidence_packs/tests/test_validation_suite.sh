@@ -930,6 +930,9 @@ test_pack_validation_check_dependencies_covers_pip_bootstrap_and_missing_install
         fi
         if [[ "${1:-}" == "-m" && "${2:-}" == "pip" && "${3:-}" == "install" ]]; then
             local pip_args="$*"
+            if [[ "${pip_args}" == *"requirements/evidence-packs/accelerate.txt"* && "${pip_args}" != *"--no-deps"* ]]; then
+                return 1
+            fi
             case "${pip_args}" in
                 *"requirements/evidence-packs/huggingface_hub.txt"*|\
                 *"requirements/evidence-packs/accelerate.txt"*|\

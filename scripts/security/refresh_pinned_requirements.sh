@@ -88,22 +88,40 @@ compile_pyproject() {
 compile_req_in() {
   local input="$1"
   local output="$2"
+  local input_arg="$1"
+  local output_arg="$2"
   shift 2
-  uv pip compile "${input}" \
-    --universal \
-    --generate-hashes \
-    --output-file "${output}" \
-    "$@"
+  if [[ "${input}" == "${ROOT_DIR}/"* && "${output}" == "${ROOT_DIR}/"* ]]; then
+    input_arg="${input#${ROOT_DIR}/}"
+    output_arg="${output#${ROOT_DIR}/}"
+  fi
+  (
+    cd "${ROOT_DIR}"
+    uv pip compile "${input_arg}" \
+      --universal \
+      --generate-hashes \
+      --output-file "${output_arg}" \
+      "$@"
+  )
 }
 
 compile_req_platform() {
   local input="$1"
   local output="$2"
+  local input_arg="$1"
+  local output_arg="$2"
   shift 2
-  uv pip compile "${input}" \
-    --generate-hashes \
-    --output-file "${output}" \
-    "$@"
+  if [[ "${input}" == "${ROOT_DIR}/"* && "${output}" == "${ROOT_DIR}/"* ]]; then
+    input_arg="${input#${ROOT_DIR}/}"
+    output_arg="${output#${ROOT_DIR}/}"
+  fi
+  (
+    cd "${ROOT_DIR}"
+    uv pip compile "${input_arg}" \
+      --generate-hashes \
+      --output-file "${output_arg}" \
+      "$@"
+  )
 }
 
 run_workflow_locks() {
@@ -187,7 +205,8 @@ run_workflow_locks() {
 run_evidence_pack_locks() {
   compile_req_in \
     "${EVIDENCE_PACK_DIR}/accelerate.in" \
-    "${EVIDENCE_PACK_DIR}/accelerate.txt"
+    "${EVIDENCE_PACK_DIR}/accelerate.txt" \
+    --no-deps
 
   compile_req_in \
     "${EVIDENCE_PACK_DIR}/cuda-nvcc.in" \

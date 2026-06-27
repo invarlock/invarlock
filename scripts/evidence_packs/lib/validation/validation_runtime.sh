@@ -546,7 +546,12 @@ check_dependencies() {
         if [[ "${PACK_NET}" == "1" ]]; then
             log "Installing accelerate..."
             if [[ "${pip_available}" == "true" ]]; then
-                pack_install_pinned_requirement "accelerate" || missing+=("accelerate")
+                if pack_install_pinned_requirement "accelerate" --no-deps \
+                    && python3 -c "import accelerate" 2>/dev/null; then
+                    :
+                else
+                    missing+=("accelerate")
+                fi
             else
                 missing+=("accelerate")
             fi

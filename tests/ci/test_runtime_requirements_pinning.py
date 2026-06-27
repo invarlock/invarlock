@@ -25,6 +25,11 @@ def test_refresh_pinned_requirements_generates_runtime_locks() -> None:
         '    "${WORKFLOW_DIR}/runtime-image-py312-aarch64.txt"'
     ) in text
     assert (
+        '"${EVIDENCE_PACK_DIR}/accelerate.in" \\\n'
+        '    "${EVIDENCE_PACK_DIR}/accelerate.txt" \\\n'
+        "    --no-deps"
+    ) in text
+    assert (
         '"${EVIDENCE_PACK_DIR}/cuda-nvcc.in" \\\n'
         '    "${EVIDENCE_PACK_DIR}/cuda-nvcc.txt" \\\n'
         "    --no-deps"
@@ -36,6 +41,31 @@ def test_refresh_pinned_requirements_generates_runtime_locks() -> None:
     ) in text
     assert text.count("--torch-backend cpu") == 2
     assert text.count("--torch-backend cu128") == 2
+
+
+def test_evidence_pack_helper_locks_do_not_select_torch_cuda_backend() -> None:
+    req_dir = Path.cwd() / "requirements" / "evidence-packs"
+    forbidden = (
+        "torch==",
+        "cuda-toolkit",
+        "cuda-bindings",
+        "nvidia-cublas",
+        "nvidia-cudnn",
+        "nvidia-cusparse",
+        "nvidia-cusolver",
+        "nvidia-cufft",
+        "nvidia-nccl",
+        "cu13",
+    )
+    allowed_backend_specific = {"cuda-nvcc.txt"}
+
+    for path in sorted(req_dir.glob("*.txt")):
+        if path.name in allowed_backend_specific:
+            continue
+        text = path.read_text(encoding="utf-8")
+        assert str(Path.cwd()) not in text, f"{path.name} must use repo-relative paths"
+        for token in forbidden:
+            assert token not in text, f"{path.name} must not pin {token!r}"
 
 
 def test_refresh_pinned_requirements_help_is_side_effect_free() -> None:
