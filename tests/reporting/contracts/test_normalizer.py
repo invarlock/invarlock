@@ -87,3 +87,29 @@ def test_normalize_run_report_preserves_edit_plan_and_extended_deltas():
     assert rep["edit"]["config"]["quantization_mode"] == "rtn_dequantized_weight_edit"
     assert rep["edit"]["deltas"]["storage_format"] == "float_dequantized"
     assert rep["edit"]["deltas"]["runtime_memory_reduction"] is False
+
+
+def test_normalize_run_report_preserves_optional_edit_provenance_and_impact():
+    raw = {
+        "meta": {"model_id": "m", "adapter": "hf", "seed": 1, "device": "cpu"},
+        "data": {"dataset": "ds"},
+        "edit": {
+            "name": "custom",
+            "plan_digest": "sha256:abc",
+            "edit_provenance": {
+                "edit_family": "self_edit",
+                "edit_method": "custom",
+                "edit_count": 2,
+                "target_set_digest": "sha256:" + "a" * 64,
+                "dynamic_runtime_required": False,
+            },
+            "edit_impact": {"scenario_types": ["target_success"]},
+        },
+        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
+    }
+
+    rep = normalize_run_report(raw)
+
+    assert rep["edit"]["edit_provenance"]["edit_family"] == "self_edit"
+    assert rep["edit"]["edit_provenance"]["edit_count"] == 2
+    assert rep["edit"]["edit_impact"]["scenario_types"] == ["target_success"]

@@ -302,6 +302,8 @@ def _make_bert_tokenizer(
     *,
     tokenizer_load_kwargs: dict[str, Any] | None = None,
 ) -> TokenizerFactory:
+    base_tokenizer_load_kwargs = dict(tokenizer_load_kwargs or {})
+
     def factory(
         *,
         tokenizer_load_kwargs: dict[str, Any] | None = None,
@@ -310,7 +312,7 @@ def _make_bert_tokenizer(
             model_id,
             family_label="BERT",
             load_kwargs=_merge_tokenizer_load_kwargs(
-                factory.tokenizer_load_kwargs,
+                base_tokenizer_load_kwargs,
                 tokenizer_load_kwargs,
             ),
         )
@@ -329,7 +331,6 @@ def _make_bert_tokenizer(
         hash_value = _hash_tokenizer(tokenizer)
         return tokenizer, hash_value
 
-    factory.tokenizer_load_kwargs = dict(tokenizer_load_kwargs or {})  # type: ignore[attr-defined]
     return factory
 
 
@@ -338,6 +339,8 @@ def _make_gpt2_tokenizer(
     *,
     tokenizer_load_kwargs: dict[str, Any] | None = None,
 ) -> TokenizerFactory:
+    base_tokenizer_load_kwargs = dict(tokenizer_load_kwargs or {})
+
     def factory(
         *,
         tokenizer_load_kwargs: dict[str, Any] | None = None,
@@ -346,7 +349,7 @@ def _make_gpt2_tokenizer(
             model_id,
             family_label="causal",
             load_kwargs=_merge_tokenizer_load_kwargs(
-                factory.tokenizer_load_kwargs,
+                base_tokenizer_load_kwargs,
                 tokenizer_load_kwargs,
             ),
         )
@@ -355,7 +358,6 @@ def _make_gpt2_tokenizer(
         hash_value = _hash_tokenizer(tokenizer)
         return tokenizer, hash_value
 
-    factory.tokenizer_load_kwargs = dict(tokenizer_load_kwargs or {})  # type: ignore[attr-defined]
     return factory
 
 
@@ -364,6 +366,8 @@ def _make_causal_auto_tokenizer(
     *,
     tokenizer_load_kwargs: dict[str, Any] | None = None,
 ) -> TokenizerFactory:
+    base_tokenizer_load_kwargs = dict(tokenizer_load_kwargs or {})
+
     def factory(
         *,
         tokenizer_load_kwargs: dict[str, Any] | None = None,
@@ -372,7 +376,7 @@ def _make_causal_auto_tokenizer(
             model_id,
             family_label="causal",
             load_kwargs=_merge_tokenizer_load_kwargs(
-                factory.tokenizer_load_kwargs,
+                base_tokenizer_load_kwargs,
                 tokenizer_load_kwargs,
             ),
         )
@@ -389,7 +393,6 @@ def _make_causal_auto_tokenizer(
         hash_value = _hash_tokenizer(tokenizer)
         return tokenizer, hash_value
 
-    factory.tokenizer_load_kwargs = dict(tokenizer_load_kwargs or {})  # type: ignore[attr-defined]
     return factory
 
 
@@ -398,6 +401,8 @@ def _make_unknown_tokenizer(
     *,
     tokenizer_load_kwargs: dict[str, Any] | None = None,
 ) -> TokenizerFactory:
+    base_tokenizer_load_kwargs = dict(tokenizer_load_kwargs or {})
+
     def factory(
         *,
         tokenizer_load_kwargs: dict[str, Any] | None = None,
@@ -406,7 +411,7 @@ def _make_unknown_tokenizer(
             model_id,
             family_label="text",
             load_kwargs=_merge_tokenizer_load_kwargs(
-                factory.tokenizer_load_kwargs,
+                base_tokenizer_load_kwargs,
                 tokenizer_load_kwargs,
             ),
         )
@@ -417,7 +422,6 @@ def _make_unknown_tokenizer(
         hash_value = _hash_tokenizer(tokenizer)
         return tokenizer, hash_value
 
-    factory.tokenizer_load_kwargs = dict(tokenizer_load_kwargs or {})  # type: ignore[attr-defined]
     return factory
 
 

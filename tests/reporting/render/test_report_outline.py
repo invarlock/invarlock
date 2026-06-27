@@ -111,6 +111,7 @@ def test_report_outline_orders_modern_sections_before_appendix() -> None:
 
     outline = build_evaluation_report_outline(cert)
 
+    assert "edit_provenance" not in outline.section_keys
     assert [section.key for section in outline.sections] == [
         "decision",
         "primary_metric",
@@ -131,6 +132,35 @@ def test_report_outline_orders_modern_sections_before_appendix() -> None:
     assert (
         _section(outline, "benchmark_comparison").facts_by_label["Scenarios"].value
         == "1 total, 1 passed, 0 skipped"
+    )
+
+
+def test_report_outline_adds_optional_edit_provenance_section() -> None:
+    evaluation_report = make_report(_mk_report(), _mk_report())
+    evaluation_report["edit"]["edit_provenance"] = {
+        "edit_family": "knowledge_edit",
+        "edit_method": "custom",
+        "edit_count": 2,
+        "target_set_digest": "sha256:" + "a" * 64,
+        "dynamic_runtime_required": False,
+    }
+    evaluation_report["edit"]["edit_impact"] = {
+        "scenario_types": [
+            "target_success",
+            "near_neighbor",
+            "unrelated_locality",
+        ]
+    }
+
+    outline = build_evaluation_report_outline(evaluation_report)
+
+    assert "edit_provenance" in outline.section_keys
+    section = _section(outline, "edit_provenance")
+    assert section.facts_by_label["Edit Family"].value == "knowledge_edit"
+    assert section.facts_by_label["Edit Method"].value == "custom"
+    assert section.facts_by_label["Edit Count"].value == "2"
+    assert section.facts_by_label["Scenario Types"].value == (
+        "target_success, near_neighbor, unrelated_locality"
     )
 
 

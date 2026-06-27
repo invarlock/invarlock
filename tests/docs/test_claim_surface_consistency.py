@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_claim_surface_consistency_script_passes() -> None:
@@ -11,3 +14,27 @@ def test_claim_surface_consistency_script_passes() -> None:
         text=True,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_knowledge_self_edit_workflow_page_keeps_claim_boundary() -> None:
+    text = (
+        REPO_ROOT / "docs" / "user-guide" / "knowledge-and-self-edit-workflows.md"
+    ).read_text(encoding="utf-8")
+    lower = text.lower()
+
+    assert "external editor creates the subject" in lower
+    assert "declared baseline against that subject" in lower
+    assert "reporting context for the existing weight-edit regression contract" in lower
+    assert "named profile would be required" in lower
+
+    banned = [
+        "guarantees locality",
+        "guarantees robustness",
+        "guarantees safety",
+        "knowledge-edit assurance mode",
+        "self-edit assurance mode",
+        "knowledge-edit profile",
+        "self-edit profile",
+    ]
+    for phrase in banned:
+        assert phrase not in lower

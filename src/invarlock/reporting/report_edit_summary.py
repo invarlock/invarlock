@@ -563,6 +563,15 @@ def extract_edit_metadata(
     if plan_dict:
         edit_metadata["plan"] = copy.deepcopy(plan_dict)
 
+    for optional_key in ("edit_provenance", "edit_impact"):
+        optional_value = edit_section.get(optional_key)
+        if not isinstance(optional_value, dict):
+            config_section = edit_section.get("config")
+            if isinstance(config_section, dict):
+                optional_value = config_section.get(optional_key)
+        if isinstance(optional_value, dict):
+            edit_metadata[optional_key] = copy.deepcopy(optional_value)
+
     if not budgets:
         edit_metadata.pop("budgets")
     if seed_value is None:

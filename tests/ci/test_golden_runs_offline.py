@@ -4,12 +4,21 @@ import hashlib
 import json
 from pathlib import Path
 
-from invarlock.evidence_pack import EvidencePackStatus, verify_evidence_pack
+from invarlock.evidence_pack import (
+    EvidencePackStatus,
+    _generate_signing_keypair,
+    build_evidence_pack,
+    verify_evidence_pack,
+)
 from invarlock.public_contracts import load_public_evidence_index, published_basis_lanes
 from invarlock.reporting.report_schema import validate_report
 from invarlock.reporting.verify_contract import VerifyOutcome, run_verify_reports
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _write_json_file(path: Path, payload: object) -> None:
+    path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def test_published_basis_lanes_ship_public_evidence_references() -> None:
@@ -567,6 +576,23 @@ def test_byoe_examples_verify_release_strict() -> None:
         assert refs["weights_vendored"] is False
         assert refs["subject_checkpoint"]["external_edit_type"] == edit_type
         assert refs["subject_checkpoint"]["built_in_edit_plugin"] is False
+        if directory == "lora_merge_byoe":
+            edit = report["edit"]
+            assert edit["edit_provenance"]["edit_family"] == "lora_merge"
+            assert edit["edit_provenance"]["edit_method"] == "custom"
+            assert edit["edit_provenance"]["edit_count"] == 1
+            assert edit["edit_provenance"]["dynamic_runtime_required"] is False
+            assert edit["edit_impact"]["scenario_types"] == [
+                "target_success",
+                "near_neighbor",
+                "unrelated_locality",
+                "general_ability_sentinel",
+            ]
+            assert (
+                refs["subject_checkpoint"]["edit_provenance"]
+                == (edit["edit_provenance"])
+            )
+            assert refs["subject_checkpoint"]["edit_impact"] == edit["edit_impact"]
 
         result = run_verify_reports(
             [report_path],
@@ -577,3 +603,77 @@ def test_byoe_examples_verify_release_strict() -> None:
         assert result.outcome == VerifyOutcome.OK
         verification = result.payload["results"][0]["verification"]
         assert verification["runtime_provenance"]["status"] == "verified"
+
+
+def test_lora_byoe_metadata_builds_and_verifies_signed_evidence_pack(
+    tmp_path: Path,
+) -> None:
+    example_dir = REPO_ROOT / "public_evidence" / "byoe_examples" / "lora_merge_byoe"
+    report_path = example_dir / "evaluation.report.json"
+    refs_path = example_dir / "checkpoint_refs.json"
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    expected_provenance = report["edit"]["edit_provenance"]
+    expected_impact = report["edit"]["edit_impact"]
+
+    final_verdict = tmp_path / "final_verdict.json"
+    signing_key = tmp_path / "evidence-pack-signing-key.pem"
+    public_key = tmp_path / "evidence-pack-signing-key.pub.pem"
+    pack_dir = tmp_path / "lora_byoe_evidence_pack"
+    _write_json_file(
+        final_verdict,
+        {
+            "verdict": "PASS",
+            "scope": "lora_merge_byoe_optional_edit_metadata_fixture",
+        },
+    )
+    fingerprint = _generate_signing_keypair(
+        signing_key,
+        public_key_path=public_key,
+    )
+
+    build_result = build_evidence_pack(
+        pack_dir,
+        final_verdict_path=final_verdict,
+        report_paths=[report_path],
+        material_specs=[("checkpoint_refs", refs_path)],
+        signing_key_path=signing_key,
+        profile="release",
+        report_assurance="strict",
+        release_review=True,
+    )
+
+    assert build_result.status == EvidencePackStatus.OK
+    assert build_result.payload["ok"] is True
+    assert build_result.payload["signature"]["present"] is True
+    assert build_result.payload["signature"]["signer_fingerprint"] == fingerprint
+    assert build_result.payload["verify"]["summary"]["ok"] is True
+    assert build_result.payload["verify"]["results"][0]["ok"] is True
+
+    copied_reports = sorted(pack_dir.glob("reports/**/evaluation.report.json"))
+    assert len(copied_reports) == 1
+    copied_report = json.loads(copied_reports[0].read_text(encoding="utf-8"))
+    assert validate_report(copied_report) is True
+    assert copied_report["edit"]["edit_provenance"] == expected_provenance
+    assert copied_report["edit"]["edit_impact"] == expected_impact
+
+    copied_refs = json.loads(
+        (pack_dir / "metadata" / "checkpoint_refs.json").read_text(encoding="utf-8")
+    )
+    assert copied_refs["subject_checkpoint"]["edit_provenance"] == expected_provenance
+    assert copied_refs["subject_checkpoint"]["edit_impact"] == expected_impact
+
+    verify_result = verify_evidence_pack(
+        pack_dir,
+        strict=True,
+        expected_fingerprint=fingerprint,
+        profile="release",
+        report_assurance="strict",
+    )
+
+    assert verify_result.status == EvidencePackStatus.OK
+    assert verify_result.payload["ok"] is True
+    assert verify_result.payload["authenticity"] == "pinned"
+    assert verify_result.payload["verify"]["summary"]["ok"] is True
+    assert verify_result.payload["verify"]["results"][0]["ok"] is True
+    verification = verify_result.payload["verify"]["results"][0]["verification"]
+    assert verification["runtime_provenance"]["status"] == "verified"

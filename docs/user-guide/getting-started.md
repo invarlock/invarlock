@@ -121,6 +121,7 @@ Artifact model:
 | **Custom data user** | Getting Started → [Bring Your Own Data](bring-your-own-data.md) → [Config Gallery](config-gallery.md) |
 | **Validation engineer** | Getting Started → [Evidence Packs](evidence-packs.md) → [Evidence Packs Internals](evidence-packs-internals.md) |
 | **Integration author** | Getting Started → [Integration Examples](integrations.md) → [Compare & evaluate (BYOE)](compare-and-evaluate.md) |
+| **Knowledge/self-edit workflow owner** | Getting Started → [Knowledge & self-edit workflows](knowledge-and-self-edit-workflows.md) → [Compare & evaluate (BYOE)](compare-and-evaluate.md) |
 | **Security auditor** | Getting Started → [Threat Model](../security/threat-model.md) → [Best Practices](../security/best-practices.md) |
 
 ## Advanced Workflows
@@ -162,6 +163,7 @@ for local smoke and portability runs.
 | I want to... | Start here |
 | --- | --- |
 | evaluate my own edited checkpoint workflow | [Compare & evaluate (BYOE)](compare-and-evaluate.md) |
+| evaluate a subject from a knowledge-edit or self-edit workflow | [Knowledge & self-edit workflows](knowledge-and-self-edit-workflows.md) |
 | attach evidence to an external edit toolchain | [Integration Examples](integrations.md) |
 | understand the CLI commands | [Quickstart](quickstart.md) |
 | bring my own evaluation dataset | [Bring Your Own Data](bring-your-own-data.md) |

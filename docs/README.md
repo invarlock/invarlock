@@ -1,10 +1,10 @@
 # InvarLock Documentation
 
 InvarLock provides auditable strict verification for edited model checkpoints. It
-validates baseline-vs-subject comparisons, not a specific edit toolchain. A
-small built-in RTN dequantized weight-edit simulation (`quant_rtn`, 8-bit)
-exists for advanced smoke and demo workflows; production workflows are
-bring-your-own-edited-checkpoint (BYOE). See [Compare & evaluate
+centers on baseline-vs-subject comparisons for artifacts produced by your own
+edit workflow. A small built-in RTN dequantized weight-edit simulation
+(`quant_rtn`, 8-bit) exists for advanced smoke and demo workflows; production
+workflows are bring-your-own-edited-checkpoint (BYOE). See [Compare & evaluate
 (BYOE)](user-guide/compare-and-evaluate.md) and the [Public Evidence
 Walkthrough](user-guide/public-evidence-walkthrough.md).
 
@@ -22,7 +22,8 @@ running paired evaluation on text workflows plus the included image-text path.
 1. **[Getting Started](user-guide/getting-started.md)** – environment setup and the first `evaluate` → `verify` → `report html` loop.
 2. **[Quickstart](user-guide/quickstart.md)** – CLI highlights for common workflows.
 3. **[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)** – baseline ↔ subject paired evaluation with the guard chain.
-4. **[Primary Metric Smoke](user-guide/primary-metric-smoke.md)** – tiny examples for ppl/accuracy kinds.
+4. **[Knowledge & self-edit workflows](user-guide/knowledge-and-self-edit-workflows.md)** – use upstream edit systems as BYOE subject generators.
+5. **[Primary Metric Smoke](user-guide/primary-metric-smoke.md)** – tiny examples for ppl/accuracy kinds.
 
 ### Choose Your Path
 
@@ -60,6 +61,7 @@ boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 - [Getting Started](user-guide/getting-started.md)
 - [Quickstart](user-guide/quickstart.md)
 - [Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)
+- [Knowledge & self-edit workflows](user-guide/knowledge-and-self-edit-workflows.md)
 - [Primary Metric Smoke](user-guide/primary-metric-smoke.md)
 - [Live Examples](user-guide/live-examples.md)
 - [Integration Examples](user-guide/integrations.md)
@@ -299,10 +301,11 @@ lanes do not become part of the published assurance basis until supporting
 artifacts are attached. OLMoE is the smaller MoE published-basis validation
 lane; Mixtral 8x7B and Qwen3 30B-A3B are larger no-op preservation
 bases. Gemma 4 26B-A4B is a multimodal MoE image-text preservation basis; it is
-not audio, exhaustive expert-bank, or MoE routing-quality evidence. The Qwen3
-30B-A3B fixture requires all-8 80GB-GPU sharding and uses scoped
-attention/router/shared-expert guard scans; it is not an exhaustive expert-bank
-or MoE routing-quality claim.
+scoped to pinned image-text evidence. Audio, exhaustive expert-bank, and MoE
+routing-quality evidence require separate artifacts. The Qwen3 30B-A3B fixture
+requires all-8 80GB-GPU sharding and uses scoped attention/router/shared-expert
+guard scans; exhaustive expert-bank and MoE routing-quality claims require
+separate evidence.
 The empirical guard manifest includes no-op published-basis summaries for the
 modern promoted families. They are null-behavior evidence and calibration
 inputs, but they do not re-derive the packaged spectral/RMT/variance tier

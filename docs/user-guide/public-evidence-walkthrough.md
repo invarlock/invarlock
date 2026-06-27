@@ -40,12 +40,12 @@ Each directory includes:
 The support matrix records these paths under
 `contracts/support_matrix.json` as the `published_basis` evidence floor.
 
-The GPT-2 `artifact_package/` is intentionally a checkpoint-reference package,
-not a weight dump. It names the baseline and subject checkpoint references, binds
-them to the report, runtime manifest, and signed pack, and keeps the exact
-verification commands in `artifact_package/artifact_package.json`. Large model
-weights remain external to the repository; the rebuild recipe is the source of
-truth for materializing a fresh BYOE evidence drop.
+The GPT-2 `artifact_package/` is a checkpoint-reference package. It names the
+baseline and subject checkpoint references, binds them to the report, runtime
+manifest, and signed pack, and keeps the exact verification commands in
+`artifact_package/artifact_package.json`. Large model weights remain external to
+the repository; the rebuild recipe is the source of truth for materializing a
+fresh BYOE evidence drop.
 
 The GPT-2 lane also ships a small signed pack so reviewers can exercise the
 full offline evidence-pack verifier without rebuilding the suite:
@@ -101,8 +101,8 @@ uv run invarlock advanced evidence-pack verify \
 The exact `invarlock evaluate` command is in
 `public_evidence/real_runs/tiny_gpt2_quant_rtn/run_command.txt`. The pack remains
 small enough for the repo because it references model checkpoints rather than
-vendoring weights. The built-in edit remains a demo/smoke edit, not a deployable
-quantization backend.
+vendoring weights. The built-in edit is a demo/smoke edit; deployable
+quantization backend evidence is covered by separate deployable-artifact lanes.
 
 The second run is a real external BYOE path. The subject checkpoint is
 materialized outside InvarLock by
@@ -123,9 +123,9 @@ uv run invarlock advanced evidence-pack verify \
   --expected-fingerprint sha256:e01c40a94c89b22306a2670b032f623aa5428351d06e18f9b3e9e6a39b42c41b
 ```
 
-That artifact is the concrete real-run evidence for BYOE/custom subjects: the
-checkpoint weights are not vendored, `checkpoint_refs.json` records the external
-edit type and file hashes, and the report records `edit_name = custom`.
+That artifact is the concrete real-run evidence for BYOE/custom subjects:
+`checkpoint_refs.json` records the external edit type and file hashes for the
+external checkpoint weights, and the report records `edit_name = custom`.
 
 ## Export evidence for reviewers
 
@@ -184,9 +184,10 @@ invarlock verify --profile release --assurance strict \
 
 Each example includes `checkpoint_refs.json` beside the report. The pruning
 fixture is a dense magnitude-pruned subject reference, and the LoRA fixture is a
-merged-adapter/fine-tune style subject reference. Both are validation-subject
-fixtures only; sparse runtime speedups, packed quantized storage, and deployable
-optimized backend behavior are outside their scope.
+merged-adapter/fine-tune style subject reference. Both cover
+validation-subject fixture semantics. Sparse runtime speedups, packed quantized
+storage, and deployable optimized backend behavior require deployable-artifact
+evidence lanes.
 
 ## Caught regressions
 
@@ -205,8 +206,8 @@ invarlock verify --profile release --assurance strict \
   public_evidence/caught_regressions/variance_guard_failure/evaluation.report.json
 ```
 
-Expected outcome: verification fails. The failure is not a perplexity failure;
-it is a guard/policy failure. For the spectral case, the verifier reports:
+Expected outcome: verification fails. The failing predicate is a guard/policy
+condition rather than perplexity. For the spectral case, the verifier reports:
 
 ```text
 Release verification requires validation.spectral_stable == true
@@ -239,10 +240,10 @@ module passes PM and does not add a new baseline-relative cap. The compact sweep
 summary records adjacent scale points showing that the attention target starts
 triggering at 1.18 and the FFN target remains PM-accepted through 1.20.
 
-This is not a strict spectral-failure example: `validation.spectral_stable`
-remains true because the spectral cap budget is not exceeded. It is an
-evidence-pack guard-value demonstration: baseline-only guard signals do not count
-as new guard catches, but a PM-passing run that adds a new capped module does.
+This artifact is an evidence-pack guard-value demonstration:
+`validation.spectral_stable` remains true because the spectral cap budget is
+not exceeded. Baseline-only guard signals do not count as new guard catches, but
+a PM-passing run that adds a new capped module does.
 
 ## Policy failures
 

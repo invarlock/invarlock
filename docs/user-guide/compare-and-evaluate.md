@@ -21,9 +21,10 @@ existing tooling intact whether you are validating quantization, pruning,
 fine-tuning, or other checkpoint-edit workflows.
 
 That is the production boundary in InvarLock: guards and verifier policy inspect
-the resulting subject checkpoint and paired metrics, not the external program
-that produced the subject. Built-in edit generation is kept to demo/smoke
-support; production validation should normally use BYOE.
+the resulting subject checkpoint and paired metrics. The external program that
+produced the subject remains upstream provenance context. Built-in edit
+generation is kept to demo/smoke support; production validation should normally
+use BYOE.
 
 ## TL;DR
 
@@ -144,6 +145,7 @@ reports and `runtime.manifest.json` and revalidated by `invarlock verify`.
 ## Related Documentation
 
 - [CLI Reference](../reference/cli.md) — Full `evaluate` command options
+- [Knowledge & self-edit workflows](knowledge-and-self-edit-workflows.md) — External edit systems as BYOE subject generators
 - [Reading a report](reading-report.md) — Understanding output reports
 - [Coverage & Pairing (Assurance)](../assurance/02-coverage-and-pairing.md) — Window pairing invariants
 - [Determinism Contracts (Assurance)](../assurance/08-determinism-contracts.md) — Seed and reproducibility guarantees

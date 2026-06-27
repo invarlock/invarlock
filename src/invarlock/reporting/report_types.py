@@ -79,6 +79,8 @@ class EditInfo(TypedDict):
     deltas: EditDeltas  # Computed parameter changes
     plan: NotRequired[dict[str, Any]]
     config: NotRequired[dict[str, Any]]
+    edit_provenance: NotRequired[dict[str, Any]]
+    edit_impact: NotRequired[dict[str, Any]]
 
 
 class EditDeltas(TypedDict):

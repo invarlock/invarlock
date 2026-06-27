@@ -31,8 +31,9 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 2. [Configuration Schema](config-schema.md) — YAML presets and profiles
 3. [Datasets](datasets.md) — Provider configuration
 4. [Model Adapters](model-adapters.md) — Adapter selection
-5. [Model Family Catalog](model-family-catalog.md) — Support inventory and backlog
-6. [Public Contracts](contracts.md) — Machine-readable trust contracts
+5. [Knowledge & self-edit workflows](../user-guide/knowledge-and-self-edit-workflows.md) — External edit systems as BYOE subject generators
+6. [Model Family Catalog](model-family-catalog.md) — Support inventory and backlog
+7. [Public Contracts](contracts.md) — Machine-readable trust contracts
 
 ### Understanding reports
 
