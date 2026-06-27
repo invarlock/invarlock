@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sys
+import types
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -145,6 +147,52 @@ def test_peft_lora_helper_isolates_dense_lora_from_quantized_dispatch(
         "_disable_quantized_peft_dispatch_for_dense_example",
         lambda: True,
     )
+
+    assert (
+        helper._get_dense_peft_model(DenseModel(), object(), fake_get_peft_model)
+        == "peft-model"
+    )
+    assert calls["count"] == 2
+
+
+def test_peft_lora_helper_disables_imported_gptqmodel_checks(
+    monkeypatch,
+) -> None:
+    helper = _load_module(
+        PEFT_DIR / "materialize_tiny_peft_lora_subject.py",
+        "peft_lora_example_dispatch_modules",
+    )
+    module_names = (
+        "peft.import_utils",
+        "peft.tuners.lora.awq",
+        "peft.tuners.lora.gptq",
+    )
+
+    def available() -> bool:
+        return True
+
+    for module_name in module_names:
+        module = types.ModuleType(module_name)
+        module.is_gptqmodel_available = available
+        monkeypatch.setitem(sys.modules, module_name, module)
+
+    class DenseModel:
+        config = object()
+        is_quantized = False
+
+    calls = {"count": 0}
+
+    def fake_get_peft_model(_model, _config):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise ImportError(
+                "gptqmodel requires optimum version `1.24.0` or higher "
+                "to be installed."
+            )
+        for module_name in module_names:
+            if sys.modules[module_name].is_gptqmodel_available():
+                raise ImportError(f"{module_name} still reports GPTQModel support")
+        return "peft-model"
 
     assert (
         helper._get_dense_peft_model(DenseModel(), object(), fake_get_peft_model)
