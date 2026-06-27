@@ -9,7 +9,7 @@
   "device": "cuda",
   "execution_mode": "container",
   "gpu_group": "0,1,2,3,4,5,6,7",
-  "host": "root@31.56.109.46",
+  "host": "<cuda-validation-host>",
   "model_revision": "0d7cf23991f47feeb3a57ecb4c9cee8ea4a17bfe",
   "profile": "release",
   "runner": "NVIDIA H100 80GB HBM3 x8",

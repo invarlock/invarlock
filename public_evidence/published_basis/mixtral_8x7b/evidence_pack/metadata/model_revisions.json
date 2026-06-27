@@ -11,7 +11,7 @@
             "main"
           ],
           "size_on_disk": 93408096783,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--mistralai--Mixtral-8x7B-v0.1/snapshots/fc7ac94680e38d7348cfa806e51218e6273104b0"
+          "snapshot_path": "<hf-cache-dir>/hub/models--mistralai--Mixtral-8x7B-v0.1/snapshots/fc7ac94680e38d7348cfa806e51218e6273104b0"
         }
       ],
       "slug": "mistralai_mixtral_8x7b_v0_1",

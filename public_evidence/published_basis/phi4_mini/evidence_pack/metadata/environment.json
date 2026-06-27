@@ -3,7 +3,7 @@
   "execution_mode": "container",
   "gpu": "NVIDIA A100-SXM4-80GB",
   "gpu_id": "1",
-  "host": "root@86.38.238.232",
+  "host": "<cuda-validation-host>",
   "model_revision": "cfbefacb99257ffa30c83adab238a50856ac3083",
   "profile": "release",
   "runtime_image": "invarlock-runtime:cuda-local",

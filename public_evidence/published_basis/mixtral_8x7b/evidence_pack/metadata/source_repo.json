@@ -27,5 +27,5 @@
     "src/invarlock/reporting/guard_warnings.py": "sha256:c2a358316971889cd48a8d5a13cbce5e127ed1b64d4973e477fb686fda393a47"
   },
   "worktree_branch": "work/promote-gemma-deepseek",
-  "worktree_sync_note": "Remote checkout /root/invarlock-public-promote was synced to this branch before the Mixtral H100F validation run. The run used the committed large-model snapshot policy and Mixtral preset with context.run.skip_overhead_check=true."
+  "worktree_sync_note": "Remote checkout <validation-repo>-promote was synced to this branch before the Mixtral H100F validation run. The run used the committed large-model snapshot policy and Mixtral preset with context.run.skip_overhead_check=true."
 }

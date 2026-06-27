@@ -20,7 +20,7 @@
             "main"
           ],
           "size_on_disk": null,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--Qwen--Qwen3-30B-A3B-Instruct-2507/snapshots/0d7cf23991f47feeb3a57ecb4c9cee8ea4a17bfe"
+          "snapshot_path": "<hf-cache-dir>/hub/models--Qwen--Qwen3-30B-A3B-Instruct-2507/snapshots/0d7cf23991f47feeb3a57ecb4c9cee8ea4a17bfe"
         }
       ],
       "slug": "qwen3_30b_a3b",

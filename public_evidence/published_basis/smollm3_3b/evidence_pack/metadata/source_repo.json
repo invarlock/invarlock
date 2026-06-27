@@ -25,5 +25,5 @@
     "src/invarlock/guards/spectral_detection.py": "sha256:a7a20f76dd8f7c10939069346ea5e8dd9e78146d7b742c46477e67a90457b39e"
   },
   "worktree_branch": "work/promote-gemma-deepseek",
-  "worktree_sync_note": "Remote rerun checkout /root/invarlock-public-promote-rerun was fast-forwarded to the listed source ref; release evidence used the recorded --preset-override path for 400 paired windows and explicit skip_overhead_check. The committed SmolLM3 preset was updated after the run to carry the same skip_overhead_check policy directly for reproducibility."
+  "worktree_sync_note": "Remote rerun checkout <validation-repo>-promote-rerun was fast-forwarded to the listed source ref; release evidence used the recorded --preset-override path for 400 paired windows and explicit skip_overhead_check. The committed SmolLM3 preset was updated after the run to carry the same skip_overhead_check policy directly for reproducibility."
 }

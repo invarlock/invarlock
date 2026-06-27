@@ -11,7 +11,7 @@
             "main"
           ],
           "size_on_disk": 2202464926,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--TinyLlama--TinyLlama-1.1B-Chat-v1.0/snapshots/fe8a4ea1ffedaf415f4da2f062534de366a451e6"
+          "snapshot_path": "<hf-cache-dir>/hub/models--TinyLlama--TinyLlama-1.1B-Chat-v1.0/snapshots/fe8a4ea1ffedaf415f4da2f062534de366a451e6"
         }
       ],
       "slug": "tinyllama_1_1b",
@@ -26,7 +26,7 @@
             "main"
           ],
           "size_on_disk": 27439629068,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--allenai--OLMo-2-1124-13B-Instruct/snapshots/3a5c85baefbb1896a54d56fe2e76c0395627ddf4"
+          "snapshot_path": "<hf-cache-dir>/hub/models--allenai--OLMo-2-1124-13B-Instruct/snapshots/3a5c85baefbb1896a54d56fe2e76c0395627ddf4"
         }
       ],
       "slug": "olmo2_13b",
@@ -41,7 +41,7 @@
             "main"
           ],
           "size_on_disk": 10278816137,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--google--gemma-4-E2B-it/snapshots/70af34e20bd4b7a91f0de6b22675850c43922a03"
+          "snapshot_path": "<hf-cache-dir>/hub/models--google--gemma-4-E2B-it/snapshots/70af34e20bd4b7a91f0de6b22675850c43922a03"
         }
       ],
       "slug": "gemma4_e2b",
@@ -56,7 +56,7 @@
             "main"
           ],
           "size_on_disk": 27907631858,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--mistralai--Ministral-3-14B-Instruct-2512-BF16/snapshots/847d2b6bde907f188db5e7f2748bffdd3b88c77a"
+          "snapshot_path": "<hf-cache-dir>/hub/models--mistralai--Ministral-3-14B-Instruct-2512-BF16/snapshots/847d2b6bde907f188db5e7f2748bffdd3b88c77a"
         }
       ],
       "slug": "ministral3_14b",

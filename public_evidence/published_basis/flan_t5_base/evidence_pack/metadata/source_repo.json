@@ -27,5 +27,5 @@
     "src/invarlock/model_profile.py": "sha256:ea6fe5b733c5ab84979b491119ab26182bae5bf37416199b7c95d12bcba2215c"
   },
   "worktree_branch": "work/promote-gemma-deepseek",
-  "worktree_sync_note": "Remote checkout /root/invarlock-public-promote was fast-forwarded to the listed source ref before the release evidence run."
+  "worktree_sync_note": "Remote checkout <validation-repo>-promote was fast-forwarded to the listed source ref before the release evidence run."
 }

@@ -6,7 +6,7 @@ checkpoint created by `external_edit_recipe.py`.
 
 The subject checkpoint is not produced by an InvarLock edit plugin. The recipe
 loads the baseline checkpoint, applies deterministic magnitude pruning outside
-the verifier, saves the subject under `/private/tmp`, and then `invarlock
+the verifier, saves the subject under `<local-temp-dir>`, and then `invarlock
 evaluate` consumes that subject with `--edit-label custom`.
 
 Verify the report:

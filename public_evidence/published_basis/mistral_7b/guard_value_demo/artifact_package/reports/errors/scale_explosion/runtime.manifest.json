@@ -16,8 +16,8 @@
   "manifest_version": 1,
   "report": {
     "filename": "evaluation.report.json",
-    "path": "/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/reports/errors/scale_explosion/evaluation.report.json",
-    "sha256": "b4ff63b33f007371cef912c7e0addde5c4a22072d30193afcec75709a85824e6"
+    "path": "<validation-output-root>/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/reports/errors/scale_explosion/evaluation.report.json",
+    "sha256": "32900d734d6ecdc461af4ec352219829516f3b051b145c84612ac0b217f3426f"
   },
   "runtime": {
     "allow_network": false,

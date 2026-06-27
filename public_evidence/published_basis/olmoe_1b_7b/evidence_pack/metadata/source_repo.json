@@ -26,5 +26,5 @@
     "src/invarlock/reporting/guard_warnings.py": "sha256:c2a358316971889cd48a8d5a13cbce5e127ed1b64d4973e477fb686fda393a47"
   },
   "worktree_branch": "work/promote-gemma-deepseek",
-  "worktree_sync_note": "Remote checkout /root/invarlock-public-promote was synced before the OLMoE validation run; the subsequent runtime-container --init cleanup commit was not part of this OLMoE artifact."
+  "worktree_sync_note": "Remote checkout <validation-repo>-promote was synced before the OLMoE validation run; the subsequent runtime-container --init cleanup commit was not part of this OLMoE artifact."
 }

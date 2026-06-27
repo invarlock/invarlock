@@ -8,7 +8,7 @@
     "prepare_guards": 13.842749612987973,
     "total": 75.73236027598614
   },
-  "baseline": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d/models/mistralai__mistral-7b-v01/baseline",
+  "baseline": "<validation-output-root>/mistral_guard_value_real_20260612d/models/mistralai__mistral-7b-v01/baseline",
   "baseline_adapter": "hf_causal",
   "baseline_report_reused": true,
   "defer_report_rendering": true,
@@ -34,7 +34,7 @@
     }
   },
   "schema": "invarlock/evaluate-timing-v1",
-  "subject": "/root/evidence-pack-runs/mistral_guard_confirm_20260612a/mistralai__mistral-7b-v01/models/error_rmt_norm_noise_l31_ffn_up_b030",
+  "subject": "<validation-output-root>/mistral_guard_confirm_20260612a/mistralai__mistral-7b-v01/models/error_rmt_norm_noise_l31_ffn_up_b030",
   "subject_adapter": "hf_causal",
   "tier": "balanced",
   "timings_seconds": {

@@ -11,7 +11,7 @@
             "main"
           ],
           "size_on_disk": 15242804690,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--Qwen--Qwen2.5-7B/snapshots/d149729398750b98c0af14eb82c78cfe92750796"
+          "snapshot_path": "<hf-cache-dir>/hub/models--Qwen--Qwen2.5-7B/snapshots/d149729398750b98c0af14eb82c78cfe92750796"
         }
       ],
       "slug": "qwen2_5_7b",

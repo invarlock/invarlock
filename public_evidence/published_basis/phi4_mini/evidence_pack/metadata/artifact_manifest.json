@@ -51,11 +51,11 @@
       "model_id": "microsoft/Phi-4-mini-instruct",
       "ok": true,
       "preset": "configs/presets/causal_lm/phi4_mini_512.yaml",
-      "report_path": "/root/model-evidence/20260613Tphi4MiniRelease400FixA/shard-00-gpu-1/eval/microsoft_phi_4_mini_instruct/report/evaluation.report.json",
+      "report_path": "<model-evidence-root>/20260613Tphi4MiniRelease400FixA/shard-00-gpu-1/eval/microsoft_phi_4_mini_instruct/report/evaluation.report.json",
       "slug": "microsoft_phi_4_mini_instruct",
       "status": "ok",
       "verify_exit": 0,
-      "verify_path": "/root/model-evidence/20260613Tphi4MiniRelease400FixA/shard-00-gpu-1/eval/microsoft_phi_4_mini_instruct/verify.json"
+      "verify_path": "<model-evidence-root>/20260613Tphi4MiniRelease400FixA/shard-00-gpu-1/eval/microsoft_phi_4_mini_instruct/verify.json"
     }
   ],
   "ok": true,

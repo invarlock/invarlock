@@ -11,7 +11,7 @@
             "refs/pr/8"
           ],
           "size_on_disk": 28091,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--openlm-research--open_llama_7b/snapshots/51e494fbe8de984abad275aa60f1e12e8234dcb2"
+          "snapshot_path": "<hf-cache-dir>/hub/models--openlm-research--open_llama_7b/snapshots/51e494fbe8de984abad275aa60f1e12e8234dcb2"
         },
         {
           "commit_hash": "6fb184ff23774c25bf84b3628e49c8b78372c7be",
@@ -19,7 +19,7 @@
             "main"
           ],
           "size_on_disk": 13477512646,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--openlm-research--open_llama_7b/snapshots/6fb184ff23774c25bf84b3628e49c8b78372c7be"
+          "snapshot_path": "<hf-cache-dir>/hub/models--openlm-research--open_llama_7b/snapshots/6fb184ff23774c25bf84b3628e49c8b78372c7be"
         }
       ],
       "slug": "openlm_research_open_llama_7b",
@@ -34,7 +34,7 @@
             "main"
           ],
           "size_on_disk": 14437156558,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--tiiuae--falcon-7b/snapshots/ec89142b67d748a1865ea4451372db8313ada0d8"
+          "snapshot_path": "<hf-cache-dir>/hub/models--tiiuae--falcon-7b/snapshots/ec89142b67d748a1865ea4451372db8313ada0d8"
         }
       ],
       "slug": "tiiuae_falcon_7b",
@@ -49,7 +49,7 @@
             "main"
           ],
           "size_on_disk": 268652869,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--distilbert-base-uncased/snapshots/12040accade4e8a0f71eabdb258fecc2e7e948be"
+          "snapshot_path": "<hf-cache-dir>/hub/models--distilbert-base-uncased/snapshots/12040accade4e8a0f71eabdb258fecc2e7e948be"
         }
       ],
       "slug": "distilbert_base_uncased",

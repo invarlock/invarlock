@@ -7,7 +7,7 @@
     "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:a9ab799ebfffd1fc19c74c8c23cbfa4da2fc52a8f97d2e910d15793727389c1d",
+  "expected_fingerprint": "sha256:5ca487b9b61f69ff96dec7c937f6b305e784555f574b0c9bcedd8e43c96be162",
   "generated_by": "model evidence remote sweep",
   "model_revision": "fc7ac94680e38d7348cfa806e51218e6273104b0",
   "non_goals": [
@@ -19,6 +19,6 @@
   "summary": "Release-strict verifier fixture for the Mixtral 8x7B MoE published-basis lane on pinned WikiText-103 text data.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/mixtral_8x7b/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/mixtral_8x7b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:a9ab799ebfffd1fc19c74c8c23cbfa4da2fc52a8f97d2e910d15793727389c1d"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/mixtral_8x7b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:5ca487b9b61f69ff96dec7c937f6b305e784555f574b0c9bcedd8e43c96be162"
   ]
 }

@@ -11,7 +11,7 @@
             "main"
           ],
           "size_on_disk": 10278816137,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--google--gemma-4-E2B-it/snapshots/70af34e20bd4b7a91f0de6b22675850c43922a03"
+          "snapshot_path": "<hf-cache-dir>/hub/models--google--gemma-4-E2B-it/snapshots/70af34e20bd4b7a91f0de6b22675850c43922a03"
         }
       ],
       "slug": "gemma4_e2b",

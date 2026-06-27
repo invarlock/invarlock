@@ -6,7 +6,7 @@
     "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:07f70e0fd5f09b50fdf8e59ce393cf69f600fc85bd165dbd7a9a5d7658996c57",
+  "expected_fingerprint": "sha256:e3e73c1c0952d0a220df887ca9b4bd7b8f81864381f43a1bc02941793a335041",
   "generated_by": "model evidence remote sweep",
   "model_revision": "916b56a44061fd5cd7d6a8fb632557ed4f724f60",
   "non_goals": [
@@ -17,6 +17,6 @@
   "summary": "Release-strict verifier fixture for the DeepSeek-R1-Distill-Qwen 7B published-basis lane.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:07f70e0fd5f09b50fdf8e59ce393cf69f600fc85bd165dbd7a9a5d7658996c57"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:e3e73c1c0952d0a220df887ca9b4bd7b8f81864381f43a1bc02941793a335041"
   ]
 }
