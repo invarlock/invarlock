@@ -220,10 +220,12 @@ test_run_pack_release_review_requires_pass_and_runtime_manifests() {
     PACK_REQUIRE_PASS=1
     PACK_VERIFY_PROFILE=ci
     PACK_REPORT_ASSURANCE=strict
+    PACK_EVALUATE_ASSURANCE=strict
     PACK_SIGN_MANIFEST=1
     PACK_REQUIRE_RUNTIME_MANIFESTS=1
     export PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
-    export PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+    export PACK_REPORT_ASSURANCE PACK_EVALUATE_ASSURANCE
+    export PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
 
     run pack_build_pack "${run_dir}" "${TEST_TMPDIR}/pack"
     assert_rc "1" "${RUN_RC}" "release-review rejects non-PASS verdict"
@@ -235,7 +237,8 @@ test_run_pack_release_review_requires_pass_and_runtime_manifests() {
     assert_match "Missing runtime.manifest.json" "${RUN_ERR}" "runtime sidecar required"
 
     unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
-    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+    unset PACK_REPORT_ASSURANCE PACK_EVALUATE_ASSURANCE
+    unset PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
 }
 
 test_run_pack_entrypoint_release_review_sets_hardened_defaults() {
@@ -251,12 +254,14 @@ test_run_pack_entrypoint_release_review_sets_hardened_defaults() {
     assert_eq "1" "${PACK_REQUIRE_PASS}" "release-review requires PASS"
     assert_eq "ci" "${PACK_VERIFY_PROFILE}" "release-review uses ci profile"
     assert_eq "strict" "${PACK_REPORT_ASSURANCE}" "release-review uses strict assurance"
+    assert_eq "strict" "${PACK_EVALUATE_ASSURANCE}" "release-review evaluates with strict assurance"
     assert_eq "1" "${PACK_SIGN_MANIFEST}" "release-review signs manifests"
     assert_eq "1" "${PACK_REQUIRE_RUNTIME_MANIFESTS}" "release-review requires runtime manifests"
     assert_eq "1" "${PACK_DEFER_REPORT_RENDERING}" "release-review defers optional report rendering"
 
     unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
-    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+    unset PACK_REPORT_ASSURANCE PACK_EVALUATE_ASSURANCE
+    unset PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
     unset PACK_DEFER_REPORT_RENDERING
 }
 
@@ -276,12 +281,14 @@ test_run_pack_entrypoint_applies_preconfigured_release_review_defaults() {
     assert_eq "1" "${PACK_REQUIRE_PASS}" "preconfigured release-review requires PASS"
     assert_eq "ci" "${PACK_VERIFY_PROFILE}" "preconfigured release-review uses ci profile"
     assert_eq "strict" "${PACK_REPORT_ASSURANCE}" "preconfigured release-review uses strict assurance"
+    assert_eq "strict" "${PACK_EVALUATE_ASSURANCE}" "preconfigured release-review evaluates with strict assurance"
     assert_eq "1" "${PACK_SIGN_MANIFEST}" "preconfigured release-review signs manifests"
     assert_eq "1" "${PACK_REQUIRE_RUNTIME_MANIFESTS}" "preconfigured release-review requires runtime manifests"
     assert_eq "1" "${PACK_DEFER_REPORT_RENDERING}" "preconfigured release-review defers optional report rendering"
 
     unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
-    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+    unset PACK_REPORT_ASSURANCE PACK_EVALUATE_ASSURANCE
+    unset PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
     unset PACK_DEFER_REPORT_RENDERING
 }
 
@@ -294,17 +301,20 @@ test_run_pack_release_review_rejects_dev_verify_profile() {
     PACK_REQUIRE_PASS=1
     PACK_VERIFY_PROFILE=dev
     PACK_REPORT_ASSURANCE=strict
+    PACK_EVALUATE_ASSURANCE=strict
     PACK_SIGN_MANIFEST=1
     PACK_REQUIRE_RUNTIME_MANIFESTS=1
     export PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
-    export PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+    export PACK_REPORT_ASSURANCE PACK_EVALUATE_ASSURANCE
+    export PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
 
     run pack_validate_release_review_settings
     assert_rc "1" "${RUN_RC}" "release-review rejects dev verify profile"
     assert_match "PACK_VERIFY_PROFILE=dev" "${RUN_ERR}" "dev profile rejection is explicit"
 
     unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
-    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+    unset PACK_REPORT_ASSURANCE PACK_EVALUATE_ASSURANCE
+    unset PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
 }
 
 test_run_pack_release_review_rejects_weak_report_assurance() {
@@ -316,17 +326,45 @@ test_run_pack_release_review_rejects_weak_report_assurance() {
     PACK_REQUIRE_PASS=1
     PACK_VERIFY_PROFILE=ci
     PACK_REPORT_ASSURANCE=report
+    PACK_EVALUATE_ASSURANCE=strict
     PACK_SIGN_MANIFEST=1
     PACK_REQUIRE_RUNTIME_MANIFESTS=1
     export PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
-    export PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+    export PACK_REPORT_ASSURANCE PACK_EVALUATE_ASSURANCE
+    export PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
 
     run pack_validate_release_review_settings
     assert_rc "1" "${RUN_RC}" "release-review rejects weak report assurance"
     assert_match "PACK_REPORT_ASSURANCE=strict" "${RUN_ERR}" "strict report assurance is required"
 
     unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
-    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+    unset PACK_REPORT_ASSURANCE PACK_EVALUATE_ASSURANCE
+    unset PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+}
+
+test_run_pack_release_review_rejects_weak_evaluate_assurance() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    PACK_RELEASE_REVIEW=1
+    PACK_REQUIRE_PASS=1
+    PACK_VERIFY_PROFILE=ci
+    PACK_REPORT_ASSURANCE=strict
+    PACK_EVALUATE_ASSURANCE=off
+    PACK_SIGN_MANIFEST=1
+    PACK_REQUIRE_RUNTIME_MANIFESTS=1
+    export PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    export PACK_REPORT_ASSURANCE PACK_EVALUATE_ASSURANCE
+    export PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+
+    run pack_validate_release_review_settings
+    assert_rc "1" "${RUN_RC}" "release-review rejects weak evaluate assurance"
+    assert_match "PACK_EVALUATE_ASSURANCE=strict" "${RUN_ERR}" "strict evaluate assurance is required"
+
+    unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    unset PACK_REPORT_ASSURANCE PACK_EVALUATE_ASSURANCE
+    unset PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
 }
 
 test_run_pack_release_review_rejects_missing_hardened_settings() {
@@ -338,10 +376,12 @@ test_run_pack_release_review_rejects_missing_hardened_settings() {
     PACK_REQUIRE_PASS=0
     PACK_VERIFY_PROFILE=ci
     PACK_REPORT_ASSURANCE=strict
+    PACK_EVALUATE_ASSURANCE=strict
     PACK_SIGN_MANIFEST=1
     PACK_REQUIRE_RUNTIME_MANIFESTS=1
     export PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
-    export PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+    export PACK_REPORT_ASSURANCE PACK_EVALUATE_ASSURANCE
+    export PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
 
     run pack_validate_release_review_settings
     assert_rc "1" "${RUN_RC}" "release-review rejects disabled PASS requirement"
@@ -366,7 +406,8 @@ test_run_pack_release_review_rejects_missing_hardened_settings() {
     assert_match "explicit PACK_VERIFY_PROFILE" "${RUN_ERR}" "missing profile error is explicit"
 
     unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
-    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+    unset PACK_REPORT_ASSURANCE PACK_EVALUATE_ASSURANCE
+    unset PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
 }
 
 test_run_pack_release_review_cli_preserves_and_rejects_explicit_dev_profile() {
