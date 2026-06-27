@@ -56,6 +56,14 @@ QUANT_ADAPTER_BACKENDS = {
     "hf_ct": "compressed-tensors",
 }
 
+OPTIONAL_IMPORT_ERRORS = (
+    AttributeError,
+    ImportError,
+    ModuleNotFoundError,
+    OSError,
+    RuntimeError,
+)
+
 
 def _fail(message: str) -> None:
     raise SystemExit(message)
@@ -98,7 +106,16 @@ def _selected_adapters(raw_value: str) -> tuple[str, ...]:
     return selected
 
 
+def _apply_runtime_compat_patches() -> None:
+    try:
+        from invarlock.plugins import _patch_gptqmodel_transformers_hub_compat
+    except (ImportError, ModuleNotFoundError):
+        return
+    _patch_gptqmodel_transformers_hub_compat()
+
+
 def _import_required_modules(selected_adapters: tuple[str, ...]) -> None:
+    _apply_runtime_compat_patches()
     backend_imports = {
         QUANT_BACKEND_IMPORTS[adapter_name] for adapter_name in selected_adapters
     }
@@ -109,7 +126,7 @@ def _import_required_modules(selected_adapters: tuple[str, ...]) -> None:
     for module_name in sorted(set(CORE_RUNTIME_IMPORTS) | backend_imports):
         try:
             importlib.import_module(module_name)
-        except (ImportError, ModuleNotFoundError, OSError, RuntimeError):
+        except OPTIONAL_IMPORT_ERRORS:
             missing.append(module_name)
     if missing:
         _fail("missing quant runtime modules: " + ", ".join(sorted(missing)))

@@ -168,7 +168,9 @@ integration_log_kv "python" "$PYTHON_BIN"
 integration_log_kv "device" "$effective_device"
 integration_log_kv "report_out" "$report_out"
 
-if ! "$PYTHON_BIN" -c 'import gptqmodel' >/dev/null 2>&1; then
+export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+
+if ! "$PYTHON_BIN" -c 'from invarlock.plugins import _patch_gptqmodel_transformers_hub_compat; _patch_gptqmodel_transformers_hub_compat(); import gptqmodel' >/dev/null 2>&1; then
   cat >&2 <<'MSG'
 Missing example dependency: GPTQModel
 
@@ -180,7 +182,6 @@ MSG
   exit 2
 fi
 
-export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 integration_preflight_host_cuda_device "$PYTHON_BIN" "$effective_execution_mode" "$effective_device" "GPTQModel" || exit $?
 integration_preflight_gptqmodel_host_runtime "$PYTHON_BIN" "$effective_execution_mode" || exit $?
 if [[ "$effective_execution_mode" == "host" && -z "${TORCHDYNAMO_DISABLE:-}" ]]; then

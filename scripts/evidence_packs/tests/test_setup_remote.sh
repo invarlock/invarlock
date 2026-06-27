@@ -103,7 +103,8 @@ test_setup_remote_verify_runtime_image_stack_checks_quant_image() {
     pack_activate_venv() { :; }
     pack_run_cmd() { echo "$*" > "${TEST_TMPDIR}/runtime-smoke.cmd"; }
 
-    REPO_DIR="/opt/invarlock"
+    REPO_DIR="${TEST_TMPDIR}/repo"
+    mkdir -p "${REPO_DIR}"
     INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-quant"
     PACK_RUNTIME_IMAGE_FLAVOR="quant"
 

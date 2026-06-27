@@ -205,7 +205,9 @@ MSG
   exit 2
 fi
 
-if ! "$PYTHON_BIN" -c 'import gptqmodel' >/dev/null 2>&1; then
+export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+
+if ! "$PYTHON_BIN" -c 'from invarlock.plugins import _patch_gptqmodel_transformers_hub_compat; _patch_gptqmodel_transformers_hub_compat(); import gptqmodel' >/dev/null 2>&1; then
   cat >&2 <<'MSG'
 Missing example dependency: GPTQModel
 
@@ -230,8 +232,6 @@ shared compare wrapper.
 MSG
   exit 2
 fi
-
-export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 
 materialize_cmd=(
   "$PYTHON_BIN"

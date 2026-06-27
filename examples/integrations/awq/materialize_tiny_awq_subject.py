@@ -172,6 +172,9 @@ def _prepare_output_dirs(paths: Sequence[Path], *, force: bool) -> None:
 def _require_dependencies() -> tuple[Any, Any, Any, Any, Any, Any, Any]:
     try:
         import torch
+        from invarlock.plugins import _patch_gptqmodel_transformers_hub_compat
+
+        _patch_gptqmodel_transformers_hub_compat()
         from gptqmodel import AWQConfig, GPTQModel
         from transformers import (
             AutoModelForCausalLM,
