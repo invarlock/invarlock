@@ -33,6 +33,7 @@ claim-bearing.
 - Produce the edited subject checkpoint with your upstream workflow.
 - Run Compare & evaluate (BYOE) with `--baseline` and `--subject`.
 - Record optional edit provenance metadata when you need reviewer context.
+- Record evaluation realism metadata when the metric is a proxy for live generation.
 - Verify `evaluation.report.json` together with its `runtime.manifest.json`.
 
 ```bash
@@ -67,6 +68,27 @@ If behavior depends on runtime-generated weights or context rather than a stable
 checkpoint, record that with `dynamic_runtime_required: true` and keep the
 evidence scope narrow. Context-conditioned behavior is not a separate artifact
 class in this workflow.
+
+## Evaluation Realism
+
+Knowledge-edit and self-edit reviews often mix live generation checks with proxy
+metrics such as teacher-forced log-probability. Record the evaluation mode so a
+reviewer can tell what behavior was actually exercised.
+
+| Field | Purpose |
+| --- | --- |
+| `mode` | Evaluation mode: `generation`, `logprob`, `teacher_forced`, `classification`, or `benchmark_harness`. |
+| `prompt_template_hash` | Digest of the prompt template used for generation or scoring. |
+| `decoding_config` | Generation settings such as temperature, sampling, beams, or stop rules. |
+| `max_tokens` | Maximum generated or scored tokens for the task. |
+| `truncation_policy` | How prompts, contexts, or completions were truncated. |
+| `dataset_or_task_id` | Dataset, task, or benchmark lane identifier. |
+| `metric_is_generation_realistic` | Whether the primary metric reflects live generation behavior. |
+| `proxy_metric_warning` | Short warning when the metric is useful but not live-generation realistic. |
+
+Use this metadata as reader context: a teacher-forced or log-prob proxy is a
+regression signal, while live generation behavior belongs in a generation-mode
+lane.
 
 ## Optional Edit Provenance
 
@@ -103,6 +125,43 @@ portability, and sequential-edit checks.
 For v1, keep these labels descriptive in reports, examples, and evidence packs.
 Turning them into strict gates would require a future profile with thresholds,
 calibration, and assurance evidence.
+
+## Optional Topology Metadata
+
+Most v1 examples are baseline checkpoint versus subject checkpoint. Some edit
+systems may produce adapter packages, merged adapters, memory modules, dynamic
+weight modules, runtime configs, or prompt wrappers. Use optional topology
+metadata when the subject is more than one static checkpoint.
+
+| Field | Purpose |
+| --- | --- |
+| `artifact_kind` | Subject artifact kind such as `checkpoint`, `adapter`, `merged_adapter`, `memory_module`, `dynamic_weight_module`, `runtime_config`, or `prompt_wrapper`. |
+| `module_hashes` | Hashes for adapter, memory, generator, routing, or wrapper modules. |
+| `runtime_activation_policy` | Declared activation or routing condition for runtime-dependent modules. |
+| `training_or_edit_data_ref` | Public reference or hash-only pointer to training/edit data when applicable. |
+
+Topology metadata is descriptive; verifier verdicts still come from the selected
+baseline-vs-subject evaluation policy.
+
+## Delta And Privacy Exposure
+
+Public evidence packs should not require raw deltas, adapter weights, parameter
+patches, or other recovered-subject-sensitive artifacts by default. Those
+materials may expose sensitive or proprietary edit information depending on the
+method and threat model.
+
+Use `delta_privacy` metadata to tell reviewers whether raw edit material is
+absent, private, public, or hash-only:
+
+| Field | Purpose |
+| --- | --- |
+| `delta_available` | `none`, `private`, `public`, or `hash_only`. |
+| `privacy_sensitivity` | `public`, `internal`, `customer_controlled`, or `sensitive`. |
+| `public_raw_delta_approved` | Whether public disclosure of raw deltas or adapter weights was explicitly approved. |
+
+InvarLock preserves this disclosure metadata for review. Treat privacy analysis
+as upstream release review, and prefer hash-only or manifest-only evidence for
+public bundles unless raw artifact disclosure is intentional.
 
 ## Evidence Packs
 
