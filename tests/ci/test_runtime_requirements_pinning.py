@@ -60,10 +60,10 @@ def test_evidence_pack_helper_locks_do_not_select_torch_cuda_backend() -> None:
     allowed_backend_specific = {"cuda-nvcc.txt"}
 
     for path in sorted(req_dir.glob("*.txt")):
-        if path.name in allowed_backend_specific:
-            continue
         text = path.read_text(encoding="utf-8")
         assert str(Path.cwd()) not in text, f"{path.name} must use repo-relative paths"
+        if path.name in allowed_backend_specific:
+            continue
         for token in forbidden:
             assert token not in text, f"{path.name} must not pin {token!r}"
 
