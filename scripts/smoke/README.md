@@ -12,6 +12,7 @@ target when one exists.
 | `run_gpt2_user_journey_smoke.sh` | `.github/workflows/gpt2-smoke.yml`; realistic lane | Required unless cache is seeded | Host, container, or both | `journey-results.tsv`, `final_verdict.json`, reports, HTML |
 | `run_tiny_container_smoke.sh` | `.github/workflows/tiny-container-smoke.yml` | Required unless cache is seeded | Container by default; host with `INVARLOCK_SMOKE_MODE=local` | Evaluation report, HTML, optional evidence pack |
 | `run_tiny_all_matrix.sh` | Manual tiny model matrix | Optional; `NET=1` enables downloads | Container by default through `evaluate`; dry-run by default | `checklist.md`, and reports when `RUN=1` |
+| `run_tiny_fine_tune_byoe_smoke.py` | Manual BYOE fine-tune smoke | Never by default; `--allow-network` enables cache fill | Host CPU | Baseline/subject checkpoints, enriched evaluation report, verify JSON, smoke summary |
 | `run_cpu_telemetry.sh` | Manual telemetry sweep | Required | Evaluate default execution path | Telemetry reports under `reports/telemetry/cpu-ci` |
 | `check_device_drift.py` | Assurance docs and tests | Never | N/A | Exit status and drift message |
 | `gpt2_journey_helpers.py` | Helper for `run_gpt2_user_journey_smoke.sh` | Never directly | N/A | TSV summaries, final verdicts, strict-bundle fixtures |
@@ -33,3 +34,6 @@ target when one exists.
   lane behavior belongs in the lane scripts it invokes.
 - `run_cpu_telemetry.sh` is telemetry-oriented rather than a normal pass/fail
   CI smoke gate. Keep that distinction visible in docs and summaries.
+- `run_tiny_fine_tune_byoe_smoke.py` is the local fine-tune BYOE realism lane:
+  it should remain offline by default and should enrich a real evaluation report
+  only after the baseline and subject checkpoints have been materialized.

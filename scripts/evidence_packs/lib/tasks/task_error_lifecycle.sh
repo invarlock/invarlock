@@ -297,6 +297,13 @@ task_evaluate_error() {
             echo "ERROR: Failed to stage baseline report for evaluate runtime: ${baseline_report_file}" >> "${log_file}"
             return 1
         }
+        local effective_report_schedule
+        effective_report_schedule="$(_baseline_report_schedule_for_eval "${abs_baseline_report_file}" "${log_file}")" || {
+            echo "ERROR: Failed to read effective schedule from staged baseline report: ${abs_baseline_report_file}" >> "${log_file}"
+            return 1
+        }
+        IFS=':' read -r seq_len stride preview_n final_n <<< "${effective_report_schedule}"
+        echo "  Using effective baseline report schedule for evaluate runtime: seq=${seq_len}, stride=${stride}, preview=${preview_n}, final=${final_n}" >> "${log_file}"
         baseline_report_args=(--baseline-report "${abs_baseline_report_file}")
         echo "  Reusing baseline report: ${baseline_report_file}" >> "${log_file}"
     else

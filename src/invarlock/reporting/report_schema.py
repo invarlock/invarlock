@@ -207,6 +207,31 @@ REPORT_JSON_SCHEMA: dict[str, Any] = {
             },
             "additionalProperties": True,
         },
+        "evaluation_realism": {
+            "type": "object",
+            "properties": {
+                "mode": {
+                    "enum": [
+                        "generation",
+                        "logprob",
+                        "teacher_forced",
+                        "classification",
+                        "benchmark_harness",
+                    ]
+                },
+                "prompt_template_hash": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$",
+                },
+                "decoding_config": {"type": "object"},
+                "max_tokens": {"type": "integer", "minimum": 0},
+                "truncation_policy": {"type": "string", "minLength": 1},
+                "dataset_or_task_id": {"type": "string", "minLength": 1},
+                "metric_is_generation_realistic": {"type": "boolean"},
+                "proxy_metric_warning": {"type": "string", "minLength": 1},
+            },
+            "additionalProperties": False,
+        },
         "system_overhead": {
             "type": "object",
             # Numeric keys must match these patterns when present; allow flexibility otherwise

@@ -52,6 +52,22 @@ EDIT_IMPACT_SCENARIO_TYPES = {
     "multilingual_portability",
     "sequential_edit_stress",
 }
+EDIT_TOPOLOGY_ARTIFACT_KINDS = {
+    "checkpoint",
+    "adapter",
+    "merged_adapter",
+    "memory_module",
+    "dynamic_weight_module",
+    "runtime_config",
+    "prompt_wrapper",
+}
+DELTA_AVAILABILITY_VALUES = {"none", "private", "public", "hash_only"}
+PRIVACY_SENSITIVITY_VALUES = {
+    "public",
+    "internal",
+    "customer_controlled",
+    "sensitive",
+}
 _SHA256_RE = re.compile(r"^sha256:[a-f0-9]{64}$")
 
 
@@ -183,6 +199,8 @@ def _metadata_consistency_errors(
             )
     errors.extend(_optional_edit_provenance_errors(prefix, metadata))
     errors.extend(_optional_edit_impact_errors(prefix, metadata))
+    errors.extend(_optional_edit_topology_errors(prefix, metadata))
+    errors.extend(_optional_delta_privacy_errors(prefix, metadata))
     return errors
 
 
@@ -260,6 +278,95 @@ def _optional_edit_impact_errors(prefix: str, metadata: dict[str, Any]) -> list[
                 + f"edit_impact.scenario_types[{index}] unsupported: "
                 + f"{scenario_type!r}"
             )
+    return errors
+
+
+def _optional_edit_topology_errors(prefix: str, metadata: dict[str, Any]) -> list[str]:
+    topology = metadata.get("edit_topology")
+    if topology is None:
+        return []
+    if not isinstance(topology, dict):
+        return [prefix + "edit_topology must be an object when present"]
+
+    errors: list[str] = []
+    artifact_kind = topology.get("artifact_kind")
+    if artifact_kind is not None and (
+        not isinstance(artifact_kind, str)
+        or artifact_kind not in EDIT_TOPOLOGY_ARTIFACT_KINDS
+    ):
+        errors.append(
+            prefix + f"edit_topology.artifact_kind unsupported: {artifact_kind!r}"
+        )
+
+    module_hashes = topology.get("module_hashes")
+    if module_hashes is not None:
+        if not isinstance(module_hashes, dict):
+            errors.append(prefix + "edit_topology.module_hashes must be an object")
+        else:
+            for name, digest in module_hashes.items():
+                if not isinstance(name, str) or not name.strip():
+                    errors.append(
+                        prefix + f"edit_topology.module_hashes key invalid: {name!r}"
+                    )
+                    continue
+                if not isinstance(digest, str) or _SHA256_RE.fullmatch(digest) is None:
+                    errors.append(
+                        prefix
+                        + f"edit_topology.module_hashes.{name} must be a "
+                        + "sha256:<64 lowercase hex> digest"
+                    )
+
+    activation_policy = topology.get("runtime_activation_policy")
+    if activation_policy is not None:
+        valid_policy = isinstance(activation_policy, dict) or (
+            isinstance(activation_policy, str) and bool(activation_policy.strip())
+        )
+        if not valid_policy:
+            errors.append(
+                prefix
+                + "edit_topology.runtime_activation_policy must be a non-empty string or object"
+            )
+
+    data_ref = topology.get("training_or_edit_data_ref")
+    if data_ref is not None and (not isinstance(data_ref, str) or not data_ref.strip()):
+        errors.append(
+            prefix
+            + "edit_topology.training_or_edit_data_ref must be a non-empty string"
+        )
+    return errors
+
+
+def _optional_delta_privacy_errors(prefix: str, metadata: dict[str, Any]) -> list[str]:
+    privacy = metadata.get("delta_privacy")
+    if privacy is None:
+        return []
+    if not isinstance(privacy, dict):
+        return [prefix + "delta_privacy must be an object when present"]
+
+    errors: list[str] = []
+    delta_available = privacy.get("delta_available")
+    if delta_available is not None and (
+        not isinstance(delta_available, str)
+        or delta_available not in DELTA_AVAILABILITY_VALUES
+    ):
+        errors.append(
+            prefix + f"delta_privacy.delta_available unsupported: {delta_available!r}"
+        )
+
+    sensitivity = privacy.get("privacy_sensitivity")
+    if sensitivity is not None and (
+        not isinstance(sensitivity, str)
+        or sensitivity not in PRIVACY_SENSITIVITY_VALUES
+    ):
+        errors.append(
+            prefix + f"delta_privacy.privacy_sensitivity unsupported: {sensitivity!r}"
+        )
+
+    raw_approval = privacy.get("public_raw_delta_approved")
+    if raw_approval is not None and not isinstance(raw_approval, bool):
+        errors.append(
+            prefix + "delta_privacy.public_raw_delta_approved must be boolean"
+        )
     return errors
 
 

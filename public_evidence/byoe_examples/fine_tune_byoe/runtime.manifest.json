@@ -1,0 +1,24 @@
+{
+  "config": {
+    "path": null,
+    "sha256": null,
+    "source": "missing"
+  },
+  "execution_mode": "container",
+  "generated_at_utc": "2026-05-30T00:00:00+00:00",
+  "manifest_version": 1,
+  "report": {
+    "filename": "evaluation.report.json",
+    "path": "public_evidence/byoe_examples/fine_tune_byoe/evaluation.report.json",
+    "sha256": "d98fec6a810841f8a5aa1a2ad18e63dac2bdb485c1a7c4ee1069f4a161c9f144"
+  },
+  "runtime": {
+    "allow_network": false,
+    "allow_remote_code": false,
+    "allow_third_party_plugins": false,
+    "container_execution": true,
+    "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "image_ref": "ghcr.io/invarlock/invarlock-runtime:public-fixture"
+  },
+  "verifier_contract_version": "runtime-manifest-v1"
+}

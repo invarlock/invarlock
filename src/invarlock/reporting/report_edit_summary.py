@@ -563,7 +563,12 @@ def extract_edit_metadata(
     if plan_dict:
         edit_metadata["plan"] = copy.deepcopy(plan_dict)
 
-    for optional_key in ("edit_provenance", "edit_impact"):
+    for optional_key in (
+        "edit_provenance",
+        "edit_impact",
+        "edit_topology",
+        "delta_privacy",
+    ):
         optional_value = edit_section.get(optional_key)
         if not isinstance(optional_value, dict):
             config_section = edit_section.get("config")

@@ -1501,6 +1501,20 @@ test_task_baseline_report_helpers_execute_python_wrappers() {
     run _validate_evaluate_baseline_report "${report}" "hf_auto" "ci" "balanced"
     assert_rc "0" "${RUN_RC}" "baseline report validation runs python wrapper"
     assert_file_exists "${calls}" "python stub invoked"
+
+    : > "${calls}"
+    run _validate_reusable_evaluate_baseline_report "${report}" "hf_auto" "ci" "balanced"
+    assert_rc "0" "${RUN_RC}" "reusable baseline report validation runs python wrapper"
+    local reusable_call
+    reusable_call="$(cat "${calls}")"
+    assert_match "validate-baseline-report ${report} hf_auto ci balanced off" "${reusable_call}" "reusable baseline reports validate as cache inputs"
+    [[ "${reusable_call}" != *"--expected-preview-n"* ]] || t_fail "reusable baseline validation should not enforce requested preview count"
+    [[ "${reusable_call}" != *"--expected-final-n"* ]] || t_fail "reusable baseline validation should not enforce requested final count"
+
+    : > "${calls}"
+    PACK_EVALUATE_ASSURANCE="strict" run _validate_reusable_evaluate_baseline_report "${report}" "hf_auto" "ci" "balanced"
+    assert_rc "0" "${RUN_RC}" "reusable baseline report validation honors strict evaluate assurance"
+    assert_match "validate-baseline-report ${report} hf_auto ci balanced strict" "$(cat "${calls}")" "strict reusable baseline reports validate as strict cache inputs"
 }
 
 test_task_baseline_report_helpers_cover_generate_baseline_report_path() {
@@ -1685,10 +1699,10 @@ EOF
     # Force CI window override by returning tiny preview/final windows.
     _estimate_model_size() { echo "30"; }
     _get_invarlock_config() { echo "128:128:1:1:1"; }
-    export INVARLOCK_CERT_MIN_WINDOWS="192"
+    export INVARLOCK_CERT_MIN_WINDOWS="400"
 
     local baseline_report="${TEST_TMPDIR}/baseline_report.json"
-    write_minimal_evaluate_baseline_report "${baseline_report}" 128 128 192 192
+    write_minimal_evaluate_baseline_report "${baseline_report}" 128 128 218 218
     _ensure_evaluate_baseline_report() { echo "${baseline_report}"; }
 
     resolve_edit_params() {
@@ -1713,8 +1727,11 @@ EOF
     staged_preset_contents="$(cat "${model_output_dir}/reports/_clean/run_1/runtime_inputs/calibrated_preset_${model_name}.yaml")"
     assert_match "seq_len: 128" "${staged_preset_contents}" "staged preset seq_len normalized for evaluate edit"
     assert_match "stride: 128" "${staged_preset_contents}" "staged preset stride normalized for evaluate edit"
-    assert_match "preview_n: 192" "${staged_preset_contents}" "staged preset preview_n normalized for evaluate edit"
-    assert_match "final_n: 192" "${staged_preset_contents}" "staged preset final_n normalized for evaluate edit"
+    assert_match "preview_n: 218" "${staged_preset_contents}" "staged preset preview_n normalized for evaluate edit"
+    assert_match "final_n: 218" "${staged_preset_contents}" "staged preset final_n normalized for evaluate edit"
+    assert_match "Using effective baseline report schedule" "$(cat "${log_file}")" "evaluate edit uses effective baseline schedule"
+    assert_match "preview_n: 218" "$(cat "${model_output_dir}/reports/_clean/run_1/config_root/runtime/profiles/ci.yaml")" "profile preview_n matches effective baseline report"
+    assert_match "final_n: 218" "$(cat "${model_output_dir}/reports/_clean/run_1/config_root/runtime/profiles/ci.yaml")" "profile final_n matches effective baseline report"
 
     local calls
     calls="$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")"
@@ -1806,10 +1823,10 @@ test_task_evaluate_error_reuses_baseline_report_for_nonstructural_errors_and_app
     : > "${log_file}"
 
     _get_invarlock_config() { echo "128:128:1:1:1"; }
-    export INVARLOCK_CERT_MIN_WINDOWS="192"
+    export INVARLOCK_CERT_MIN_WINDOWS="400"
 
     local baseline_report="${TEST_TMPDIR}/baseline_report.json"
-    write_minimal_evaluate_baseline_report "${baseline_report}" 128 128 192 192
+    write_minimal_evaluate_baseline_report "${baseline_report}" 128 128 218 218
     _ensure_evaluate_baseline_report() { echo "${baseline_report}"; }
 
     mkdir -p "${out}/presets"
@@ -1831,8 +1848,11 @@ test_task_evaluate_error_reuses_baseline_report_for_nonstructural_errors_and_app
     staged_error_preset_contents="$(cat "${model_output_dir}/reports/errors/norm_collapse/runtime_inputs/calibrated_preset_${model_name}.yaml")"
     assert_match "seq_len: 128" "${staged_error_preset_contents}" "staged preset seq_len normalized for evaluate error"
     assert_match "stride: 128" "${staged_error_preset_contents}" "staged preset stride normalized for evaluate error"
-    assert_match "preview_n: 192" "${staged_error_preset_contents}" "staged preset preview_n normalized for evaluate error"
-    assert_match "final_n: 192" "${staged_error_preset_contents}" "staged preset final_n normalized for evaluate error"
+    assert_match "preview_n: 218" "${staged_error_preset_contents}" "staged preset preview_n normalized for evaluate error"
+    assert_match "final_n: 218" "${staged_error_preset_contents}" "staged preset final_n normalized for evaluate error"
+    assert_match "Using effective baseline report schedule" "$(cat "${log_file}")" "evaluate error uses effective baseline schedule"
+    assert_match "preview_n: 218" "$(cat "${model_output_dir}/reports/errors/norm_collapse/config_root/runtime/profiles/ci.yaml")" "error profile preview_n matches effective baseline report"
+    assert_match "final_n: 218" "$(cat "${model_output_dir}/reports/errors/norm_collapse/config_root/runtime/profiles/ci.yaml")" "error profile final_n matches effective baseline report"
     local calls
     calls="$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")"
     assert_match "--assurance off" "${calls}" "error evaluate forwards default assurance mode"

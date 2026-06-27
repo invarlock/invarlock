@@ -113,6 +113,14 @@ def schedule_from_baseline_report(report_path: Path) -> tuple[int, int, int, int
     )
 
 
+def _baseline_report_schedule(args: argparse.Namespace) -> int:
+    seq_len, stride, preview_n, final_n = schedule_from_baseline_report(
+        Path(args.baseline_report)
+    )
+    print(f"{seq_len}:{stride}:{preview_n}:{final_n}")
+    return 0
+
+
 def _normalize_staged_preset(args: argparse.Namespace) -> int:
     if args.baseline_report:
         seq_len, stride, preview_n, final_n = schedule_from_baseline_report(

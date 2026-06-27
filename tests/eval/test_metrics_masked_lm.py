@@ -6,7 +6,16 @@ from invarlock.eval.metrics import compute_perplexity
 pytest.importorskip("transformers")
 
 
+def _disable_torchvision_for_text_only_transformers() -> None:
+    import transformers.utils as transformers_utils
+    import transformers.utils.import_utils as import_utils
+
+    import_utils.is_torchvision_available = lambda: False
+    transformers_utils.is_torchvision_available = lambda: False
+
+
 def test_compute_perplexity_masked_lm_returns_positive_value():
+    _disable_torchvision_for_text_only_transformers()
     from transformers import BertConfig, BertForMaskedLM
 
     config = BertConfig(
@@ -38,6 +47,7 @@ def test_compute_perplexity_masked_lm_returns_positive_value():
 
 
 def test_compute_perplexity_masked_lm_masks_tokens():
+    _disable_torchvision_for_text_only_transformers()
     from transformers import BertConfig, BertForMaskedLM
 
     config = BertConfig(
