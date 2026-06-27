@@ -47,14 +47,14 @@ def test_evidence_pack_helper_locks_do_not_select_torch_cuda_backend() -> None:
     req_dir = Path.cwd() / "requirements" / "evidence-packs"
     forbidden = (
         "torch==",
+        "torchvision==",
+        "torchao==",
+        "triton==",
+        "bitsandbytes==",
+        "optimum-quanto==",
         "cuda-toolkit",
         "cuda-bindings",
-        "nvidia-cublas",
-        "nvidia-cudnn",
-        "nvidia-cusparse",
-        "nvidia-cusolver",
-        "nvidia-cufft",
-        "nvidia-nccl",
+        "nvidia-",
         "cu13",
     )
     allowed_backend_specific = {"cuda-nvcc.txt"}
@@ -66,6 +66,22 @@ def test_evidence_pack_helper_locks_do_not_select_torch_cuda_backend() -> None:
             continue
         for token in forbidden:
             assert token not in text, f"{path.name} must not pin {token!r}"
+
+
+def test_runtime_image_locks_are_the_explicit_torch_backend_surface() -> None:
+    workflow_dir = Path.cwd() / "requirements" / "workflows"
+    runtime_locks = {
+        "runtime-image-py312.txt": "+cpu",
+        "runtime-image-py312-aarch64.txt": "+cpu",
+        "runtime-image-py312-cu128.txt": "+cu128",
+        "runtime-image-quant-py312-cu128.txt": "+cu128",
+    }
+
+    for filename, backend_suffix in runtime_locks.items():
+        text = (workflow_dir / filename).read_text(encoding="utf-8")
+        assert f"torch==2.11.0{backend_suffix}" in text
+        assert "torchvision==0.26.0" in text
+        assert "cu13" not in text
 
 
 def test_refresh_pinned_requirements_help_is_side_effect_free() -> None:
