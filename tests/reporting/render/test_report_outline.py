@@ -164,6 +164,51 @@ def test_report_outline_adds_optional_edit_provenance_section() -> None:
     )
 
 
+def test_report_outline_adds_optional_evaluation_realism_section() -> None:
+    report = _mk_report()
+    report["evaluation_realism"] = {
+        "mode": "teacher_forced",
+        "prompt_template_hash": "sha256:" + "a" * 64,
+        "decoding_config": {"temperature": 0.0},
+        "max_tokens": 64,
+        "truncation_policy": "truncate_to_context",
+        "dataset_or_task_id": "qaedit-locality-smoke",
+        "metric_is_generation_realistic": False,
+        "proxy_metric_warning": "Teacher-forced log-prob is a proxy.",
+    }
+    evaluation_report = make_report(report, _mk_report())
+
+    outline = build_evaluation_report_outline(evaluation_report)
+
+    assert "evaluation_realism" in outline.section_keys
+    section = _section(outline, "evaluation_realism")
+    assert section.facts_by_label["Mode"].value == "teacher_forced"
+    assert section.facts_by_label["Generation Realistic"].value == "False"
+    assert section.facts_by_label["Task"].value == "qaedit-locality-smoke"
+
+
+def test_report_outline_adds_optional_topology_and_delta_privacy_facts() -> None:
+    evaluation_report = make_report(_mk_report(), _mk_report())
+    evaluation_report["edit"]["edit_topology"] = {
+        "artifact_kind": "dynamic_weight_module",
+        "module_hashes": {"generator": "sha256:" + "a" * 64},
+        "runtime_activation_policy": "query_conditioned",
+        "training_or_edit_data_ref": "hash-only-target-set",
+    }
+    evaluation_report["edit"]["delta_privacy"] = {
+        "delta_available": "hash_only",
+        "privacy_sensitivity": "customer_controlled",
+        "public_raw_delta_approved": False,
+    }
+
+    outline = build_evaluation_report_outline(evaluation_report)
+
+    section = _section(outline, "edit_provenance")
+    assert section.facts_by_label["Artifact Kind"].value == "dynamic_weight_module"
+    assert section.facts_by_label["Delta Availability"].value == "hash_only"
+    assert section.facts_by_label["Privacy Sensitivity"].value == "customer_controlled"
+
+
 def test_report_outline_summarizes_multimodal_accuracy_without_ppl_language() -> None:
     cert = make_report(_mk_report(), _mk_report())
     cert["meta"]["adapter"] = "hf_multimodal"
