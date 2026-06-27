@@ -136,9 +136,12 @@ class WorkflowVerificationSummary:
     expected_failure_reports: int
     failed_reports: int
     policy_profile: str
+    report_assurance: str | None = None
+    evaluate_assurance: str | None = None
+    release_review: bool | None = None
 
     def to_summary_payload(self) -> dict[str, object]:
-        return asdict(self)
+        return {key: value for key, value in asdict(self).items() if value is not None}
 
 
 def write_json(path: Path, payload: object) -> None:

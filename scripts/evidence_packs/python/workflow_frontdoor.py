@@ -18,6 +18,7 @@ if str(SCRIPTS_ROOT) not in sys.path:
 from evidence_workflows import (  # noqa: E402
     WorkflowCommandStep,
     WorkflowLanePlan,
+    WorkflowLaneResult,
     WorkflowRunMetadata,
     WorkflowSweepExecutionRequest,
     WorkflowSweepPlan,
@@ -129,6 +130,50 @@ def _parse_args(argv: list[str]) -> EvidencePackWorkflowRequest:
     )
 
 
+def _tail_text(path: Path, *, max_lines: int = 80) -> str:
+    if not path.is_file():
+        return ""
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    return "\n".join(lines[-max_lines:])
+
+
+def _emit_failure_diagnostics(
+    *,
+    output_root: Path,
+    results: list[WorkflowLaneResult],
+) -> None:
+    failed = [result for result in results if not result.ok]
+    if not failed:
+        return
+
+    print(
+        f"Evidence-pack workflow failed; output_root={output_root}",
+        file=sys.stderr,
+    )
+    status_log = output_root / "status.log"
+    if status_log.is_file():
+        print(f"Status log: {status_log}", file=sys.stderr)
+        status_tail = _tail_text(status_log, max_lines=40)
+        if status_tail:
+            print(status_tail, file=sys.stderr)
+
+    logs_dir = output_root / "logs"
+    for result in failed:
+        verify_exit = "NA" if result.verify_exit is None else str(result.verify_exit)
+        print(
+            "Failed lane "
+            f"{result.slug}: status={result.status} detail={result.detail or '-'} "
+            f"evaluate_exit={result.evaluate_exit} verify_exit={verify_exit}",
+            file=sys.stderr,
+        )
+        lane_log = logs_dir / f"{result.slug}.log"
+        if lane_log.is_file():
+            print(f"Log tail: {lane_log}", file=sys.stderr)
+            log_tail = _tail_text(lane_log)
+            if log_tail:
+                print(log_tail, file=sys.stderr)
+
+
 def run_evidence_pack_workflow(request: EvidencePackWorkflowRequest) -> int:
     workflow = build_evidence_pack_workflow(request)
     if request.dry_run:
@@ -167,7 +212,10 @@ def run_evidence_pack_workflow(request: EvidencePackWorkflowRequest) -> int:
         results=results,
         artifact_patterns=("**/*.log", "summary.json", "status.log"),
     )
-    return workflow_return_code(results)
+    rc = workflow_return_code(results)
+    if rc != 0:
+        _emit_failure_diagnostics(output_root=workflow.output_root, results=results)
+    return rc
 
 
 def main(argv: list[str] | None = None) -> int:

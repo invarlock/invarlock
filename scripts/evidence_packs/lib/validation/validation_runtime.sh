@@ -314,11 +314,21 @@ disk_preflight() {
 
     local free_gb=""
     free_gb=$(get_free_disk_gb "${OUTPUT_DIR}" 2>/dev/null || echo "")
-    [[ -z "${free_gb}" ]] && return 0
+    if [[ -z "${free_gb}" ]]; then
+        if [[ "${PACK_RELEASE_REVIEW:-0}" == "1" ]]; then
+            error_exit "Release-review disk preflight could not determine free disk for OUTPUT_DIR=${OUTPUT_DIR}."
+        fi
+        return 0
+    fi
 
     local planned_gb=""
     planned_gb=$(estimate_planned_model_storage_gb 2>/dev/null || echo "")
-    [[ -z "${planned_gb}" ]] && return 0
+    if [[ -z "${planned_gb}" ]]; then
+        if [[ "${PACK_RELEASE_REVIEW:-0}" == "1" ]]; then
+            error_exit "Release-review disk preflight could not estimate planned model storage."
+        fi
+        return 0
+    fi
 
     local min_free="${MIN_FREE_DISK_GB:-200}"
     if ! [[ "${min_free}" =~ ^[0-9]+$ ]]; then
@@ -339,7 +349,12 @@ disk_preflight() {
     log "       Fix: mount a larger volume and set OUTPUT_DIR, or run the subset suite, or set RUN_ERROR_INJECTION=false."
     log "       Override (not recommended): PACK_SKIP_DISK_PREFLIGHT=1"
 
-    # Resume mode may already have artifacts; allow user to proceed if explicitly resuming.
+    if [[ "${PACK_RELEASE_REVIEW:-0}" == "1" ]]; then
+        error_exit "Insufficient disk for release-review run (need >= ${required_gb}GB incl MIN_FREE_DISK_GB=${min_free})."
+    fi
+
+    # Resume mode may already have artifacts; allow non-release runs to proceed
+    # if explicitly resuming.
     if [[ "${RESUME_FLAG:-false}" == "true" ]]; then
         log "WARNING: --resume mode enabled; continuing despite preflight estimate."
         return 0

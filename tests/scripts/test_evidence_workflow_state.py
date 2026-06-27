@@ -241,3 +241,34 @@ def test_write_verification_summary_preserves_evidence_pack_schema(
         "failed_reports": 0,
         "policy_profile": "release",
     }
+
+
+def test_write_verification_summary_includes_optional_release_review_metadata(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "results" / "verification_summary.json"
+
+    write_verification_summary(
+        path,
+        summary=WorkflowVerificationSummary(
+            clean_reports=2,
+            error_injection_reports=1,
+            expected_failure_reports=3,
+            failed_reports=0,
+            policy_profile="ci",
+            report_assurance="strict",
+            evaluate_assurance="strict",
+            release_review=True,
+        ),
+    )
+
+    assert json.loads(path.read_text(encoding="utf-8")) == {
+        "clean_reports": 2,
+        "error_injection_reports": 1,
+        "expected_failure_reports": 3,
+        "failed_reports": 0,
+        "policy_profile": "ci",
+        "report_assurance": "strict",
+        "evaluate_assurance": "strict",
+        "release_review": True,
+    }

@@ -900,6 +900,11 @@ JSON
 #!/usr/bin/env bash
 set -euo pipefail
 echo "$*" >> "${TEST_TMPDIR}/invarlock.calls"
+for arg in "$@"; do
+    if [[ "${arg}" == */errors/*/evaluation.report.json ]]; then
+        exit 1
+    fi
+done
 echo '{"ok": true}'
 exit 0
 EOF
@@ -1000,7 +1005,7 @@ EOF
 
     run pack_verify_reports "${pack_dir}" ""
     assert_rc "1" "${RUN_RC}" "verify fails when scenario-declared must_fail report verifies clean"
-    assert_match "Expected verify failure passed" "${RUN_ERR}" "unexpected expected-failure pass is explicit"
+    assert_match "Expected verify failure verified as passing" "${RUN_ERR}" "unexpected expected-failure pass is explicit"
 
     PATH="${original_path}"
 }

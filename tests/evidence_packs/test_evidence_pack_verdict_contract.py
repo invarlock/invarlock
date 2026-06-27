@@ -264,6 +264,12 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     assert category["stress"]["any_flag"] == 3
     assert category["error_injection"]["reports"] == 12
     assert category["error_injection"]["any_flag"] == 11
+    assert verdict["manifest"]["path"] == "scripts/evidence_packs/scenarios.json"
+    for record in verdict["records"]:
+        assert not Path(record["path"]).is_absolute()
+        baseline_report = record.get("baseline_report")
+        if baseline_report:
+            assert not Path(str(baseline_report)).is_absolute()
 
 
 def test_verdict_contract_reports_guard_signal_uniqueness(tmp_path: Path) -> None:

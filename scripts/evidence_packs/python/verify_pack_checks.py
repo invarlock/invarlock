@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from collections.abc import Callable
@@ -29,6 +30,11 @@ CONTROL_FILES = {
     "metadata/manifest.json",
     "metadata/manifest.signature.json",
     "metadata/checksums.sha256",
+}
+CONTROL_FILE_MIRRORS = {
+    "manifest.json": "metadata/manifest.json",
+    "manifest.signature.json": "metadata/manifest.signature.json",
+    "checksums.sha256": "metadata/checksums.sha256",
 }
 
 
@@ -118,6 +124,12 @@ def cmd_scenario_strictness(args: argparse.Namespace) -> int:
 
 def cmd_extra_files(args: argparse.Namespace) -> int:
     pack_dir = args.pack_dir.resolve()
+    mirror_errors = _control_file_mirror_errors(pack_dir)
+    if mirror_errors:
+        for error in mirror_errors:
+            print(f"ERROR: {error}", file=sys.stderr)
+        return 1
+
     expected = _checksum_paths(pack_dir / "checksums.sha256") | CONTROL_FILES
     actual = _actual_pack_files(pack_dir)
     extras = sorted(actual - expected)
@@ -132,6 +144,70 @@ def cmd_extra_files(args: argparse.Namespace) -> int:
     for rel_path in extras:
         print(f"  - {rel_path}", file=sys.stderr)
     return 1 if args.strict else 0
+
+
+def _control_file_mirror_errors(pack_dir: Path) -> list[str]:
+    errors: list[str] = []
+    for canonical_rel, mirror_rel in CONTROL_FILE_MIRRORS.items():
+        mirror_path = pack_dir / mirror_rel
+        if not mirror_path.is_file():
+            continue
+        canonical_path = pack_dir / canonical_rel
+        if not canonical_path.is_file():
+            errors.append(
+                f"{mirror_rel} exists but canonical {canonical_rel} is missing."
+            )
+            continue
+        if mirror_path.read_bytes() != canonical_path.read_bytes():
+            errors.append(
+                f"{mirror_rel} must match canonical {canonical_rel} byte-for-byte."
+            )
+    return errors
+
+
+def cmd_json_object(args: argparse.Namespace) -> int:
+    payload = _load_json(args.path)
+    if not isinstance(payload, dict):
+        print(
+            f"ERROR: {args.label} must be a JSON object: {args.path}",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
+def cmd_scenarios_manifest(args: argparse.Namespace) -> int:
+    payload = _load_json(args.path)
+    if not isinstance(payload, dict):
+        print(
+            f"ERROR: scenarios manifest must be a JSON object: {args.path}",
+            file=sys.stderr,
+        )
+        return 1
+    if payload.get("schema") != "evidence_pack_scenarios_v1":
+        print(
+            f"ERROR: scenarios manifest schema must be evidence_pack_scenarios_v1: {args.path}",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        version = int(payload.get("schema_version", 0) or 0)
+    except (TypeError, ValueError, OverflowError):
+        version = 0
+    if version != 1:
+        print(
+            f"ERROR: scenarios manifest schema_version must be 1: {args.path}",
+            file=sys.stderr,
+        )
+        return 1
+    scenarios = payload.get("scenarios")
+    if not isinstance(scenarios, list) or not scenarios:
+        print(
+            f"ERROR: scenarios manifest must include a non-empty scenarios list: {args.path}",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
 
 
 def _run_manifest_check(path: Path, check: Callable[[Path], list[str]]) -> int:
@@ -241,6 +317,21 @@ def _truthy(value: Any) -> bool:
     if isinstance(value, str):
         return value.strip().lower() in {"1", "true", "yes", "y", "on"}
     return bool(value)
+
+
+def _summary_evaluate_assurance() -> str | None:
+    return os.environ.get("PACK_EVALUATE_ASSURANCE_USED") or os.environ.get(
+        "PACK_EVALUATE_ASSURANCE"
+    )
+
+
+def _summary_release_review() -> bool | None:
+    raw = os.environ.get("PACK_RELEASE_REVIEW_USED") or os.environ.get(
+        "PACK_RELEASE_REVIEW"
+    )
+    if raw is None:
+        return None
+    return raw == "1"
 
 
 def _expected_failure_signal(report: Path) -> bool:
@@ -361,9 +452,9 @@ def _verify_reports_with_sidecars(
                 report_assurance=report_assurance,
                 stdout_path=verify_out,
             )
-            if rc == 0 and not _expected_failure_signal(report):
+            if rc == 0:
                 print(
-                    f"ERROR: Expected verify failure passed without report failure signal: {report}",
+                    f"ERROR: Expected verify failure verified as passing: {report}",
                     file=sys.stderr,
                 )
                 count_failed += 1
@@ -399,6 +490,9 @@ def _verify_reports_with_sidecars(
                 expected_failure_reports=count_expected_failure,
                 failed_reports=count_failed,
                 policy_profile=profile,
+                report_assurance=report_assurance,
+                evaluate_assurance=_summary_evaluate_assurance(),
+                release_review=_summary_release_review(),
             ),
         )
 
@@ -458,9 +552,9 @@ def _verify_reports_aggregate(
             report_assurance=report_assurance,
             stdout_to_null=True,
         )
-        if rc == 0 and not _expected_failure_signal(report):
+        if rc == 0:
             print(
-                f"ERROR: Expected verify failure passed without report failure signal: {report}",
+                f"ERROR: Expected verify failure verified as passing: {report}",
                 file=sys.stderr,
             )
             return 1
@@ -533,6 +627,15 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     verify_reports.add_argument("--write-sidecars", action="store_true")
     verify_reports.add_argument("--summary-out", type=Path)
     verify_reports.set_defaults(func=cmd_verify_reports)
+
+    json_object = subparsers.add_parser("json-object")
+    json_object.add_argument("path", type=Path)
+    json_object.add_argument("--label", default="metadata file")
+    json_object.set_defaults(func=cmd_json_object)
+
+    scenarios_manifest = subparsers.add_parser("scenarios-manifest")
+    scenarios_manifest.add_argument("path", type=Path)
+    scenarios_manifest.set_defaults(func=cmd_scenarios_manifest)
 
     extra_files = subparsers.add_parser("extra-files")
     extra_files.add_argument("pack_dir", type=Path)

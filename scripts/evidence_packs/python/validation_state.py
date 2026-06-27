@@ -610,7 +610,8 @@ def build_evaluation_optimization_summary(run_dir: Path) -> dict[str, Any]:
     timings = _collect_evaluate_timings(run_dir)
     return {
         "schema": "invarlock/evidence-pack-evaluation-optimization-summary-v1",
-        "run_dir": str(run_dir),
+        "run_dir": ".",
+        "path_scope": "run_root_relative",
         "controls": {
             "PACK_DEFER_REPORT_RENDERING": os.environ.get("PACK_DEFER_REPORT_RENDERING")
             or os.environ.get("PACK_DEFER_OPTIONAL_REPORT_RENDERING")

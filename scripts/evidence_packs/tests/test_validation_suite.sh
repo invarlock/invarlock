@@ -575,6 +575,36 @@ test_pack_validation_disk_preflight_allows_resume_but_aborts_without_resume() {
     assert_eq "99" "${rc}" "non-resume path aborts via error_exit"
 }
 
+test_pack_validation_disk_preflight_fails_closed_for_release_review() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+    pack_setup_output_dirs
+
+    error_exit() { exit 97; }
+    PACK_RELEASE_REVIEW=1
+
+    get_free_disk_gb() { echo ""; }
+    estimate_planned_model_storage_gb() { echo "10"; }
+    local rc=0
+    ( disk_preflight ) || rc=$?
+    assert_eq "97" "${rc}" "release-review aborts when free disk is unknown"
+
+    get_free_disk_gb() { echo "5000"; }
+    estimate_planned_model_storage_gb() { echo ""; }
+    rc=0
+    ( disk_preflight ) || rc=$?
+    assert_eq "97" "${rc}" "release-review aborts when storage estimate is unknown"
+
+    RESUME_FLAG="true"
+    get_free_disk_gb() { echo "10"; }
+    estimate_planned_model_storage_gb() { echo "1000"; }
+    rc=0
+    ( disk_preflight ) || rc=$?
+    assert_eq "97" "${rc}" "release-review resume does not bypass insufficient disk"
+}
+
 test_pack_validation_disk_preflight_returns_ok_when_disk_is_sufficient() {
     mock_reset
 
@@ -907,6 +937,7 @@ test_pack_validation_check_dependencies_covers_pip_bootstrap_and_missing_install
     }
 
     local pip_version_calls=0
+    local installed_modules=""
     local mode="bootstrap"
     python3() {
         if [[ "${1:-}" == "-m" && "${2:-}" == "pip" && "${3:-}" == "--version" ]]; then
@@ -942,6 +973,13 @@ test_pack_validation_check_dependencies_covers_pip_bootstrap_and_missing_install
                     if [[ "${mode}" == "failinstalls" ]]; then
                         return 1
                     fi
+                    case "${pip_args}" in
+                        *"requirements/evidence-packs/huggingface_hub.txt"*) installed_modules="${installed_modules} huggingface_hub" ;;
+                        *"requirements/evidence-packs/accelerate.txt"*) installed_modules="${installed_modules} accelerate" ;;
+                        *"requirements/evidence-packs/pyyaml.txt"*) installed_modules="${installed_modules} yaml" ;;
+                        *"requirements/evidence-packs/protobuf.txt"*) installed_modules="${installed_modules} google.protobuf" ;;
+                        *"requirements/evidence-packs/sentencepiece.txt"*) installed_modules="${installed_modules} sentencepiece" ;;
+                    esac
                     return 0
                     ;;
                 *"requirements/evidence-packs/flash-attn.txt"*)
@@ -969,18 +1007,23 @@ test_pack_validation_check_dependencies_covers_pip_bootstrap_and_missing_install
                     return 1
                     ;;
                 *"import huggingface_hub"*)
+                    [[ " ${installed_modules} " == *" huggingface_hub "* ]] && return 0
                     return 1
                     ;;
                 *"import accelerate"*)
+                    [[ " ${installed_modules} " == *" accelerate "* ]] && return 0
                     return 1
                     ;;
                 *"import yaml"*)
+                    [[ " ${installed_modules} " == *" yaml "* ]] && return 0
                     return 1
                     ;;
                 *"import google.protobuf"*)
+                    [[ " ${installed_modules} " == *" google.protobuf "* ]] && return 0
                     return 1
                     ;;
                 *"import sentencepiece"*)
+                    [[ " ${installed_modules} " == *" sentencepiece "* ]] && return 0
                     return 1
                     ;;
             esac
@@ -994,6 +1037,7 @@ test_pack_validation_check_dependencies_covers_pip_bootstrap_and_missing_install
 
     mode="failinstalls"
     pip_version_calls=0
+    installed_modules=""
     : > "${TEST_TMPDIR}/dep.log"
     local rc=0
     ( check_dependencies ) || rc=$?
@@ -1001,6 +1045,7 @@ test_pack_validation_check_dependencies_covers_pip_bootstrap_and_missing_install
 
     mode="nopip"
     pip_version_calls=0
+    installed_modules=""
     : > "${TEST_TMPDIR}/dep.log"
     rc=0
     ( check_dependencies ) || rc=$?
@@ -1477,6 +1522,7 @@ test_pack_validation_main_dynamic_resume_and_monitoring_branches_offline() {
 
     # Existing queue with tasks for --resume branch coverage.
     RESUME_FLAG="true"
+    PACK_RETRY_FAILED_ON_RESUME="1"
     mkdir -p "${OUTPUT_DIR}/queue"/{pending,ready,running,completed,failed}
     printf '{"id":"t1","status":"running"}\n' > "${OUTPUT_DIR}/queue/running/t1.task"
     printf '{"id":"t2","status":"failed"}\n' > "${OUTPUT_DIR}/queue/failed/t2.task"
@@ -1563,6 +1609,41 @@ EOF
     run main_dynamic
     assert_rc "1" "${RUN_RC}" "main_dynamic fails closed when worker/task failures occur"
     assert_file_exists "${TEST_TMPDIR}/shutdown.calls" "signal_shutdown called on empty queue"
+}
+
+test_pack_validation_main_dynamic_resume_requires_explicit_failed_retry() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+    pack_setup_output_dirs
+
+    check_dependencies() { :; }
+    configure_gpu_pool() { NUM_GPUS=1; GPU_ID_LIST="0"; export NUM_GPUS GPU_ID_LIST; }
+    disk_preflight() { :; }
+    setup_pack_environment() { :; }
+
+    RESUME_FLAG="true"
+    mkdir -p "${OUTPUT_DIR}/queue"/{pending,ready,running,completed,failed}
+    printf '{"id":"t2","status":"failed"}\n' > "${OUTPUT_DIR}/queue/failed/t2.task"
+
+    init_queue() {
+        QUEUE_DIR="${OUTPUT_DIR}/queue"
+        GPU_RESERVATION_DIR="${OUTPUT_DIR}/gpu_reservations"
+        mkdir -p "${QUEUE_DIR}"/{pending,ready,running,completed,failed} "${GPU_RESERVATION_DIR}"
+        export QUEUE_DIR GPU_RESERVATION_DIR
+    }
+
+    error_exit() {
+        printf '%s\n' "$*" > "${TEST_TMPDIR}/error_exit.txt"
+        exit 98
+    }
+
+    local rc=0
+    ( main_dynamic ) || rc=$?
+
+    assert_eq "98" "${rc}" "resume aborts when failed tasks exist without explicit retry"
+    assert_match "PACK_RETRY_FAILED_ON_RESUME=1" "$(cat "${TEST_TMPDIR}/error_exit.txt")" "retry opt-in guidance is emitted"
 }
 
 test_pack_validation_main_dynamic_exits_with_resumable_blocked_state() {

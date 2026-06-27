@@ -35,6 +35,8 @@ def test_build_summary_collects_timing_and_reuse_counts(tmp_path: Path):
     )
     summary = build_evaluation_optimization_summary(tmp_path)
 
+    assert summary["run_dir"] == "."
+    assert summary["path_scope"] == "run_root_relative"
     assert summary["evaluation_reports_timed"] == 1
     assert summary["baseline_report_reuse_count"] == 1
     assert summary["deferred_rendering_count"] == 1

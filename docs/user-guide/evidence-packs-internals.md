@@ -858,9 +858,11 @@ Primary metric acceptance/drift gates should be configured via profile/config
 | `PACK_SKIP_HTML` | `0` | Skip HTML rendering |
 | `PACK_VERIFY_PROFILE` | `dev` | Profile for `invarlock verify` |
 | `PACK_REPORT_ASSURANCE` | `report` | Nested report assurance mode passed to report verification (`report`, `strict`, or `off`) |
+| `PACK_EVALUATE_ASSURANCE` | `off` | Assurance mode passed to `invarlock evaluate` when creating evidence-pack reports (`strict` or `off`) |
+| `PACK_RETRY_FAILED_ON_RESUME` | unset | Set to `1` to explicitly retry failed queue tasks during `--resume`; otherwise resume aborts when failed tasks are present |
 | `PACK_REQUIRE_PASS` | `0` | Fail pack generation unless `final_verdict.json` is `PASS` |
 | `PACK_REQUIRE_RUNTIME_MANIFESTS` | `0` | Require report-adjacent runtime manifests during hardened pack generation |
-| `PACK_RELEASE_REVIEW` | `0` | Set by `run_pack.sh --release-review`; requires PASS verdicts, signed manifests, runtime manifests, CI profile, and strict report assurance |
+| `PACK_RELEASE_REVIEW` | `0` | Set by `run_pack.sh --release-review`; requires PASS verdicts, signed manifests, runtime manifests, model revision metadata, a non-empty scenarios manifest, CI profile, strict evaluation assurance, and strict report assurance |
 
 ## Troubleshooting
 

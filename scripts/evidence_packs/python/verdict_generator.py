@@ -74,6 +74,20 @@ def _scenario_records(
     ]
 
 
+def _display_manifest_path(manifest_path: Path) -> str:
+    default_manifest = _manifest_root() / "scenarios.json"
+    try:
+        if manifest_path.resolve() == default_manifest.resolve():
+            return "scripts/evidence_packs/scenarios.json"
+    except OSError:
+        pass
+    if manifest_path.name == "scenarios.json" and manifest_path.parent.name == "state":
+        return "state/scenarios.json"
+    if manifest_path.name == "scenarios.json":
+        return manifest_path.name
+    return manifest_path.name
+
+
 def _evaluate_coverage_requirements(
     model_names: list[str],
     by_key: dict[tuple[str, str, str], dict[str, Any]],
@@ -479,6 +493,7 @@ def generate_verdict(
         latest,
         scenario_index=catalog.scenario_index,
         baseline_reports=baseline_reports,
+        output_dir=output_dir,
     )
     by_key: dict[tuple[str, str, str], dict[str, Any]] = {
         (record["model"], record["category"], record["name"]): record
@@ -560,7 +575,7 @@ def generate_verdict(
     return {
         "verdict": verdict,
         "manifest": {
-            "path": str(manifest_path),
+            "path": _display_manifest_path(manifest_path),
             "schema": manifest.get("schema"),
             "schema_version": manifest.get("schema_version"),
         },

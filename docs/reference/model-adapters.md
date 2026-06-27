@@ -85,7 +85,7 @@ Do not infer `published_basis` from adapter availability alone. For example,
 - **Quantized adapters** (`hf_bnb`, `hf_awq`, `hf_gptq`, `hf_torchao`, `hf_hqq`, `hf_quanto`, `hf_ct`) handle
   their own device placement; avoid calling `.to(...)` on the loaded model.
 - **Containerized quant evidence** requires a runtime image with the optional
-  quant backends installed. For remote CUDA evidence-pack setup, set
+  quant backends installed. For CUDA evidence-pack setup, set
   `PACK_RUNTIME_IMAGE_FLAVOR=quant` to select/build
   `invarlock-runtime:cuda-quant` instead of the default CUDA runtime image.
   This opt-in image uses the pinned CUDA devel base and retains the compiler
