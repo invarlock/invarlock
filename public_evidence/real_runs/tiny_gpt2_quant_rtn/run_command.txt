@@ -1,3 +1,5 @@
+RUN_DIR=${RUN_DIR:-tmp/invarlock-real-run-512}
+
 uv run invarlock evaluate \
   --baseline sshleifer/tiny-gpt2 \
   --subject sshleifer/tiny-gpt2 \
@@ -9,7 +11,7 @@ uv run invarlock evaluate \
   --assurance strict \
   --execution-mode container \
   --allow-network \
-  --out /private/tmp/invarlock-real-run-512/runs \
-  --report-out /private/tmp/invarlock-real-run-512/report \
+  --out "$RUN_DIR/runs" \
+  --report-out "$RUN_DIR/report" \
   --quiet \
   --no-progress
