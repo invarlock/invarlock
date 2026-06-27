@@ -287,3 +287,87 @@ def test_optional_edit_topology_and_delta_privacy_reports_malformed_payload() ->
     assert any("delta_privacy.delta_available" in error for error in errors)
     assert any("delta_privacy.privacy_sensitivity" in error for error in errors)
     assert any("delta_privacy.public_raw_delta_approved" in error for error in errors)
+
+
+def test_optional_edit_topology_accepts_empty_descriptive_payload() -> None:
+    errors = edit_metadata_mod._metadata_consistency_errors(
+        scenario_id="dynamic",
+        spec={
+            "artifact_class": "validation_subject_checkpoint",
+            "generation": {"edit_spec": "custom:dynamic:all"},
+        },
+        metadata={
+            "schema": "invarlock/evidence-pack-edit-metadata-v1",
+            "artifact_class": "validation_subject_checkpoint",
+            "edit_type": "custom",
+            "optimized_deployment_backend": False,
+            "packed_quantized_storage": False,
+            "edit_topology": {},
+            "delta_privacy": {},
+        },
+    )
+
+    assert errors == []
+
+
+def test_optional_edit_topology_reports_non_object_shapes() -> None:
+    errors = edit_metadata_mod._metadata_consistency_errors(
+        scenario_id="dynamic",
+        spec={
+            "artifact_class": "validation_subject_checkpoint",
+            "generation": {"edit_spec": "custom:dynamic:all"},
+        },
+        metadata={
+            "schema": "invarlock/evidence-pack-edit-metadata-v1",
+            "artifact_class": "validation_subject_checkpoint",
+            "edit_type": "custom",
+            "optimized_deployment_backend": False,
+            "packed_quantized_storage": False,
+            "edit_topology": ["checkpoint"],
+            "delta_privacy": ["hash_only"],
+        },
+    )
+
+    assert any("edit_topology must be an object" in error for error in errors)
+    assert any("delta_privacy must be an object" in error for error in errors)
+
+
+def test_optional_edit_topology_reports_bad_module_hash_container_and_key() -> None:
+    non_object_errors = edit_metadata_mod._metadata_consistency_errors(
+        scenario_id="dynamic",
+        spec={
+            "artifact_class": "validation_subject_checkpoint",
+            "generation": {"edit_spec": "custom:dynamic:all"},
+        },
+        metadata={
+            "schema": "invarlock/evidence-pack-edit-metadata-v1",
+            "artifact_class": "validation_subject_checkpoint",
+            "edit_type": "custom",
+            "optimized_deployment_backend": False,
+            "packed_quantized_storage": False,
+            "edit_topology": {"module_hashes": ["sha256:" + "a" * 64]},
+        },
+    )
+    bad_key_errors = edit_metadata_mod._metadata_consistency_errors(
+        scenario_id="dynamic",
+        spec={
+            "artifact_class": "validation_subject_checkpoint",
+            "generation": {"edit_spec": "custom:dynamic:all"},
+        },
+        metadata={
+            "schema": "invarlock/evidence-pack-edit-metadata-v1",
+            "artifact_class": "validation_subject_checkpoint",
+            "edit_type": "custom",
+            "optimized_deployment_backend": False,
+            "packed_quantized_storage": False,
+            "edit_topology": {"module_hashes": {"": "sha256:" + "a" * 64}},
+        },
+    )
+
+    assert any(
+        "edit_topology.module_hashes must be an object" in error
+        for error in non_object_errors
+    )
+    assert any(
+        "edit_topology.module_hashes key invalid" in error for error in bad_key_errors
+    )
