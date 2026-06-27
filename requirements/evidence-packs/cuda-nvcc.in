@@ -1,1 +1,1 @@
-nvidia-cuda-nvcc==13.0.88
+nvidia-cuda-nvcc-cu12==12.8.93

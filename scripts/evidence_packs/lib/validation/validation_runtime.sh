@@ -471,7 +471,7 @@ PY
     export CUDA_HOME="${cuda_home}"
     export CUDA_PATH="${cuda_home}"
     export PATH="${cuda_home}/bin:${PATH}"
-    log "CUDA nvcc: using pinned compiler from nvidia-cuda-nvcc package"
+    log "CUDA nvcc: using pinned compiler from CUDA nvcc package"
 }
 
 pack_prepare_flash_attn_build_toolchain() {

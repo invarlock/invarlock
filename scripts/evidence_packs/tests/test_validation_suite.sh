@@ -796,7 +796,7 @@ test_pack_validation_prepare_flash_attn_build_toolchain_uses_pinned_nvcc() {
         fi
         if [[ "${1:-}" == "-" ]]; then
             cat >/dev/null
-            printf '%s\n' "${TEST_TMPDIR}/site/nvidia/cuda_nvcc"
+            printf '%s\n' "${TEST_TMPDIR}/site/nvidia/cu12"
             return 0
         fi
         return 0
@@ -807,9 +807,9 @@ test_pack_validation_prepare_flash_attn_build_toolchain_uses_pinned_nvcc() {
 
     assert_match "requirements/evidence-packs/cuda-nvcc.txt" "$(cat "${TEST_TMPDIR}/pip.args")" "cuda-nvcc lock installed"
     assert_match "--no-deps" "$(cat "${TEST_TMPDIR}/pip.args")" "cuda-nvcc install stays no-deps"
-    assert_eq "${TEST_TMPDIR}/site/nvidia/cuda_nvcc" "${CUDA_HOME}" "CUDA_HOME points at pinned cuda-nvcc"
-    assert_eq "${TEST_TMPDIR}/site/nvidia/cuda_nvcc" "${CUDA_PATH}" "CUDA_PATH points at pinned cuda-nvcc"
-    assert_match "^${TEST_TMPDIR}/site/nvidia/cuda_nvcc/bin:" "${PATH}" "pinned nvcc is prepended to PATH"
+    assert_eq "${TEST_TMPDIR}/site/nvidia/cu12" "${CUDA_HOME}" "CUDA_HOME points at pinned cuda-nvcc"
+    assert_eq "${TEST_TMPDIR}/site/nvidia/cu12" "${CUDA_PATH}" "CUDA_PATH points at pinned cuda-nvcc"
+    assert_match "^${TEST_TMPDIR}/site/nvidia/cu12/bin:" "${PATH}" "pinned nvcc is prepended to PATH"
 }
 
 test_pack_validation_check_dependencies_errors_when_missing() {
