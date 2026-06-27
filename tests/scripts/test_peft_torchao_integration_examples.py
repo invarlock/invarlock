@@ -12,6 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 INTEGRATIONS_DIR = REPO_ROOT / "examples" / "integrations"
 SOURCE_MATRIX = INTEGRATIONS_DIR / "source_matrix.json"
 PEFT_DIR = REPO_ROOT / "examples" / "integrations" / "peft_lora"
+FINE_TUNE_DIR = REPO_ROOT / "examples" / "integrations" / "fine_tune"
 TORCHAO_DIR = REPO_ROOT / "examples" / "integrations" / "torchao_int8_runtime"
 
 EXAMPLE_RUNNERS = [
@@ -22,6 +23,7 @@ EXAMPLE_RUNNERS = [
     INTEGRATIONS_DIR / "hqq" / "run_tiny_hf_hqq.sh",
     INTEGRATIONS_DIR / "lm_eval_harness" / "run_tiny_lm_eval_sidecar.sh",
     INTEGRATIONS_DIR / "peft_lora" / "run_tiny_peft_lora.sh",
+    INTEGRATIONS_DIR / "fine_tune" / "run_tiny_fine_tune.sh",
     INTEGRATIONS_DIR / "quanto" / "run_tiny_hf_quanto.sh",
     INTEGRATIONS_DIR / "torchao_int8_runtime" / "run_tiny_hf_torchao_int8.sh",
 ]
@@ -34,6 +36,7 @@ README_EXAMPLES = [
     "hqq",
     "lm_eval_harness",
     "peft_lora",
+    "fine_tune",
     "quanto",
     "torchao_int8_runtime",
 ]
@@ -76,6 +79,27 @@ def test_peft_lora_runner_wires_local_fixture() -> None:
     assert "import ${required_module}" in text
 
 
+def test_fine_tune_runner_wires_local_fixture() -> None:
+    runner = FINE_TUNE_DIR / "run_tiny_fine_tune.sh"
+    subprocess.run(["bash", "-n", str(runner)], check=True)
+
+    text = runner.read_text(encoding="utf-8")
+    assert "--fixture-dir" in text
+    assert "--preset" in text
+    assert "fixture_summary.json" in text
+    assert "--lane MODE" in text
+    assert 'compare_cmd+=(--lane "$lane")' in text
+    assert "--runtime-provenance" in text
+    assert "--device" in text
+    assert "integration_log_header" in text
+    assert "integration_log_step" in text
+    assert "lane_artifact_label" in text
+    assert "select_python_bin transformers" in text
+    assert 'for candidate in python "$REPO_ROOT/.venv/bin/python" python3' in text
+    assert "import ${required_module}" in text
+    assert "--edit-label fine_tune" in text
+
+
 def test_integration_example_readmes_document_run_lanes() -> None:
     expected_headings = {
         "awq": ["### cuda-host-off lane", "### cuda-container-strict lane"],
@@ -92,6 +116,7 @@ def test_integration_example_readmes_document_run_lanes() -> None:
             "### mps-host-off lane",
         ],
         "peft_lora": ["### cpu-host-off lane", "### cuda-container-strict lane"],
+        "fine_tune": ["### cpu-host-off lane", "### cuda-container-strict lane"],
         "quanto": ["### cpu-host-off lane", "### cuda-container-strict lane"],
         "torchao_int8_runtime": [
             "### cpu-host-off lane",
@@ -111,6 +136,7 @@ def test_integration_example_readmes_document_run_lanes() -> None:
         "hf_bnb",
         "hqq",
         "peft_lora",
+        "fine_tune",
         "quanto",
         "torchao_int8_runtime",
     ]:
@@ -259,6 +285,11 @@ def test_strict_evidence_claim_readmes_have_artifact_source_matrix() -> None:
             "external_edit_summary.json",
             "fixture_summary.json",
         },
+        "fine_tune": {
+            "checkpoint_refs.json",
+            "external_edit_summary.json",
+            "fixture_summary.json",
+        },
         "quanto": {
             "checkpoint_refs.json",
             "adapter_runtime_summary.json",
@@ -331,6 +362,7 @@ def test_materialized_subject_readmes_define_evidence_boundary() -> None:
         "compressed_tensors": ["`hf_ct`", "`adapter_runtime_summary.json`"],
         "gptqmodel": ["`hf_gptq`", "`external_edit_summary.json`"],
         "peft_lora": ["`hf_causal`", "`external_edit_summary.json`"],
+        "fine_tune": ["`hf_causal`", "`external_edit_summary.json`"],
     }
 
     for example, phrases in expectations.items():
@@ -692,6 +724,39 @@ def test_peft_lora_helper_writes_local_jsonl_and_preset(tmp_path: Path) -> None:
     assert f'file: "{data_path}"' in preset
     assert "preview_n: 3" in preset
     assert summary["format_version"] == "peft-lora-fixture-v1"
+
+
+def test_fine_tune_helper_writes_local_jsonl_and_preset(tmp_path: Path) -> None:
+    helper = _load_module(
+        FINE_TUNE_DIR / "materialize_tiny_fine_tune_subject.py",
+        "fine_tune_example",
+    )
+    summary = helper.write_text_fixture(
+        tmp_path,
+        model_id="/tmp/tiny-gpt2-baseline",
+        rows=6,
+        terms_per_row=5,
+        seq_len=32,
+        preview_n=3,
+        final_n=3,
+    )
+
+    data_path = Path(summary["data_path"])
+    preset_path = Path(summary["preset_path"])
+    assert data_path.exists()
+    assert preset_path.exists()
+    assert (tmp_path / "fixture_summary.json").exists()
+
+    rows = [
+        json.loads(line) for line in data_path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert len(rows) == 6
+    preset = preset_path.read_text(encoding="utf-8")
+    assert 'kind: "local_jsonl"' in preset
+    assert 'id: "/tmp/tiny-gpt2-baseline"' in preset
+    assert f'file: "{data_path}"' in preset
+    assert "preview_n: 3" in preset
+    assert summary["format_version"] == "tiny-fine-tune-fixture-v1"
 
 
 def test_peft_lora_helper_isolates_dense_lora_from_quantized_dispatch(
