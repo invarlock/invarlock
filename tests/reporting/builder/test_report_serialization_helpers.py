@@ -45,6 +45,6 @@ def test_make_report_baseline_variants() -> None:
 def test_to_json_sanitizes_non_serializable(tmp_path: Path) -> None:
     rp = _mk_report()
     # Inject a non-serializable object; sanitizer should render it as string
-    rp["meta"]["extra"] = Path("/tmp/unit").resolve()
+    rp["meta"]["extra"] = (tmp_path / "unit").resolve()
     txt = to_json(rp)
-    assert "/tmp" in txt or "unit" in txt
+    assert "unit" in txt
