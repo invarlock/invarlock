@@ -24,6 +24,16 @@ def test_refresh_pinned_requirements_generates_runtime_locks() -> None:
         '"${WORKFLOW_DIR}/runtime-image.in" \\\n'
         '    "${WORKFLOW_DIR}/runtime-image-py312-aarch64.txt"'
     ) in text
+    assert (
+        '"${EVIDENCE_PACK_DIR}/cuda-nvcc.in" \\\n'
+        '    "${EVIDENCE_PACK_DIR}/cuda-nvcc.txt" \\\n'
+        "    --no-deps"
+    ) in text
+    assert (
+        '"${EVIDENCE_PACK_DIR}/flash-attn.in" \\\n'
+        '    "${EVIDENCE_PACK_DIR}/flash-attn.txt" \\\n'
+        "    --no-deps"
+    ) in text
     assert text.count("--torch-backend cpu") == 2
     assert text.count("--torch-backend cu128") == 2
 

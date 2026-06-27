@@ -774,6 +774,44 @@ test_pack_validation_check_dependencies_flash_attn_branches_and_package_installs
     check_dependencies
 }
 
+test_pack_validation_prepare_flash_attn_build_toolchain_uses_pinned_nvcc() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    PACK_NET="1"
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+    pack_setup_output_dirs
+
+    local req_dir="${TEST_TMPDIR}/requirements/evidence-packs"
+    mkdir -p "${req_dir}"
+    : > "${req_dir}/cuda-nvcc.txt"
+    pack_evidence_pack_requirement_path() {
+        printf '%s/%s.txt\n' "${req_dir}" "$1"
+    }
+
+    python3() {
+        if [[ "${1:-}" == "-m" && "${2:-}" == "pip" && "${3:-}" == "install" ]]; then
+            printf '%s\n' "$*" > "${TEST_TMPDIR}/pip.args"
+            return 0
+        fi
+        if [[ "${1:-}" == "-" ]]; then
+            cat >/dev/null
+            printf '%s\n' "${TEST_TMPDIR}/site/nvidia/cuda_nvcc"
+            return 0
+        fi
+        return 0
+    }
+
+    PATH="/usr/bin:/bin"
+    pack_prepare_flash_attn_build_toolchain "true"
+
+    assert_match "requirements/evidence-packs/cuda-nvcc.txt" "$(cat "${TEST_TMPDIR}/pip.args")" "cuda-nvcc lock installed"
+    assert_match "--no-deps" "$(cat "${TEST_TMPDIR}/pip.args")" "cuda-nvcc install stays no-deps"
+    assert_eq "${TEST_TMPDIR}/site/nvidia/cuda_nvcc" "${CUDA_HOME}" "CUDA_HOME points at pinned cuda-nvcc"
+    assert_eq "${TEST_TMPDIR}/site/nvidia/cuda_nvcc" "${CUDA_PATH}" "CUDA_PATH points at pinned cuda-nvcc"
+    assert_match "^${TEST_TMPDIR}/site/nvidia/cuda_nvcc/bin:" "${PATH}" "pinned nvcc is prepended to PATH"
+}
+
 test_pack_validation_check_dependencies_errors_when_missing() {
     mock_reset
 

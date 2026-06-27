@@ -439,6 +439,64 @@ pack_install_pinned_requirement() {
     python3 -m pip install --require-hashes -r "${requirement_path}" "$@"
 }
 
+pack_configure_pinned_cuda_nvcc() {
+    local cuda_home
+    cuda_home="$(
+        python3 - <<'PY'
+from __future__ import annotations
+
+import site
+import sysconfig
+from pathlib import Path
+
+roots: list[Path] = []
+for raw in site.getsitepackages():
+    roots.append(Path(raw))
+purelib = sysconfig.get_paths().get("purelib")
+if purelib:
+    roots.append(Path(purelib))
+for root in roots:
+    candidates = [root / "nvidia" / "cuda_nvcc"]
+    candidates.extend(sorted((root / "nvidia").glob("cu*")))
+    for candidate in candidates:
+        if (candidate / "bin" / "nvcc").is_file():
+            print(candidate)
+            raise SystemExit(0)
+PY
+    )"
+    if [[ -z "${cuda_home}" ]]; then
+        log "WARNING: pinned cuda-nvcc installed but nvcc was not found, using existing CUDA toolkit"
+        return 1
+    fi
+    export CUDA_HOME="${cuda_home}"
+    export CUDA_PATH="${cuda_home}"
+    export PATH="${cuda_home}/bin:${PATH}"
+    log "CUDA nvcc: using pinned compiler from nvidia-cuda-nvcc package"
+}
+
+pack_prepare_flash_attn_build_toolchain() {
+    if [[ "${PACK_NET}" != "1" ]]; then
+        return 0
+    fi
+    if [[ "${1:-}" != "true" ]]; then
+        return 0
+    fi
+
+    local cuda_nvcc_requirement
+    cuda_nvcc_requirement="$(pack_evidence_pack_requirement_path "cuda-nvcc")"
+    if [[ ! -f "${cuda_nvcc_requirement}" ]]; then
+        log "WARNING: pinned cuda-nvcc requirement file missing, using existing CUDA toolkit"
+        return 0
+    fi
+
+    log "Installing CUDA nvcc for flash-attn build..."
+    if pack_install_pinned_requirement "cuda-nvcc" --no-deps >> "${LOG_FILE}" 2>&1; then
+        pack_configure_pinned_cuda_nvcc || true
+    else
+        log "WARNING: cuda-nvcc install failed, using existing CUDA toolkit"
+    fi
+}
+
 check_dependencies() {
     log_section "PHASE 0: DEPENDENCY CHECK"
 
@@ -529,8 +587,9 @@ check_dependencies() {
                     log "Flash Attention 2: Not found, attempting install..."
                     local flash_attn_requirement
                     flash_attn_requirement="$(pack_evidence_pack_requirement_path "flash-attn")"
+                    pack_prepare_flash_attn_build_toolchain "${pip_available}"
                     # Use timeout to prevent hanging on slow builds
-                    if [[ "${pip_available}" == "true" ]] && [[ -f "${flash_attn_requirement}" ]] && timeout 600 python3 -m pip install --require-hashes -r "${flash_attn_requirement}" --no-deps --no-build-isolation 2>&1 | tee -a "${LOG_FILE}"; then
+                    if [[ "${pip_available}" == "true" ]] && [[ -f "${flash_attn_requirement}" ]] && timeout 600 python3 -m pip install --require-hashes -r "${flash_attn_requirement}" --no-deps --no-build-isolation >> "${LOG_FILE}" 2>&1; then
                         # Verify it actually imported
                         if python3 -c "import flash_attn" 2>/dev/null; then
                             export FLASH_ATTENTION_AVAILABLE="true"
