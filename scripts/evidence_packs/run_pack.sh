@@ -5,6 +5,8 @@ RUN_PACK_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # shellcheck source=run_suite.sh
 source "${RUN_PACK_SCRIPT_DIR}/run_suite.sh"
+# shellcheck source=lib/config/release_review_policy.sh
+source "${RUN_PACK_SCRIPT_DIR}/lib/config/release_review_policy.sh"
 
 pack_usage() {
     cat <<'EOF'
@@ -34,7 +36,8 @@ Options:
   --repeats N          Determinism repeat count metadata (default: 0)
   --scenario-ids IDS   Comma-separated scenario IDs to include (filters scenarios.json before queue generation)
   --release-review     Hardened release-review mode: require PASS, signed pack,
-                       runtime manifests, ci profile, and strict report assurance
+                       runtime manifests, ci profile, strict evaluation assurance,
+                       and strict report assurance
   --calibrate-only     Only run calibration tasks (implies PACK_SUITE_MODE=calibrate-only)
   --errors-only        Only run error injection scenarios (still performs calibration unless presets are provided)
   --run-only           Run edits/reports only (implies resume)
@@ -202,9 +205,14 @@ pack_verify_reports() {
     local pack_dir="$1"
     local profile="${PACK_VERIFY_PROFILE:-dev}"
     local report_assurance="${PACK_REPORT_ASSURANCE:-report}"
+    local evaluate_assurance="${PACK_EVALUATE_ASSURANCE:-off}"
+    local release_review="${PACK_RELEASE_REVIEW:-0}"
     PACK_VERIFY_PROFILE_USED="${profile}"
     PACK_REPORT_ASSURANCE_USED="${report_assurance}"
+    PACK_EVALUATE_ASSURANCE_USED="${evaluate_assurance}"
+    PACK_RELEASE_REVIEW_USED="${release_review}"
     export PACK_VERIFY_PROFILE_USED PACK_REPORT_ASSURANCE_USED
+    export PACK_EVALUATE_ASSURANCE_USED PACK_RELEASE_REVIEW_USED
 
     local results_dir="${pack_dir}/results"
     mkdir -p "${results_dir}"
@@ -259,6 +267,39 @@ pack_write_edit_artifact_summary() {
         --pack-dir "${pack_dir}" \
         --scenarios "${scenarios_path}" \
         --out "${summary_path}"
+}
+
+pack_require_json_object_metadata() {
+    local path="$1"
+    local label="$2"
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/verify_pack_checks.py" \
+        json-object \
+        "${path}" \
+        --label "${label}"
+}
+
+pack_require_scenarios_manifest_metadata() {
+    local path="$1"
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/verify_pack_checks.py" \
+        scenarios-manifest \
+        "${path}"
+}
+
+pack_copy_release_review_metadata() {
+    local run_dir="$1"
+    local revisions_dest="$2"
+    local scenarios_dest="$3"
+
+    if [[ "${PACK_RELEASE_REVIEW:-0}" == "1" ]]; then
+        pack_copy_file "${run_dir}/state/model_revisions.json" "${revisions_dest}" || return $?
+        pack_copy_file "${run_dir}/state/scenarios.json" "${scenarios_dest}" || return $?
+        pack_require_json_object_metadata "${revisions_dest}" "model_revisions.json" || return $?
+        pack_require_scenarios_manifest_metadata "${scenarios_dest}" || return $?
+        return 0
+    fi
+
+    pack_copy_optional "${run_dir}/state/model_revisions.json" "${revisions_dest}"
+    pack_copy_optional "${run_dir}/state/scenarios.json" "${scenarios_dest}"
 }
 
 pack_sign_manifest_helper() {
@@ -333,45 +374,29 @@ pack_require_runtime_manifests() {
     fi
 }
 
-pack_apply_release_review_defaults() {
-    PACK_REQUIRE_PASS="${PACK_REQUIRE_PASS:-1}"
-    PACK_VERIFY_PROFILE="${PACK_VERIFY_PROFILE:-ci}"
-    PACK_REPORT_ASSURANCE="${PACK_REPORT_ASSURANCE:-strict}"
-    PACK_SIGN_MANIFEST="${PACK_SIGN_MANIFEST:-1}"
-    PACK_REQUIRE_RUNTIME_MANIFESTS="${PACK_REQUIRE_RUNTIME_MANIFESTS:-1}"
-    PACK_DEFER_REPORT_RENDERING="${PACK_DEFER_REPORT_RENDERING:-1}"
-    PACK_RELEASE_REVIEW=1
-    export PACK_REQUIRE_PASS PACK_VERIFY_PROFILE PACK_REPORT_ASSURANCE
-    export PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
-    export PACK_DEFER_REPORT_RENDERING PACK_RELEASE_REVIEW
-}
-
-pack_validate_release_review_settings() {
+pack_require_release_review_queue_complete() {
+    local run_dir="$1"
     if [[ "${PACK_RELEASE_REVIEW:-0}" != "1" ]]; then
         return 0
     fi
-    if [[ "${PACK_REQUIRE_PASS:-0}" != "1" ]]; then
-        echo "ERROR: release-review mode requires PACK_REQUIRE_PASS=1." >&2
-        return 1
+
+    local queue_dir="${run_dir}/queue"
+    if [[ ! -d "${queue_dir}" ]]; then
+        return 0
     fi
-    if [[ "${PACK_SIGN_MANIFEST:-1}" == "0" ]]; then
-        echo "ERROR: release-review mode requires PACK_SIGN_MANIFEST=1." >&2
-        return 1
-    fi
-    if [[ "${PACK_REQUIRE_RUNTIME_MANIFESTS:-0}" != "1" ]]; then
-        echo "ERROR: release-review mode requires PACK_REQUIRE_RUNTIME_MANIFESTS=1." >&2
-        return 1
-    fi
-    if [[ -z "${PACK_VERIFY_PROFILE:-}" ]]; then
-        echo "ERROR: release-review mode requires explicit PACK_VERIFY_PROFILE." >&2
-        return 1
-    fi
-    if [[ "${PACK_VERIFY_PROFILE}" == "dev" ]]; then
-        echo "ERROR: release-review mode rejects PACK_VERIFY_PROFILE=dev." >&2
-        return 1
-    fi
-    if [[ "${PACK_REPORT_ASSURANCE:-}" != "strict" ]]; then
-        echo "ERROR: release-review mode requires PACK_REPORT_ASSURANCE=strict." >&2
+
+    local pending=0
+    local ready=0
+    local running=0
+    local failed=0
+    pending=$(find "${queue_dir}/pending" -type f -name "*.task" 2>/dev/null | wc -l | tr -d ' ')
+    ready=$(find "${queue_dir}/ready" -type f -name "*.task" 2>/dev/null | wc -l | tr -d ' ')
+    running=$(find "${queue_dir}/running" -type f -name "*.task" 2>/dev/null | wc -l | tr -d ' ')
+    failed=$(find "${queue_dir}/failed" -type f -name "*.task" 2>/dev/null | wc -l | tr -d ' ')
+
+    if [[ ${pending} -gt 0 || ${ready} -gt 0 || ${running} -gt 0 || ${failed} -gt 0 ]]; then
+        echo "ERROR: release-review mode requires a terminal clean queue before packaging." >&2
+        echo "       Queue state: pending=${pending}, ready=${ready}, running=${running}, failed=${failed}." >&2
         return 1
     fi
 }
@@ -509,8 +534,10 @@ pack_populate_pack_dir() {
     pack_copy_optional "${run_dir}/reports/scenario_signal_summary.json" "${analysis_dir}/scenario_signal_summary.json"
     pack_copy_optional "${run_dir}/results/analysis/evaluation_optimization_summary.json" "${analysis_dir}/evaluation_optimization_summary.json"
 
-    pack_copy_optional "${run_dir}/state/model_revisions.json" "${revisions_dest}"
-    pack_copy_optional "${run_dir}/state/scenarios.json" "${scenarios_dest}"
+    pack_copy_release_review_metadata \
+        "${run_dir}" \
+        "${revisions_dest}" \
+        "${scenarios_dest}" || return $?
     pack_copy_optional "${run_dir}/state/tuned_edit_params.json" "${tuned_edit_params_dest}"
     pack_write_source_repo_metadata "${source_repo_dest}" || return $?
     pack_write_environment_metadata "${run_dir}" "${environment_dest}" || return $?
@@ -587,6 +614,7 @@ pack_build_pack() {
 
     pack_require_passing_run_verdict "${run_dir}" || return 1
     pack_validate_release_review_settings || return 1
+    pack_require_release_review_queue_complete "${run_dir}" || return 1
     if [[ "${PACK_REQUIRE_RUNTIME_MANIFESTS:-0}" == "1" ]]; then
         pack_require_runtime_manifests "${run_dir}" || return 1
     fi

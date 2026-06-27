@@ -11,7 +11,7 @@
             "main"
           ],
           "size_on_disk": 7715719367,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--mistralai--Ministral-3-3B-Instruct-2512-BF16/snapshots/ecc3ba8b43a45610e709327c049d24b009bfec88"
+          "snapshot_path": "<hf-cache-dir>/hub/models--mistralai--Ministral-3-3B-Instruct-2512-BF16/snapshots/ecc3ba8b43a45610e709327c049d24b009bfec88"
         }
       ],
       "slug": "mistralai_ministral_3_3b_instruct_2512_bf16",

@@ -6,7 +6,7 @@
     "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:12b8916497e9035f11fc376ac87dae0952f5fff00fea2c727dd5d33ab2d9a1f8",
+  "expected_fingerprint": "sha256:62b02a19bf6472a894cc3a29b8e9a7071ed494b6fe3687425c79110dc871928d",
   "generated_by": "model evidence remote sweep",
   "model_revision": "3a5c85baefbb1896a54d56fe2e76c0395627ddf4",
   "non_goals": [
@@ -17,6 +17,6 @@
   "summary": "Release-strict verifier fixture for the OLMo 2 13B published-basis lane.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/olmo2_13b/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/olmo2_13b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:12b8916497e9035f11fc376ac87dae0952f5fff00fea2c727dd5d33ab2d9a1f8"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/olmo2_13b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:62b02a19bf6472a894cc3a29b8e9a7071ed494b6fe3687425c79110dc871928d"
   ]
 }

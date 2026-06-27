@@ -16,8 +16,8 @@
   "manifest_version": 1,
   "report": {
     "filename": "evaluation.report.json",
-    "path": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json",
-    "sha256": "b34873741b4a8ad264fbefbc42aa4302be53b3c4ad887f0f9f890ff99b2d37ce"
+    "path": "<validation-output-root>/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json",
+    "sha256": "187743c8e58390cb28540d7a3f4d6d058bfab3dda61ce7fd5e58d643b1897e9f"
   },
   "runtime": {
     "allow_network": false,

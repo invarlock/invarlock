@@ -33,6 +33,45 @@ PUBLISHED_BASIS_MULTIMODAL_MIN_FINAL_EXAMPLES = 200
 PUBLISHED_BASIS_MULTIMODAL_MIN_ANSWER_SHAPE_RATE = 0.95
 PUBLISHED_BASIS_MULTIMODAL_MAX_ANSWER_WORDS = 12
 PUBLISHED_BASIS_MULTIMODAL_MAX_ANSWER_CHARS = 80
+PUBLIC_TEXT_SUFFIXES = {".json", ".jsonl", ".md", ".txt", ".yaml", ".yml"}
+
+PRIVATE_EXECUTION_PATTERNS = (
+    (
+        "root_ssh_target",
+        re.compile(r"\broot@[A-Za-z0-9._-]+\b"),
+        "replace root SSH targets with a generic CUDA validation host label",
+    ),
+    (
+        "private_ip_address",
+        re.compile(
+            r"(?<![A-Za-z0-9])"
+            r"(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}"
+            r"(?:25[0-5]|2[0-4]\d|1?\d?\d)"
+            r"(?![A-Za-z0-9])"
+        ),
+        "replace private host IP addresses with a generic host label",
+    ),
+    (
+        "absolute_root_path",
+        re.compile(r"(?<![A-Za-z0-9._-])/root(?:/[^\s\"'`,)}\]]*)?"),
+        "replace absolute root paths with generic validation-root placeholders",
+    ),
+    (
+        "private_tmp_path",
+        re.compile(r"(?<![A-Za-z0-9._-])/private/tmp(?:/[^\s\"'`,)}\]]*)?"),
+        "replace private temporary paths with generic local-run placeholders",
+    ),
+    (
+        "macos_var_folder_path",
+        re.compile(r"(?<![A-Za-z0-9._-])/var/folders(?:/[^\s\"'`,)}\]]*)?"),
+        "replace macOS temporary paths with generic local-temp placeholders",
+    ),
+    (
+        "home_directory_path",
+        re.compile(r"(?<![A-Za-z0-9._-])/home/[A-Za-z0-9._-]+(?:/[^\s\"'`,)}\]]*)?"),
+        "replace home-directory paths with generic validation-root placeholders",
+    ),
+)
 
 
 def _load_json(path: Path) -> tuple[dict[str, Any] | None, str | None]:
@@ -79,6 +118,21 @@ def _relative(path: Path, root: Path = REPO_ROOT) -> str:
         return path.relative_to(root).as_posix()
     except ValueError:
         return str(path)
+
+
+def _check_public_evidence_privacy(errors: list[str], root: Path) -> None:
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.suffix not in PUBLIC_TEXT_SUFFIXES:
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError) as exc:
+            errors.append(f"{_relative(path)}: unable to scan public text: {exc}")
+            continue
+        for line_number, line in enumerate(lines, start=1):
+            for name, pattern, message in PRIVATE_EXECUTION_PATTERNS:
+                if pattern.search(line):
+                    errors.append(f"{_relative(path)}:{line_number}: {name}: {message}")
 
 
 def _require_path(
@@ -364,6 +418,7 @@ def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
         errors.append(f"{_relative(root)}: README.md is required")
     if not root.is_dir():
         return [f"public evidence root not found: {root}"]
+    _check_public_evidence_privacy(errors, root)
 
     for artifact_dir in sorted(_artifact_dirs(root)):
         meta_path = artifact_dir / META_FILENAME

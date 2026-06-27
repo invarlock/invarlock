@@ -145,7 +145,11 @@ def _is_peft_gptqmodel_awq_dispatch_error(exc: BaseException) -> bool:
 
 def _disable_quantized_peft_dispatch_for_dense_example() -> bool:
     patched = False
-    for module_name in ("peft.import_utils", "peft.tuners.lora.awq"):
+    for module_name in (
+        "peft.import_utils",
+        "peft.tuners.lora.awq",
+        "peft.tuners.lora.gptq",
+    ):
         module = sys.modules.get(module_name)
         if module is None:
             try:

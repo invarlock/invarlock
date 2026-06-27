@@ -28,7 +28,11 @@ python -m pip install "invarlock[awq]"
 From a source checkout with `uv`:
 
 ```bash
-uv run --extra awq python -c "import gptqmodel"
+uv run --extra awq python - <<'PY'
+from invarlock.plugins import _patch_gptqmodel_transformers_hub_compat
+_patch_gptqmodel_transformers_hub_compat()
+import gptqmodel
+PY
 ```
 
 ## Run

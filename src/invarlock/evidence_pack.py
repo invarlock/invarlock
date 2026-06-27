@@ -669,6 +669,7 @@ def verify_evidence_pack(
     errors.extend(_verify_manifest_binds_checksums(pack_dir))
     checksum_errors, covered_paths = _verify_checksums(pack_dir)
     errors.extend(checksum_errors)
+    errors.extend(evidence_pack_integrity_mod.verify_control_file_mirrors(pack_dir))
     errors.extend(verify_manifest_provenance(pack_dir))
     errors.extend(_verify_edit_metadata_consistency(pack_dir))
     extra_errors, extra_warnings = _verify_no_extra_files(

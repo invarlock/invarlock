@@ -47,6 +47,7 @@ def test_awq_runner_has_expected_adapter_contract() -> None:
     assert "AWQ lanes in this example are CUDA-only" in text
     assert '[[ "$effective_device" != cuda* ]]' in text
     assert '[[ "$quantize_device" != cuda* ]]' in text
+    assert "_patch_gptqmodel_transformers_hub_compat" in text
 
 
 def test_awq_runner_rejects_cpu_lane_before_materialization(tmp_path: Path) -> None:
@@ -111,6 +112,9 @@ def test_awq_helper_defaults_are_awq_compatible() -> None:
 
 def test_awq_helper_writes_local_jsonl_and_preset(tmp_path: Path) -> None:
     helper = _load_helper_module()
+    helper_text = HELPER.read_text(encoding="utf-8")
+    assert "_patch_gptqmodel_transformers_hub_compat" in helper_text
+
     summary = helper.write_text_fixture(
         tmp_path,
         rows=6,

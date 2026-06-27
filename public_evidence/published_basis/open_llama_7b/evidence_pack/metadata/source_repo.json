@@ -18,5 +18,5 @@
     "src/invarlock/model_profile.py": "sha256:618a1e5d14e9f654e46e7ddb8d9341d204dc6a616b472560ab9ab0eb81c4538a"
   },
   "worktree_branch": "work/promote-gemma-deepseek",
-  "worktree_sync_note": "Remote /root/invarlock-public-promote was used explicitly at source_ref 30f26d5608210fe6b96eaad590a16ad4f0310802 with --skip-sync."
+  "worktree_sync_note": "Remote <validation-repo>-promote was used explicitly at source_ref 30f26d5608210fe6b96eaad590a16ad4f0310802 with --skip-sync."
 }

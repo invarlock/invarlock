@@ -57,6 +57,7 @@ def test_manifest_writer_runs_with_warnings_as_errors(tmp_path: Path) -> None:
     assert manifest.get("subject", {}).get("path") == "results/final_verdict.json"
     assert manifest.get("artifacts") == ["results/final_verdict.json"]
     assert manifest.get("checksums_sha256_digest")
+    assert "run_dir" not in manifest
     assert isinstance(manifest.get("materials"), list)
     assert "config_source" in (manifest.get("invocation") or {})
 
@@ -124,7 +125,7 @@ def test_write_source_repo_metadata_uses_explicit_snapshot_marker_without_git(
     assert payload["branch"] == "staging/next"
     assert payload["describe"] == "staging-next-test"
     assert payload["dirty"] is False
-    assert payload["metadata_source"] == str(marker_path)
+    assert payload["metadata_source"] == marker_path.name
 
 
 def test_manifest_writer_uses_existing_source_repo_metadata_without_git(

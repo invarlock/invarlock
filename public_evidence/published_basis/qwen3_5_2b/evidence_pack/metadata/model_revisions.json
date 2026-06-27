@@ -3,7 +3,7 @@
   "generated_at": "2026-06-14T03:00:47.652301+00:00",
   "models": [
     {
-      "cache_dir": "/root/invarlock-public-promote/tmp/model_evidence_hf_home/hub",
+      "cache_dir": "<validation-repo>-promote/tmp/model_evidence_hf_home/hub",
       "model_id": "Qwen/Qwen3.5-2B",
       "revisions": [
         {
@@ -12,7 +12,7 @@
             "main"
           ],
           "size_on_disk": 4571198095,
-          "snapshot_path": "/root/invarlock-public-promote/tmp/model_evidence_hf_home/hub/models--Qwen--Qwen3.5-2B/snapshots/15852e8c16360a2fea060d615a32b45270f8a8fc"
+          "snapshot_path": "<validation-repo>-promote/tmp/model_evidence_hf_home/hub/models--Qwen--Qwen3.5-2B/snapshots/15852e8c16360a2fea060d615a32b45270f8a8fc"
         }
       ],
       "slug": "qwen_qwen3_5_2b",

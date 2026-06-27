@@ -51,11 +51,11 @@
       "model_id": "mistralai/Ministral-3-3B-Instruct-2512-BF16",
       "ok": true,
       "preset": "configs/presets/causal_lm/ministral3_3b_512.yaml",
-      "report_path": "/root/model-evidence/20260612Tministral3bReleaseA/shard-00-gpu-0/eval/mistralai_ministral_3_3b_instruct_2512_bf16/report/evaluation.report.json",
+      "report_path": "<model-evidence-root>/20260612Tministral3bReleaseA/shard-00-gpu-0/eval/mistralai_ministral_3_3b_instruct_2512_bf16/report/evaluation.report.json",
       "slug": "mistralai_ministral_3_3b_instruct_2512_bf16",
       "status": "ok",
       "verify_exit": 0,
-      "verify_path": "/root/model-evidence/20260612Tministral3bReleaseA/shard-00-gpu-0/eval/mistralai_ministral_3_3b_instruct_2512_bf16/verify.json"
+      "verify_path": "<model-evidence-root>/20260612Tministral3bReleaseA/shard-00-gpu-0/eval/mistralai_ministral_3_3b_instruct_2512_bf16/verify.json"
     }
   ],
   "ok": true,

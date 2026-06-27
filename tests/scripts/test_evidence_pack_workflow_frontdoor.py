@@ -100,6 +100,149 @@ def test_evidence_pack_workflow_frontdoor_executes_via_shared_runner(
     assert (tmp_path / "workflow" / "artifact_manifest.json").is_file()
 
 
+def test_evidence_pack_workflow_frontdoor_emits_failure_diagnostics(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    mod = _load_workflow_frontdoor()
+    from evidence_workflows import WorkflowLaneResult
+
+    output_root = tmp_path / "workflow"
+    (output_root / "logs").mkdir(parents=True)
+    (output_root / "status.log").write_text("start\nfailed\n", encoding="utf-8")
+    (output_root / "logs" / "lane-a.log").write_text(
+        "\n".join(f"line {idx}" for idx in range(90)),
+        encoding="utf-8",
+    )
+
+    class FakeWorkflow:
+        def __init__(self) -> None:
+            self.output_root = output_root
+            self.execution_root = tmp_path
+            self.metadata = mod.WorkflowRunMetadata(
+                suite="subset",
+                execution_mode="test",
+            )
+
+        def to_plan(self):
+            return object()
+
+    failed_result = WorkflowLaneResult(
+        slug="lane-a",
+        lane_id="lane-a",
+        model_id="org/model",
+        preset="preset.yaml",
+        evaluate_exit=2,
+        verify_exit=None,
+        report_path="report.json",
+        verify_path=None,
+        status="failed",
+        detail="verify failed",
+    )
+
+    monkeypatch.setattr(
+        mod,
+        "build_evidence_pack_workflow",
+        lambda request: FakeWorkflow(),
+    )
+    monkeypatch.setattr(
+        mod,
+        "execute_workflow_sweep",
+        lambda request: [failed_result],
+    )
+    monkeypatch.setattr(mod, "write_summary_files", lambda *args, **kwargs: None)
+    monkeypatch.setattr(mod, "write_artifact_manifest", lambda *args, **kwargs: None)
+
+    rc = mod.run_evidence_pack_workflow(
+        mod.EvidencePackWorkflowRequest(
+            frontdoor="run-pack",
+            args=("--suite", "subset"),
+            output_root=output_root,
+        )
+    )
+
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert f"Evidence-pack workflow failed; output_root={output_root}" in captured.err
+    assert "Status log:" in captured.err
+    assert "failed" in captured.err
+    assert "Failed lane lane-a: status=failed detail=verify failed" in captured.err
+    assert "evaluate_exit=2 verify_exit=NA" in captured.err
+    assert "line 89" in captured.err
+    assert "line 0" not in captured.err
+
+
+def test_evidence_pack_workflow_frontdoor_diagnostic_edge_cases(
+    tmp_path: Path, capsys
+) -> None:
+    mod = _load_workflow_frontdoor()
+    from evidence_workflows import WorkflowLaneResult
+
+    assert mod._tail_text(tmp_path / "missing.log") == ""
+
+    ok_result = WorkflowLaneResult(
+        slug="lane-ok",
+        lane_id="lane-ok",
+        model_id="org/model",
+        preset="preset.yaml",
+        evaluate_exit=0,
+        verify_exit=0,
+        report_path="report.json",
+        verify_path="verify.json",
+        status="ok",
+    )
+    mod._emit_failure_diagnostics(output_root=tmp_path, results=[ok_result])
+    assert capsys.readouterr().err == ""
+
+    failed_result = WorkflowLaneResult(
+        slug="lane-missing-log",
+        lane_id="lane-missing-log",
+        model_id="org/model",
+        preset="preset.yaml",
+        evaluate_exit=4,
+        verify_exit=5,
+        report_path="report.json",
+        verify_path="verify.json",
+        status="failed",
+    )
+
+    no_status_root = tmp_path / "no-status"
+    no_status_root.mkdir()
+    mod._emit_failure_diagnostics(
+        output_root=no_status_root,
+        results=[failed_result],
+    )
+    no_status_err = capsys.readouterr().err
+    assert "Status log:" not in no_status_err
+    assert "Log tail:" not in no_status_err
+    assert "detail=-" in no_status_err
+    assert "verify_exit=5" in no_status_err
+
+    empty_status_root = tmp_path / "empty-status"
+    empty_status_root.mkdir()
+    (empty_status_root / "status.log").write_text("", encoding="utf-8")
+    mod._emit_failure_diagnostics(
+        output_root=empty_status_root,
+        results=[failed_result],
+    )
+    empty_status_err = capsys.readouterr().err
+    assert "Status log:" in empty_status_err
+    assert "Log tail:" not in empty_status_err
+
+    empty_log_root = tmp_path / "empty-log"
+    (empty_log_root / "logs").mkdir(parents=True)
+    (empty_log_root / "logs" / "lane-missing-log.log").write_text(
+        "",
+        encoding="utf-8",
+    )
+    mod._emit_failure_diagnostics(
+        output_root=empty_log_root,
+        results=[failed_result],
+    )
+    empty_log_err = capsys.readouterr().err
+    assert "Log tail:" in empty_log_err
+    assert "verify_exit=5" in empty_log_err
+
+
 def test_evidence_pack_workflow_frontdoor_parse_errors_and_defaults(
     tmp_path: Path, monkeypatch
 ) -> None:

@@ -16,6 +16,7 @@ _COERCE_ERRORS = (TypeError, ValueError, OverflowError)
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _REPO_SRC = _REPO_ROOT / "src"
 _COMMIT_RE = re.compile(r"^[0-9a-fA-F]{40}$")
+_LOCAL_SNAPSHOT_URI = "urn:invarlock:local-snapshot"
 
 
 class SourceRepoMetadataError(RuntimeError):
@@ -116,7 +117,7 @@ def _snapshot_marker_payload(repo_dir: Path) -> dict[str, Any] | None:
         if not _COMMIT_RE.match(commit):
             continue
 
-        uri = values.get("source_uri") or values.get("uri") or repo_dir.as_uri()
+        uri = values.get("source_uri") or values.get("uri") or _LOCAL_SNAPSHOT_URI
         branch = (
             values.get("source_branch") or values.get("branch") or "detached-snapshot"
         )
@@ -133,7 +134,7 @@ def _snapshot_marker_payload(repo_dir: Path) -> dict[str, Any] | None:
             "branch": branch,
             "describe": describe,
             "dirty": dirty,
-            "metadata_source": str(marker_path),
+            "metadata_source": marker_path.name,
         }
 
     return None
@@ -168,7 +169,7 @@ def build_source_repo_payload(repo_dir: Path | None = None) -> dict[str, Any]:
         raise
 
     return {
-        "uri": f"git+{remote_url}" if remote_url else resolved_repo_dir.as_uri(),
+        "uri": f"git+{remote_url}" if remote_url else _LOCAL_SNAPSHOT_URI,
         "commit": commit,
         "branch": branch,
         "describe": describe,

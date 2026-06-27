@@ -4066,11 +4066,11 @@
       "model_id": "google/gemma-4-E4B-it",
       "ok": true,
       "preset": "configs/presets/multimodal/gemma4_e4b_public_vqav2_256.yaml",
-      "report_path": "/root/model-evidence/20260614Tgemma4_e4b_e2b_vqav2/shard-00-gpu-0/eval/google_gemma_4_e4b_it/report/evaluation.report.json",
+      "report_path": "<model-evidence-root>/20260614Tgemma4_e4b_e2b_vqav2/shard-00-gpu-0/eval/google_gemma_4_e4b_it/report/evaluation.report.json",
       "slug": "google_gemma_4_e4b_it",
       "status": "ok",
       "verify_exit": 0,
-      "verify_path": "/root/model-evidence/20260614Tgemma4_e4b_e2b_vqav2/shard-00-gpu-0/eval/google_gemma_4_e4b_it/verify.json"
+      "verify_path": "<model-evidence-root>/20260614Tgemma4_e4b_e2b_vqav2/shard-00-gpu-0/eval/google_gemma_4_e4b_it/verify.json"
     }
   ],
   "ok": true,

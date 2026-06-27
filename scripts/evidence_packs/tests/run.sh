@@ -59,6 +59,7 @@ coverage_owner_hint() {
     case "${rel}" in
         scripts/evidence_packs/lib/config/config_generator.sh) echo "scripts/evidence_packs/tests/test_config_generator.sh" ;;
         scripts/evidence_packs/lib/config/dataset_provider_config.sh) echo "scripts/evidence_packs/tests/test_dataset_provider_config.sh" ;;
+        scripts/evidence_packs/lib/config/release_review_policy.sh) echo "scripts/evidence_packs/tests/test_run_pack.sh" ;;
         scripts/evidence_packs/lib/tasks/task_serialization.sh) echo "scripts/evidence_packs/tests/test_task_serialization.sh" ;;
         scripts/evidence_packs/lib/queue/queue_manager.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;
         scripts/evidence_packs/lib/queue/queue_core.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;

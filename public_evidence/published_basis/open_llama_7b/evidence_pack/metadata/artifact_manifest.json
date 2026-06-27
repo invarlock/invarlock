@@ -81,11 +81,11 @@
       "model_id": "openlm-research/open_llama_7b",
       "ok": true,
       "preset": "configs/presets/causal_lm/open_llama_7b_512.yaml",
-      "report_path": "/root/model-evidence/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/eval/openlm_research_open_llama_7b/report/evaluation.report.json",
+      "report_path": "<model-evidence-root>/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/eval/openlm_research_open_llama_7b/report/evaluation.report.json",
       "slug": "openlm_research_open_llama_7b",
       "status": "ok",
       "verify_exit": 0,
-      "verify_path": "/root/model-evidence/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/eval/openlm_research_open_llama_7b/verify.json"
+      "verify_path": "<model-evidence-root>/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/eval/openlm_research_open_llama_7b/verify.json"
     },
     {
       "detail": null,
@@ -94,11 +94,11 @@
       "model_id": "tiiuae/falcon-7b",
       "ok": true,
       "preset": "configs/presets/causal_lm/falcon_7b_512.yaml",
-      "report_path": "/root/model-evidence/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/eval/tiiuae_falcon_7b/report/evaluation.report.json",
+      "report_path": "<model-evidence-root>/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/eval/tiiuae_falcon_7b/report/evaluation.report.json",
       "slug": "tiiuae_falcon_7b",
       "status": "ok",
       "verify_exit": 0,
-      "verify_path": "/root/model-evidence/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/eval/tiiuae_falcon_7b/verify.json"
+      "verify_path": "<model-evidence-root>/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/eval/tiiuae_falcon_7b/verify.json"
     },
     {
       "detail": "verify_failed",
@@ -107,11 +107,11 @@
       "model_id": "distilbert-base-uncased",
       "ok": false,
       "preset": "configs/presets/masked_lm/distilbert_base_uncased_128.yaml",
-      "report_path": "/root/model-evidence/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/eval/distilbert_base_uncased/report/evaluation.report.json",
+      "report_path": "<model-evidence-root>/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/eval/distilbert_base_uncased/report/evaluation.report.json",
       "slug": "distilbert_base_uncased",
       "status": "failed",
       "verify_exit": 1,
-      "verify_path": "/root/model-evidence/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/eval/distilbert_base_uncased/verify.json"
+      "verify_path": "<model-evidence-root>/20260613TpromotionGapReleasePromoteA/shard-00-gpu-0/eval/distilbert_base_uncased/verify.json"
     }
   ],
   "ok": false,

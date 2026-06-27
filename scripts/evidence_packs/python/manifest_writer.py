@@ -370,7 +370,6 @@ def write_manifest(
         "determinism": determinism,
         "repeats": repeats,
         "determinism_repeats": determinism_repeats,
-        "run_dir": str(run_dir),
         "invarlock_version": _maybe_get_invarlock_version(),
         "model_list": model_list,
         "models": models,
