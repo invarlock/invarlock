@@ -186,8 +186,7 @@ def test_peft_lora_helper_disables_imported_gptqmodel_checks(
         calls["count"] += 1
         if calls["count"] == 1:
             raise ImportError(
-                "gptqmodel requires optimum version `1.24.0` or higher "
-                "to be installed."
+                "gptqmodel requires optimum version `1.24.0` or higher to be installed."
             )
         for module_name in module_names:
             if sys.modules[module_name].is_gptqmodel_available():
