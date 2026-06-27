@@ -318,13 +318,13 @@
     },
     {
       "path": "guard_value_summary.json",
-      "sha256": "07387fd99f972cea598f12dc773218ba5c7d425a3b94d14b8e23a8292534498c",
+      "sha256": "e5c0b963ff6031206d372162b40a7cfd675f719026c35cbe30a15909e3f63a60",
       "size_bytes": 14623
     },
     {
       "path": "run_command.txt",
-      "sha256": "ef56e60f47fd62c80420de15063b278269c023f4869efc5fa9d0dddf23aa760f",
-      "size_bytes": 1753
+      "sha256": "4575184c08644c0f029433dce09e61eb1b6579c7ee03cf667e1449d62653d93c",
+      "size_bytes": 1761
     }
   ],
   "schema": "invarlock.public_evidence.guard_value_manifest.v2",
@@ -332,11 +332,11 @@
     "host": "self-hosted CUDA runner",
     "model_id": "mistralai/Mistral-7B-v0.1",
     "model_revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",
-    "remote_output_root": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d",
+    "remote_output_root": "<validation-output-root>/mistral_guard_value_real_20260612d",
     "remote_output_roots": [
-      "/root/evidence-pack-runs/mistral_guard_value_real_20260612d",
-      "/root/evidence-pack-runs/mistral_guard_all_guards_20260612a",
-      "/root/evidence-pack-runs/mistral_guard_confirm_20260612a"
+      "<validation-output-root>/mistral_guard_value_real_20260612d",
+      "<validation-output-root>/mistral_guard_all_guards_20260612a",
+      "<validation-output-root>/mistral_guard_confirm_20260612a"
     ],
     "scenario_ids": [
       "rmt_norm_noise_l31_ffn_up_b030",
