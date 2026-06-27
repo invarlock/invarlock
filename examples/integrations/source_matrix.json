@@ -172,6 +172,88 @@
       "runner_enforcement": {}
     },
     {
+      "target": "fine_tune",
+      "readme": "examples/integrations/fine_tune/README.md",
+      "runner": "examples/integrations/fine_tune/run_tiny_fine_tune.sh",
+      "status_label": "runnable",
+      "strict_claim_phrase": "strict container evidence is verified",
+      "subject_form": "materialized-checkpoint",
+      "subject_adapter": "hf_causal",
+      "lane": "cuda-container-strict",
+      "command_shape": "--lane cuda",
+      "report_path": "reports/tiny-fine-tune/<artifact-lane>",
+      "runtime_image": {
+        "family": "standard-cuda",
+        "source_command": "make runtime-image-cuda",
+        "digest_source": "runtime.manifest.json"
+      },
+      "expected": {
+        "lane_artifact_label": "cuda-container-strict",
+        "verify_status": "ok",
+        "runtime_provenance_declared": "container",
+        "runtime_provenance_verified": true
+      },
+      "required_artifacts": [
+        "evaluation.report.json",
+        "verify.json",
+        "runtime.manifest.json",
+        "evaluation.html",
+        "lane_artifact.json",
+        "run_command.txt",
+        "run_summary.txt",
+        "checkpoint_refs.json",
+        "external_edit_summary.json",
+        "fixture_summary.json"
+      ],
+      "provenance_artifacts": [
+        "checkpoint_refs.json",
+        "external_edit_summary.json",
+        "fixture_summary.json"
+      ],
+      "runner_enforcement": {}
+    },
+    {
+      "target": "magnitude_prune",
+      "readme": "examples/integrations/magnitude_prune/README.md",
+      "runner": "examples/integrations/magnitude_prune/run_tiny_magnitude_prune.sh",
+      "status_label": "runnable",
+      "strict_claim_phrase": "strict container evidence is verified",
+      "subject_form": "materialized-checkpoint",
+      "subject_adapter": "hf_causal",
+      "lane": "cuda-container-strict",
+      "command_shape": "--lane cuda",
+      "report_path": "reports/tiny-magnitude-prune/<artifact-lane>",
+      "runtime_image": {
+        "family": "standard-cuda",
+        "source_command": "make runtime-image-cuda",
+        "digest_source": "runtime.manifest.json"
+      },
+      "expected": {
+        "lane_artifact_label": "cuda-container-strict",
+        "verify_status": "ok",
+        "runtime_provenance_declared": "container",
+        "runtime_provenance_verified": true
+      },
+      "required_artifacts": [
+        "evaluation.report.json",
+        "verify.json",
+        "runtime.manifest.json",
+        "evaluation.html",
+        "lane_artifact.json",
+        "run_command.txt",
+        "run_summary.txt",
+        "checkpoint_refs.json",
+        "external_edit_summary.json",
+        "fixture_summary.json"
+      ],
+      "provenance_artifacts": [
+        "checkpoint_refs.json",
+        "external_edit_summary.json",
+        "fixture_summary.json"
+      ],
+      "runner_enforcement": {}
+    },
+    {
       "target": "torchao_int8_runtime",
       "readme": "examples/integrations/torchao_int8_runtime/README.md",
       "runner": "examples/integrations/torchao_int8_runtime/run_tiny_hf_torchao_int8.sh",

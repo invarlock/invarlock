@@ -61,18 +61,6 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
                     kwargs=kwargs,
                     allow_direct_submodule=_ALLOW_DIRECT_SUBMODULE,
                 )
-                direct_strategy = (
-                    resolve_core_loader_strategy(
-                        task="causal",
-                        model_id=model_id,
-                        # Preserve the direct-submodule fallback even when the
-                        # initial auto path was attempted with trust_remote_code.
-                        kwargs={},
-                        allow_direct_submodule=True,
-                    )
-                    if strategy.strategy == "auto"
-                    else strategy
-                )
                 auto_strategy = (
                     strategy
                     if strategy.strategy == "auto"
@@ -100,10 +88,17 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
                         **kwargs,
                     )
             except ModelLoadError:
-                if (
-                    strategy.strategy == "auto"
-                    and direct_strategy.strategy == "direct_submodule"
-                ):
+                if strategy.strategy == "auto":
+                    direct_strategy = resolve_core_loader_strategy(
+                        task="causal",
+                        model_id=model_id,
+                        # Preserve the direct-submodule fallback even when the
+                        # initial auto path was attempted with trust_remote_code.
+                        kwargs={},
+                        allow_direct_submodule=True,
+                    )
+                    if direct_strategy.strategy != "direct_submodule":
+                        raise
                     self._last_loader_strategy = direct_strategy.strategy
                     self._last_loader_label = direct_strategy.loader_label
                     with wrap_errors(
@@ -119,8 +114,6 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
                             **kwargs,
                         )
                     return self._safe_to_device(model, device)
-                if strategy.strategy == "auto":
-                    raise
                 self._last_loader_strategy = auto_strategy.strategy
                 self._last_loader_label = auto_strategy.loader_label
                 with wrap_errors(
