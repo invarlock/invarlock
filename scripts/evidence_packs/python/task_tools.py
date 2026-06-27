@@ -18,6 +18,7 @@ try:
         write_model_profile,
     )
     from .task_tools_preset import (
+        _baseline_report_schedule,
         _normalize_staged_preset,
         _parse_window_candidate,
         _plan_effective_windows,
@@ -48,6 +49,7 @@ except ImportError:  # pragma: no cover - direct script execution
         write_model_profile,
     )
     from task_tools_preset import (
+        _baseline_report_schedule,
         _normalize_staged_preset,
         _parse_window_candidate,
         _plan_effective_windows,
@@ -177,6 +179,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     normalize_parser.add_argument("--final-n", type=int)
     normalize_parser.add_argument("--skip-overhead-check", action="store_true")
     normalize_parser.set_defaults(func=_normalize_staged_preset)
+
+    schedule_parser = subparsers.add_parser(
+        "baseline-report-schedule",
+        help="Print the effective seq/stride/window schedule from a baseline report.",
+    )
+    schedule_parser.add_argument("baseline_report")
+    schedule_parser.set_defaults(func=_baseline_report_schedule)
 
     error_model_parser = subparsers.add_parser(
         "create-error-model",
