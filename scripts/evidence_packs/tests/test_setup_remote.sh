@@ -71,7 +71,7 @@ test_setup_remote_verify_remote_stack_runs_package_native_smoke() {
     assert_match "--repo-root /opt/invarlock" "${cmd}" "repo root forwarded to smoke helper"
 }
 
-test_setup_remote_verify_remote_stack_checks_quant_modules_when_requested() {
+test_setup_remote_verify_remote_stack_stays_backend_neutral_for_quant_images() {
     mock_reset
 
     source ./scripts/evidence_packs/lib/core/setup_remote.sh
@@ -86,13 +86,52 @@ test_setup_remote_verify_remote_stack_checks_quant_modules_when_requested() {
 
     local cmd
     cmd="$(cat "${TEST_TMPDIR}/smoke.cmd")"
-    assert_match "--module bitsandbytes" "${cmd}" "quant smoke requires bitsandbytes"
-    assert_match "--module gptqmodel" "${cmd}" "quant smoke requires gptqmodel"
-    assert_match "--module hqq" "${cmd}" "quant smoke requires hqq"
-    assert_match "--module torchao" "${cmd}" "quant smoke requires torchao"
+    [[ "${cmd}" != *"--module bitsandbytes"* ]] || t_fail "host smoke must not require bitsandbytes"
+    [[ "${cmd}" != *"--module gptqmodel"* ]] || t_fail "host smoke must not require gptqmodel"
+    [[ "${cmd}" != *"--module hqq"* ]] || t_fail "host smoke must not require hqq"
+    [[ "${cmd}" != *"--module torchao"* ]] || t_fail "host smoke must not require torchao"
     assert_match "--repo-root /opt/invarlock" "${cmd}" "repo root forwarded to smoke helper"
 
     unset PACK_RUNTIME_IMAGE_FLAVOR
+}
+
+test_setup_remote_verify_runtime_image_stack_checks_quant_image() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
+
+    pack_activate_venv() { :; }
+    pack_run_cmd() { echo "$*" > "${TEST_TMPDIR}/runtime-smoke.cmd"; }
+
+    REPO_DIR="/opt/invarlock"
+    INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-quant"
+    PACK_RUNTIME_IMAGE_FLAVOR="quant"
+
+    verify_runtime_image_stack
+
+    local cmd
+    cmd="$(cat "${TEST_TMPDIR}/runtime-smoke.cmd")"
+    assert_match "make RUNTIME_IMAGE_CUDA_QUANT=invarlock-runtime:cuda-quant runtime-smoke-cuda-quant" "${cmd}" "quant runtime image smoke invoked"
+
+    unset INVARLOCK_RUNTIME_IMAGE PACK_RUNTIME_IMAGE_FLAVOR
+}
+
+test_setup_remote_verify_runtime_image_stack_stays_optional_without_image() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
+
+    local cmd_log="${TEST_TMPDIR}/runtime-smoke.log"
+    : > "${cmd_log}"
+
+    pack_activate_venv() { :; }
+    pack_run_cmd() { printf '%s\n' "$*" >> "${cmd_log}"; }
+
+    unset INVARLOCK_RUNTIME_IMAGE
+
+    verify_runtime_image_stack
+
+    assert_eq "" "$(cat "${cmd_log}")" "runtime image smoke skipped without image"
 }
 
 test_setup_remote_ensure_runtime_image_builds_cuda_local_when_missing() {
