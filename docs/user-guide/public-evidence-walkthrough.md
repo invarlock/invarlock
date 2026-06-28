@@ -180,14 +180,18 @@ invarlock verify --profile release --assurance strict \
 
 invarlock verify --profile release --assurance strict \
   public_evidence/byoe_examples/lora_merge_byoe/evaluation.report.json
+
+invarlock verify --profile release --assurance strict \
+  public_evidence/byoe_examples/fine_tune_byoe/evaluation.report.json
 ```
 
 Each example includes `checkpoint_refs.json` beside the report. The pruning
 fixture is a dense magnitude-pruned subject reference, and the LoRA fixture is a
-merged-adapter/fine-tune style subject reference. Both cover
+merged-adapter subject reference. The fine-tune fixture is a separate
+fine-tuned checkpoint subject reference. These fixtures cover
 validation-subject fixture semantics. Sparse runtime speedups, packed quantized
-storage, and deployable optimized backend behavior require deployable-artifact
-evidence lanes.
+storage, deployable optimized backend behavior, and training-method quality
+require separate evidence lanes.
 
 ## Caught regressions
 

@@ -29,7 +29,8 @@ High-signal workflow front doors:
 - `python scripts/smoke/run_tiny_fine_tune_byoe_smoke.py`: run the local
   CPU-only BYOE fine-tune smoke against a cached tiny GPT-2 model, then verify
   the enriched report with evaluation-realism, topology, and delta/privacy
-  metadata.
+  metadata. Generated fine-tune validation-subject coverage lives in the
+  evidence-pack harness.
 - `make model-evidence-list`: print the maintained shipped-model evidence lane
   manifest.
 - `make model-evidence-sweep MODEL_EVIDENCE_ARGS='--dry-run'`: inspect the

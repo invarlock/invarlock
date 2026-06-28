@@ -367,7 +367,9 @@ Edit-stack neutral means the stable production boundary is BYOE: an external
 quantization tool, pruner, adapter merge, or fine-tuning pipeline produces the
 subject checkpoint, and InvarLock validates the resulting
 baseline-vs-subject evidence.
-Built-in edit generation is limited to demo/smoke support.
+The evaluator CLI keeps built-in editing to portable demo/smoke support. The
+repo evidence-pack harness has deterministic generated validation-subject lanes
+for quantization, pruning, LoRA merge, and fine-tune coverage.
 
 ## Module Dependencies
 

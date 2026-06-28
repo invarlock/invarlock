@@ -143,6 +143,9 @@ invarlock verify --profile release --assurance strict \
   public_evidence/byoe_examples/lora_merge_byoe/evaluation.report.json
 
 invarlock verify --profile release --assurance strict \
+  public_evidence/byoe_examples/fine_tune_byoe/evaluation.report.json
+
+invarlock verify --profile release --assurance strict \
   public_evidence/real_runs/tiny_gpt2_quant_rtn/evaluation.report.json
 
 invarlock verify --profile release --assurance strict \
