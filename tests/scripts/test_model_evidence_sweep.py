@@ -504,8 +504,28 @@ def test_model_evidence_sweep_returns_failure_when_verify_fails(
     assert result["slug"] == "gemma4_e2b_public"
     assert result["evaluate_exit"] == 0
     assert result["verify_exit"] == 1
+    assert result["detail"] == "policy_fail"
     assert result["ok"] is False
     assert (output_root / "eval" / "gemma4_e2b_public" / "verify.json").is_file()
+
+
+def test_model_evidence_sweep_verify_failure_detail_is_sanitized(
+    tmp_path: Path,
+) -> None:
+    mod = load_script_module("model_evidence_sweep")
+    verify_path = tmp_path / "verify.json"
+
+    verify_path.write_text(
+        json.dumps({"summary": {"reason": "policy-fail"}}),
+        encoding="utf-8",
+    )
+    assert mod._verify_failure_detail(verify_path) == "policy_fail"
+
+    verify_path.write_text(
+        json.dumps({"summary": {"reason": "../policy fail"}}),
+        encoding="utf-8",
+    )
+    assert mod._verify_failure_detail(verify_path) is None
 
 
 def test_model_evidence_sweep_host_mode_rejects_ci_profile(tmp_path: Path) -> None:

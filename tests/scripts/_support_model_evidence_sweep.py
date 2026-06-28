@@ -62,7 +62,7 @@ if [[ "${1:-}" == "-m" && "${2:-}" == "invarlock" && "${3:-}" == "evaluate" ]]; 
 fi
 
 if [[ "${1:-}" == "-m" && "${2:-}" == "invarlock" && "${3:-}" == "verify" ]]; then
-  printf '{"status":"fail"}\\n'
+  printf '{"summary":{"ok":false,"reason":"policy_fail"},"results":[{"reason":"policy_fail"}]}\\n'
   exit 1
 fi
 
