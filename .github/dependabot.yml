@@ -20,6 +20,8 @@ updates:
       time: "09:00"
       timezone: "America/Toronto"
     open-pull-requests-limit: 5
+    reviewers:
+      - "invarlock/invarlock-maintainers"
     labels:
       - "dependencies"
       - "python"
@@ -56,6 +58,8 @@ updates:
       time: "09:00"
       timezone: "America/Toronto"
     open-pull-requests-limit: 5
+    reviewers:
+      - "invarlock/invarlock-maintainers"
     labels:
       - "dependencies"
       - "github-actions"
@@ -76,6 +80,8 @@ updates:
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 3
+    reviewers:
+      - "invarlock/invarlock-maintainers"
     labels:
       - "dependencies"
       - "npm"
