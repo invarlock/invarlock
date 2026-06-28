@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import random
 import shutil
 from datetime import UTC, datetime
@@ -268,6 +269,42 @@ def _delta_summary(before: dict[str, Any], model: Any) -> dict[str, Any]:
     }
 
 
+def _require_finite_training_artifacts(
+    *,
+    loss_value: float,
+    delta: dict[str, Any],
+) -> None:
+    if not math.isfinite(loss_value):
+        raise SystemExit(
+            "fine-tune materialization produced a non-finite training loss"
+        )
+
+    by_tensor = delta.get("by_tensor")
+    non_finite_tensors = []
+    if isinstance(by_tensor, dict):
+        for name, value in by_tensor.items():
+            try:
+                tensor_delta = float(value)
+            except (TypeError, ValueError):
+                non_finite_tensors.append(str(name))
+                continue
+            if not math.isfinite(tensor_delta):
+                non_finite_tensors.append(str(name))
+
+    try:
+        max_abs_delta = float(delta.get("max_abs_delta", 0.0))
+    except (TypeError, ValueError):
+        max_abs_delta = math.nan
+
+    if not math.isfinite(max_abs_delta) or non_finite_tensors:
+        examples = ", ".join(non_finite_tensors[:5])
+        suffix = f" ({examples})" if examples else ""
+        raise SystemExit(
+            "fine-tune materialization produced non-finite tensor deltas"
+            f"{suffix}"
+        )
+
+
 def _materialize(args: argparse.Namespace) -> dict[str, Any]:
     torch, AutoModelForCausalLM, AutoTokenizer = _require_dependencies()
     _disable_torchvision_for_text_only_transformers()
@@ -282,6 +319,7 @@ def _materialize(args: argparse.Namespace) -> dict[str, Any]:
     model = AutoModelForCausalLM.from_pretrained(
         args.baseline, local_files_only=local_files_only
     )
+    model.to(dtype=torch.float32)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -319,11 +357,17 @@ def _materialize(args: argparse.Namespace) -> dict[str, Any]:
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     optimizer.zero_grad(set_to_none=True)
     loss = model(**encoded, labels=labels).loss
+    loss_value = float(loss.detach().cpu().item())
+    if not math.isfinite(loss_value):
+        raise SystemExit(
+            "fine-tune materialization produced a non-finite training loss"
+        )
     loss.backward()
     optimizer.step()
     model.eval()
 
     delta = _delta_summary(before, model)
+    _require_finite_training_artifacts(loss_value=loss_value, delta=delta)
     if int(delta["changed_tensors"]) == 0:
         raise SystemExit("fine-tune materialization did not change any tensors")
 
@@ -361,7 +405,8 @@ def _materialize(args: argparse.Namespace) -> dict[str, Any]:
         "model_id": args.baseline,
         "seed": args.seed,
         "learning_rate": args.learning_rate,
-        "loss": float(loss.detach().cpu().item()),
+        "training_dtype": "float32",
+        "loss": loss_value,
         "changed_tensors": delta["changed_tensors"],
         "checked_tensors": delta["checked_tensors"],
         "max_abs_delta": delta["max_abs_delta"],
