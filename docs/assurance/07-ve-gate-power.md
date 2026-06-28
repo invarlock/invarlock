@@ -9,7 +9,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Define when the variance guard may enable scaling and how the predictive gate is audited. |
-| **Audience** | Variance guard maintainers, calibration reviewers, and release reviewers checking VE evidence. |
+| **Audience** | Variance guard maintainers, calibration auditors, and release approvers checking VE evidence. |
 | **Contract scope** | Predictive paired delta-log-loss gates, tier sidedness, minimum effect, and enablement provenance. |
 | **Source of truth** | `src/invarlock/guards/variance*.py`, `runtime/tiers.yaml`, and variance assurance tests. |
 

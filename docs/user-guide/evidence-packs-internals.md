@@ -425,7 +425,7 @@ Small/medium models default to batch edit creation:
   peak memory.
 - **Deferred optional report rendering**: `PACK_DEFER_REPORT_RENDERING=1`
   keeps `evaluation.report.json`, `runtime.manifest.json`, and JSON evidence
-  sidecars in the hot path while skipping markdown/reviewer bundle rendering.
+  sidecars in the hot path while skipping markdown/evidence bundle rendering.
   Pack verification does not require those optional rendered files. Release
   review mode enables this default so evaluation workers spend less time on
   report-heavy filesystem writes; pack-level HTML export still runs unless
@@ -433,7 +433,7 @@ Small/medium models default to batch edit creation:
 - **Evaluation-loop telemetry**: each `evaluate_timing.json` records top-level
   evaluate timings plus nested baseline/subject run timings when reports expose
   them. The pack-level `evaluation_optimization_summary.json` aggregates those
-  timings so reviewers can separate process startup savings from model load,
+  timings so evidence readers can separate process startup savings from model load,
   dataset preparation, guard/eval, and report-generation costs.
 
 Large or MoE models can still disable batch edit tasks automatically (or via
@@ -749,7 +749,7 @@ Common knobs for the setup script:
 | `PACK_REPEATS` | `0` | Determinism repeat metadata |
 | `PACK_MODEL_REVISIONS_FILE` | `OUTPUT_DIR/state/model_revisions.json` | Revisions path |
 | `PACK_USE_BATCH_EDITS` | `auto` | Force/disable batch edit creation |
-| `PACK_DEFER_REPORT_RENDERING` | `0` (`1` under `--release-review`) | Skip optional markdown/reviewer bundle rendering during evaluation |
+| `PACK_DEFER_REPORT_RENDERING` | `0` (`1` under `--release-review`) | Skip optional markdown/evidence bundle rendering during evaluation |
 | `PACK_RUNTIME_IMAGE_FLAVOR` | `default` | Remote setup runtime image flavor; use `quant` on CUDA hosts for optional quant adapter container evidence, including `hf_bnb`, `hf_awq`, `hf_gptq`, `hf_torchao`, `hf_hqq`, `hf_quanto`, and `hf_ct` |
 | `RESUME_MODE` | `true` | Skip completed steps when outputs exist |
 

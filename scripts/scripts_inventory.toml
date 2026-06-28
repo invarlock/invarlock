@@ -97,7 +97,7 @@ paths = [
   "scripts/smoke/lib/smoke_common.sh",
   "scripts/smoke/run_cpu_telemetry.sh",
   "scripts/smoke/run_gpt2_user_journey_smoke.sh",
-  "scripts/smoke/run_reviewer_training_campaign.py",
+  "scripts/smoke/run_training_evidence_campaign.py",
   "scripts/smoke/run_tiny_fine_tune_byoe_smoke.py",
   "scripts/smoke/run_tiny_all_matrix.sh",
   "scripts/smoke/run_tiny_container_smoke.sh",

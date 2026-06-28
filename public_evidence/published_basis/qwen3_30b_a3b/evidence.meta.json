@@ -8,7 +8,7 @@
   },
   "dataset_revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:293cc1dd7c8f1579963eb4867ba89ed55c213fb5e6c1fbf59583cac31f14b09e",
+  "expected_fingerprint": "sha256:a0c88109136bbe4776907a0b72f410b7fdc11f16f891cb68dc3310bfd099e388",
   "generated_by": "direct H100 all-8 strict model evidence run",
   "model_revision": "0d7cf23991f47feeb3a57ecb4c9cee8ea4a17bfe",
   "non_goals": [
@@ -20,6 +20,6 @@
   "summary": "Release-strict verifier fixture for the Qwen3 30B-A3B MoE published-basis lane on public WikiText-103.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/qwen3_30b_a3b/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/qwen3_30b_a3b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:293cc1dd7c8f1579963eb4867ba89ed55c213fb5e6c1fbf59583cac31f14b09e"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/qwen3_30b_a3b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:a0c88109136bbe4776907a0b72f410b7fdc11f16f891cb68dc3310bfd099e388"
   ]
 }

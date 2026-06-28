@@ -7,7 +7,7 @@
     "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:a4ac98eeb185676f841bac95dfde6121f82dd8cd5c5d4de6ed573f34bb6926c8",
+  "expected_fingerprint": "sha256:a35996dd58539211feab43450dfdd176b80d0a538b6d8ac13bddd6920d870b36",
   "generated_by": "model evidence remote sweep",
   "model_revision": "fee6332c1abaafb77f6f9624236c63aa2f1d0187",
   "non_goals": [
@@ -19,6 +19,6 @@
   "summary": "Release-strict verifier fixture for the Gemma 4 E4B image-text published-basis lane. Final accuracy 0.500 over 400 examples; ratio_vs_baseline 1.010; no guard warnings.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/gemma4_e4b/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/gemma4_e4b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:a4ac98eeb185676f841bac95dfde6121f82dd8cd5c5d4de6ed573f34bb6926c8"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/gemma4_e4b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:a35996dd58539211feab43450dfdd176b80d0a538b6d8ac13bddd6920d870b36"
   ]
 }

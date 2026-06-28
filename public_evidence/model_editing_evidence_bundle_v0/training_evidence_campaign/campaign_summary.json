@@ -1,6 +1,6 @@
 {
-  "campaign_id": "reviewer-training-gpu-20260628",
-  "claim_boundary": "reviewer-facing empirical evidence only; no new assurance claim",
+  "campaign_id": "training-evidence-gpu-20260628",
+  "claim_boundary": "empirical training evidence only; no new assurance claim",
   "lanes": [
     {
       "artifacts": {
@@ -155,8 +155,8 @@
       "weights_vendored": false
     }
   ],
-  "public_artifact_policy": "publish scrubbed summaries, report manifests, checkpoint references, evaluation reports, verification JSON, and hash inventories only",
-  "schema": "invarlock.reviewer_training_campaign.summary.v1",
+  "public_artifact_policy": "publish public summaries, report manifests, checkpoint references, evaluation reports, verification JSON, and hash inventories only",
+  "schema": "invarlock.training_evidence_campaign.summary.v1",
   "status": "completed",
   "weights_vendored": false
 }

@@ -113,9 +113,9 @@
       "target": "peft_lora"
     }
   ],
-  "campaign_id": "reviewer-training-gpu-20260628",
-  "claim_boundary": "reviewer-facing empirical evidence only; no new assurance claim",
-  "schema": "invarlock.reviewer_training_campaign.hash_inventory.v1",
+  "campaign_id": "training-evidence-gpu-20260628",
+  "claim_boundary": "empirical training evidence only; no new assurance claim",
+  "schema": "invarlock.training_evidence_campaign.hash_inventory.v1",
   "status": "completed",
   "weights_vendored": false
 }

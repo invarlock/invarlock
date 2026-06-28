@@ -5,7 +5,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Understand and interpret InvarLock v1 reports. |
-| **Audience** | Reviewers validating evaluation evidence. |
+| **Audience** | Evidence readers validating evaluation evidence. |
 | **Key sections** | Decision, Primary Metric, Policy Gates, Guard Signals, Evidence And Provenance, Technical Appendix. |
 | **Validation** | Use `invarlock verify <evaluation.report.json>` to check schema, pairing, and required runtime provenance via `runtime.manifest.json`. |
 | **Source of truth** | [reports](../reference/reports.md) for full schema. |
@@ -71,7 +71,7 @@ comes from `evaluation.report.json` and should be re-checked with
   - `resolved_policy.spectral.measurement_contract` /
     `resolved_policy.rmt.measurement_contract` pin the estimator + sampling
     procedure used by guards.
-  - `rmt.mode` makes the active RMT measurement path reviewer-visible; public
+  - `rmt.mode` makes the active RMT measurement path visible to evidence readers; public
     reports emit `activation_edge_risk`.
   - `spectral.measurement_contract_hash` / `rmt.measurement_contract_hash` are
     compact digests for audit and baseline pairing.

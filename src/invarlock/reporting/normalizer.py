@@ -283,7 +283,7 @@ def normalize_run_report(report: Mapping[str, Any] | RunReport) -> RunReport:
         out["provenance"] = dict(prov)
 
     # keep optional evaluation-realism metadata when present. This is descriptive
-    # reviewer context, not verifier semantics.
+    # reader context, not verifier semantics.
     realism = src.get("evaluation_realism")
     if isinstance(realism, Mapping):
         out["evaluation_realism"] = dict(realism)

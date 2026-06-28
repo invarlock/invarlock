@@ -20,7 +20,7 @@ checkpoint and alongside broader benchmark, monitoring, and registry systems.
   configured bounds.
 - A strict verification workflow needs a fail-closed `evaluate -> verify` contract with
   pairing, guard evidence, and runtime provenance.
-- Reviewers expect a self-contained report bundle they can re-verify offline.
+- Evidence readers expect a self-contained report bundle they can re-verify offline.
 
 ## When To Reach For Something Else
 
@@ -56,7 +56,7 @@ checkpoint and alongside broader benchmark, monitoring, and registry systems.
 ## Related Documentation
 
 - [Trust Model](../assurance/14-trust-model.md) — Strict pass scope
-- [Strict Assurance Checklist](../assurance/15-strict-assurance-checklist.md) — Reviewer acceptance criteria
+- [Strict Assurance Checklist](../assurance/15-strict-assurance-checklist.md) — Evidence acceptance criteria
 - [Reports Reference](reports.md) — Schema, telemetry, and HTML export
 - [Guards Reference](guards.md) — Configuration and evidence
 - [Model Family Catalog](model-family-catalog.md) — Authoritative support inventory

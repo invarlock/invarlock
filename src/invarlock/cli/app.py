@@ -279,7 +279,7 @@ def _evaluate_lazy(
         False,
         "--defer-report-rendering",
         help=(
-            "Write JSON evidence sidecars only; skip markdown/reviewer bundle "
+            "Write JSON evidence sidecars only; skip markdown/evidence bundle "
             "rendering in the hot path."
         ),
     ),

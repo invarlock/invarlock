@@ -91,7 +91,7 @@ def test_report_explain_help_mentions_evaluation_bundle(monkeypatch):
     out = strip_ansi(res.stdout)
     normalized = " ".join(out.split())
     assert "--evaluation-report" in out
-    assert "Preferred reviewer" in out
+    assert "Preferred evidence" in out
     assert "explains the evaluation bundle" in normalized
     assert "directly without requiring linked raw run" in normalized
 

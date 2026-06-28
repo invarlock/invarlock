@@ -138,7 +138,7 @@ def test_save_report_bundle_can_defer_optional_rendering(tmp_path: Path, monkeyp
     assert "report_md" not in out
     assert not (tmp_path / "evaluation_report.md").exists()
     assert not (tmp_path / "manifest.json").exists()
-    assert not (tmp_path / "reviewer_summary.txt").exists()
+    assert not (tmp_path / "evidence_summary.txt").exists()
     assert not (tmp_path / "guards_evidence.json").exists()
 
 

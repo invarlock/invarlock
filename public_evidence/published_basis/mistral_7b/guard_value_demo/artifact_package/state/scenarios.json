@@ -4,7 +4,7 @@
     "notes": [
       "Scenario IDs must match the directory names under <model>/reports/ in evidence pack runs.",
       "Strictness drives verdict gating: must_* scenarios are gating; informational scenarios never fail the pack.",
-      "intent + primary_guard provide scenario utility metadata for maintainers and external evidence reviewers.",
+      "intent + primary_guard provide scenario utility metadata for maintainers and external evidence assessors.",
       "Error scenarios may include generation.env to pin deterministic, scenario-specific injector settings.",
       "Optional sidecar probe artifacts (for example rmt_probe.json) can provide detector evidence when compare-mode guards are delta-internal.",
       "Scenarios can declare suites: [\"subset\", \"showcase\", \"workshop3\", \"full\", ...]; the suite filters to PACK_SUITE and writes the effective manifest to OUTPUT_DIR/state/scenarios.json.",

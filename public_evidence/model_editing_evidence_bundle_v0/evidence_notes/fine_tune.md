@@ -3,7 +3,7 @@
 This lane uses the public fine-tune BYOE fixture as a fine-tuned checkpoint
 evidence example.
 
-Reviewer takeaways:
+Evidence takeaways:
 
 - Artifact mode: public BYOE subject fixture.
 - Verification surface: release/strict report verification plus optional

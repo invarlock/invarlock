@@ -6,7 +6,7 @@
     "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:694b388d49bc5de1861a239b027340b426995d45175c524e632795824ad97dd1",
+  "expected_fingerprint": "sha256:608228c83500234596758480954b404331fea9850f19902ca841c9328df4dc3c",
   "generated_by": "model evidence remote sweep",
   "model_revision": "453ed1575b739b5b03ce3758b23befdb0967f40e",
   "non_goals": [
@@ -17,6 +17,6 @@
   "summary": "Release-strict verifier fixture for the Qwen2 7B published-basis lane.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/qwen2_7b/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/qwen2_7b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:694b388d49bc5de1861a239b027340b426995d45175c524e632795824ad97dd1"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/qwen2_7b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:608228c83500234596758480954b404331fea9850f19902ca841c9328df4dc3c"
   ]
 }

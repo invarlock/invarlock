@@ -116,7 +116,7 @@ pack_copy_report_sidecars() {
     pack_copy_optional "${report_dir}/manifest.json" "${dest_dir}/manifest.json"
     pack_copy_optional "${report_dir}/runtime.manifest.json" "${dest_dir}/runtime.manifest.json"
     pack_copy_optional "${report_dir}/evaluation_report.md" "${dest_dir}/evaluation_report.md"
-    pack_copy_optional "${report_dir}/reviewer_summary.txt" "${dest_dir}/reviewer_summary.txt"
+    pack_copy_optional "${report_dir}/evidence_summary.txt" "${dest_dir}/evidence_summary.txt"
     pack_copy_optional "${report_dir}/edit_metadata.json" "${dest_dir}/edit_metadata.json"
     pack_copy_optional "${report_dir}/deployable_artifact_validation.json" "${dest_dir}/deployable_artifact_validation.json"
     pack_copy_optional "${report_dir}/backend_inventory.json" "${dest_dir}/backend_inventory.json"

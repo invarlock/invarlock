@@ -2,14 +2,14 @@
 
 > **Plain language:** This handbook explains what each guard checks, the
 > thresholds we enforce, and how those decisions appear in the report so
-> reviewers can trace every PASS or FAIL.
+> evidence readers can trace every PASS or FAIL.
 
 ## Overview
 
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Consolidate guard contracts, statistical assumptions, thresholds, and report evidence fields. |
-| **Audience** | Guard maintainers, release reviewers, and contributors changing guard policy or reporting. |
+| **Audience** | Guard maintainers, release approvers, and contributors changing guard policy or reporting. |
 | **Contract scope** | Invariants, Spectral, RMT, Variance, bootstrap sanity, calibration expectations, and report observability. |
 | **Source of truth** | Guard modules under `src/invarlock/guards/`, report guard renderers, packaged tiers, and assurance-contract tests. |
 
@@ -202,7 +202,7 @@ read primary-metric replicate floors as VE replicate counts.
   140/140 (Aggressive); profiles may request higher counts.
 
 These values are linted by `tests/eval/test_assurance_contracts.py` and surfaced
-in reports so reviewers can audit reproducibility.
+in reports so evidence readers can audit reproducibility.
 
 ## Calibration Evaluation Slice Requirements
 

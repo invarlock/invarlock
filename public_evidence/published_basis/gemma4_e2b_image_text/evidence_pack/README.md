@@ -7,10 +7,10 @@ Evidence level: high
 Review summary: clean_reports=1, error_injection_reports=0, failed_reports=0, profile=release.
 
 Why it might be wrong:
-- Nested report verification succeeded for the bundled clean reports, but reviewers should still inspect the underlying evaluation.report.json files.
+- Nested report verification succeeded for the bundled clean reports, but evidence readers should still inspect the underlying evaluation.report.json files.
 - Error-injection reports are expected-failure evidence and should not be interpreted as clean PASS runs.
 - The pack is ready for strict verification; signed manifest and checksum sealing are present.
-- Signer fingerprint: sha256:206fe5b53f0741b01809245518bf3c2a1c1f0f49e0f2e15e4a68ebd960a9f04f
+- Signer fingerprint: sha256:212bca8fdcbaed3239e9906181f9081508e1aed974ab7cb385c44aa966687126
 
 ## Verify
 

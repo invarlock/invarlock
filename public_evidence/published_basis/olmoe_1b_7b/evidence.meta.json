@@ -7,7 +7,7 @@
     "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:97e1356c23f351433986864e28869d47242ec85972b4d70a4c99a9f6fcd96305",
+  "expected_fingerprint": "sha256:fc4bcce76e2e8137cd20dcd4832544a4a8064f538c7353682328b708001ec28f",
   "generated_by": "model evidence remote sweep",
   "model_revision": "unresolved_by_huggingface_cache_scan",
   "non_goals": [
@@ -19,6 +19,6 @@
   "summary": "Release-strict verifier fixture for the OLMoE 1B-active/7B-total published-basis lane.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/olmoe_1b_7b/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/olmoe_1b_7b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:97e1356c23f351433986864e28869d47242ec85972b4d70a4c99a9f6fcd96305"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/olmoe_1b_7b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:fc4bcce76e2e8137cd20dcd4832544a4a8064f538c7353682328b708001ec28f"
   ]
 }

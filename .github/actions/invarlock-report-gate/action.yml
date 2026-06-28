@@ -1,5 +1,5 @@
 name: InvarLock report gate
-description: Verify an InvarLock evaluation report and publish reviewer artifacts.
+description: Verify an InvarLock evaluation report and publish evidence reader artifacts.
 
 inputs:
   report:

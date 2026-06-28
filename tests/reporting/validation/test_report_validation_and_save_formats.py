@@ -179,15 +179,15 @@ def test_save_evaluation_bundle_uses_manifest_summary_view_model(
     assert manifest["summary"]["overall_status"] == "PASS"
     assert manifest["summary"]["gates_passed"] == 3
     assert manifest["evidence_level"] == "medium"
-    assert "reviewer_summary_txt" in manifest["files"]
+    assert "evidence_summary_txt" in manifest["files"]
     assert manifest["summary"]["outline_facts"]
-    reviewer_summary = (tmp_path / "reviewer_summary.txt").read_text(encoding="utf-8")
-    assert "Shared report outline facts:" in reviewer_summary
+    evidence_summary = (tmp_path / "evidence_summary.txt").read_text(encoding="utf-8")
+    assert "Shared report outline facts:" in evidence_summary
     assert "manifest" in saved
-    assert "reviewer_summary" in saved
+    assert "evidence_summary" in saved
 
 
-def test_reviewer_summary_handles_outline_absence() -> None:
+def test_evidence_summary_handles_outline_absence() -> None:
     summary = report_summary_mod.ReportManifestSummary(
         run_model="m",
         device="cpu",
@@ -198,7 +198,7 @@ def test_reviewer_summary_handles_outline_absence() -> None:
         gates_total=2,
     )
 
-    text = report_bundle_mod.render_evaluation_bundle_reviewer_summary(
+    text = report_bundle_mod.render_evaluation_bundle_evidence_summary(
         summary,
         evidence_level="medium",
         has_guard_evidence=False,

@@ -8,12 +8,12 @@ from pathlib import Path
 from types import ModuleType
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = REPO_ROOT / "scripts" / "smoke" / "run_reviewer_training_campaign.py"
+SCRIPT_PATH = REPO_ROOT / "scripts" / "smoke" / "run_training_evidence_campaign.py"
 
 
 def _load_module() -> ModuleType:
     spec = importlib.util.spec_from_file_location(
-        "run_reviewer_training_campaign", SCRIPT_PATH
+        "run_training_evidence_campaign", SCRIPT_PATH
     )
     assert spec is not None
     module = importlib.util.module_from_spec(spec)
@@ -32,7 +32,7 @@ def _public_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_reviewer_training_campaign_dry_run_writes_public_safe_summary(
+def test_training_evidence_campaign_dry_run_writes_public_safe_summary(
     tmp_path: Path,
 ) -> None:
     module = _load_module()
@@ -43,7 +43,7 @@ def test_reviewer_training_campaign_dry_run_writes_public_safe_summary(
         [
             "--dry-run",
             "--campaign-id",
-            "reviewer-training-test",
+            "training-evidence-test",
             "--work-root",
             str(work_root),
             "--publish-summary",
@@ -61,7 +61,7 @@ def test_reviewer_training_campaign_dry_run_writes_public_safe_summary(
     inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
 
     assert summary["schema"] == module.SUMMARY_SCHEMA
-    assert summary["campaign_id"] == "reviewer-training-test"
+    assert summary["campaign_id"] == "training-evidence-test"
     assert summary["status"] == "planned"
     assert summary["claim_boundary"] == module.CLAIM_BOUNDARY
     assert summary["weights_vendored"] is False
@@ -88,7 +88,7 @@ def test_reviewer_training_campaign_dry_run_writes_public_safe_summary(
 
     assert inventory == {
         "schema": module.HASH_INVENTORY_SCHEMA,
-        "campaign_id": "reviewer-training-test",
+        "campaign_id": "training-evidence-test",
         "status": "planned",
         "claim_boundary": module.CLAIM_BOUNDARY,
         "weights_vendored": False,
@@ -109,7 +109,7 @@ def test_reviewer_training_campaign_dry_run_writes_public_safe_summary(
     assert "root@" not in public_text
 
 
-def test_reviewer_training_campaign_completed_lane_hashes_artifacts(
+def test_training_evidence_campaign_completed_lane_hashes_artifacts(
     tmp_path: Path,
 ) -> None:
     module = _load_module()
@@ -185,7 +185,7 @@ def test_reviewer_training_campaign_completed_lane_hashes_artifacts(
         assert "repo_relative_path" not in artifact
 
 
-def test_reviewer_training_campaign_rejects_unknown_target() -> None:
+def test_training_evidence_campaign_rejects_unknown_target() -> None:
     module = _load_module()
 
     try:

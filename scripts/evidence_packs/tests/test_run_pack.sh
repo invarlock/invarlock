@@ -223,7 +223,7 @@ test_run_pack_build_pack_collects_artifacts() {
 }
 JSON
     echo "# summary" > "${run_dir}/modelA/reports/edit/run_1/evaluation_report.md"
-    echo "reviewer summary" > "${run_dir}/modelA/reports/edit/run_1/reviewer_summary.txt"
+    echo "evidence summary" > "${run_dir}/modelA/reports/edit/run_1/evidence_summary.txt"
     mkdir -p "${run_dir}/modelA/reports/edit/run_1/runtime_inputs"
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/runtime_inputs/baseline_report.json"
     echo "preset: true" > "${run_dir}/modelA/reports/edit/run_1/runtime_inputs/preset.yaml"
@@ -290,7 +290,7 @@ EOF
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/runtime.manifest.json" "runtime manifest copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/edit_metadata.json" "edit metadata copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/evaluation_report.md" "markdown summary copied"
-    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/reviewer_summary.txt" "reviewer summary copied"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/evidence_summary.txt" "evidence summary copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/runtime_inputs/baseline_report.json" "runtime inputs copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/runtime_inputs/preset.yaml" "runtime preset copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/rmt_probe.json" "probe sidecar copied"

@@ -7,7 +7,7 @@
     "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "real_model_run",
-  "expected_fingerprint": "sha256:9af5a5e66c9b099fa309529ad47787435e5d62674c881a10b3222e5ff713e3d7",
+  "expected_fingerprint": "sha256:d024b1c077bd340f2943d23ccdb5c269135aa83f8186768a248904a1f0296861",
   "generated_by": "invarlock evaluate",
   "model_family": "gpt2",
   "non_goals": [
@@ -20,6 +20,6 @@
   "summary": "Container-backed real run for sshleifer/tiny-gpt2 with the built-in quant_rtn RTN dequantized weight-edit simulation.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/real_runs/tiny_gpt2_quant_rtn/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/real_runs/tiny_gpt2_quant_rtn/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:9af5a5e66c9b099fa309529ad47787435e5d62674c881a10b3222e5ff713e3d7"
+    "uv run invarlock advanced evidence-pack verify public_evidence/real_runs/tiny_gpt2_quant_rtn/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:d024b1c077bd340f2943d23ccdb5c269135aa83f8186768a248904a1f0296861"
   ]
 }

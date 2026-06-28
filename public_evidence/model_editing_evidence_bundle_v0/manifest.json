@@ -8,7 +8,7 @@
       "edit_family": "quantization",
       "evaluation_report": "public_evidence/real_runs/tiny_gpt2_quant_rtn/evaluation.report.json",
       "external_edit_type": "quant_rtn",
-      "reviewer_note": "public_evidence/model_editing_evidence_bundle_v0/reviewer_notes/quantization.md",
+      "evidence_note": "public_evidence/model_editing_evidence_bundle_v0/evidence_notes/quantization.md",
       "runtime_manifest": "public_evidence/real_runs/tiny_gpt2_quant_rtn/runtime.manifest.json"
     },
     {
@@ -16,7 +16,7 @@
       "edit_family": "magnitude_prune",
       "evaluation_report": "public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json",
       "external_edit_type": "magnitude_prune",
-      "reviewer_note": "public_evidence/model_editing_evidence_bundle_v0/reviewer_notes/magnitude_prune.md",
+      "evidence_note": "public_evidence/model_editing_evidence_bundle_v0/evidence_notes/magnitude_prune.md",
       "runtime_manifest": "public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/runtime.manifest.json"
     },
     {
@@ -24,7 +24,7 @@
       "edit_family": "lora_merge",
       "evaluation_report": "public_evidence/byoe_examples/lora_merge_byoe/evaluation.report.json",
       "external_edit_type": "lora_merge",
-      "reviewer_note": "public_evidence/model_editing_evidence_bundle_v0/reviewer_notes/lora_merge.md",
+      "evidence_note": "public_evidence/model_editing_evidence_bundle_v0/evidence_notes/lora_merge.md",
       "runtime_manifest": "public_evidence/byoe_examples/lora_merge_byoe/runtime.manifest.json"
     },
     {
@@ -32,13 +32,13 @@
       "edit_family": "fine_tune",
       "evaluation_report": "public_evidence/byoe_examples/fine_tune_byoe/evaluation.report.json",
       "external_edit_type": "fine_tune",
-      "reviewer_note": "public_evidence/model_editing_evidence_bundle_v0/reviewer_notes/fine_tune.md",
+      "evidence_note": "public_evidence/model_editing_evidence_bundle_v0/evidence_notes/fine_tune.md",
       "runtime_manifest": "public_evidence/byoe_examples/fine_tune_byoe/runtime.manifest.json"
     }
   ],
-  "reviewer_training_campaign_hash_inventory": "public_evidence/model_editing_evidence_bundle_v0/reviewer_training_campaign/hash_inventory.json",
-  "reviewer_training_campaign_summary": "public_evidence/model_editing_evidence_bundle_v0/reviewer_training_campaign/campaign_summary.json",
-  "reviewer_training_matrix_plan": "public_evidence/model_editing_evidence_bundle_v0/reviewer_training_matrix_plan.md",
+  "training_evidence_campaign_hash_inventory": "public_evidence/model_editing_evidence_bundle_v0/training_evidence_campaign/hash_inventory.json",
+  "training_evidence_campaign_summary": "public_evidence/model_editing_evidence_bundle_v0/training_evidence_campaign/campaign_summary.json",
+  "training_evidence_matrix_plan": "public_evidence/model_editing_evidence_bundle_v0/training_evidence_matrix_plan.md",
   "schema": "invarlock.public_evidence.model_editing_bundle.v0",
   "verification_summary": "public_evidence/model_editing_evidence_bundle_v0/verification_summary.json"
 }

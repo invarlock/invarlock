@@ -9,7 +9,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Track the lightweight guard-validation evidence surface for spectral, RMT, and variance guards. |
-| **Audience** | Maintainers, release reviewers, and calibration owners. |
+| **Audience** | Maintainers, release approvers, and calibration owners. |
 | **Contract scope** | Deterministic synthetic smoke only; empirical model-family calibration remains a release-evidence requirement. |
 | **Source of truth** | `scripts/smoke/guard_validation_smoke.py`, generated `artifacts/guard-validation/*`, and guard-specific assurance docs. |
 
@@ -44,7 +44,7 @@ families:
 - model-family placeholder rows
 - synthetic shifted-power rates
 
-Release reviewers should treat the smoke as a floor. Empirical artifacts for
+Release approvers should treat the smoke as a floor. Empirical artifacts for
 real model families still belong in the release evidence bundle when a release
 claims new or expanded guard calibration.
 

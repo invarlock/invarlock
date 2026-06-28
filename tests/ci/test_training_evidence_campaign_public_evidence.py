@@ -7,22 +7,22 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 BUNDLE_DIR = REPO_ROOT / "public_evidence" / "model_editing_evidence_bundle_v0"
 
 
-def test_reviewer_training_campaign_summary_is_public_safe() -> None:
+def test_training_evidence_campaign_summary_is_public_safe() -> None:
     manifest = json.loads((BUNDLE_DIR / "manifest.json").read_text(encoding="utf-8"))
-    summary_path = REPO_ROOT / manifest["reviewer_training_campaign_summary"]
-    inventory_path = REPO_ROOT / manifest["reviewer_training_campaign_hash_inventory"]
+    summary_path = REPO_ROOT / manifest["training_evidence_campaign_summary"]
+    inventory_path = REPO_ROOT / manifest["training_evidence_campaign_hash_inventory"]
 
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
 
-    assert summary["schema"] == "invarlock.reviewer_training_campaign.summary.v1"
+    assert summary["schema"] == "invarlock.training_evidence_campaign.summary.v1"
     assert summary["status"] == "completed"
     assert summary["claim_boundary"] == (
-        "reviewer-facing empirical evidence only; no new assurance claim"
+        "empirical training evidence only; no new assurance claim"
     )
     assert summary["weights_vendored"] is False
     assert (
-        inventory["schema"] == "invarlock.reviewer_training_campaign.hash_inventory.v1"
+        inventory["schema"] == "invarlock.training_evidence_campaign.hash_inventory.v1"
     )
     assert inventory["status"] == "completed"
     assert inventory["weights_vendored"] is False

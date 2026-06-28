@@ -103,7 +103,7 @@ Colab (CPU-friendly):
 The public front door is `evaluate -> verify -> report html`. The README keeps
 the three common onboarding paths separate:
 
-- **Wheel user / reviewer**: install `invarlock`, inspect an existing
+- **Wheel user / evidence reader**: install `invarlock`, inspect an existing
   `evaluation.report.json`, and render HTML without cloning the repository.
 - **Evaluator**: install `invarlock[hf]` when you want `evaluate` to load
   Hugging Face models and emit a fresh evaluation bundle.
@@ -161,10 +161,10 @@ Artifact model:
 | `report.json` | Baseline/subject run directories under `runs/...` | `invarlock report generate`, `invarlock report explain --subject-report ... --baseline-report ...` |
 
 `invarlock verify` expects `evaluation.report.json`; if you only have a raw
-run directory containing `report.json`, first build the reviewer bundle with
+run directory containing `report.json`, first build the evaluation bundle with
 `invarlock report generate --run <subject report.json> --baseline-run-report <baseline report.json> --format report -o <output-dir>`.
 `invarlock advanced runtime-verify` is narrower: it checks runtime manifest
-binding/provenance; report/gate verification remains the reviewer-facing gate.
+binding/provenance; report/gate verification remains the evidence gate.
 
 Example output (abridged; counts vary by profile/config):
 

@@ -99,7 +99,7 @@ security or alignment.
   `invarlock verify`) to detect misconfiguration, schema drift, and runtime
   provenance mismatches.
 - report fields for seeds, windowing, dataset/tokenizer hashes, and guard
-  telemetry so reviewers can audit the assurance evidence.
+  telemetry so evidence readers can audit the assurance evidence.
 
 ## Attack Scenarios
 
@@ -141,7 +141,7 @@ in report. Manual review of `report.guards[]` evidence.
 ### 4. Configuration Drift Attack
 
 **Threat:** Attacker modifies config to weaken guards (larger ε, disabled
-checks) hoping reviewers don't notice.
+checks) hoping auditors do not notice.
 
 **Mitigation:** reports capture `resolved_policy.*` and `policy_digest`
 for audit. `invarlock verify` enforces schema compliance.

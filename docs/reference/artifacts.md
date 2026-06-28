@@ -47,7 +47,7 @@ quick-start path above stays wheel-compatible by using direct flags only.
 | --- | --- | --- |
 | `invarlock evaluate` | `runs/`, `reports/<name>/evaluation.report.json`, `runtime.manifest.json` | Evaluation report bundle plus runtime provenance for container-backed runs. |
 | `invarlock report html` | `reports/<name>/evaluation.html` | Optional (can be rebuilt). |
-| `invarlock report export` | Optional output path for `mlflow-tags.json`, `model-card-invarlock.md`, or `release-review.md` | Optional reviewer/registry convenience output (can be rebuilt). |
+| `invarlock report export` | Optional output path for `mlflow-tags.json`, `model-card-invarlock.md`, or `release-review.md` | Optional release/registry convenience output (can be rebuilt). |
 
 ## Reference
 
@@ -78,7 +78,7 @@ reports/
 ### Archive checklist
 
 - Keep `evaluation.report.json` with `runtime.manifest.json`.
-- Retain HTML exports only when you need reviewer-friendly artifacts.
+- Retain HTML exports only when you need evidence-reader-friendly artifacts.
 - Retain scratch `runs/` only if debugging or rebuilding derived artifacts.
 - Prune timestamped `runs/` once evidence is archived.
 
@@ -90,7 +90,7 @@ reports/
 | `evaluation.html` | Human review | No |
 | `mlflow-tags.json` | Registry tag handoff | No |
 | `model-card-invarlock.md` | Model-card evidence block | No |
-| `release-review.md` | Reviewer packet | No |
+| `release-review.md` | Release packet | No |
 | `invarlock-verify.json` | Stored CI verify output | No |
 
 ### Seeds, hashes, and policy digests

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Run the reviewer-facing real training evidence campaign.
+"""Run the real training evidence campaign.
 
 This maintainer smoke wraps the existing PEFT LoRA and full fine-tune
 integration examples. Generated checkpoints and raw runner outputs remain local
-by default; the script writes scrubbed summaries and hash inventories that can
-be reviewed before any public evidence is committed.
+by default; the script writes public summaries and hash inventories that can be
+checked before any public evidence is committed.
 """
 
 from __future__ import annotations
@@ -20,9 +20,9 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SUMMARY_SCHEMA = "invarlock.reviewer_training_campaign.summary.v1"
-HASH_INVENTORY_SCHEMA = "invarlock.reviewer_training_campaign.hash_inventory.v1"
-CLAIM_BOUNDARY = "reviewer-facing empirical evidence only; no new assurance claim"
+SUMMARY_SCHEMA = "invarlock.training_evidence_campaign.summary.v1"
+HASH_INVENTORY_SCHEMA = "invarlock.training_evidence_campaign.hash_inventory.v1"
+CLAIM_BOUNDARY = "empirical training evidence only; no new assurance claim"
 DEFAULT_TARGETS = ("peft_lora", "fine_tune")
 PUBLISHABLE_ARTIFACTS = {
     "evaluation_report": "evaluation.report.json",
@@ -215,7 +215,7 @@ def _command_for_target(
     return command
 
 
-def _scrubbed_command_shape(args: argparse.Namespace) -> dict[str, Any]:
+def _public_command_shape(args: argparse.Namespace) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "execution_lane": args.execution_lane,
         "profile": args.profile,
@@ -249,7 +249,7 @@ def _planned_lane_payload(
         "toolchain": config.toolchain,
         "weights_vendored": False,
         "publishable_artifact_names": sorted(PUBLISHABLE_ARTIFACTS.values()),
-        "command_shape": _scrubbed_command_shape(args),
+        "command_shape": _public_command_shape(args),
         "campaign_relative_report_dir": _campaign_relative(
             paths["report_dir"], work_root
         ),
@@ -300,7 +300,7 @@ def _completed_lane_payload(
         "subject_checkpoint_policy": (
             "materialized for validation; do not commit checkpoint weights by default"
         ),
-        "command_shape": _scrubbed_command_shape(args),
+        "command_shape": _public_command_shape(args),
         "lane_artifact_label": lane_artifact.get("lane_artifact_label"),
         "verification": {
             "assurance": run_summary.get("assurance"),
@@ -333,7 +333,7 @@ def _build_summary(
         "claim_boundary": CLAIM_BOUNDARY,
         "weights_vendored": False,
         "public_artifact_policy": (
-            "publish scrubbed summaries, report manifests, checkpoint references, "
+            "publish public summaries, report manifests, checkpoint references, "
             "evaluation reports, verification JSON, and hash inventories only"
         ),
         "lanes": lanes,
@@ -392,9 +392,9 @@ def _selected_targets(values: list[str] | None) -> list[str]:
 
 
 def run_campaign(args: argparse.Namespace) -> int:
-    campaign_id = args.campaign_id or f"reviewer-training-{_timestamp()}"
+    campaign_id = args.campaign_id or f"training-evidence-{_timestamp()}"
     work_root = Path(
-        args.work_root or Path("reports") / "reviewer-training-campaign" / campaign_id
+        args.work_root or Path("reports") / "training-evidence-campaign" / campaign_id
     )
     work_root.mkdir(parents=True, exist_ok=True)
 
@@ -463,7 +463,7 @@ def run_campaign(args: argparse.Namespace) -> int:
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Run the real PEFT LoRA and full fine-tune reviewer-evidence campaign "
+            "Run the real PEFT LoRA and full fine-tune training evidence campaign "
             "using tiny public-safe integration lanes."
         )
     )
@@ -478,13 +478,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--work-root",
         help=(
-            "Campaign output root. Defaults to reports/reviewer-training-campaign/"
+            "Campaign output root. Defaults to reports/training-evidence-campaign/"
             "<campaign-id>."
         ),
     )
     parser.add_argument(
         "--campaign-id",
-        help="Stable campaign ID. Defaults to reviewer-training-<UTC timestamp>.",
+        help="Stable campaign ID. Defaults to training-evidence-<UTC timestamp>.",
     )
     parser.add_argument(
         "--execution-lane",
@@ -517,7 +517,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--publish-summary",
         help=(
-            "Optional directory for scrubbed campaign_summary.json and "
+            "Optional directory for public campaign_summary.json and "
             "hash_inventory.json. Check these files before committing them."
         ),
     )
@@ -529,7 +529,7 @@ def main(argv: list[str] | None = None) -> int:
         args = parse_args(sys.argv[1:] if argv is None else argv)
         return run_campaign(args)
     except Exception as exc:
-        print(f"[reviewer-training-campaign] FAIL: {exc}", file=sys.stderr)
+        print(f"[training-evidence-campaign] FAIL: {exc}", file=sys.stderr)
         return 1
 
 

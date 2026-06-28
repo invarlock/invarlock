@@ -3,7 +3,7 @@
 This lane uses the public LoRA-merge BYOE fixture as an adapter-merge evidence
 example.
 
-Reviewer takeaways:
+Evidence takeaways:
 
 - Artifact mode: public BYOE subject fixture.
 - Verification surface: release/strict report verification plus optional edit

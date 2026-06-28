@@ -6,7 +6,7 @@
 > (2) the **exact recipe** to recalibrate from scratch on your setup
 > (weight-based Spectral κ, activation-based RMT ε, VE min-effect, and window
 > sizing).
-> Every knob is surfaced in run reports and reports so reviewers can audit or recompute.
+> Every knob is surfaced in run reports and reports so evidence readers can audit or recompute.
 > The public evidence floor is the source-tree `published_basis` fixture set.
 > That fixture set demonstrates the public report/evidence-pack contract; it is
 > not the entire calibration corpus used to justify every numeric tier constant:
@@ -29,7 +29,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Summarize the pilot calibration basis and the recipe for recalibrating tier policy values. |
-| **Audience** | Calibration owners, release reviewers, and contributors updating tier thresholds. |
+| **Audience** | Calibration owners, release approvers, and contributors updating tier thresholds. |
 | **Contract scope** | Balanced and Conservative tier values for Spectral kappa, RMT epsilon, VE min-effect, and window sizing. |
 | **Source of truth** | `runtime/tiers.yaml`, public evidence fixtures, and the Tier Policy Catalog. |
 
@@ -57,7 +57,7 @@ policy under `resolved_policy.spectral`.
   boundary for the chosen `min_effect_lognll`), verified on pilot runs.
 - CI/Release profiles request stricter counts than the base tier floors. The
   runtime/report gates enforce perfect pairing, zero overlap, and selected
-  tier-floor minima; reviewers should compare requested profile counts to the
+  tier-floor minima; evidence readers should compare requested profile counts to the
   recorded used counts when judging a release evidence package.
 
 **Spectral calibration provenance.** Aggregated null-run stats are derived from
@@ -217,7 +217,7 @@ $$
 
 **RMT calibration provenance.** Aggregated null-run stats are derived from
 calibration reports. The current repo does not ship a dedicated RMT ε
-calibration CLI summarizer; recalibration is a manual/reviewer-audited procedure
+calibration CLI summarizer; recalibration is a manually audited procedure
 using report JSON fields such as `rmt.families.*.{edge_base,edge_cur,delta}`.
 Report quantile summaries of Δ(f) = r_cur(f)/r_base(f) − 1 and skip cases with
 missing or zero baseline.

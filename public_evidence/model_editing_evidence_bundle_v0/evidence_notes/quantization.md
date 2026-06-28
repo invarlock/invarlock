@@ -3,7 +3,7 @@
 This lane uses the existing tiny GPT-2 `quant_rtn` public run as a quantization
 evidence example.
 
-Reviewer takeaways:
+Evidence takeaways:
 
 - Artifact mode: real tiny-model run.
 - Verification surface: release/strict report verification and runtime

@@ -8,7 +8,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Define how resolved policies and override order are captured, digested, and audited in reports. |
-| **Audience** | Report verifier maintainers, release reviewers, and operators checking policy drift. |
+| **Audience** | Report verifier maintainers, release approvers, and operators checking policy drift. |
 | **Contract scope** | `resolved_policy`, `policy_provenance`, policy digests, override ordering, and auditor recomputation. |
 | **Source of truth** | `src/invarlock/reporting/policy_utils.py`, report generation code, and policy digest tests. |
 

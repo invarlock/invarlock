@@ -12,7 +12,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Document the paired token-weighted bootstrap method and its fallback behavior. |
-| **Audience** | Statistics reviewers, report-verifier maintainers, and contributors changing CI computation. |
+| **Audience** | Statistics auditors, report-verifier maintainers, and contributors changing CI computation. |
 | **Contract scope** | Paired delta-log-loss confidence intervals and ratio-CI conversion for report evidence. |
 | **Source of truth** | `src/invarlock/core/bootstrap.py`, `src/invarlock/core/runner_eval_metrics_stats.py`, and bootstrap tests. |
 

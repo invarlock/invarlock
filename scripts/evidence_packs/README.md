@@ -9,7 +9,7 @@
 | `scripts/evidence_packs/verify_pack.sh` | Verify an existing evidence pack, including nested reports and signatures. | Fast to medium; offline. |
 | `scripts/evidence_packs/run_mini_pack_gate.sh` | Local dry-run and targeted mini-pack gate used by tests. | Fast; offline by default. |
 
-Use `run_pack.sh --release-review` for reviewer-facing evidence. `run_suite.sh`
+Use `run_pack.sh --release-review` for release evidence. `run_suite.sh`
 is intentionally not a pack publisher; it executes the same scenario machinery
 but leaves packaging and strict pack verification to `run_pack.sh`.
 
