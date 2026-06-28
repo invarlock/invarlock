@@ -15,13 +15,22 @@
 # - Adaptive under-allocation logic (disabled by default via get_minimum_gpus)
 
 # Source dependencies
-export SCHEDULER_CORE_LOADED=1
+SCHEDULER_CORE_LOADED=1
+export -n SCHEDULER_CORE_LOADED 2>/dev/null || true
 SCHEDULER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_DIR="${SCHEDULER_SCRIPT_DIR}"
 # shellcheck source=../core/runtime.sh
 source "${SCHEDULER_SCRIPT_DIR}/../core/runtime.sh"
-[[ -z "${QUEUE_MANAGER_LOADED:-}" ]] && source "${SCHEDULER_SCRIPT_DIR}/queue_manager.sh" && export QUEUE_MANAGER_LOADED=1
-[[ -z "${TASK_SERIALIZATION_LOADED:-}" ]] && source "${SCHEDULER_SCRIPT_DIR}/../tasks/task_serialization.sh" && export TASK_SERIALIZATION_LOADED=1
+if ! declare -F get_task_field >/dev/null 2>&1; then
+    source "${SCHEDULER_SCRIPT_DIR}/queue_manager.sh"
+fi
+QUEUE_MANAGER_LOADED=1
+export -n QUEUE_MANAGER_LOADED 2>/dev/null || true
+if ! declare -F calculate_required_gpus >/dev/null 2>&1; then
+    source "${SCHEDULER_SCRIPT_DIR}/../tasks/task_serialization.sh"
+fi
+TASK_SERIALIZATION_LOADED=1
+export -n TASK_SERIALIZATION_LOADED 2>/dev/null || true
 
 # ============ GPU POOL MANAGEMENT ============
 # Track which GPUs are reserved for multi-GPU tasks

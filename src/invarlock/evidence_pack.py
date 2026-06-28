@@ -171,9 +171,16 @@ def _report_scenario_id(pack_dir: Path, report: Path) -> str | None:
         parts = report.relative_to(pack_dir / "reports").parts
     except ValueError:
         return None
-    if len(parts) < 4:
+    if len(parts) < 3:
         return None
+    if parts[1] == "errors" and len(parts) >= 4:
+        scenario = parts[2].strip()
+        return scenario or None
     return parts[1]
+
+
+def _is_error_injection_report(report: Path) -> bool:
+    return "errors" in report.parts and report.name == "evaluation.report.json"
 
 
 def _report_expects_verify_failure(
@@ -182,10 +189,17 @@ def _report_expects_verify_failure(
     *,
     strictness_by_id: dict[str, str],
 ) -> bool:
-    if "/errors/" in report.as_posix():
-        return True
+    is_error = _is_error_injection_report(report)
     scenario_id = _report_scenario_id(pack_dir, report)
-    return bool(scenario_id and strictness_by_id.get(scenario_id) == "must_fail")
+    if scenario_id and scenario_id in strictness_by_id:
+        strictness = strictness_by_id[scenario_id]
+        if is_error:
+            return strictness in {"must_fail", "must_detect"}
+        return strictness == "must_fail"
+
+    # Legacy packs did not always carry scenario metadata. Preserve the old
+    # hard-fault behavior for unclassified reports under errors/.
+    return is_error
 
 
 def _verify_command_succeeded(result: VerifyExecutionResult) -> bool:

@@ -101,6 +101,7 @@ tier policy, and report policy. There is no public env var that forces BCa.
 | `PACK_DEFER_REPORT_RENDERING` | unset (`1` under `run_pack.sh --release-review`) | Evidence-pack wrapper toggle that skips optional markdown/reviewer rendering during evaluation. |
 | `PACK_DEFER_OPTIONAL_REPORT_RENDERING` | unset | Alias for `PACK_DEFER_REPORT_RENDERING`. |
 | `PACK_EVALUATE_ASSURANCE` | `off` (`strict` under `run_pack.sh --release-review`) | Evidence-pack wrapper toggle forwarded to `invarlock evaluate` for generated reports. |
+| `PACK_FLASH_ATTN_ALLOW_SOURCE_BUILD` | `0` | Evidence-pack dependency toggle. Set to `1` only when intentionally allowing a local Flash Attention source build; default FA2 install attempts use wheels only and fall back to eager attention if unavailable. |
 | `PACK_REPORT_ASSURANCE` | `report` (`strict` under `run_pack.sh --release-review`) | Evidence-pack wrapper toggle forwarded to nested `invarlock verify` during pack verification. |
 | `PACK_RETRY_FAILED_ON_RESUME` | unset | Evidence-pack resume toggle. Set to `1` to explicitly move failed queue tasks back to pending during `--resume`; otherwise failed tasks abort resume so they can be inspected first. |
 

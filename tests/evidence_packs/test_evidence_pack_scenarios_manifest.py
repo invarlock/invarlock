@@ -253,8 +253,8 @@ def test_mistral_guard_value_scenarios_cover_rmt_and_variance_sidecars() -> None
     ve_detectors = ve_requirements["detectors_all_of"]
     assert {
         "kind": "ve_probe",
-        "field": "signal",
-        "expected": True,
+        "field": "proposed_scales",
+        "min": 1,
     } in ve_detectors
     assert {
         "kind": "guard_signal_baseline_relative",

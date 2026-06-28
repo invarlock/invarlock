@@ -73,11 +73,17 @@ def test_evidence_pack_workflow_frontdoor_executes_via_shared_runner(
     mod = _load_workflow_frontdoor()
     from evidence_workflows import workflow_runner
 
-    calls: list[tuple[list[str], str | None]] = []
+    calls: list[tuple[list[str], str | None, str | None]] = []
 
     def fake_run(cmd, **kwargs):
         env = kwargs.get("env") or {}
-        calls.append((list(cmd), env.get("PACK_WORKFLOW_SUBPROCESS")))
+        calls.append(
+            (
+                list(cmd),
+                env.get("PACK_WORKFLOW_SUBPROCESS"),
+                env.get("PACK_USE_WORKFLOW_FRONTDOOR"),
+            )
+        )
         return subprocess.CompletedProcess(cmd, 0)
 
     monkeypatch.setattr(workflow_runner.subprocess, "run", fake_run)
@@ -94,6 +100,7 @@ def test_evidence_pack_workflow_frontdoor_executes_via_shared_runner(
     assert calls
     assert calls[0][0][:2] == ["bash", str(mod.FRONTDOOR_SCRIPTS["run-suite"])]
     assert calls[0][1] == "1"
+    assert calls[0][2] == "0"
     summary = json.loads((tmp_path / "workflow" / "summary.json").read_text())
     assert summary["ok"] is True
     assert summary["results"][0]["slug"] == "run-suite"

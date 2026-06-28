@@ -57,7 +57,8 @@ if [[ ${SCRIPT_DIR+x} ]]; then
 fi
 # shellcheck source=../tasks/model_creation.sh
 source "${_PACK_VALIDATION_LIB_ROOT}/tasks/model_creation.sh"
-export MODEL_CREATION_LOADED=1
+MODEL_CREATION_LOADED=1
+export -n MODEL_CREATION_LOADED 2>/dev/null || true
 if [[ ${_pack_prev_script_dir_was_set} -eq 1 ]]; then
     SCRIPT_DIR="${_pack_prev_script_dir_value}"
 else
@@ -184,11 +185,23 @@ if [[ -n "${PACK_OUTPUT_DIR}" && -z "${OUTPUT_DIR:-}" ]]; then
 fi
 
 # shellcheck source=validation_preflight.sh
-[[ -z "${PACK_VALIDATION_PREFLIGHT_LOADED:-}" ]] && source "${_PACK_VALIDATION_LIB_DIR}/validation_preflight.sh" && export PACK_VALIDATION_PREFLIGHT_LOADED=1
+if ! declare -F pack_apply_network_mode >/dev/null 2>&1; then
+    source "${_PACK_VALIDATION_LIB_DIR}/validation_preflight.sh"
+fi
+PACK_VALIDATION_PREFLIGHT_LOADED=1
+export -n PACK_VALIDATION_PREFLIGHT_LOADED 2>/dev/null || true
 # shellcheck source=validation_runtime.sh
-[[ -z "${PACK_VALIDATION_RUNTIME_LOADED:-}" ]] && source "${_PACK_VALIDATION_LIB_DIR}/validation_runtime.sh" && export PACK_VALIDATION_RUNTIME_LOADED=1
+if ! declare -F check_dependencies >/dev/null 2>&1; then
+    source "${_PACK_VALIDATION_LIB_DIR}/validation_runtime.sh"
+fi
+PACK_VALIDATION_RUNTIME_LOADED=1
+export -n PACK_VALIDATION_RUNTIME_LOADED 2>/dev/null || true
 # shellcheck source=validation_dynamic.sh
-[[ -z "${PACK_VALIDATION_DYNAMIC_LOADED:-}" ]] && source "${_PACK_VALIDATION_LIB_DIR}/validation_dynamic.sh" && export PACK_VALIDATION_DYNAMIC_LOADED=1
+if ! declare -F main_dynamic >/dev/null 2>&1; then
+    source "${_PACK_VALIDATION_LIB_DIR}/validation_dynamic.sh"
+fi
+PACK_VALIDATION_DYNAMIC_LOADED=1
+export -n PACK_VALIDATION_DYNAMIC_LOADED 2>/dev/null || true
 
 # ============ MAIN ============
 # Dynamic scheduling with work-stealing is the only supported mode (v2.1.0)

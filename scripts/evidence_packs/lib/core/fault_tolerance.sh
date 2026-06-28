@@ -14,10 +14,19 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=runtime.sh
 source "${SCRIPT_DIR}/runtime.sh"
-[[ -z "${QUEUE_MANAGER_LOADED:-}" ]] && source "${SCRIPT_DIR}/../queue/queue_manager.sh" && export QUEUE_MANAGER_LOADED=1
-[[ -z "${SCHEDULER_LOADED:-}" ]] && source "${SCRIPT_DIR}/../queue/scheduler.sh" && export SCHEDULER_LOADED=1
+if ! declare -F fail_task >/dev/null 2>&1; then
+    source "${SCRIPT_DIR}/../queue/queue_manager.sh"
+fi
+QUEUE_MANAGER_LOADED=1
+export -n QUEUE_MANAGER_LOADED 2>/dev/null || true
+if ! declare -F release_task_gpus >/dev/null 2>&1; then
+    source "${SCRIPT_DIR}/../queue/scheduler.sh"
+fi
+SCHEDULER_LOADED=1
+export -n SCHEDULER_LOADED 2>/dev/null || true
 
-export FAULT_TOLERANCE_LOADED=1
+FAULT_TOLERANCE_LOADED=1
+export -n FAULT_TOLERANCE_LOADED 2>/dev/null || true
 
 # ============ CONFIGURATION ============
 

@@ -16,17 +16,32 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../core/runtime.sh
 source "${SCRIPT_DIR}/../core/runtime.sh"
-[[ -z "${SCHEDULER_LOADED:-}" ]] && source "${SCRIPT_DIR}/scheduler.sh" && export SCHEDULER_LOADED=1
-[[ -z "${TASK_FUNCTIONS_LOADED:-}" ]] && source "${SCRIPT_DIR}/../tasks/task_functions.sh" && export TASK_FUNCTIONS_LOADED=1
-if [[ -z "${MODEL_CREATION_LOADED:-}" && -f "${SCRIPT_DIR}/../tasks/model_creation.sh" ]]; then
-    source "${SCRIPT_DIR}/../tasks/model_creation.sh"
-    export MODEL_CREATION_LOADED=1
+if ! declare -F find_and_claim_task >/dev/null 2>&1; then
+    source "${SCRIPT_DIR}/scheduler.sh"
 fi
-[[ -z "${TASK_SERIALIZATION_LOADED:-}" ]] && source "${SCRIPT_DIR}/../tasks/task_serialization.sh" && export TASK_SERIALIZATION_LOADED=1
+SCHEDULER_LOADED=1
+export -n SCHEDULER_LOADED 2>/dev/null || true
+if ! declare -F execute_task >/dev/null 2>&1; then
+    source "${SCRIPT_DIR}/../tasks/task_functions.sh"
+fi
+TASK_FUNCTIONS_LOADED=1
+export -n TASK_FUNCTIONS_LOADED 2>/dev/null || true
+if ! declare -F create_model_variant >/dev/null 2>&1 && [[ -f "${SCRIPT_DIR}/../tasks/model_creation.sh" ]]; then
+    source "${SCRIPT_DIR}/../tasks/model_creation.sh"
+fi
+MODEL_CREATION_LOADED=1
+export -n MODEL_CREATION_LOADED 2>/dev/null || true
+if ! declare -F get_task_field >/dev/null 2>&1; then
+    source "${SCRIPT_DIR}/../tasks/task_serialization.sh"
+fi
+TASK_SERIALIZATION_LOADED=1
+export -n TASK_SERIALIZATION_LOADED 2>/dev/null || true
 # Fault tolerance is optional - use subshell to handle source failure
-if [[ -z "${FAULT_TOLERANCE_LOADED:-}" ]]; then
+if ! declare -F should_retry_task >/dev/null 2>&1; then
     source "${SCRIPT_DIR}/../core/fault_tolerance.sh" 2>/dev/null || true
 fi
+FAULT_TOLERANCE_LOADED=1
+export -n FAULT_TOLERANCE_LOADED 2>/dev/null || true
 
 # ============ WORKER CONFIGURATION ============
 

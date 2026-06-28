@@ -969,6 +969,50 @@ EOF
     PATH="${original_path}"
 }
 
+test_verify_pack_verify_reports_accepts_informational_error_probe_that_verifies_clean() {
+    mock_reset
+
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/metadata"
+    mkdir -p "${pack_dir}/reports/modelA/quant_4bit_clean/run_1"
+    mkdir -p "${pack_dir}/reports/modelA/errors/rmt_norm_noise_probe"
+    cat > "${pack_dir}/metadata/scenarios.json" <<'JSON'
+{
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "quant_4bit_clean", "strictness": "must_pass"},
+    {"id": "rmt_norm_noise_probe", "strictness": "informational"}
+  ]
+}
+JSON
+    echo "{}" > "${pack_dir}/reports/modelA/quant_4bit_clean/run_1/evaluation.report.json"
+    echo "{}" > "${pack_dir}/reports/modelA/errors/rmt_norm_noise_probe/evaluation.report.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "$*" >> "${TEST_TMPDIR}/invarlock.calls"
+exit 0
+EOF
+    chmod +x "${bin_dir}/invarlock"
+
+    local original_path="${PATH}"
+    PATH="${bin_dir}:${PATH}"
+
+    run pack_verify_reports "${pack_dir}" ""
+    assert_rc "0" "${RUN_RC}" "informational error probe may verify clean"
+    assert_match "quant_4bit_clean/run_1/evaluation\\.report\\.json" "$(cat "${TEST_TMPDIR}/invarlock.calls")" "verifies expected-pass report"
+    assert_match "errors/rmt_norm_noise_probe/evaluation\\.report\\.json" "$(cat "${TEST_TMPDIR}/invarlock.calls")" "verifies informational probe report"
+    [[ "${RUN_ERR}" != *"Expected verify failure verified as passing"* ]] || t_fail "informational probe should not be expected to fail verification"
+
+    PATH="${original_path}"
+}
+
 test_verify_pack_verify_reports_rejects_scenario_expected_failure_that_passes() {
     mock_reset
 

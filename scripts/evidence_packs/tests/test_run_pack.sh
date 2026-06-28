@@ -793,6 +793,82 @@ EOF
     assert_match "\"failed_reports\": 0" "$(cat "${pack_dir}/results/verification_summary.json")" "failed count recorded"
 }
 
+test_run_pack_build_pack_accepts_informational_error_probe_that_verifies_clean() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}/reports" "${run_dir}/analysis" "${run_dir}/state"
+    mkdir -p "${run_dir}/modelA/reports/quant_4bit_clean/run_1"
+    mkdir -p "${run_dir}/modelA/reports/errors/rmt_norm_noise_probe"
+
+    echo "verdict" > "${run_dir}/reports/final_verdict.txt"
+    echo '{"verdict":"PASS"}' > "${run_dir}/reports/final_verdict.json"
+    echo '{"model_list": ["org/model"], "models": {"org/model": {"revision": "abc"}}}' > "${run_dir}/state/model_revisions.json"
+    cat > "${run_dir}/state/scenarios.json" <<'JSON'
+{
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "quant_4bit_clean", "strictness": "must_pass"},
+    {"id": "rmt_norm_noise_probe", "strictness": "informational"}
+  ]
+}
+JSON
+    echo "{}" > "${run_dir}/modelA/reports/quant_4bit_clean/run_1/evaluation.report.json"
+    echo "{}" > "${run_dir}/modelA/reports/errors/rmt_norm_noise_probe/evaluation.report.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+cmd="${1:-}"
+shift || true
+case "${cmd}" in
+    report)
+        sub="${1:-}"
+        if [[ "${sub}" == "html" ]]; then
+            out=""
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --output|-o)
+                        out="$2"
+                        shift 2
+                        ;;
+                    *)
+                        shift
+                        ;;
+                esac
+            done
+            mkdir -p "$(dirname "${out}")"
+            printf '<html>ok</html>\n' > "${out}"
+            exit 0
+        fi
+        ;;
+    verify)
+        echo '{"ok": true}'
+        exit 0
+        ;;
+esac
+echo '{}'
+EOF
+    chmod +x "${bin_dir}/invarlock"
+    export PATH="${bin_dir}:${PATH}"
+
+    PACK_SIGN_MANIFEST=0
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    pack_build_pack "${run_dir}" "${pack_dir}"
+
+    assert_file_exists "${pack_dir}/reports/modelA/quant_4bit_clean/run_1/verify.json" "expected-pass verify output captured"
+    assert_file_exists "${pack_dir}/reports/modelA/errors/rmt_norm_noise_probe/verify.json" "informational probe verify output captured"
+    assert_match "\"clean_reports\": 1" "$(cat "${pack_dir}/results/verification_summary.json")" "expected-pass count recorded"
+    assert_match "\"error_injection_reports\": 1" "$(cat "${pack_dir}/results/verification_summary.json")" "informational probe is not counted as clean"
+    assert_match "\"failed_reports\": 0" "$(cat "${pack_dir}/results/verification_summary.json")" "failed count recorded"
+}
+
 test_run_pack_build_pack_rejects_expected_failure_report_that_verifies_clean() {
     mock_reset
 
