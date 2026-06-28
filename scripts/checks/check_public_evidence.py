@@ -29,12 +29,14 @@ ALLOWED_CLASSES = {
     "runtime_backend_compat_sweep",
     "evidence_pack_queue_stress_resume",
     "fa2_fallback_compatibility",
+    "larger_model_smoke_findings",
 }
 REAL_CLASSES = {"real_model_run", "real_guard_value_demo", "signed_real_model_pack"}
 NON_FIXTURE_CLASSES = REAL_CLASSES | {
     "runtime_backend_compat_sweep",
     "evidence_pack_queue_stress_resume",
     "fa2_fallback_compatibility",
+    "larger_model_smoke_findings",
 }
 RUNTIME_BACKEND_COMPAT_SCHEMA = "invarlock.runtime_backend_compat.cuda128.summary.v1"
 RUNTIME_BACKEND_HASH_SCHEMA = (
@@ -46,6 +48,10 @@ QUEUE_STRESS_HASH_SCHEMA = (
 )
 FA2_FALLBACK_SUMMARY_SCHEMA = "invarlock.fa2_fallback_compatibility.summary.v1"
 FA2_FALLBACK_HASH_SCHEMA = "invarlock.fa2_fallback_compatibility.hash_inventory.v1"
+LARGER_MODEL_SMOKE_FINDINGS_SCHEMA = "invarlock.larger_model_smoke_findings.summary.v1"
+LARGER_MODEL_SMOKE_HASH_SCHEMA = (
+    "invarlock.larger_model_smoke_findings.hash_inventory.v1"
+)
 RUNTIME_BACKEND_FAMILIES = {
     "cuda-bnb": ("hf_bnb",),
     "cuda-compressed-tensors": ("hf_ct",),
@@ -858,6 +864,256 @@ def _check_fa2_fallback_compatibility(
             )
 
 
+def _check_larger_model_smoke_hash_inventory(
+    errors: list[str],
+    base: Path,
+    inventory_path: Path,
+) -> None:
+    inventory, error = _load_json(inventory_path)
+    if error:
+        errors.append(error)
+        return
+    assert inventory is not None
+    if inventory.get("schema") != LARGER_MODEL_SMOKE_HASH_SCHEMA:
+        errors.append(
+            f"{_relative(inventory_path)}: schema must be "
+            f"{LARGER_MODEL_SMOKE_HASH_SCHEMA}"
+        )
+    if inventory.get("status") != "completed":
+        errors.append(f"{_relative(inventory_path)}: status must be completed")
+    artifacts = inventory.get("artifacts")
+    if not isinstance(artifacts, list) or not artifacts:
+        errors.append(f"{_relative(inventory_path)}: artifacts must be non-empty")
+        return
+    for index, artifact in enumerate(artifacts):
+        if not isinstance(artifact, dict):
+            errors.append(
+                f"{_relative(inventory_path)}: artifacts[{index}] must be object"
+            )
+            continue
+        rel_path = artifact.get("path")
+        expected_sha = artifact.get("sha256")
+        expected_bytes = artifact.get("bytes")
+        if not isinstance(rel_path, str) or not rel_path:
+            errors.append(
+                f"{_relative(inventory_path)}: artifacts[{index}].path required"
+            )
+            continue
+        if rel_path.startswith("/") or ".." in Path(rel_path).parts:
+            errors.append(
+                f"{_relative(inventory_path)}: artifacts[{index}].path must be relative"
+            )
+            continue
+        path = base / rel_path
+        if not path.is_file():
+            errors.append(
+                f"{_relative(base)}: hash inventory file missing {rel_path!r}"
+            )
+            continue
+        content = path.read_bytes()
+        actual_sha = "sha256:" + hashlib.sha256(content).hexdigest()
+        if actual_sha != expected_sha:
+            errors.append(
+                f"{_relative(base)}: hash inventory mismatch for {rel_path!r}"
+            )
+        if len(content) != expected_bytes:
+            errors.append(
+                f"{_relative(base)}: hash inventory byte mismatch for {rel_path!r}"
+            )
+
+
+def _check_larger_model_smoke_findings(
+    errors: list[str],
+    base: Path,
+    artifact_paths: dict[str, Any],
+) -> None:
+    summary_path = _require_path(errors, base, artifact_paths, "findings_summary")
+    inventory_path = _require_path(errors, base, artifact_paths, "hash_inventory")
+    if inventory_path is not None:
+        _check_larger_model_smoke_hash_inventory(errors, base, inventory_path)
+    if summary_path is None:
+        return
+    summary, error = _load_json(summary_path)
+    if error:
+        errors.append(error)
+        return
+    assert summary is not None
+    if summary.get("schema") != LARGER_MODEL_SMOKE_FINDINGS_SCHEMA:
+        errors.append(
+            f"{_relative(summary_path)}: schema must be "
+            f"{LARGER_MODEL_SMOKE_FINDINGS_SCHEMA}"
+        )
+    if summary.get("status") != "completed":
+        errors.append(f"{_relative(summary_path)}: status must be completed")
+    if summary.get("validation_environment") != "CUDA-capable validation host":
+        errors.append(
+            f"{_relative(summary_path)}: validation_environment must be generic"
+        )
+    if summary.get("raw_logs_published") is not False:
+        errors.append(f"{_relative(summary_path)}: raw_logs_published must be false")
+    if summary.get("weights_vendored") is not False:
+        errors.append(f"{_relative(summary_path)}: weights_vendored must be false")
+    if summary.get("support_matrix_change_claimed") is not False:
+        errors.append(
+            f"{_relative(summary_path)}: support_matrix_change_claimed must be false"
+        )
+    if summary.get("suite") != "model-catalog-gpu":
+        errors.append(f"{_relative(summary_path)}: suite must be model-catalog-gpu")
+    if summary.get("execution_mode") != "container":
+        errors.append(f"{_relative(summary_path)}: execution_mode must be container")
+
+    clean_lanes = summary.get("clean_lanes")
+    failed_findings = summary.get("failed_findings")
+    duplicates = summary.get("duplicate_clean_runs")
+    counts = summary.get("counts")
+    if not isinstance(clean_lanes, list) or not clean_lanes:
+        errors.append(f"{_relative(summary_path)}: clean_lanes must be non-empty")
+        clean_lanes = []
+    if not isinstance(failed_findings, list) or not failed_findings:
+        errors.append(f"{_relative(summary_path)}: failed_findings must be non-empty")
+        failed_findings = []
+    if not isinstance(duplicates, list):
+        errors.append(f"{_relative(summary_path)}: duplicate_clean_runs must be a list")
+        duplicates = []
+    if not isinstance(counts, dict):
+        errors.append(f"{_relative(summary_path)}: counts must be object")
+        counts = {}
+
+    seen_clean: set[str] = set()
+    duplicate_extra_runs = 0
+    for index, lane in enumerate(clean_lanes):
+        if not isinstance(lane, dict):
+            errors.append(
+                f"{_relative(summary_path)}: clean_lanes[{index}] must be object"
+            )
+            continue
+        slug = lane.get("slug")
+        if not isinstance(slug, str) or not slug:
+            errors.append(
+                f"{_relative(summary_path)}: clean_lanes[{index}].slug required"
+            )
+        elif slug in seen_clean:
+            errors.append(f"{_relative(summary_path)}: duplicate clean lane {slug!r}")
+        else:
+            seen_clean.add(slug)
+        model_id = lane.get("model_id")
+        preset = lane.get("preset")
+        if not isinstance(model_id, str) or not model_id:
+            errors.append(
+                f"{_relative(summary_path)}: clean_lanes[{index}].model_id required"
+            )
+        if (
+            not isinstance(preset, str)
+            or preset.startswith("/")
+            or not (REPO_ROOT / preset).is_file()
+        ):
+            errors.append(
+                f"{_relative(summary_path)}: clean_lanes[{index}].preset invalid"
+            )
+        if lane.get("rc") != 0:
+            errors.append(f"{_relative(summary_path)}: {slug} rc must be zero")
+        if lane.get("evaluate_exit") != 0 or lane.get("verify_exit") != 0:
+            errors.append(
+                f"{_relative(summary_path)}: {slug} evaluate/verify exits must be zero"
+            )
+        if lane.get("report_materialized") is not True:
+            errors.append(f"{_relative(summary_path)}: {slug} report must materialize")
+        if lane.get("verify_materialized") is not True:
+            errors.append(f"{_relative(summary_path)}: {slug} verify must materialize")
+        if lane.get("status") != "ok":
+            errors.append(f"{_relative(summary_path)}: {slug} status must be ok")
+
+    for index, duplicate in enumerate(duplicates):
+        if not isinstance(duplicate, dict):
+            errors.append(
+                f"{_relative(summary_path)}: duplicate_clean_runs[{index}] must be object"
+            )
+            continue
+        slug = duplicate.get("slug")
+        extra = duplicate.get("additional_clean_runs")
+        if slug not in seen_clean:
+            errors.append(
+                f"{_relative(summary_path)}: duplicate_clean_runs[{index}].slug unknown"
+            )
+        if not isinstance(extra, int) or extra <= 0:
+            errors.append(
+                f"{_relative(summary_path)}: duplicate_clean_runs[{index}] "
+                "additional_clean_runs invalid"
+            )
+        else:
+            duplicate_extra_runs += extra
+
+    unique_failed: set[str] = set()
+    failed_attempts = 0
+    pre_verification_failures = 0
+    for index, finding in enumerate(failed_findings):
+        if not isinstance(finding, dict):
+            errors.append(
+                f"{_relative(summary_path)}: failed_findings[{index}] must be object"
+            )
+            continue
+        slug = finding.get("slug")
+        if not isinstance(slug, str) or not slug:
+            errors.append(
+                f"{_relative(summary_path)}: failed_findings[{index}].slug required"
+            )
+        else:
+            unique_failed.add(slug)
+        preset = finding.get("preset")
+        if (
+            not isinstance(preset, str)
+            or preset.startswith("/")
+            or not (REPO_ROOT / preset).is_file()
+        ):
+            errors.append(
+                f"{_relative(summary_path)}: failed_findings[{index}].preset invalid"
+            )
+        attempts = finding.get("attempts")
+        if not isinstance(attempts, int) or attempts <= 0:
+            errors.append(
+                f"{_relative(summary_path)}: failed_findings[{index}].attempts invalid"
+            )
+            attempts = 0
+        failed_attempts += attempts
+        if finding.get("status") != "evaluate_failed_before_report":
+            errors.append(
+                f"{_relative(summary_path)}: failed_findings[{index}].status invalid"
+            )
+        if finding.get("classification") != "pre_verification_evaluate_failure":
+            errors.append(
+                f"{_relative(summary_path)}: failed_findings[{index}].classification invalid"
+            )
+        if finding.get("evaluate_exit") != 1 or finding.get("verify_exit") is not None:
+            errors.append(
+                f"{_relative(summary_path)}: failed_findings[{index}] exit fields invalid"
+            )
+        if finding.get("report_materialized") is not False:
+            errors.append(
+                f"{_relative(summary_path)}: failed_findings[{index}] report must be false"
+            )
+        if finding.get("verify_materialized") is not False:
+            errors.append(
+                f"{_relative(summary_path)}: failed_findings[{index}] verify must be false"
+            )
+        pre_verification_failures += attempts
+
+    expected_counts = {
+        "unique_clean_lanes": len(seen_clean),
+        "unique_failed_lanes": len(unique_failed),
+        "clean_runs": len(seen_clean) + duplicate_extra_runs,
+        "failed_runs": failed_attempts,
+        "pre_verification_failures": pre_verification_failures,
+        "report_materialized_clean": len(seen_clean) + duplicate_extra_runs,
+        "verify_materialized_clean": len(seen_clean) + duplicate_extra_runs,
+    }
+    expected_counts["completed_runs"] = (
+        expected_counts["clean_runs"] + expected_counts["failed_runs"]
+    )
+    for key, expected in expected_counts.items():
+        if counts.get(key) != expected:
+            errors.append(f"{_relative(summary_path)}: counts.{key} must be {expected}")
+
+
 def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
     errors: list[str] = []
     root = root.resolve()
@@ -935,6 +1191,9 @@ def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
 
         if evidence_class == "fa2_fallback_compatibility":
             _check_fa2_fallback_compatibility(errors, artifact_dir, artifact_paths)
+
+        if evidence_class == "larger_model_smoke_findings":
+            _check_larger_model_smoke_findings(errors, artifact_dir, artifact_paths)
 
         commands = metadata.get("verifier_commands")
         if not isinstance(commands, list) or not commands:

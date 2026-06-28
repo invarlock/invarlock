@@ -1,0 +1,14 @@
+{
+  "schema": "invarlock.public_evidence.meta.v1",
+  "evidence_class": "larger_model_smoke_findings",
+  "summary": "Summary-only larger-model CUDA/container smoke findings.",
+  "generated_by": "scripts/model_evidence/model_evidence_sweep.py structured summaries",
+  "artifact_paths": {
+    "findings_summary": "findings_summary.json",
+    "hash_inventory": "hash_inventory.json"
+  },
+  "verifier_commands": [
+    "python scripts/checks/check_public_evidence.py",
+    "python -m pytest tests/ci/test_larger_model_smoke_findings_public_evidence.py"
+  ]
+}
