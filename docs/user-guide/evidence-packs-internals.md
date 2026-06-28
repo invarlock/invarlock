@@ -18,7 +18,7 @@ task graph, scheduling, and artifact generation. It complements
 | Manifest format | `evidence-pack-v1` |
 | Hardware | NVIDIA GPUs where models fit VRAM; multi-GPU recommended for `full` |
 | Models | `subset` (1 model), `showcase`/`workshop3` (3 models), or `full` (6 models); all ungated public |
-| Edits | Scenario-driven; default suites use 4 clean + 4 stress edit scenarios per model, and filtered manifests may select any subset |
+| Edits | Scenario-driven; default suites use 6 clean + 6 stress edit scenarios per model, and filtered manifests may select any subset |
 | Preset Derivation | `CALIBRATION_RUN` + `GENERATE_PRESET` create run-scoped calibrated presets |
 | Scheduling | Dynamic work-stealing, `small_first` priority strategy |
 | Multi-GPU | Profile-based; `required_gpus` grows only when memory requires it |
@@ -186,7 +186,7 @@ Notes:
 
 ## Edit Types
 
-Each model runs 8 validation-subject edit experiments (4 types × 2 versions)
+Each model runs 12 validation-subject edit experiments (6 types x 2 versions)
 plus optional error-injection tests. `scripts/evidence_packs/scenarios.json`
 is the source of truth for each scenario's `artifact_class`.
 
@@ -200,7 +200,12 @@ quantization.
 The same distinction applies to the other current edits: FP8 round-trips tensors
 through FP8 or float16 and saves ordinary floating-point weights; magnitude
 pruning writes zeros into dense tensors; low-rank SVD writes dense approximated
-tensors instead of factorized low-rank modules.
+tensors instead of factorized low-rank modules; LoRA merge applies a
+deterministic low-rank adapter-style dense delta; and fine-tune applies a
+deterministic tiny gradient-style dense update. These validation-subject
+generators produce regression evidence from materialized subject checkpoints;
+deployable training pipelines are separate BYOE or deployable-artifact
+workflows.
 
 ### Clean edits (tuned)
 
@@ -212,8 +217,10 @@ parameters at runtime.
 | --- | --- | --- | --- |
 | RTN dequantized external-subject simulation | validation subject checkpoint | tuned (`bits`, `group_size`) from tuned params file | FFN only |
 | FP8 dequantized external-subject simulation | validation subject checkpoint | tuned (`format`) from tuned params file | FFN only |
-| Dense magnitude-pruned checkpoint | validation subject checkpoint | tuned (`prune_level`) from tuned params file | FFN only |
+| Dense magnitude-pruned checkpoint | validation subject checkpoint | tuned (`sparsity`) from tuned params file | FFN only |
 | Dense low-rank-SVD approximated checkpoint | validation subject checkpoint | tuned (`rank`) from tuned params file | FFN only |
+| Dense LoRA-merged checkpoint | validation subject checkpoint | tuned (`rank`, `alpha`) from tuned params file | Attention only |
+| Dense tiny fine-tuned checkpoint | validation subject checkpoint | tuned (`learning_rate`, `steps`) from tuned params file | FFN only |
 
 ### Stress edits
 
@@ -236,6 +243,8 @@ rerun.
 | FP8 dequantized external-subject simulation | validation subject checkpoint | `fp8_quant:e5m2:all` | All layers |
 | Dense magnitude-pruned checkpoint | validation subject checkpoint | `magnitude_prune:0.5:all` (50% sparsity) | All layers |
 | Dense low-rank-SVD approximated checkpoint | validation subject checkpoint | `lowrank_svd:32:all` (rank 32) | All layers |
+| Dense LoRA-merged checkpoint | validation subject checkpoint | `lora_merge:8:64:all` (rank 8, alpha 64) | All layers |
+| Dense tiny fine-tuned checkpoint | validation subject checkpoint | `fine_tune:0.0005:3:all` (3 steps) | All layers |
 
 ### Deployable edits
 
@@ -689,7 +698,7 @@ Maintainer evidence-pack packaging also treats source provenance as fail-closed:
 fresh GPU hosts. It clones the repo, creates a venv, installs PyTorch and
 InvarLock, and leaves the host ready to run `run_pack.sh`.
 
-Operational guidance for remote evidence-pack work:
+Operational guidance for evidence-pack validation hosts:
 
 - Prefer a fresh clone or work tree per campaign instead of reusing an older
   editable-install checkout.
@@ -704,18 +713,11 @@ Operational guidance for remote evidence-pack work:
   `INVARLOCK_CONFIG_ROOT`, `HF_HOME`, `HF_HUB_CACHE`, `HF_DATASETS_CACHE`,
   `TRANSFORMERS_CACHE`, `TMPDIR`, `TMP`.
 - If a staged preset or profile uses `!include` outside its config directory,
-  set `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1` on the remote host before the
-  evidence-pack entrypoint; the default runtime-container launcher rejects that config
-  graph before container start when the override is missing.
-- After Qwen2.5-14B campaigns run with `PACK_CLEANUP_MODELS=0`, run
-  `scripts/evidence_packs/run_qwen14_sentinels.sh` from the same fresh work tree to
-  validate saved-model direct evaluate and the public quant smoke. The sentinel
-  helper reloads retained edit subject directories, so default cleanup mode is
-  not sufficient for this follow-up check. The helper defaults to
-  `--profile dev --assurance off` and requires evaluate/verify subprocesses to
-  exit zero.
+  set `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1` on the validation host before
+  the evidence-pack entrypoint; the default runtime-container launcher rejects
+  that config graph before container start when the override is missing.
 
-Recommended remote validation checklist after security-default changes:
+Recommended validation-host checklist after security-default changes:
 
 1. Run an evidence-pack subset lane with explicit external `HF_HOME` and
    `INVARLOCK_CONFIG_ROOT` overrides.

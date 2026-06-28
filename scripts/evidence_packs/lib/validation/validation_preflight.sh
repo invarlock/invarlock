@@ -113,13 +113,15 @@ EDIT_BITS="${EDIT_BITS:-8}"
 EDIT_GROUP_SIZE="${EDIT_GROUP_SIZE:-128}"
 EDIT_SCOPE="${EDIT_SCOPE:-ffn}"
 
-# Edit Types to test (4 types × 2 versions each)
+# Edit Types to test (6 generated families × clean/stress variants)
 # Clean specs use tuned edit presets; use "clean" sentinel.
 EDIT_TYPES_CLEAN=(
     "quant_rtn:clean:ffn"        # Clean external RTN simulation artifact (calibrated bits/group_size on FFN)
     "fp8_quant:clean:ffn"        # Clean FP8 (calibrated format on FFN)
     "magnitude_prune:clean:ffn"  # Clean pruning (calibrated sparsity on FFN)
     "lowrank_svd:clean:ffn"      # Clean low-rank (calibrated rank on FFN)
+    "lora_merge:clean:attn"      # Clean deterministic merged LoRA-style delta
+    "fine_tune:clean:ffn"        # Clean deterministic tiny fine-tune-style update
 )
 
 EDIT_TYPES_STRESS=(
@@ -127,6 +129,8 @@ EDIT_TYPES_STRESS=(
     "fp8_quant:e5m2:all"         # FP8 E5M2 on all (stress)
     "magnitude_prune:0.5:all"    # 50% sparsity on all
     "lowrank_svd:32:all"         # rank-32 SVD on all
+    "lora_merge:8:64:all"        # larger deterministic merged LoRA-style delta
+    "fine_tune:0.0005:3:all"     # larger deterministic tiny fine-tune-style update
 )
 
 # Tuned edit presets (external inputs; required for clean edits)

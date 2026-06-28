@@ -3,7 +3,102 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from scripts.evidence_packs.python import preset_generator
+
+
+def test_default_preset_edit_types_include_generated_lora_and_fine_tune() -> None:
+    assert preset_generator.DEFAULT_PRESET_EDIT_TYPES == (
+        "quant_rtn",
+        "fp8_quant",
+        "magnitude_prune",
+        "lowrank_svd",
+        "lora_merge",
+        "fine_tune",
+    )
+
+
+def test_dataset_provider_spec_resolves_json_yaml_hf_and_local_overrides(
+    monkeypatch, tmp_path: Path
+) -> None:
+    assert preset_generator._resolve_dataset_provider_spec("") == "wikitext2"
+    assert preset_generator._resolve_dataset_provider_spec("wikitext2") == "wikitext2"
+
+    monkeypatch.setenv(
+        "INVARLOCK_DATASET_PROVIDER_JSON",
+        json.dumps({"kind": "custom_text", "path": "data.jsonl"}),
+    )
+    assert preset_generator._resolve_dataset_provider_spec("wikitext2") == {
+        "kind": "custom_text",
+        "path": "data.jsonl",
+    }
+
+    monkeypatch.setenv("INVARLOCK_DATASET_PROVIDER_JSON", "[]")
+    with pytest.raises(SystemExit, match="must be a JSON object"):
+        preset_generator._resolve_dataset_provider_spec("wikitext2")
+
+    monkeypatch.setenv("INVARLOCK_DATASET_PROVIDER_JSON", "{")
+    with pytest.raises(SystemExit, match="not valid JSON"):
+        preset_generator._resolve_dataset_provider_spec("wikitext2")
+
+    monkeypatch.delenv("INVARLOCK_DATASET_PROVIDER_JSON")
+    if preset_generator._YAML_AVAILABLE:
+        monkeypatch.setenv(
+            "INVARLOCK_DATASET_PROVIDER_YAML",
+            "path: local.jsonl\ntext_field: body\n",
+        )
+        assert preset_generator._resolve_dataset_provider_spec("local_jsonl") == {
+            "kind": "local_jsonl",
+            "path": "local.jsonl",
+            "text_field": "body",
+        }
+
+        monkeypatch.setenv("INVARLOCK_DATASET_PROVIDER_YAML", "[]")
+        with pytest.raises(SystemExit, match="must parse to a mapping"):
+            preset_generator._resolve_dataset_provider_spec("local_jsonl")
+        monkeypatch.delenv("INVARLOCK_DATASET_PROVIDER_YAML")
+
+    monkeypatch.setenv("INVARLOCK_HF_DATASET", "c4")
+    monkeypatch.setenv("INVARLOCK_HF_MAX_SAMPLES", "bad")
+    monkeypatch.setenv("INVARLOCK_HF_TRUST_REMOTE_CODE", "false")
+    provider = preset_generator._resolve_dataset_provider_spec("hf_text")
+    assert provider["kind"] == "hf_text"
+    assert provider["dataset_name"] == "allenai/c4"
+    assert provider["config_name"] == "en"
+    assert provider["max_samples"] == 2000
+    assert provider["trust_remote_code"] is False
+
+    monkeypatch.setenv("INVARLOCK_HF_TRUST_REMOTE_CODE", "true")
+    with pytest.raises(ValueError, match="requires INVARLOCK_ALLOW_REMOTE_CODE"):
+        preset_generator._resolve_dataset_provider_spec("hf_text")
+
+    monkeypatch.setenv("INVARLOCK_ALLOW_REMOTE_CODE", "1")
+    provider = preset_generator._resolve_dataset_provider_spec("hf_text")
+    assert provider["trust_remote_code"] is True
+
+    monkeypatch.delenv("INVARLOCK_HF_DATASET")
+    monkeypatch.delenv("INVARLOCK_HF_MAX_SAMPLES")
+    monkeypatch.delenv("INVARLOCK_HF_TRUST_REMOTE_CODE")
+    monkeypatch.delenv("INVARLOCK_ALLOW_REMOTE_CODE")
+
+    local_file = tmp_path / "dataset.jsonl"
+    monkeypatch.setenv("INVARLOCK_LOCAL_JSONL_FILE", str(local_file))
+    provider = preset_generator._resolve_dataset_provider_spec("local_jsonl")
+    assert provider["file"] == str(local_file)
+    assert provider["max_samples"] == 2000
+
+    monkeypatch.delenv("INVARLOCK_LOCAL_JSONL_FILE")
+    monkeypatch.setenv("INVARLOCK_LOCAL_JSONL_PATH", "/datasets")
+    monkeypatch.setenv("INVARLOCK_LOCAL_JSONL_MAX_SAMPLES", "bad")
+    provider = preset_generator._resolve_dataset_provider_spec("local_jsonl")
+    assert provider["path"] == "/datasets"
+    assert provider["max_samples"] == 2000
+
+    monkeypatch.delenv("INVARLOCK_LOCAL_JSONL_PATH")
+    monkeypatch.setenv("INVARLOCK_LOCAL_JSONL_DATA_FILES", "part-*.jsonl")
+    provider = preset_generator._resolve_dataset_provider_spec("local_jsonl")
+    assert provider["data_files"] == "part-*.jsonl"
 
 
 def _write_calibration_run(

@@ -11,10 +11,14 @@ import torch
 
 try:
     from .editing.implementations import (
+        apply_dense_lora_merge_delta,
         apply_dense_lowrank_approximation,
         apply_dense_magnitude_prune,
         apply_fp8_dequantized_simulation,
         apply_rtn_dequantized_simulation,
+        apply_tiny_fine_tune_update,
+        build_fine_tune_validation_metadata,
+        build_lora_merge_validation_metadata,
         build_validation_edit_metadata,
         fp8_dtype,
     )
@@ -23,10 +27,14 @@ try:
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from editing.implementations import (
+        apply_dense_lora_merge_delta,
         apply_dense_lowrank_approximation,
         apply_dense_magnitude_prune,
         apply_fp8_dequantized_simulation,
         apply_rtn_dequantized_simulation,
+        apply_tiny_fine_tune_update,
+        build_fine_tune_validation_metadata,
+        build_lora_merge_validation_metadata,
         build_validation_edit_metadata,
         fp8_dtype,
     )
@@ -268,6 +276,91 @@ def _create_fp8_quant(args: argparse.Namespace) -> int:
     return 0
 
 
+def _create_lora_merge(args: argparse.Namespace) -> int:
+    _configure_determinism()
+    rank = int(args.rank)
+    alpha = float(args.alpha)
+    scope = str(args.scope)
+    if rank < 1:
+        raise ValueError("lora-merge rank must be a positive integer")
+    if alpha <= 0:
+        raise ValueError("lora-merge alpha must be positive")
+    model, tokenizer = _load_model_and_tokenizer(Path(args.baseline_path))
+
+    print(
+        f"Applying deterministic LoRA merge (rank={rank}, alpha={alpha}, scope={scope})..."
+    )
+    stats = apply_dense_lora_merge_delta(
+        model,
+        rank=rank,
+        alpha=alpha,
+        scope=scope,
+    )
+    coverage_pct = 100.0 * stats.coverage_ratio
+    print(
+        f"Modified {stats.edited_tensors} matrices "
+        f"({stats.edited_params:,} / {stats.total_params:,} = {coverage_pct:.1f}% coverage)"
+    )
+
+    metadata = build_lora_merge_validation_metadata(
+        scope=scope,
+        rank=rank,
+        alpha=alpha,
+        stats=stats,
+    )
+    _save_model(
+        model=model,
+        tokenizer=tokenizer,
+        output_path=Path(args.output_path),
+        metadata=metadata,
+    )
+    print(f"Saved LoRA-merged model to {args.output_path}")
+    return 0
+
+
+def _create_fine_tune(args: argparse.Namespace) -> int:
+    _configure_determinism()
+    learning_rate = float(args.learning_rate)
+    steps = int(args.steps)
+    scope = str(args.scope)
+    if learning_rate <= 0:
+        raise ValueError("fine-tune learning_rate must be positive")
+    if steps < 1:
+        raise ValueError("fine-tune steps must be a positive integer")
+    model, tokenizer = _load_model_and_tokenizer(Path(args.baseline_path))
+
+    print(
+        "Applying deterministic tiny fine-tune update "
+        f"(learning_rate={learning_rate}, steps={steps}, scope={scope})..."
+    )
+    stats = apply_tiny_fine_tune_update(
+        model,
+        learning_rate=learning_rate,
+        steps=steps,
+        scope=scope,
+    )
+    coverage_pct = 100.0 * stats.coverage_ratio
+    print(
+        f"Modified {stats.edited_tensors} matrices "
+        f"({stats.edited_params:,} / {stats.total_params:,} = {coverage_pct:.1f}% coverage)"
+    )
+
+    metadata = build_fine_tune_validation_metadata(
+        scope=scope,
+        learning_rate=learning_rate,
+        steps=steps,
+        stats=stats,
+    )
+    _save_model(
+        model=model,
+        tokenizer=tokenizer,
+        output_path=Path(args.output_path),
+        metadata=metadata,
+    )
+    print(f"Saved fine-tuned model to {args.output_path}")
+    return 0
+
+
 def _add_common_paths(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("baseline_path")
     parser.add_argument("output_path")
@@ -303,6 +396,20 @@ def build_parser() -> argparse.ArgumentParser:
     fp8.add_argument("format")
     fp8.add_argument("scope")
     fp8.set_defaults(func=_create_fp8_quant)
+
+    lora = subparsers.add_parser("lora-merge")
+    _add_common_paths(lora)
+    lora.add_argument("rank")
+    lora.add_argument("alpha")
+    lora.add_argument("scope")
+    lora.set_defaults(func=_create_lora_merge)
+
+    fine_tune = subparsers.add_parser("fine-tune")
+    _add_common_paths(fine_tune)
+    fine_tune.add_argument("learning_rate")
+    fine_tune.add_argument("steps")
+    fine_tune.add_argument("scope")
+    fine_tune.set_defaults(func=_create_fine_tune)
 
     return parser
 

@@ -5,6 +5,9 @@ from pathlib import Path
 
 def test_makefile_exposes_podman_runtime_targets() -> None:
     text = (Path.cwd() / "Makefile").read_text(encoding="utf-8")
+    dockerfile_text = (Path.cwd() / "runtime" / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
     quant_smoke_text = (
         Path.cwd()
         / "examples"
@@ -36,3 +39,8 @@ def test_makefile_exposes_podman_runtime_targets() -> None:
     assert "container-front-door-smoke: runtime-image" in text
     assert "container-front-door-smoke-podman" in text
     assert "container-front-door-smoke-podman: CONTAINER_ENGINE=podman" in text
+    assert (
+        "apt-get install -y --no-install-recommends build-essential jq"
+        in dockerfile_text
+    )
+    assert "shutil.which('jq')" in text

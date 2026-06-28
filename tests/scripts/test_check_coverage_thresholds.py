@@ -121,6 +121,32 @@ def test_checker_owns_canonical_coverage_policy(monkeypatch) -> None:
     assert checker.coverage_include() == policy.coverage_include()
 
 
+def test_evidence_pack_generator_surfaces_are_threshold_listed() -> None:
+    expected = {
+        "scripts/evidence_packs/python/create_edit_model.py",
+        "scripts/evidence_packs/python/create_edits_batch.py",
+        "scripts/evidence_packs/python/editing/implementations.py",
+        "scripts/evidence_packs/python/editing/tensor_ops.py",
+        "scripts/evidence_packs/python/preset_generator.py",
+        "scripts/evidence_packs/python/task_tools_reports.py",
+    }
+
+    assert expected.issubset(THRESHOLDS)
+    include_patterns = set(
+        subprocess.check_output(
+            [
+                sys.executable,
+                str(Path("scripts") / "coverage" / "check_coverage_thresholds.py"),
+                "coverage-include",
+            ],
+            text=True,
+        )
+        .strip()
+        .split(",")
+    )
+    assert expected.issubset(include_patterns)
+
+
 def test_checker_help_renders_percent_defaults() -> None:
     proc = subprocess.run(
         [

@@ -117,16 +117,18 @@ keep `seq_len=stride` for deterministic non-overlapping windows.
 - Portable: reports are self-contained artifacts with provenance.
 - Low maintenance: you can update your edit tools without waiting for InvarLock updates.
 - Auditable: public BYOE fixtures under `public_evidence/byoe_examples/` show
-  dense magnitude pruning and LoRA-merge style subjects verifying through the
-  same strict verification path.
+  dense magnitude pruning, LoRA-merge, and fine-tune subjects verifying through
+  the same strict verification path.
 
 ## When to use built-in edits
 
-InvarLock ships a single built-in edit tuned for portable smokes:
+The evaluator CLI ships a single portable demo edit:
 
 - `quant_rtn` — 8‑bit (attention‑only mode available), CPU/MPS friendly
 
 Use it for quick local checks. For production edits, prefer Compare & evaluate (BYOE).
+The repo evidence-pack harness has additional deterministic validation-subject
+generators for quantization, pruning, LoRA merge, and fine-tune lane coverage.
 
 ## Determinism & pairing
 

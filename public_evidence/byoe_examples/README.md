@@ -7,7 +7,7 @@ subject. They are intentionally BYOE examples, not new built-in edit plugins.
 | Example | External edit type | Purpose |
 | --- | --- | --- |
 | `magnitude_prune_byoe/` | Dense magnitude pruning | Pruning evidence point for BYOE strict-evidence wiring. |
-| `lora_merge_byoe/` | LoRA merge / fine-tune-derived checkpoint | Adapter-merge evidence point with optional edit provenance and edit-impact scenario labels. |
+| `lora_merge_byoe/` | LoRA-merged checkpoint | Adapter-merge evidence point with optional edit provenance and edit-impact scenario labels. |
 | `fine_tune_byoe/` | Fine-tuned checkpoint | Fine-tune evidence point with optional realism, topology, and delta/privacy metadata. |
 
 Each example includes `evaluation.report.json`, `runtime.manifest.json`, and

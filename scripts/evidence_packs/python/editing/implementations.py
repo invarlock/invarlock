@@ -39,6 +39,8 @@ VALIDATION_STORAGE_FORMATS = {
     "fp8_quant": "float_dequantized",
     "magnitude_prune": "dense_float_with_zeros",
     "lowrank_svd": "dense_float_lowrank_approximated",
+    "lora_merge": "merged_dense_checkpoint",
+    "fine_tune": "fine_tuned_dense_checkpoint",
 }
 
 EDIT_SEMANTICS_EXTERNAL_SUBJECT = "external_subject_validation_edit"
@@ -67,6 +69,22 @@ EDIT_IMPACT_SCENARIO_TYPES = {
     "general_ability_sentinel",
     "multilingual_portability",
     "sequential_edit_stress",
+}
+EDIT_TOPOLOGY_ARTIFACT_KINDS = {
+    "checkpoint",
+    "adapter",
+    "merged_adapter",
+    "memory_module",
+    "dynamic_weight_module",
+    "runtime_config",
+    "prompt_wrapper",
+}
+DELTA_AVAILABILITY_VALUES = {"none", "private", "public", "hash_only"}
+PRIVACY_SENSITIVITY_VALUES = {
+    "public",
+    "internal",
+    "customer_controlled",
+    "sensitive",
 }
 _SHA256_RE = re.compile(r"^sha256:[a-f0-9]{64}$")
 
@@ -127,6 +145,20 @@ class ResolvedEditSpec:
         elif self.edit_type == "lowrank_svd":
             payload["rank"] = (
                 int(self.param1) if _safe_int(self.param1) is not None else 0
+            )
+        elif self.edit_type == "lora_merge":
+            payload["rank"] = (
+                int(self.param1) if _safe_int(self.param1) is not None else 0
+            )
+            payload["alpha"] = (
+                float(self.param2) if _safe_float(self.param2) is not None else 0.0
+            )
+        elif self.edit_type == "fine_tune":
+            payload["learning_rate"] = (
+                float(self.param1) if _safe_float(self.param1) is not None else 0.0
+            )
+            payload["steps"] = (
+                int(self.param2) if _safe_int(self.param2) is not None else 0
             )
         return payload
 
@@ -245,6 +277,10 @@ def _default_edit_dir_name(
         return f"prune_{pct}pct_{version}"
     if edit_type == "lowrank_svd":
         return f"svd_rank{param1}_{version}"
+    if edit_type == "lora_merge":
+        return f"lora_rank{param1}_{version}"
+    if edit_type == "fine_tune":
+        return f"fine_tune_step{param2}_{version}"
     return f"{edit_type}_{version}"
 
 
@@ -300,6 +336,14 @@ def resolve_edit_spec(
                 param1 = str(entry.get("rank", ""))
                 param2 = ""
                 scope = str(entry.get("scope") or scope or "")
+            elif edit_type == "lora_merge":
+                param1 = str(entry.get("rank", ""))
+                param2 = str(entry.get("alpha", ""))
+                scope = str(entry.get("scope") or scope or "")
+            elif edit_type == "fine_tune":
+                param1 = str(entry.get("learning_rate", ""))
+                param2 = str(entry.get("steps", ""))
+                scope = str(entry.get("scope") or scope or "")
             edit_dir_name = str(entry.get("edit_dir_name") or "")
     else:
         if edit_type == "quant_rtn":
@@ -318,6 +362,24 @@ def resolve_edit_spec(
             if not param1:
                 status = "invalid"
                 reason = "invalid_fp_format"
+        elif edit_type == "lora_merge":
+            rank = _safe_int(param1)
+            alpha = _safe_float(param2)
+            if rank is None or rank < 1:
+                status = "invalid"
+                reason = "invalid_lora_rank"
+            elif alpha is None or alpha <= 0:
+                status = "invalid"
+                reason = "invalid_lora_alpha"
+        elif edit_type == "fine_tune":
+            learning_rate = _safe_float(param1)
+            steps = _safe_int(param2)
+            if learning_rate is None or learning_rate <= 0:
+                status = "invalid"
+                reason = "invalid_fine_tune_learning_rate"
+            elif steps is None or steps < 1:
+                status = "invalid"
+                reason = "invalid_fine_tune_steps"
 
     version = version_hint or ("clean" if clean_spec else "")
     if status == "selected" and not edit_dir_name:
@@ -493,6 +555,101 @@ def build_validation_edit_metadata(
     )
 
 
+def build_lora_merge_validation_metadata(
+    *,
+    scope: str,
+    rank: int,
+    alpha: float,
+    stats: EditStats,
+) -> dict[str, object]:
+    return build_validation_edit_metadata(
+        edit_type="lora_merge",
+        scope=scope,
+        parameters={"rank": rank, "alpha": alpha},
+        coverage=stats.coverage_payload(),
+        edit_provenance={
+            "edit_family": "lora_merge",
+            "edit_method": "deterministic_dense_lowrank_merge",
+            "edit_count": 1,
+            "dynamic_runtime_required": False,
+        },
+        edit_impact={
+            "scenario_types": [
+                "target_success",
+                "near_neighbor",
+                "unrelated_locality",
+                "general_ability_sentinel",
+            ]
+        },
+        extra={
+            "rank": rank,
+            "alpha": alpha,
+            "modified_matrices": stats.edited_tensors,
+            "base_scope": stats.details.get("base_scope"),
+            "layer_limit": stats.details.get("layer_limit"),
+            "layer": stats.details.get("layer"),
+            "total_delta_norm": stats.details.get("total_delta_norm"),
+            "edit_topology": {
+                "artifact_kind": "merged_adapter",
+                "runtime_activation_policy": "static_merged_checkpoint",
+                "training_or_edit_data_ref": "deterministic-generator-no-private-data",
+            },
+            "delta_privacy": {
+                "delta_available": "hash_only",
+                "privacy_sensitivity": "public",
+                "public_raw_delta_approved": False,
+            },
+        },
+    )
+
+
+def build_fine_tune_validation_metadata(
+    *,
+    scope: str,
+    learning_rate: float,
+    steps: int,
+    stats: EditStats,
+) -> dict[str, object]:
+    return build_validation_edit_metadata(
+        edit_type="fine_tune",
+        scope=scope,
+        parameters={"learning_rate": learning_rate, "steps": steps},
+        coverage=stats.coverage_payload(),
+        edit_provenance={
+            "edit_family": "fine_tune",
+            "edit_method": "deterministic_tiny_fine_tune_update",
+            "edit_count": steps,
+            "dynamic_runtime_required": False,
+        },
+        edit_impact={
+            "scenario_types": [
+                "target_success",
+                "unrelated_locality",
+                "general_ability_sentinel",
+            ]
+        },
+        extra={
+            "learning_rate": learning_rate,
+            "steps": steps,
+            "modified_matrices": stats.edited_tensors,
+            "base_scope": stats.details.get("base_scope"),
+            "layer_limit": stats.details.get("layer_limit"),
+            "layer": stats.details.get("layer"),
+            "total_update_norm": stats.details.get("total_update_norm"),
+            "edit_topology": {
+                "artifact_kind": "checkpoint",
+                "runtime_activation_policy": "static_checkpoint",
+                "training_or_edit_data_ref": "deterministic-generator-no-private-data",
+            },
+            "delta_privacy": {
+                "delta_available": "hash_only",
+                "privacy_sensitivity": "public",
+                "public_raw_delta_approved": False,
+            },
+        },
+    )
+
+
 def write_edit_metadata(path: Path, metadata: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n")
@@ -597,6 +754,8 @@ def validate_edit_metadata(
 
     errors.extend(_validate_optional_edit_provenance(metadata))
     errors.extend(_validate_optional_edit_impact(metadata))
+    errors.extend(_validate_optional_edit_topology(metadata))
+    errors.extend(_validate_optional_delta_privacy(metadata))
     return errors
 
 
@@ -667,6 +826,82 @@ def _validate_optional_edit_impact(metadata: dict[str, object]) -> list[str]:
             errors.append(
                 f"edit_impact.scenario_types[{index}] unsupported: {scenario_type!r}"
             )
+    return errors
+
+
+def _validate_optional_edit_topology(metadata: dict[str, object]) -> list[str]:
+    topology = metadata.get("edit_topology")
+    if topology is None:
+        return []
+    if not isinstance(topology, dict):
+        return ["edit_topology must be an object when present"]
+
+    errors: list[str] = []
+    artifact_kind = topology.get("artifact_kind")
+    if artifact_kind is not None and (
+        not isinstance(artifact_kind, str)
+        or artifact_kind not in EDIT_TOPOLOGY_ARTIFACT_KINDS
+    ):
+        errors.append(f"edit_topology.artifact_kind unsupported: {artifact_kind!r}")
+
+    module_hashes = topology.get("module_hashes")
+    if module_hashes is not None:
+        if not isinstance(module_hashes, dict):
+            errors.append("edit_topology.module_hashes must be an object")
+        else:
+            for name, digest in module_hashes.items():
+                if not isinstance(name, str) or not name.strip():
+                    errors.append(f"edit_topology.module_hashes key invalid: {name!r}")
+                    continue
+                if not isinstance(digest, str) or _SHA256_RE.fullmatch(digest) is None:
+                    errors.append(
+                        f"edit_topology.module_hashes.{name} must be a "
+                        "sha256:<64 lowercase hex> digest"
+                    )
+
+    activation_policy = topology.get("runtime_activation_policy")
+    if activation_policy is not None:
+        valid_policy = isinstance(activation_policy, dict) or (
+            isinstance(activation_policy, str) and bool(activation_policy.strip())
+        )
+        if not valid_policy:
+            errors.append(
+                "edit_topology.runtime_activation_policy must be a non-empty string or object"
+            )
+
+    data_ref = topology.get("training_or_edit_data_ref")
+    if data_ref is not None and (not isinstance(data_ref, str) or not data_ref.strip()):
+        errors.append(
+            "edit_topology.training_or_edit_data_ref must be a non-empty string"
+        )
+    return errors
+
+
+def _validate_optional_delta_privacy(metadata: dict[str, object]) -> list[str]:
+    privacy = metadata.get("delta_privacy")
+    if privacy is None:
+        return []
+    if not isinstance(privacy, dict):
+        return ["delta_privacy must be an object when present"]
+
+    errors: list[str] = []
+    delta_available = privacy.get("delta_available")
+    if delta_available is not None and (
+        not isinstance(delta_available, str)
+        or delta_available not in DELTA_AVAILABILITY_VALUES
+    ):
+        errors.append(f"delta_privacy.delta_available unsupported: {delta_available!r}")
+
+    sensitivity = privacy.get("privacy_sensitivity")
+    if sensitivity is not None and (
+        not isinstance(sensitivity, str)
+        or sensitivity not in PRIVACY_SENSITIVITY_VALUES
+    ):
+        errors.append(f"delta_privacy.privacy_sensitivity unsupported: {sensitivity!r}")
+
+    raw_approval = privacy.get("public_raw_delta_approved")
+    if raw_approval is not None and not isinstance(raw_approval, bool):
+        errors.append("delta_privacy.public_raw_delta_approved must be boolean")
     return errors
 
 
@@ -755,6 +990,36 @@ def apply_dense_magnitude_prune(
     )
 
 
+def apply_dense_lora_merge_delta(
+    model: Any,
+    *,
+    rank: int,
+    alpha: float,
+    scope: str,
+) -> EditStats:
+    return _tensor_ops.apply_dense_lora_merge_delta(
+        model,
+        rank=rank,
+        alpha=alpha,
+        scope=scope,
+    )
+
+
+def apply_tiny_fine_tune_update(
+    model: Any,
+    *,
+    learning_rate: float,
+    steps: int,
+    scope: str,
+) -> EditStats:
+    return _tensor_ops.apply_tiny_fine_tune_update(
+        model,
+        learning_rate=learning_rate,
+        steps=steps,
+        scope=scope,
+    )
+
+
 def parse_scope_layers(raw_scope: str) -> tuple[str, int | None, int | None]:
     return _tensor_ops.parse_scope_layers(raw_scope)
 
@@ -799,8 +1064,10 @@ __all__ = [
     "EDIT_METADATA_SCHEMA",
     "EDIT_IMPACT_SCENARIO_TYPES",
     "EDIT_PROVENANCE_FAMILIES",
+    "EDIT_TOPOLOGY_ARTIFACT_KINDS",
     "EDIT_SEMANTICS_DEPLOYABLE",
     "EDIT_SEMANTICS_EXTERNAL_SUBJECT",
+    "DELTA_AVAILABILITY_VALUES",
     "EditStats",
     "EVIDENCE_ONLY_PACK",
     "FAULT_INJECTION_FIXTURE",
@@ -808,10 +1075,14 @@ __all__ = [
     "VALIDATION_STORAGE_FORMATS",
     "VALIDATION_SUBJECT_CHECKPOINT",
     "apply_dense_lowrank_approximation",
+    "apply_dense_lora_merge_delta",
     "apply_dense_magnitude_prune",
     "apply_fp8_dequantized_simulation",
     "apply_rtn_dequantized_simulation",
+    "apply_tiny_fine_tune_update",
     "build_edit_metadata",
+    "build_fine_tune_validation_metadata",
+    "build_lora_merge_validation_metadata",
     "build_validation_edit_metadata",
     "fp8_dtype",
     "magnitude_prune_tensor",

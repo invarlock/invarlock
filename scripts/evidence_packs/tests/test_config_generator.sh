@@ -309,6 +309,57 @@ test_config_generator_generate_invarlock_config_writes_to_stdout_when_requested(
     assert_match 'skip_overhead_check: true' "${out}" "skip-overhead policy emitted when requested"
 }
 
+test_config_generator_generate_invarlock_config_strict_flash_and_guard_branches() {
+    mock_reset
+
+    # shellcheck source=../config_generator.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/config_generator.sh"
+
+    INVARLOCK_PREVIEW_WINDOWS="128"
+    INVARLOCK_FINAL_WINDOWS="128"
+    INVARLOCK_SEQ_LEN="256"
+    INVARLOCK_STRIDE="128"
+    INVARLOCK_EVAL_BATCH="1"
+    INVARLOCK_DATASET="wikitext2"
+    INVARLOCK_TIER="balanced"
+    export \
+        INVARLOCK_PREVIEW_WINDOWS \
+        INVARLOCK_FINAL_WINDOWS \
+        INVARLOCK_SEQ_LEN \
+        INVARLOCK_STRIDE \
+        INVARLOCK_EVAL_BATCH \
+        INVARLOCK_DATASET \
+        INVARLOCK_TIER
+
+    FLASH_ATTENTION_AVAILABLE="true"
+    PACK_DETERMINISM="strict"
+    PACK_GUARDS_ORDER="variance, , invariants"
+    export FLASH_ATTENTION_AVAILABLE PACK_DETERMINISM PACK_GUARDS_ORDER
+
+    local strict_cfg="${TEST_TMPDIR}/strict_config.yaml"
+    run generate_invarlock_config "demo/model" "${strict_cfg}" "edit"
+    assert_rc "0" "${RUN_RC}" "strict config generation succeeds"
+    assert_file_exists "${strict_cfg}" "strict config written to file"
+    assert_match 'attn_implementation: "flash_attention_2"' "$(cat "${strict_cfg}")" "flash attention branch emitted"
+    assert_match 'compile: false' "$(cat "${strict_cfg}")" "strict determinism disables compile"
+    assert_match 'tf32: false' "$(cat "${strict_cfg}")" "strict determinism disables tf32"
+    assert_match 'benchmark: false' "$(cat "${strict_cfg}")" "strict determinism disables benchmark"
+    assert_match '    - variance' "$(cat "${strict_cfg}")" "custom guard order keeps non-empty values"
+    assert_match '    - invariants' "$(cat "${strict_cfg}")" "custom guard order trims values"
+
+    FLASH_ATTENTION_AVAILABLE="false"
+    PACK_DETERMINISM="throughput"
+    PACK_GUARDS_ORDER=" , "
+    export FLASH_ATTENTION_AVAILABLE PACK_DETERMINISM PACK_GUARDS_ORDER
+
+    local fallback_cfg="${TEST_TMPDIR}/fallback_config.yaml"
+    run generate_invarlock_config "demo/model" "${fallback_cfg}" "edit"
+    assert_rc "0" "${RUN_RC}" "fallback config generation succeeds"
+    assert_match '# flash_attention_2 not available' "$(cat "${fallback_cfg}")" "non-flash branch emitted"
+    assert_match 'compile: true' "$(cat "${fallback_cfg}")" "throughput keeps compile enabled"
+    assert_match $'    - spectral\n    - rmt\n    - variance' "$(cat "${fallback_cfg}")" "empty custom guard list falls back to defaults"
+}
+
 test_config_generator_run_single_calibration_exports_remote_code_allowance() {
     mock_reset
 

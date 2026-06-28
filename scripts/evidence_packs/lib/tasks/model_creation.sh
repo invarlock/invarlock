@@ -78,6 +78,20 @@ create_model_variant() {
             fi
             create_lowrank_model "${baseline_path}" "${output_path}" "${param1}" "${scope}" "${gpu_id}"
             ;;
+        "lora_merge")
+            if [[ -z "${param1}" || -z "${param2}" || -z "${scope}" ]]; then
+                echo "ERROR: lora_merge requires rank, alpha, scope" >&2
+                return 1
+            fi
+            create_lora_merged_model "${baseline_path}" "${output_path}" "${param1}" "${param2}" "${scope}" "${gpu_id}"
+            ;;
+        "fine_tune")
+            if [[ -z "${param1}" || -z "${param2}" || -z "${scope}" ]]; then
+                echo "ERROR: fine_tune requires learning_rate, steps, scope" >&2
+                return 1
+            fi
+            create_fine_tuned_model "${baseline_path}" "${output_path}" "${param1}" "${param2}" "${scope}" "${gpu_id}"
+            ;;
         "error_injection")
             if [[ -z "${param1}" ]]; then
                 echo "ERROR: error_injection requires error_type" >&2
@@ -182,6 +196,66 @@ create_lowrank_model() {
         "${scope}"
 }
 export -f create_lowrank_model
+
+# ============ DETERMINISTIC LORA MERGE ============
+create_lora_merged_model() {
+    local baseline_path="$1"
+    local output_path="$2"
+    local rank="$3"
+    local alpha="$4"
+    local scope="$5"
+    local gpu_id="${6:-0}"
+
+    log "Creating LoRA-merged model (GPU ${gpu_id}):"
+    log "  Baseline: ${baseline_path}"
+    log "  Output: ${output_path}"
+    log "  Rank: ${rank}, Alpha: ${alpha}, Scope: ${scope}"
+
+    local parent_dir
+    parent_dir="$(dirname "${output_path}")"
+    local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
+    _model_creation_run_python \
+        "${parent_dir}" \
+        "${cuda_devices}" \
+        "${EVIDENCE_PACK_PY_DIR}/create_edit_model.py" \
+        "lora-merge" \
+        "${baseline_path}" \
+        "${output_path}" \
+        "${rank}" \
+        "${alpha}" \
+        "${scope}"
+}
+export -f create_lora_merged_model
+
+# ============ DETERMINISTIC TINY FINE-TUNE UPDATE ============
+create_fine_tuned_model() {
+    local baseline_path="$1"
+    local output_path="$2"
+    local learning_rate="$3"
+    local steps="$4"
+    local scope="$5"
+    local gpu_id="${6:-0}"
+
+    log "Creating fine-tuned model (GPU ${gpu_id}):"
+    log "  Baseline: ${baseline_path}"
+    log "  Output: ${output_path}"
+    log "  Learning rate: ${learning_rate}, Steps: ${steps}, Scope: ${scope}"
+
+    local parent_dir
+    parent_dir="$(dirname "${output_path}")"
+    local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
+    _model_creation_run_python \
+        "${parent_dir}" \
+        "${cuda_devices}" \
+        "${EVIDENCE_PACK_PY_DIR}/create_edit_model.py" \
+        "fine-tune" \
+        "${baseline_path}" \
+        "${output_path}" \
+        "${learning_rate}" \
+        "${steps}" \
+        "${scope}"
+}
+export -f create_fine_tuned_model
 
 # ============ FP8 QUANTIZATION (SIMULATED) ============
 create_fp8_model() {

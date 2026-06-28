@@ -46,8 +46,10 @@ come from any external edit workflow: quantization, pruning, LoRA merge,
 fine-tuning, or another weight-edit pipeline. The built-in `quant_rtn` edit is
 for demos and smoke tests; production workflows are
 bring-your-own-edited-checkpoint (BYOE). The repo ships strict-verifiable BYOE
-fixtures for dense magnitude pruning and LoRA-merge style subjects under
-`public_evidence/byoe_examples/`. Real model runs under
+fixtures for dense magnitude pruning, LoRA-merge, and fine-tune subjects under
+`public_evidence/byoe_examples/`. The evidence-pack harness also includes
+deterministic generated validation-subject lanes for quantization, pruning,
+LoRA merge, and fine-tune coverage. Real model runs under
 `public_evidence/real_runs/` include an external magnitude-prune BYOE run and a
 tiny GPT-2 quantization smoke.
 
@@ -304,6 +306,9 @@ For guidance on where to ask questions, how to report bugs, and what to expect i
 - Contributing guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Local setup: `make dev-install`
 - Everyday checks: `make test`, `make lint`, and `make docs-check`
+- Optional parallel fast tests: `make test-parallel` or
+  `make test-fast PYTEST_WORKERS=auto`. Keep `make coverage-enforce` serial;
+  it writes combined coverage artifacts.
 - Maintainer PR gate: `git diff --check origin/staging/next...HEAD`,
   `make lock-sync`, `pre-commit run --all-files --show-diff-on-failure`,
   `make workflow-lint`, `make docs-check`, `make mypy-typed-surface`,

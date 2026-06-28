@@ -78,6 +78,52 @@ def test_scenarios_do_not_ship_unverified_quantization_lanes() -> None:
     )
 
 
+def test_scenarios_include_generated_lora_and_fine_tune_lane_parity() -> None:
+    scenarios = _load_scenarios()
+    by_id = {str(item.get("id")): item for item in scenarios}
+
+    expected = {
+        "lora_rank4_clean": {
+            "edit_spec": "lora_merge:clean:attn",
+            "version": "clean",
+            "strictness": "must_pass",
+            "failure_class": "common_edit.lora_merge",
+        },
+        "fine_tune_step1_clean": {
+            "edit_spec": "fine_tune:clean:ffn",
+            "version": "clean",
+            "strictness": "must_pass",
+            "failure_class": "common_edit.fine_tune",
+        },
+        "lora_rank8_stress": {
+            "edit_spec": "lora_merge:8:64:all",
+            "version": "stress",
+            "strictness": "informational",
+            "failure_class": "stress_edit.lora_merge",
+        },
+        "fine_tune_step3_stress": {
+            "edit_spec": "fine_tune:0.0005:3:all",
+            "version": "stress",
+            "strictness": "informational",
+            "failure_class": "stress_edit.fine_tune",
+        },
+    }
+
+    for scenario_id, expected_fields in expected.items():
+        scenario = by_id.get(scenario_id)
+        assert scenario is not None, f"{scenario_id} missing from scenarios manifest"
+        generation = scenario.get("generation")
+        assert isinstance(generation, dict), f"{scenario_id}: generation must be dict"
+        assert generation.get("kind") == "edit"
+        assert generation.get("edit_spec") == expected_fields["edit_spec"]
+        assert generation.get("version") == expected_fields["version"]
+        assert scenario.get("artifact_class") == "validation_subject_checkpoint"
+        assert scenario.get("optimized_deployment_backend") is False
+        assert scenario.get("strictness") == expected_fields["strictness"]
+        assert scenario.get("failure_class") == expected_fields["failure_class"]
+        assert "subset" in scenario.get("suites", [])
+
+
 def test_scenarios_target_expected_guards_for_injection_probes() -> None:
     scenarios = _load_scenarios()
     by_id = {str(item.get("id")): item for item in scenarios}

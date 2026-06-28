@@ -62,6 +62,16 @@ Or use the Makefile fast lane:
 make test-fast
 ```
 
+Use pytest-xdist workers only when you want an opt-in local speedup:
+
+```bash
+make test-parallel
+make test-fast PYTEST_WORKERS=auto
+```
+
+Keep coverage enforcement serial unless the coverage target is updated to
+combine per-worker data.
+
 Run the slower integration/smoke backstop separately:
 
 ```bash

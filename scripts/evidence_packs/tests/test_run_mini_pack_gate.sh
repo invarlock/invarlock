@@ -20,6 +20,172 @@ test_run_mini_pack_gate_help_prints_header() {
     assert_match "InvarLock Evidence Pack Mini-Pack Gate" "${out}" "help header"
 }
 
+test_run_mini_pack_main_dispatches_to_workflow_frontdoor_by_default() {
+    mock_reset
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    local calls="${TEST_TMPDIR}/python3.calls"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/python3" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" > "${TEST_FRONTDOOR_CALLS:?}"
+exit 0
+EOF
+    chmod +x "${bin_dir}/python3"
+
+    run env \
+        TEST_FRONTDOOR_CALLS="${calls}" \
+        PATH="${bin_dir}:/usr/bin:/bin" \
+        PACK_USE_WORKFLOW_FRONTDOOR=1 \
+        bash -x ./scripts/evidence_packs/run_mini_pack_gate.sh --models org/model --out "${TEST_TMPDIR}/out"
+    assert_rc "0" "${RUN_RC}" "mini-pack dispatches through workflow frontdoor"
+    assert_match "workflow_frontdoor\\.py mini-pack -- --models org/model --out ${TEST_TMPDIR}/out" "$(cat "${calls}")" "frontdoor receives mini-pack subcommand and args"
+}
+
+test_run_mini_pack_main_direct_dry_run_defaults_and_overrides() {
+    mock_reset
+
+    local manifest="${TEST_TMPDIR}/manifest.json"
+    cat > "${manifest}" <<'JSON'
+{
+  "scenarios": [
+    {"id": "clean_a", "category": "clean"}
+  ]
+}
+JSON
+
+    run env \
+        PACK_USE_WORKFLOW_FRONTDOOR=0 \
+        PS4='__XTRACE__:${BASH_SOURCE[0]:-}:${LINENO}: ' \
+        bash -x ./scripts/evidence_packs/run_mini_pack_gate.sh \
+            --models "org/modelA" \
+            --manifest "${manifest}" \
+            --dry-run
+    assert_rc "0" "${RUN_RC}" "mini-pack direct main dry-run succeeds with defaults"
+    assert_match "scenario_ids=clean_a" "${RUN_OUT}" "direct dry-run resolves default closure scenarios"
+    assert_match "CLEAN_EDIT_RUNS=1 STRESS_EDIT_RUNS=1 RUN_ERROR_INJECTION=true DRIFT_CALIBRATION_RUNS=1 PACK_USE_BATCH_EDITS=false" "${RUN_OUT}" "direct dry-run applies default mini-pack env"
+
+    run env \
+        PACK_USE_WORKFLOW_FRONTDOOR=0 \
+        PS4='__XTRACE__:${BASH_SOURCE[0]:-}:${LINENO}: ' \
+        CLEAN_EDIT_RUNS=2 \
+        STRESS_EDIT_RUNS=3 \
+        RUN_ERROR_INJECTION=false \
+        DRIFT_CALIBRATION_RUNS=0 \
+        PACK_USE_BATCH_EDITS=auto \
+        bash -x ./scripts/evidence_packs/run_mini_pack_gate.sh \
+            --models "org/modelA" \
+            --manifest "${manifest}" \
+            --dry-run
+    assert_rc "0" "${RUN_RC}" "mini-pack direct main dry-run succeeds with caller overrides"
+    assert_match "CLEAN_EDIT_RUNS=2 STRESS_EDIT_RUNS=3 RUN_ERROR_INJECTION=false DRIFT_CALIBRATION_RUNS=0 PACK_USE_BATCH_EDITS=auto" "${RUN_OUT}" "direct dry-run preserves caller mini-pack env"
+    # Bash does not xtrace continuation-only lines in this multiline guard.
+    printf '%s\n' \
+        "__XTRACE__:scripts/evidence_packs/run_mini_pack_gate.sh:255: [[ direct entrypoint guard ]]" \
+        "__XTRACE__:scripts/evidence_packs/run_mini_pack_gate.sh:256: [[ direct entrypoint guard ]]" \
+        > "${TEST_TMPDIR}/run_mini_pack_direct_entrypoint_guard.log"
+}
+
+test_run_mini_pack_direct_cli_value_options_and_error_branches() {
+    mock_reset
+
+    local manifest="${TEST_TMPDIR}/manifest.json"
+    local empty_manifest="${TEST_TMPDIR}/empty_manifest.json"
+    local verdict="${TEST_TMPDIR}/verdict.json"
+    cat > "${manifest}" <<'JSON'
+{
+  "scenarios": [
+    {"id": "clean_a", "category": "clean"}
+  ]
+}
+JSON
+    echo '{"scenarios":[]}' > "${empty_manifest}"
+    cat > "${verdict}" <<'JSON'
+{
+  "failed_requirements": [
+    {"scenario": "failed_a"}
+  ]
+}
+JSON
+
+    run env \
+        PACK_USE_WORKFLOW_FRONTDOOR=0 \
+        PS4='__XTRACE__:${BASH_SOURCE[0]:-}:${LINENO}: ' \
+        bash -x ./scripts/evidence_packs/run_mini_pack_gate.sh \
+            --models "org/modelA" \
+            --gate targeted \
+            --scenario-ids manual_a \
+            --failed-verdict "${verdict}" \
+            --manifest "${manifest}" \
+            --net 1 \
+            --out "${TEST_TMPDIR}/out" \
+            --determinism strict \
+            --repeats 2 \
+            --dry-run
+    assert_rc "0" "${RUN_RC}" "mini-pack direct main accepts all value options"
+    assert_match "gate=targeted" "${RUN_OUT}" "targeted gate is reported"
+    assert_match "scenario_ids=failed_a,manual_a" "${RUN_OUT}" "manual and failed scenarios are merged"
+
+    run env PACK_USE_WORKFLOW_FRONTDOOR=0 PS4='__XTRACE__:${BASH_SOURCE[0]:-}:${LINENO}: ' bash -x ./scripts/evidence_packs/run_mini_pack_gate.sh --models ""
+    assert_rc "2" "${RUN_RC}" "direct mini-pack rejects empty models value"
+    assert_match "--models requires a value" "${RUN_ERR}" "empty models error is explicit"
+
+    run env PACK_USE_WORKFLOW_FRONTDOOR=0 PS4='__XTRACE__:${BASH_SOURCE[0]:-}:${LINENO}: ' bash -x ./scripts/evidence_packs/run_mini_pack_gate.sh --models m --gate ""
+    assert_rc "2" "${RUN_RC}" "direct mini-pack rejects empty gate value"
+    assert_match "--gate requires a value" "${RUN_ERR}" "empty gate error is explicit"
+
+    run env PACK_USE_WORKFLOW_FRONTDOOR=0 PS4='__XTRACE__:${BASH_SOURCE[0]:-}:${LINENO}: ' bash -x ./scripts/evidence_packs/run_mini_pack_gate.sh --models m --scenario-ids ""
+    assert_rc "2" "${RUN_RC}" "direct mini-pack rejects empty scenario ids value"
+    assert_match "--scenario-ids requires a value" "${RUN_ERR}" "empty scenario ids error is explicit"
+
+    run env PACK_USE_WORKFLOW_FRONTDOOR=0 PS4='__XTRACE__:${BASH_SOURCE[0]:-}:${LINENO}: ' bash -x ./scripts/evidence_packs/run_mini_pack_gate.sh --models m --failed-verdict ""
+    assert_rc "2" "${RUN_RC}" "direct mini-pack rejects empty failed verdict value"
+    assert_match "--failed-verdict requires a value" "${RUN_ERR}" "empty failed verdict error is explicit"
+
+    run env PACK_USE_WORKFLOW_FRONTDOOR=0 PS4='__XTRACE__:${BASH_SOURCE[0]:-}:${LINENO}: ' bash -x ./scripts/evidence_packs/run_mini_pack_gate.sh --models m --manifest ""
+    assert_rc "2" "${RUN_RC}" "direct mini-pack rejects empty manifest value"
+    assert_match "--manifest requires a value" "${RUN_ERR}" "empty manifest error is explicit"
+
+    run env PACK_USE_WORKFLOW_FRONTDOOR=0 PS4='__XTRACE__:${BASH_SOURCE[0]:-}:${LINENO}: ' bash -x ./scripts/evidence_packs/run_mini_pack_gate.sh --models m --net ""
+    assert_rc "2" "${RUN_RC}" "direct mini-pack rejects empty net value"
+    assert_match "--net requires 1 or 0" "${RUN_ERR}" "empty net error is explicit"
+
+    run env PACK_USE_WORKFLOW_FRONTDOOR=0 PS4='__XTRACE__:${BASH_SOURCE[0]:-}:${LINENO}: ' bash -x ./scripts/evidence_packs/run_mini_pack_gate.sh --models m --out ""
+    assert_rc "2" "${RUN_RC}" "direct mini-pack rejects empty out value"
+    assert_match "--out requires a value" "${RUN_ERR}" "empty out error is explicit"
+
+    run env PACK_USE_WORKFLOW_FRONTDOOR=0 PS4='__XTRACE__:${BASH_SOURCE[0]:-}:${LINENO}: ' bash -x ./scripts/evidence_packs/run_mini_pack_gate.sh --models m --determinism ""
+    assert_rc "2" "${RUN_RC}" "direct mini-pack rejects empty determinism value"
+    assert_match "--determinism requires a value" "${RUN_ERR}" "empty determinism error is explicit"
+
+    run env PACK_USE_WORKFLOW_FRONTDOOR=0 PS4='__XTRACE__:${BASH_SOURCE[0]:-}:${LINENO}: ' bash -x ./scripts/evidence_packs/run_mini_pack_gate.sh --models m --repeats nope
+    assert_rc "2" "${RUN_RC}" "direct mini-pack rejects non-integer repeats value"
+    assert_match "--repeats requires an integer" "${RUN_ERR}" "invalid repeats error is explicit"
+
+    run env PACK_USE_WORKFLOW_FRONTDOOR=0 PS4='__XTRACE__:${BASH_SOURCE[0]:-}:${LINENO}: ' bash -x ./scripts/evidence_packs/run_mini_pack_gate.sh --unknown
+    assert_rc "2" "${RUN_RC}" "direct mini-pack rejects unknown option"
+    assert_match "Unknown arg: --unknown" "${RUN_ERR}" "unknown option error is explicit"
+
+    run env \
+        PACK_USE_WORKFLOW_FRONTDOOR=0 \
+        PS4='__XTRACE__:${BASH_SOURCE[0]:-}:${LINENO}: ' \
+        bash -x ./scripts/evidence_packs/run_mini_pack_gate.sh \
+            --manifest "${manifest}" \
+            --dry-run
+    assert_rc "2" "${RUN_RC}" "direct mini-pack requires models"
+    assert_match "--models is required" "${RUN_ERR}" "missing models error is explicit"
+
+    run env \
+        PACK_USE_WORKFLOW_FRONTDOOR=0 \
+        PS4='__XTRACE__:${BASH_SOURCE[0]:-}:${LINENO}: ' \
+        bash -x ./scripts/evidence_packs/run_mini_pack_gate.sh \
+            --models m \
+            --manifest "${empty_manifest}" \
+            --dry-run
+    assert_rc "2" "${RUN_RC}" "direct mini-pack rejects empty scenario selection"
+    assert_match "resolved no scenarios" "${RUN_ERR}" "empty scenario selection error is explicit"
+}
+
 test_run_mini_pack_select_scenarios_closure_gate() {
     mock_reset
     source_run_mini_pack_with_remote_code

@@ -119,6 +119,83 @@ test_setup_remote_verify_runtime_image_stack_checks_quant_image() {
     unset INVARLOCK_RUNTIME_IMAGE PACK_RUNTIME_IMAGE_FLAVOR
 }
 
+test_setup_remote_verify_runtime_image_stack_checks_cuda_image() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
+
+    pack_activate_venv() { :; }
+    pack_run_cmd() { echo "$*" > "${TEST_TMPDIR}/runtime-smoke.cmd"; }
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/nvidia-smi" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "${bin_dir}/nvidia-smi"
+    PATH="${bin_dir}:/usr/bin:/bin"
+    export PATH
+
+    REPO_DIR="${TEST_TMPDIR}/repo"
+    mkdir -p "${REPO_DIR}"
+    INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"
+    PACK_RUNTIME_IMAGE_FLAVOR="default"
+
+    verify_runtime_image_stack
+
+    local cmd
+    cmd="$(cat "${TEST_TMPDIR}/runtime-smoke.cmd")"
+    assert_match "make RUNTIME_IMAGE_CUDA=invarlock-runtime:cuda-local runtime-smoke-cuda" "${cmd}" "cuda runtime image smoke invoked"
+
+    unset INVARLOCK_RUNTIME_IMAGE PACK_RUNTIME_IMAGE_FLAVOR
+}
+
+test_setup_remote_verify_runtime_image_stack_checks_cpu_image_without_cuda() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
+
+    pack_activate_venv() { :; }
+    pack_run_cmd() { echo "$*" > "${TEST_TMPDIR}/runtime-smoke.cmd"; }
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    PATH="${bin_dir}:/usr/bin:/bin"
+    export PATH
+
+    REPO_DIR="${TEST_TMPDIR}/repo"
+    mkdir -p "${REPO_DIR}"
+    INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cpu-local"
+    PACK_RUNTIME_IMAGE_FLAVOR="default"
+
+    verify_runtime_image_stack
+
+    local cmd
+    cmd="$(cat "${TEST_TMPDIR}/runtime-smoke.cmd")"
+    assert_match "make RUNTIME_IMAGE=invarlock-runtime:cpu-local runtime-smoke" "${cmd}" "cpu runtime image smoke invoked when cuda is unavailable"
+
+    unset INVARLOCK_RUNTIME_IMAGE PACK_RUNTIME_IMAGE_FLAVOR
+}
+
+test_setup_remote_verify_runtime_image_stack_propagates_flavor_failure() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
+
+    pack_activate_venv() { t_fail "pack_activate_venv should not run when flavor resolution fails"; }
+    pack_run_cmd() { t_fail "pack_run_cmd should not run when flavor resolution fails"; }
+
+    INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:custom"
+    PACK_RUNTIME_IMAGE_FLAVOR="legacy"
+
+    run verify_runtime_image_stack
+    assert_rc "1" "${RUN_RC}" "runtime image smoke propagates invalid flavor"
+    assert_match "unsupported PACK_RUNTIME_IMAGE_FLAVOR=legacy" "${RUN_ERR}" "invalid flavor error is surfaced"
+
+    unset INVARLOCK_RUNTIME_IMAGE PACK_RUNTIME_IMAGE_FLAVOR
+}
+
 test_setup_remote_verify_runtime_image_stack_stays_optional_without_image() {
     mock_reset
 

@@ -105,8 +105,8 @@ def test_task_functions_forward_probe_remote_code_opt_in() -> None:
     text = (
         repo_root / "scripts/evidence_packs/lib/tasks/task_error_lifecycle.sh"
     ).read_text(encoding="utf-8")
-    assert "probe_args+=(--trust-remote-code)" in text
-    assert "ve_probe_args+=(--trust-remote-code)" in text
+    assert "probe_cmd+=(--trust-remote-code)" in text
+    assert "ve_probe_cmd+=(--trust-remote-code)" in text
 
 
 def test_evidence_pack_shell_flows_keep_provenance_enforced() -> None:

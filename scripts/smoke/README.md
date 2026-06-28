@@ -37,3 +37,5 @@ target when one exists.
 - `run_tiny_fine_tune_byoe_smoke.py` is the local fine-tune BYOE realism lane:
   it should remain offline by default and should enrich a real evaluation report
   only after the baseline and subject checkpoints have been materialized.
+  Generated fine-tune validation-subject coverage lives in the evidence-pack
+  harness.
