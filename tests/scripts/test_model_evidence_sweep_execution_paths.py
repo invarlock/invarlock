@@ -177,6 +177,20 @@ if [[ "${1:-}" == "-c" ]]; then
   echo "GatedRepoError: Cannot access gated repo" >&2
   exit 1
 fi
+if [[ "${1:-}" == "scripts/model_evidence/materialize_vision_text_dataset.py" ]]; then
+  output_dir=""
+  while [[ $# -gt 0 ]]; do
+    if [[ "$1" == "--output-dir" ]]; then
+      output_dir="$2"
+      shift 2
+      continue
+    fi
+    shift
+  done
+  mkdir -p "$output_dir/images"
+  printf '{"id":"fake","image_path":"images/000000-fake.png","prompt":"what?","answer":"cat","answers":["cat"]}\n' > "$output_dir/manifest.jsonl"
+  exit 0
+fi
 echo "unexpected invocation" >&2
 exit 99
 """,

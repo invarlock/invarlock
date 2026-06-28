@@ -931,10 +931,22 @@ def _classify_failure(
     ):
         return ("failed", "container_image_pull_denied")
     if evaluate_exit != 0:
-        return ("failed", f"{phase}_failed")
+        return ("failed", _evaluate_failure_detail(text) or f"{phase}_failed")
     if verify_exit not in {None, 0}:
         return ("failed", _verify_failure_detail(verify_path) or "verify_failed")
     return ("failed", None)
+
+
+def _evaluate_failure_detail(log_text: str) -> str | None:
+    log_text = log_text.lower()
+    if "no-samples" in log_text or "produced no samples" in log_text:
+        return "no_samples"
+    if (
+        "couldn't find cache for" in log_text
+        and "available configs in the cache" in log_text
+    ):
+        return "dataset_cache_missing"
+    return None
 
 
 def _safe_detail(value: object) -> str | None:

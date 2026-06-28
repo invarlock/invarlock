@@ -528,6 +528,32 @@ def test_model_evidence_sweep_verify_failure_detail_is_sanitized(
     assert mod._verify_failure_detail(verify_path) is None
 
 
+def test_model_evidence_sweep_evaluate_failure_detail_classifies_no_samples() -> None:
+    mod = load_script_module("model_evidence_sweep")
+
+    assert (
+        mod._evaluate_failure_detail(
+            "[FAIL] [INVARLOCK:E306] NO-SAMPLES: vision_text produced no samples"
+        )
+        == "no_samples"
+    )
+
+
+def test_model_evidence_sweep_evaluate_failure_detail_classifies_dataset_cache() -> (
+    None
+):
+    mod = load_script_module("model_evidence_sweep")
+
+    assert (
+        mod._evaluate_failure_detail(
+            "Couldn't find cache for Salesforce/wikitext for config "
+            "'wikitext-103-v1'. Available configs in the cache: "
+            "['wikitext-2-raw-v1']"
+        )
+        == "dataset_cache_missing"
+    )
+
+
 def test_model_evidence_sweep_host_mode_rejects_ci_profile(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"

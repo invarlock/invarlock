@@ -133,6 +133,63 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
     }.items():
         assert specs[slug].preset_relpath == preset
         assert specs[slug].adapter == "hf_multimodal"
+        assert specs[slug].vision_text_materialization is not None
+        assert specs[slug].vision_text_materialization["dataset"] == (
+            "Multimodal-Fatima/VQAv2_sample_validation"
+        )
+    assert "Do not explain or include thinking" in str(
+        specs["qwen_qwen3_5_4b"].vision_text_materialization["prompt_template"]
+    )
+    for slug in {
+        "google_gemma_4_e4b_it",
+        "google_gemma_4_26b_a4b_it",
+    }:
+        assert specs[slug].vision_text_materialization is not None
+        assert specs[slug].vision_text_materialization["max_samples"] == 800
+
+
+def test_model_catalog_qwen_dry_run_materializes_public_vqav2(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
+    output_root = tmp_path / "catalog-qwen-vqav2"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--suite",
+            "model-catalog-gpu",
+            "--slug",
+            "qwen_qwen3_5_2b",
+            "--output-root",
+            str(output_root),
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    assert len(payload) == 1
+    item = payload[0]
+    assert item["slug"] == "qwen_qwen3_5_2b"
+    assert item["materialize_dataset"][0] == sys.executable
+    assert "Multimodal-Fatima/VQAv2_sample_validation" in item["materialize_dataset"]
+    assert "99487d2651df3799002b2fb3e455741744514a02" in item["materialize_dataset"]
+    preset_idx = item["evaluate"].index("--preset") + 1
+    assert item["evaluate"][preset_idx].endswith("prepared_preset.yaml")
+
+    manifest = json.loads((output_root / "manifest.json").read_text(encoding="utf-8"))
+    lane = manifest["lanes"][0]
+    assert lane["vision_text_materialization"]["dataset"] == (
+        "Multimodal-Fatima/VQAv2_sample_validation"
+    )
+    assert lane["vision_text_materialization"]["max_samples"] == 800
 
 
 def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> None:

@@ -417,6 +417,20 @@ def _qwen3_5_4b_vqav2_materialization() -> dict[str, object]:
     return materialization
 
 
+def _public_vqav2_materialization_for_preset(
+    preset_relpath: str,
+) -> dict[str, object] | None:
+    preset_name = Path(preset_relpath).name
+    if not (
+        preset_relpath.startswith("configs/presets/multimodal/")
+        and preset_name.endswith("_public_vqav2_256.yaml")
+    ):
+        return None
+    if preset_name == "qwen3_5_4b_public_vqav2_256.yaml":
+        return _qwen3_5_4b_vqav2_materialization()
+    return _public_vqav2_materialization()
+
+
 SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
     EvidenceLane(
         slug="google_gemma_4_12b_it",
@@ -571,6 +585,9 @@ def _build_model_catalog_gpu_lanes(
                 preset_relpath=defaults.preset_relpath,
                 adapter=defaults.adapter,
                 verify_profile="dev",
+                vision_text_materialization=_public_vqav2_materialization_for_preset(
+                    defaults.preset_relpath
+                ),
             )
         )
         seen.add(model_id)
