@@ -13,6 +13,22 @@
         "scope": "ffn",
         "status": "selected"
       },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
+        "status": "selected"
+      },
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
@@ -42,6 +58,22 @@
         "format": "e5m2",
         "reason": "selected_by_evaluate_pass:e5m2_ffn",
         "scope": "ffn",
+        "status": "selected"
+      },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
         "status": "selected"
       },
       "lowrank_svd": {
@@ -75,6 +107,22 @@
         "scope": "ffn",
         "status": "selected"
       },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
+        "status": "selected"
+      },
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
@@ -104,6 +152,22 @@
         "format": "e5m2",
         "reason": "selected_by_evaluate_pass:e5m2_ffn",
         "scope": "ffn",
+        "status": "selected"
+      },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
         "status": "selected"
       },
       "lowrank_svd": {
@@ -137,6 +201,22 @@
         "scope": "ffn",
         "status": "selected"
       },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
+        "status": "selected"
+      },
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
@@ -166,6 +246,22 @@
         "format": "e5m2",
         "reason": "selected_by_supported_experimental_recheck_seed:e5m2_ffn",
         "scope": "ffn",
+        "status": "selected"
+      },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
         "status": "selected"
       },
       "lowrank_svd": {
@@ -199,6 +295,22 @@
         "scope": "ffn",
         "status": "selected"
       },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
+        "status": "selected"
+      },
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
@@ -228,6 +340,22 @@
         "format": "e5m2",
         "reason": "selected_by_supported_experimental_recheck_seed:e5m2_ffn",
         "scope": "ffn",
+        "status": "selected"
+      },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
         "status": "selected"
       },
       "lowrank_svd": {
@@ -261,6 +389,22 @@
         "scope": "ffn",
         "status": "selected"
       },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
+        "status": "selected"
+      },
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
@@ -290,6 +434,22 @@
         "format": "e5m2",
         "reason": "selected_by_supported_experimental_recheck_seed:e5m2_ffn",
         "scope": "ffn",
+        "status": "selected"
+      },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
         "status": "selected"
       },
       "lowrank_svd": {
@@ -323,6 +483,22 @@
         "scope": "ffn",
         "status": "selected"
       },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
+        "status": "selected"
+      },
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
@@ -352,6 +528,22 @@
         "format": "e5m2",
         "reason": "selected_by_supported_experimental_recheck_seed:e5m2_ffn",
         "scope": "ffn",
+        "status": "selected"
+      },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
         "status": "selected"
       },
       "lowrank_svd": {
@@ -385,6 +577,22 @@
         "scope": "ffn",
         "status": "selected"
       },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
+        "status": "selected"
+      },
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
@@ -414,6 +622,22 @@
         "format": "e5m2",
         "reason": "selected_by_supported_experimental_recheck_seed:e5m2_ffn",
         "scope": "ffn",
+        "status": "selected"
+      },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
         "status": "selected"
       },
       "lowrank_svd": {
@@ -447,6 +671,22 @@
         "scope": "ffn",
         "status": "selected"
       },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
+        "status": "selected"
+      },
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
@@ -476,6 +716,22 @@
         "format": "e5m2",
         "reason": "selected_by_supported_experimental_recheck_seed:e5m2_ffn",
         "scope": "ffn",
+        "status": "selected"
+      },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
         "status": "selected"
       },
       "lowrank_svd": {
@@ -509,6 +765,22 @@
         "scope": "ffn",
         "status": "selected"
       },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
+        "status": "selected"
+      },
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
@@ -538,6 +810,22 @@
         "format": "e5m2",
         "reason": "selected_by_candidate_promotion_seed:e5m2_ffn",
         "scope": "ffn",
+        "status": "selected"
+      },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
         "status": "selected"
       },
       "lowrank_svd": {
@@ -571,6 +859,22 @@
         "scope": "ffn",
         "status": "selected"
       },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
+        "status": "selected"
+      },
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
@@ -600,6 +904,22 @@
         "format": "e5m2",
         "reason": "selected_by_evaluate_pass:e5m2_ffn",
         "scope": "ffn",
+        "status": "selected"
+      },
+      "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1
+      },
+      "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
         "status": "selected"
       },
       "lowrank_svd": {

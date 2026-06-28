@@ -154,6 +154,15 @@ def test_extract_edit_metadata_preserves_optional_edit_provenance_and_impact():
     ]
 
 
+def test_extract_edit_metadata_preserves_generated_edit_algorithms():
+    for algorithm in ("lora_merge", "fine_tune", "magnitude_prune", "lowrank_svd"):
+        report = {"edit": {"name": algorithm, "algorithm": algorithm}}
+
+        metadata = report_edit_summary_mod.extract_edit_metadata(report, {})
+
+        assert metadata["algorithm"] == algorithm
+
+
 def test_compute_report_digest_returns_none_for_non_dict():
     assert provenance_mod.compute_report_digest(None) is None
 

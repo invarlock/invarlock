@@ -28,7 +28,6 @@ REAL_PRODUCER_MARKERS = (
     "run_pack.sh",
     "run_suite.sh",
     "run_model_evidence_remote.py",
-    "run_qwen14_sentinels.sh",
 )
 _MANIFEST_OBJECT_ERROR = "empirical guard evidence manifest must be a JSON object."
 

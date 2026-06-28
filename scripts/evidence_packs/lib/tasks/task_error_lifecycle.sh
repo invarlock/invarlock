@@ -43,8 +43,13 @@ task_create_error() {
     echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Creating error model: ${error_type}" >> "${log_file}"
 
     local -a injector_env=()
+    local injector_env_count=0
     if [[ -n "${error_env_json}" && "${error_env_json}" != "null" ]]; then
-        mapfile -t injector_env < <(
+        while IFS= read -r injector_entry; do
+            [[ -z "${injector_entry}" ]] && continue
+            injector_env+=("${injector_entry}")
+            injector_env_count=$((injector_env_count + 1))
+        done < <(
             printf '%s\n' "${error_env_json}" | jq -r '
                 objects
                 | to_entries[]
@@ -56,13 +61,13 @@ task_create_error() {
             ' 2>/dev/null
         )
     fi
-    if [[ ${#injector_env[@]} -gt 0 ]]; then
+    if [[ ${injector_env_count} -gt 0 ]]; then
         echo "  Injector env overrides: ${injector_env[*]}" >> "${log_file}"
     fi
 
     local create_rc=0
     if type create_error_model &>/dev/null; then
-        if [[ ${#injector_env[@]} -gt 0 ]]; then
+        if [[ ${injector_env_count} -gt 0 ]]; then
             local -a injector_keys=()
             local -a injector_prev_values=()
             local -a injector_had_prev=()
@@ -291,6 +296,7 @@ task_evaluate_error() {
         )
     fi
     local -a baseline_report_args=()
+    local baseline_report_arg_count=0
     if [[ -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
         local abs_baseline_report_file
         abs_baseline_report_file="$(_stage_baseline_report_for_eval "${baseline_report_file}" "${cert_dir}" "${log_file}")" || {
@@ -305,6 +311,7 @@ task_evaluate_error() {
         IFS=':' read -r seq_len stride preview_n final_n <<< "${effective_report_schedule}"
         echo "  Using effective baseline report schedule for evaluate runtime: seq=${seq_len}, stride=${stride}, preview=${preview_n}, final=${final_n}" >> "${log_file}"
         baseline_report_args=(--baseline-report "${abs_baseline_report_file}")
+        baseline_report_arg_count=2
         echo "  Reusing baseline report: ${baseline_report_file}" >> "${log_file}"
     else
         echo "  WARNING: Baseline report unavailable; will run per-cert baseline evaluation" >> "${log_file}"
@@ -409,17 +416,24 @@ PRESET_YAML
     }
     (
         cd "${work_dir}" || exit 1
-        env "${extra_env[@]}" invarlock evaluate \
-            --baseline "${abs_baseline_path}" \
-            "${baseline_report_args[@]}" \
-            --subject "${abs_error_path}" \
-            --profile "${profile_flag}" \
-            --tier "${tier}" \
-            --out "${cert_dir}" \
-            --report-out "${cert_dir}" \
-            --preset "${abs_preset_file}" \
-            --assurance "${evaluate_assurance}" \
-            "${evaluate_extra_args[@]}" >> "${log_file}" 2>&1
+        local -a evaluate_cmd=(
+            env "${extra_env[@]}" invarlock evaluate
+            --baseline "${abs_baseline_path}"
+        )
+        if [[ ${baseline_report_arg_count} -gt 0 ]]; then
+            evaluate_cmd+=("${baseline_report_args[@]}")
+        fi
+        evaluate_cmd+=(
+            --subject "${abs_error_path}"
+            --profile "${profile_flag}"
+            --tier "${tier}"
+            --out "${cert_dir}"
+            --report-out "${cert_dir}"
+            --preset "${abs_preset_file}"
+            --assurance "${evaluate_assurance}"
+            "${evaluate_extra_args[@]}"
+        )
+        "${evaluate_cmd[@]}" >> "${log_file}" 2>&1
     ) || exit_code=$?
 
     # Find and copy report (only the canonical cert)
@@ -490,20 +504,20 @@ PRESET_YAML
         local probe_out="${cert_dir}/rmt_probe.json"
         if [[ -f "${probe_script}" && -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
             local probe_rc=0
-            local probe_args=()
+            local -a probe_cmd=(
+                _cmd_python "${probe_script}"
+                --baseline-model "${abs_baseline_path}"
+                --subject-model "${abs_error_path}"
+                --baseline-report "${baseline_report_file}"
+                --out "${probe_out}"
+                --tier "${tier}"
+                --profile "${profile_flag}"
+                --activation-windows "${PACK_RMT_PROBE_WINDOWS:-64}"
+            )
             if pack_remote_code_allowed; then
-                probe_args+=(--trust-remote-code)
+                probe_cmd+=(--trust-remote-code)
             fi
-            _cmd_python "${probe_script}" \
-                --baseline-model "${abs_baseline_path}" \
-                --subject-model "${abs_error_path}" \
-                --baseline-report "${baseline_report_file}" \
-                --out "${probe_out}" \
-                --tier "${tier}" \
-                --profile "${profile_flag}" \
-                --activation-windows "${PACK_RMT_PROBE_WINDOWS:-64}" \
-                "${probe_args[@]}" \
-                >> "${log_file}" 2>&1 || probe_rc=$?
+            "${probe_cmd[@]}" >> "${log_file}" 2>&1 || probe_rc=$?
             if [[ ${probe_rc} -ne 0 ]]; then
                 echo "  WARNING: RMT cross-model probe failed (exit=${probe_rc})" >> "${log_file}"
             fi
@@ -520,21 +534,21 @@ PRESET_YAML
         local ve_probe_out="${cert_dir}/ve_probe.json"
         if [[ -f "${ve_probe_script}" && -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
             local ve_probe_rc=0
-            local ve_probe_args=()
+            local -a ve_probe_cmd=(
+                _cmd_python "${ve_probe_script}"
+                --baseline-model "${abs_baseline_path}"
+                --subject-model "${abs_error_path}"
+                --baseline-report "${baseline_report_file}"
+                --out "${ve_probe_out}"
+                --tier "${tier}"
+                --profile "${profile_flag}"
+                --calibration-windows "${PACK_VE_PROBE_WINDOWS:-12}"
+                --min-coverage "${PACK_VE_PROBE_MIN_COVERAGE:-10}"
+            )
             if pack_remote_code_allowed; then
-                ve_probe_args+=(--trust-remote-code)
+                ve_probe_cmd+=(--trust-remote-code)
             fi
-            _cmd_python "${ve_probe_script}" \
-                --baseline-model "${abs_baseline_path}" \
-                --subject-model "${abs_error_path}" \
-                --baseline-report "${baseline_report_file}" \
-                --out "${ve_probe_out}" \
-                --tier "${tier}" \
-                --profile "${profile_flag}" \
-                --calibration-windows "${PACK_VE_PROBE_WINDOWS:-12}" \
-                --min-coverage "${PACK_VE_PROBE_MIN_COVERAGE:-10}" \
-                "${ve_probe_args[@]}" \
-                >> "${log_file}" 2>&1 || ve_probe_rc=$?
+            "${ve_probe_cmd[@]}" >> "${log_file}" 2>&1 || ve_probe_rc=$?
             if [[ ${ve_probe_rc} -ne 0 ]]; then
                 echo "  WARNING: VE cross-model probe failed (exit=${ve_probe_rc})" >> "${log_file}"
             fi

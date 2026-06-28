@@ -164,32 +164,23 @@ estimate_model_weights_gb() {
         return 0
     fi
 
-    case "${lower}" in
-        *"72b"*)
-            echo 144
-            ;;
-        *"70b"*)
-            echo 140
-            ;;
-        *"34b"*)
-            echo 68
-            ;;
-        *"32b"*)
-            echo 64
-            ;;
-        *"14b"*)
-            echo 28
-            ;;
-        *"13b"*)
-            echo 26
-            ;;
-        *"7b"*)
-            echo 14
-            ;;
-        *)
-            return 1
-            ;;
-    esac
+    if [[ "${lower}" =~ (^|[^0-9])([0-9]+)([._][0-9]+)?b([^0-9]|$) ]]; then
+        local major="${BASH_REMATCH[2]}"
+        local fractional="${BASH_REMATCH[3]:-}"
+        if [[ -n "${fractional}" ]]; then
+            fractional="${fractional#[._]}"
+            awk -v major="${major}" -v fractional="${fractional}" 'BEGIN {
+                scale = 10 ^ length(fractional)
+                params = major + fractional / scale
+                printf "%d\n", int(params * 2 + 0.999)
+            }'
+            return 0
+        fi
+        echo $((major * 2))
+        return 0
+    fi
+
+    return 1
 }
 
 estimate_planned_model_storage_gb() {

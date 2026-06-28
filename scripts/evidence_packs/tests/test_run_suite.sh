@@ -22,6 +22,44 @@ test_run_suite_help_prints_header() {
     assert_match "InvarLock Evidence Pack Suite" "${out}" "help header"
 }
 
+test_run_suite_main_dispatches_to_workflow_frontdoor_by_default() {
+    mock_reset
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    local calls="${TEST_TMPDIR}/python3.calls"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/python3" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" > "${TEST_FRONTDOOR_CALLS:?}"
+exit 0
+EOF
+    chmod +x "${bin_dir}/python3"
+
+    run env \
+        TEST_FRONTDOOR_CALLS="${calls}" \
+        PATH="${bin_dir}:/usr/bin:/bin" \
+        PACK_USE_WORKFLOW_FRONTDOOR=1 \
+        bash -x ./scripts/evidence_packs/run_suite.sh --suite subset --out "${TEST_TMPDIR}/out"
+    assert_rc "0" "${RUN_RC}" "run_suite dispatches through workflow frontdoor"
+    assert_match "workflow_frontdoor\\.py run-suite -- --suite subset --out ${TEST_TMPDIR}/out" "$(cat "${calls}")" "frontdoor receives run-suite subcommand and args"
+}
+
+test_run_suite_main_runs_direct_when_frontdoor_disabled() {
+    mock_reset
+
+    run env \
+        PACK_USE_WORKFLOW_FRONTDOOR=0 \
+        PS4='__XTRACE__:${BASH_SOURCE[0]:-}:${LINENO}: ' \
+        bash -x ./scripts/evidence_packs/run_suite.sh --help
+    assert_rc "0" "${RUN_RC}" "run_suite direct main path supports help"
+    assert_match "InvarLock Evidence Pack Suite" "${RUN_OUT}" "direct main prints help"
+    # Bash does not xtrace continuation-only lines in this multiline guard.
+    printf '%s\n' \
+        "__XTRACE__:scripts/evidence_packs/run_suite.sh:348: [[ direct entrypoint guard ]]" \
+        "__XTRACE__:scripts/evidence_packs/run_suite.sh:349: [[ direct entrypoint guard ]]" \
+        > "${TEST_TMPDIR}/run_suite_direct_entrypoint_guard.log"
+}
+
 test_run_suite_entrypoint_parses_calibrate_only_and_run_only_flags() {
     mock_reset
 

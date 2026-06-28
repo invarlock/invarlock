@@ -1337,3 +1337,28 @@ test_reservation_scoping_does_not_clobber_locals() {
     release_gpus "task_scoping" >/dev/null || true
     assert_eq "SENTINEL_GPU_ID" "${gpu_id}" "gpu_id clobbered after release_gpus()"
 }
+
+test_scheduler_direct_module_source_guards() {
+    mock_reset
+
+    (
+        get_task_field() { return 0; }
+        # shellcheck source=../scheduler_core.sh
+        source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler_core.sh"
+        declare -F calculate_required_gpus >/dev/null
+    )
+
+    (
+        # shellcheck source=../scheduler_reservations.sh
+        source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler_reservations.sh"
+        declare -F reserve_gpus >/dev/null
+        declare -F get_gpu_available_memory >/dev/null
+    )
+
+    (
+        # shellcheck source=../scheduler_selection.sh
+        source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler_selection.sh"
+        declare -F find_and_claim_task >/dev/null
+        declare -F reserve_gpus >/dev/null
+    )
+}

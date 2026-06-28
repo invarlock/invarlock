@@ -13,6 +13,20 @@ test_dataset_provider_config_default_string_provider() {
     assert_match 'provider: "wikitext2"' "${out}" "defaults to wikitext2 string provider"
 }
 
+test_dataset_provider_config_model_trust_remote_code_yaml_branches() {
+    mock_reset
+
+    # shellcheck source=../lib/config/dataset_provider_config.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/dataset_provider_config.sh"
+
+    unset INVARLOCK_ALLOW_REMOTE_CODE
+    assert_eq "  trust_remote_code: false" "$(pack_model_trust_remote_code_yaml "  ")" "model trust remote code defaults false"
+
+    INVARLOCK_ALLOW_REMOTE_CODE="1"
+    export INVARLOCK_ALLOW_REMOTE_CODE
+    assert_eq "  trust_remote_code: true" "$(pack_model_trust_remote_code_yaml "  ")" "model trust remote code follows explicit allow"
+}
+
 test_dataset_provider_config_yaml_override_supports_blank_lines() {
     mock_reset
 

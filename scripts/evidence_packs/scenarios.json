@@ -111,6 +111,54 @@
       "run_directory_contains_edit_artifacts": true
     },
     {
+      "id": "lora_rank4_clean",
+      "suites": [
+        "subset",
+        "showcase",
+        "workshop3",
+        "full"
+      ],
+      "category": "clean",
+      "failure_class": "common_edit.lora_merge",
+      "strictness": "must_pass",
+      "intent": "clean_control",
+      "primary_guard": "primary_metric",
+      "generation": {
+        "kind": "edit",
+        "edit_spec": "lora_merge:clean:attn",
+        "version": "clean"
+      },
+      "artifact_class": "validation_subject_checkpoint",
+      "deployable_as_hf_checkpoint": true,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
+    },
+    {
+      "id": "fine_tune_step1_clean",
+      "suites": [
+        "subset",
+        "showcase",
+        "workshop3",
+        "full"
+      ],
+      "category": "clean",
+      "failure_class": "common_edit.fine_tune",
+      "strictness": "must_pass",
+      "intent": "clean_control",
+      "primary_guard": "primary_metric",
+      "generation": {
+        "kind": "edit",
+        "edit_spec": "fine_tune:clean:ffn",
+        "version": "clean"
+      },
+      "artifact_class": "validation_subject_checkpoint",
+      "deployable_as_hf_checkpoint": true,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
+    },
+    {
       "id": "prune_50pct_stress",
       "suites": [
         "subset",
@@ -217,6 +265,90 @@
             "kind": "validation_flag",
             "flag": "spectral_stable",
             "expected": false
+          },
+          {
+            "kind": "spectral_caps_applied",
+            "min": 1
+          }
+        ]
+      },
+      "artifact_class": "validation_subject_checkpoint",
+      "deployable_as_hf_checkpoint": true,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
+    },
+    {
+      "id": "lora_rank8_stress",
+      "suites": [
+        "subset",
+        "showcase",
+        "workshop3",
+        "full"
+      ],
+      "category": "stress",
+      "failure_class": "stress_edit.lora_merge",
+      "strictness": "informational",
+      "intent": "subtle_detectable",
+      "primary_guard": "primary_metric",
+      "generation": {
+        "kind": "edit",
+        "edit_spec": "lora_merge:8:64:all",
+        "version": "stress"
+      },
+      "requirements": {
+        "detectors_any_of": [
+          {
+            "kind": "validation_flag",
+            "flag": "primary_metric_acceptable",
+            "expected": false
+          },
+          {
+            "kind": "primary_metric",
+            "field": "degraded",
+            "expected": true
+          },
+          {
+            "kind": "spectral_caps_applied",
+            "min": 1
+          }
+        ]
+      },
+      "artifact_class": "validation_subject_checkpoint",
+      "deployable_as_hf_checkpoint": true,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
+    },
+    {
+      "id": "fine_tune_step3_stress",
+      "suites": [
+        "subset",
+        "showcase",
+        "workshop3",
+        "full"
+      ],
+      "category": "stress",
+      "failure_class": "stress_edit.fine_tune",
+      "strictness": "informational",
+      "intent": "subtle_detectable",
+      "primary_guard": "primary_metric",
+      "generation": {
+        "kind": "edit",
+        "edit_spec": "fine_tune:0.0005:3:all",
+        "version": "stress"
+      },
+      "requirements": {
+        "detectors_any_of": [
+          {
+            "kind": "validation_flag",
+            "flag": "primary_metric_acceptable",
+            "expected": false
+          },
+          {
+            "kind": "primary_metric",
+            "field": "degraded",
+            "expected": true
           },
           {
             "kind": "spectral_caps_applied",

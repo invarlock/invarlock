@@ -477,7 +477,16 @@ def extract_edit_metadata(
         alg_lower = str(algorithm).strip().lower()
     except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
         alg_lower = ""
-    allowed_algorithms = {"quant_rtn", "noop", "custom"}
+    allowed_algorithms = {
+        "fine_tune",
+        "fp8_quant",
+        "lora_merge",
+        "lowrank_svd",
+        "magnitude_prune",
+        "noop",
+        "quant_rtn",
+        "custom",
+    }
     if alg_lower not in allowed_algorithms:
         algorithm = ""
 

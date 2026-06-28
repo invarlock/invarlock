@@ -414,7 +414,7 @@ mock_python3_force_real_cmd_python() {
 }
 
 push_active_python_bin() {
-    if [[ -v PYTHON_BIN ]]; then
+    if [[ "${PYTHON_BIN+x}" == "x" ]]; then
         TEST_PREV_PYTHON_BIN="${PYTHON_BIN}"
         TEST_PREV_PYTHON_BIN_WAS_SET="1"
     else

@@ -633,6 +633,10 @@ test_generate_model_tasks_disables_batch_for_large_memory_and_uses_manifest_fall
 
     # scenarios.json + jq fallback defaults should be used.
     assert_match "quant_rtn:clean:ffn" "${all_calls}" "fallback clean edit spec used"
+    assert_match "lora_merge:clean:attn" "${all_calls}" "fallback LoRA clean edit spec used"
+    assert_match "fine_tune:clean:ffn" "${all_calls}" "fallback fine-tune clean edit spec used"
+    assert_match "lora_merge:8:64:all" "${all_calls}" "fallback LoRA stress edit spec used"
+    assert_match "fine_tune:0.0005:3:all" "${all_calls}" "fallback fine-tune stress edit spec used"
     assert_match "weight_tying_break" "${all_calls}" "fallback error type used"
 }
 
@@ -661,8 +665,12 @@ test_generate_model_tasks_nonbatch_edit_dependencies_match_create_specs() {
     {"id": "fp8_clean", "generation": {"kind": "edit", "edit_spec": "fp8_quant:clean:ffn", "version": "clean"}},
     {"id": "prune_clean", "generation": {"kind": "edit", "edit_spec": "magnitude_prune:clean:ffn", "version": "clean"}},
     {"id": "svd_clean", "generation": {"kind": "edit", "edit_spec": "lowrank_svd:clean:ffn", "version": "clean"}},
+    {"id": "lora_clean", "generation": {"kind": "edit", "edit_spec": "lora_merge:clean:attn", "version": "clean"}},
+    {"id": "fine_clean", "generation": {"kind": "edit", "edit_spec": "fine_tune:clean:ffn", "version": "clean"}},
     {"id": "prune_stress", "generation": {"kind": "edit", "edit_spec": "magnitude_prune:0.5:all", "version": "stress"}},
-    {"id": "svd_stress", "generation": {"kind": "edit", "edit_spec": "lowrank_svd:32:all", "version": "stress"}}
+    {"id": "svd_stress", "generation": {"kind": "edit", "edit_spec": "lowrank_svd:32:all", "version": "stress"}},
+    {"id": "lora_stress", "generation": {"kind": "edit", "edit_spec": "lora_merge:8:64:all", "version": "stress"}},
+    {"id": "fine_stress", "generation": {"kind": "edit", "edit_spec": "fine_tune:0.0005:3:all", "version": "stress"}}
   ]
 }
 EOF
@@ -671,7 +679,7 @@ EOF
 
     local create_count
     create_count="$(find "${QUEUE_DIR}" -type f -name '*_CREATE_EDIT_*.task' | wc -l | tr -d ' ')"
-    assert_eq "6" "${create_count}" "all requested non-batch create tasks emitted"
+    assert_eq "10" "${create_count}" "all requested non-batch create tasks emitted"
 
     local duplicate_ids
     duplicate_ids="$(
@@ -1797,4 +1805,605 @@ test_queue_manager_terminal_state_covers_completed_variants() {
     get_queue_stats() { echo "0:1:1:0:0:2"; }
     run queue_terminal_state
     assert_rc "1" "${RUN_RC}" "active queue is not terminal"
+}
+
+test_queue_manager_direct_module_source_guards() {
+    mock_reset
+
+    (
+        # shellcheck source=../queue_dependencies.sh
+        source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_dependencies.sh"
+        declare -F check_dependencies_met >/dev/null
+        declare -F mark_task_ready >/dev/null
+    )
+
+    (
+        # shellcheck source=../queue_generation.sh
+        source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_generation.sh"
+        declare -F generate_all_tasks >/dev/null
+        declare -F check_dependencies_met >/dev/null
+    )
+}
+
+test_queue_lock_stale_owner_reads_owner_and_removes_lock() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
+
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+
+    local lock_dir="${QUEUE_DIR}/queue.lock.d"
+    mkdir -p "${lock_dir}"
+    printf '%s\n' "999999" > "${lock_dir}/owner"
+
+    _pid_is_alive() { return 1; }
+    _now_epoch() { echo "100"; }
+
+    acquire_queue_lock 1
+    assert_dir_exists "${QUEUE_LOCK_DIR}" "lock reacquired after stale owner cleanup"
+    release_queue_lock
+}
+
+test_queue_lifecycle_move_failures_release_locks() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
+
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+
+    jq -n '{task_id:"ready_mv", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+        > "${QUEUE_DIR}/ready/ready_mv.task"
+    jq -n '{task_id:"complete_mv", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+        > "${QUEUE_DIR}/running/complete_mv.task"
+    jq -n '{task_id:"fail_mv", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+        > "${QUEUE_DIR}/running/fail_mv.task"
+
+    mark_task_started() { return 0; }
+    mark_task_completed() { return 0; }
+    mark_task_failed() { return 0; }
+    update_progress_state() { :; }
+    mv() { return 1; }
+
+    run claim_task "ready_mv" "0"
+    assert_rc "1" "${RUN_RC}" "claim_task returns non-zero when ready->running move fails"
+    [[ -z "${QUEUE_LOCK_DIR:-}" ]] || t_fail "claim_task should release lock after move failure"
+
+    run complete_task "complete_mv"
+    assert_rc "1" "${RUN_RC}" "complete_task returns non-zero when running->completed move fails"
+    [[ -z "${QUEUE_LOCK_DIR:-}" ]] || t_fail "complete_task should release lock after move failure"
+
+    run fail_task "fail_mv" "boom"
+    assert_rc "1" "${RUN_RC}" "fail_task returns non-zero when running->failed move fails"
+    [[ -z "${QUEUE_LOCK_DIR:-}" ]] || t_fail "fail_task should release lock after move failure"
+}
+
+test_queue_dependency_cancellation_rechecks_age_and_updates_progress() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
+
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+
+    _now_epoch() { echo "100"; }
+    _file_mtime_epoch() { echo "0"; }
+    local progress_updates=0
+    update_progress_state() { progress_updates=$((progress_updates + 1)); }
+
+    jq -n '{task_id:"dep", task_type:"SETUP_BASELINE", model_id:"m", model_name:"d", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+        > "${QUEUE_DIR}/failed/dep.task"
+    jq -n '{task_id:"child", task_type:"EVAL_BASELINE", model_id:"m", model_name:"c", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:["dep"], params:{}, priority:50}' \
+        > "${QUEUE_DIR}/pending/child.task"
+
+    run cancel_tasks_with_failed_dependencies 10
+    assert_rc "0" "${RUN_RC}" "aged failed dependency cancellation succeeds"
+    assert_eq "1" "${RUN_OUT}" "aged failed dependency cancels child"
+    assert_file_exists "${QUEUE_DIR}/failed/child.task" "child moved to failed"
+    assert_eq "1" "${progress_updates}" "progress updated after cancellation"
+}
+
+test_queue_dependency_promotion_and_demote_branches_under_calibrate_only() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
+
+    export PACK_SUITE_MODE="calibrate-only"
+
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+
+    jq -n '{task_id:"allowed", task_type:"CALIBRATION_RUN", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+        > "${QUEUE_DIR}/pending/allowed.task"
+    jq -n '{task_id:"blocked", task_type:"EVAL_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+        > "${QUEUE_DIR}/pending/blocked.task"
+
+    assert_eq "1" "$(resolve_dependencies)" "only calibration task promoted"
+    assert_file_exists "${QUEUE_DIR}/ready/allowed.task" "allowed task promoted"
+    assert_file_exists "${QUEUE_DIR}/pending/blocked.task" "blocked task stays pending"
+
+    mv "${QUEUE_DIR}/pending/blocked.task" "${QUEUE_DIR}/ready/blocked.task"
+    update_task_status "${QUEUE_DIR}/ready/blocked.task" "ready"
+    demote_ready_tasks_for_calibration_only
+    assert_file_exists "${QUEUE_DIR}/pending/blocked.task" "disallowed ready task demoted"
+}
+
+test_queue_generation_error_paths_and_skip_branches() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
+
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+
+    _runtime_python() { return 1; }
+    run update_progress_state
+    assert_rc "1" "${RUN_RC}" "progress update returns non-zero when queue_state helper fails"
+
+    local calls="${TEST_TMPDIR}/calls"
+    : > "${calls}"
+    add_task() {
+        local task_type="$1"
+        printf '%s\n' "${task_type}" >> "${calls}"
+        local count
+        count=$(wc -l < "${calls}" | tr -d ' ')
+        echo "t${count}"
+    }
+    estimate_model_memory() { echo "14"; }
+    resolve_dependencies() { echo "0"; }
+    update_progress_state() { :; }
+    print_queue_stats() { :; }
+
+    DRIFT_CALIBRATION_RUNS=0
+    PACK_PRESET_READY=false
+    CLEAN_EDIT_RUNS=1
+    STRESS_EDIT_RUNS=0
+    RUN_ERROR_INJECTION=false
+    export DRIFT_CALIBRATION_RUNS PACK_PRESET_READY CLEAN_EDIT_RUNS STRESS_EDIT_RUNS RUN_ERROR_INJECTION
+    assert_match 'Skipping edit creation \(no calibrated preset available\)' "$(generate_model_tasks 1 "org/model" "model")" "no-preset branch reached"
+
+    : > "${calls}"
+    PACK_PRESET_READY=true
+    CLEAN_EDIT_RUNS=-3
+    STRESS_EDIT_RUNS=-2
+    assert_match 'Skipping edit creation \(CLEAN_EDIT_RUNS=0, STRESS_EDIT_RUNS=0\)' "$(generate_model_tasks 1 "org/model" "model")" "negative run counts clamp to zero"
+}
+
+test_generate_evaluate_and_all_tasks_branch_representatives() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
+
+    local calls="${TEST_TMPDIR}/calls"
+    : > "${calls}"
+    add_task() {
+        local task_type="$1"
+        local deps="$5"
+        printf '%s|%s\n' "${task_type}" "${deps}" >> "${calls}"
+        local count
+        count=$(wc -l < "${calls}" | tr -d ' ')
+        echo "t${count}"
+    }
+    estimate_model_memory() { echo "14"; }
+
+    generate_evaluate_tasks "org/model" "model" "edit1" "preset1" "spec" "clean" "bad" >/dev/null
+    assert_match 'evaluate_EDIT\|edit1,preset1' "$(cat "${calls}")" "preset dependency included for invalid cert_runs default"
+
+    : > "${calls}"
+    generate_evaluate_tasks "org/model" "model" "edit1" "" "spec" "clean" "-1" >/dev/null
+    assert_eq "" "$(cat "${calls}")" "negative cert_runs creates no evaluate tasks"
+
+    local generated=""
+    generate_model_tasks() { generated+="$1:$2:$3;"; }
+    resolve_dependencies() { echo "0"; }
+    update_progress_state() { :; }
+    print_queue_stats() { :; }
+
+    generate_all_tasks "" "Org/Model Name" >/dev/null
+    assert_match '2:Org/Model Name:org__model_name' "${generated}" "non-empty model id normalized and generated"
+}
+
+test_queue_memory_plan_profile_fallbacks_and_model_id_candidates() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
+
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+
+    _runtime_python() { echo "33 1"; }
+
+    jq -n '{task_id:"direct", task_type:"SETUP_BASELINE", model_id:"m", model_name:"model", status:"pending", model_size_gb:10, required_gpus:1, retries:0, max_retries:3, created_at:"x", dependencies:[], params:{}, priority:50}' \
+        > "${QUEUE_DIR}/pending/direct.task"
+    mkdir -p "${out_dir}/model/models/baseline"
+    echo '{}' > "${out_dir}/model/models/baseline/model_profile.json"
+    update_model_task_memory "model" "${out_dir}" ""
+    assert_eq "33" "$(jq -r '.model_size_gb' "${QUEUE_DIR}/pending/direct.task")" "model-local profile fallback used"
+
+    jq -n '{task_id:"candidate", task_type:"SETUP_BASELINE", model_id:"Org/Other Model", model_name:"candidate", status:"ready", model_size_gb:10, required_gpus:1, retries:0, max_retries:3, created_at:"x", dependencies:[], params:{}, priority:50}' \
+        > "${QUEUE_DIR}/ready/candidate.task"
+    mkdir -p "${out_dir}/models/org__other_model/baseline"
+    echo '{}' > "${out_dir}/models/org__other_model/baseline/model_profile.json"
+    update_model_task_memory "candidate" "${out_dir}" "Org/Other Model"
+    assert_eq "33" "$(jq -r '.model_size_gb' "${QUEUE_DIR}/ready/candidate.task")" "model_id sanitized profile candidate used"
+
+    mkdir -p "${out_dir}/profiled"
+    echo "Org/Profiled" > "${out_dir}/profiled/.model_id"
+    refresh_task_memory_from_profiles "${out_dir}"
+}
+
+test_queue_manager_remaining_core_dependency_and_lifecycle_branches() {
+    (
+        mock_reset
+        # shellcheck source=../queue_manager.sh
+        source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
+
+        local pack_root="${TEST_TMPDIR}/pack_root"
+        mkdir -p "${pack_root}/tools"
+        SCRIPT_DIR="${pack_root}/tools"
+        assert_eq "${pack_root}" "$(_pack_queue_pack_root)" "non-queue script dir resolves pack root"
+
+        local captured=""
+        local rc=0
+        mktemp() { return 1; }
+        set +e
+        capture_add_task captured "SETUP_BASELINE" "org/model" "model" "14" "none" '{}' "50"
+        rc=$?
+        set -e
+        assert_rc "1" "${rc}" "capture_add_task returns 1 when temp creation fails"
+        unset -f mktemp
+
+        add_task() { return 6; }
+        run capture_add_task captured "SETUP_BASELINE" "org/model" "model" "14" "none" '{}' "50"
+        assert_rc "6" "${RUN_RC}" "capture_add_task propagates add_task rc"
+
+        add_task() { return 0; }
+        run capture_add_task captured "SETUP_BASELINE" "org/model" "model" "14" "none" '{}' "50"
+        assert_rc "1" "${RUN_RC}" "capture_add_task rejects empty add_task output"
+    )
+
+    (
+        mock_reset
+        # shellcheck source=../queue_manager.sh
+        source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
+
+        local out_dir="${TEST_TMPDIR}/dep_out"
+        init_queue "${out_dir}" >/dev/null
+
+        run check_dependencies_met "${QUEUE_DIR}/pending/missing.task"
+        assert_rc "1" "${RUN_RC}" "missing dependency file returns unmet"
+
+        jq -n '{task_id:"baddeps", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", dependencies:["dep"], params:{}}' \
+            > "${QUEUE_DIR}/pending/baddeps.task"
+        get_task_dependencies() { return 1; }
+        run check_dependencies_met "${QUEUE_DIR}/pending/baddeps.task"
+        assert_rc "1" "${RUN_RC}" "dependency parser failure returns unmet"
+    )
+
+    (
+        mock_reset
+        # shellcheck source=../queue_manager.sh
+        source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
+
+        local out_dir="${TEST_TMPDIR}/cancel_out"
+        init_queue "${out_dir}" >/dev/null
+
+        _now_epoch() { echo "100"; }
+        _file_mtime_epoch() { echo ""; }
+
+        jq -n '{task_id:"dep", task_type:"SETUP_BASELINE", model_id:"m", model_name:"d", status:"failed", retries:0, max_retries:3, created_at:"x", dependencies:[], params:{}}' \
+            > "${QUEUE_DIR}/failed/dep.task"
+        jq -n '{task_id:"child", task_type:"EVAL_BASELINE", model_id:"m", model_name:"c", status:"pending", retries:0, max_retries:3, created_at:"x", dependencies:["dep"], params:{}}' \
+            > "${QUEUE_DIR}/pending/child.task"
+
+        assert_eq "1" "$(cancel_tasks_with_failed_dependencies "not-a-number")" "invalid grace still cancels failed dependency"
+        assert_file_exists "${QUEUE_DIR}/failed/child.task" "blocked child moved to failed"
+        assert_match 'Dependency failed: dep' "$(jq -r '.error_msg' "${QUEUE_DIR}/failed/child.task")" "failed dependency named in error"
+    )
+
+    (
+        mock_reset
+        # shellcheck source=../queue_manager.sh
+        source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
+
+        local out_dir="${TEST_TMPDIR}/dep_promote_out"
+        init_queue "${out_dir}" >/dev/null
+
+        jq -n '{task_id:"dep", task_type:"SETUP_BASELINE", model_id:"m", model_name:"d", status:"completed", retries:0, max_retries:3, created_at:"x", dependencies:[], params:{}}' \
+            > "${QUEUE_DIR}/completed/dep.task"
+        jq -n '{task_id:"child", task_type:"EVAL_BASELINE", model_id:"m", model_name:"c", status:"pending", retries:0, max_retries:3, created_at:"x", dependencies:["dep"], params:{}}' \
+            > "${QUEUE_DIR}/pending/child.task"
+
+        update_dependents "dep"
+        assert_file_exists "${QUEUE_DIR}/ready/child.task" "dependent promoted when completed dependency is present"
+    )
+
+    (
+        mock_reset
+        # shellcheck source=../queue_manager.sh
+        source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
+
+        local out_dir="${TEST_TMPDIR}/lifecycle_out"
+        init_queue "${out_dir}" >/dev/null
+
+        run complete_task "missing"
+        assert_rc "1" "${RUN_RC}" "complete_task releases and fails for missing running task"
+
+        run fail_task "missing" "boom"
+        assert_rc "1" "${RUN_RC}" "fail_task releases and fails for missing running task"
+
+        jq -n '{task_id:"race", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:0, max_retries:3, created_at:"x", dependencies:[], params:{}}' \
+            > "${QUEUE_DIR}/failed/race.task"
+        acquire_queue_lock() { rm -f "${QUEUE_DIR}/failed/race.task"; return 0; }
+        release_queue_lock() { return 0; }
+        run retry_task "race"
+        assert_rc "1" "${RUN_RC}" "retry_task fails if failed file disappears after lock"
+    )
+}
+
+test_generate_model_tasks_remaining_batch_and_nonbatch_paths() {
+    (
+        mock_reset
+        # shellcheck source=../queue_manager.sh
+        source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
+
+        local calls="${TEST_TMPDIR}/batch_calls"
+        : > "${calls}"
+        add_task() {
+            local task_type="$1"
+            local deps="$5"
+            local params="${6:-}"
+            printf '%s|%s|%s\n' "${task_type}" "${deps}" "${params}" >> "${calls}"
+            local count
+            count=$(wc -l < "${calls}" | tr -d ' ')
+            echo "b${count}"
+        }
+        estimate_model_memory() { echo "14"; }
+
+        local pack_root="${TEST_TMPDIR}/pack_batch"
+        mkdir -p "${pack_root}/lib"
+        SCRIPT_DIR="${pack_root}/lib"
+        cat > "${pack_root}/scenarios.json" <<'EOF'
+{
+  "scenarios": [
+    {"id": "clean", "generation": {"kind": "edit", "edit_spec": "clean_spec", "version": "clean"}},
+    {"id": "stress", "generation": {"kind": "edit", "edit_spec": "stress_spec", "version": "stress"}}
+  ]
+}
+EOF
+
+        PACK_USE_BATCH_EDITS="true"
+        PACK_CLEANUP_MODELS="1"
+        DRIFT_CALIBRATION_RUNS="1"
+        CLEAN_EDIT_RUNS="1"
+        STRESS_EDIT_RUNS="1"
+        RUN_ERROR_INJECTION="false"
+
+        generate_model_tasks "1" "org/model" "model" >/dev/null
+
+        local all_calls
+        all_calls="$(cat "${calls}")"
+        assert_match 'CREATE_EDITS_BATCH\|' "${all_calls}" "batch edit task created"
+        assert_match 'evaluate_EDIT\|b5,b3,b4\|' "${all_calls}" "clean batch evaluate waits for edit batch preset and baseline report"
+        assert_match 'evaluate_EDIT\|b5,b3,b4\|' "${all_calls}" "stress batch evaluate waits for edit batch preset and baseline report"
+        assert_eq "2" "$(awk -F '|' '$1=="CLEANUP_EDIT"{c++} END {print c+0}' "${calls}")" "batch cleanup tasks created for both edit versions"
+    )
+
+    (
+        mock_reset
+        # shellcheck source=../queue_manager.sh
+        source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
+
+        local calls="${TEST_TMPDIR}/nonbatch_calls"
+        : > "${calls}"
+        add_task() {
+            local task_type="$1"
+            local deps="$5"
+            local params="${6:-}"
+            printf '%s|%s|%s\n' "${task_type}" "${deps}" "${params}" >> "${calls}"
+            local count
+            count=$(wc -l < "${calls}" | tr -d ' ')
+            echo "n${count}"
+        }
+        estimate_model_memory() { echo "14"; }
+
+        local pack_root="${TEST_TMPDIR}/pack_nonbatch"
+        mkdir -p "${pack_root}/lib"
+        SCRIPT_DIR="${pack_root}/lib"
+        cat > "${pack_root}/scenarios.json" <<'EOF'
+{
+  "scenarios": [
+    {"id": "clean", "generation": {"kind": "edit", "edit_spec": "clean_spec", "version": "clean"}},
+    {"id": "stress", "generation": {"kind": "edit", "edit_spec": "stress_spec", "version": "stress"}}
+  ]
+}
+EOF
+
+        PACK_USE_BATCH_EDITS="false"
+        PACK_CLEANUP_MODELS="1"
+        DRIFT_CALIBRATION_RUNS="1"
+        CLEAN_EDIT_RUNS="1"
+        STRESS_EDIT_RUNS="1"
+        RUN_ERROR_INJECTION="false"
+
+        generate_model_tasks "1" "org/model" "model" >/dev/null
+
+        local all_calls
+        all_calls="$(cat "${calls}")"
+        assert_eq "2" "$(awk -F '|' '$1=="CREATE_EDIT"{c++} END {print c+0}' "${calls}")" "nonbatch creates one edit per manifest version"
+        assert_match 'evaluate_EDIT\|n5,n3,n4\|' "${all_calls}" "clean nonbatch evaluate waits for clean edit preset and baseline"
+        assert_match 'evaluate_EDIT\|n8,n3,n4\|' "${all_calls}" "stress nonbatch evaluate waits for stress edit preset and baseline"
+        assert_eq "2" "$(awk -F '|' '$1=="CLEANUP_EDIT"{c++} END {print c+0}' "${calls}")" "nonbatch cleanup tasks created for both edit versions"
+    )
+
+    (
+        mock_reset
+        # shellcheck source=../queue_manager.sh
+        source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
+
+        local calls="${TEST_TMPDIR}/large_memory_calls"
+        : > "${calls}"
+        add_task() {
+            local task_type="$1"
+            printf '%s\n' "${task_type}" >> "${calls}"
+            local count
+            count=$(wc -l < "${calls}" | tr -d ' ')
+            echo "m${count}"
+        }
+        estimate_model_memory() {
+            if [[ "${2:-}" == "evaluate_EDIT" ]]; then
+                echo "175"
+            else
+                echo "14"
+            fi
+        }
+
+        PACK_CLEANUP_MODELS="0"
+        DRIFT_CALIBRATION_RUNS="0"
+        PACK_PRESET_READY="false"
+        CLEAN_EDIT_RUNS="0"
+        STRESS_EDIT_RUNS="0"
+        RUN_ERROR_INJECTION="false"
+        unset PACK_USE_BATCH_EDITS
+
+        assert_match 'Skipping edit creation \(CLEAN_EDIT_RUNS=0, STRESS_EDIT_RUNS=0\)' \
+            "$(generate_model_tasks "1" "org/model-medium" "model-medium")" \
+            "large memory branch still produces a valid no-edit graph"
+        assert_match '^SETUP_BASELINE$' "$(cat "${calls}")" "setup task still created in large memory case"
+    )
+}
+
+test_generate_model_tasks_remaining_manifest_fallback_paths() {
+    (
+        mock_reset
+        # shellcheck source=../queue_manager.sh
+        source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
+
+        local out_dir="${TEST_TMPDIR}/state_out"
+        init_queue "${out_dir}" >/dev/null
+        cat > "${out_dir}/state/scenarios.json" <<'EOF'
+{
+  "scenarios": [
+    {"id": "clean", "generation": {"kind": "edit", "edit_spec": "state_clean_spec", "version": "clean"}},
+    {"id": "blank_error", "generation": {"kind": "error", "error_type": "", "env": {"SHOULD_SKIP": "1"}}},
+    {"id": "real_error", "generation": {"kind": "error", "error_type": "state_error", "env": {"MODE": "state"}}}
+  ]
+}
+EOF
+
+        local calls="${TEST_TMPDIR}/state_calls"
+        : > "${calls}"
+        add_task() {
+            local task_type="$1"
+            local params="${6:-}"
+            printf '%s|%s\n' "${task_type}" "${params}" >> "${calls}"
+            local count
+            count=$(wc -l < "${calls}" | tr -d ' ')
+            echo "s${count}"
+        }
+        estimate_model_memory() { echo "14"; }
+
+        PACK_USE_BATCH_EDITS="true"
+        PACK_PRESET_READY="true"
+        DRIFT_CALIBRATION_RUNS="0"
+        CLEAN_EDIT_RUNS="1"
+        STRESS_EDIT_RUNS="0"
+        RUN_ERROR_INJECTION="true"
+
+        generate_model_tasks "1" "org/model" "model" >/dev/null
+
+        local all_calls
+        all_calls="$(cat "${calls}")"
+        assert_match 'state_clean_spec' "${all_calls}" "state manifest edit spec used"
+        assert_eq "1" "$(awk -F '|' '$1=="CREATE_ERROR"{c++} END {print c+0}' "${calls}")" "blank state-manifest error skipped"
+        assert_match '"error_type":"state_error"' "${all_calls}" "state manifest error emitted"
+    )
+
+    (
+        mock_reset
+        # shellcheck source=../queue_manager.sh
+        source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
+
+        local calls="${TEST_TMPDIR}/fallback_calls"
+        : > "${calls}"
+        add_task() {
+            local task_type="$1"
+            local params="${6:-}"
+            printf '%s|%s\n' "${task_type}" "${params}" >> "${calls}"
+            local count
+            count=$(wc -l < "${calls}" | tr -d ' ')
+            echo "f${count}"
+        }
+        estimate_model_memory() { echo "14"; }
+
+        local pack_root="${TEST_TMPDIR}/pack_without_manifest"
+        mkdir -p "${pack_root}/lib"
+        SCRIPT_DIR="${pack_root}/lib"
+        command() {
+            if [[ "${1:-}" == "-v" && "${2:-}" == "jq" ]]; then
+                return 1
+            fi
+            builtin command "$@"
+        }
+        type() {
+            if [[ "${1:-}" == "-P" && "${2:-}" == "jq" ]]; then
+                return 1
+            fi
+            builtin type "$@"
+        }
+
+        PACK_USE_BATCH_EDITS="true"
+        PACK_PRESET_READY="true"
+        DRIFT_CALIBRATION_RUNS="0"
+        CLEAN_EDIT_RUNS="1"
+        STRESS_EDIT_RUNS="1"
+        RUN_ERROR_INJECTION="true"
+
+        generate_model_tasks "1" "org/model" "model" >/dev/null
+
+        local all_calls
+        all_calls="$(cat "${calls}")"
+        assert_match 'quant_rtn:clean:ffn' "${all_calls}" "fallback clean edit set used when manifest cannot load"
+        assert_match 'fine_tune:0.0005:3:all' "${all_calls}" "fallback stress edit set used when manifest cannot load"
+        assert_match 'CREATE_ERROR\|{"error_type": "nan_injection"}' "${all_calls}" "plain error JSON used when jq binary is unavailable"
+    )
+}
+
+test_generate_evaluate_and_all_tasks_remaining_owner_branches() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
+
+    local calls="${TEST_TMPDIR}/evaluate_calls"
+    : > "${calls}"
+    add_task() {
+        local task_type="$1"
+        local deps="$5"
+        printf '%s|%s\n' "${task_type}" "${deps}" >> "${calls}"
+        local count
+        count=$(wc -l < "${calls}" | tr -d ' ')
+        echo "e${count}"
+    }
+    estimate_model_memory() { echo "14"; }
+
+    generate_evaluate_tasks "org/model" "model" "edit1" "preset1" "spec" "clean" "bad" >/dev/null
+    assert_match 'evaluate_EDIT\|edit1,preset1' "$(cat "${calls}")" "invalid cert run count defaults to one evaluate task with preset dependency"
+
+    : > "${calls}"
+    generate_evaluate_tasks "org/model" "model" "edit1" "" "spec" "clean" "1" >/dev/null
+    assert_match 'evaluate_EDIT\|edit1$' "$(cat "${calls}")" "empty preset leaves evaluate dependency on edit only"
+
+    : > "${calls}"
+    generate_evaluate_tasks "org/model" "model" "edit1" "preset1" "spec" "clean" "-3" >/dev/null
+    assert_eq "" "$(cat "${calls}")" "negative cert run count emits no evaluate tasks"
+
+    local generated=""
+    generate_model_tasks() { generated+="$1:$2:$3;"; }
+    resolve_dependencies() { echo "0"; }
+    update_progress_state() { :; }
+    print_queue_stats() { :; }
+
+    generate_all_tasks "" "Org/Model Name" >/dev/null
+    assert_match '2:Org/Model Name:org__model_name' "${generated}" "generate_all_tasks normalizes non-empty model ids"
 }

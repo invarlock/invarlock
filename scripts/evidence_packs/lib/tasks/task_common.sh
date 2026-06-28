@@ -322,6 +322,20 @@ _task_create_model_variant() {
             fi
             create_lowrank_model "${baseline_path}" "${output_path}" "${param1}" "${scope}" "${gpu_id}"
             ;;
+        "lora_merge")
+            if ! type create_lora_merged_model &>/dev/null; then
+                echo "ERROR: create_lora_merged_model not available" >&2
+                return 1
+            fi
+            create_lora_merged_model "${baseline_path}" "${output_path}" "${param1}" "${param2}" "${scope}" "${gpu_id}"
+            ;;
+        "fine_tune")
+            if ! type create_fine_tuned_model &>/dev/null; then
+                echo "ERROR: create_fine_tuned_model not available" >&2
+                return 1
+            fi
+            create_fine_tuned_model "${baseline_path}" "${output_path}" "${param1}" "${param2}" "${scope}" "${gpu_id}"
+            ;;
         *)
             echo "ERROR: Unknown edit type: ${edit_type}" >&2
             return 1
@@ -535,7 +549,7 @@ _normalize_staged_preset_for_eval() {
 
     local previous_python_bin="${PYTHON_BIN:-}"
     local had_python_bin="0"
-    if [[ -v PYTHON_BIN ]]; then
+    if [[ "${PYTHON_BIN+x}" == "x" ]]; then
         had_python_bin="1"
     fi
     if [[ "${had_python_bin}" != "1" ]]; then
@@ -579,7 +593,7 @@ _baseline_report_schedule_for_eval() {
 
     local previous_python_bin="${PYTHON_BIN:-}"
     local had_python_bin="0"
-    if [[ -v PYTHON_BIN ]]; then
+    if [[ "${PYTHON_BIN+x}" == "x" ]]; then
         had_python_bin="1"
     fi
     if [[ "${had_python_bin}" != "1" ]]; then
@@ -691,23 +705,32 @@ YAML
 
         local guards_order_csv="${PACK_GUARDS_ORDER:-}"
         local -a raw_guards_order=()
+        local raw_guards_order_count=0
         if [[ -n "${guards_order_csv}" ]]; then
             IFS=',' read -ra raw_guards_order <<< "${guards_order_csv}"
+            raw_guards_order_count=${#raw_guards_order[@]}
         fi
         local -a guards_order=()
         local g
-        for g in "${raw_guards_order[@]}"; do
-            g="$(echo "${g}" | xargs)"
-            [[ -z "${g}" ]] && continue
-            guards_order+=("${g}")
-        done
-        if [[ ${#guards_order[@]} -eq 0 ]]; then
+        local guards_order_count=0
+        if [[ ${raw_guards_order_count} -gt 0 ]]; then
+            for g in "${raw_guards_order[@]}"; do
+                g="$(echo "${g}" | xargs)"
+                [[ -z "${g}" ]] && continue
+                guards_order+=("${g}")
+                guards_order_count=$((guards_order_count + 1))
+            done
+        fi
+        if [[ ${guards_order_count} -eq 0 ]]; then
             guards_order=("invariants" "spectral" "rmt" "variance" "invariants")
+            guards_order_count=5
         fi
         local guards_order_yaml=""
-        for g in "${guards_order[@]}"; do
-            guards_order_yaml+=$'    - '"${g}"$'\n'
-        done
+        if [[ ${guards_order_count} -gt 0 ]]; then
+            for g in "${guards_order[@]}"; do
+                guards_order_yaml+=$'    - '"${g}"$'\n'
+            done
+        fi
 
         local dataset_provider_yaml
         dataset_provider_yaml="$(pack_render_dataset_provider_yaml "${INVARLOCK_DATASET:-wikitext2}")"

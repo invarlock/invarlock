@@ -379,6 +379,172 @@ def apply_dense_lowrank_approximation(
     return stats
 
 
+def _deterministic_lowrank_delta(
+    weight: torch.Tensor,
+    *,
+    rank: int,
+) -> torch.Tensor:
+    original_shape = weight.shape
+    weight_2d = weight.reshape(weight.shape[0], -1)
+    out_features, in_features = weight_2d.shape
+    effective_rank = max(1, min(rank, out_features, in_features))
+    device = weight.device
+    basis = torch.arange(
+        1,
+        effective_rank + 1,
+        device=device,
+        dtype=torch.float32,
+    )
+    rows = torch.arange(1, out_features + 1, device=device, dtype=torch.float32)
+    cols = torch.arange(1, in_features + 1, device=device, dtype=torch.float32)
+    a = torch.sin(rows[:, None] * basis[None, :] * 0.017)
+    b = torch.cos(basis[:, None] * cols[None, :] * 0.013)
+    a = a / max(out_features, 1) ** 0.5
+    b = b / max(in_features, 1) ** 0.5
+    delta = a @ b
+    return delta.reshape(original_shape)
+
+
+@torch.no_grad()
+def _apply_deterministic_lowrank_update(
+    param: torch.Tensor,
+    *,
+    rank: int,
+    scale: float,
+    sign: float,
+    row_chunk_size: int = 256,
+) -> tuple[int, float]:
+    weight_2d = param.data.reshape(param.shape[0], -1)
+    out_features, in_features = weight_2d.shape
+    effective_rank = max(1, min(rank, out_features, in_features))
+    device = param.device
+    basis = torch.arange(
+        1,
+        effective_rank + 1,
+        device=device,
+        dtype=torch.float32,
+    )
+    cols = torch.arange(1, in_features + 1, device=device, dtype=torch.float32)
+    b = torch.cos(basis[:, None] * cols[None, :] * 0.013)
+    b = b / max(in_features, 1) ** 0.5
+    total_update_norm = 0.0
+    chunk_size = max(int(row_chunk_size), 1)
+
+    for start in range(0, out_features, chunk_size):
+        stop = min(start + chunk_size, out_features)
+        rows = torch.arange(start + 1, stop + 1, device=device, dtype=torch.float32)
+        a = torch.sin(rows[:, None] * basis[None, :] * 0.017)
+        a = a / max(out_features, 1) ** 0.5
+        update = (a @ b) * float(scale) * float(sign)
+        original = weight_2d[start:stop].float()
+        weight_2d[start:stop] = (original + update).to(weight_2d.dtype)
+        total_update_norm += float(update.norm().item())
+
+    return effective_rank, total_update_norm
+
+
+@torch.no_grad()
+def apply_dense_lora_merge_delta(
+    model: Any,
+    *,
+    rank: int,
+    alpha: float,
+    scope: str,
+) -> EditStats:
+    base_scope, layer_limit, layer_exact = parse_scope_layers(scope)
+    stats = EditStats(total_params=total_model_params(model))
+    total_delta_norm = 0.0
+
+    for name, param in model.named_parameters():
+        if not _layer_selected(
+            name,
+            layer_limit=layer_limit,
+            layer_exact=layer_exact,
+        ):
+            continue
+        if not _matches_scope(name, base_scope) or param.dim() < 2:
+            continue
+        base_scale = float(param.data.detach().abs().mean().float().item()) or 1.0
+        flat_shape = param.data.reshape(param.shape[0], -1).shape
+        effective_rank = max(1, min(rank, flat_shape[0], flat_shape[1]))
+        scale = (float(alpha) / effective_rank) * 0.001 * base_scale
+        _effective_rank, delta_norm = _apply_deterministic_lowrank_update(
+            param,
+            rank=rank,
+            scale=scale,
+            sign=1.0,
+        )
+        total_delta_norm += delta_norm
+        stats.edited_tensors += 1
+        stats.edited_params += param.numel()
+        if stats.edited_tensors <= 3:
+            print(f"  LoRA-merged: {name} ({tuple(param.shape)})")
+
+    stats.details.update(
+        {
+            "rank": int(rank),
+            "alpha": float(alpha),
+            "base_scope": base_scope,
+            "layer_limit": layer_limit,
+            "layer": layer_exact,
+            "total_delta_norm": total_delta_norm,
+        }
+    )
+    return stats
+
+
+@torch.no_grad()
+def apply_tiny_fine_tune_update(
+    model: Any,
+    *,
+    learning_rate: float,
+    steps: int,
+    scope: str,
+) -> EditStats:
+    base_scope, layer_limit, layer_exact = parse_scope_layers(scope)
+    stats = EditStats(total_params=total_model_params(model))
+    effective_steps = max(int(steps), 1)
+    total_update_norm = 0.0
+
+    for name, param in model.named_parameters():
+        if not _layer_selected(
+            name,
+            layer_limit=layer_limit,
+            layer_exact=layer_exact,
+        ):
+            continue
+        if not _matches_scope(name, base_scope) or param.dim() < 2:
+            continue
+        base_scale = float(param.data.detach().abs().mean().float().item()) or 1.0
+        update_scale = min(
+            max(float(learning_rate) * effective_steps * 100.0, 1e-4),
+            0.05,
+        )
+        _effective_rank, update_norm = _apply_deterministic_lowrank_update(
+            param,
+            rank=1,
+            scale=base_scale * update_scale,
+            sign=-1.0,
+        )
+        total_update_norm += update_norm
+        stats.edited_tensors += 1
+        stats.edited_params += param.numel()
+        if stats.edited_tensors <= 3:
+            print(f"  Fine-tune update: {name} ({tuple(param.shape)})")
+
+    stats.details.update(
+        {
+            "learning_rate": float(learning_rate),
+            "steps": effective_steps,
+            "base_scope": base_scope,
+            "layer_limit": layer_limit,
+            "layer": layer_exact,
+            "total_update_norm": total_update_norm,
+        }
+    )
+    return stats
+
+
 __all__ = [
     "EditStats",
     "_EXCLUDED_PATH_SEGMENTS",
@@ -388,9 +554,11 @@ __all__ = [
     "_matches_scope",
     "_path_segments",
     "apply_dense_lowrank_approximation",
+    "apply_dense_lora_merge_delta",
     "apply_dense_magnitude_prune",
     "apply_fp8_dequantized_simulation",
     "apply_rtn_dequantized_simulation",
+    "apply_tiny_fine_tune_update",
     "extract_layer_index",
     "fp8_dtype",
     "magnitude_prune_tensor",

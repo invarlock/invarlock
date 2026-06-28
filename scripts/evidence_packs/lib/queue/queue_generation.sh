@@ -262,6 +262,8 @@ generate_model_tasks() {
 
     local clean_edits=()
     local stress_edits=()
+    local clean_edit_count=0
+    local stress_edit_count=0
     local loaded_edit_manifest="false"
 
     if command -v jq >/dev/null 2>&1 && [[ -f "${scenarios_file}" ]]; then
@@ -274,12 +276,21 @@ generate_model_tasks() {
         if [[ -n "${edit_specs_json}" ]]; then
             loaded_edit_manifest="true"
         fi
-        mapfile -t clean_edits < <(
+        local edit_spec=""
+        while IFS= read -r edit_spec; do
+            [[ -n "${edit_spec}" ]] || continue
+            clean_edits+=("${edit_spec}")
+            clean_edit_count=$((clean_edit_count + 1))
+        done < <(
             jq -r '.scenarios[]
                 | select(.generation.kind=="edit" and .generation.version=="clean")
                 | .generation.edit_spec' "${scenarios_file}" 2>/dev/null
         )
-        mapfile -t stress_edits < <(
+        while IFS= read -r edit_spec; do
+            [[ -n "${edit_spec}" ]] || continue
+            stress_edits+=("${edit_spec}")
+            stress_edit_count=$((stress_edit_count + 1))
+        done < <(
             jq -r '.scenarios[]
                 | select(.generation.kind=="edit" and .generation.version=="stress")
                 | .generation.edit_spec' "${scenarios_file}" 2>/dev/null
@@ -288,8 +299,10 @@ generate_model_tasks() {
 
     if [[ "${loaded_edit_manifest}" != "true" ]]; then
         # Fallback defaults (kept for standalone script use).
-        clean_edits=("quant_rtn:clean:ffn" "fp8_quant:clean:ffn" "magnitude_prune:clean:ffn" "lowrank_svd:clean:ffn")
-        stress_edits=("quant_rtn:4:32:all" "fp8_quant:e5m2:all" "magnitude_prune:0.5:all" "lowrank_svd:32:all")
+        clean_edits=("quant_rtn:clean:ffn" "fp8_quant:clean:ffn" "magnitude_prune:clean:ffn" "lowrank_svd:clean:ffn" "lora_merge:clean:attn" "fine_tune:clean:ffn")
+        stress_edits=("quant_rtn:4:32:all" "fp8_quant:e5m2:all" "magnitude_prune:0.5:all" "lowrank_svd:32:all" "lora_merge:8:64:all" "fine_tune:0.0005:3:all")
+        clean_edit_count=6
+        stress_edit_count=6
     fi
 
     # Materialize the reusable noop baseline report as a real dependency instead
@@ -323,12 +336,12 @@ generate_model_tasks() {
 
         local -a requested_specs=()
         local edit_spec
-        if [[ ${clean_runs} -gt 0 ]]; then
+        if [[ ${clean_runs} -gt 0 && ${clean_edit_count} -gt 0 ]]; then
             for edit_spec in "${clean_edits[@]}"; do
                 requested_specs+=("{\"spec\": \"${edit_spec}\", \"version\": \"clean\"}")
             done
         fi
-        if [[ ${stress_runs} -gt 0 ]]; then
+        if [[ ${stress_runs} -gt 0 && ${stress_edit_count} -gt 0 ]]; then
             for edit_spec in "${stress_edits[@]}"; do
                 requested_specs+=("{\"spec\": \"${edit_spec}\", \"version\": \"stress\"}")
             done
@@ -344,7 +357,7 @@ generate_model_tasks() {
         task_ids+=("${edits_id}")
         echo "Created: ${edits_id}"
 
-        if [[ ${clean_runs} -gt 0 ]]; then
+        if [[ ${clean_runs} -gt 0 && ${clean_edit_count} -gt 0 ]]; then
             for edit_spec in "${clean_edits[@]}"; do
                 local -a eval_ids=()
                 local run
@@ -375,7 +388,7 @@ generate_model_tasks() {
             done
         fi
 
-        if [[ ${stress_runs} -gt 0 ]]; then
+        if [[ ${stress_runs} -gt 0 && ${stress_edit_count} -gt 0 ]]; then
             for edit_spec in "${stress_edits[@]}"; do
                 local -a eval_ids=()
                 local run
@@ -407,7 +420,7 @@ generate_model_tasks() {
         fi
     else
         # CREATE_EDIT - Create single edits (one task per edit) and enqueue eval/evaluate
-        if [[ ${clean_runs} -gt 0 ]]; then
+        if [[ ${clean_runs} -gt 0 && ${clean_edit_count} -gt 0 ]]; then
         for edit_spec in "${clean_edits[@]}"; do
             local edit_deps="${setup_id}"
             local edit_id=""
@@ -448,7 +461,7 @@ generate_model_tasks() {
         done
         fi
 
-        if [[ ${stress_runs} -gt 0 ]]; then
+        if [[ ${stress_runs} -gt 0 && ${stress_edit_count} -gt 0 ]]; then
         for edit_spec in "${stress_edits[@]}"; do
             local edit_id=""
             capture_add_task edit_id "CREATE_EDIT" "${model_id}" "${model_name}" \
@@ -493,8 +506,14 @@ generate_model_tasks() {
         local jq_bin=""
         jq_bin="$(type -P jq 2>/dev/null || true)"
         local error_pairs=()
+        local error_pair_count=0
         if [[ -n "${jq_bin}" && -f "${scenarios_file}" ]]; then
-            mapfile -t error_pairs < <(
+            local error_pair=""
+            while IFS= read -r error_pair; do
+                [[ -n "${error_pair}" ]] || continue
+                error_pairs+=("${error_pair}")
+                error_pair_count=$((error_pair_count + 1))
+            done < <(
                 "${jq_bin}" -r --arg model_id "${model_id}" --arg model_name "${model_name}" '.scenarios[]
                     | select(.generation.kind=="error")
                     | (.generation.env // {}) as $base_env
@@ -507,7 +526,7 @@ generate_model_tasks() {
                     | @tsv' "${scenarios_file}"
             )
         fi
-        if [[ ${#error_pairs[@]} -eq 0 && "${using_state_manifest}" != "true" ]]; then
+        if [[ ${error_pair_count} -eq 0 && "${using_state_manifest}" != "true" ]]; then
             :
             error_pairs=(
                 $'nan_injection\t{}'
@@ -520,7 +539,9 @@ generate_model_tasks() {
                 $'norm_collapse\t{}'
                 $'weight_tying_break\t{}'
             )
+            error_pair_count=9
         fi
+        if [[ ${error_pair_count} -gt 0 ]]; then
         for error_pair in "${error_pairs[@]}"; do
             local error_type="${error_pair%%$'\t'*}"
             local error_env_json="{}"
@@ -570,6 +591,7 @@ generate_model_tasks() {
                 echo "Created: ${cleanup_id}"
             fi
         done
+        fi
     else
         echo "Skipping error injection (RUN_ERROR_INJECTION=false or no preset)"
     fi

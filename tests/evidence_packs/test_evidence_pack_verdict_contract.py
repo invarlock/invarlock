@@ -78,19 +78,21 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
         spectral_violations=[],
     )
 
-    # Clean edits (4) => must PASS.
+    # Clean edits (6) => must PASS.
     for edit in (
         "quant_4bit_clean",
         "fp8_e5m2_clean",
         "prune_clean",
         "svd_rank32_clean",
+        "lora_rank4_clean",
+        "fine_tune_step1_clean",
     ):
         write_cert(
             model_dir / "reports" / edit / "run_1" / "evaluation.report.json",
             validation=shared_validation,
         )
 
-    # Stress edits (4): two catastrophic required to FAIL, one informational,
+    # Stress edits (6): two catastrophic required to FAIL, three informational,
     # and FP8 as a PM-pass spectral-intervention demonstration.
     for edit in ("prune_50pct_stress", "svd_rank32_stress"):
         write_cert(
@@ -128,6 +130,18 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
             ("model.layers.0.self_attn.k_proj", "attn", 3.2),
         ],
     )
+    for edit in ("lora_rank8_stress", "fine_tune_step3_stress"):
+        write_cert(
+            model_dir / "reports" / edit / "run_1" / "evaluation.report.json",
+            validation={
+                "invariants_pass": True,
+                "primary_metric_acceptable": False,
+                "spectral_stable": True,
+                "rmt_stable": True,
+                "preview_final_drift_acceptable": True,
+                "guard_overhead_acceptable": True,
+            },
+        )
 
     # Error injections (9) => must be detected (not PASS).
     for error_type in (
@@ -232,18 +246,18 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     assert "Auditable verification for edited model checkpoints." in verdict_text
     counts = verdict["counts"]
     assert counts["models_total"] == 1
-    assert counts["clean_total"] == 4
-    assert counts["stress_total"] == 4
+    assert counts["clean_total"] == 6
+    assert counts["stress_total"] == 6
     assert counts["error_injection_total"] == 12
-    assert counts["informational_stress_signaled"] == 1
+    assert counts["informational_stress_signaled"] == 3
     assert counts["primary_guard_required_scenarios"] == 6
     assert counts["primary_guard_required_hits"] == 6
 
     guard_summary = verdict["guard_signal_summary"]
-    assert guard_summary["records_total"] == 20
+    assert guard_summary["records_total"] == 24
     signals = guard_summary["signals"]
-    assert signals["primary_metric"]["flagged"] == 11
-    assert signals["primary_metric"]["unique"] == 2
+    assert signals["primary_metric"]["flagged"] == 13
+    assert signals["primary_metric"]["unique"] == 4
     assert signals["spectral"]["flagged"] == 10
     assert signals["spectral"]["unique"] == 1
     assert signals["rmt"]["flagged"] == 10
@@ -258,10 +272,10 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     assert interventions["ve_signal"]["flagged"] == 1
 
     category = verdict["category_summary"]
-    assert category["clean"]["reports"] == 4
+    assert category["clean"]["reports"] == 6
     assert category["clean"]["any_flag"] == 0
-    assert category["stress"]["reports"] == 4
-    assert category["stress"]["any_flag"] == 3
+    assert category["stress"]["reports"] == 6
+    assert category["stress"]["any_flag"] == 5
     assert category["error_injection"]["reports"] == 12
     assert category["error_injection"]["any_flag"] == 11
     assert verdict["manifest"]["path"] == "scripts/evidence_packs/scenarios.json"
