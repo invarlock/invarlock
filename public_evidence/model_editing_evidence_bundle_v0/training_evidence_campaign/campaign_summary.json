@@ -1,6 +1,6 @@
 {
   "campaign_id": "training-evidence-gpu-20260628",
-  "claim_boundary": "empirical training evidence only; no new assurance claim",
+  "evidence_scope": "empirical training evidence only; no new assurance claim",
   "lanes": [
     {
       "artifacts": {

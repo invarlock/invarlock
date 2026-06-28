@@ -629,12 +629,12 @@ def test_model_editing_evidence_bundle_v0_lanes_verify_release_strict() -> None:
     expected_families = {"quantization", "magnitude_prune", "lora_merge", "fine_tune"}
     lanes = manifest["lanes"]
     assert {lane["edit_family"] for lane in lanes} == expected_families
-    assert manifest["claim_boundary"] == "release-evidence wiring only"
+    assert manifest["evidence_scope"] == "release-evidence wiring only"
     assert summary["schema"] == (
         "invarlock.public_evidence.model_editing_bundle_verification.v1"
     )
     assert summary["bundle_id"] == manifest["bundle_id"]
-    assert summary["claim_boundary"] == manifest["claim_boundary"]
+    assert summary["evidence_scope"] == manifest["evidence_scope"]
     assert summary["verification"] == {
         "assurance": "strict",
         "lane_count": 4,

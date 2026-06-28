@@ -28,6 +28,11 @@ Options:
   --allow-network              Allow model/dataset downloads.
   --force                      Replace an existing subject directory.
   --materialize-only           Stop after writing the merged subject checkpoint.
+  --target-module NAME         LoRA target module; can be repeated.
+                               Default: materializer default.
+  --rank N                     LoRA rank override.
+  --alpha N                    LoRA alpha override.
+  --lora-init-scale VALUE      LoRA initialization scale override.
   --no-html                    Skip HTML rendering in the compare wrapper.
   -h, --help                   Show this help.
 
@@ -56,6 +61,10 @@ allow_network=0
 force=0
 materialize_only=0
 render_html=1
+target_modules=()
+rank=""
+alpha=""
+lora_init_scale=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -115,6 +124,22 @@ while [[ $# -gt 0 ]]; do
     --materialize-only)
       materialize_only=1
       shift
+      ;;
+    --target-module)
+      target_modules+=("${2:-}")
+      shift 2
+      ;;
+    --rank)
+      rank="${2:-}"
+      shift 2
+      ;;
+    --alpha)
+      alpha="${2:-}"
+      shift 2
+      ;;
+    --lora-init-scale)
+      lora_init_scale="${2:-}"
+      shift 2
       ;;
     --no-html)
       render_html=0
@@ -208,6 +233,18 @@ if [[ "$allow_network" -eq 1 ]]; then
 fi
 if [[ "$force" -eq 1 ]]; then
   materialize_cmd+=(--force)
+fi
+for target_module in "${target_modules[@]}"; do
+  materialize_cmd+=(--target-module "$target_module")
+done
+if [[ -n "$rank" ]]; then
+  materialize_cmd+=(--rank "$rank")
+fi
+if [[ -n "$alpha" ]]; then
+  materialize_cmd+=(--alpha "$alpha")
+fi
+if [[ -n "$lora_init_scale" ]]; then
+  materialize_cmd+=(--lora-init-scale "$lora_init_scale")
 fi
 
 integration_log_step "materialize tiny LoRA subject and local fixture"

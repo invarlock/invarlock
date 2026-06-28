@@ -16,7 +16,7 @@ def test_claim_surface_consistency_script_passes() -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_knowledge_self_edit_workflow_page_keeps_claim_boundary() -> None:
+def test_knowledge_self_edit_workflow_page_keeps_bounded_scope() -> None:
     text = (
         REPO_ROOT / "docs" / "user-guide" / "knowledge-and-self-edit-workflows.md"
     ).read_text(encoding="utf-8")

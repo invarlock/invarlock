@@ -22,7 +22,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SUMMARY_SCHEMA = "invarlock.training_evidence_campaign.summary.v1"
 HASH_INVENTORY_SCHEMA = "invarlock.training_evidence_campaign.hash_inventory.v1"
-CLAIM_BOUNDARY = "empirical training evidence only; no new assurance claim"
+EVIDENCE_SCOPE = "empirical training evidence only; no new assurance claim"
 DEFAULT_TARGETS = ("peft_lora", "fine_tune")
 PUBLISHABLE_ARTIFACTS = {
     "evaluation_report": "evaluation.report.json",
@@ -206,6 +206,19 @@ def _command_for_target(
     ]
     if args.execution_lane == "host":
         command.extend(["--device", args.device])
+    if args.baseline:
+        command.extend(["--baseline", args.baseline])
+    if config.target == "peft_lora":
+        for target_module in args.peft_target_module or []:
+            command.extend(["--target-module", target_module])
+        if args.peft_rank is not None:
+            command.extend(["--rank", str(args.peft_rank)])
+        if args.peft_alpha is not None:
+            command.extend(["--alpha", str(args.peft_alpha)])
+        if args.peft_lora_init_scale is not None:
+            command.extend(["--lora-init-scale", str(args.peft_lora_init_scale)])
+    elif config.target == "fine_tune" and args.fine_tune_learning_rate is not None:
+        command.extend(["--learning-rate", str(args.fine_tune_learning_rate)])
     if args.allow_network:
         command.append("--allow-network")
     if args.force:
@@ -330,7 +343,7 @@ def _build_summary(
         "schema": SUMMARY_SCHEMA,
         "campaign_id": campaign_id,
         "status": status,
-        "claim_boundary": CLAIM_BOUNDARY,
+        "evidence_scope": EVIDENCE_SCOPE,
         "weights_vendored": False,
         "public_artifact_policy": (
             "publish public summaries, report manifests, checkpoint references, "
@@ -354,7 +367,7 @@ def _build_inventory(
         "schema": HASH_INVENTORY_SCHEMA,
         "campaign_id": campaign_id,
         "status": status,
-        "claim_boundary": CLAIM_BOUNDARY,
+        "evidence_scope": EVIDENCE_SCOPE,
         "weights_vendored": False,
         "artifacts": sorted(
             artifacts,
@@ -499,6 +512,33 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--device",
         default="cpu",
         help="Host-lane device. Ignored for --execution-lane cuda. Default: cpu.",
+    )
+    parser.add_argument(
+        "--baseline",
+        help=(
+            "Optional baseline model ID or path forwarded to each target runner. "
+            "Defaults to each runner's tiny GPT-2 baseline."
+        ),
+    )
+    parser.add_argument(
+        "--peft-target-module",
+        action="append",
+        help=(
+            "Optional PEFT LoRA target module forwarded to the LoRA runner. "
+            "Can be repeated."
+        ),
+    )
+    parser.add_argument("--peft-rank", type=int, help="Optional PEFT LoRA rank.")
+    parser.add_argument("--peft-alpha", type=int, help="Optional PEFT LoRA alpha.")
+    parser.add_argument(
+        "--peft-lora-init-scale",
+        type=float,
+        help="Optional PEFT LoRA initialization scale.",
+    )
+    parser.add_argument(
+        "--fine-tune-learning-rate",
+        type=float,
+        help="Optional full fine-tune learning rate.",
     )
     parser.add_argument("--profile", default="release")
     parser.add_argument("--tier", default="balanced")
