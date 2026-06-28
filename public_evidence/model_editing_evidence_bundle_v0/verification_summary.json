@@ -1,6 +1,6 @@
 {
   "bundle_id": "invarlock-model-editing-evidence-bundle-v0",
-  "claim_boundary": "release-evidence wiring only",
+  "evidence_scope": "release-evidence wiring only",
   "hash_algorithm": "sha256",
   "lanes": [
     {

@@ -17,7 +17,7 @@ def test_training_evidence_campaign_summary_is_public_safe() -> None:
 
     assert summary["schema"] == "invarlock.training_evidence_campaign.summary.v1"
     assert summary["status"] == "completed"
-    assert summary["claim_boundary"] == (
+    assert summary["evidence_scope"] == (
         "empirical training evidence only; no new assurance claim"
     )
     assert summary["weights_vendored"] is False

@@ -63,7 +63,7 @@ def test_training_evidence_campaign_dry_run_writes_public_safe_summary(
     assert summary["schema"] == module.SUMMARY_SCHEMA
     assert summary["campaign_id"] == "training-evidence-test"
     assert summary["status"] == "planned"
-    assert summary["claim_boundary"] == module.CLAIM_BOUNDARY
+    assert summary["evidence_scope"] == module.EVIDENCE_SCOPE
     assert summary["weights_vendored"] is False
     assert {lane["target"] for lane in summary["lanes"]} == {
         "peft_lora",
@@ -90,7 +90,7 @@ def test_training_evidence_campaign_dry_run_writes_public_safe_summary(
         "schema": module.HASH_INVENTORY_SCHEMA,
         "campaign_id": "training-evidence-test",
         "status": "planned",
-        "claim_boundary": module.CLAIM_BOUNDARY,
+        "evidence_scope": module.EVIDENCE_SCOPE,
         "weights_vendored": False,
         "artifacts": [],
     }
@@ -194,3 +194,51 @@ def test_training_evidence_campaign_rejects_unknown_target() -> None:
         assert "unknown target" in str(exc)
     else:  # pragma: no cover - assertion guard
         raise AssertionError("unknown target was accepted")
+
+
+def test_training_evidence_campaign_forwards_bounded_edit_knobs(tmp_path: Path) -> None:
+    module = _load_module()
+    args = Namespace(
+        allow_network=True,
+        baseline="distilgpt2",
+        device="cpu",
+        execution_lane="cuda",
+        fine_tune_learning_rate=1e-6,
+        force=True,
+        peft_alpha=1,
+        peft_lora_init_scale=0.01,
+        peft_rank=1,
+        peft_target_module=["c_attn"],
+        profile="release",
+        render_html=False,
+        tier="balanced",
+    )
+
+    peft_paths = module._lane_paths(
+        config=module.TARGETS["peft_lora"], work_root=tmp_path
+    )
+    peft_command = module._command_for_target(
+        config=module.TARGETS["peft_lora"], paths=peft_paths, args=args
+    )
+
+    assert peft_command.count("--baseline") == 1
+    assert peft_command[peft_command.index("--baseline") + 1] == "distilgpt2"
+    assert peft_command[peft_command.index("--target-module") + 1] == "c_attn"
+    assert peft_command[peft_command.index("--rank") + 1] == "1"
+    assert peft_command[peft_command.index("--alpha") + 1] == "1"
+    assert peft_command[peft_command.index("--lora-init-scale") + 1] == "0.01"
+    assert "--allow-network" in peft_command
+    assert "--force" in peft_command
+    assert "--no-html" in peft_command
+
+    fine_tune_paths = module._lane_paths(
+        config=module.TARGETS["fine_tune"], work_root=tmp_path
+    )
+    fine_tune_command = module._command_for_target(
+        config=module.TARGETS["fine_tune"], paths=fine_tune_paths, args=args
+    )
+
+    assert fine_tune_command.count("--baseline") == 1
+    assert fine_tune_command[fine_tune_command.index("--baseline") + 1] == "distilgpt2"
+    assert fine_tune_command[fine_tune_command.index("--learning-rate") + 1] == "1e-06"
+    assert "--lora-init-scale" not in fine_tune_command

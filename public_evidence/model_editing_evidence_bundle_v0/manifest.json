@@ -1,6 +1,6 @@
 {
   "bundle_id": "invarlock-model-editing-evidence-bundle-v0",
-  "claim_boundary": "release-evidence wiring only",
+  "evidence_scope": "release-evidence wiring only",
   "description": "Publishable curated evidence lanes for edited subject artifacts.",
   "lanes": [
     {

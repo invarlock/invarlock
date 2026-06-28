@@ -64,6 +64,10 @@ def test_peft_lora_runner_wires_local_fixture() -> None:
     assert 'compare_cmd+=(--lane "$lane")' in text
     assert "--runtime-provenance" in text
     assert "--device" in text
+    assert "--target-module" in text
+    assert "--rank" in text
+    assert "--alpha" in text
+    assert "--lora-init-scale" in text
     assert "integration_log_header" in text
     assert "integration_log_step" in text
     assert "lane_artifact_label" in text
@@ -84,6 +88,7 @@ def test_fine_tune_runner_wires_local_fixture() -> None:
     assert 'compare_cmd+=(--lane "$lane")' in text
     assert "--runtime-provenance" in text
     assert "--device" in text
+    assert "--learning-rate" in text
     assert "integration_log_header" in text
     assert "integration_log_step" in text
     assert "lane_artifact_label" in text
@@ -491,6 +496,8 @@ def test_shared_compare_wrapper_checks_report_materialization() -> None:
     assert "lane_artifact.json" in text
     assert "lane_artifact_label" in text
     assert "run_summary.txt" in text
+    assert 'internal_runs_dir="$report_out/.invarlock-evaluation-runs"' in text
+    assert '--out "$internal_runs_dir"' in text
     assert "--require-backend-inventory" in text
     assert "InvarLock integration run complete" in text
     assert "InvarLock integration run failed" in text
@@ -620,6 +627,9 @@ raise SystemExit(f"unexpected fake invarlock command: {{args!r}}")
     assert "status: success" in (tmp_path / "reports" / "run_summary.txt").read_text(
         encoding="utf-8"
     )
+    run_command = (tmp_path / "reports" / "run_command.txt").read_text(encoding="utf-8")
+    assert "--out" in run_command
+    assert ".invarlock-evaluation-runs" in run_command
 
 
 def test_shared_source_archive_helper_avoids_macos_xattrs() -> None:

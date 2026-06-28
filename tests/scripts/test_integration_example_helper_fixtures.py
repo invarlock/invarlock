@@ -6,6 +6,8 @@ import sys
 import types
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INTEGRATIONS_DIR = REPO_ROOT / "examples" / "integrations"
 PEFT_DIR = INTEGRATIONS_DIR / "peft_lora"
@@ -92,6 +94,24 @@ def test_fine_tune_helper_writes_local_jsonl_and_preset(tmp_path: Path) -> None:
         expected_model_id="/tmp/tiny-gpt2-baseline",
         expected_format_version="tiny-fine-tune-fixture-v1",
     )
+
+
+def test_fine_tune_helper_rejects_non_finite_training_artifacts() -> None:
+    helper = _load_module(
+        FINE_TUNE_DIR / "materialize_tiny_fine_tune_subject.py",
+        "fine_tune_example_finite_guard",
+    )
+
+    helper._require_finite_training_artifacts(
+        loss_value=1.0,
+        delta={"max_abs_delta": 0.01, "by_tensor": {"w": 0.01}},
+    )
+
+    with pytest.raises(SystemExit, match="non-finite tensor deltas"):
+        helper._require_finite_training_artifacts(
+            loss_value=1.0,
+            delta={"max_abs_delta": float("inf"), "by_tensor": {"w": float("inf")}},
+        )
 
 
 def test_magnitude_prune_helper_writes_local_jsonl_and_preset(

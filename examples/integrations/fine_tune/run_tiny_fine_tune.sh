@@ -28,6 +28,7 @@ Options:
   --allow-network              Allow model/dataset downloads.
   --force                      Replace an existing subject directory.
   --materialize-only           Stop after writing the fine-tuned checkpoint.
+  --learning-rate VALUE        Fine-tune learning-rate override.
   --no-html                    Skip HTML rendering in the compare wrapper.
   -h, --help                   Show this help.
 
@@ -56,6 +57,7 @@ allow_network=0
 force=0
 materialize_only=0
 render_html=1
+learning_rate=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -115,6 +117,10 @@ while [[ $# -gt 0 ]]; do
     --materialize-only)
       materialize_only=1
       shift
+      ;;
+    --learning-rate)
+      learning_rate="${2:-}"
+      shift 2
       ;;
     --no-html)
       render_html=0
@@ -206,6 +212,9 @@ if [[ "$allow_network" -eq 1 ]]; then
 fi
 if [[ "$force" -eq 1 ]]; then
   materialize_cmd+=(--force)
+fi
+if [[ -n "$learning_rate" ]]; then
+  materialize_cmd+=(--learning-rate "$learning_rate")
 fi
 
 integration_log_step "materialize tiny fine-tuned subject and local fixture"
