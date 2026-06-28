@@ -2366,7 +2366,8 @@ EOF
         all_calls="$(cat "${calls}")"
         assert_match 'quant_rtn:clean:ffn' "${all_calls}" "fallback clean edit set used when manifest cannot load"
         assert_match 'fine_tune:0.0005:3:all' "${all_calls}" "fallback stress edit set used when manifest cannot load"
-        assert_match 'CREATE_ERROR\|{"error_type": "nan_injection"}' "${all_calls}" "plain error JSON used when jq binary is unavailable"
+        grep -Fxq 'CREATE_ERROR|{"error_type": "nan_injection"}' "${calls}" \
+            || t_fail "plain error JSON used when jq binary is unavailable actual='${all_calls}'"
     )
 }
 

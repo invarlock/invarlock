@@ -27,12 +27,20 @@ ALLOWED_CLASSES = {
     "real_guard_value_demo",
     "signed_real_model_pack",
     "runtime_backend_compat_sweep",
+    "evidence_pack_queue_stress_resume",
 }
 REAL_CLASSES = {"real_model_run", "real_guard_value_demo", "signed_real_model_pack"}
-NON_FIXTURE_CLASSES = REAL_CLASSES | {"runtime_backend_compat_sweep"}
+NON_FIXTURE_CLASSES = REAL_CLASSES | {
+    "runtime_backend_compat_sweep",
+    "evidence_pack_queue_stress_resume",
+}
 RUNTIME_BACKEND_COMPAT_SCHEMA = "invarlock.runtime_backend_compat.cuda128.summary.v1"
 RUNTIME_BACKEND_HASH_SCHEMA = (
     "invarlock.runtime_backend_compat.cuda128.hash_inventory.v1"
+)
+QUEUE_STRESS_SUMMARY_SCHEMA = "invarlock.evidence_pack_queue_stress_resume.summary.v1"
+QUEUE_STRESS_HASH_SCHEMA = (
+    "invarlock.evidence_pack_queue_stress_resume.hash_inventory.v1"
 )
 RUNTIME_BACKEND_FAMILIES = {
     "cuda-bnb": ("hf_bnb",),
@@ -583,6 +591,124 @@ def _check_runtime_backend_compat_sweep(
         )
 
 
+def _check_queue_stress_hash_inventory(
+    errors: list[str],
+    base: Path,
+    inventory_path: Path,
+) -> None:
+    inventory, error = _load_json(inventory_path)
+    if error:
+        errors.append(error)
+        return
+    assert inventory is not None
+    if inventory.get("schema") != QUEUE_STRESS_HASH_SCHEMA:
+        errors.append(
+            f"{_relative(inventory_path)}: schema must be {QUEUE_STRESS_HASH_SCHEMA}"
+        )
+    if inventory.get("status") != "completed":
+        errors.append(f"{_relative(inventory_path)}: status must be completed")
+    artifacts = inventory.get("artifacts")
+    if not isinstance(artifacts, list) or not artifacts:
+        errors.append(f"{_relative(inventory_path)}: artifacts must be non-empty")
+        return
+    for index, artifact in enumerate(artifacts):
+        if not isinstance(artifact, dict):
+            errors.append(
+                f"{_relative(inventory_path)}: artifacts[{index}] must be object"
+            )
+            continue
+        rel_path = artifact.get("path")
+        expected_sha = artifact.get("sha256")
+        expected_bytes = artifact.get("bytes")
+        if not isinstance(rel_path, str) or not rel_path:
+            errors.append(
+                f"{_relative(inventory_path)}: artifacts[{index}].path required"
+            )
+            continue
+        if rel_path.startswith("/") or ".." in Path(rel_path).parts:
+            errors.append(
+                f"{_relative(inventory_path)}: artifacts[{index}].path must be relative"
+            )
+            continue
+        path = base / rel_path
+        if not path.is_file():
+            errors.append(
+                f"{_relative(base)}: hash inventory file missing {rel_path!r}"
+            )
+            continue
+        content = path.read_bytes()
+        actual_sha = "sha256:" + hashlib.sha256(content).hexdigest()
+        if actual_sha != expected_sha:
+            errors.append(
+                f"{_relative(base)}: hash inventory mismatch for {rel_path!r}"
+            )
+        if len(content) != expected_bytes:
+            errors.append(
+                f"{_relative(base)}: hash inventory byte mismatch for {rel_path!r}"
+            )
+
+
+def _check_evidence_pack_queue_stress_resume(
+    errors: list[str],
+    base: Path,
+    artifact_paths: dict[str, Any],
+) -> None:
+    summary_path = _require_path(errors, base, artifact_paths, "stress_summary")
+    inventory_path = _require_path(errors, base, artifact_paths, "hash_inventory")
+    if inventory_path is not None:
+        _check_queue_stress_hash_inventory(errors, base, inventory_path)
+    if summary_path is None:
+        return
+    summary, error = _load_json(summary_path)
+    if error:
+        errors.append(error)
+        return
+    assert summary is not None
+    if summary.get("schema") != QUEUE_STRESS_SUMMARY_SCHEMA:
+        errors.append(
+            f"{_relative(summary_path)}: schema must be {QUEUE_STRESS_SUMMARY_SCHEMA}"
+        )
+    if summary.get("status") != "completed":
+        errors.append(f"{_relative(summary_path)}: status must be completed")
+    if summary.get("validation_environment") != "CUDA-capable validation host":
+        errors.append(
+            f"{_relative(summary_path)}: validation_environment must be generic"
+        )
+    if summary.get("raw_logs_published") is not False:
+        errors.append(f"{_relative(summary_path)}: raw_logs_published must be false")
+    if summary.get("weights_vendored") is not False:
+        errors.append(f"{_relative(summary_path)}: weights_vendored must be false")
+
+    suites = summary.get("suites")
+    if not isinstance(suites, list) or len(suites) < 2:
+        errors.append(f"{_relative(summary_path)}: suites must include both checks")
+        return
+    observed = {suite.get("name"): suite for suite in suites if isinstance(suite, dict)}
+    expected = {
+        "queue_manager_shell": 74,
+        "queue_state_python": 3,
+    }
+    for name, expected_passed in expected.items():
+        suite = observed.get(name)
+        if not isinstance(suite, dict):
+            errors.append(f"{_relative(summary_path)}: missing suite {name}")
+            continue
+        if suite.get("rc") != 0 or suite.get("tests_failed") != 0:
+            errors.append(f"{_relative(summary_path)}: {name} must pass cleanly")
+        if suite.get("tests_passed") != expected_passed:
+            errors.append(
+                f"{_relative(summary_path)}: {name} tests_passed must be {expected_passed}"
+            )
+        command = suite.get("command")
+        if not isinstance(command, str) or command.startswith("/"):
+            errors.append(f"{_relative(summary_path)}: {name} command invalid")
+        surface = suite.get("coverage_surface")
+        if not isinstance(surface, list) or not surface:
+            errors.append(
+                f"{_relative(summary_path)}: {name} coverage_surface required"
+            )
+
+
 def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
     errors: list[str] = []
     root = root.resolve()
@@ -652,6 +778,11 @@ def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
 
         if evidence_class == "runtime_backend_compat_sweep":
             _check_runtime_backend_compat_sweep(errors, artifact_dir, artifact_paths)
+
+        if evidence_class == "evidence_pack_queue_stress_resume":
+            _check_evidence_pack_queue_stress_resume(
+                errors, artifact_dir, artifact_paths
+            )
 
         commands = metadata.get("verifier_commands")
         if not isinstance(commands, list) or not commands:

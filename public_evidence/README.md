@@ -59,6 +59,7 @@ clean confirmation reruns.
 | `real_guard_value_demo` | Real scenario evidence showing PM-only acceptance against baseline-relative guard-intervention or detection signals. |
 | `signed_real_model_pack` | Signed evidence pack built from a real model run. |
 | `runtime_backend_compat_sweep` | Summary-only build/import-smoke compatibility evidence for optional runtime backend images. |
+| `evidence_pack_queue_stress_resume` | Summary-only queue stress/resume validation for evidence-pack task lifecycle, retry, dependency, and orphan-recovery behavior. |
 
 Every artifact directory that carries public evidence must include an
 `evidence.meta.json` file. The metadata declares the evidence class, lists the
