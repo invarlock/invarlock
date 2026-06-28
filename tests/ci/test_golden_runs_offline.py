@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
 from invarlock.evidence_pack import (
@@ -19,6 +20,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 def _write_json_file(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def test_published_basis_lanes_ship_public_evidence_references() -> None:
@@ -266,8 +271,8 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
             json.dumps(manifest["source_run"], sort_keys=True),
         ]
     )
-    assert "root@86.38.238.232" not in public_narrative
-    assert "86.38.238.232" not in public_narrative
+    assert "root@" not in public_narrative
+    assert re.search(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", public_narrative) is None
     assert "The older FP8" not in public_narrative
     assert "FP8 stress report remains historical context" not in public_narrative
     assert summary["source_run"]["model_id"] == "mistralai/Mistral-7B-v0.1"
@@ -617,16 +622,46 @@ def test_model_editing_evidence_bundle_v0_lanes_verify_release_strict() -> None:
     bundle_dir = REPO_ROOT / "public_evidence" / "model_editing_evidence_bundle_v0"
     manifest_path = bundle_dir / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    summary_path = REPO_ROOT / manifest["verification_summary"]
+    training_plan_path = REPO_ROOT / manifest["reviewer_training_matrix_plan"]
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
 
     expected_families = {"quantization", "magnitude_prune", "lora_merge", "fine_tune"}
     lanes = manifest["lanes"]
     assert {lane["edit_family"] for lane in lanes} == expected_families
     assert manifest["claim_boundary"] == "release-evidence wiring only"
+    assert summary["schema"] == (
+        "invarlock.public_evidence.model_editing_bundle_verification.v1"
+    )
+    assert summary["bundle_id"] == manifest["bundle_id"]
+    assert summary["claim_boundary"] == manifest["claim_boundary"]
+    assert summary["verification"] == {
+        "assurance": "strict",
+        "lane_count": 4,
+        "outcome": "all_lanes_verified",
+        "profile": "release",
+    }
+    assert training_plan_path.is_file()
+    training_plan = training_plan_path.read_text(encoding="utf-8")
+    assert "PEFT LoRA train-and-merge subject" in training_plan
+    assert "Full fine-tune subject" in training_plan
+    assert "/private/tmp" not in training_plan
+    assert "root@" not in training_plan
+
+    summary_lanes = {lane["edit_family"]: lane for lane in summary["lanes"]}
+    assert set(summary_lanes) == expected_families
+    assert {
+        summary_lanes["quantization"]["evidence_mode"],
+        summary_lanes["magnitude_prune"]["evidence_mode"],
+    } == {"real_tiny_model_run", "real_tiny_model_external_edit_run"}
+    assert summary_lanes["lora_merge"]["evidence_mode"] == "public_byoe_subject_fixture"
+    assert summary_lanes["fine_tune"]["evidence_mode"] == "public_byoe_subject_fixture"
 
     for lane in lanes:
         report_path = REPO_ROOT / lane["evaluation_report"]
         refs_path = REPO_ROOT / lane["checkpoint_refs"]
         note_path = REPO_ROOT / lane["reviewer_note"]
+        summary_lane = summary_lanes[lane["edit_family"]]
 
         report = json.loads(report_path.read_text(encoding="utf-8"))
         refs = json.loads(refs_path.read_text(encoding="utf-8"))
@@ -637,9 +672,29 @@ def test_model_editing_evidence_bundle_v0_lanes_verify_release_strict() -> None:
             refs["subject_checkpoint"]["external_edit_type"]
             == lane["external_edit_type"]
         )
-        assert "Edit success" in note
-        assert "model safety" in note
-        assert "require separate evidence" in note
+        assert "Reviewer takeaways" in note
+        assert "Artifact mode:" in note
+        assert "Verification surface:" in note
+        assert "Companion benchmark evidence:" in note
+        assert "/private/tmp" not in note
+        assert "root@" not in note
+        assert summary_lane["external_edit_type"] == lane["external_edit_type"]
+        assert summary_lane["weights_vendored"] is False
+        assert summary_lane["strict_verification"] == {
+            "assurance": "strict",
+            "outcome": "ok",
+            "profile": "release",
+            "runtime_provenance_status": "verified",
+        }
+        for key, expected_path in {
+            "evaluation_report": lane["evaluation_report"],
+            "runtime_manifest": lane["runtime_manifest"],
+            "checkpoint_refs": lane["checkpoint_refs"],
+            "reviewer_note": lane["reviewer_note"],
+        }.items():
+            artifact = summary_lane["artifacts"][key]
+            assert artifact["path"] == expected_path
+            assert artifact["sha256"] == _sha256_file(REPO_ROOT / expected_path)
 
         if lane["edit_family"] in {"lora_merge", "fine_tune"}:
             assert (

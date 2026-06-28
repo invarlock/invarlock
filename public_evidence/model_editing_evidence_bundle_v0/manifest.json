@@ -36,5 +36,7 @@
       "runtime_manifest": "public_evidence/byoe_examples/fine_tune_byoe/runtime.manifest.json"
     }
   ],
-  "schema": "invarlock.public_evidence.model_editing_bundle.v0"
+  "reviewer_training_matrix_plan": "public_evidence/model_editing_evidence_bundle_v0/reviewer_training_matrix_plan.md",
+  "schema": "invarlock.public_evidence.model_editing_bundle.v0",
+  "verification_summary": "public_evidence/model_editing_evidence_bundle_v0/verification_summary.json"
 }
