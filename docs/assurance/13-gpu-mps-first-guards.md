@@ -9,7 +9,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Define the maintained measurement-contract expectations for accelerator-friendly spectral and RMT guards. |
-| **Audience** | Contributors, maintainers, and evidence readers of guard evidence. |
+| **Audience** | Contributors, maintainers, and auditors of guard evidence. |
 | **Contract scope** | Spectral + RMT guard contracts on CUDA/MPS-capable and CPU fallback paths. |
 | **Source of truth** | Guard implementations in `src/invarlock/guards/*.py`. |
 

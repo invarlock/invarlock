@@ -312,7 +312,7 @@ signed manifest cryptographically binds the checksums file (and thus all hashed 
 Newer packs also carry a signed provenance block in the same manifest:
 `builder`, `subject`, `invocation`, `environment`, and digest-backed `materials`.
 The manifest also records a derived `evidence_level` (`low`/`medium`/`high`) so
-evidence readers can triage bundles quickly without replacing the underlying strict signed checks.
+readers can triage bundles quickly without replacing the underlying strict signed checks.
 Package-native signed packs store the detached Ed25519 signature bundle in
 `manifest.signature.json` and record `signing_key_fingerprint` in the manifest
 for audit trails.

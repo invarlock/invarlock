@@ -6,7 +6,7 @@
     "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:cfcd336bb4dacc9307b98fcd8368137465b4bbc39e6cdc7458d298f3f34c90e5",
+  "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
   "generated_by": "model evidence remote sweep",
   "model_revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",
   "non_goals": [
@@ -18,6 +18,6 @@
   "summary": "Release-strict verifier fixture for the Mistral 7B published-basis lane.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/mistral_7b/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/mistral_7b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:cfcd336bb4dacc9307b98fcd8368137465b4bbc39e6cdc7458d298f3f34c90e5"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/mistral_7b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb"
   ]
 }

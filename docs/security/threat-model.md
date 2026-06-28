@@ -99,7 +99,7 @@ security or alignment.
   `invarlock verify`) to detect misconfiguration, schema drift, and runtime
   provenance mismatches.
 - report fields for seeds, windowing, dataset/tokenizer hashes, and guard
-  telemetry so evidence readers can audit the assurance evidence.
+  telemetry so auditors can audit the assurance evidence.
 
 ## Attack Scenarios
 

@@ -433,7 +433,7 @@ Small/medium models default to batch edit creation:
 - **Evaluation-loop telemetry**: each `evaluate_timing.json` records top-level
   evaluate timings plus nested baseline/subject run timings when reports expose
   them. The pack-level `evaluation_optimization_summary.json` aggregates those
-  timings so evidence readers can separate process startup savings from model load,
+  timings so readers can separate process startup savings from model load,
   dataset preparation, guard/eval, and report-generation costs.
 
 Large or MoE models can still disable batch edit tasks automatically (or via

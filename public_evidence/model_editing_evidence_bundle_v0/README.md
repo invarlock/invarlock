@@ -1,6 +1,6 @@
 # Model-Editing Evidence Bundle v0
 
-This public-safe bundle groups small InvarLock evidence lanes for common
+This publishable evidence bundle groups small InvarLock evidence lanes for common
 post-edit subject types. It is a curated index over existing public fixtures and
 real tiny-model runs; it does not vendor model weights.
 

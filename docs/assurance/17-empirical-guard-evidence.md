@@ -1,7 +1,7 @@
 # Empirical Guard Evidence
 
 > **Plain language:** Empirical guard evidence is the portable manifest layer
-> that points evidence readers to real model/checkpoint runs for spectral, RMT, and
+> that points readers to real model/checkpoint runs for spectral, RMT, and
 > variance behavior.
 
 ## Overview

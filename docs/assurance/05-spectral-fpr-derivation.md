@@ -126,7 +126,7 @@ summary.
 - Balanced `max_caps = 5`. After the fifth WARN the guard continues to WARN;
   the sixth triggers `spectral.caps_exceeded=true` and the run aborts.
 - Multiple-testing metadata shows `spectral.multiple_testing = {method: "bh",
-  alpha: 0.05, m: 4}` so evidence readers can verify the published policy and compute
+  alpha: 0.05, m: 4}` so readers can verify the published policy and compute
   modeled tails for the calibrated caps.
 
 ## Calibration

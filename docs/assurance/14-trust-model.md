@@ -78,7 +78,7 @@ outside the published support basis.
 
 Strict reports include a top-level `assurance` section. Generated reports record
 the intended strict claim and leave runtime provenance verification pending
-until `invarlock verify` checks the sibling `runtime.manifest.json`. Evidence readers
+until `invarlock verify` checks the sibling `runtime.manifest.json`. Readers
 should require the combination of report-local strict shape and a verified
 runtime-provenance result.
 
@@ -105,7 +105,7 @@ signature over `manifest.json`. The verifier always derives and reports the
 signing-key fingerprint when a signature is present. That check provides
 tamper evidence for the manifest and checksum chain.
 
-Authenticity is stronger: evidence readers must decide which signing keys they accept.
+Authenticity is stronger: readers must decide which signing keys they accept.
 For distributable evidence, require one of:
 
 - `invarlock advanced evidence-pack verify <dir> --expected-fingerprint sha256:<64-hex-chars>`

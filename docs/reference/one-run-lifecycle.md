@@ -5,12 +5,12 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Map one `evaluate -> verify -> report` journey to code and artifact owners. |
-| **Audience** | Maintainers, evidence readers auditing the assurance boundary, contributors tracing failures. |
+| **Audience** | Maintainers auditing the assurance boundary, contributors tracing failures. |
 | **Contract scope** | Current strict assurance flow and report v1 artifacts. |
 | **Source of truth** | `src/invarlock/cli/commands/evaluate.py`, `src/invarlock/core/evaluate_plan.py`, `src/invarlock/core/assurance_contract.py`, `src/invarlock/reporting/verify_contract.py`. |
 
 This page maps one `evaluate -> verify -> report` journey to the code and
-artifact surfaces evidence readers inspect.
+artifact surfaces readers inspect.
 
 ## Quick Start
 
@@ -29,7 +29,7 @@ invarlock verify --assurance strict reports/eval/evaluation.report.json
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
-Each stage emits artifacts the next stage consumes; evidence readers can pause at any
+Each stage emits artifacts the next stage consumes; readers can pause at any
 stage to inspect the surface in the table below. The `evaluate` command uses
 the runtime container by default for model-loading work; host execution must be
 an explicit non-assurance bypass.

@@ -6,7 +6,7 @@ strict-pass report, runtime manifest, signed evidence pack, and verifier
 commands in one place.
 
 The package is weight-free by design. Checkpoint materialization is external:
-evidence readers can verify the shipped evidence without downloading weights, and
+readers can verify the shipped evidence without downloading weights, and
 maintainers can rebuild the checkpoints from
 `../evidence_pack_recipe.json` when producing a fresh evidence drop.
 
@@ -33,7 +33,7 @@ uv run invarlock advanced evidence-pack verify \
   --strict \
   --profile release \
   --report-assurance strict \
-  --expected-fingerprint sha256:504eaec37c909dc7a97d5e0e2363888693798b3456f0dfa38ebc2560eb816ae3
+  --expected-fingerprint sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb
 ```
 
 Expected result: both commands pass. The evidence-pack verifier reports

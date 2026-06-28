@@ -20,7 +20,7 @@ checkpoint and alongside broader benchmark, monitoring, and registry systems.
   configured bounds.
 - A strict verification workflow needs a fail-closed `evaluate -> verify` contract with
   pairing, guard evidence, and runtime provenance.
-- Evidence readers expect a self-contained report bundle they can re-verify offline.
+- Auditors expect a self-contained report bundle they can re-verify offline.
 
 ## When To Reach For Something Else
 

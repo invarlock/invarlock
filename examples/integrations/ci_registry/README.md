@@ -101,7 +101,7 @@ summarizes regression evidence only; it is not deployment approval.
 
 ## Release Review Packet
 
-Generate a release-review packet for release maintainers and evidence assessors:
+Generate a release-review packet for release maintainers and auditors:
 
 ```bash
 invarlock report export \

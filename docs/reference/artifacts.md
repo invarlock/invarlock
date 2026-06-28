@@ -78,7 +78,7 @@ reports/
 ### Archive checklist
 
 - Keep `evaluation.report.json` with `runtime.manifest.json`.
-- Retain HTML exports only when you need evidence-reader-friendly artifacts.
+- Retain HTML exports only when you need human-readable artifacts.
 - Retain scratch `runs/` only if debugging or rebuilding derived artifacts.
 - Prune timestamped `runs/` once evidence is archived.
 

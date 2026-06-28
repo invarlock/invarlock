@@ -464,7 +464,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Run the real PEFT LoRA and full fine-tune training evidence campaign "
-            "using tiny public-safe integration lanes."
+            "using tiny publishable integration lanes."
         )
     )
     parser.add_argument(

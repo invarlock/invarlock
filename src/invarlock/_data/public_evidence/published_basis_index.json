@@ -43,15 +43,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:39f22d7c3e931ffe9ca26b1ec5798d0f56f609fabc819a3f0a209d858e311bec",
-            "manifest.json": "sha256:e91e14f32720ac40670368b9ece189d2ea4e1b5cf48067786e2e660a3dc20b4c",
-            "manifest.signature.json": "sha256:0167471f978e690a818ba18d1f37b6c6c7b0fb2c8ad9e64a41431feeae5c0f47",
+            "checksums.sha256": "sha256:416ba304dcaf8ef56e0a03e560f1594ed266f7672e694ffc32b2e7410a36d118",
+            "manifest.json": "sha256:27f178469e197a1030744de3c718646f0adf8f36f9cfdda83ee19c8e2bca6afd",
+            "manifest.signature.json": "sha256:8c2b0e1e37dd8cd98e60181f6bbd1ac513c7bac8ff0be632be4a2a5e729a4410",
             "results/final_verdict.json": "sha256:e66447aee6473e1a8b61874fc4ebffeb75dedae1162adcfeaeee2d3fb57db1bb"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evidence_pack",
-          "size_bytes": 5613446
+          "size_bytes": 5613437
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -67,7 +67,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:13c61b404136d2c7522ae3a2aed538ec4ad924484962399b44f37354e1509bac",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "deepseek-r1-0528-qwen3-8b-causal-hf"
       ],
@@ -85,15 +85,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:261cc9c44dd3c681822f0fd7f3bd8f48e9a5ea278fee3ce7932002267eed7f89",
-            "manifest.json": "sha256:d05994545ea47ceef65572f77ea0e0a311d9faf8b751208a12947b4e6df25d05",
-            "manifest.signature.json": "sha256:7d72440c2296a64b0a4791a9cca9e67258aa98252764a2643b8c4d03ca21b828",
+            "checksums.sha256": "sha256:00a09e5c839d64a629fa80310c10eef9222b4e89b705eab6e3db8880a55d49db",
+            "manifest.json": "sha256:d8bc66b370071b014d85cd59cf26a6a1155167c683b998bf45683a28faab4e0b",
+            "manifest.signature.json": "sha256:8f1674d4d3893da3a78f1198c96198d910d7766c5d18d4d9e805308d4cb4eac1",
             "results/final_verdict.json": "sha256:b894abe8aadaa5391170ef81a3096a539df0a535b964041a203980f9ea8cd3b9"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evidence_pack",
-          "size_bytes": 5629321
+          "size_bytes": 5629312
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -109,7 +109,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:05325d243bf76ad3960c80f036185ac8366295f603e746474fba427efbc5f629",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "deepseek-r1-distill-qwen-14b-causal-hf"
       ],
@@ -127,15 +127,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:468f0cc8e70e41a52a19d9ede1d32e71c9b9468d556da03f0fc2b63d3f216337",
-            "manifest.json": "sha256:6ad22db982c09c27ec20f8f315a1c3d6038fde02d473c94ecc50767bdca90512",
-            "manifest.signature.json": "sha256:576894e2c0e9deff8d0e9af13524858c75d2b5de423b7702a15f913d9f9b7c48",
+            "checksums.sha256": "sha256:5291c2e989db6de6e343aaded29f88a7f518c7ee908e0553ac85a630a951005d",
+            "manifest.json": "sha256:f722bf7069fd58c8dae1f2490c7bab679a26dddf1b1cceb887660e57537184de",
+            "manifest.signature.json": "sha256:eb512009109cb078ba23fc9b31fa396b6a4c553f1f3585c30da351c3f986a742",
             "results/final_verdict.json": "sha256:407178d9defec41e5c66dbedeb27f230967f9f6aa0cef3f1f6c11aee2eea3550"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evidence_pack",
-          "size_bytes": 3400205
+          "size_bytes": 3400196
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -151,7 +151,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:b9fdffeba389ca522cb9ee59478f7464f652006a161bfdcf81253f1fc7370488",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "deepseek-r1-distill-qwen-causal-hf"
       ],
@@ -169,15 +169,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:be13c12bcb83bae359506b7f097a697e3ac219bc77e62acab7146464fc6c70e8",
-            "manifest.json": "sha256:45c4c082792d393a23cbe52a58b7e4ba011ddbcd544de45151ddae9b616e3137",
-            "manifest.signature.json": "sha256:99b5ce2492812a3d12ec405ca9e85320d974055e857423125c2218a5df10574a",
+            "checksums.sha256": "sha256:cf03b08a8a1e0e4b845ff5eda53df45db46998e4c3a9dab621238815fc853f4c",
+            "manifest.json": "sha256:ebf9614cee7bcb8870169fd38b147eeca74412fe4a2772f0b8e74e708f8a4d04",
+            "manifest.signature.json": "sha256:20057b33829c43269cb1ba952335621d109604fc19ef77561c1f688e87993b8c",
             "results/final_verdict.json": "sha256:bb98e2a3c790e5869e32312d52e6d1173452b39c37ed32009855cdfc053ba6ae"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/falcon_7b/evidence_pack",
-          "size_bytes": 2387145
+          "size_bytes": 2387136
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -193,7 +193,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:ae93e7211094ab2ccdd2c0d587610c6ac82de9856eb4afcedc4f5b32cfc42d50",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "falcon-7b-causal-hf"
       ],
@@ -211,15 +211,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:8ae833d1a34f3e80127d4709a1f1bd9c389ed3eb2f1f7b9644fc215ad24cfb15",
-            "manifest.json": "sha256:f156f3f5095e39e7a6cad584aaf4589ecae0a32fea6641b683a15d42cbdd7583",
-            "manifest.signature.json": "sha256:8076ce175404e92c1fd360d6c8d813636f34eab44d6b1263d389ef6d79e28983",
+            "checksums.sha256": "sha256:eebff65baaa49cd73758d53a6fbcb78ea150225b855b4591b18975cbbd724318",
+            "manifest.json": "sha256:b0e88b667101655046a916204f5a1f5dfadb6a5af90b1e1c0fa503254e62091f",
+            "manifest.signature.json": "sha256:de238bd0c7fc4288b00e7d41ef683a07fc40ca483691776a21bc7b94578430c8",
             "results/final_verdict.json": "sha256:d16dc69e3aa728360ac65f213394e548097792b86b780b86bb390c477935e783"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/flan_t5_base/evidence_pack",
-          "size_bytes": 2279338
+          "size_bytes": 2279329
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -241,7 +241,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:befc3513ed3e4f97bfde87432bd1ad213ee303f241ee24012aebc4df87654543",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "flan-t5-base-seq2seq-hf"
       ],
@@ -259,15 +259,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:b30e394c6c9d46e340234173b910d295c2f18dfb11d6a5314cda7f877c41f0dd",
-            "manifest.json": "sha256:ecb6e189eac5660684fc9c428ee81498f19f2cb1e9e1b7914da801ab8812ecbc",
-            "manifest.signature.json": "sha256:f480aba3cec1f25f8531f545fb98046402107a392c10356b456f12e71a27e8c9",
+            "checksums.sha256": "sha256:2bf954ebc0764d81a1a9c03f82c5fba9d11f87c2bee3c12c7e713391ba325858",
+            "manifest.json": "sha256:e98b212a6f17dc4dab4ea610df46af72c5c302b50fd84ed8b058fe151462c8c4",
+            "manifest.signature.json": "sha256:4dbcaaaddeabbf4b2e3f0dd3fc2589cd1484d23abd974b2cbbd42d458436bbd7",
             "results/final_verdict.json": "sha256:691747a38288c5cca32f11414860195bd7e8f5b64848008d97adbd0856fa2567"
           },
           "file_count": 13,
           "kind": "directory",
           "path": "public_evidence/published_basis/gemma4_12b/evidence_pack",
-          "size_bytes": 1375549
+          "size_bytes": 1375540
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -289,7 +289,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:9b8aeb85921fe0c10b9dbb91ed5588ace7a6d6837c4c8aaec2adb4a4429d3eab",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "gemma4-12b-any-to-any-hf"
       ],
@@ -307,15 +307,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:72fdfc846c6e8296ae80b1c9703e446e71c1d4f5e39715c552077435d3a53268",
-            "manifest.json": "sha256:f196bcbe2c55f3212a5da5377f19ed0173b1955ea6a9112c51953fc7f025b7c7",
-            "manifest.signature.json": "sha256:6cd83596181cd747da10483f251689e39da28cc92856bb8bf231e8816f905b1d",
+            "checksums.sha256": "sha256:ab50718901ead7ddf2a3adbd8ea928eb82f012cddc151f39c2bfc23eb087ed69",
+            "manifest.json": "sha256:43d317d637c89a248b27e2d795f5282fe5f55b7b0d08c0f9e9f6cbe10a35f551",
+            "manifest.signature.json": "sha256:17796021514898932ed89a87b0bf1d6d5b9b23f1929771d13b5c90db25c43157",
             "results/final_verdict.json": "sha256:97cc63ecbdb7df2c9f18cd95fe2abbe8fd2af9c72622a3c9ff0926c401efad7c"
           },
           "file_count": 13,
           "kind": "directory",
           "path": "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack",
-          "size_bytes": 1361099
+          "size_bytes": 1361090
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -337,7 +337,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:6c96a379e4e1fa6da126f3bd5156e9a7c2fa76abb3392caf914380ea1d2f5dae",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "gemma4-26b-a4b-moe-image-text-hf"
       ],
@@ -355,15 +355,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:aca6b7c0659d2e6d891ef7d5020e8cc8991240476d30e33ef0b8164489eef6c2",
-            "manifest.json": "sha256:c2b06e64f45316106b245cf2a2e41e6a5c0171683a0ab95d38a67f2810ee6560",
-            "manifest.signature.json": "sha256:726be662c8657a935ec9bfd0ea4d0a03ea0e78e8b42c7a95d31edcc9917e7dba",
+            "checksums.sha256": "sha256:6bc009f33ea4559b0e3832ab4caa12004f9c1afbbad3a331ccb19b120c10150d",
+            "manifest.json": "sha256:b163f8468331d62417bf1ea8e60506b2f244161a2937b9f47ee925843222f24f",
+            "manifest.signature.json": "sha256:2d1b43e536f49aeed8fa1807ae7b75bd86e829ff96b5a0b6a7ac5bcf0fe73813",
             "results/final_verdict.json": "sha256:efb88f2be649ec56dfbe7db430aaecdaa2e3b2e8386be4abdb4d47c3a053ccc9"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/gemma4_e2b/evidence_pack",
-          "size_bytes": 4098027
+          "size_bytes": 4098018
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -379,7 +379,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:17144428d183b58d61fa0d56bcad194bd00342f3308518c55f69b3558f71315a",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "gemma4-e2b-text-causal-hf"
       ],
@@ -397,15 +397,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:5345f2734525f4106da5566de5cc7a3602de74187e97c3a55c7de0386c4e7c3f",
-            "manifest.json": "sha256:c2675f9b54b18f51ab0d27ef44dbcc08145613d142f5773c58e001ea2c1c498c",
-            "manifest.signature.json": "sha256:c8b674532fb162525a2376e37d8fdc0c7c5c7a1470df831f665afb5bf193cdb1",
+            "checksums.sha256": "sha256:bd798ce30323d36150bc1380c09a3c9c7ebb0d3d8f0aaff409d3be61fbb3242e",
+            "manifest.json": "sha256:2921bdf0c2bad7cc46777c02c4650cd5c6536e1d059aab5378343438c30f8fe9",
+            "manifest.signature.json": "sha256:1b6f4fe1939ba220789feb79413e4e18ebee8d4df2c52c5ae24e2a980b6c1a0b",
             "results/final_verdict.json": "sha256:ee81fee3b1ebd77141c42d90070b548a7c89d785009c6e1eedb4764354229175"
           },
           "file_count": 15,
           "kind": "directory",
           "path": "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack",
-          "size_bytes": 1402912
+          "size_bytes": 1402903
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -427,7 +427,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:212bca8fdcbaed3239e9906181f9081508e1aed974ab7cb385c44aa966687126",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "gemma4-e2b-image-text-hf"
       ],
@@ -445,15 +445,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:2c2c4306398096168c514a2da23cd8e5d9e9c91f61b1977c76a43a71ae93c8a0",
-            "manifest.json": "sha256:796880a53ea00838717a1541d00d507631a4de1cc0d2c6878ddd5b108f00e80b",
-            "manifest.signature.json": "sha256:1ad7e77207cd3182d65daaee7574e09fa47b69f36645275d9b3f888ccadd8873",
+            "checksums.sha256": "sha256:7b353e9de4d8eca2323d2cec2a1b18be0fb43308fd56ce6939ca13a603c5d753",
+            "manifest.json": "sha256:497cbd4ed81396aa07a9f5f615fa3ce8639f9a92a6461af7e175ec6f1237814b",
+            "manifest.signature.json": "sha256:ec4b4407f6ce8476b393d36696be18a82a88704de901ac8cbd7fb7ee6fae7321",
             "results/final_verdict.json": "sha256:1f98fca08147009d551646db82f9c4945879437c09338f1ba12741d64bd284c8"
           },
           "file_count": 15,
           "kind": "directory",
           "path": "public_evidence/published_basis/gemma4_e4b/evidence_pack",
-          "size_bytes": 1378875
+          "size_bytes": 1378866
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -475,7 +475,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:a35996dd58539211feab43450dfdd176b80d0a538b6d8ac13bddd6920d870b36",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "gemma4-e4b-image-text-hf"
       ],
@@ -490,7 +490,7 @@
           "file_count": 3,
           "kind": "directory",
           "path": "public_evidence/published_basis/gpt2/artifact_package",
-          "size_bytes": 4174
+          "size_bytes": 4165
         },
         "evaluation_report": {
           "kind": "file",
@@ -500,15 +500,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:e4c50ddbe6a2e251c4dc232284d2b235fb0e21d1e6d5cd1b57cafcfa975812fd",
-            "manifest.json": "sha256:f57be8cb8ea9107d2d271c66af3a4db7e4575fc01e203d1ff2c619a0767f0511",
-            "manifest.signature.json": "sha256:cf9c7af3396195cae44d494add0a91258f88ebe15bb7c0fe812e8d5e7234e93b",
+            "checksums.sha256": "sha256:5f066c42a8cf76980b8e2ebb761615c0b3982c5dd9e09056892d876db4cde13b",
+            "manifest.json": "sha256:91547c253ab62205103280c834d3bc0760e3cc5d6e3df4199e44450758ce4fbf",
+            "manifest.signature.json": "sha256:96b74b3a7d204e64344d07b6642ed3d978e094511f0d40fd2f696c7281c1b8a9",
             "results/final_verdict.json": "sha256:6f04be9d050f03c16005b9a1ed8ba6e28f5d3a27ccc623311179b6ccc4f406b9"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/gpt2/evidence_pack",
-          "size_bytes": 11944
+          "size_bytes": 11935
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -524,7 +524,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:504eaec37c909dc7a97d5e0e2363888693798b3456f0dfa38ebc2560eb816ae3",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "gpt2-causal-hf"
       ],
@@ -542,15 +542,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:e79ff0f8cb54a5be18a9e771a38783ee0ba4d65db88b3c6893b803aa25181009",
-            "manifest.json": "sha256:906f4b9fdeffcbfe1de1bb2a68c9fb0e30d839c577db3d70dfdb6d96fe1661a3",
-            "manifest.signature.json": "sha256:4e0acc9a5622b2912640663fd69ddab5afe882622f8be7a038f3228fd532f7f6",
+            "checksums.sha256": "sha256:0a79bcef148b598e10e46b3a5159f18f03734adde21185569cd80046532ed183",
+            "manifest.json": "sha256:a8cae16c974f184810997a8c4fd44fbbbb71433a6cc39c7c3d861221b23755d0",
+            "manifest.signature.json": "sha256:ec694e8451967a203b04fd976fcb1b2b115b45f29cb5eac9c0c1077d77e1f1f6",
             "results/final_verdict.json": "sha256:2d45438ef161056cd569dd746c0a1678feb88c71cc3223ad6323684bda5214a8"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/granite4_1_3b/evidence_pack",
-          "size_bytes": 5642298
+          "size_bytes": 5642289
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -566,7 +566,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:406df562339942d72903b33f079a44a0bec7be240ff6f1ea58ed4abaa8c00de5",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "granite-4-1-3b-causal-hf"
       ],
@@ -584,15 +584,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:7409434e3b2f5c8832ac7968fd46f975287fb886478dff5add635c4ebc29cce1",
-            "manifest.json": "sha256:f2b4b74395c91f763668612a58d26c5f0cd6389a644adaf5f887bdecfdc58c01",
-            "manifest.signature.json": "sha256:7c71f08fbbabb11eb3ce12905a31381e1f7e0f0d652ef1728c4a9659b189c2d1",
+            "checksums.sha256": "sha256:e665c6b623e3c01cbb6d6966458bb71d11edfdeecf39db886bc865c5d063eb9e",
+            "manifest.json": "sha256:f5c7aef31d06163a17409a98b165f913b16fbf1d6baf1144e430197cb55da443",
+            "manifest.signature.json": "sha256:2662c899a7f0a9346ce2aa2cdffeab50889ff403c320d24b7afd23e2effa619f",
             "results/final_verdict.json": "sha256:2970b78e5ace51784197f949207d9fe4979332ccf87d2c5d20582468e61b79d6"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/granite4_1_8b/evidence_pack",
-          "size_bytes": 5642784
+          "size_bytes": 5642775
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -608,7 +608,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:e8bb2d9a90d4d31b2b54c7d79f96f9ed5fa735ee6fbe6bae772cb13617ca46ff",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "granite-4-1-8b-causal-hf"
       ],
@@ -626,15 +626,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:cf5f69df3aa751f37883d3aee940405be13f2558adeb15a0d2b762523980dce5",
-            "manifest.json": "sha256:22206ddbff447d38d9081b3e1609f55f65462f63299f96f53f5ea4b805cbf63a",
-            "manifest.signature.json": "sha256:a61bb83c17453259c1e15356a48afba8a36402b83ed35993e8e0207770974034",
+            "checksums.sha256": "sha256:4c0b4102dbf186f9354ff8c6511d2c715712896e5e229574918dab3a52921e03",
+            "manifest.json": "sha256:89f9003d2ff94ede0e08b327eb239c2fda234eb6429ef30c47508d6c941fe068",
+            "manifest.signature.json": "sha256:7b19354259ae3f668017210a73c22be544910b81e1fa61a56e4453d504b07130",
             "results/final_verdict.json": "sha256:6151bbcee4ad21e2a14879c1f819617c5e523d727bd44d65263965609e970d19"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/ministral3_14b/evidence_pack",
-          "size_bytes": 2736545
+          "size_bytes": 2736536
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -650,7 +650,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:a59bfc86da87a647d2c46a65ce6b648885f4bd463fb03a99b13812c3249c96b6",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "ministral-3-14b-text-causal-hf"
       ],
@@ -668,15 +668,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:f54dbe0ff97d017f8a46b9a770a218feab3577e48cd1280c367592e2b0b7f08f",
-            "manifest.json": "sha256:9eefb7e9e8eebc3145e94fcdd2979d3fe5fc35f6a1a876b1e870a8eabfc0e1b8",
-            "manifest.signature.json": "sha256:a5af7ed2aa106d888c00440d1555379a09deacd427388e688ca9f03aad8bdb51",
+            "checksums.sha256": "sha256:93c7477ca5df61edb836fe2f2665a87d6cde3061e6edce12a9847c6568d98c88",
+            "manifest.json": "sha256:4e86dda60e16740263f33f2ca761135c685e33ebefc0673b7263dd1da246e4fe",
+            "manifest.signature.json": "sha256:2791a09596d7b1fef19f05ca950bf5a7571b3df823519042d8bc548da5f524e7",
             "results/final_verdict.json": "sha256:56d56556c44b6c1c4bf57119610ee2af4da1bd63973dec834859543a3a06e4b3"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/ministral3_3b/evidence_pack",
-          "size_bytes": 4454710
+          "size_bytes": 4454701
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -692,7 +692,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:71ff0cc821ec0b3e10eb36aaf715ed75be4025a2bfc2f4aefdee150ae17727ea",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "ministral-3-3b-text-causal-hf"
       ],
@@ -710,15 +710,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:34fce8fa379bfe506e9e839c70cea4a8ee93fe5a753dc9edd06d7eb85554c46d",
-            "manifest.json": "sha256:bfd64fa8ebccb173c0b14f64f8d13abef6edd294aa4c99eb3ab579cbdac59e39",
-            "manifest.signature.json": "sha256:f829fa748a324263e312cd7338191608d726adeaa4bd8d679606ffe7d11da5f2",
+            "checksums.sha256": "sha256:9a5b42f00bdc44993c2ab41a7f65a3d22230159f9a06fb5fc8f9c5573e846f90",
+            "manifest.json": "sha256:51d51a90cb180e572cbf0fdac358bccbc2c8fdad1c33af493f3249905cbf7e59",
+            "manifest.signature.json": "sha256:b4ce6939e15468db4e5f4932b7f156665015e3c65fed5a3b7dfd3720711350bb",
             "results/final_verdict.json": "sha256:4bb6c8344789f3d8a3648aa45d44cc96379c838494b4324f5769f54d87419908"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/ministral3_8b/evidence_pack",
-          "size_bytes": 2722587
+          "size_bytes": 2722578
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -734,7 +734,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:82dec158ca6135756aa0692df164d2f1c5512c4499725dc2f8b07dbe43d6229b",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "ministral-3-8b-text-causal-hf"
       ],
@@ -752,15 +752,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:8a1c24dc98eb94afe4eafcf9368fc92404efc798741e31a65b3db40af6b6f3ab",
-            "manifest.json": "sha256:f4369bca147c8c521fe69ca45e319f4db8942dfd34e93acff99ffaa1f6d5e130",
-            "manifest.signature.json": "sha256:1f75a96310b1134dff431440fc7eaaf3acf78516c1e1403c66fcdf9ccb78ed8b",
+            "checksums.sha256": "sha256:76ff3023f91318047d5378c80a85d1449a1057c13be197cd3f638f7749c783c2",
+            "manifest.json": "sha256:88d336235347afba5725bb5bb64e1b1c3b03fe69f9dab74865cf6b5ab1bc7f08",
+            "manifest.signature.json": "sha256:d39a26dcacf4ba8f6b712c39f6d138513aabcf46ec195cc253ad3ae1e284953a",
             "results/final_verdict.json": "sha256:fdbe4be8be54cfbd70d70cd42f914617528ede4b281951321bea87065d865fd6"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/mistral_7b/evidence_pack",
-          "size_bytes": 2078609
+          "size_bytes": 2078600
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -776,7 +776,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:cfcd336bb4dacc9307b98fcd8368137465b4bbc39e6cdc7458d298f3f34c90e5",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "mistral-7b-causal-hf"
       ],
@@ -794,15 +794,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:38afdb34ecceff75088d7850d563c5d2e12dd151e1db5c3e5e26ff1ba9255d25",
-            "manifest.json": "sha256:8a12d59ce7f71c80f66cd01af479f41b47b89a51bb5c748cf7db02233cbe281f",
-            "manifest.signature.json": "sha256:3c8c5b15dfc68c91d77edd7f44bda163cfe62bbcc321d70efd7425d1d59626a9",
+            "checksums.sha256": "sha256:0c4011e804d45bb28ac607f08fd4adfad1766446cdd6aae59b8dfa8552268048",
+            "manifest.json": "sha256:e392c7e7336d445255394eed9384341b1d189b7116db49867daf64b05878128f",
+            "manifest.signature.json": "sha256:0d90e6dd88c31bea682dc20b729f90990eb97272f2c5efacb883724bd3d782ee",
             "results/final_verdict.json": "sha256:2edaf7c59d43290dfc8fccd9861497b67e64f1ce8fc338590fe976aa6632a8b1"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/mixtral_8x7b/evidence_pack",
-          "size_bytes": 4052703
+          "size_bytes": 4052694
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -824,7 +824,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:a8ccb53300146f4127ffe2c114196d3e1859d2850faca9afa2f0912326aa17e6",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "mixtral-8x7b-moe-causal-hf"
       ],
@@ -842,15 +842,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:440d43da6a459f429b38acae3e8ec48e09e5d7775c28f18a771c264bc7296f2d",
-            "manifest.json": "sha256:4c19291b0f5e8260c12ef4929402c98ca1835df84f757e4a90f2db9f7b36e4fb",
-            "manifest.signature.json": "sha256:a4cf820c8f79f65c3797ef953ee5844b5115c94ad1b8865751b2965f58abf9c2",
+            "checksums.sha256": "sha256:b7666764f9d9ef7e9aaa61080bd2d24abf64b15559ab6b285d362ab25bb42d4e",
+            "manifest.json": "sha256:c96528dc62724b51492898bb16b3500d637ac6b6c08cbaaf81cb4dc95a5f6ebb",
+            "manifest.signature.json": "sha256:739721bcf78b2622b434198cf5447355edd7ed986e8b3b9d3658af0401a3a676",
             "results/final_verdict.json": "sha256:85252008c54f497fc4cb207276e555d9326f8c1b81c4fd1821350b759a99473c"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/olmo2_13b/evidence_pack",
-          "size_bytes": 3429646
+          "size_bytes": 3429637
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -866,7 +866,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:27118c6b2017094f16cb5d5cdfffaef6cd8713ec9edc4368c835940dcdd36e4d",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "olmo-2-13b-causal-hf"
       ],
@@ -884,15 +884,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:c5cdb7780cbf8a69ebe61e9d44250cd96a43b17de482bc5e9040630c1eaf66fe",
-            "manifest.json": "sha256:06a7ac5bba40fe8ccb79c0637af427f06d4fcf05560c10cd0e89d7d3c9022c10",
-            "manifest.signature.json": "sha256:8a3c96a3dab50c02170441d4e35cf168370351a47c2123fd4ed2b4abc1a47fbd",
+            "checksums.sha256": "sha256:edc9fb76442f46bda686b160d76562b34c81c116600d085bbc5153c433af84d9",
+            "manifest.json": "sha256:e24fd19a1e0d5239ac860a9f217ff3a4f6a410c314dd2470a2bd768b9fabccbb",
+            "manifest.signature.json": "sha256:31996823838cbd4eb8f45865db74934e8d419a4659a5a3e1b1d40257d0cbadec",
             "results/final_verdict.json": "sha256:0db82c520fafa003634bd4673dea6aab0bd8f571e34ac12cc0d32abf6bc7a304"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/olmo2_7b/evidence_pack",
-          "size_bytes": 3415205
+          "size_bytes": 3415196
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -908,7 +908,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:e6ca351962f6a6bdbfe3a4f654e5c665549b9e097beec16758ea5df1c1c2e3b4",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "olmo-2-7b-causal-hf"
       ],
@@ -926,15 +926,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:8e38793dac0f4c0820a2807730877b1dd4f08b29ba831f8e1b9cb9cbeebdd342",
-            "manifest.json": "sha256:1db6af40eebb44b89340f4529e130bc978b822a2bfc156a9524fabfd9e19a255",
-            "manifest.signature.json": "sha256:c417c26c7e3d3da247280a5390e49b8f5467c764ba91ccc596e79ef7d19d0eaf",
+            "checksums.sha256": "sha256:02f6d9c8ea36f26b7eabc6ffcb84ea4b3628e11a619e569c76c42175d4b4c4ce",
+            "manifest.json": "sha256:41c4bb12f7e87f6477ed2545722b822bb1fea5cccd411ee9722dfe15fac10c0d",
+            "manifest.signature.json": "sha256:1774d8a02147d0b3aad2b5ff2fbdac0ed6173eaba1282c0d1fde71af9643859c",
             "results/final_verdict.json": "sha256:d1b393412cb8419bb3ddc02060970753d4b095fbe238c1434bd88953d359567e"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/olmoe_1b_7b/evidence_pack",
-          "size_bytes": 3974808
+          "size_bytes": 3974799
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -956,7 +956,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:fc4bcce76e2e8137cd20dcd4832544a4a8064f538c7353682328b708001ec28f",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "olmoe-1b-7b-0924-causal-hf"
       ],
@@ -974,15 +974,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:9629c008511a9d9b14de7b93542037e91121637cd34c1c6218728b093198562d",
-            "manifest.json": "sha256:a7c9a55c557bb1640c7d36e4bd98a0c6087c2e1c6c8ca2445f32e0dd2bdd3963",
-            "manifest.signature.json": "sha256:7edb120d0329bcd364a915c23dc9ee7d21edeedb657c7336e6583064ec984a4e",
+            "checksums.sha256": "sha256:c1135498ecdb02981dd8dc2171fcfabe833ff62e8282db7599094f50d234168f",
+            "manifest.json": "sha256:82610f415c380d20d876bd5eb4eb40ab9b098a6cfb027a63f2acd922c98b8a76",
+            "manifest.signature.json": "sha256:a3a21556512547afb7cd2b4ed88f7368e32144065e04afb7023d1d06c1c1d7c0",
             "results/final_verdict.json": "sha256:76ee05ab3e499e42e3fcd3d1d27c79f1880a484eb6830484a5ad20e80bb6890a"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/open_llama_7b/evidence_pack",
-          "size_bytes": 2272098
+          "size_bytes": 2272089
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -998,7 +998,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:f0d821e6f26597c0249fd330e6b2650afb1cd7992b5985b06d8f147061126643",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "open-llama-7b-causal-hf"
       ],
@@ -1016,15 +1016,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:c3669d0923694c486d6514f9a80f7baf6111526fa556994729a28ed8779c7d77",
-            "manifest.json": "sha256:1a612d4154b00067dd44844785ca9ef1a5cfbbda0f330d112378fc3d62353ee8",
-            "manifest.signature.json": "sha256:64f931e81f4bc8aee28125b0424f2c7d19b24d0837b480bf8a47b1a1b9c5e2a1",
+            "checksums.sha256": "sha256:7446404d56a10097f67b9a8a886f185c14c280abfe86b4876cac548fd4f83d1d",
+            "manifest.json": "sha256:a8b8958ea5607f9c1f008606f94101a36a98b0ad11ad23d5cf573d280cd5005d",
+            "manifest.signature.json": "sha256:e44d76a6e2d7f8cb5bf5dccad2363f01a0ca2cae5c46ed205cb833a4716e9589",
             "results/final_verdict.json": "sha256:99eb70d272c7d2d4f3d14dda0e5ae6399c9b80ec6cf1b66e9be718444f41aa1d"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/phi4_mini/evidence_pack",
-          "size_bytes": 5649799
+          "size_bytes": 5649790
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -1046,7 +1046,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:3f7ff8124da4d8e2f2f756ec57fd7951af58443c68038fb1528c57fbd56f93f8",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "phi-4-mini-causal-hf"
       ],
@@ -1064,15 +1064,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:6e2ce367cd88f8594065083ecc862fcfb5d4df5d4697ffdc24929744d41e986f",
-            "manifest.json": "sha256:bf9fcab667b7d56ae88cfcde65bcd2d7112e183058b1addbdd4abd96b57b64e2",
-            "manifest.signature.json": "sha256:c58f4338c93e1aee4dfbd0a73ca308a93f99b4c7aa80c01bdea29a15cccb7d08",
+            "checksums.sha256": "sha256:fa5c69a4b58ea5daa33715278f49a10bfe031dd2a486c4c9b3a165c9937e8212",
+            "manifest.json": "sha256:0b2a1c5b14e3e136345b7db587d429ce5db1df764356bdc07f7201768333ef5e",
+            "manifest.signature.json": "sha256:902d11935f2589abf21d872fe68311c01d1dc3e495588b8fe23479235fbd706c",
             "results/final_verdict.json": "sha256:9faa76dbe996069b2bdeda06451ce9c4e534a2bc704a6835e2fdcafd1f17089f"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/phi4_reasoning_plus/evidence_pack",
-          "size_bytes": 3416655
+          "size_bytes": 3416646
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -1088,7 +1088,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:f0861aa1ec37e68a92f65f567531e8af49afd98471b9495c61cc0eb64bd36d7f",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "phi-4-text-causal-hf"
       ],
@@ -1106,15 +1106,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:9cd4abf287d938e5da90c4e9edaf098c1d25184acf6a7568118a077934d685f6",
-            "manifest.json": "sha256:81168c56cb2a58ba9a207d7d5b96e6ff10d2a0659d7347869c2d5bb183be3cf2",
-            "manifest.signature.json": "sha256:b5b1eb1a61aeb9ba4ee5726a8a65daa45c8c66a1c4c0adbb99c792df93c808f3",
+            "checksums.sha256": "sha256:d041df9d984e711f51db3e65a0a04e9f7872286ed199e0143b6250de7dd0c26d",
+            "manifest.json": "sha256:76acbd85d50e52f34619ca04d01bad0e427c548c717bc007d4c2ea2337d2cb09",
+            "manifest.signature.json": "sha256:179e4bbc3f2c045bbe48a76f70f42ec62939d59f9f51e6dcb8985d36fd368c82",
             "results/final_verdict.json": "sha256:a47ba38b55aa80387bdb0b09c65942a1c5bb0bc0da5f50087e8ebb3b09640fa8"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/qwen2_5_14b/evidence_pack",
-          "size_bytes": 3420951
+          "size_bytes": 3420942
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -1130,7 +1130,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:aa07222bdc9be6f4f027a3f6a8579f503561508f813af56e962e44ecac1716e7",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "qwen2-5-14b-causal-hf"
       ],
@@ -1148,15 +1148,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:4859e34ef88ad92ba9bc8ce11f14234633bbe6e739b3bf5b5d558390bf7b5a6a",
-            "manifest.json": "sha256:17fa4650da317c92d45708c946174239217dd7a767b0b912a45b431b0153e336",
-            "manifest.signature.json": "sha256:2a0944dd248b464f7b397bc525f9b1be503dd7770a3cadf9166619c6142847a0",
+            "checksums.sha256": "sha256:2b0c341d40cd6213059035db23f4e2d1b9ab217d80c0d311ee4ba2a0e92d63ce",
+            "manifest.json": "sha256:499094e9e18b079ca472b48d60c46078c3bc7f20542296466039c51deb88a9aa",
+            "manifest.signature.json": "sha256:e6c12a8bc09dc91739d507313071cd302384e4daf8c8b4846cb3e3e8707f25da",
             "results/final_verdict.json": "sha256:d51660f8d375852bf68fa672699f32cc75acd1ae8dcee89c2aaa28f0c745b884"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/qwen2_5_7b/evidence_pack",
-          "size_bytes": 3397429
+          "size_bytes": 3397420
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -1172,7 +1172,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:0fa6c70c83adcab3748a49fa342b44fa6594ed1f14fd855802f396e2ce45c42b",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "qwen2-5-7b-causal-hf"
       ],
@@ -1190,15 +1190,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:1ccd8497da14b5d2c5fa013af631e7ee7b2a2d2e681814187b4c64b63e478bc2",
-            "manifest.json": "sha256:740fece599f53b1fd6fdba6532e2aa07022ba9c348e9e1059acf0aa401461ce6",
-            "manifest.signature.json": "sha256:07cec4559425bb095c36caa5e757740dc21aeeed2024023d10d72588d9747637",
+            "checksums.sha256": "sha256:ad9032625d6528db147bd9565cc11b7ab0d43e3e0ec0c9bf7cb6b0efbe2001a9",
+            "manifest.json": "sha256:8338787a83366efef613cd230d137e25df46308319873b9d23698bd2cd65a64f",
+            "manifest.signature.json": "sha256:8661c86c3088817e9c981f601a1303d4e633bc1476dd5cf13a814f4e8174f2f0",
             "results/final_verdict.json": "sha256:270be76e56a190071b209364acbef02e261677b31781c3434106d3a178adc14d"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/qwen2_7b/evidence_pack",
-          "size_bytes": 3397118
+          "size_bytes": 3397109
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -1214,7 +1214,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:608228c83500234596758480954b404331fea9850f19902ca841c9328df4dc3c",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "qwen2-7b-causal-hf"
       ],
@@ -1232,15 +1232,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:2112d7ddafe8e144dc3e57c2c514cb285e3904e4156085b3588a0dd7b9d955a0",
-            "manifest.json": "sha256:3df6fcbb89da9a7306119818b03e77380cc153180af48c48ffaa50b53e06a7a5",
-            "manifest.signature.json": "sha256:3b1a77bd183bda4dab70ec9b360ec7234267f4a48f4ec7ca05de5f991a60a43f",
+            "checksums.sha256": "sha256:5d88210d2e83321d11f778f27506fee2b5a518dd981617837f5b89c9b9068bf3",
+            "manifest.json": "sha256:7d426a97466ba0238c030b63f9f5554fd0f991d146ceefee8455b26116d8ab65",
+            "manifest.signature.json": "sha256:2cd1ab51df2eaf3529fdd4ad8e90f9e6cf78a415311479129449fc74d8e60364",
             "results/final_verdict.json": "sha256:92c1d05791c21143d4da895f0b7a77e676c45843222611d02695dc96e6cd52d9"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack",
-          "size_bytes": 5618639
+          "size_bytes": 5618630
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -1262,7 +1262,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:a0c88109136bbe4776907a0b72f410b7fdc11f16f891cb68dc3310bfd099e388",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "qwen3-30b-a3b-moe-causal-hf"
       ],
@@ -1280,15 +1280,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:55ce7c8632d8270ba31683e9e87f75c120635ef36f3a734d2d5969c673103791",
-            "manifest.json": "sha256:ffa3f89aba7933d7d52a46fc8b3fee8f24ab1f01eb93751326b689dbd8aeb6bc",
-            "manifest.signature.json": "sha256:8dbd9b8a57395a0d6a398b308576278896388f91734c6e349a8d86c8dc02502a",
+            "checksums.sha256": "sha256:ca1826a1d7c55e88e0aca1fe4fb3e5549555d417498207907e9ea93e2806b044",
+            "manifest.json": "sha256:ce11ab42d77fa6bb497894d585f3cb17a2f8da8d0109ced024789a2ea90f06f3",
+            "manifest.signature.json": "sha256:3b3d328767c2289728e710d16aa6bac459ec079b49f7de7c49f166b7cc3a4f4c",
             "results/final_verdict.json": "sha256:4e9ec6acf859145435918480ea3e536b557aa74143c4aa2a2ae04859463c510e"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/qwen3_5_2b/evidence_pack",
-          "size_bytes": 1074502
+          "size_bytes": 1074493
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -1304,7 +1304,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:c050e048736ff6cbf7cb18f1a8845c3bc9ee836f8856674c91b9e9bf666dea96",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "qwen3-5-2b-image-text-hf"
       ],
@@ -1322,15 +1322,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:4b74c4721c884c95422514a839f4963bdd350a625fe17077d907974d10132a30",
-            "manifest.json": "sha256:4cbbf98afc809623f6e3b837a00a846d8ea25de1aed7846009eae48422135e7f",
-            "manifest.signature.json": "sha256:39e75fb35947723304d8a36d3d262b6208dc59237504d731a879dfc02b398f95",
+            "checksums.sha256": "sha256:44ee7bcff4805f04ce2d3bffb620925dd914900013fa1d3d985d21f6e777e408",
+            "manifest.json": "sha256:333dfb0560f7d90860311627c97639f7d0e4b1827a029c08e9a2c0e4c03d12c9",
+            "manifest.signature.json": "sha256:755e40c7efc49700aaa6f2e465f8209f1ca9ba50e6dcd7f3fda8e0dcfd5a85ab",
             "results/final_verdict.json": "sha256:32bf690981f94d0150c4d79f71f525aa724dcb1f14e46dcbc9b203e154cdbab0"
           },
           "file_count": 13,
           "kind": "directory",
           "path": "public_evidence/published_basis/qwen3_5_4b/evidence_pack",
-          "size_bytes": 1377140
+          "size_bytes": 1377131
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -1352,7 +1352,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:aa220aac64757a6201714b3f8d7a2ad8e1a0039e4a5968ab55e0428c2dc40ca1",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "qwen3-5-4b-image-text-hf"
       ],
@@ -1370,15 +1370,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:49628c33141ba5e29f3c9f5e2953b0d9233b54543447e90a9dcd409b549084c9",
-            "manifest.json": "sha256:4d3b32743eee9fa4ef6b968a7d30891e62d54e5497c64c5282e7beeaeb5c2a6b",
-            "manifest.signature.json": "sha256:7afdf022b2d0d1bae3510303e5c2d6e627ce65b8a05e15e6a1f0d62953c61e38",
+            "checksums.sha256": "sha256:c659f2055e96df7dc7f5a55a0ee903e7e9eaf6ae300cac327d0d219c88d5032e",
+            "manifest.json": "sha256:baa5e7f4ebcb2086d423b578bd64cb327180e8a9532a9ecc8579915c10077dde",
+            "manifest.signature.json": "sha256:a8c70ffa7bc56b0dc1d36bb9194cc8a14bec7f19d9e27801236a73e7c046ade2",
             "results/final_verdict.json": "sha256:74255249fb11de7b71afb70b339f4e7c2a504829ba4cbe8d739ba17d71fe2ff6"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/qwen3_5_9b/evidence_pack",
-          "size_bytes": 3407604
+          "size_bytes": 3407595
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -1394,7 +1394,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:044075dad4fd8c4d117f2617046120387b22df214d828c779f971446e66bc0ca",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "qwen3-5-causal-hf"
       ],
@@ -1412,15 +1412,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:d3f941efc0ca795f69babb9dcdf6d7050c4b41889e6fa2b8822a664ea290f1aa",
-            "manifest.json": "sha256:91d5cb3a53cecc9f9cb69a8165a3f31ffa51fa565629f93ff86c3b76cbdf6b4e",
-            "manifest.signature.json": "sha256:a769b5bb73b302ba2acc1fb0d211f11a7c9e371786468274e42299acf84a6e8f",
+            "checksums.sha256": "sha256:4d43ec970c779f8ab6bb9ba11a115134587d274b7323b5bcf75eefe0a15e870b",
+            "manifest.json": "sha256:7b4ea41fae01b1ae1a33978085694ef33d1872f501a5cb235658452ed1dea72f",
+            "manifest.signature.json": "sha256:5ec33348cad99f1143b636457038398e41ca2b4ab6a22523c3213b5b57fe2423",
             "results/final_verdict.json": "sha256:ca92c346fb90fd52eceb8e235a12858b5c045ac1c3c8e598ac73430b6998e8b3"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/qwen3_8b/evidence_pack",
-          "size_bytes": 3405216
+          "size_bytes": 3405207
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -1436,7 +1436,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:f0f7d0d98a3e13aad510ef127b425fcea7788c7f2e2640e4013e2bd9f789c0f3",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "qwen3-causal-hf"
       ],
@@ -1454,15 +1454,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:a3ce8724c81a22dcf751c01bb6c2da9eb783fec83ddefc890133e2772ad3877f",
-            "manifest.json": "sha256:71b84c51492e77ce68a187ca460aa1d56e2de546481e329ab32e857f9ba4325f",
-            "manifest.signature.json": "sha256:0af83380deae1d7cea1083c03bd518542c1d9dd49bdafbc3bbac9f3988ead812",
+            "checksums.sha256": "sha256:597c94eb8b8c414a27a847906b627a6245dbd5d28d9134968675092bb8e0b0b8",
+            "manifest.json": "sha256:7af46ef07bba849d06c6450479e44aee9a53937c46dc13dabf4326eda8798e4d",
+            "manifest.signature.json": "sha256:50c8f785aa2ea050b61219610cbb76b6ff696f715adaa19da09513789bbb8ff9",
             "results/final_verdict.json": "sha256:98cb81552bcd6f570085bcc1f71f1371408b9bfc6f7ce6216680d7d46e02362e"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/smollm3_3b/evidence_pack",
-          "size_bytes": 5638743
+          "size_bytes": 5638734
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -1484,7 +1484,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:2c127fcce7e816bc23b17d641888981b07358d5791c48f6b68dd8944369f3759",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "smollm3-3b-causal-hf"
       ],
@@ -1502,15 +1502,15 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:92ecd692cdf8658b8babf8a6d2f3a51f1ce70c24442bc4f1675a49fa8fa821dc",
-            "manifest.json": "sha256:5641dccff00646f4ad7aab66d22ca665733284613dca9f3dc6a5abdf7ac607ce",
-            "manifest.signature.json": "sha256:c7db08881e05e79f4c4dd0f32abc04912c7c4a0caaa3488fd81f94bf6955ea19",
+            "checksums.sha256": "sha256:cd604f76460ae68e1bb6cb1a056f0117a89c23d0cb008f807f81ede036a2c505",
+            "manifest.json": "sha256:d7f3bd212c8edf7e791ef7b681e665a3d6342844afe69e47d3e153f5b8a8f66c",
+            "manifest.signature.json": "sha256:9df16cc12c4278600cfd59ea99cb24f287415dc0e00195865d1ce61377f914f4",
             "results/final_verdict.json": "sha256:1d0f582023ce72f086f60f14e48cc550591b6e14449b72e3f5e9c5335a2c57c4"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/tinyllama_1_1b/evidence_pack",
-          "size_bytes": 2073046
+          "size_bytes": 2073037
         },
         "evidence_pack_recipe": {
           "kind": "file",
@@ -1526,7 +1526,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:324150e752102f9aa8fa13eff19f4a9aebd2bc8aa10132b4321ea0c434505351",
+      "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
       "lanes": [
         "tinyllama-1-1b-causal-hf"
       ],
@@ -1538,6 +1538,6 @@
   "format_version": "public-evidence-index-v1",
   "published_basis_count": 35,
   "published_basis_file_count": 507,
-  "published_basis_size_bytes": 220442817,
+  "published_basis_size_bytes": 220442502,
   "source_root": "public_evidence"
 }

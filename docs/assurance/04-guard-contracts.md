@@ -2,7 +2,7 @@
 
 > **Plain language:** This handbook explains what each guard checks, the
 > thresholds we enforce, and how those decisions appear in the report so
-> evidence readers can trace every PASS or FAIL.
+> readers can trace every PASS or FAIL.
 
 ## Overview
 
@@ -202,7 +202,7 @@ read primary-metric replicate floors as VE replicate counts.
   140/140 (Aggressive); profiles may request higher counts.
 
 These values are linted by `tests/eval/test_assurance_contracts.py` and surfaced
-in reports so evidence readers can audit reproducibility.
+in reports so readers can audit reproducibility.
 
 ## Calibration Evaluation Slice Requirements
 

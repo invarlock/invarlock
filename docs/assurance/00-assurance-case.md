@@ -28,7 +28,7 @@ pairing), see the [Glossary](glossary.md).
 2) a **test or contract** that fails fast when assumptions are violated
    (“Runtime enforcement”).
 
-We also list **observability**—the report fields that let evidence readers verify
+We also list **observability**—the report fields that let readers verify
 the claim.
 
 ## Scope, Assumptions, and Adjacent Domains

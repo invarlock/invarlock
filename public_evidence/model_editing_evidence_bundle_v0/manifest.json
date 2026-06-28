@@ -1,7 +1,7 @@
 {
   "bundle_id": "invarlock-model-editing-evidence-bundle-v0",
   "claim_boundary": "release-evidence wiring only",
-  "description": "Public-safe curated evidence lanes for edited subject artifacts.",
+  "description": "Publishable curated evidence lanes for edited subject artifacts.",
   "lanes": [
     {
       "checkpoint_refs": "public_evidence/real_runs/tiny_gpt2_quant_rtn/checkpoint_refs.json",

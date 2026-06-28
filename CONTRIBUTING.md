@@ -470,7 +470,7 @@ uv run invarlock advanced evidence-pack verify <evidence-dir>/evidence_pack \
 ```
 
 Verifier examples must preserve the provenance link to the matching
-`runtime.manifest.json`; evidence readers need that manifest to confirm execution
+`runtime.manifest.json`; readers need that manifest to confirm execution
 context, profile, and artifact integrity.
 
 Evidence metadata should be scanner-friendly and reader-friendly. Store file

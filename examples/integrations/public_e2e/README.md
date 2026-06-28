@@ -55,7 +55,7 @@ examples/integrations/public_e2e/run_public_e2e_release_review.sh \
 | `evaluation.html` | Human-readable report. |
 | `mlflow-tags.json` | Dependency-free registry tag payload. |
 | `model-card-invarlock.md` | Copy-pasteable model-card evidence block. |
-| `release-review.md` | Release-review packet for maintainers and evidence readers. |
+| `release-review.md` | Release-review packet for maintainers and auditors. |
 | `ci-summary.md` | Markdown summary matching the GitHub Actions summary shape. |
 | `run_command.txt` | Wrapper invocation for this handoff run. |
 | `source_run_command.txt` | Original evaluation command copied from the source evidence, when present. |

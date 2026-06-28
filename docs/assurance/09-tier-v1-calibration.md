@@ -6,7 +6,7 @@
 > (2) the **exact recipe** to recalibrate from scratch on your setup
 > (weight-based Spectral κ, activation-based RMT ε, VE min-effect, and window
 > sizing).
-> Every knob is surfaced in run reports and reports so evidence readers can audit or recompute.
+> Every knob is surfaced in run reports and reports so readers can audit or recompute.
 > The public evidence floor is the source-tree `published_basis` fixture set.
 > That fixture set demonstrates the public report/evidence-pack contract; it is
 > not the entire calibration corpus used to justify every numeric tier constant:
@@ -57,7 +57,7 @@ policy under `resolved_policy.spectral`.
   boundary for the chosen `min_effect_lognll`), verified on pilot runs.
 - CI/Release profiles request stricter counts than the base tier floors. The
   runtime/report gates enforce perfect pairing, zero overlap, and selected
-  tier-floor minima; evidence readers should compare requested profile counts to the
+  tier-floor minima; readers should compare requested profile counts to the
   recorded used counts when judging a release evidence package.
 
 **Spectral calibration provenance.** Aggregated null-run stats are derived from

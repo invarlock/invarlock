@@ -103,7 +103,7 @@ Colab (CPU-friendly):
 The public front door is `evaluate -> verify -> report html`. The README keeps
 the three common onboarding paths separate:
 
-- **Wheel user / evidence reader**: install `invarlock`, inspect an existing
+- **Wheel user / report reader**: install `invarlock`, inspect an existing
   `evaluation.report.json`, and render HTML without cloning the repository.
 - **Evaluator**: install `invarlock[hf]` when you want `evaluate` to load
   Hugging Face models and emit a fresh evaluation bundle.
