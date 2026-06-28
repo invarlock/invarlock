@@ -1,0 +1,14 @@
+{
+  "schema": "invarlock.public_evidence.meta.v1",
+  "evidence_class": "fa2_fallback_compatibility",
+  "summary": "Flash Attention 2 unavailable fallback compatibility summary.",
+  "generated_by": "scripts/evidence_packs/tests/run.sh --filter flash_attn, scripts/evidence_packs/tests/run.sh --filter strict_flash, and a CUDA/FA2 availability probe",
+  "artifact_paths": {
+    "compatibility_summary": "compatibility_summary.json",
+    "hash_inventory": "hash_inventory.json"
+  },
+  "verifier_commands": [
+    "python scripts/checks/check_public_evidence.py",
+    "python -m pytest tests/ci/test_fa2_fallback_public_evidence.py"
+  ]
+}
