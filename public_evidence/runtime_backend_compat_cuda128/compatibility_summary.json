@@ -1,0 +1,118 @@
+{
+  "schema": "invarlock.runtime_backend_compat.cuda128.summary.v1",
+  "status": "completed",
+  "evidence_scope": "runtime backend build/import smoke compatibility only; no model-quality or assurance claim",
+  "validation_environment": "CUDA-capable validation host",
+  "container_engine": "docker",
+  "python": "3.12",
+  "torch_backend": "cu128",
+  "raw_logs_published": false,
+  "weights_vendored": false,
+  "started_utc": "2026-06-28T13:40:12Z",
+  "completed_utc": "2026-06-28T14:22:47Z",
+  "families": [
+    {
+      "family": "cuda-bnb",
+      "image_tag": "invarlock-example-runtime:cuda-bnb",
+      "requirements_lock": "examples/integrations/_runtime_images/requirements/cuda-bnb-py312-cu128.txt",
+      "build_command": "examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-bnb",
+      "smoke_command": "examples/integrations/_runtime_images/smoke_example_runtime_image.sh cuda-bnb",
+      "adapter_smoke": [
+        "hf_bnb"
+      ],
+      "requires_cuda_toolchain": false,
+      "gpu_required": true,
+      "build_rc": 0,
+      "smoke_rc": 0,
+      "smoke_result": "quant runtime image imports ok: hf_bnb",
+      "image_id": "sha256:bac6d33ba46065dc5fa65a419a334d90ea0209cf30b2d9d06dae5b35ef1c817e",
+      "image_size_bytes": 4292516639
+    },
+    {
+      "family": "cuda-compressed-tensors",
+      "image_tag": "invarlock-example-runtime:cuda-compressed-tensors",
+      "requirements_lock": "examples/integrations/_runtime_images/requirements/cuda-compressed-tensors-py312-cu128.txt",
+      "build_command": "examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-compressed-tensors",
+      "smoke_command": "examples/integrations/_runtime_images/smoke_example_runtime_image.sh cuda-compressed-tensors",
+      "adapter_smoke": [
+        "hf_ct"
+      ],
+      "requires_cuda_toolchain": false,
+      "gpu_required": true,
+      "build_rc": 0,
+      "smoke_rc": 0,
+      "smoke_result": "quant runtime image imports ok: hf_ct",
+      "image_id": "sha256:6e0a873586598213f9bbe02438cb007e1a16b228cf2c9a77d127d3b6092110f8",
+      "image_size_bytes": 4232409019
+    },
+    {
+      "family": "cuda-gptqmodel",
+      "image_tag": "invarlock-example-runtime:cuda-gptqmodel",
+      "requirements_lock": "examples/integrations/_runtime_images/requirements/cuda-gptqmodel-py312-cu128.txt",
+      "build_command": "examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-gptqmodel",
+      "smoke_command": "examples/integrations/_runtime_images/smoke_example_runtime_image.sh cuda-gptqmodel",
+      "adapter_smoke": [
+        "hf_awq",
+        "hf_gptq"
+      ],
+      "requires_cuda_toolchain": true,
+      "gpu_required": true,
+      "build_rc": 0,
+      "smoke_rc": 0,
+      "smoke_result": "quant runtime image imports ok: hf_awq, hf_gptq",
+      "image_id": "sha256:3bfab976ceff5a34a828388dd72118c62738b69f78468610ccebbefb5adb97fa",
+      "image_size_bytes": 9399997610
+    },
+    {
+      "family": "cuda-hqq",
+      "image_tag": "invarlock-example-runtime:cuda-hqq",
+      "requirements_lock": "examples/integrations/_runtime_images/requirements/cuda-hqq-py312-cu128.txt",
+      "build_command": "examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-hqq",
+      "smoke_command": "examples/integrations/_runtime_images/smoke_example_runtime_image.sh cuda-hqq",
+      "adapter_smoke": [
+        "hf_hqq"
+      ],
+      "requires_cuda_toolchain": false,
+      "gpu_required": true,
+      "build_rc": 0,
+      "smoke_rc": 0,
+      "smoke_result": "quant runtime image imports ok: hf_hqq",
+      "image_id": "sha256:038e843fa7e083c09383bd531d112de819f7e2952f1816d71b2ea03eeb78bcc1",
+      "image_size_bytes": 4232327636
+    },
+    {
+      "family": "cuda-quanto",
+      "image_tag": "invarlock-example-runtime:cuda-quanto",
+      "requirements_lock": "examples/integrations/_runtime_images/requirements/cuda-quanto-py312-cu128.txt",
+      "build_command": "examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-quanto",
+      "smoke_command": "examples/integrations/_runtime_images/smoke_example_runtime_image.sh cuda-quanto",
+      "adapter_smoke": [
+        "hf_quanto"
+      ],
+      "requires_cuda_toolchain": false,
+      "gpu_required": true,
+      "build_rc": 0,
+      "smoke_rc": 0,
+      "smoke_result": "quant runtime image imports ok: hf_quanto",
+      "image_id": "sha256:71170cc89c21deae83d5c7619b457877cd1f52eb5d00fa82f4bc55c36dfabc74",
+      "image_size_bytes": 4232312852
+    },
+    {
+      "family": "cuda-torchao",
+      "image_tag": "invarlock-example-runtime:cuda-torchao",
+      "requirements_lock": "examples/integrations/_runtime_images/requirements/cuda-torchao-py312-cu128.txt",
+      "build_command": "examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-torchao",
+      "smoke_command": "examples/integrations/_runtime_images/smoke_example_runtime_image.sh cuda-torchao",
+      "adapter_smoke": [
+        "hf_torchao"
+      ],
+      "requires_cuda_toolchain": false,
+      "gpu_required": true,
+      "build_rc": 0,
+      "smoke_rc": 0,
+      "smoke_result": "quant runtime image imports ok: hf_torchao",
+      "image_id": "sha256:4554f4f1bb29200f2797037b9048fa2fa57014214d4df91c9b840217ab5c53e4",
+      "image_size_bytes": 4236670376
+    }
+  ]
+}

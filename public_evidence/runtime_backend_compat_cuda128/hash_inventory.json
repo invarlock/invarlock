@@ -1,0 +1,25 @@
+{
+  "schema": "invarlock.runtime_backend_compat.cuda128.hash_inventory.v1",
+  "status": "completed",
+  "evidence_scope": "runtime backend build/import smoke compatibility only; no model-quality or assurance claim",
+  "artifacts": [
+    {
+      "artifact": "readme",
+      "path": "README.md",
+      "bytes": 615,
+      "sha256": "sha256:3633b51fbb5a8acb62e91400b1a4b12ed43a2e69a7a238e49d8ab95288e7d567"
+    },
+    {
+      "artifact": "compatibility_summary",
+      "path": "compatibility_summary.json",
+      "bytes": 5294,
+      "sha256": "sha256:26c9e4a7000157d523c3cf83974d8b3d9dab23a0e7c2dbdfce87a722a6d17f1c"
+    },
+    {
+      "artifact": "evidence_meta",
+      "path": "evidence.meta.json",
+      "bytes": 642,
+      "sha256": "sha256:d58ab0a38e65a798432ef55ed62e4ac52a75978d74773b2aba031572c9d03ee5"
+    }
+  ]
+}
