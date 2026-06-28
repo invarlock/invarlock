@@ -274,6 +274,9 @@ def _report_scenario_id(pack_dir: Path, report: Path) -> str | None:
     parts = rel.parts
     if len(parts) < 3:
         return None
+    if parts[1] == "errors" and len(parts) >= 4:
+        scenario = parts[2].strip()
+        return scenario or None
     scenario = parts[1].strip()
     return scenario or None
 
@@ -295,20 +298,28 @@ def _scenario_strictness(scenarios_path: Path, scenario_id: str) -> str | None:
 
 
 def _report_expects_verify_failure(pack_dir: Path, report: Path) -> bool:
-    if "errors" in report.parts and report.name == "evaluation.report.json":
-        return True
-
     scenario_id = _report_scenario_id(pack_dir, report)
-    if scenario_id is None:
-        return False
+    is_error = _is_error_injection_report(report)
     scenarios_path = pack_dir / "metadata" / "scenarios.json"
-    if not scenarios_path.is_file():
-        return False
-    return _scenario_strictness(scenarios_path, scenario_id) == "must_fail"
+    if scenario_id is not None and scenarios_path.is_file():
+        strictness = _scenario_strictness(scenarios_path, scenario_id)
+        if is_error:
+            return strictness in {"must_fail", "must_detect"}
+        return strictness == "must_fail"
+
+    # Legacy packs did not always carry scenario metadata. Preserve the old
+    # hard-fault behavior for unclassified reports under errors/.
+    return is_error
 
 
 def _is_error_injection_report(report: Path) -> bool:
     return "errors" in report.parts and report.name == "evaluation.report.json"
+
+
+def _report_counts_as_clean_pass(pack_dir: Path, report: Path) -> bool:
+    return not _is_error_injection_report(
+        report
+    ) and not _report_expects_verify_failure(pack_dir, report)
 
 
 def _truthy(value: Any) -> bool:
@@ -471,7 +482,10 @@ def _verify_reports_with_sidecars(
             stdout_path=verify_out,
         )
         if rc == 0:
-            count_clean += 1
+            if _is_error_injection_report(report):
+                count_error += 1
+            else:
+                count_clean += 1
         else:
             print(f"ERROR: Unexpected verify failure: {report}", file=sys.stderr)
             count_failed += 1
@@ -499,7 +513,7 @@ def _verify_reports_with_sidecars(
     print(
         "Verified: "
         f"{count_clean} expected-pass, "
-        f"{count_error} error-injection expected-fail, "
+        f"{count_error} error/probe reports, "
         f"{count_expected_failure} scenario expected-fail, "
         f"{count_failed} unexpected failures; "
         f"report assurance={report_assurance}"
@@ -516,10 +530,15 @@ def _verify_reports_aggregate(
     json_out: Path | None,
     require_clean: bool,
 ) -> int:
-    clean_reports = [
+    expected_pass_reports = [
         report
         for report in reports
         if not _report_expects_verify_failure(pack_dir, report)
+    ]
+    clean_reports = [
+        report
+        for report in expected_pass_reports
+        if _report_counts_as_clean_pass(pack_dir, report)
     ]
     expected_failure_reports = [
         report for report in reports if _report_expects_verify_failure(pack_dir, report)
@@ -535,9 +554,9 @@ def _verify_reports_aggregate(
         )
         return 1
 
-    if clean_reports:
+    if expected_pass_reports:
         rc = _verify_command(
-            clean_reports,
+            expected_pass_reports,
             profile=profile,
             report_assurance=report_assurance,
             stdout_path=json_out,

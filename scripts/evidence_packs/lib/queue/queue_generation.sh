@@ -5,11 +5,23 @@
 
 QUEUE_MODULE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=queue_core.sh
-[[ -z "${QUEUE_CORE_LOADED:-}" ]] && source "${QUEUE_MODULE_DIR}/queue_core.sh"
+if ! declare -F add_task >/dev/null 2>&1; then
+    source "${QUEUE_MODULE_DIR}/queue_core.sh"
+fi
+QUEUE_CORE_LOADED=1
+export -n QUEUE_CORE_LOADED 2>/dev/null || true
 # shellcheck source=queue_lifecycle.sh
-[[ -z "${QUEUE_LIFECYCLE_LOADED:-}" ]] && source "${QUEUE_MODULE_DIR}/queue_lifecycle.sh" && export QUEUE_LIFECYCLE_LOADED=1
+if ! declare -F mark_task_ready >/dev/null 2>&1; then
+    source "${QUEUE_MODULE_DIR}/queue_lifecycle.sh"
+fi
+QUEUE_LIFECYCLE_LOADED=1
+export -n QUEUE_LIFECYCLE_LOADED 2>/dev/null || true
 # shellcheck source=queue_dependencies.sh
-[[ -z "${QUEUE_DEPENDENCIES_LOADED:-}" ]] && source "${QUEUE_MODULE_DIR}/queue_dependencies.sh" && export QUEUE_DEPENDENCIES_LOADED=1
+if ! declare -F check_dependencies_met >/dev/null 2>&1; then
+    source "${QUEUE_MODULE_DIR}/queue_dependencies.sh"
+fi
+QUEUE_DEPENDENCIES_LOADED=1
+export -n QUEUE_DEPENDENCIES_LOADED 2>/dev/null || true
 
 # ============ PROGRESS TRACKING ============
 

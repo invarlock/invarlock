@@ -11,15 +11,17 @@
 # - Track queue statistics
 
 # Source task serialization if not already sourced
-export QUEUE_CORE_LOADED=1
+QUEUE_CORE_LOADED=1
+export -n QUEUE_CORE_LOADED 2>/dev/null || true
 QUEUE_MANAGER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_DIR="${QUEUE_MANAGER_SCRIPT_DIR}"
 # shellcheck source=../core/runtime.sh
 source "${SCRIPT_DIR}/../core/runtime.sh"
-if [[ -z "${TASK_SERIALIZATION_LOADED:-}" ]]; then
+if ! declare -F get_task_field >/dev/null 2>&1; then
     source "${SCRIPT_DIR}/../tasks/task_serialization.sh"
-    export TASK_SERIALIZATION_LOADED=1
 fi
+TASK_SERIALIZATION_LOADED=1
+export -n TASK_SERIALIZATION_LOADED 2>/dev/null || true
 SCRIPT_DIR="${QUEUE_MANAGER_SCRIPT_DIR}"
 
 _pack_queue_pack_root() {

@@ -84,6 +84,43 @@ test_pack_validation_pack_is_bash4_default_impl_executes() {
     pack_is_bash4 || true
 }
 
+test_pack_validation_worker_sources_dependencies_with_inherited_loaded_flags() {
+    mock_reset
+
+    local rc=0
+    (
+        set -euo pipefail
+        export SCHEDULER_LOADED=1
+        export TASK_FUNCTIONS_LOADED=1
+        export MODEL_CREATION_LOADED=1
+        export TASK_SERIALIZATION_LOADED=1
+        export FAULT_TOLERANCE_LOADED=1
+        export QUEUE_CORE_LOADED=1
+        export QUEUE_LIFECYCLE_LOADED=1
+        export QUEUE_DEPENDENCIES_LOADED=1
+        export QUEUE_MEMORY_PLAN_LOADED=1
+        export QUEUE_GENERATION_LOADED=1
+        export SCHEDULER_CORE_LOADED=1
+        export SCHEDULER_GPU_RUNTIME_LOADED=1
+        export SCHEDULER_RESERVATIONS_LOADED=1
+        export SCHEDULER_SELECTION_LOADED=1
+        resolve_edit_params() { :; }
+
+        source ./scripts/evidence_packs/lib/queue/gpu_worker.sh
+
+        declare -F find_and_claim_task >/dev/null
+        declare -F execute_task >/dev/null
+        declare -F create_model_variant >/dev/null
+        declare -F get_task_field >/dev/null
+        declare -F _get_task_timeout >/dev/null
+        declare -F should_retry_task >/dev/null
+        ! env | grep -q '^SCHEDULER_LOADED='
+        ! env | grep -q '^TASK_FUNCTIONS_LOADED='
+    ) || rc=$?
+
+    assert_rc "0" "${rc}" "worker must source dependencies even when child shell inherits stale loaded flags"
+}
+
 test_pack_validation_setup_hf_cache_dirs_errors_when_home_is_file() {
     mock_reset
 
@@ -796,6 +833,26 @@ test_pack_validation_check_dependencies_flash_attn_branches_and_package_installs
     fixture_write "timeout.rc" "1"
     check_dependencies
     assert_eq "false" "${FLASH_ATTENTION_AVAILABLE}" "flash-attn install failed"
+    assert_match "flash-attn install failed" "$(cat "${LOG_FILE}")" "flash-attn failed install fallback logged"
+
+    FLASH_ATTN_CHECK_RC=1
+    FLASH_ATTN_VERIFY_RC=1
+    fixture_write "timeout.rc" "137"
+    check_dependencies
+    assert_eq "false" "${FLASH_ATTENTION_AVAILABLE}" "flash-attn killed build falls back"
+    assert_match "flash-attn install failed" "$(cat "${LOG_FILE}")" "flash-attn killed build fallback logged"
+    assert_match "--only-binary=:all:" "$(cat "${TEST_TMPDIR}/fixtures/timeout.calls")" "flash-attn install avoids source builds by default"
+
+    : > "${TEST_TMPDIR}/fixtures/timeout.calls"
+    PACK_FLASH_ATTN_ALLOW_SOURCE_BUILD=1
+    FLASH_ATTN_CHECK_RC=1
+    FLASH_ATTN_VERIFY_RC=1
+    fixture_write "timeout.rc" "1"
+    check_dependencies
+    assert_eq "false" "${FLASH_ATTENTION_AVAILABLE}" "explicit flash-attn source build failure falls back"
+    assert_match "--no-build-isolation" "$(cat "${TEST_TMPDIR}/fixtures/timeout.calls")" "flash-attn source build opt-in preserves source build args"
+    [[ "$(cat "${TEST_TMPDIR}/fixtures/timeout.calls")" != *"--only-binary=:all:"* ]] || t_fail "source-build opt-in must not use only-binary"
+    unset PACK_FLASH_ATTN_ALLOW_SOURCE_BUILD
 
     # protobuf + sentencepiece install branches
     PROTOBUF_IMPORT_RC=1

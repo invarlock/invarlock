@@ -512,6 +512,33 @@ pack_prepare_flash_attn_build_toolchain() {
     fi
 }
 
+pack_try_install_flash_attn() {
+    local flash_attn_requirement="$1"
+    local -a pip_args=(
+        python3 -m pip install
+        --require-hashes
+        -r "${flash_attn_requirement}"
+        --no-deps
+    )
+    case "${PACK_FLASH_ATTN_ALLOW_SOURCE_BUILD:-0}" in
+        1|true|TRUE|yes|YES|on|ON)
+            pip_args+=(--no-build-isolation)
+            ;;
+        *)
+            pip_args+=(--only-binary=:all:)
+            ;;
+    esac
+    local old_opts="$-"
+    set +e
+    timeout 600 "${pip_args[@]}" >> "${LOG_FILE}" 2>&1
+    local rc=$?
+    case "${old_opts}" in
+        *e*) set -e ;;
+        *) set +e ;;
+    esac
+    return "${rc}"
+}
+
 check_dependencies() {
     log_section "PHASE 0: DEPENDENCY CHECK"
 
@@ -609,7 +636,7 @@ check_dependencies() {
                     flash_attn_requirement="$(pack_evidence_pack_requirement_path "flash-attn")"
                     pack_prepare_flash_attn_build_toolchain "${pip_available}"
                     # Use timeout to prevent hanging on slow builds
-                    if [[ "${pip_available}" == "true" ]] && [[ -f "${flash_attn_requirement}" ]] && timeout 600 python3 -m pip install --require-hashes -r "${flash_attn_requirement}" --no-deps --no-build-isolation >> "${LOG_FILE}" 2>&1; then
+                    if [[ "${pip_available}" == "true" ]] && [[ -f "${flash_attn_requirement}" ]] && pack_try_install_flash_attn "${flash_attn_requirement}"; then
                         # Verify it actually imported
                         if python3 -c "import flash_attn" 2>/dev/null; then
                             export FLASH_ATTENTION_AVAILABLE="true"

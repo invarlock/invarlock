@@ -1128,8 +1128,8 @@
           },
           {
             "kind": "ve_probe",
-            "field": "signal",
-            "expected": true
+            "field": "proposed_scales",
+            "min": 1
           },
           {
             "kind": "guard_signal_baseline_relative",

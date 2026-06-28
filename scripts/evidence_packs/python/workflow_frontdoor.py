@@ -191,6 +191,7 @@ def run_evidence_pack_workflow(request: EvidencePackWorkflowRequest) -> int:
 
     env = dict(os.environ)
     env["PACK_WORKFLOW_SUBPROCESS"] = "1"
+    env["PACK_USE_WORKFLOW_FRONTDOOR"] = "0"
     results = execute_workflow_sweep(
         WorkflowSweepExecutionRequest(
             plan=workflow,

@@ -6,13 +6,29 @@
 
 TASK_FUNCTIONS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=task_common.sh
-[[ -z "${TASK_COMMON_LOADED:-}" ]] && source "${TASK_FUNCTIONS_DIR}/task_common.sh"
+if ! declare -F _get_task_timeout >/dev/null 2>&1; then
+    source "${TASK_FUNCTIONS_DIR}/task_common.sh"
+fi
+TASK_COMMON_LOADED=1
+export -n TASK_COMMON_LOADED 2>/dev/null || true
 # shellcheck source=task_baseline.sh
-[[ -z "${TASK_BASELINE_LOADED:-}" ]] && source "${TASK_FUNCTIONS_DIR}/task_baseline.sh" && export TASK_BASELINE_LOADED=1
+if ! declare -F task_setup_baseline >/dev/null 2>&1; then
+    source "${TASK_FUNCTIONS_DIR}/task_baseline.sh"
+fi
+TASK_BASELINE_LOADED=1
+export -n TASK_BASELINE_LOADED 2>/dev/null || true
 # shellcheck source=task_edit_lifecycle.sh
-[[ -z "${TASK_EDIT_LIFECYCLE_LOADED:-}" ]] && source "${TASK_FUNCTIONS_DIR}/task_edit_lifecycle.sh" && export TASK_EDIT_LIFECYCLE_LOADED=1
+if ! declare -F task_create_edit >/dev/null 2>&1; then
+    source "${TASK_FUNCTIONS_DIR}/task_edit_lifecycle.sh"
+fi
+TASK_EDIT_LIFECYCLE_LOADED=1
+export -n TASK_EDIT_LIFECYCLE_LOADED 2>/dev/null || true
 # shellcheck source=task_error_lifecycle.sh
-[[ -z "${TASK_ERROR_LIFECYCLE_LOADED:-}" ]] && source "${TASK_FUNCTIONS_DIR}/task_error_lifecycle.sh" && export TASK_ERROR_LIFECYCLE_LOADED=1
+if ! declare -F task_create_error >/dev/null 2>&1; then
+    source "${TASK_FUNCTIONS_DIR}/task_error_lifecycle.sh"
+fi
+TASK_ERROR_LIFECYCLE_LOADED=1
+export -n TASK_ERROR_LIFECYCLE_LOADED 2>/dev/null || true
 
 # ============ TASK EXECUTOR ============
 

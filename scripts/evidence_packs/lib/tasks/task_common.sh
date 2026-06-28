@@ -9,7 +9,8 @@
 # to enable parallel execution across GPUs.
 
 # Source dependencies
-export TASK_COMMON_LOADED=1
+TASK_COMMON_LOADED=1
+export -n TASK_COMMON_LOADED 2>/dev/null || true
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACK_REPO_ROOT="${PACK_REPO_ROOT:-$(cd "${SCRIPT_DIR}/../../../.." && pwd)}"
 PACK_REPO_PYTHONPATH="${PACK_REPO_ROOT}/src"
@@ -17,7 +18,11 @@ PACK_REPO_PYTHONPATH="${PACK_REPO_ROOT}/src"
 source "${SCRIPT_DIR}/../core/runtime.sh"
 # shellcheck source=../config/dataset_provider_config.sh
 source "${SCRIPT_DIR}/../config/dataset_provider_config.sh"
-[[ -z "${QUEUE_MANAGER_LOADED:-}" ]] && source "${SCRIPT_DIR}/../queue/queue_manager.sh" && export QUEUE_MANAGER_LOADED=1
+if ! declare -F get_task_field >/dev/null 2>&1; then
+    source "${SCRIPT_DIR}/../queue/queue_manager.sh"
+fi
+QUEUE_MANAGER_LOADED=1
+export -n QUEUE_MANAGER_LOADED 2>/dev/null || true
 
 # ============ FALLBACK FUNCTIONS ============
 # These provide fallback implementations when main script functions aren't available
