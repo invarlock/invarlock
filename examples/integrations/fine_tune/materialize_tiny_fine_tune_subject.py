@@ -300,8 +300,7 @@ def _require_finite_training_artifacts(
         examples = ", ".join(non_finite_tensors[:5])
         suffix = f" ({examples})" if examples else ""
         raise SystemExit(
-            "fine-tune materialization produced non-finite tensor deltas"
-            f"{suffix}"
+            f"fine-tune materialization produced non-finite tensor deltas{suffix}"
         )
 
 
