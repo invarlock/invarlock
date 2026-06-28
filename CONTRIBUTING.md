@@ -177,6 +177,10 @@ pytest -q -m "not integration and not slow and not manual" tests
 # Same lane via Makefile
 make test-fast
 
+# Optional pytest-xdist workers for the fast lane
+make test-parallel
+make test-fast PYTEST_WORKERS=auto
+
 # Full suite (can be slow)
 pytest -q
 
@@ -188,6 +192,8 @@ make test-integration
 ```
 
 For more curated examples (including the CI subset), see `tests/README.md`.
+Keep coverage runs serial unless the coverage target is explicitly updated to
+combine per-worker data; `make coverage-enforce` writes shared coverage reports.
 
 ### 3.3 Coverage policy
 
