@@ -892,6 +892,7 @@ def _classify_failure(
     evaluate_exit: int,
     verify_exit: int | None,
     phase: str,
+    verify_path: Path | None = None,
 ) -> tuple[str, str | None]:
     if evaluate_exit == 0 and verify_exit == 0:
         return ("ok", None)
@@ -918,6 +919,8 @@ def _classify_failure(
         or "primary metric degraded or non-finite" in text
     ):
         return ("failed", "invalid_primary_metric")
+    if phase == "verify" and verify_exit not in {None, 0}:
+        return ("failed", _verify_failure_detail(verify_path) or "verify_failed")
     if evaluate_exit == 125 and (
         "docker:" in text
         and (
@@ -930,8 +933,43 @@ def _classify_failure(
     if evaluate_exit != 0:
         return ("failed", f"{phase}_failed")
     if verify_exit not in {None, 0}:
-        return ("failed", "verify_failed")
+        return ("failed", _verify_failure_detail(verify_path) or "verify_failed")
     return ("failed", None)
+
+
+def _safe_detail(value: object) -> str | None:
+    text = str(value or "").strip().lower().replace("-", "_")
+    if not text or len(text) > 64:
+        return None
+    allowed = set("abcdefghijklmnopqrstuvwxyz0123456789_")
+    if not all(char in allowed for char in text):
+        return None
+    return text
+
+
+def _verify_failure_detail(verify_path: Path | None) -> str | None:
+    if verify_path is None or not verify_path.is_file():
+        return None
+    try:
+        payload = json.loads(verify_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    summary = payload.get("summary")
+    if isinstance(summary, dict):
+        detail = _safe_detail(summary.get("reason"))
+        if detail:
+            return detail
+    results = payload.get("results")
+    if isinstance(results, list):
+        for result in results:
+            if not isinstance(result, dict):
+                continue
+            detail = _safe_detail(result.get("reason"))
+            if detail:
+                return detail
+    return None
 
 
 def _lane_env_for_spec(spec: EvidenceLane, env: dict[str, str]) -> dict[str, str]:
@@ -987,6 +1025,7 @@ def _model_lane_result_from_state(
             evaluate_exit=base.evaluate_exit,
             verify_exit=base.verify_exit,
             phase="evaluate",
+            verify_path=published_verify_path,
         )
     elif failed_phase.name == "materialize_dataset":
         status, detail = ("failed", "dataset_materialize_failed")
@@ -1003,6 +1042,7 @@ def _model_lane_result_from_state(
             evaluate_exit=phase_exit,
             verify_exit=base.verify_exit,
             phase=failed_phase.name,
+            verify_path=published_verify_path,
         )
 
     return LaneResult(
