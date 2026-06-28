@@ -9,7 +9,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Define the RMT edge-risk acceptance band and the report fields needed to audit it. |
-| **Audience** | RMT guard maintainers, calibration reviewers, and release reviewers checking activation evidence. |
+| **Audience** | RMT guard maintainers, calibration auditors, and release approvers checking activation evidence. |
 | **Contract scope** | Baseline-relative activation edge-risk growth, per-family epsilon bands, and report-verifier behavior. |
 | **Source of truth** | `src/invarlock/guards/rmt*.py`, `runtime/tiers.yaml`, and RMT assurance tests. |
 

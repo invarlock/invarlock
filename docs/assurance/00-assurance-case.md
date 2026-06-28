@@ -7,7 +7,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Index the assurance claims, evidence notes, and runtime enforcement paths for weight-edit regression review. |
-| **Audience** | Maintainers, release reviewers, auditors, and contributors changing assurance-critical behavior. |
+| **Audience** | Maintainers, release approvers, auditors, and contributors changing assurance-critical behavior. |
 | **Contract scope** | Assurance case v1.0 for one configured baseline, subject, dataset window plan, tier, profile, and runtime policy. |
 | **Source of truth** | This claim table, the linked assurance notes, `src/invarlock/core/assurance_contract.py`, and `src/invarlock/reporting/verify_contract.py`. |
 
@@ -28,7 +28,7 @@ pairing), see the [Glossary](glossary.md).
 2) a **test or contract** that fails fast when assumptions are violated
    (“Runtime enforcement”).
 
-We also list **observability**—the report fields that let reviewers verify
+We also list **observability**—the report fields that let readers verify
 the claim.
 
 ## Scope, Assumptions, and Adjacent Domains

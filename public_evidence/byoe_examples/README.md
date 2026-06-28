@@ -19,7 +19,7 @@ compression, sparse runtime acceleration, and packed quantized storage are
 outside these fixture examples.
 
 The LoRA merge and fine-tune fixtures demonstrate optional descriptive metadata
-for BYOE subjects. Those fields help reviewers identify the upstream edit
+for BYOE subjects. Those fields help readers identify the upstream edit
 family, scenario labels, evaluation realism, topology, and delta/privacy
 disclosure. Verifier verdicts remain the strict release-profile checks over each
 report.

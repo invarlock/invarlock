@@ -41,7 +41,7 @@ def _serialize_evaluation_report_json(evaluation_report: dict[str, Any]) -> str:
     )
 
 
-def render_evaluation_bundle_reviewer_summary(
+def render_evaluation_bundle_evidence_summary(
     summary: ReportManifestSummary,
     *,
     evidence_level: str,
@@ -51,7 +51,7 @@ def render_evaluation_bundle_reviewer_summary(
     """Render a short plain-text audit summary for evaluation bundles."""
     outline_facts = list(outline_facts or [])
     lines = [
-        "InvarLock Evaluation Bundle Reviewer Summary",
+        "InvarLock Evaluation Bundle Evidence Summary",
         "",
         f"Evidence level: {evidence_level}",
         f"Overall status: {summary.overall_status}",
@@ -77,7 +77,7 @@ def render_evaluation_bundle_reviewer_summary(
     lines.append("Why it might be wrong:")
     if has_guard_evidence:
         lines.append(
-            "- Guard evidence sidecar is present, but reviewers should still compare it against the canonical evaluation report."
+            "- Guard evidence sidecar is present, but readers should still compare it against the canonical evaluation report."
         )
     else:
         lines.append(
@@ -161,9 +161,9 @@ def write_report_manifest(
         if has_guard_evidence and ev_file is not None:
             manifest["evidence"] = {"guards_evidence": str(ev_file)}
 
-        reviewer_summary_path = output_path / "reviewer_summary.txt"
-        reviewer_summary_path.write_text(
-            render_evaluation_bundle_reviewer_summary(
+        evidence_summary_path = output_path / "evidence_summary.txt"
+        evidence_summary_path.write_text(
+            render_evaluation_bundle_evidence_summary(
                 summary,
                 evidence_level=evidence_level,
                 has_guard_evidence=has_guard_evidence,
@@ -171,8 +171,8 @@ def write_report_manifest(
             ),
             encoding="utf-8",
         )
-        manifest["files"]["reviewer_summary_txt"] = str(reviewer_summary_path)
-        saved_files["reviewer_summary"] = reviewer_summary_path
+        manifest["files"]["evidence_summary_txt"] = str(evidence_summary_path)
+        saved_files["evidence_summary"] = evidence_summary_path
 
         manifest_path = output_path / "manifest.json"
         manifest_path.write_text(
@@ -320,7 +320,7 @@ def save_evaluation_bundle(
 
 
 __all__ = [
-    "render_evaluation_bundle_reviewer_summary",
+    "render_evaluation_bundle_evidence_summary",
     "save_evaluation_bundle",
     "save_report",
     "write_report_manifest",

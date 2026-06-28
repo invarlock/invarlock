@@ -1,6 +1,6 @@
 # Model-Editing Evidence Bundle v0
 
-This public-safe bundle groups small InvarLock evidence lanes for common
+This publishable evidence bundle groups small InvarLock evidence lanes for common
 post-edit subject types. It is a curated index over existing public fixtures and
 real tiny-model runs; it does not vendor model weights.
 
@@ -11,6 +11,6 @@ the benchmark evidence that can be paired with the verified reports when a
 review needs edit-quality, locality, robustness, or safety results.
 
 Use `manifest.json` to locate each lane's evaluation report, runtime manifest,
-checkpoint references, and reviewer note. Use `verification_summary.json` for
+checkpoint references, and evidence note. Use `verification_summary.json` for
 the deterministic hash inventory and release/strict verification status for the
 bundle lanes.

@@ -470,10 +470,10 @@ uv run invarlock advanced evidence-pack verify <evidence-dir>/evidence_pack \
 ```
 
 Verifier examples must preserve the provenance link to the matching
-`runtime.manifest.json`; reviewers need that manifest to confirm execution
+`runtime.manifest.json`; readers need that manifest to confirm execution
 context, profile, and artifact integrity.
 
-Evidence metadata should be scanner-friendly and reviewer-friendly. Store file
+Evidence metadata should be scanner-friendly and reader-friendly. Store file
 hashes as records such as `{"path": "...", "sha256": "..."}` instead of using
 file names as JSON keys when those names can look like secret/token fields to
 generic scanners.

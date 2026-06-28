@@ -13,7 +13,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Explain how spectral guard family caps map to false-positive-rate interpretation under modeled nulls. |
-| **Audience** | Guard maintainers, calibration reviewers, and contributors changing spectral policy. |
+| **Audience** | Guard maintainers, calibration auditors, and contributors changing spectral policy. |
 | **Contract scope** | Spectral z-score caps, multiple-testing policy, sentinel caps, and report observability. |
 | **Source of truth** | `src/invarlock/guards/spectral*.py`, `runtime/tiers.yaml`, and spectral assurance tests. |
 
@@ -126,7 +126,7 @@ summary.
 - Balanced `max_caps = 5`. After the fifth WARN the guard continues to WARN;
   the sixth triggers `spectral.caps_exceeded=true` and the run aborts.
 - Multiple-testing metadata shows `spectral.multiple_testing = {method: "bh",
-  alpha: 0.05, m: 4}` so reviewers can verify the published policy and compute
+  alpha: 0.05, m: 4}` so readers can verify the published policy and compute
   modeled tails for the calibrated caps.
 
 ## Calibration

@@ -1,0 +1,162 @@
+{
+  "campaign_id": "training-evidence-gpu-20260628",
+  "claim_boundary": "empirical training evidence only; no new assurance claim",
+  "lanes": [
+    {
+      "artifacts": {
+        "checkpoint_refs": {
+          "artifact": "checkpoint_refs",
+          "bytes": 1260,
+          "campaign_relative_path": "peft_lora/checkpoint_refs.json",
+          "sha256": "sha256:649d9813270d89e08ce8d09875d7dbe52eca25fa77f7eeeddb5defe3f42a4957"
+        },
+        "evaluation_report": {
+          "artifact": "evaluation_report",
+          "bytes": 2062394,
+          "campaign_relative_path": "peft_lora/evaluation.report.json",
+          "sha256": "sha256:5a11e3dbd0d88ba16a3022230039c223f85c8d77656d3749acca2a2a58ef218f"
+        },
+        "external_edit_summary": {
+          "artifact": "external_edit_summary",
+          "bytes": 2181,
+          "campaign_relative_path": "peft_lora/external_edit_summary.json",
+          "sha256": "sha256:fa11465cd349c016e3b2099132a2a0bab73e53b0102b830f16ed321e59327b56"
+        },
+        "fixture_summary": {
+          "artifact": "fixture_summary",
+          "bytes": 611,
+          "campaign_relative_path": "peft_lora/fixture_summary.json",
+          "sha256": "sha256:3c485c8a4f174b7693bd46d2bdd2f49f1e3d132a879d713791ca30211b131eee"
+        },
+        "lane_artifact": {
+          "artifact": "lane_artifact",
+          "bytes": 186,
+          "campaign_relative_path": "peft_lora/lane_artifact.json",
+          "sha256": "sha256:20b7efb0d6924d5d18ff0b59173b5109349c26a4b6818ded3975b8cfeded6622"
+        },
+        "run_summary": {
+          "artifact": "run_summary",
+          "bytes": 586,
+          "campaign_relative_path": "peft_lora/run_summary.txt",
+          "sha256": "sha256:0ef707f24cc502ac4fca0c3ec3e5065ff3a6f6708f6d1ce998ef4ba79beb7d12"
+        },
+        "runtime_manifest": {
+          "artifact": "runtime_manifest",
+          "bytes": 999,
+          "campaign_relative_path": "peft_lora/runtime.manifest.json",
+          "sha256": "sha256:9395d56251631de80305990787c8a82784b568039b64cd828a57df2b33ca9a87"
+        },
+        "verify_json": {
+          "artifact": "verify_json",
+          "bytes": 750,
+          "campaign_relative_path": "peft_lora/verify.json",
+          "sha256": "sha256:ee740eb1e33295cb2b72b3a4489f950c014b36ccf86a9a97b8f905648649262b"
+        }
+      },
+      "command_shape": {
+        "execution_lane": "cuda",
+        "network": "enabled by operator flag",
+        "profile": "release",
+        "tier": "balanced",
+        "validation_host": "CUDA-capable validation host",
+        "weights_vendored": false
+      },
+      "display_name": "PEFT LoRA train-and-merge subject",
+      "edit_family": "lora_merge",
+      "lane_artifact_label": "cuda-container-strict",
+      "status": "completed",
+      "subject_checkpoint_policy": "materialized for validation; do not commit checkpoint weights by default",
+      "target": "peft_lora",
+      "toolchain": "peft",
+      "verification": {
+        "assurance": "strict",
+        "profile": "release",
+        "runtime_provenance": "container",
+        "runtime_provenance_status": "verified",
+        "runtime_provenance_verified": "true",
+        "verify_status": "ok"
+      },
+      "weights_vendored": false
+    },
+    {
+      "artifacts": {
+        "checkpoint_refs": {
+          "artifact": "checkpoint_refs",
+          "bytes": 1305,
+          "campaign_relative_path": "fine_tune/checkpoint_refs.json",
+          "sha256": "sha256:b071f7d1d9bee8f2897b4b8f01639a3a2813a97d1c9b23f87ef77fe3299d8a80"
+        },
+        "evaluation_report": {
+          "artifact": "evaluation_report",
+          "bytes": 2062716,
+          "campaign_relative_path": "fine_tune/evaluation.report.json",
+          "sha256": "sha256:2ea38c5b908e0dcd93a74ecb42a837005ba08d5c65e23ed4312b09711be212f3"
+        },
+        "external_edit_summary": {
+          "artifact": "external_edit_summary",
+          "bytes": 1233,
+          "campaign_relative_path": "fine_tune/external_edit_summary.json",
+          "sha256": "sha256:5cc4be556f9675eda864e5f3d4d46e60ac7feff041a90c7e183b3cbc8edc04dd"
+        },
+        "fixture_summary": {
+          "artifact": "fixture_summary",
+          "bytes": 653,
+          "campaign_relative_path": "fine_tune/fixture_summary.json",
+          "sha256": "sha256:9890d0d9ca32e2b7175281d0c73907c5777e33c62602018493d20e67f7925379"
+        },
+        "lane_artifact": {
+          "artifact": "lane_artifact",
+          "bytes": 186,
+          "campaign_relative_path": "fine_tune/lane_artifact.json",
+          "sha256": "sha256:20b7efb0d6924d5d18ff0b59173b5109349c26a4b6818ded3975b8cfeded6622"
+        },
+        "run_summary": {
+          "artifact": "run_summary",
+          "bytes": 586,
+          "campaign_relative_path": "fine_tune/run_summary.txt",
+          "sha256": "sha256:759e8abd2a320d576d34ec051f2f9e73c330f74e7c3e18058cced6bb38f8928d"
+        },
+        "runtime_manifest": {
+          "artifact": "runtime_manifest",
+          "bytes": 999,
+          "campaign_relative_path": "fine_tune/runtime.manifest.json",
+          "sha256": "sha256:8387d78968e49648764e5ee5f819b8ba242a5d9f736e68d169e19f8cb5a50f58"
+        },
+        "verify_json": {
+          "artifact": "verify_json",
+          "bytes": 749,
+          "campaign_relative_path": "fine_tune/verify.json",
+          "sha256": "sha256:efe0cac54fbc7ac902d1f8608826227809d8f95a3682a8b6b34c63e9b043d46d"
+        }
+      },
+      "command_shape": {
+        "execution_lane": "cuda",
+        "network": "enabled by operator flag",
+        "profile": "release",
+        "tier": "balanced",
+        "validation_host": "CUDA-capable validation host",
+        "weights_vendored": false
+      },
+      "display_name": "Full fine-tune subject",
+      "edit_family": "fine_tune",
+      "lane_artifact_label": "cuda-container-strict",
+      "status": "completed",
+      "subject_checkpoint_policy": "materialized for validation; do not commit checkpoint weights by default",
+      "target": "fine_tune",
+      "toolchain": "transformers",
+      "verification": {
+        "assurance": "strict",
+        "profile": "release",
+        "runtime_provenance": "container",
+        "runtime_provenance_status": "verified",
+        "runtime_provenance_verified": "true",
+        "verify_status": "ok"
+      },
+      "weights_vendored": false
+    }
+  ],
+  "public_artifact_policy": "publish public summaries, report manifests, checkpoint references, evaluation reports, verification JSON, and hash inventories only",
+  "schema": "invarlock.training_evidence_campaign.summary.v1",
+  "status": "completed",
+  "weights_vendored": false
+}

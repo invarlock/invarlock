@@ -5,7 +5,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Explain the runtime-provenance evidence required for strict assurance. |
-| **Audience** | Release reviewers, security reviewers, operators packaging evidence bundles. |
+| **Audience** | Release approvers, security auditors, operators packaging evidence bundles. |
 | **Contract scope** | Current strict assurance behavior, runtime manifest schema v1. |
 | **Required artifact** | `runtime.manifest.json` adjacent to every container-backed `evaluation.report.json`. |
 | **Source of truth** | `src/invarlock/runtime_verify.py`, `src/invarlock/runtime_provenance.py`, `contracts/runtime_manifest.schema.json`, `docs/security/threat-model.md`. |

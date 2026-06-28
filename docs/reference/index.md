@@ -12,12 +12,12 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 | [Configuration Schema](config-schema.md) | YAML config structure and precedence | CLI users |
 | [Guards](guards.md) | Guard configuration and evidence | Users tuning guards |
 | [Model Adapters](model-adapters.md) | Adapter selection and capabilities | CLI and API users |
-| [Model Family Catalog](model-family-catalog.md) | Authoritative support inventory and backlog | Reviewers, tool authors |
-| [Public Contracts](contracts.md) | Stable public contracts for reports, verification, and policy artifacts | Tool authors, reviewers |
+| [Model Family Catalog](model-family-catalog.md) | Authoritative support inventory and backlog | Auditors, tool authors |
+| [Public Contracts](contracts.md) | Stable public contracts for reports, verification, and policy artifacts | Tool authors, auditors |
 | [Datasets](datasets.md) | Dataset providers and pairing | CLI users |
 | [reports](reports.md) | v1 schema, telemetry, and HTML export | Operators, tool authors |
-| [Report Outline](report-outline.md) | Renderer-neutral report information architecture | Renderer authors, reviewers |
-| [Architecture](architecture.md) | System layers, data flow, and dependencies | Builders, reviewers |
+| [Report Outline](report-outline.md) | Renderer-neutral report information architecture | Renderer authors, auditors |
+| [Architecture](architecture.md) | System layers, data flow, and dependencies | Builders, auditors |
 | [Tier Policy Catalog](tier-policy-catalog.md) | Guard threshold explanations | Operators auditing policies |
 | [Environment Variables](env-vars.md) | Runtime toggles and flags | Operators |
 | [API Guide](api-guide.md) | Programmatic interface | Python developers |

@@ -5,7 +5,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Auditable strict-verification framework for ML model weight modifications. |
-| **Audience** | Developers extending InvarLock, operators debugging pipelines, security reviewers. |
+| **Audience** | Developers extending InvarLock, operators debugging pipelines, security auditors. |
 | **Core components** | CLI shells, Core/runtime policy layer, Guard chain, Reporting/artifact subsystem. |
 | **Design goals** | Torch-independent core, edit-stack-neutral guards, deterministic evaluation, explicit artifact contracts, full provenance. |
 | **Source of truth** | `src/invarlock/core/*.py`, `src/invarlock/reporting/*.py`, `src/invarlock/runtime_provenance.py`, `src/invarlock/runtime_verify.py`, `src/invarlock/cli/commands/*.py`, `src/invarlock/cli/run_*.py`, `src/invarlock/guards/*.py`. |

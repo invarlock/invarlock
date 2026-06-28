@@ -623,7 +623,7 @@ def test_model_editing_evidence_bundle_v0_lanes_verify_release_strict() -> None:
     manifest_path = bundle_dir / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     summary_path = REPO_ROOT / manifest["verification_summary"]
-    training_plan_path = REPO_ROOT / manifest["reviewer_training_matrix_plan"]
+    training_plan_path = REPO_ROOT / manifest["training_evidence_matrix_plan"]
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
 
     expected_families = {"quantization", "magnitude_prune", "lora_merge", "fine_tune"}
@@ -660,7 +660,7 @@ def test_model_editing_evidence_bundle_v0_lanes_verify_release_strict() -> None:
     for lane in lanes:
         report_path = REPO_ROOT / lane["evaluation_report"]
         refs_path = REPO_ROOT / lane["checkpoint_refs"]
-        note_path = REPO_ROOT / lane["reviewer_note"]
+        note_path = REPO_ROOT / lane["evidence_note"]
         summary_lane = summary_lanes[lane["edit_family"]]
 
         report = json.loads(report_path.read_text(encoding="utf-8"))
@@ -672,7 +672,7 @@ def test_model_editing_evidence_bundle_v0_lanes_verify_release_strict() -> None:
             refs["subject_checkpoint"]["external_edit_type"]
             == lane["external_edit_type"]
         )
-        assert "Reviewer takeaways" in note
+        assert "Evidence takeaways" in note
         assert "Artifact mode:" in note
         assert "Verification surface:" in note
         assert "Companion benchmark evidence:" in note
@@ -690,7 +690,7 @@ def test_model_editing_evidence_bundle_v0_lanes_verify_release_strict() -> None:
             "evaluation_report": lane["evaluation_report"],
             "runtime_manifest": lane["runtime_manifest"],
             "checkpoint_refs": lane["checkpoint_refs"],
-            "reviewer_note": lane["reviewer_note"],
+            "evidence_note": lane["evidence_note"],
         }.items():
             artifact = summary_lane["artifacts"][key]
             assert artifact["path"] == expected_path

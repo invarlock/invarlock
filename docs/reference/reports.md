@@ -505,7 +505,7 @@ invarlock report export \
 | --- | --- | --- |
 | `mlflow-tags` | JSON with `tags` and report artifact path | Set registry tags and log the report as an MLflow artifact from an MLflow-enabled environment. |
 | `model-card-md` | Markdown block | Paste InvarLock evidence into a Hugging Face model card or equivalent model README. |
-| `release-review-md` | Markdown packet | Attach pass/fail, baseline/subject identity, report hash, policy profile, and reviewer checklist to release review. |
+| `release-review-md` | Markdown packet | Attach pass/fail, baseline/subject identity, report hash, policy profile, and acceptance checklist to release review. |
 
 These exports summarize regression evidence only. They do not change verifier
 semantics, replace `invarlock verify`, or provide deployment approval.

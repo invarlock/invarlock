@@ -41,7 +41,7 @@ The action writes:
 | Artifact | Purpose |
 | --- | --- |
 | `evaluation.html` | Human-readable report. |
-| `release-review.md` | Reviewer packet for release checks. |
+| `release-review.md` | Release packet for release checks. |
 | `mlflow-tags.json` | Registry tag export. |
 | `invarlock-verify.json` | Machine-readable verify result. |
 
@@ -101,7 +101,7 @@ summarizes regression evidence only; it is not deployment approval.
 
 ## Release Review Packet
 
-Generate a release-review packet for release maintainers and reviewers:
+Generate a release-review packet for release maintainers and auditors:
 
 ```bash
 invarlock report export \
@@ -113,4 +113,4 @@ invarlock report export \
 ```
 
 The packet includes the baseline and subject identities, pass/fail status,
-report hash, policy profile, gate checklist, and reviewer checklist.
+report hash, policy profile, gate checklist, and evidence checklist.

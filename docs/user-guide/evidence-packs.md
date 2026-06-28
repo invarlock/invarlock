@@ -226,7 +226,7 @@ A suite run writes artifacts under `OUTPUT_DIR` (default: `./evidence_pack_runs/
   variance/VE evidence from clean confirmation reruns
 - `reports/**/deployable_artifact_validation.json`, `backend_inventory.json`, `memory_report.json`, `load_smoke.json`, and `inference_smoke.json` for deployable scenarios
 - `reports/**/evaluation.html` + `reports/**/verify.json`
-- `README.md` (reviewer summary), `manifest.json`, `checksums.sha256`
+- `README.md` (evidence summary), `manifest.json`, `checksums.sha256`
 - `manifest.signature.json` when the pack is signed
 - `metadata/source_repo.json`, `metadata/environment.json`, and other input metadata sidecars when present
 
@@ -244,7 +244,7 @@ generation overhead by loading the baseline once for multiple validation edits,
 but each evaluated subject checkpoint is loaded by its own `evaluate_EDIT` task.
 
 `PACK_DEFER_REPORT_RENDERING=1` keeps `evaluation.report.json` and required
-sidecars, but skips optional markdown/reviewer rendering in the hot path.
+sidecars, but skips optional markdown/evidence rendering in the hot path.
 `run_pack.sh --release-review` enables this by default; pack-level HTML export
 and verification still run unless explicitly disabled.
 
@@ -312,7 +312,7 @@ signed manifest cryptographically binds the checksums file (and thus all hashed 
 Newer packs also carry a signed provenance block in the same manifest:
 `builder`, `subject`, `invocation`, `environment`, and digest-backed `materials`.
 The manifest also records a derived `evidence_level` (`low`/`medium`/`high`) so
-reviewers can triage bundles quickly without replacing the underlying strict signed checks.
+readers can triage bundles quickly without replacing the underlying strict signed checks.
 Package-native signed packs store the detached Ed25519 signature bundle in
 `manifest.signature.json` and record `signing_key_fingerprint` in the manifest
 for audit trails.
@@ -387,7 +387,7 @@ Use the package-native subcommands:
   digest-backed manifest references, or strict extra-file checks)
 - `7`: report verification failure (`invarlock verify`)
 
-Reviewer checklist:
+Evidence checklist:
 
 - [ ] `invarlock advanced evidence-pack verify <dir> --strict --report-assurance strict` returns `0`
 - [ ] Verification is signer-pinned with `--expected-fingerprint` or a trust

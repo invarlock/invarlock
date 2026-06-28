@@ -98,7 +98,7 @@ tier policy, and report policy. There is no public env var that forces BCa.
 | `INVARLOCK_OMP_THREADS` | `1` | Thread caps for determinism preset. |
 | `INVARLOCK_DEBUG_TRACE` | unset | Verbose debug traces for data/eval paths. |
 | `INVARLOCK_LIGHT_IMPORT` | unset | Avoid heavy imports for docs/tests. |
-| `PACK_DEFER_REPORT_RENDERING` | unset (`1` under `run_pack.sh --release-review`) | Evidence-pack wrapper toggle that skips optional markdown/reviewer rendering during evaluation. |
+| `PACK_DEFER_REPORT_RENDERING` | unset (`1` under `run_pack.sh --release-review`) | Evidence-pack wrapper toggle that skips optional markdown/evidence rendering during evaluation. |
 | `PACK_DEFER_OPTIONAL_REPORT_RENDERING` | unset | Alias for `PACK_DEFER_REPORT_RENDERING`. |
 | `PACK_EVALUATE_ASSURANCE` | `off` (`strict` under `run_pack.sh --release-review`) | Evidence-pack wrapper toggle forwarded to `invarlock evaluate` for generated reports. |
 | `PACK_FLASH_ATTN_ALLOW_SOURCE_BUILD` | `0` | Evidence-pack dependency toggle. Set to `1` only when intentionally allowing a local Flash Attention source build; default FA2 install attempts use wheels only and fall back to eager attention if unavailable. |

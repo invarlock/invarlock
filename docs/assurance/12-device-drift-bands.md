@@ -9,7 +9,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Define the pilot review bands for comparing CPU, MPS, and CUDA evaluation ratios. |
-| **Audience** | Maintainers, release reviewers, and operators attaching cross-device evidence. |
+| **Audience** | Maintainers, release approvers, and operators attaching cross-device evidence. |
 | **Contract scope** | Empirical drift review for matching reports; PyTorch cross-platform reproducibility remains a separate platform concern. |
 | **Source of truth** | `scripts/smoke/check_device_drift.py`, report `primary_metric.*`, and runtime metadata under `meta.*`. |
 

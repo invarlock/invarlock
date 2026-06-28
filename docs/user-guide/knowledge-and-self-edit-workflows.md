@@ -32,7 +32,7 @@ claim-bearing.
 - Produce or reference the baseline checkpoint.
 - Produce the edited subject checkpoint with your upstream workflow.
 - Run Compare & evaluate (BYOE) with `--baseline` and `--subject`.
-- Record optional edit provenance metadata when you need reviewer context.
+- Record optional edit provenance metadata when you need reader context.
 - Record evaluation realism metadata when the metric is a proxy for live generation.
 - Verify `evaluation.report.json` together with its `runtime.manifest.json`.
 
@@ -73,7 +73,7 @@ class in this workflow.
 
 Knowledge-edit and self-edit reviews often mix live generation checks with proxy
 metrics such as teacher-forced log-probability. Record the evaluation mode so a
-reviewer can tell what behavior was actually exercised.
+reader can tell what behavior was actually exercised.
 
 | Field | Purpose |
 | --- | --- |
@@ -150,7 +150,7 @@ patches, or other recovered-subject-sensitive artifacts by default. Those
 materials may expose sensitive or proprietary edit information depending on the
 method and threat model.
 
-Use `delta_privacy` metadata to tell reviewers whether raw edit material is
+Use `delta_privacy` metadata to tell readers whether raw edit material is
 absent, private, public, or hash-only:
 
 | Field | Purpose |
@@ -168,7 +168,7 @@ public bundles unless raw artifact disclosure is intentional.
 Evidence packs can carry the resulting reports, checksums, runtime manifests,
 optional signatures, and edit metadata. They keep model weights external by
 default. For external subject workflows, include checkpoint references or
-digests that let reviewers understand which baseline and subject were compared.
+digests that let readers understand which baseline and subject were compared.
 
 ## Related Documentation
 

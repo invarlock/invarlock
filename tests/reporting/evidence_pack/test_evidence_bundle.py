@@ -72,7 +72,7 @@ def test_manifest_and_expected_files_present(tmp_path: Path) -> None:
     assert (out_dir / "evaluation_report.md").exists(), (
         "evaluation report Markdown missing"
     )
-    assert (out_dir / "reviewer_summary.txt").exists(), "reviewer summary missing"
+    assert (out_dir / "evidence_summary.txt").exists(), "evidence summary missing"
     # Evidence file should be present when debug flag is on
     ev_file = out_dir / "guards_evidence.json"
     assert ev_file.exists(), "guards_evidence.json missing"

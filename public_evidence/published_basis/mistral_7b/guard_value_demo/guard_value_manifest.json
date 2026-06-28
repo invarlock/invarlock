@@ -303,8 +303,8 @@
     },
     {
       "path": "artifact_package/state/scenarios.json",
-      "sha256": "b725446c93f77ac927dbbed6215fb2f3b0dc30b5d672819874176cbcf48b44a5",
-      "size_bytes": 8046
+      "sha256": "c857da89608d7963146223b0a9b5d72feeef7f4056c251bb5b0c8147d04130f8",
+      "size_bytes": 8036
     },
     {
       "path": "artifact_package/state/tuned_edit_params.json",

@@ -1,13 +1,13 @@
-# Reviewer Training Matrix Plan
+# Training Evidence Matrix Plan
 
-The v0 public bundle gives reviewers a compact release-evidence view across
+The v0 public bundle gives independent readers a compact release-evidence view across
 quantization, pruning, LoRA/adapter-merge, and fine-tuned subjects. The current
 public lanes mix real tiny-model runs and BYOE subject fixtures so the bundle
 stays small, reproducible, and free of vendored model weights.
 
 ## Current Coverage
 
-| Edit family | Public lane mode | Reviewer use |
+| Edit family | Public lane mode | Evidence use |
 | --- | --- | --- |
 | Quantization | Real tiny-model run | Check release/strict report verification for a quantized subject. |
 | Magnitude prune | Real tiny-model external edit run | Check release/strict report verification and signed evidence-pack packaging for an externally produced subject. |
@@ -16,19 +16,19 @@ stays small, reproducible, and free of vendored model weights.
 
 The evidence-pack harness also exercises generated LoRA and fine-tune
 validation-subject lanes. Those lanes are useful for deterministic parity and
-regression coverage. A real training matrix answers a different reviewer
+regression coverage. A real training matrix answers a different evidence
 question: whether the same reporting and verification flow remains clean for
 subjects produced by common training/adaptation pipelines.
 
 ## Recommended Optional Matrix
 
 Start with publishable tiny-model runs, then add larger CUDA-capable validation
-runs when reviewer needs justify the extra runtime:
+runs when the evidence question justifies the extra runtime:
 
 - PEFT LoRA train-and-merge subject, evaluated as a saved subject checkpoint.
 - Full fine-tune subject, evaluated as a saved subject checkpoint.
 - At least one control lane where the baseline and subject are equivalent.
-- Optional larger-family lanes for reviewer-facing breadth when runtime budget
+- Optional larger-family lanes for evidence breadth when runtime budget
   permits.
 
 Each lane should publish or retain:
@@ -37,9 +37,21 @@ Each lane should publish or retain:
   assurance.
 - `runtime.manifest.json` and `checkpoint_refs.json`.
 - `evidence.meta.json` when the lane is committed under `public_evidence/`.
-- Hash inventory for reviewer-facing artifacts.
+- Hash inventory for public artifacts.
 - Clear statement of whether weights are vendored; default to no vendored
   weights.
 
 Training quality, locality, robustness, and safety results should be reported
 only when the lane includes benchmark evidence for those questions.
+
+## Maintained Campaign Entrypoint
+
+Use `python scripts/smoke/run_training_evidence_campaign.py --dry-run` to inspect
+the maintained campaign shape. The entrypoint reuses the PEFT LoRA and full
+fine-tune integration examples, writes generated checkpoints under an ignored
+local work root, and emits `campaign_summary.json` plus `hash_inventory.json`.
+
+Default execution is a tiny host CPU smoke intended for local validation. Use
+`--execution-lane cuda` on a CUDA-capable validation host for strict
+CUDA/container evidence. Commit only reviewed, repo-relative summaries and hash
+inventories; do not vendor generated checkpoint weights by default.

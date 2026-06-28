@@ -6,7 +6,7 @@
     "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:d0cd20018d42e51e27e62be3327711ab812679920dd048d74e5fd6924ceb1ea1",
+  "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
   "generated_by": "model evidence remote sweep",
   "model_revision": "8ad60471ac9865280da0c6b29de387a183c8db73",
   "non_goals": [
@@ -17,6 +17,6 @@
   "summary": "Release-strict verifier fixture for the Ministral 3 8B published-basis lane.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/ministral3_8b/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/ministral3_8b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:d0cd20018d42e51e27e62be3327711ab812679920dd048d74e5fd6924ceb1ea1"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/ministral3_8b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb"
   ]
 }

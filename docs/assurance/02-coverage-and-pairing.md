@@ -9,7 +9,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Define the pairing, non-overlap, seed, and tier-floor requirements for evaluation windows. |
-| **Audience** | Evaluation pipeline maintainers, release reviewers, and operators preparing paired evidence. |
+| **Audience** | Evaluation pipeline maintainers, release approvers, and operators preparing paired evidence. |
 | **Contract scope** | Baseline/subject window reuse, pairing statistics, coverage floors, and report-verifier checks. |
 | **Source of truth** | `src/invarlock/core/runner_pairing.py`, `src/invarlock/eval/window_planning.py`, and report pairing tests. |
 

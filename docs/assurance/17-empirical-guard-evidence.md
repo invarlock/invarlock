@@ -1,7 +1,7 @@
 # Empirical Guard Evidence
 
 > **Plain language:** Empirical guard evidence is the portable manifest layer
-> that points reviewers to real model/checkpoint runs for spectral, RMT, and
+> that points readers to real model/checkpoint runs for spectral, RMT, and
 > variance behavior.
 
 ## Overview
@@ -9,7 +9,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Track non-synthetic guard evidence for spectral, RMT, and variance behavior on real model/checkpoint workflows. |
-| **Audience** | Maintainers, release reviewers, and calibration owners. |
+| **Audience** | Maintainers, release approvers, and calibration owners. |
 | **Contract scope** | Portable evidence manifests that point to real-run artifacts; strict report acceptance remains governed by the verifier report contract. |
 | **Source of truth** | `scripts/release/evidence_contracts.py empirical`, `scripts/model_evidence/model_evidence_sweep.py`, calibration commands, and evidence-pack scripts. |
 

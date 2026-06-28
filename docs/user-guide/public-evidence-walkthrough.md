@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This walkthrough shows the shipped public evidence floor that reviewers can
+This walkthrough shows the shipped public evidence floor that readers can
 verify without downloading model weights. It is deliberately BYOE-oriented:
 InvarLock validates baseline/subject comparison artifacts for externally
 materialized subjects; deployable quantized checkpoint production is outside
@@ -11,7 +11,7 @@ this public evidence floor.
 `public_evidence/README.md` defines the evidence taxonomy. In short, fixture
 artifacts validate verifier contracts, while real-run artifacts are produced by
 `invarlock evaluate` against materialized baseline and subject checkpoints.
-Every public evidence artifact carries `evidence.meta.json` so reviewers can see
+Every public evidence artifact carries `evidence.meta.json` so readers can see
 whether they are looking at a fixture or a real run.
 
 ## Published-basis pass
@@ -47,7 +47,7 @@ manifest, and signed pack, and keeps the exact verification commands in
 the repository; the rebuild recipe is the source of truth for materializing a
 fresh BYOE evidence drop.
 
-The GPT-2 lane also ships a small signed pack so reviewers can exercise the
+The GPT-2 lane also ships a small signed pack so readers can exercise the
 full offline evidence-pack verifier without rebuilding the suite:
 
 ```bash
@@ -127,7 +127,7 @@ That artifact is the concrete real-run evidence for BYOE/custom subjects:
 `checkpoint_refs.json` records the external edit type and file hashes for the
 external checkpoint weights, and the report records `edit_name = custom`.
 
-## Export evidence for reviewers
+## Export Evidence
 
 Existing public reports can be converted into CI and registry handoff artifacts
 without adding generated files to `public_evidence/`:
@@ -162,7 +162,7 @@ invarlock report export \
   --output reports/public-evidence-export/release-review.md
 ```
 
-These generated files are reviewer conveniences. The canonical evidence remains
+These generated files are convenience outputs. The canonical evidence remains
 the checked-in `evaluation.report.json`, `runtime.manifest.json`, and evidence
 pack.
 

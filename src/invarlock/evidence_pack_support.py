@@ -109,7 +109,7 @@ def _render_evidence_pack_readme(
         )
     else:
         lines.append(
-            "- Nested report verification succeeded for the bundled clean reports, but reviewers should still inspect the underlying evaluation.report.json files."
+            "- Nested report verification succeeded for the bundled clean reports, but readers should still inspect the underlying evaluation.report.json files."
         )
     lines.append(
         "- Error-injection reports are expected-failure evidence and should not be interpreted as clean PASS runs."
