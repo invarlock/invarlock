@@ -1,0 +1,14 @@
+{
+  "schema": "invarlock.public_evidence.meta.v1",
+  "evidence_class": "evidence_pack_queue_stress_resume",
+  "summary": "Evidence-pack queue stress/resume validation summary.",
+  "generated_by": "scripts/evidence_packs/tests/run.sh --filter test_queue_manager and python -m pytest tests/scripts/test_evidence_pack_queue_state.py -q",
+  "artifact_paths": {
+    "stress_summary": "stress_summary.json",
+    "hash_inventory": "hash_inventory.json"
+  },
+  "verifier_commands": [
+    "python scripts/checks/check_public_evidence.py",
+    "python -m pytest tests/ci/test_evidence_pack_queue_stress_public_evidence.py"
+  ]
+}

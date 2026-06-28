@@ -1,0 +1,48 @@
+{
+  "schema": "invarlock.evidence_pack_queue_stress_resume.summary.v1",
+  "status": "completed",
+  "evidence_scope": "evidence-pack queue stress/resume validation only; no model-quality or assurance claim",
+  "validation_environment": "CUDA-capable validation host",
+  "raw_logs_published": false,
+  "weights_vendored": false,
+  "started_utc": "2026-06-28T21:17:48Z",
+  "completed_utc": "2026-06-28T21:18:15Z",
+  "suites": [
+    {
+      "name": "queue_manager_shell",
+      "command": "scripts/evidence_packs/tests/run.sh --filter test_queue_manager",
+      "rc": 0,
+      "tests_passed": 74,
+      "tests_failed": 0,
+      "coverage_surface": [
+        "stale_owner_lock_recovery",
+        "atomic_claim_complete_fail_retry_transitions",
+        "retry_sanitization_and_max_retry_handling",
+        "dependency_promotion_demotion_and_failed_dependency_cancellation",
+        "orphaned_running_task_reclamation",
+        "worker_restart_paths",
+        "memory_plan_reservation_updates",
+        "queue_progress_terminal_state_updates"
+      ]
+    },
+    {
+      "name": "queue_state_python",
+      "command": "python -m pytest tests/scripts/test_evidence_pack_queue_state.py -q",
+      "rc": 0,
+      "tests_passed": 3,
+      "tests_failed": 0,
+      "coverage_surface": [
+        "structured_retry_task_update",
+        "canonical_progress_summary",
+        "task_memory_estimate_stdout_contract"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "finding": "A queue-manager fallback-path test used regex-sensitive matching for a generated JSON row.",
+      "status": "fixed",
+      "artifact": "scripts/evidence_packs/tests/test_queue_manager.sh"
+    }
+  ]
+}
