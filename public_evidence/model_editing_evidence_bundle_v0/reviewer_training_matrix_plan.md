@@ -43,3 +43,15 @@ Each lane should publish or retain:
 
 Training quality, locality, robustness, and safety results should be reported
 only when the lane includes benchmark evidence for those questions.
+
+## Maintained Campaign Entrypoint
+
+Use `python scripts/smoke/run_reviewer_training_campaign.py --dry-run` to inspect
+the maintained campaign shape. The entrypoint reuses the PEFT LoRA and full
+fine-tune integration examples, writes generated checkpoints under an ignored
+local work root, and emits `campaign_summary.json` plus `hash_inventory.json`.
+
+Default execution is a tiny host CPU smoke intended for local validation. Use
+`--execution-lane cuda` on a CUDA-capable validation host for strict
+CUDA/container evidence. Commit only reviewed, repo-relative summaries and hash
+inventories; do not vendor generated checkpoint weights by default.

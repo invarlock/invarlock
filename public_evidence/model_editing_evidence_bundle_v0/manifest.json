@@ -36,6 +36,8 @@
       "runtime_manifest": "public_evidence/byoe_examples/fine_tune_byoe/runtime.manifest.json"
     }
   ],
+  "reviewer_training_campaign_hash_inventory": "public_evidence/model_editing_evidence_bundle_v0/reviewer_training_campaign/hash_inventory.json",
+  "reviewer_training_campaign_summary": "public_evidence/model_editing_evidence_bundle_v0/reviewer_training_campaign/campaign_summary.json",
   "reviewer_training_matrix_plan": "public_evidence/model_editing_evidence_bundle_v0/reviewer_training_matrix_plan.md",
   "schema": "invarlock.public_evidence.model_editing_bundle.v0",
   "verification_summary": "public_evidence/model_editing_evidence_bundle_v0/verification_summary.json"

@@ -12,6 +12,7 @@ target when one exists.
 | `run_gpt2_user_journey_smoke.sh` | `.github/workflows/gpt2-smoke.yml`; realistic lane | Required unless cache is seeded | Host, container, or both | `journey-results.tsv`, `final_verdict.json`, reports, HTML |
 | `run_tiny_container_smoke.sh` | `.github/workflows/tiny-container-smoke.yml` | Required unless cache is seeded | Container by default; host with `INVARLOCK_SMOKE_MODE=local` | Evaluation report, HTML, optional evidence pack |
 | `run_tiny_all_matrix.sh` | Manual tiny model matrix | Optional; `NET=1` enables downloads | Container by default through `evaluate`; dry-run by default | `checklist.md`, and reports when `RUN=1` |
+| `run_reviewer_training_campaign.py` | Manual reviewer-evidence campaign | Never by default; `--allow-network` enables cache fill | Host CPU by default; strict CUDA/container with `--execution-lane cuda` | Scrubbed campaign summary and hash inventory for PEFT LoRA and full fine-tune lanes |
 | `run_tiny_fine_tune_byoe_smoke.py` | Manual BYOE fine-tune smoke | Never by default; `--allow-network` enables cache fill | Host CPU | Baseline/subject checkpoints, enriched evaluation report, verify JSON, smoke summary |
 | `run_cpu_telemetry.sh` | Manual telemetry sweep | Required | Evaluate default execution path | Telemetry reports under `reports/telemetry/cpu-ci` |
 | `check_device_drift.py` | Assurance docs and tests | Never | N/A | Exit status and drift message |
@@ -28,6 +29,10 @@ target when one exists.
   runtime-image functions.
 - GPT-2 journey report shaping and strict-bundle fixture generation live in
   `gpt2_journey_helpers.py`; keep heavy JSON/TSV transforms out of shell.
+- `run_reviewer_training_campaign.py` is the real training reviewer-evidence
+  dispatcher. It reuses the PEFT LoRA and full fine-tune integration runners,
+  keeps generated checkpoints under the local campaign work root, and writes
+  only scrubbed summaries plus hash inventories for public review.
 - `cli_smoke_fast.sh` remains the main future extraction candidate because it
   still owns several embedded fixtures and command result helpers.
 - `cli_smoke_matrix.sh` is a lane dispatcher. Keep it focused on orchestration;
