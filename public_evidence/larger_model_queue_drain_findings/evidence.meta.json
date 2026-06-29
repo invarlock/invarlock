@@ -6,6 +6,7 @@
   "artifact_paths": {
     "findings_summary": "findings_summary.json",
     "late_clean_addendum": "late_clean_addendum.json",
+    "modern_followon_addendum": "modern_followon_addendum.json",
     "hash_inventory": "hash_inventory.json"
   },
   "verifier_commands": [

@@ -123,6 +123,7 @@ def test_larger_model_queue_drain_hash_inventory_matches_public_files() -> None:
         "README.md",
         "findings_summary.json",
         "late_clean_addendum.json",
+        "modern_followon_addendum.json",
         "evidence.meta.json",
     }
     for rel_path, artifact in by_path.items():
@@ -140,6 +141,7 @@ def test_larger_model_queue_drain_metadata_declares_summary_only_findings() -> N
     assert metadata["artifact_paths"] == {
         "findings_summary": "findings_summary.json",
         "late_clean_addendum": "late_clean_addendum.json",
+        "modern_followon_addendum": "modern_followon_addendum.json",
         "hash_inventory": "hash_inventory.json",
     }
     assert "invarlock evaluate" not in str(metadata["generated_by"])
@@ -206,6 +208,82 @@ def test_larger_model_queue_drain_late_clean_addendum_is_public_safe() -> None:
                 "Held out because the late run used a generic preset rather "
                 "than a model-specific repo preset at packaging time."
             ),
+        }
+    ]
+
+    serialized = json.dumps(addendum, sort_keys=True)
+    for pattern in PRIVATE_TEXT_PATTERNS:
+        assert pattern not in serialized
+
+
+def test_larger_model_queue_drain_modern_followon_addendum_is_public_safe() -> None:
+    addendum = _load_json(EVIDENCE_DIR / "modern_followon_addendum.json")
+
+    assert addendum["schema"] == (
+        "invarlock.larger_model_queue_drain_findings.modern_followon_addendum.v1"
+    )
+    assert addendum["status"] == "completed"
+    assert addendum["validation_environment"] == "CUDA-capable validation host"
+    assert addendum["raw_logs_published"] is False
+    assert addendum["weights_vendored"] is False
+    assert addendum["support_matrix_change_claimed"] is False
+    assert addendum["model_quality_claimed"] is False
+    assert addendum["source_window"] == "post_pr_111_modern_followon"
+    assert addendum["execution_mode"] == "container"
+
+    clean_lanes = addendum["clean_followon_lanes"]
+    diagnostic_lanes = addendum["diagnostic_lanes"]
+    strict_findings = addendum["strict_policy_findings"]
+    dependency_findings = addendum["dependency_findings"]
+    assert addendum["counts"] == {
+        "clean_followon_lanes": len(clean_lanes),
+        "diagnostic_lanes": len(diagnostic_lanes),
+        "strict_policy_findings": len(strict_findings),
+        "dependency_findings": len(dependency_findings),
+    }
+
+    assert {lane["slug"] for lane in clean_lanes if isinstance(lane, dict)} == {
+        "google_gemma_4_31b_it",
+        "openai_gpt_oss_20b",
+    }
+    assert {lane["slug"] for lane in diagnostic_lanes if isinstance(lane, dict)} == {
+        "qwen_qwen3_5_27b_dev",
+        "qwen_qwen3_5_27b_maxcaps6",
+        "qwen_qwen3_6_27b_dev",
+        "qwen_qwen3_6_27b_maxcaps6",
+    }
+    for lane in [*clean_lanes, *diagnostic_lanes]:
+        assert isinstance(lane, dict)
+        assert lane["evaluate_exit"] == 0
+        assert lane["verify_exit"] == 0
+        assert lane["status"] == "ok"
+        assert (REPO_ROOT / str(lane["preset_basis"])).is_file()
+
+    assert {finding["slug"] for finding in strict_findings} == {
+        "qwen_qwen3_5_27b",
+        "qwen_qwen3_6_27b",
+    }
+    for finding in strict_findings:
+        assert finding["evaluate_exit"] == 0
+        assert finding["verify_exit"] == 1
+        assert finding["detail"] == "policy_fail"
+        assert finding["classification"] == "strict_spectral_cap_budget_boundary"
+        assert finding["spectral_caps_applied"] == 6
+        assert finding["spectral_max_caps"] == 5
+        assert finding["support_claimed"] is False
+
+    assert dependency_findings == [
+        {
+            "slug": "nvidia_nemotron_3_nano_30b_a3b_bf16",
+            "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
+            "suite": "adhoc-nemotron-text-gpu",
+            "verification_profile": "dev",
+            "evaluate_exit": 1,
+            "verify_exit": None,
+            "detail": "evaluate_failed",
+            "classification": "runtime_dependency_missing",
+            "missing_dependency": "mamba-ssm",
+            "support_claimed": False,
         }
     ]
 
