@@ -74,7 +74,7 @@ family under the strict claim.
 **Action:** use a supported lane, add the missing adapter/guard support and
 tests, or treat the run as exploratory. See
 [Model Family Catalog](../reference/model-family-catalog.md) for the current
-support inventory.
+support status.
 
 ## Guard Catches Clean Primary Metric
 

@@ -12,6 +12,7 @@
     "olmoe_1b_7b",
     "mixtral_8x7b",
     "qwen3_30b_a3b",
+    "gpt_oss_20b",
     "open_llama_7b",
     "falcon_7b",
     "qwen2_7b",
@@ -30,6 +31,9 @@
     "ministral3_3b",
     "smollm3_3b",
     "phi4_mini",
+    "qwen3_5_27b_scoped",
+    "qwen3_6_27b_scoped",
+    "gemma4_31b",
     "flan_t5_base"
   ],
   "lanes": [
@@ -98,6 +102,12 @@
       "model_id": "Qwen/Qwen3-30B-A3B-Instruct-2507",
       "primary_metric_kind": "ppl_causal",
       "report": "public_evidence/published_basis/qwen3_30b_a3b/evaluation.report.json"
+    },
+    {
+      "id": "gpt_oss_20b",
+      "model_id": "openai/gpt-oss-20b",
+      "primary_metric_kind": "ppl_causal",
+      "report": "public_evidence/published_basis/gpt_oss_20b/evaluation.report.json"
     },
     {
       "id": "open_llama_7b",
@@ -206,6 +216,24 @@
       "model_id": "microsoft/Phi-4-mini-instruct",
       "primary_metric_kind": "ppl_causal",
       "report": "public_evidence/published_basis/phi4_mini/evaluation.report.json"
+    },
+    {
+      "id": "qwen3_5_27b_scoped",
+      "model_id": "Qwen/Qwen3.5-27B",
+      "primary_metric_kind": "accuracy",
+      "report": "public_evidence/published_basis/qwen3_5_27b_scoped/evaluation.report.json"
+    },
+    {
+      "id": "qwen3_6_27b_scoped",
+      "model_id": "Qwen/Qwen3.6-27B",
+      "primary_metric_kind": "accuracy",
+      "report": "public_evidence/published_basis/qwen3_6_27b_scoped/evaluation.report.json"
+    },
+    {
+      "id": "gemma4_31b",
+      "model_id": "google/gemma-4-31B-it",
+      "primary_metric_kind": "accuracy",
+      "report": "public_evidence/published_basis/gemma4_31b/evaluation.report.json"
     },
     {
       "id": "flan_t5_base",

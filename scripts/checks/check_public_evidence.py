@@ -60,6 +60,9 @@ LARGER_MODEL_QUEUE_DRAIN_FINDINGS_SCHEMA = (
 LARGER_MODEL_QUEUE_DRAIN_ADDENDUM_SCHEMA = (
     "invarlock.larger_model_queue_drain_findings.late_clean_addendum.v1"
 )
+LARGER_MODEL_QUEUE_DRAIN_MODERN_ADDENDUM_SCHEMA = (
+    "invarlock.larger_model_queue_drain_findings.modern_followon_addendum.v1"
+)
 LARGER_MODEL_QUEUE_DRAIN_HASH_SCHEMA = (
     "invarlock.larger_model_queue_drain_findings.hash_inventory.v1"
 )
@@ -1142,6 +1145,9 @@ def _check_larger_model_queue_drain_findings(
 ) -> None:
     summary_path = _require_path(errors, base, artifact_paths, "findings_summary")
     addendum_path = _require_path(errors, base, artifact_paths, "late_clean_addendum")
+    modern_addendum_path = _require_path(
+        errors, base, artifact_paths, "modern_followon_addendum"
+    )
     inventory_path = _require_path(errors, base, artifact_paths, "hash_inventory")
     if inventory_path is not None:
         _check_larger_model_smoke_hash_inventory(
@@ -1154,6 +1160,8 @@ def _check_larger_model_queue_drain_findings(
         return
     if addendum_path is not None:
         _check_larger_model_queue_drain_addendum(errors, addendum_path)
+    if modern_addendum_path is not None:
+        _check_larger_model_queue_drain_modern_addendum(errors, modern_addendum_path)
     summary, error = _load_json(summary_path)
     if error:
         errors.append(error)
@@ -1502,6 +1510,158 @@ def _check_larger_model_queue_drain_addendum(
         "late_clean_lanes": len(seen_clean),
         "rerun_clean_resolutions": len(rerun_classifications),
         "excluded_lanes": len(excluded_lanes),
+    }
+    for key, expected in expected_counts.items():
+        if counts.get(key) != expected:
+            errors.append(
+                f"{_relative(addendum_path)}: counts.{key} must be {expected}"
+            )
+
+
+def _check_larger_model_queue_drain_modern_addendum(
+    errors: list[str],
+    addendum_path: Path,
+) -> None:
+    addendum, error = _load_json(addendum_path)
+    if error:
+        errors.append(error)
+        return
+    assert addendum is not None
+    if addendum.get("schema") != LARGER_MODEL_QUEUE_DRAIN_MODERN_ADDENDUM_SCHEMA:
+        errors.append(
+            f"{_relative(addendum_path)}: schema must be "
+            f"{LARGER_MODEL_QUEUE_DRAIN_MODERN_ADDENDUM_SCHEMA}"
+        )
+    if addendum.get("status") != "completed":
+        errors.append(f"{_relative(addendum_path)}: status must be completed")
+    if addendum.get("validation_environment") != "CUDA-capable validation host":
+        errors.append(
+            f"{_relative(addendum_path)}: validation_environment must be generic"
+        )
+    for key in (
+        "raw_logs_published",
+        "weights_vendored",
+        "support_matrix_change_claimed",
+        "model_quality_claimed",
+    ):
+        if addendum.get(key) is not False:
+            errors.append(f"{_relative(addendum_path)}: {key} must be false")
+    if addendum.get("source_window") != "post_pr_111_modern_followon":
+        errors.append(f"{_relative(addendum_path)}: source_window invalid")
+    if addendum.get("execution_mode") != "container":
+        errors.append(f"{_relative(addendum_path)}: execution_mode must be container")
+
+    counts = addendum.get("counts")
+    if not isinstance(counts, dict):
+        errors.append(f"{_relative(addendum_path)}: counts must be object")
+        counts = {}
+
+    clean_lanes = addendum.get("clean_followon_lanes")
+    if not isinstance(clean_lanes, list) or not clean_lanes:
+        errors.append(
+            f"{_relative(addendum_path)}: clean_followon_lanes must be non-empty"
+        )
+        clean_lanes = []
+    for index, lane in enumerate(clean_lanes):
+        if not isinstance(lane, dict):
+            errors.append(
+                f"{_relative(addendum_path)}: clean_followon_lanes[{index}] "
+                "must be object"
+            )
+            continue
+        if lane.get("rc") != 0 or lane.get("evaluate_exit") != 0:
+            errors.append(
+                f"{_relative(addendum_path)}: clean_followon_lanes[{index}] "
+                "must have clean evaluation"
+            )
+        if lane.get("verify_exit") != 0 or lane.get("status") != "ok":
+            errors.append(
+                f"{_relative(addendum_path)}: clean_followon_lanes[{index}] "
+                "must have clean verification"
+            )
+        preset = lane.get("preset_basis")
+        if not isinstance(preset, str) or not (REPO_ROOT / preset).is_file():
+            errors.append(
+                f"{_relative(addendum_path)}: clean_followon_lanes[{index}] "
+                "preset_basis must be a repo file"
+            )
+
+    diagnostics = addendum.get("diagnostic_lanes")
+    if not isinstance(diagnostics, list) or not diagnostics:
+        errors.append(f"{_relative(addendum_path)}: diagnostic_lanes must be non-empty")
+        diagnostics = []
+    for index, lane in enumerate(diagnostics):
+        if not isinstance(lane, dict):
+            errors.append(
+                f"{_relative(addendum_path)}: diagnostic_lanes[{index}] must be object"
+            )
+            continue
+        if lane.get("evaluate_exit") != 0 or lane.get("verify_exit") != 0:
+            errors.append(
+                f"{_relative(addendum_path)}: diagnostic_lanes[{index}] must pass"
+            )
+        if lane.get("support_claimed") is not False:
+            errors.append(
+                f"{_relative(addendum_path)}: diagnostic_lanes[{index}] "
+                "support_claimed must be false"
+            )
+
+    strict_findings = addendum.get("strict_policy_findings")
+    if not isinstance(strict_findings, list) or not strict_findings:
+        errors.append(
+            f"{_relative(addendum_path)}: strict_policy_findings must be non-empty"
+        )
+        strict_findings = []
+    for index, finding in enumerate(strict_findings):
+        if not isinstance(finding, dict):
+            errors.append(
+                f"{_relative(addendum_path)}: strict_policy_findings[{index}] "
+                "must be object"
+            )
+            continue
+        if finding.get("detail") != "policy_fail":
+            errors.append(
+                f"{_relative(addendum_path)}: strict_policy_findings[{index}] "
+                "detail must be policy_fail"
+            )
+        if finding.get("verify_exit") != 1 or finding.get("evaluate_exit") != 0:
+            errors.append(
+                f"{_relative(addendum_path)}: strict_policy_findings[{index}] "
+                "must fail only at verification"
+            )
+        if finding.get("classification") != "strict_spectral_cap_budget_boundary":
+            errors.append(
+                f"{_relative(addendum_path)}: strict_policy_findings[{index}] "
+                "classification invalid"
+            )
+
+    dependency_findings = addendum.get("dependency_findings")
+    if not isinstance(dependency_findings, list):
+        errors.append(f"{_relative(addendum_path)}: dependency_findings must be a list")
+        dependency_findings = []
+    for index, finding in enumerate(dependency_findings):
+        if not isinstance(finding, dict):
+            errors.append(
+                f"{_relative(addendum_path)}: dependency_findings[{index}] "
+                "must be object"
+            )
+            continue
+        if finding.get("classification") != "runtime_dependency_missing":
+            errors.append(
+                f"{_relative(addendum_path)}: dependency_findings[{index}] "
+                "classification invalid"
+            )
+        if finding.get("verify_exit") is not None:
+            errors.append(
+                f"{_relative(addendum_path)}: dependency_findings[{index}] "
+                "verify_exit must be null"
+            )
+
+    expected_counts = {
+        "clean_followon_lanes": len(clean_lanes),
+        "diagnostic_lanes": len(diagnostics),
+        "strict_policy_findings": len(strict_findings),
+        "dependency_findings": len(dependency_findings),
     }
     for key, expected in expected_counts.items():
         if counts.get(key) != expected:

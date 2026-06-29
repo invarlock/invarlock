@@ -51,7 +51,7 @@ print(adapter.describe(model)["model_type"])
 > Gemma 4 image-text through `hf_multimodal` plus `vision_text`, and MoE causal
 > lanes such as OLMoE, Mixtral, and Qwen3 30B-A3B. Treat
 > `contracts/support_matrix.json` as authoritative for model-lane status and the
-> Model Family Catalog as the broader inventory of adapter/profile coverage.
+> Model Family Catalog as the broader view of adapter/profile coverage.
 
 ## Support Tiers
 

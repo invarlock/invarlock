@@ -1,6 +1,6 @@
 {
   "format_version": "model-family-catalog-v1",
-  "as_of": "2026-06-14",
+  "as_of": "2026-06-29",
   "declared_support": [
     {
       "family_id": "gpt2-causal-lm",
@@ -444,6 +444,57 @@
       ]
     },
     {
+      "family_id": "granite-4-1-3b-causal-lm",
+      "display_name": "Granite 4.1 3B causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "ibm-granite/granite-4.1-3b"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/granite4_1_3b_512.yaml",
+        "configs/calibration/null_sweep_granite4_1_3b.yaml",
+        "public_evidence/published_basis/granite4_1_3b/evaluation.report.json",
+        "public_evidence/published_basis/granite4_1_3b/runtime.manifest.json",
+        "public_evidence/published_basis/granite4_1_3b/evidence_pack"
+      ],
+      "support_groups": [
+        "published_modern",
+        "small_local",
+        "enterprise_permissive"
+      ],
+      "notes": "Promoted from support_matrix lane granite-4-1-3b-causal-hf with container-backed release-profile public evidence."
+    },
+    {
+      "family_id": "flan-t5-base-seq2seq-lm",
+      "display_name": "FLAN-T5 base seq2seq LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "seq2seq",
+      "state": "published_basis",
+      "representative_models": [
+        "google/flan-t5-base"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml",
+        "configs/calibration/null_sweep_flan_t5_base.yaml",
+        "public_evidence/published_basis/flan_t5_base/evaluation.report.json",
+        "public_evidence/published_basis/flan_t5_base/runtime.manifest.json",
+        "public_evidence/published_basis/flan_t5_base/evidence_pack"
+      ],
+      "support_groups": [
+        "published_modern",
+        "seq2seq"
+      ],
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and pinned CNN/DailyMail validation data through hf_seq2seq."
+    },
+    {
       "family_id": "gemma-4-12b-any-to-any-lm",
       "display_name": "Gemma 4 12B any-to-any LM",
       "modalities": [
@@ -606,6 +657,265 @@
       ]
     },
     {
+      "family_id": "qwen-3-5-27b-image-text-scoped-lm",
+      "display_name": "Qwen3.5 27B image-text LM (scoped)",
+      "task_role": "image_text",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "state": "published_basis",
+      "support_groups": [
+        "published_modern",
+        "enterprise_permissive",
+        "multimodal_candidate",
+        "large_model_candidate"
+      ],
+      "representative_models": [
+        "Qwen/Qwen3.5-27B"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "src/invarlock/model_profile.py",
+        "src/invarlock/adapters/hf_loading.py",
+        "configs/presets/multimodal/qwen3_5_27b_public_vqav2_scoped_256.yaml",
+        "configs/calibration/null_sweep_qwen3_5_27b_scoped.yaml",
+        "public_evidence/published_basis/qwen3_5_27b_scoped/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_5_27b_scoped/runtime.manifest.json",
+        "public_evidence/published_basis/qwen3_5_27b_scoped/evidence_pack",
+        "public_evidence/larger_model_queue_drain_findings/modern_followon_addendum.json",
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_multimodal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
+      ],
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence using scoped self-attention and MLP guard scans. The no-op report passes strict policy with 0.8975 final accuracy over 400 examples and no guard warnings. Linear-attention module coverage remains a separate strict spectral-cap finding in the larger-model follow-on addendum; this is no-op preservation/null-behavior evidence and not guard-value proof."
+    },
+    {
+      "family_id": "qwen-3-6-27b-image-text-scoped-lm",
+      "display_name": "Qwen3.6 27B image-text LM (scoped)",
+      "task_role": "image_text",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "state": "published_basis",
+      "support_groups": [
+        "published_modern",
+        "enterprise_permissive",
+        "multimodal_candidate",
+        "large_model_candidate"
+      ],
+      "representative_models": [
+        "Qwen/Qwen3.6-27B"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "src/invarlock/model_profile.py",
+        "src/invarlock/adapters/hf_loading.py",
+        "configs/presets/multimodal/qwen3_6_27b_public_vqav2_scoped_256.yaml",
+        "configs/calibration/null_sweep_qwen3_6_27b_scoped.yaml",
+        "public_evidence/published_basis/qwen3_6_27b_scoped/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_6_27b_scoped/runtime.manifest.json",
+        "public_evidence/published_basis/qwen3_6_27b_scoped/evidence_pack",
+        "public_evidence/larger_model_queue_drain_findings/modern_followon_addendum.json",
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_multimodal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
+      ],
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence using scoped self-attention and MLP guard scans. The no-op report passes strict policy with 0.8825 final accuracy over 400 examples and no guard warnings. Linear-attention module coverage remains a separate strict spectral-cap finding in the larger-model follow-on addendum; this is no-op preservation/null-behavior evidence and not guard-value proof."
+    },
+    {
+      "family_id": "gemma-4-26b-a4b-moe-image-text-lm",
+      "display_name": "Gemma 4 26B-A4B MoE image-text LM",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "task_role": "any_to_any",
+      "state": "published_basis",
+      "representative_models": [
+        "google/gemma-4-26B-A4B-it"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "src/invarlock/model_profile.py",
+        "src/invarlock/adapters/hf_loading.py",
+        "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_gemma4_26b_a4b.yaml",
+        "public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_26b_a4b/runtime.manifest.json",
+        "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack",
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_multimodal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
+      ],
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.555 final accuracy over 400 examples, ratio_vs_baseline 1.009, and no guard warnings. This is no-op preservation/null-behavior evidence; audio, exhaustive expert-bank behavior, and MoE routing quality remain out of scope, and it is not guard-value proof.",
+      "support_groups": [
+        "published_modern",
+        "enterprise_permissive",
+        "multimodal_candidate",
+        "moe_candidate",
+        "large_model_candidate"
+      ]
+    },
+    {
+      "family_id": "gemma-4-31b-image-text-lm",
+      "display_name": "Gemma 4 31B image-text LM",
+      "task_role": "image_text",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "state": "published_basis",
+      "support_groups": [
+        "published_modern",
+        "enterprise_permissive",
+        "multimodal_candidate",
+        "large_model_candidate"
+      ],
+      "representative_models": [
+        "google/gemma-4-31B-it"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "src/invarlock/model_profile.py",
+        "src/invarlock/adapters/hf_loading.py",
+        "configs/presets/multimodal/gemma4_31b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_gemma4_31b.yaml",
+        "public_evidence/published_basis/gemma4_31b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_31b/runtime.manifest.json",
+        "public_evidence/published_basis/gemma4_31b/evidence_pack",
+        "scripts/model_evidence/materialize_vision_text_dataset.py",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_multimodal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
+      ],
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.610 final accuracy over 400 examples and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof."
+    },
+    {
+      "family_id": "mixtral",
+      "display_name": "Mixtral 8x7B MoE causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "mistralai/Mixtral-8x7B-v0.1"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "src/invarlock/model_profile.py",
+        "src/invarlock/adapters/hf_loading.py",
+        "src/invarlock/adapters/auto.py",
+        "configs/presets/causal_lm/mixtral_8x7b_512.yaml",
+        "configs/calibration/null_sweep_mixtral_8x7b.yaml",
+        "public_evidence/published_basis/mixtral_8x7b/evaluation.report.json",
+        "public_evidence/published_basis/mixtral_8x7b/runtime.manifest.json",
+        "public_evidence/published_basis/mixtral_8x7b/evidence_pack",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/core/test_model_profiles.py",
+        "tests/cli/test_preset_causal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
+      ],
+      "notes": "Promoted as a Mixtral MoE causal LM published basis with explicit hf_causal preset, release-profile public report, runtime manifest, and signed evidence pack. The preset keeps the full guard scan surface while using BF16, automatic device placement, low-CPU-memory loading, disabled optional HF loading-info collection, and a skipped optional guard-overhead check for large-model resource discipline.",
+      "support_groups": [
+        "moe_candidate",
+        "large_model_candidate"
+      ]
+    },
+    {
+      "family_id": "qwen3-30b-a3b-moe-causal-lm",
+      "display_name": "Qwen3 30B-A3B MoE causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "Qwen/Qwen3-30B-A3B-Instruct-2507"
+      ],
+      "repo_evidence": [
+        "src/invarlock/model_profile.py",
+        "src/invarlock/adapters/hf_loading.py",
+        "configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml",
+        "configs/calibration/null_sweep_qwen3_30b_a3b_instruct_2507.yaml",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/cli/test_preset_causal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py",
+        "contracts/support_matrix.json",
+        "public_evidence/published_basis/qwen3_30b_a3b/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_30b_a3b/runtime.manifest.json",
+        "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack"
+      ],
+      "notes": "Promoted as a recent Qwen3 MoE causal LM published basis with explicit hf_causal preset, public WikiText-103 release-profile report, runtime manifest, and signed evidence pack. The fixture uses BF16/low-CPU-memory loading, disabled optional Hugging Face loading-info collection, automatic device placement, and scoped attention/router/shared-expert guard scans. This is no-op preservation evidence; it is not a benchmark-quality, fine-tuning, deployment, exhaustive expert-bank, or MoE routing-quality claim.",
+      "support_groups": [
+        "moe_candidate",
+        "large_model_candidate"
+      ]
+    },
+    {
+      "family_id": "gpt-oss",
+      "display_name": "GPT-OSS 20B causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "support_groups": [
+        "published_modern",
+        "large_model_candidate"
+      ],
+      "representative_models": [
+        "openai/gpt-oss-20b"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "src/invarlock/model_profile.py",
+        "src/invarlock/model_profile_selectors.py",
+        "src/invarlock/adapters/hf_loading.py",
+        "src/invarlock/adapters/auto.py",
+        "configs/presets/causal_lm/gpt_oss_20b_512.yaml",
+        "configs/calibration/null_sweep_gpt_oss_20b.yaml",
+        "public_evidence/published_basis/gpt_oss_20b/evaluation.report.json",
+        "public_evidence/published_basis/gpt_oss_20b/runtime.manifest.json",
+        "public_evidence/published_basis/gpt_oss_20b/evidence_pack",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/core/test_model_profiles.py",
+        "tests/cli/test_preset_causal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
+      ],
+      "notes": "Promoted with release-profile container-backed public WikiText-2 validation evidence for the pinned fixture. The no-op report passes strict policy with final perplexity 86.273 over 400 paired windows and no guard warnings. This is no-op preservation evidence; it is not a fine-tuning, benchmark-quality, deployment, safety, or alternate-seed/window robustness claim."
+    },
+    {
+      "family_id": "olmoe-1b-7b-causal-lm",
+      "display_name": "OLMoE 1B-active/7B-total causal LM",
+      "modalities": [
+        "text"
+      ],
+      "task_role": "causal_lm",
+      "state": "published_basis",
+      "representative_models": [
+        "allenai/OLMoE-1B-7B-0924"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/olmoe_1b_7b_0924_512.yaml",
+        "configs/calibration/null_sweep_olmoe_1b_7b_0924.yaml",
+        "public_evidence/published_basis/olmoe_1b_7b/evaluation.report.json",
+        "public_evidence/published_basis/olmoe_1b_7b/runtime.manifest.json",
+        "public_evidence/published_basis/olmoe_1b_7b/evidence_pack"
+      ],
+      "support_groups": [
+        "moe_candidate",
+        "small_local"
+      ],
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack. This fixture is the smaller MoE validation basis; larger MoE assurance is covered by Mixtral, Qwen3 30B-A3B, and Gemma 4 26B-A4B published bases. Gemma 4 26B-A4B is image-text preservation/null-behavior evidence, not audio, exhaustive expert-bank, or MoE routing-quality evidence."
+    },
+    {
       "family_id": "ministral-3-3b-text-causal-lm",
       "display_name": "Ministral 3 3B causal LM (text-only eval)",
       "modalities": [
@@ -630,32 +940,6 @@
         "enterprise_permissive"
       ],
       "notes": "Promoted from support_matrix lane ministral-3-3b-text-causal-hf with container-backed public evidence."
-    },
-    {
-      "family_id": "granite-4-1-3b-causal-lm",
-      "display_name": "Granite 4.1 3B causal LM",
-      "modalities": [
-        "text"
-      ],
-      "task_role": "causal_lm",
-      "state": "published_basis",
-      "representative_models": [
-        "ibm-granite/granite-4.1-3b"
-      ],
-      "repo_evidence": [
-        "contracts/support_matrix.json",
-        "configs/presets/causal_lm/granite4_1_3b_512.yaml",
-        "configs/calibration/null_sweep_granite4_1_3b.yaml",
-        "public_evidence/published_basis/granite4_1_3b/evaluation.report.json",
-        "public_evidence/published_basis/granite4_1_3b/runtime.manifest.json",
-        "public_evidence/published_basis/granite4_1_3b/evidence_pack"
-      ],
-      "support_groups": [
-        "published_modern",
-        "small_local",
-        "enterprise_permissive"
-      ],
-      "notes": "Promoted from support_matrix lane granite-4-1-3b-causal-hf with container-backed release-profile public evidence."
     },
     {
       "family_id": "granite-4-1-8b-causal-lm",
@@ -780,146 +1064,9 @@
         "reasoning_focused"
       ],
       "notes": "Promoted from support_matrix lane deepseek-r1-0528-qwen3-8b-causal-hf with container-backed public evidence."
-    },
-    {
-      "family_id": "flan-t5-base-seq2seq-lm",
-      "display_name": "FLAN-T5 base seq2seq LM",
-      "modalities": [
-        "text"
-      ],
-      "task_role": "seq2seq",
-      "state": "published_basis",
-      "representative_models": [
-        "google/flan-t5-base"
-      ],
-      "repo_evidence": [
-        "contracts/support_matrix.json",
-        "configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml",
-        "configs/calibration/null_sweep_flan_t5_base.yaml",
-        "public_evidence/published_basis/flan_t5_base/evaluation.report.json",
-        "public_evidence/published_basis/flan_t5_base/runtime.manifest.json",
-        "public_evidence/published_basis/flan_t5_base/evidence_pack"
-      ],
-      "support_groups": [
-        "seq2seq"
-      ],
-      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and pinned CNN/DailyMail validation data through hf_seq2seq."
-    },
-    {
-      "family_id": "olmoe-1b-7b-causal-lm",
-      "display_name": "OLMoE 1B-active/7B-total causal LM",
-      "modalities": [
-        "text"
-      ],
-      "task_role": "causal_lm",
-      "state": "published_basis",
-      "representative_models": [
-        "allenai/OLMoE-1B-7B-0924"
-      ],
-      "repo_evidence": [
-        "contracts/support_matrix.json",
-        "configs/presets/causal_lm/olmoe_1b_7b_0924_512.yaml",
-        "configs/calibration/null_sweep_olmoe_1b_7b_0924.yaml",
-        "public_evidence/published_basis/olmoe_1b_7b/evaluation.report.json",
-        "public_evidence/published_basis/olmoe_1b_7b/runtime.manifest.json",
-        "public_evidence/published_basis/olmoe_1b_7b/evidence_pack"
-      ],
-      "support_groups": [
-        "moe_candidate",
-        "small_local"
-      ],
-      "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack. This fixture is the smaller MoE validation basis; larger MoE assurance is covered by Mixtral, Qwen3 30B-A3B, and Gemma 4 26B-A4B published bases. Gemma 4 26B-A4B is image-text preservation/null-behavior evidence, not audio, exhaustive expert-bank, or MoE routing-quality evidence."
     }
   ],
   "implemented_coverage": [
-    {
-      "family_id": "qwen3-30b-a3b-moe-causal-lm",
-      "display_name": "Qwen3 30B-A3B MoE causal LM",
-      "modalities": [
-        "text"
-      ],
-      "task_role": "causal_lm",
-      "state": "published_basis",
-      "representative_models": [
-        "Qwen/Qwen3-30B-A3B-Instruct-2507"
-      ],
-      "repo_evidence": [
-        "src/invarlock/model_profile.py",
-        "src/invarlock/adapters/hf_loading.py",
-        "configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml",
-        "configs/calibration/null_sweep_qwen3_30b_a3b_instruct_2507.yaml",
-        "scripts/model_evidence/model_evidence_sweep.py",
-        "tests/cli/test_preset_causal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py",
-        "contracts/support_matrix.json",
-        "public_evidence/published_basis/qwen3_30b_a3b/evaluation.report.json",
-        "public_evidence/published_basis/qwen3_30b_a3b/runtime.manifest.json",
-        "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack"
-      ],
-      "notes": "Promoted as a recent Qwen3 MoE causal LM published basis with explicit hf_causal preset, public WikiText-103 release-profile report, runtime manifest, and signed evidence pack. The fixture uses bfloat16/low-CPU-memory loading, disabled optional Hugging Face loading-info collection, automatic device placement across all eight 80GB GPUs, and scoped attention/router/shared-expert guard scans. This is no-op preservation evidence; it is not a benchmark-quality, fine-tuning, deployment, exhaustive expert-bank, or MoE routing-quality claim. A restricted four-GPU diagnostic lane failed and is intentionally not used as publication evidence."
-    },
-    {
-      "family_id": "gemma-4-26b-a4b-moe-image-text-lm",
-      "display_name": "Gemma 4 26B-A4B MoE image-text LM",
-      "modalities": [
-        "text",
-        "image"
-      ],
-      "task_role": "any_to_any",
-      "state": "published_basis",
-      "representative_models": [
-        "google/gemma-4-26B-A4B-it"
-      ],
-      "repo_evidence": [
-        "contracts/support_matrix.json",
-        "src/invarlock/model_profile.py",
-        "src/invarlock/adapters/hf_loading.py",
-        "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
-        "configs/calibration/null_sweep_gemma4_26b_a4b.yaml",
-        "public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json",
-        "public_evidence/published_basis/gemma4_26b_a4b/runtime.manifest.json",
-        "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack",
-        "scripts/model_evidence/materialize_vision_text_dataset.py",
-        "scripts/model_evidence/model_evidence_sweep.py",
-        "tests/cli/test_preset_multimodal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py"
-      ],
-      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.555 final accuracy over 400 examples, ratio_vs_baseline 1.009, and no guard warnings. This is no-op preservation/null-behavior evidence; audio, exhaustive expert-bank behavior, and MoE routing quality remain out of scope, and it is not guard-value proof.",
-      "support_groups": [
-        "published_modern",
-        "enterprise_permissive",
-        "multimodal_candidate",
-        "moe_candidate"
-      ]
-    },
-    {
-      "family_id": "mixtral",
-      "display_name": "Mixtral 8x7B MoE causal LM",
-      "modalities": [
-        "text"
-      ],
-      "task_role": "causal_lm",
-      "state": "published_basis",
-      "representative_models": [
-        "mistralai/Mixtral-8x7B-v0.1"
-      ],
-      "repo_evidence": [
-        "contracts/support_matrix.json",
-        "src/invarlock/model_profile.py",
-        "src/invarlock/adapters/hf_loading.py",
-        "src/invarlock/adapters/auto.py",
-        "configs/presets/causal_lm/mixtral_8x7b_512.yaml",
-        "configs/calibration/null_sweep_mixtral_8x7b.yaml",
-        "public_evidence/published_basis/mixtral_8x7b/evaluation.report.json",
-        "public_evidence/published_basis/mixtral_8x7b/runtime.manifest.json",
-        "public_evidence/published_basis/mixtral_8x7b/evidence_pack",
-        "scripts/model_evidence/model_evidence_sweep.py",
-        "tests/core/test_model_profiles.py",
-        "tests/cli/test_preset_causal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py"
-      ],
-      "notes": "Promoted as a Mixtral MoE causal LM published basis with explicit hf_causal preset, release-profile public report, runtime manifest, and signed evidence pack. The preset keeps the full guard scan surface while using BF16, automatic device placement, low-CPU-memory loading, disabled optional HF loading-info collection, and a skipped optional guard-overhead check for large-model resource discipline."
-    },
     {
       "family_id": "llama",
       "display_name": "Llama",
@@ -949,7 +1096,9 @@
       "representative_models": [
         "Qwen/Qwen2.5-14B",
         "Qwen/Qwen3.5-9B",
-        "Qwen/Qwen3.5-4B"
+        "Qwen/Qwen3.5-4B",
+        "Qwen/Qwen3.5-27B",
+        "Qwen/Qwen3.6-27B"
       ],
       "repo_evidence": [
         "src/invarlock/model_profile.py",
@@ -962,9 +1111,13 @@
         "public_evidence/published_basis/qwen3_5_2b/evaluation.report.json",
         "public_evidence/published_basis/qwen3_5_2b/evidence_pack",
         "public_evidence/published_basis/qwen3_5_4b/evaluation.report.json",
-        "public_evidence/published_basis/qwen3_5_4b/evidence_pack"
+        "public_evidence/published_basis/qwen3_5_4b/evidence_pack",
+        "configs/presets/multimodal/qwen3_5_27b_public_vqav2_scoped_256.yaml",
+        "configs/calibration/null_sweep_qwen3_5_27b_scoped.yaml",
+        "configs/presets/multimodal/qwen3_6_27b_public_vqav2_scoped_256.yaml",
+        "configs/calibration/null_sweep_qwen3_6_27b_scoped.yaml"
       ],
-      "notes": "Shared qwen-family heuristics cover aliases beyond the declared text-only Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 9B public lanes. Qwen3.5 2B and Qwen3.5 4B have published image-text evidence through hf_multimodal and pinned public VQAv2 materialization."
+      "notes": "Shared qwen-family heuristics cover aliases beyond the declared text-only Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 9B public lanes. Qwen3.5 2B, Qwen3.5 4B, and scoped Qwen3.5/Qwen3.6 27B have published image-text evidence through hf_multimodal and pinned public VQAv2 materialization."
     },
     {
       "family_id": "yi",
@@ -1018,7 +1171,8 @@
         "google/gemma-4-E2B-it",
         "google/gemma-4-E4B-it",
         "google/gemma-4-12B-it",
-        "google/gemma-4-26B-A4B-it"
+        "google/gemma-4-26B-A4B-it",
+        "google/gemma-4-31B-it"
       ],
       "repo_evidence": [
         "src/invarlock/model_profile.py",
@@ -1040,9 +1194,13 @@
         "public_evidence/published_basis/gemma4_12b/evaluation.report.json",
         "public_evidence/published_basis/gemma4_12b/evidence_pack",
         "public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json",
-        "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack"
+        "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack",
+        "configs/presets/multimodal/gemma4_31b_public_vqav2_256.yaml",
+        "configs/calibration/null_sweep_gemma4_31b.yaml",
+        "public_evidence/published_basis/gemma4_31b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_31b/evidence_pack"
       ],
-      "notes": "Gemma-family selectors and loaders are first-class for compatible local or user-supplied checkpoints. Repo-declared published Gemma support includes Gemma 4 E2B text-only plus Gemma 4 E2B, E4B, 12B, and 26B-A4B image-text published-basis evidence."
+      "notes": "Gemma-family selectors and loaders are first-class for compatible local or user-supplied checkpoints. Repo-declared published Gemma support includes Gemma 4 E2B text-only plus Gemma 4 E2B, E4B, 12B, 26B-A4B, and 31B image-text published-basis evidence."
     },
     {
       "family_id": "opt-neox-gptj",
@@ -1060,25 +1218,7 @@
         "src/invarlock/adapters/hf_loading.py",
         "src/invarlock/adapters/auto.py"
       ],
-      "notes": "These families are available through shared GPT-style loader and profile paths rather than dedicated public support lanes. The catalog intentionally avoids naming the common OPT-1.3B hosted checkpoint because it is not Apache-2.0 or MIT licensed."
-    },
-    {
-      "family_id": "gpt-oss",
-      "display_name": "GPT-OSS",
-      "modalities": [
-        "text"
-      ],
-      "task_role": "causal_lm",
-      "state": "profile_shared_alias",
-      "representative_models": [
-        "openai/gpt-oss-20b"
-      ],
-      "repo_evidence": [
-        "src/invarlock/model_profile.py",
-        "src/invarlock/adapters/hf_loading.py",
-        "src/invarlock/adapters/auto.py"
-      ],
-      "notes": "GPT-OSS rides the shared GPT-style profile path, with an explicit HF causal loader hint for the published open-weight checkpoint."
+      "notes": "These families are available through shared GPT-style loader and profile paths rather than dedicated public support lanes."
     },
     {
       "family_id": "falcon",
@@ -1111,7 +1251,7 @@
       "repo_evidence": [
         "src/invarlock/adapters/auto.py"
       ],
-      "notes": "Family visibility currently comes from adapter-auto heuristics only. The public catalog intentionally avoids naming hosted GLM chat checkpoints that fall outside the repo's Apache-2.0/MIT named-checkpoint policy."
+      "notes": "Family visibility currently comes from adapter-auto heuristics only."
     },
     {
       "family_id": "deepseek",
@@ -1166,7 +1306,7 @@
         "src/invarlock/adapters/auto.py",
         "docs/reference/model-adapters.md"
       ],
-      "notes": "Concrete loader families exist beyond the public FLAN-T5 base seq2seq basis; mBART/PEGASUS/Marian still need dedicated presets and public evidence before they become declared support lanes. The catalog intentionally avoids naming CC-BY-4.0-only hosted checkpoints because they are outside the repo's strict Apache-2.0/MIT named-checkpoint policy."
+      "notes": "Concrete loader families exist beyond the public FLAN-T5 base seq2seq basis; mBART/PEGASUS/Marian still need dedicated presets and public evidence before they become declared support lanes."
     }
   ],
   "usage_only": [
@@ -1408,7 +1548,7 @@
           "tests/core/test_model_profile_local_config.py"
         ],
         "missing_artifacts": [],
-        "notes": "The public Phi surface is intentionally held at the shipped Phi-4 text-only lane in this wave rather than widening to another family-specific lane."
+        "notes": "The public Phi surface remains the shipped Phi-4 text-only lane for this wave."
       },
       {
         "candidate_id": "falcon-7b-causal-lm",
@@ -1486,7 +1626,7 @@
           "docs/reference/model-adapters.md"
         ],
         "missing_artifacts": [],
-        "notes": "FLAN-T5 base now supplies the concrete public seq2seq basis; this broader mBART candidate remains intentionally out of scope until it has its own preset, calibration config, smoke evidence, and public run."
+        "notes": "FLAN-T5 base now supplies the concrete public seq2seq basis; this broader mBART candidate stays out of scope until it has its own preset, calibration config, smoke evidence, and public run."
       }
     ]
   },

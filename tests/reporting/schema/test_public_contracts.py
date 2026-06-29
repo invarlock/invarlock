@@ -95,6 +95,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "olmoe-1b-7b-0924-causal-hf",
         "mixtral-8x7b-moe-causal-hf",
         "qwen3-30b-a3b-moe-causal-hf",
+        "gpt-oss-20b-causal-hf",
         "open-llama-7b-causal-hf",
         "falcon-7b-causal-hf",
         "qwen2-7b-causal-hf",
@@ -104,6 +105,8 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "qwen3-5-causal-hf",
         "qwen3-5-2b-image-text-hf",
         "qwen3-5-4b-image-text-hf",
+        "qwen3-5-27b-image-text-scoped-hf",
+        "qwen3-6-27b-image-text-scoped-hf",
         "granite-4-1-3b-causal-hf",
         "granite-4-1-8b-causal-hf",
         "gemma4-e2b-text-causal-hf",
@@ -111,6 +114,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "gemma4-e4b-image-text-hf",
         "gemma4-12b-any-to-any-hf",
         "gemma4-26b-a4b-moe-image-text-hf",
+        "gemma4-31b-image-text-hf",
         "deepseek-r1-distill-qwen-causal-hf",
         "deepseek-r1-0528-qwen3-8b-causal-hf",
         "deepseek-r1-distill-qwen-14b-causal-hf",
@@ -122,63 +126,18 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
 
     family_catalog = contracts.load_model_family_catalog()
     assert family_catalog["format_version"] == "model-family-catalog-v1"
-    assert family_catalog["as_of"] == "2026-06-14"
+    assert family_catalog["as_of"] == "2026-06-29"
     assert family_catalog["declared_support"][0]["display_name"] == "GPT-2 causal LM"
+    published_lane_families = {
+        lane["family"] for lane in contracts.published_basis_lanes()
+    }
     declared = {item["display_name"] for item in family_catalog["declared_support"]}
-    assert declared == {
-        "GPT-2 causal LM",
-        "BERT / RoBERTa MLM",
-        "Mistral 7B causal LM",
-        "Ministral 3 8B causal LM (text-only eval)",
-        "Ministral 3 14B causal LM (text-only eval)",
-        "Qwen2 7B causal LM",
-        "Qwen2.5 7B causal LM",
-        "Qwen2.5 14B causal LM",
-        "Qwen3 causal LM",
-        "DeepSeek-R1-Distill-Qwen causal LM",
-        "Phi-4 causal LM (text-only eval)",
-        "Gemma 4 E2B causal LM (text-only eval)",
-        "TinyLlama 1.1B causal LM",
-        "OLMo 2 7B causal LM",
-        "OLMo 2 13B causal LM",
-        "OLMoE 1B-active/7B-total causal LM",
-        "OpenLLaMA 7B causal LM",
-        "Falcon 7B causal LM",
-        "Qwen3.5 causal LM",
-        "Gemma 4 12B any-to-any LM",
-        "Gemma 4 E4B image-text LM",
-        "Gemma 4 E2B image-text LM",
-        "Qwen3.5 4B image-text LM",
-        "Qwen3.5 2B image-text LM",
-        "Ministral 3 3B causal LM (text-only eval)",
-        "Granite 4.1 3B causal LM",
-        "Granite 4.1 8B causal LM",
-        "SmolLM3 3B causal LM",
-        "Phi-4 mini causal LM",
-        "DeepSeek-R1-Distill-Qwen 14B causal LM",
-        "DeepSeek-R1-0528-Qwen3 8B causal LM",
-        "FLAN-T5 base seq2seq LM",
-    }
+    assert declared == published_lane_families
     assert all(item["support_groups"] for item in family_catalog["declared_support"])
-    implemented = {
-        item["display_name"]: item for item in family_catalog["implemented_coverage"]
-    }
-    qwen3_moe = implemented["Qwen3 30B-A3B MoE causal LM"]
-    assert qwen3_moe["state"] == "published_basis"
-    assert any(
-        evidence == "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack"
-        for evidence in qwen3_moe["repo_evidence"]
+    assert all(
+        item["state"] != "published_basis"
+        for item in family_catalog["implemented_coverage"]
     )
-    assert "not a benchmark-quality" in qwen3_moe["notes"]
-    assert "four-GPU diagnostic lane failed" in qwen3_moe["notes"]
-    gemma4_26b = implemented["Gemma 4 26B-A4B MoE image-text LM"]
-    assert gemma4_26b["state"] == "published_basis"
-    assert any(
-        evidence == "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack"
-        for evidence in gemma4_26b["repo_evidence"]
-    )
-    assert "0.555 final accuracy over 400 examples" in gemma4_26b["notes"]
-
     usage_only = {item["display_name"] for item in family_catalog["usage_only"]}
     assert "QwQ 32B reasoning" not in usage_only
     assert "Qwen2.5 7B" not in usage_only

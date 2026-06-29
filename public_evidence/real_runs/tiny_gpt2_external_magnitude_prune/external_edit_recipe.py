@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -104,7 +105,8 @@ def main() -> int:
     parser.add_argument("--model-id", default="sshleifer/tiny-gpt2")
     parser.add_argument(
         "--output-dir",
-        default="/private/tmp/invarlock-byoe-magnitude-prune-subject",
+        default=None,
+        help="Output directory. Defaults to a temporary work directory.",
     )
     parser.add_argument("--prune-fraction", type=float, default=0.0025)
     parser.add_argument("--allow-network", action="store_true")
@@ -115,7 +117,11 @@ def main() -> int:
 
     summary = materialize_subject(
         model_id=args.model_id,
-        output_dir=Path(args.output_dir),
+        output_dir=(
+            Path(args.output_dir)
+            if args.output_dir
+            else Path(tempfile.gettempdir()) / "invarlock-byoe-magnitude-prune-subject"
+        ),
         prune_fraction=args.prune_fraction,
         local_files_only=not args.allow_network,
     )

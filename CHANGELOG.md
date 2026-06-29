@@ -153,8 +153,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   model-evidence sweeps remain manually runnable.
 - Removed the stale `tests/fuzzing` owner expectation from the active test-tree
   contract after the fuzzing surface was retired from the repo layout.
-- Removed confirmed non-Apache-2.0/MIT hosted model checkpoints from active
-  support, calibration, and public-evidence surfaces.
+- Removed inactive hosted model checkpoints from active support, calibration,
+  and public-evidence surfaces.
 
 ### Fixed
 
@@ -1224,7 +1224,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   presets so profile-driven runs, overlays, and preset paths stay aligned.
 - B200 calibration configs now default to `guards.order: [invariants, variance, invariants]` (drops spectral/rmt) to avoid CPU-bound SVD (`torch.linalg.svdvals` / MKL `sgesdd`) dominating wall time and making GPUs appear idle during calibration.
 - B200 calibrated presets now include `guards.order`, and only include `guards.spectral` / `guards.rmt` sections when those guards are enabled (run a smaller follow-up calibration pass if you need spectral caps or an RMT ε).
-- B200 bootstrap defaults HuggingFace caches under `${OUTPUT_DIR}/.hf` (override with `HF_HOME` / `HF_HUB_CACHE` / `HF_DATASETS_CACHE`) to avoid small `/root` partitions on GPU nodes.
+- B200 bootstrap defaults HuggingFace caches under `${OUTPUT_DIR}/.hf` (override with `HF_HOME` / `HF_HUB_CACHE` / `HF_DATASETS_CACHE`) to avoid small root-disk partitions on GPU nodes.
 - `invarlock evaluate` now honors `guards.order` when provided by `--preset` (instead of always forcing `["invariants", "spectral", "rmt", "variance", "invariants"]`), so evaluate matches the calibration preset’s intended guard set.
 
 - Bump katex from 0.16.25 to 0.16.27.
@@ -1251,7 +1251,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WikiText-2 window stratification now uses a deterministic offline byte-level n-gram scorer (replaces the GPT‑2 scorer) to keep window selection stable across model families and avoid implicit model downloads.
 - B200 validation suite is dynamic-scheduling only; dependency promotion is centralized to reduce queue lock contention and improve throughput.
 - B200 generated configs default to `guards.order: [invariants, rmt, variance]` to avoid slow CPU SVD during calibration; spectral caps are not produced unless you re-enable spectral calibration separately.
-- B200 bootstrap defaults HuggingFace caches under `${WORK_DIR}/hf_home` to avoid small `/root` partitions on GPU nodes.
+- B200 bootstrap defaults HuggingFace caches under `${WORK_DIR}/hf_home` to avoid small root-disk partitions on GPU nodes.
 
 - Updated CLI/dataset/env-var references for the new difficulty scorer and removal of `INVARLOCK_SCORES_BATCH_SIZE`.
 

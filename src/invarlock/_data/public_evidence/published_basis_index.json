@@ -349,6 +349,54 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_31b/evaluation.report.json",
+          "sha256": "sha256:6fe2ad0e53831158712ff7ed354771df0d381c3c9c0c51acc80c12e57e36a5f1",
+          "size_bytes": 1050587
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:be7386ec34a38020af0f4be302ffecfb6e31a815e26a9e15dbe315a1028c1388",
+            "manifest.json": "sha256:ad4094943f3494fb6c7c2ccabd77012525e24bb1185c2590fcd0d520263743ad",
+            "manifest.signature.json": "sha256:35f8d6169cbb849c5c3be172d947c882437795c84388c44950b4e80a1582b93f",
+            "results/final_verdict.json": "sha256:4f72067c7789f85ab6a90b2ce470a7a17b8ce99ce67043ff46abf49fb58e42b4"
+          },
+          "file_count": 13,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/gemma4_31b/evidence_pack",
+          "size_bytes": 1387873
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_31b/evidence_pack_recipe.json",
+          "sha256": "sha256:62e8b67071165da3bf5bb8c3e40b9c85f4512e6b604ef3662067fcff06e458bd",
+          "size_bytes": 2008
+        },
+        "evidence_run_preset": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_31b/evidence_run_preset.yaml",
+          "sha256": "sha256:248f04f70f3c8576c4ec6732d2ef51335e8f7c04b13e1430ea78be3cee7d0fa7",
+          "size_bytes": 1365
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gemma4_31b/runtime.manifest.json",
+          "sha256": "sha256:2e73ff8fd383c261ebb45cf6f61cc1bde9530f184461fdc288909e96ea89ddbd",
+          "size_bytes": 1125
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:e6d0ecaa098b6a05f45d893fa8f9366b75b69caaf124679e889809330054810d",
+      "lanes": [
+        "gemma4-31b-image-text-hf"
+      ],
+      "path": "public_evidence/published_basis/gemma4_31b",
+      "slug": "gemma4_31b",
+      "summary": "Release-strict verifier fixture for the Gemma 4 31B image-text published-basis lane. Final accuracy 0.610 over 400 examples; no guard warnings."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
           "path": "public_evidence/published_basis/gemma4_e2b/evaluation.report.json",
           "sha256": "sha256:2274a10df15c319ffb48d0d5f25e69648f5d8b09de1b101bcd8a9e39c33b94fc",
           "size_bytes": 4087874
@@ -531,6 +579,54 @@
       "path": "public_evidence/published_basis/gpt2",
       "slug": "gpt2",
       "summary": "Strict-pass verifier fixture for the GPT-2-style published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gpt_oss_20b/evaluation.report.json",
+          "sha256": "sha256:b656ab5e9cba0f6d56a794861a83f5bb55a595fe214fdafcbbeaeb6132bba58a",
+          "size_bytes": 5594133
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:5eff616b53857453d153ea4dbc34520e2fc878b349fd96847ddd0f4a0df91098",
+            "manifest.json": "sha256:eb8b397cf070803e9935a36a466b66cd5361f0f08ccc40ba13f27e60396f801d",
+            "manifest.signature.json": "sha256:1dcb8981b0a7e2989b2eff494b8404a4ca49a22c3d1bffea493cde437cdb90db",
+            "results/final_verdict.json": "sha256:a779902ceb9071a737b3c7d65810c7bded73fd91cdae500ece655f7ec1704ae0"
+          },
+          "file_count": 11,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/gpt_oss_20b/evidence_pack",
+          "size_bytes": 5603168
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gpt_oss_20b/evidence_pack_recipe.json",
+          "sha256": "sha256:10149de03b05a05c8d318b19c7f10068520d91a4e5af9983f89b42120a2374e7",
+          "size_bytes": 2012
+        },
+        "evidence_run_preset": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gpt_oss_20b/evidence_run_preset.yaml",
+          "sha256": "sha256:d877b39eed328054014745c79bf7ba199ed5548a2bcf62e0b38c7ef980906bd1",
+          "size_bytes": 1412
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/gpt_oss_20b/runtime.manifest.json",
+          "sha256": "sha256:083d09dbb5a47a5adadbe2069bc190a212af78b9f8952ec60caeaf1ee43e5748",
+          "size_bytes": 1035
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:e008ce065eeb2b32a529b1e8dfd312ed7e5753bc1e6fbfa516bf45ad6a606762",
+      "lanes": [
+        "gpt-oss-20b-causal-hf"
+      ],
+      "path": "public_evidence/published_basis/gpt_oss_20b",
+      "slug": "gpt_oss_20b",
+      "summary": "Release-strict verifier fixture for the GPT-OSS 20B HF causal published-basis lane on public WikiText-2 validation."
     },
     {
       "artifacts": {
@@ -1274,6 +1370,54 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_5_27b_scoped/evaluation.report.json",
+          "sha256": "sha256:1b4a11507db64ffe2eb463a384cf684c42bf23931ac8be3ddc5f5e1cb5b7877a",
+          "size_bytes": 1078353
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:63f5b1e5822e77767c6b67dbb1396f0f59fdcce24770f9e223ae6472e98bbf45",
+            "manifest.json": "sha256:7a382c5fccbbaf38bddbeacaef4f38d156d897c898473b9dc336b98023937383",
+            "manifest.signature.json": "sha256:c134e26ab59c8f2606ecf6be5f9f68fa5f3f2e3b511b62420b828e0fd55e2dc9",
+            "results/final_verdict.json": "sha256:96a6052305dea83afa30156cdff4a28c065d79700e888e96706c2c776d3fb4ce"
+          },
+          "file_count": 13,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/qwen3_5_27b_scoped/evidence_pack",
+          "size_bytes": 1431423
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_5_27b_scoped/evidence_pack_recipe.json",
+          "sha256": "sha256:d0d41bd45d5b3b67d250891d4f915113aab91c981c5603035ef8f6bdfd1a373e",
+          "size_bytes": 2186
+        },
+        "evidence_run_preset": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_5_27b_scoped/evidence_run_preset.yaml",
+          "sha256": "sha256:7041a11a9dac6e0d69449a0c370c65b68b1c1060b550c1ffeb7b655eb5cd76e7",
+          "size_bytes": 1524
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_5_27b_scoped/runtime.manifest.json",
+          "sha256": "sha256:1a62e01a7cdc36aa6f79c64e73398f0ac993ae3b239cad17ff56b9ac5bcc3244",
+          "size_bytes": 1144
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:fa8e9335881e60450cf3203f6a0735da91bde3a483ee6d125c89898441d621c4",
+      "lanes": [
+        "qwen3-5-27b-image-text-scoped-hf"
+      ],
+      "path": "public_evidence/published_basis/qwen3_5_27b_scoped",
+      "slug": "qwen3_5_27b_scoped",
+      "summary": "Release-strict scoped verifier fixture for the Qwen3.5 27B image-text published-basis lane. Final accuracy 0.8975 over 400 examples; no guard warnings. Scope covers self-attention and MLP guard scans."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
           "path": "public_evidence/published_basis/qwen3_5_2b/evaluation.report.json",
           "sha256": "sha256:be75968ca4674aa69d554d123a799e6c7f9afccef1d52bc48badad96f4a89ba7",
           "size_bytes": 910510
@@ -1401,6 +1545,54 @@
       "path": "public_evidence/published_basis/qwen3_5_9b",
       "slug": "qwen3_5_9b",
       "summary": "Release-strict verifier fixture for the Qwen3.5 9B published-basis lane."
+    },
+    {
+      "artifacts": {
+        "evaluation_report": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_6_27b_scoped/evaluation.report.json",
+          "sha256": "sha256:bf5240f37983a391871f8b4a3b79d4de17ea7d9435c8eac5e947d7e251e9d4e4",
+          "size_bytes": 1078178
+        },
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:a856583a9c554dbfff4751d0b27e6e1f38f5ae1113981d0dbfe1eaaf473e4135",
+            "manifest.json": "sha256:d65c63345d5c4edf50affa59d2c899b86ac58143fdbb759a09ac1b02c3fe8eaf",
+            "manifest.signature.json": "sha256:bb4f882c967f40d4b6c8fcb11398a0416c30d0987a77d732ecde6c5afc9e7ccf",
+            "results/final_verdict.json": "sha256:b7aab7fd0ac79df205a6917963d8d64439e734301850f1b00bc69c3e335dc6c6"
+          },
+          "file_count": 13,
+          "kind": "directory",
+          "path": "public_evidence/published_basis/qwen3_6_27b_scoped/evidence_pack",
+          "size_bytes": 1431248
+        },
+        "evidence_pack_recipe": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_6_27b_scoped/evidence_pack_recipe.json",
+          "sha256": "sha256:fecd7002389a4507411342abc7be4126a981c83401482996d1e25727214fd419",
+          "size_bytes": 2186
+        },
+        "evidence_run_preset": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_6_27b_scoped/evidence_run_preset.yaml",
+          "sha256": "sha256:639327394d54e7197e9cc144750485b1e29a0a21e90d2d6b3c9d861c712299ca",
+          "size_bytes": 1524
+        },
+        "runtime_manifest": {
+          "kind": "file",
+          "path": "public_evidence/published_basis/qwen3_6_27b_scoped/runtime.manifest.json",
+          "sha256": "sha256:dd1d6562be980bfc9b8c93461acc4079fec19c25cc2aa874e99c610708b888de",
+          "size_bytes": 1144
+        }
+      },
+      "evidence_class": "strict_pass_fixture",
+      "expected_fingerprint": "sha256:a38720153b39ad9d85b1fbb3f077403caf4d2e78de271fe65b2e6d52d3aa67ff",
+      "lanes": [
+        "qwen3-6-27b-image-text-scoped-hf"
+      ],
+      "path": "public_evidence/published_basis/qwen3_6_27b_scoped",
+      "slug": "qwen3_6_27b_scoped",
+      "summary": "Release-strict scoped verifier fixture for the Qwen3.6 27B image-text published-basis lane. Final accuracy 0.8825 over 400 examples; no guard warnings. Scope covers self-attention and MLP guard scans."
     },
     {
       "artifacts": {
@@ -1536,8 +1728,8 @@
     }
   ],
   "format_version": "public-evidence-index-v1",
-  "published_basis_count": 35,
-  "published_basis_file_count": 507,
-  "published_basis_size_bytes": 220442502,
+  "published_basis_count": 39,
+  "published_basis_file_count": 573,
+  "published_basis_size_bytes": 239116130,
   "source_root": "public_evidence"
 }

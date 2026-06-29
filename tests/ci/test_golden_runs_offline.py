@@ -85,6 +85,7 @@ def test_offline_golden_runs_public_fixtures() -> None:
         "olmoe_1b_7b",
         "mixtral_8x7b",
         "qwen3_30b_a3b",
+        "gpt_oss_20b",
         "open_llama_7b",
         "falcon_7b",
         "qwen2_7b",
@@ -103,6 +104,9 @@ def test_offline_golden_runs_public_fixtures() -> None:
         "ministral3_3b",
         "smollm3_3b",
         "phi4_mini",
+        "qwen3_5_27b_scoped",
+        "qwen3_6_27b_scoped",
+        "gemma4_31b",
         "flan_t5_base",
     ]
 

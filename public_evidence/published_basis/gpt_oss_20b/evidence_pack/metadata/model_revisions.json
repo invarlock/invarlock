@@ -1,0 +1,23 @@
+{
+  "execution_mode": "container",
+  "generated_at": "2026-06-29T09:14:24.079171+00:00",
+  "models": [
+    {
+      "model_id": "openai/gpt-oss-20b",
+      "revisions": [
+        {
+          "commit_hash": "6cee5e81ee83917806bbde320786a8fb61efebee",
+          "refs": [
+            "main"
+          ],
+          "size_on_disk": 13789244452,
+          "snapshot_path": "<hf-cache-dir>/hub/models--openai--gpt-oss-20b/snapshots/6cee5e81ee83917806bbde320786a8fb61efebee"
+        }
+      ],
+      "slug": "openai_gpt_oss_20b",
+      "status": "observed"
+    }
+  ],
+  "schema": "invarlock/model-evidence-model-revisions-v1",
+  "suite": "support-matrix-backlog-gpu"
+}

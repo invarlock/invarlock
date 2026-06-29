@@ -5,8 +5,8 @@
   "artifacts": [
     {
       "path": "README.md",
-      "sha256": "sha256:5d526caf24559a7155522c984c3003334fa9e6c679ad0763228a145003091652",
-      "bytes": 858
+      "sha256": "sha256:a6b04fe3258d9eb159422059eae12bf8330c698ac5f145f1f7e4501b90fd3512",
+      "bytes": 976
     },
     {
       "path": "findings_summary.json",
@@ -19,9 +19,14 @@
       "bytes": 2354
     },
     {
+      "path": "modern_followon_addendum.json",
+      "sha256": "sha256:cc5e14e97bd7cfd49be38026c27ea77daa23ab7a53742044dc5d1a9e3cff48d3",
+      "bytes": 4366
+    },
+    {
       "path": "evidence.meta.json",
-      "sha256": "sha256:5764da5ae4ed5a0cd83ec12f3f8e37d08c1a05f64216afaf3cf7e924e30c4599",
-      "bytes": 638
+      "sha256": "sha256:8ac5dabe5c75b9dca9621d0374244fada71985002f3f0e7e38b20f59bcf2a094",
+      "bytes": 703
     }
   ]
 }

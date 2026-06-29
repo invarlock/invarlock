@@ -1,0 +1,24 @@
+{
+  "execution_mode": "container",
+  "generated_at": "2026-06-29T06:24:36.922072+00:00",
+  "models": [
+    {
+      "cache_dir": "<validation-repo>/tmp/model_evidence_hf_home/hub",
+      "model_id": "Qwen/Qwen3.6-27B",
+      "revisions": [
+        {
+          "commit_hash": "6a9e13bd6fc8f0983b9b99948120bc37f49c13e9",
+          "refs": [
+            "main"
+          ],
+          "size_on_disk": 55586032383,
+          "snapshot_path": "<validation-repo>/tmp/model_evidence_hf_home/hub/models--Qwen--Qwen3.6-27B/snapshots/6a9e13bd6fc8f0983b9b99948120bc37f49c13e9"
+        }
+      ],
+      "slug": "qwen_qwen3_6_27b_no_linear_attn_spectral",
+      "status": "observed"
+    }
+  ],
+  "schema": "invarlock/model-evidence-model-revisions-v1",
+  "suite": "support-matrix-backlog-gpu"
+}

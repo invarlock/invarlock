@@ -266,10 +266,13 @@ Notes
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | Qwen3.5 2B image-text LM | Yes | Yes | Yes | Yes |
 | Qwen3.5 4B image-text LM | Yes | Yes | Yes | Yes |
+| Qwen3.5 27B image-text LM (scoped) | Yes | Yes | Yes | Yes |
+| Qwen3.6 27B image-text LM (scoped) | Yes | Yes | Yes | Yes |
 | Gemma 4 E2B image-text LM | Yes | Yes | Yes | Yes |
 | Gemma 4 E4B image-text LM | Yes | Yes | Yes | Yes |
 | Gemma 4 12B any-to-any LM | Yes | Yes | Yes | Yes |
 | Gemma 4 26B-A4B MoE image-text LM | Yes | Yes | Yes | Yes |
+| Gemma 4 31B image-text LM | Yes | Yes | Yes | Yes |
 
 ### Large/MoE Published Evidence
 
@@ -278,6 +281,7 @@ Notes
 | OLMoE 1B-active/7B-total causal LM | Yes | Yes | Yes | Yes |
 | Mixtral 8x7B MoE causal LM | Yes | Yes | Yes | Yes |
 | Qwen3 30B-A3B MoE causal LM | Yes | Yes | Yes | Yes |
+| GPT-OSS 20B causal LM | Yes | Yes | Yes | Yes |
 
 ### Seq2Seq Published Evidence
 
@@ -293,8 +297,10 @@ Falcon 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B,
 Qwen3.5 2B image-text, DeepSeek-R1-Distill-Qwen 7B,
 DeepSeek-R1-0528-Qwen3 8B,
 DeepSeek-R1-Distill-Qwen 14B, Phi-4 text-only, Qwen3.5 4B image-text,
-Gemma 4 12B image-text, Gemma 4 26B-A4B image-text MoE, OLMoE
-1B-active/7B-total MoE, Mixtral 8x7B MoE, Qwen3 30B-A3B MoE, and FLAN-T5 base
+scoped Qwen3.5 27B image-text, scoped Qwen3.6 27B image-text,
+Gemma 4 12B image-text, Gemma 4 26B-A4B image-text MoE, Gemma 4 31B
+image-text, OLMoE 1B-active/7B-total MoE, Mixtral 8x7B MoE,
+Qwen3 30B-A3B MoE, GPT-OSS 20B, and FLAN-T5 base
 seq2seq profiles.
 Repo-included presets and pilot calibration configs for prepared practical-pick
 lanes do not become part of the published assurance basis until supporting
@@ -317,8 +323,8 @@ baseline-relative spectral, RMT, and variance/VE evidence from clean
 confirmation reruns.
 Practical-pick families without tuned edit params or public evidence fixtures
 are tracked as `community_experimental` rows, even when a repo pilot preset and
-calibration config are already present. Access-gated vendor checkpoints are
-intentionally excluded from the included preset inventory.
+calibration config are already present. Access-gated vendor checkpoints are not
+included as repo-shipped presets.
 The Phi-4 public fixture is text-only and skips guard-overhead measurement by
 preset policy; strict release verification accepts that declared skip.
 The FLAN-T5 base public fixture uses pinned CNN/DailyMail validation data via
@@ -327,12 +333,15 @@ while the hard policy gates pass.
 The Qwen3.5 4B image-text lane now includes a public VQAv2 preset, null-sweep
 config, strict public report, runtime manifest, and signed evidence pack after
 the structured JSON-answer prompt fix.
+The scoped Qwen3.5 27B and Qwen3.6 27B image-text lanes cover
+self-attention and MLP guard scans; linear-attention module coverage remains a
+separate strict spectral-cap finding.
 
 `published_basis` remains the narrow public evidence floor, while
 `supported_experimental` means the repo ships the preset, calibration config,
 targeted tests, smoke/evidence path, and tuned edit-param coverage for the lane
 without claiming a published-basis fixture set. `community_experimental` rows
-are candidate inventory entries; some already have repo pilot presets and
+are candidate entries; some already have repo pilot presets and
 calibration configs, but still need the remaining promotion artifacts before
 they become release-supported lanes.
 
@@ -341,8 +350,8 @@ Image-text evaluation uses the built-in
 `invarlock[multimodal]` for this path; Gemma 4 unified checkpoints require
 `transformers>=5.12.0` and `torchvision>=0.26.0`. Gemma 4 E2B has separate
 text-only and image-text public bases; Qwen3.5 2B, Qwen3.5 4B, Gemma 4 E4B,
-Gemma 4 12B, and Gemma 4 26B-A4B also have public image-text bases. Audio
-evaluation is deferred. Public
+scoped Qwen3.5/Qwen3.6 27B, Gemma 4 12B, Gemma 4 26B-A4B, and Gemma 4 31B
+also have public image-text bases. Audio evaluation is deferred. Public
 image-text basis promotion requires
 measured accuracy on a pinned public dataset above the repo floor; preservation
 passing alone is not sufficient.
@@ -352,8 +361,7 @@ the canonical source of truth for normalized support tiers
 (`published_basis`, `supported_experimental`, `community_experimental`) and for
 published-basis evidence references. Model lifecycle decisions live in
 `contracts/model_classification.json`: that file records whether a lane or
-family is published, backlog, blocked, smoke-only, usage-only, or out of scope,
-and centralizes blocked named checkpoints for future license/access changes.
+family is published, backlog, blocked, smoke-only, usage-only, or out of scope.
 
 Model evidence automation lives in
 `scripts/model_evidence/model_evidence_sweep.py`, with tmux-based remote launch support in
@@ -390,8 +398,8 @@ materialization pattern through
 `configs/presets/multimodal/*_public_vqav2_256.yaml` and matching
 `configs/calibration/null_sweep_*.yaml` files.
 
-For the broader inventory of declared support, implemented-but-not-public
-coverage, usage-only checkpoint families, and recommended additions, see
+For declared support, implemented-but-not-public coverage, usage-only checkpoint
+families, and recommended additions, see
 [Model Family Catalog](reference/model-family-catalog.md).
 
 ---
