@@ -443,6 +443,69 @@ class _Qwen35LinearDecoderSpec(_CausalSpec):
         return _DenseDecoderSpec().tying_map(model, base)
 
 
+class _Qwen35LinearMoEDecoderSpec(_CausalSpec):
+    spec_name = "qwen35_linear_moe_decoder"
+
+    def matches(self, model: Any, base: Any, layers: Any) -> bool:
+        layer = _first_item(layers)
+        if layer is None:
+            return False
+        has_attn = (
+            hasattr(layer, "linear_attn")
+            and _has_set_attr(layer.linear_attn, "in_proj_qkv")
+            and _has_set_attr(layer.linear_attn, "out_proj")
+        )
+        mlp = getattr(layer, "mlp", None)
+        has_moe = bool(
+            mlp is not None
+            and _has_set_attr(mlp, "gate")
+            and _has_set_attr(mlp, "experts")
+        )
+        has_norms = _has_set_attr(layer, "input_layernorm") and _has_set_attr(
+            layer, "post_attention_layernorm"
+        )
+        return bool(has_attn and has_moe and has_norms)
+
+    def infer_mlp_dim(self, layer: Any, config: Any, hidden_size: int) -> int:
+        mlp_dim = int(getattr(config, "intermediate_size", hidden_size * 4) or 0)
+        experts = getattr(getattr(layer, "mlp", None), "experts", None)
+        if experts is not None:
+            intermediate_size = getattr(experts, "intermediate_size", None)
+            if isinstance(intermediate_size, int) and intermediate_size > 0:
+                return int(intermediate_size)
+            intermediate_dim = getattr(experts, "intermediate_dim", None)
+            if isinstance(intermediate_dim, int) and intermediate_dim > 0:
+                return int(intermediate_dim)
+        shared_expert = getattr(getattr(layer, "mlp", None), "shared_expert", None)
+        gate_proj = getattr(shared_expert, "gate_proj", None)
+        gate_proj_dim = _weight_shape_dim(gate_proj, 0)
+        if gate_proj_dim is not None:
+            return int(gate_proj_dim)
+        return int(mlp_dim)
+
+    def layer_modules(self, model: Any, layer: Any) -> dict[str, Any]:
+        mlp = layer.mlp
+        modules = {
+            "linear_attn.in_proj_qkv": layer.linear_attn.in_proj_qkv,
+            "linear_attn.out_proj": layer.linear_attn.out_proj,
+            "input_layernorm": layer.input_layernorm,
+            "post_attention_layernorm": layer.post_attention_layernorm,
+            "mlp.router": mlp.gate,
+            "mlp.gate": mlp.gate,
+            "mlp.experts": mlp.experts,
+        }
+        shared_expert = getattr(mlp, "shared_expert", None)
+        if shared_expert is not None:
+            modules["mlp.shared_expert"] = shared_expert
+        shared_expert_gate = getattr(mlp, "shared_expert_gate", None)
+        if shared_expert_gate is not None:
+            modules["mlp.shared_expert_gate"] = shared_expert_gate
+        return modules
+
+    def tying_map(self, model: Any, base: Any) -> dict[str, str]:
+        return _DenseDecoderSpec().tying_map(model, base)
+
+
 class _MoEDecoderSpec(_CausalSpec):
     spec_name = "moe_decoder"
 
@@ -874,6 +937,7 @@ class _GPT2LikeDecoderSpec(_CausalSpec):
 
 
 _SPECS: list[_CausalSpec] = [
+    _Qwen35LinearMoEDecoderSpec(),
     _MoEDecoderSpec(),
     _GptOssMoEDecoderSpec(),
     _PhiDecoderSpec(),

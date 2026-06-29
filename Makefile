@@ -108,6 +108,7 @@ COVERAGE_TESTS_ADAPTERS := \
 	tests/adapters/test_hf_causal_gemma4_paths.py \
 	tests/adapters/test_hf_role_adapters.py \
 	tests/adapters/test_hf_causal_spec_contracts.py \
+	tests/adapters/test_hf_causal_qwen_linear_moe_spec.py \
 	tests/adapters/test_adapters_hf_and_integration.py
 
 COVERAGE_TESTS_RUNTIME := \
