@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import yaml
+
 from tests.scripts._support_model_evidence_sweep import (
     load_script_module,
     write_fake_python,
@@ -262,6 +264,70 @@ def test_model_evidence_sweep_dry_run_uses_preset_override(tmp_path: Path) -> No
     assert len(payload) == 1
     evaluate = payload[0]["evaluate"]
     assert evaluate[evaluate.index("--preset") + 1] == "tmp/smollm3_release.yaml"
+
+
+def test_model_evidence_sweep_materialized_lane_prepares_preset_from_override(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
+    fake_python = tmp_path / "fake-python"
+    write_fake_python(fake_python)
+    output_root = tmp_path / "override-materialized"
+    override_preset = tmp_path / "qwen-linear-only.yaml"
+    override_preset.write_text(
+        """
+model:
+  id: Qwen/Qwen3.5-2B
+dataset:
+  provider:
+    kind: vision_text
+    path: should-be-replaced.jsonl
+guards:
+  order: [spectral, rmt]
+  spectral:
+    module_include_patterns:
+      - override.linear_attn.spectral
+  rmt:
+    module_include_patterns:
+      - override.linear_attn.rmt
+""",
+        encoding="utf-8",
+    )
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--suite",
+            "support-matrix-backlog-gpu",
+            "--slug",
+            "qwen_qwen3_5_2b",
+            "--output-root",
+            str(output_root),
+            "--python",
+            str(fake_python),
+            "--preset-override",
+            f"qwen_qwen3_5_2b={override_preset}",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 1, proc.stderr
+    prepared = output_root / "eval" / "qwen_qwen3_5_2b" / "prepared_preset.yaml"
+    prepared_data = yaml.safe_load(prepared.read_text(encoding="utf-8"))
+    provider = prepared_data["dataset"]["provider"]
+    assert provider["kind"] == "vision_text"
+    assert provider["path"].endswith("eval/qwen_qwen3_5_2b/dataset/manifest.jsonl")
+    assert prepared_data["guards"]["spectral"]["module_include_patterns"] == [
+        "override.linear_attn.spectral"
+    ]
+    assert prepared_data["guards"]["rmt"]["module_include_patterns"] == [
+        "override.linear_attn.rmt"
+    ]
 
 
 def test_model_evidence_sweep_rejects_invalid_preset_override(tmp_path: Path) -> None:

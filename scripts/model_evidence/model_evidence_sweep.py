@@ -522,10 +522,16 @@ def write_prepared_preset(
     *,
     lane_root: Path,
     execution_mode: str,
+    preset_source: str | Path | None = None,
 ) -> Path | None:
     if not spec.vision_text_materialization:
         return None
-    preset_data = yaml.safe_load(spec.preset_path.read_text(encoding="utf-8"))
+    source_path = _resolve_preset_source_path(
+        preset_source,
+        default_path=spec.preset_path,
+        execution_mode=execution_mode,
+    )
+    preset_data = yaml.safe_load(source_path.read_text(encoding="utf-8"))
     if not isinstance(preset_data, dict):
         raise ValueError(f"Preset must be a mapping: {spec.preset_relpath}")
     dataset = preset_data.setdefault("dataset", {})
@@ -549,6 +555,25 @@ def write_prepared_preset(
         encoding="utf-8",
     )
     return prepared_path
+
+
+def _resolve_preset_source_path(
+    preset_source: str | Path | None,
+    *,
+    default_path: Path,
+    execution_mode: str,
+) -> Path:
+    if preset_source is None:
+        return default_path
+    source_path = Path(preset_source)
+    if execution_mode == "container" and source_path.is_absolute():
+        try:
+            source_path = REPO_ROOT / source_path.relative_to("/workspace")
+        except ValueError:
+            pass
+    if not source_path.is_absolute():
+        source_path = REPO_ROOT / source_path
+    return source_path
 
 
 def _prefetch_adapter_name(spec: EvidenceLane) -> str:
@@ -771,12 +796,17 @@ def build_lane_plan(
     )
     prepared_preset = None
     preset_arg_override = None
+    preset_source_override = (
+        preset_overrides.get(spec.slug) if preset_overrides is not None else None
+    )
+    prepared_preset_source = None
     steps: list[WorkflowCommandStep] = []
     if materialize_cmd is not None:
         prepared_preset = _command_path(
             lane_root / "prepared_preset.yaml",
             execution_mode=execution_mode,
         )
+        prepared_preset_source = preset_source_override
         preset_arg_override = prepared_preset
         steps.append(
             WorkflowCommandStep(
@@ -785,8 +815,8 @@ def build_lane_plan(
                 log_mode="w",
             )
         )
-    elif preset_overrides:
-        preset_arg_override = preset_overrides.get(spec.slug)
+    elif preset_source_override is not None:
+        preset_arg_override = preset_source_override
 
     if execution_mode == "host":
         steps.append(
@@ -846,6 +876,7 @@ def build_lane_plan(
         steps=tuple(steps),
         resource_preflight=lane_resource_preflight(spec, env=env, device=device),
         prepared_preset=prepared_preset,
+        prepared_preset_source=prepared_preset_source,
     )
 
 
@@ -1002,6 +1033,7 @@ def _after_successful_model_step(
         spec,
         lane_root=plan.lane_root,
         execution_mode=plan.execution_mode,
+        preset_source=plan.prepared_preset_source,
     )
 
 
