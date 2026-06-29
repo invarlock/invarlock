@@ -697,7 +697,7 @@
         "evidence_pack_recipe": "public_evidence/published_basis/mixtral_8x7b/evidence_pack_recipe.json",
         "evidence_pack_fixture": "public_evidence/published_basis/mixtral_8x7b/evidence_pack"
       },
-      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 64-window no-op preservation evidence. This is a large MoE preservation basis; it is not a benchmark-quality or routing-quality claim, and the optional guard-overhead check is intentionally skipped by preset policy for this lane."
+      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 64-window no-op preservation evidence. This is a large MoE preservation basis; it is not a benchmark-quality or routing-quality claim, and the preset skips optional guard-overhead measurement for this lane."
     },
     {
       "lane_id": "qwen3-30b-a3b-moe-causal-hf",

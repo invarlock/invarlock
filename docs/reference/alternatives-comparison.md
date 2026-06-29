@@ -59,5 +59,5 @@ checkpoint and alongside broader benchmark, monitoring, and registry systems.
 - [Strict Assurance Checklist](../assurance/15-strict-assurance-checklist.md) — Evidence acceptance criteria
 - [Reports Reference](reports.md) — Schema, telemetry, and HTML export
 - [Guards Reference](guards.md) — Configuration and evidence
-- [Model Family Catalog](model-family-catalog.md) — Authoritative support inventory
+- [Model Family Catalog](model-family-catalog.md) — Support tiers and backlog
 - [Compare & evaluate (BYOE)](../user-guide/compare-and-evaluate.md) — Primary BYOE workflow

@@ -7,7 +7,7 @@
       "apache-2.0",
       "mit"
     ],
-    "notes": "Repo-maintained support, promotion, and evidence-sweep inventory names only Apache-2.0 or MIT checkpoints. User-supplied local checkpoints are outside this named-checkpoint inventory policy."
+    "notes": "Support, promotion, and evidence-sweep lanes are explicit. User-supplied local checkpoints remain BYOE inputs."
   },
   "classification_values": [
     "published",
@@ -665,47 +665,47 @@
     {
       "model_id": "tiiuae/Falcon-H1R-7B",
       "license_id": "falcon-llm-license",
-      "reason": "custom license outside the repo named-checkpoint Apache-2.0/MIT policy"
+      "reason": "not an active support lane"
     },
     {
       "model_id": "THUDM/glm-4-9b-chat",
       "license_id": "glm-4",
-      "reason": "outside the repo named-checkpoint Apache-2.0/MIT policy"
+      "reason": "not an active support lane"
     },
     {
       "model_id": "zai-org/glm-4-9b-chat",
       "license_id": "glm-4",
-      "reason": "outside the repo named-checkpoint Apache-2.0/MIT policy"
+      "reason": "not an active support lane"
     },
     {
       "model_id": "facebook/opt-1.3b",
       "license_id": "other",
-      "reason": "hosted checkpoint license is not Apache-2.0 or MIT"
+      "reason": "not an active support lane"
     },
     {
       "model_id": "Qwen/Qwen1.5-72B",
       "license_id": "tongyi-qianwen",
-      "reason": "custom license outside the repo named-checkpoint Apache-2.0/MIT policy"
+      "reason": "not an active support lane"
     },
     {
       "model_id": "Qwen/Qwen2.5-72B",
       "license_id": "qwen",
-      "reason": "custom license outside the repo named-checkpoint Apache-2.0/MIT policy"
+      "reason": "not an active support lane"
     },
     {
       "model_id": "Helsinki-NLP/opus-mt-en-de",
       "license_id": "cc-by-4.0",
-      "reason": "CC-BY-only hosted checkpoint is outside the repo named-checkpoint Apache-2.0/MIT policy"
+      "reason": "not an active support lane"
     },
     {
       "model_id": "google/gemma-3n-E4B-it",
       "license_id": "gemma",
-      "reason": "gated Gemma terms/access are outside the repo named-checkpoint Apache-2.0/MIT policy"
+      "reason": "not an active support lane"
     },
     {
       "model_id": "google/gemma-3-4b-it",
       "license_id": "gemma",
-      "reason": "gated Gemma terms/access are outside the repo named-checkpoint Apache-2.0/MIT policy"
+      "reason": "not an active support lane"
     }
   ]
 }

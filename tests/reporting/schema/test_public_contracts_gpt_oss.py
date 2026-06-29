@@ -46,7 +46,7 @@ def test_followon_public_evidence_rows_are_declared_support() -> None:
         ),
         "Qwen3 30B-A3B MoE causal LM": (
             "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack",
-            "restricted diagnostic lane failed",
+            "scoped attention/router/shared-expert guard scans",
         ),
     }
 

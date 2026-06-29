@@ -12,7 +12,7 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 | [Configuration Schema](config-schema.md) | YAML config structure and precedence | CLI users |
 | [Guards](guards.md) | Guard configuration and evidence | Users tuning guards |
 | [Model Adapters](model-adapters.md) | Adapter selection and capabilities | CLI and API users |
-| [Model Family Catalog](model-family-catalog.md) | Authoritative support inventory and backlog | Auditors, tool authors |
+| [Model Family Catalog](model-family-catalog.md) | Support tiers and backlog | Auditors, tool authors |
 | [Public Contracts](contracts.md) | Stable public contracts for reports, verification, and policy artifacts | Tool authors, auditors |
 | [Datasets](datasets.md) | Dataset providers and pairing | CLI users |
 | [reports](reports.md) | v1 schema, telemetry, and HTML export | Operators, tool authors |
@@ -32,7 +32,7 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 3. [Datasets](datasets.md) — Provider configuration
 4. [Model Adapters](model-adapters.md) — Adapter selection
 5. [Knowledge & self-edit workflows](../user-guide/knowledge-and-self-edit-workflows.md) — External edit systems as BYOE subject generators
-6. [Model Family Catalog](model-family-catalog.md) — Support inventory and backlog
+6. [Model Family Catalog](model-family-catalog.md) — Support tiers and backlog
 7. [Public Contracts](contracts.md) — Machine-readable trust contracts
 
 ### Understanding reports
@@ -53,7 +53,7 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 1. [API Guide](api-guide.md) — Advanced/non-stable Python integration surface
 2. [Programmatic Quickstart](programmatic-quickstart.md) — Minimal examples
 3. [Architecture](architecture.md) — System layers and data flow
-4. [Model Family Catalog](model-family-catalog.md) — Support inventory and backlog
+4. [Model Family Catalog](model-family-catalog.md) — Support tiers and backlog
 5. [Public Contracts](contracts.md) — Evidence and policy contract surfaces
 6. [Observability](observability.md) — Monitoring infrastructure
 

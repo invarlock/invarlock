@@ -851,7 +851,7 @@
         "public_evidence/published_basis/qwen3_30b_a3b/runtime.manifest.json",
         "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack"
       ],
-      "notes": "Promoted as a recent Qwen3 MoE causal LM published basis with explicit hf_causal preset, public WikiText-103 release-profile report, runtime manifest, and signed evidence pack. The fixture uses BF16/low-CPU-memory loading, disabled optional Hugging Face loading-info collection, automatic device placement, and scoped attention/router/shared-expert guard scans. This is no-op preservation evidence; it is not a benchmark-quality, fine-tuning, deployment, exhaustive expert-bank, or MoE routing-quality claim. A restricted diagnostic lane failed and is intentionally not used as publication evidence.",
+      "notes": "Promoted as a recent Qwen3 MoE causal LM published basis with explicit hf_causal preset, public WikiText-103 release-profile report, runtime manifest, and signed evidence pack. The fixture uses BF16/low-CPU-memory loading, disabled optional Hugging Face loading-info collection, automatic device placement, and scoped attention/router/shared-expert guard scans. This is no-op preservation evidence; it is not a benchmark-quality, fine-tuning, deployment, exhaustive expert-bank, or MoE routing-quality claim.",
       "support_groups": [
         "moe_candidate",
         "large_model_candidate"
@@ -1218,7 +1218,7 @@
         "src/invarlock/adapters/hf_loading.py",
         "src/invarlock/adapters/auto.py"
       ],
-      "notes": "These families are available through shared GPT-style loader and profile paths rather than dedicated public support lanes. The catalog intentionally avoids naming the common OPT-1.3B hosted checkpoint because it is not Apache-2.0 or MIT licensed."
+      "notes": "These families are available through shared GPT-style loader and profile paths rather than dedicated public support lanes."
     },
     {
       "family_id": "falcon",
@@ -1251,7 +1251,7 @@
       "repo_evidence": [
         "src/invarlock/adapters/auto.py"
       ],
-      "notes": "Family visibility currently comes from adapter-auto heuristics only. The public catalog intentionally avoids naming hosted GLM chat checkpoints that fall outside the repo's Apache-2.0/MIT named-checkpoint policy."
+      "notes": "Family visibility currently comes from adapter-auto heuristics only."
     },
     {
       "family_id": "deepseek",
@@ -1306,7 +1306,7 @@
         "src/invarlock/adapters/auto.py",
         "docs/reference/model-adapters.md"
       ],
-      "notes": "Concrete loader families exist beyond the public FLAN-T5 base seq2seq basis; mBART/PEGASUS/Marian still need dedicated presets and public evidence before they become declared support lanes. The catalog intentionally avoids naming CC-BY-4.0-only hosted checkpoints because they are outside the repo's strict Apache-2.0/MIT named-checkpoint policy."
+      "notes": "Concrete loader families exist beyond the public FLAN-T5 base seq2seq basis; mBART/PEGASUS/Marian still need dedicated presets and public evidence before they become declared support lanes."
     }
   ],
   "usage_only": [
@@ -1548,7 +1548,7 @@
           "tests/core/test_model_profile_local_config.py"
         ],
         "missing_artifacts": [],
-        "notes": "The public Phi surface is intentionally held at the shipped Phi-4 text-only lane in this wave rather than widening to another family-specific lane."
+        "notes": "The public Phi surface remains the shipped Phi-4 text-only lane for this wave."
       },
       {
         "candidate_id": "falcon-7b-causal-lm",
@@ -1626,7 +1626,7 @@
           "docs/reference/model-adapters.md"
         ],
         "missing_artifacts": [],
-        "notes": "FLAN-T5 base now supplies the concrete public seq2seq basis; this broader mBART candidate remains intentionally out of scope until it has its own preset, calibration config, smoke evidence, and public run."
+        "notes": "FLAN-T5 base now supplies the concrete public seq2seq basis; this broader mBART candidate stays out of scope until it has its own preset, calibration config, smoke evidence, and public run."
       }
     ]
   },

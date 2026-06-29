@@ -323,8 +323,8 @@ baseline-relative spectral, RMT, and variance/VE evidence from clean
 confirmation reruns.
 Practical-pick families without tuned edit params or public evidence fixtures
 are tracked as `community_experimental` rows, even when a repo pilot preset and
-calibration config are already present. Access-gated vendor checkpoints are
-intentionally excluded from the included preset inventory.
+calibration config are already present. Access-gated vendor checkpoints are not
+included as repo-shipped presets.
 The Phi-4 public fixture is text-only and skips guard-overhead measurement by
 preset policy; strict release verification accepts that declared skip.
 The FLAN-T5 base public fixture uses pinned CNN/DailyMail validation data via
@@ -341,7 +341,7 @@ separate strict spectral-cap finding.
 `supported_experimental` means the repo ships the preset, calibration config,
 targeted tests, smoke/evidence path, and tuned edit-param coverage for the lane
 without claiming a published-basis fixture set. `community_experimental` rows
-are candidate inventory entries; some already have repo pilot presets and
+are candidate entries; some already have repo pilot presets and
 calibration configs, but still need the remaining promotion artifacts before
 they become release-supported lanes.
 
@@ -361,8 +361,7 @@ the canonical source of truth for normalized support tiers
 (`published_basis`, `supported_experimental`, `community_experimental`) and for
 published-basis evidence references. Model lifecycle decisions live in
 `contracts/model_classification.json`: that file records whether a lane or
-family is published, backlog, blocked, smoke-only, usage-only, or out of scope,
-and centralizes blocked named checkpoints for future license/access changes.
+family is published, backlog, blocked, smoke-only, usage-only, or out of scope.
 
 Model evidence automation lives in
 `scripts/model_evidence/model_evidence_sweep.py`, with tmux-based remote launch support in
@@ -399,8 +398,8 @@ materialization pattern through
 `configs/presets/multimodal/*_public_vqav2_256.yaml` and matching
 `configs/calibration/null_sweep_*.yaml` files.
 
-For the broader inventory of declared support, implemented-but-not-public
-coverage, usage-only checkpoint families, and recommended additions, see
+For declared support, implemented-but-not-public coverage, usage-only checkpoint
+families, and recommended additions, see
 [Model Family Catalog](reference/model-family-catalog.md).
 
 ---

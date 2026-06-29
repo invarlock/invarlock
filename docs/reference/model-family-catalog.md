@@ -24,9 +24,8 @@ The support matrix remains strict. In this catalog, `declared_support` is the
 complete public `published_basis` support set and follows the support-matrix
 lane order. `implemented_coverage` is reserved for code-level visibility that
 does not itself create a public support claim. The model classification
-contract records promotion decisions and blocker state, including the blocked
-named checkpoint list used by repo checks. Access-gated vendor checkpoints
-are intentionally kept out of included preset inventory.
+contract records promotion decisions and checkpoint status used by repo checks.
+Access-gated vendor checkpoints are not included as repo-shipped presets.
 
 Catalog notes use a compact format: evidence surface first, then scope caveats
 only when the public evidence lane needs them. Exact metrics, hardware details,
@@ -72,7 +71,7 @@ state the evidence scope and non-goals.
 | Gemma 4 26B-A4B MoE image-text LM | `published_basis` | `google/gemma-4-26B-A4B-it` | Promoted with release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.555 final accuracy over 400 examples, ratio_vs_baseline 1.009, and no guard warnings. This is no-op preservation/null-behavior evidence; audio, exhaustive expert-bank behavior, and MoE routing quality remain out of scope, and it is not guard-value proof. |
 | Gemma 4 31B image-text LM | `published_basis` | `google/gemma-4-31B-it` | Promoted with release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.610 final accuracy over 400 examples and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof. |
 | Mixtral 8x7B MoE causal LM | `published_basis` | `mistralai/Mixtral-8x7B-v0.1` | Promoted as a Mixtral MoE causal LM published basis with explicit hf_causal preset, release-profile public report, runtime manifest, and signed evidence pack. The preset keeps the full guard scan surface while using BF16, automatic device placement, low-CPU-memory loading, disabled optional HF loading-info collection, and a skipped optional guard-overhead check for large-model resource discipline. |
-| Qwen3 30B-A3B MoE causal LM | `published_basis` | `Qwen/Qwen3-30B-A3B-Instruct-2507` | Promoted as a recent Qwen3 MoE causal LM published basis with explicit hf_causal preset, public WikiText-103 release-profile report, runtime manifest, and signed evidence pack. The fixture uses BF16/low-CPU-memory loading, disabled optional Hugging Face loading-info collection, automatic device placement, and scoped attention/router/shared-expert guard scans. This is no-op preservation evidence; it is not a benchmark-quality, fine-tuning, deployment, exhaustive expert-bank, or MoE routing-quality claim. A restricted diagnostic lane failed and is intentionally not used as publication evidence. |
+| Qwen3 30B-A3B MoE causal LM | `published_basis` | `Qwen/Qwen3-30B-A3B-Instruct-2507` | Promoted as a recent Qwen3 MoE causal LM published basis with explicit hf_causal preset, public WikiText-103 release-profile report, runtime manifest, and signed evidence pack. The fixture uses BF16/low-CPU-memory loading, disabled optional Hugging Face loading-info collection, automatic device placement, and scoped attention/router/shared-expert guard scans. This is no-op preservation evidence; it is not a benchmark-quality, fine-tuning, deployment, exhaustive expert-bank, or MoE routing-quality claim. |
 | GPT-OSS 20B causal LM | `published_basis` | `openai/gpt-oss-20b` | Promoted with release-profile container-backed public WikiText-2 validation evidence for the pinned fixture. The no-op report passes strict policy with final perplexity 86.273 over 400 paired windows and no guard warnings. This is no-op preservation evidence; it is not a fine-tuning, benchmark-quality, deployment, safety, or alternate-seed/window robustness claim. |
 | OLMoE 1B-active/7B-total causal LM | `published_basis` | `allenai/OLMoE-1B-7B-0924` | Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack. This fixture is the smaller MoE validation basis; larger MoE assurance is covered by Mixtral, Qwen3 30B-A3B, and Gemma 4 26B-A4B published bases. Gemma 4 26B-A4B is image-text preservation/null-behavior evidence, not audio, exhaustive expert-bank, or MoE routing-quality evidence. |
 | Ministral 3 3B causal LM (text-only eval) | `published_basis` | `mistralai/Ministral-3-3B-Instruct-2512-BF16` | Promoted from support_matrix lane `ministral-3-3b-text-causal-hf` with container-backed public evidence. |
@@ -85,8 +84,8 @@ state the evidence scope and non-goals.
 ## Implemented Coverage
 
 These rows are implementation, adapter, profile, or loader coverage that exists
-outside declared public support lanes. They are intentionally not public support
-claims unless they later move into `declared_support` and `support_matrix.json`.
+outside declared public support lanes. They are not public support claims unless
+they later move into `declared_support` and `support_matrix.json`.
 
 | Family | Coverage state | Representative models | Notes |
 | --- | --- | --- | --- |
@@ -95,12 +94,12 @@ claims unless they later move into `declared_support` and `support_matrix.json`.
 | Yi | `profile_first_class` | `01-ai/Yi-34B` | Yi is treated as a RoPE decoder family in profile and adapter-auto logic. |
 | Phi family | `profile_first_class` | `microsoft/Phi-3-mini-4k-instruct`, `microsoft/Phi-4-reasoning-plus` | Phi-family selectors are first-class. Phi-4 now has a declared text-only lane via the reasoning-plus pilot, while multimodal Phi-4 remains backlog-only. |
 | Gemma family | `profile_first_class` | `google/gemma-4-E2B-it`, `google/gemma-4-E4B-it`, `google/gemma-4-12B-it`, `google/gemma-4-26B-A4B-it`, `google/gemma-4-31B-it` | Gemma-family selectors and loaders are first-class for compatible local or user-supplied checkpoints. Repo-declared published Gemma support includes Gemma 4 E2B text-only plus Gemma 4 E2B, E4B, 12B, 26B-A4B, and 31B image-text published-basis evidence. |
-| OPT / GPT-NeoX / GPT-J | `profile_shared_alias` | `EleutherAI/gpt-neox-20b` | These families are available through shared GPT-style loader and profile paths rather than dedicated public support lanes. The catalog intentionally avoids naming the common OPT-1.3B hosted checkpoint because it is not Apache-2.0 or MIT licensed. |
+| OPT / GPT-NeoX / GPT-J | `profile_shared_alias` | `EleutherAI/gpt-neox-20b` | These families are available through shared GPT-style loader and profile paths rather than dedicated public support lanes. |
 | Falcon | `profile_shared_alias` | `tiiuae/falcon-7b` | Falcon 7B now has a declared support lane; remaining Falcon-family coverage is available through adapter-auto heuristics and variant-path tests. |
-| GLM | `auto_or_loader_only` | `local-glm-compatible-checkpoint` | Family visibility currently comes from adapter-auto heuristics only. The public catalog intentionally avoids naming hosted GLM chat checkpoints that fall outside the repo's Apache-2.0/MIT named-checkpoint policy. |
+| GLM | `auto_or_loader_only` | `local-glm-compatible-checkpoint` | Family visibility currently comes from adapter-auto heuristics only. |
 | DeepSeek | `profile_first_class` | `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` | DeepSeek distill checkpoints continue to share the qwen-family route. Oversized FP8 checkpoint-specific repo hooks and shipped configs were removed after bring-up showed that they do not fit the supported hardware/runtime path. |
 | Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA) | `auto_or_loader_only` | `distilbert-base-uncased`, `microsoft/deberta-v3-base` | Loader and adapter-auto support exceeds the public BERT / RoBERTa support lane. |
-| Broader seq2seq families (mBART/PEGASUS/Marian) | `auto_or_loader_only` | `facebook/mbart-large-50` | Concrete loader families exist beyond the public FLAN-T5 base seq2seq basis; mBART/PEGASUS/Marian still need dedicated presets and public evidence before they become declared support lanes. The catalog intentionally avoids naming CC-BY-4.0-only hosted checkpoints because they are outside the repo's strict Apache-2.0/MIT named-checkpoint policy. |
+| Broader seq2seq families (mBART/PEGASUS/Marian) | `auto_or_loader_only` | `facebook/mbart-large-50` | Concrete loader families exist beyond the public FLAN-T5 base seq2seq basis; mBART/PEGASUS/Marian still need dedicated presets and public evidence before they become declared support lanes. |
 
 ## Usage Only
 
@@ -130,10 +129,10 @@ decision codes live under `promotion_candidates_text_le_14b` in
 | DeepSeek-R1-Distill-Qwen causal LM | `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` | `promoted_published_basis` | `published_basis` | Promoted with container-backed DeepSeek-R1-Distill-Qwen 7B public report, runtime manifest, and signed evidence pack. |
 | Phi-4 reasoning-plus causal LM | `microsoft/Phi-4-reasoning-plus` | `promoted_published_basis` | `published_basis` | Promoted with container-backed Phi-4 reasoning-plus public report, runtime manifest, and signed evidence pack. This fixture is text-only and skips guard-overhead measurement by preset policy. |
 | OpenLLaMA 7B causal LM | `openlm-research/open_llama_7b` | `promoted_published_basis` | `published_basis` | Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack. |
-| Phi-3 Mini 4K Instruct causal LM | `microsoft/Phi-3-mini-4k-instruct` | `explicitly_out_of_scope` | `implemented_coverage` | The public Phi surface is intentionally held at the shipped Phi-4 text-only lane in this wave rather than widening to another family-specific lane. |
+| Phi-3 Mini 4K Instruct causal LM | `microsoft/Phi-3-mini-4k-instruct` | `explicitly_out_of_scope` | `implemented_coverage` | The public Phi surface remains the shipped Phi-4 text-only lane for this wave. |
 | Falcon 7B causal LM | `tiiuae/falcon-7b` | `promoted_published_basis` | `published_basis` | Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack. |
 | Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA) | `distilbert-base-uncased` | `blocked_missing_artifacts` | `implemented_coverage` | Loader and adapter tests exist for representative DistilBERT and DeBERTa checkpoints, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
-| mBART large 50 seq2seq | `facebook/mbart-large-50` | `explicitly_out_of_scope` | `implemented_coverage` | FLAN-T5 base now supplies the concrete public seq2seq basis; this broader mBART candidate remains intentionally out of scope until it has its own preset, calibration config, smoke evidence, and public run. |
+| mBART large 50 seq2seq | `facebook/mbart-large-50` | `explicitly_out_of_scope` | `implemented_coverage` | FLAN-T5 base now supplies the concrete public seq2seq basis; this broader mBART candidate stays out of scope until it has its own preset, calibration config, smoke evidence, and public run. |
 
 The machine-readable criterion-by-criterion ledger for this candidate set lives
 under `promotion_candidates_text_le_14b` in
