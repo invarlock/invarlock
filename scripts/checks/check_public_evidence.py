@@ -57,6 +57,9 @@ LARGER_MODEL_SMOKE_HASH_SCHEMA = (
 LARGER_MODEL_QUEUE_DRAIN_FINDINGS_SCHEMA = (
     "invarlock.larger_model_queue_drain_findings.summary.v1"
 )
+LARGER_MODEL_QUEUE_DRAIN_ADDENDUM_SCHEMA = (
+    "invarlock.larger_model_queue_drain_findings.late_clean_addendum.v1"
+)
 LARGER_MODEL_QUEUE_DRAIN_HASH_SCHEMA = (
     "invarlock.larger_model_queue_drain_findings.hash_inventory.v1"
 )
@@ -1138,6 +1141,7 @@ def _check_larger_model_queue_drain_findings(
     artifact_paths: dict[str, Any],
 ) -> None:
     summary_path = _require_path(errors, base, artifact_paths, "findings_summary")
+    addendum_path = _require_path(errors, base, artifact_paths, "late_clean_addendum")
     inventory_path = _require_path(errors, base, artifact_paths, "hash_inventory")
     if inventory_path is not None:
         _check_larger_model_smoke_hash_inventory(
@@ -1148,6 +1152,8 @@ def _check_larger_model_queue_drain_findings(
         )
     if summary_path is None:
         return
+    if addendum_path is not None:
+        _check_larger_model_queue_drain_addendum(errors, addendum_path)
     summary, error = _load_json(summary_path)
     if error:
         errors.append(error)
@@ -1337,6 +1343,171 @@ def _check_larger_model_queue_drain_findings(
     for key, expected in expected_counts.items():
         if counts.get(key) != expected:
             errors.append(f"{_relative(summary_path)}: counts.{key} must be {expected}")
+
+
+def _check_larger_model_queue_drain_addendum(
+    errors: list[str],
+    addendum_path: Path,
+) -> None:
+    addendum, error = _load_json(addendum_path)
+    if error:
+        errors.append(error)
+        return
+    assert addendum is not None
+    if addendum.get("schema") != LARGER_MODEL_QUEUE_DRAIN_ADDENDUM_SCHEMA:
+        errors.append(
+            f"{_relative(addendum_path)}: schema must be "
+            f"{LARGER_MODEL_QUEUE_DRAIN_ADDENDUM_SCHEMA}"
+        )
+    if addendum.get("status") != "completed":
+        errors.append(f"{_relative(addendum_path)}: status must be completed")
+    if addendum.get("validation_environment") != "CUDA-capable validation host":
+        errors.append(
+            f"{_relative(addendum_path)}: validation_environment must be generic"
+        )
+    if addendum.get("raw_logs_published") is not False:
+        errors.append(f"{_relative(addendum_path)}: raw_logs_published must be false")
+    if addendum.get("weights_vendored") is not False:
+        errors.append(f"{_relative(addendum_path)}: weights_vendored must be false")
+    if addendum.get("support_matrix_change_claimed") is not False:
+        errors.append(
+            f"{_relative(addendum_path)}: support_matrix_change_claimed must be false"
+        )
+    if addendum.get("model_quality_claimed") is not False:
+        errors.append(
+            f"{_relative(addendum_path)}: model_quality_claimed must be false"
+        )
+    if addendum.get("source_window") != "post_pr_109_late_clean_addendum":
+        errors.append(f"{_relative(addendum_path)}: source_window invalid")
+    if addendum.get("execution_mode") != "container":
+        errors.append(f"{_relative(addendum_path)}: execution_mode must be container")
+
+    counts = addendum.get("counts")
+    if not isinstance(counts, dict):
+        errors.append(f"{_relative(addendum_path)}: counts must be object")
+        counts = {}
+
+    clean_lanes = addendum.get("late_clean_lanes")
+    if not isinstance(clean_lanes, list) or not clean_lanes:
+        errors.append(f"{_relative(addendum_path)}: late_clean_lanes must be non-empty")
+        clean_lanes = []
+
+    seen_clean: set[str] = set()
+    for index, lane in enumerate(clean_lanes):
+        if not isinstance(lane, dict):
+            errors.append(
+                f"{_relative(addendum_path)}: late_clean_lanes[{index}] must be object"
+            )
+            continue
+        slug = lane.get("slug")
+        if not isinstance(slug, str) or not slug:
+            errors.append(
+                f"{_relative(addendum_path)}: late_clean_lanes[{index}].slug required"
+            )
+        elif slug in seen_clean:
+            errors.append(f"{_relative(addendum_path)}: duplicate clean lane {slug!r}")
+        else:
+            seen_clean.add(slug)
+        model_id = lane.get("model_id")
+        if not isinstance(model_id, str) or not model_id:
+            errors.append(
+                f"{_relative(addendum_path)}: late_clean_lanes[{index}].model_id "
+                "required"
+            )
+        preset = lane.get("preset")
+        if (
+            not isinstance(preset, str)
+            or preset.startswith("/")
+            or not (REPO_ROOT / preset).is_file()
+        ):
+            errors.append(
+                f"{_relative(addendum_path)}: late_clean_lanes[{index}].preset invalid"
+            )
+        if lane.get("suite") != "model-catalog-gpu":
+            errors.append(
+                f"{_relative(addendum_path)}: late_clean_lanes[{index}].suite invalid"
+            )
+        if lane.get("rc") != 0:
+            errors.append(f"{_relative(addendum_path)}: {slug} rc must be zero")
+        if lane.get("evaluate_exit") != 0 or lane.get("verify_exit") != 0:
+            errors.append(
+                f"{_relative(addendum_path)}: {slug} evaluate/verify exits must be zero"
+            )
+        if lane.get("report_materialized") is not True:
+            errors.append(f"{_relative(addendum_path)}: {slug} report must materialize")
+        if lane.get("verify_materialized") is not True:
+            errors.append(f"{_relative(addendum_path)}: {slug} verify must materialize")
+        if lane.get("status") != "ok":
+            errors.append(f"{_relative(addendum_path)}: {slug} status must be ok")
+
+    rerun_classifications = addendum.get("rerun_classifications")
+    if not isinstance(rerun_classifications, list):
+        errors.append(
+            f"{_relative(addendum_path)}: rerun_classifications must be a list"
+        )
+        rerun_classifications = []
+    for index, classification in enumerate(rerun_classifications):
+        if not isinstance(classification, dict):
+            errors.append(
+                f"{_relative(addendum_path)}: rerun_classifications[{index}] "
+                "must be object"
+            )
+            continue
+        slug = classification.get("slug")
+        if slug not in seen_clean:
+            errors.append(
+                f"{_relative(addendum_path)}: rerun_classifications[{index}].slug "
+                "must reference a clean lane"
+            )
+        if classification.get("previous_classification") not in (
+            QUEUE_DRAIN_FAILURE_CLASSIFICATIONS
+        ):
+            errors.append(
+                f"{_relative(addendum_path)}: rerun_classifications[{index}] "
+                "previous_classification invalid"
+            )
+        if classification.get("later_clean_run_observed") is not True:
+            errors.append(
+                f"{_relative(addendum_path)}: rerun_classifications[{index}] "
+                "must observe a later clean run"
+            )
+
+    excluded_lanes = addendum.get("excluded_lanes")
+    if not isinstance(excluded_lanes, list):
+        errors.append(f"{_relative(addendum_path)}: excluded_lanes must be a list")
+        excluded_lanes = []
+    for index, lane in enumerate(excluded_lanes):
+        if not isinstance(lane, dict):
+            errors.append(
+                f"{_relative(addendum_path)}: excluded_lanes[{index}] must be object"
+            )
+            continue
+        slug = lane.get("slug")
+        model_id = lane.get("model_id")
+        reason = lane.get("reason")
+        if not isinstance(slug, str) or not slug:
+            errors.append(
+                f"{_relative(addendum_path)}: excluded_lanes[{index}].slug required"
+            )
+        if not isinstance(model_id, str) or not model_id:
+            errors.append(
+                f"{_relative(addendum_path)}: excluded_lanes[{index}].model_id required"
+            )
+        if not isinstance(reason, str) or not reason:
+            errors.append(
+                f"{_relative(addendum_path)}: excluded_lanes[{index}].reason required"
+            )
+
+    expected_counts = {
+        "late_clean_lanes": len(seen_clean),
+        "rerun_clean_resolutions": len(rerun_classifications),
+        "excluded_lanes": len(excluded_lanes),
+    }
+    for key, expected in expected_counts.items():
+        if counts.get(key) != expected:
+            errors.append(
+                f"{_relative(addendum_path)}: counts.{key} must be {expected}"
+            )
 
 
 def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:

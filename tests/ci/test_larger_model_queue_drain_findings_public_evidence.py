@@ -122,6 +122,7 @@ def test_larger_model_queue_drain_hash_inventory_matches_public_files() -> None:
     assert set(by_path) == {
         "README.md",
         "findings_summary.json",
+        "late_clean_addendum.json",
         "evidence.meta.json",
     }
     for rel_path, artifact in by_path.items():
@@ -138,6 +139,76 @@ def test_larger_model_queue_drain_metadata_declares_summary_only_findings() -> N
     assert metadata["evidence_class"] == "larger_model_queue_drain_findings"
     assert metadata["artifact_paths"] == {
         "findings_summary": "findings_summary.json",
+        "late_clean_addendum": "late_clean_addendum.json",
         "hash_inventory": "hash_inventory.json",
     }
     assert "invarlock evaluate" not in str(metadata["generated_by"])
+
+
+def test_larger_model_queue_drain_late_clean_addendum_is_public_safe() -> None:
+    addendum = _load_json(EVIDENCE_DIR / "late_clean_addendum.json")
+
+    assert (
+        addendum["schema"]
+        == "invarlock.larger_model_queue_drain_findings.late_clean_addendum.v1"
+    )
+    assert addendum["status"] == "completed"
+    assert addendum["validation_environment"] == "CUDA-capable validation host"
+    assert addendum["raw_logs_published"] is False
+    assert addendum["weights_vendored"] is False
+    assert addendum["support_matrix_change_claimed"] is False
+    assert addendum["model_quality_claimed"] is False
+    assert addendum["source_window"] == "post_pr_109_late_clean_addendum"
+    assert addendum["execution_mode"] == "container"
+
+    clean_lanes = addendum["late_clean_lanes"]
+    assert isinstance(clean_lanes, list)
+    assert {lane["slug"] for lane in clean_lanes if isinstance(lane, dict)} == {
+        "google_gemma_4_26b_a4b_it",
+        "mistralai_mixtral_8x7b_v0_1",
+        "qwen_qwen3_30b_a3b_instruct_2507",
+    }
+    assert addendum["counts"] == {
+        "late_clean_lanes": len(clean_lanes),
+        "rerun_clean_resolutions": 1,
+        "excluded_lanes": 1,
+    }
+    for lane in clean_lanes:
+        assert isinstance(lane, dict)
+        assert lane["suite"] == "model-catalog-gpu"
+        assert lane["rc"] == 0
+        assert lane["evaluate_exit"] == 0
+        assert lane["verify_exit"] == 0
+        assert lane["report_materialized"] is True
+        assert lane["verify_materialized"] is True
+        assert lane["status"] == "ok"
+        assert (REPO_ROOT / str(lane["preset"])).is_file()
+
+    rerun_classifications = addendum["rerun_classifications"]
+    assert rerun_classifications == [
+        {
+            "slug": "qwen_qwen3_30b_a3b_instruct_2507",
+            "previous_classification": "pre_verification_evaluate_failure",
+            "later_clean_run_observed": True,
+            "public_note": (
+                "A later rerun completed cleanly with evaluation and strict "
+                "verification exit 0."
+            ),
+        }
+    ]
+
+    excluded_lanes = addendum["excluded_lanes"]
+    assert excluded_lanes == [
+        {
+            "slug": "qwen_qwen2_5_32b",
+            "model_id": "Qwen/Qwen2.5-32B",
+            "reason": (
+                "Held out because the late run used a generic preset rather "
+                "than a model-specific repo preset at packaging time."
+            ),
+        }
+    ]
+
+    serialized = json.dumps(addendum, sort_keys=True)
+    for pattern in PRIVATE_TEXT_PATTERNS:
+        assert pattern not in serialized
