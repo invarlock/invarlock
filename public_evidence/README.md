@@ -62,6 +62,7 @@ clean confirmation reruns.
 | `evidence_pack_queue_stress_resume` | Summary-only queue stress/resume validation for evidence-pack task lifecycle, retry, dependency, and orphan-recovery behavior. |
 | `fa2_fallback_compatibility` | Summary-only compatibility evidence for eager-attention fallback when Flash Attention 2 is unavailable or install/import is not clean. |
 | `larger_model_smoke_findings` | Summary-only findings evidence for bounded larger-model CUDA/container smoke outcomes and pre-verification failures. |
+| `larger_model_queue_drain_findings` | Summary-only findings evidence for post-cutoff larger-model CUDA/container queue-drain outcomes and clean reruns. |
 
 Every artifact directory that carries public evidence must include an
 `evidence.meta.json` file. The metadata declares the evidence class, lists the
