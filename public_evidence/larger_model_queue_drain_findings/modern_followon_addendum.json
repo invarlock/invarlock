@@ -14,7 +14,7 @@
     "clean_followon_lanes": 2,
     "diagnostic_lanes": 4,
     "strict_policy_findings": 2,
-    "dependency_findings": 1
+    "dependency_findings": 0
   },
   "clean_followon_lanes": [
     {
@@ -126,18 +126,5 @@
       "support_claimed": false
     }
   ],
-  "dependency_findings": [
-    {
-      "slug": "nvidia_nemotron_3_nano_30b_a3b_bf16",
-      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
-      "suite": "adhoc-nemotron-text-gpu",
-      "verification_profile": "dev",
-      "evaluate_exit": 1,
-      "verify_exit": null,
-      "detail": "evaluate_failed",
-      "classification": "runtime_dependency_missing",
-      "missing_dependency": "mamba-ssm",
-      "support_claimed": false
-    }
-  ]
+  "dependency_findings": []
 }

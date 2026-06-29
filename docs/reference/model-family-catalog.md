@@ -89,7 +89,7 @@ contracts.
 | Phi family | `profile_first_class` | `microsoft/Phi-3-mini-4k-instruct`, `microsoft/Phi-4-reasoning-plus` | Dedicated Phi-family selectors exist; declared Phi support remains text-only. |
 | Gemma family | `profile_first_class` | `google/gemma-4-E2B-it`, `google/gemma-4-E4B-it`, `google/gemma-4-12B-it`, `google/gemma-4-26B-A4B-it`, `google/gemma-4-31B-it` | Gemma-family selectors and loaders are first-class for compatible local or user-supplied checkpoints. |
 | OPT / GPT-NeoX / GPT-J | `profile_shared_alias` | `EleutherAI/gpt-neox-20b` | Available through shared GPT-style paths; named support inventory stays limited by repo license policy. |
-| GPT-OSS | `profile_first_class` | `openai/gpt-oss-20b` | Dedicated profile selectors and HF causal decoder spec now cover the open-weight checkpoint directly. |
+| GPT-OSS | `published_basis` | `openai/gpt-oss-20b` | Public release-profile text fixture is included on WikiText-2 validation; the scope is pinned no-op preservation evidence. |
 | Falcon | `profile_shared_alias` | `tiiuae/falcon-7b` | Falcon-family coverage is available through shared paths; Falcon 7B has a declared support lane. |
 | GLM | `auto_or_loader_only` | `local-glm-compatible-checkpoint` | Visible through adapter-auto heuristics; named support inventory stays limited by repo license policy. |
 | DeepSeek | `profile_first_class` | `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` | DeepSeek distill checkpoints share the qwen-family route; declared DeepSeek support remains listed above. |

@@ -224,6 +224,7 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
         "microsoft_phi_4_mini_instruct",
         "google_flan_t5_base",
         "qwen_qwen3_30b_a3b_instruct_2507",
+        "openai_gpt_oss_20b",
         "mistralai_mixtral_8x7b_v0_1",
         "allenai_olmoe_1b_7b_0924",
         "google_gemma_4_26b_a4b_it",
@@ -235,6 +236,7 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
     assert adapters["google_gemma_4_e2b_it_image_text"] == "hf_multimodal"
     assert adapters["google_flan_t5_base"] == "hf_seq2seq"
     assert adapters["qwen_qwen3_30b_a3b_instruct_2507"] == "hf_causal"
+    assert adapters["openai_gpt_oss_20b"] == "hf_causal"
     assert adapters["mistralai_mixtral_8x7b_v0_1"] == "hf_causal"
     assert adapters["allenai_olmoe_1b_7b_0924"] == "hf_causal"
     assert adapters["google_gemma_4_26b_a4b_it"] == "hf_multimodal"
@@ -255,6 +257,12 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
             assert lane.verify_profile == "release"
             assert lane.preset_relpath == (
                 "configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml"
+            )
+        elif lane.slug == "openai_gpt_oss_20b":
+            assert lane.adapter == "hf_causal"
+            assert lane.verify_profile == "release"
+            assert lane.preset_relpath == (
+                "configs/presets/causal_lm/gpt_oss_20b_512.yaml"
             )
         elif lane.slug == "mistralai_mixtral_8x7b_v0_1":
             assert lane.adapter == "hf_causal"

@@ -561,10 +561,17 @@
     },
     {
       "id": "gpt-oss-family",
-      "classification": "catalog_only",
+      "classification": "published",
       "eligibility": "eligible",
+      "support_matrix_lane_id": "gpt-oss-20b-causal-hf",
       "catalog_family_ids": [
         "gpt-oss"
+      ],
+      "sweep_lane_ids": [
+        "gpt-oss-20b-causal-hf"
+      ],
+      "suite_roles": [
+        "support-matrix-backlog-gpu"
       ]
     },
     {

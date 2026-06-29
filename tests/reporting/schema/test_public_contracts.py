@@ -95,6 +95,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "olmoe-1b-7b-0924-causal-hf",
         "mixtral-8x7b-moe-causal-hf",
         "qwen3-30b-a3b-moe-causal-hf",
+        "gpt-oss-20b-causal-hf",
         "open-llama-7b-causal-hf",
         "falcon-7b-causal-hf",
         "qwen2-7b-causal-hf",
@@ -202,7 +203,6 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         for evidence in qwen36_27b["repo_evidence"]
     )
     assert "Linear-attention module coverage remains" in qwen36_27b["notes"]
-
     usage_only = {item["display_name"] for item in family_catalog["usage_only"]}
     assert "QwQ 32B reasoning" not in usage_only
     assert "Qwen2.5 7B" not in usage_only

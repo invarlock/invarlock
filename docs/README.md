@@ -281,6 +281,7 @@ Notes
 | OLMoE 1B-active/7B-total causal LM | Yes | Yes | Yes | Yes |
 | Mixtral 8x7B MoE causal LM | Yes | Yes | Yes | Yes |
 | Qwen3 30B-A3B MoE causal LM | Yes | Yes | Yes | Yes |
+| GPT-OSS 20B causal LM | Yes | Yes | Yes | Yes |
 
 ### Seq2Seq Published Evidence
 
@@ -299,7 +300,7 @@ DeepSeek-R1-Distill-Qwen 14B, Phi-4 text-only, Qwen3.5 4B image-text,
 scoped Qwen3.5 27B image-text, scoped Qwen3.6 27B image-text,
 Gemma 4 12B image-text, Gemma 4 26B-A4B image-text MoE, Gemma 4 31B
 image-text, OLMoE 1B-active/7B-total MoE, Mixtral 8x7B MoE,
-Qwen3 30B-A3B MoE, and FLAN-T5 base
+Qwen3 30B-A3B MoE, GPT-OSS 20B, and FLAN-T5 base
 seq2seq profiles.
 Repo-included presets and pilot calibration configs for prepared practical-pick
 lanes do not become part of the published assurance basis until supporting

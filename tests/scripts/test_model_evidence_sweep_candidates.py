@@ -58,6 +58,7 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
         "microsoft_phi_4_mini_instruct",
         "google_flan_t5_base",
         "qwen_qwen3_30b_a3b_instruct_2507",
+        "openai_gpt_oss_20b",
         "mistralai_mixtral_8x7b_v0_1",
         "allenai_olmoe_1b_7b_0924",
         "google_gemma_4_26b_a4b_it",

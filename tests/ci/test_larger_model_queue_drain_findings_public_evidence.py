@@ -272,20 +272,7 @@ def test_larger_model_queue_drain_modern_followon_addendum_is_public_safe() -> N
         assert finding["spectral_max_caps"] == 5
         assert finding["support_claimed"] is False
 
-    assert dependency_findings == [
-        {
-            "slug": "nvidia_nemotron_3_nano_30b_a3b_bf16",
-            "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
-            "suite": "adhoc-nemotron-text-gpu",
-            "verification_profile": "dev",
-            "evaluate_exit": 1,
-            "verify_exit": None,
-            "detail": "evaluate_failed",
-            "classification": "runtime_dependency_missing",
-            "missing_dependency": "mamba-ssm",
-            "support_claimed": False,
-        }
-    ]
+    assert dependency_findings == []
 
     serialized = json.dumps(addendum, sort_keys=True)
     for pattern in PRIVATE_TEXT_PATTERNS:

@@ -724,6 +724,30 @@
       "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window no-op preservation evidence. This is a large MoE preservation basis using scoped attention/router/shared-expert guard scans under all-8 80GB-GPU sharding; it is not a benchmark-quality, fine-tuning, deployment, exhaustive expert-bank, or MoE routing-quality claim."
     },
     {
+      "lane_id": "gpt-oss-20b-causal-hf",
+      "family": "GPT-OSS 20B causal LM",
+      "runtime": "huggingface-pytorch",
+      "adapter": "hf_causal",
+      "support_tier": "published_basis",
+      "evidence_status": "published_release_strict",
+      "docs_label": "Yes",
+      "provenance_source": "docs/README.md#support-matrix",
+      "support_groups": [
+        "published_modern",
+        "large_model_candidate"
+      ],
+      "representative_models": [
+        "openai/gpt-oss-20b"
+      ],
+      "evidence": {
+        "evaluation_report_fixture": "public_evidence/published_basis/gpt_oss_20b/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/gpt_oss_20b/runtime.manifest.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/gpt_oss_20b/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/gpt_oss_20b/evidence_pack"
+      },
+      "notes": "Promoted with release-profile container-backed public WikiText-2 validation evidence for the pinned fixture. The no-op report passes strict policy with final perplexity 86.273 over 400 paired windows and no guard warnings. This is no-op preservation evidence; it is not a fine-tuning, benchmark-quality, deployment, safety, or alternate-seed/window robustness claim."
+    },
+    {
       "lane_id": "olmoe-1b-7b-0924-causal-hf",
       "family": "OLMoE 1B-active/7B-total causal LM",
       "runtime": "huggingface-pytorch",

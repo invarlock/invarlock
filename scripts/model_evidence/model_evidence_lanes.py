@@ -540,6 +540,15 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
         verify_profile="release",
     ),
     EvidenceLane(
+        slug="openai_gpt_oss_20b",
+        lane_id="gpt-oss-20b-causal-hf",
+        family="GPT-OSS 20B causal LM",
+        model_id="openai/gpt-oss-20b",
+        preset_relpath="configs/presets/causal_lm/gpt_oss_20b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="release",
+    ),
+    EvidenceLane(
         slug="mistralai_mixtral_8x7b_v0_1",
         lane_id="mixtral-8x7b-moe-causal-hf",
         family="Mixtral 8x7B MoE causal LM",

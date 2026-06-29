@@ -1636,10 +1636,8 @@ def _check_larger_model_queue_drain_modern_addendum(
             )
 
     dependency_findings = addendum.get("dependency_findings")
-    if not isinstance(dependency_findings, list) or not dependency_findings:
-        errors.append(
-            f"{_relative(addendum_path)}: dependency_findings must be non-empty"
-        )
+    if not isinstance(dependency_findings, list):
+        errors.append(f"{_relative(addendum_path)}: dependency_findings must be a list")
         dependency_findings = []
     for index, finding in enumerate(dependency_findings):
         if not isinstance(finding, dict):

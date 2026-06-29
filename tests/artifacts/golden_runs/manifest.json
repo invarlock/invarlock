@@ -12,6 +12,7 @@
     "olmoe_1b_7b",
     "mixtral_8x7b",
     "qwen3_30b_a3b",
+    "gpt_oss_20b",
     "open_llama_7b",
     "falcon_7b",
     "qwen2_7b",
@@ -101,6 +102,12 @@
       "model_id": "Qwen/Qwen3-30B-A3B-Instruct-2507",
       "primary_metric_kind": "ppl_causal",
       "report": "public_evidence/published_basis/qwen3_30b_a3b/evaluation.report.json"
+    },
+    {
+      "id": "gpt_oss_20b",
+      "model_id": "openai/gpt-oss-20b",
+      "primary_metric_kind": "ppl_causal",
+      "report": "public_evidence/published_basis/gpt_oss_20b/evaluation.report.json"
     },
     {
       "id": "open_llama_7b",

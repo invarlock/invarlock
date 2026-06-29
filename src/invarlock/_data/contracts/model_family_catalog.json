@@ -1184,16 +1184,31 @@
         "text"
       ],
       "task_role": "causal_lm",
-      "state": "profile_shared_alias",
+      "state": "published_basis",
+      "support_groups": [
+        "published_modern",
+        "large_model_candidate"
+      ],
       "representative_models": [
         "openai/gpt-oss-20b"
       ],
       "repo_evidence": [
+        "contracts/support_matrix.json",
         "src/invarlock/model_profile.py",
+        "src/invarlock/model_profile_selectors.py",
         "src/invarlock/adapters/hf_loading.py",
-        "src/invarlock/adapters/auto.py"
+        "src/invarlock/adapters/auto.py",
+        "configs/presets/causal_lm/gpt_oss_20b_512.yaml",
+        "configs/calibration/null_sweep_gpt_oss_20b.yaml",
+        "public_evidence/published_basis/gpt_oss_20b/evaluation.report.json",
+        "public_evidence/published_basis/gpt_oss_20b/runtime.manifest.json",
+        "public_evidence/published_basis/gpt_oss_20b/evidence_pack",
+        "scripts/model_evidence/model_evidence_sweep.py",
+        "tests/core/test_model_profiles.py",
+        "tests/cli/test_preset_causal_presets.py",
+        "tests/scripts/test_model_evidence_sweep_catalog.py"
       ],
-      "notes": "GPT-OSS rides the shared GPT-style profile path, with an explicit HF causal loader hint for the published open-weight checkpoint."
+      "notes": "Promoted with release-profile container-backed public WikiText-2 validation evidence for the pinned fixture. The no-op report passes strict policy with final perplexity 86.273 over 400 paired windows and no guard warnings. This is no-op preservation evidence; it is not a fine-tuning, benchmark-quality, deployment, safety, or alternate-seed/window robustness claim."
     },
     {
       "family_id": "falcon",
