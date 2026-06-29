@@ -1,0 +1,24 @@
+{
+  "artifact_paths": {
+    "evaluation_report": "evaluation.report.json",
+    "evidence_pack": "evidence_pack",
+    "evidence_pack_recipe": "evidence_pack_recipe.json",
+    "evidence_run_preset": "evidence_run_preset.yaml",
+    "runtime_manifest": "runtime.manifest.json"
+  },
+  "evidence_class": "strict_pass_fixture",
+  "expected_fingerprint": "sha256:e6d0ecaa098b6a05f45d893fa8f9366b75b69caaf124679e889809330054810d",
+  "generated_by": "model evidence sweep",
+  "model_revision": "3548789868c5356dbf307c98e6f609007b82b3eb",
+  "non_goals": [
+    "Model weights and source dataset are external Hugging Face references.",
+    "This fixture is a no-op preservation/null-behavior basis, not a fine-tuning, benchmark-quality, deployment, or guard-value claim.",
+    "The run validates image-text VQA preservation only; audio and broader any-to-any behavior remain out of scope."
+  ],
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "Release-strict verifier fixture for the Gemma 4 31B image-text published-basis lane. Final accuracy 0.610 over 400 examples; no guard warnings.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/published_basis/gemma4_31b/evaluation.report.json --profile release --assurance strict",
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/gemma4_31b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:e6d0ecaa098b6a05f45d893fa8f9366b75b69caaf124679e889809330054810d"
+  ]
+}

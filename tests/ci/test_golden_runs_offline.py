@@ -103,6 +103,9 @@ def test_offline_golden_runs_public_fixtures() -> None:
         "ministral3_3b",
         "smollm3_3b",
         "phi4_mini",
+        "qwen3_5_27b_scoped",
+        "qwen3_6_27b_scoped",
+        "gemma4_31b",
         "flan_t5_base",
     ]
 

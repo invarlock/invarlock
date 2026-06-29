@@ -1,6 +1,6 @@
 {
   "format_version": "model-classification-v1",
-  "as_of": "2026-06-14",
+  "as_of": "2026-06-29",
   "policy": {
     "named_checkpoint_license_policy": "strict_apache_2_or_mit",
     "allowed_named_checkpoint_license_ids": [
@@ -333,12 +333,48 @@
       ]
     },
     {
+      "id": "qwen3-6-27b-image-text-scoped-hf",
+      "classification": "published",
+      "eligibility": "eligible",
+      "support_matrix_lane_id": "qwen3-6-27b-image-text-scoped-hf",
+      "catalog_family_ids": [
+        "qwen-3-6-27b-image-text-scoped-lm"
+      ],
+      "suite_roles": [
+        "support-matrix-backlog-gpu"
+      ]
+    },
+    {
+      "id": "qwen3-5-27b-image-text-scoped-hf",
+      "classification": "published",
+      "eligibility": "eligible",
+      "support_matrix_lane_id": "qwen3-5-27b-image-text-scoped-hf",
+      "catalog_family_ids": [
+        "qwen-3-5-27b-image-text-scoped-lm"
+      ],
+      "suite_roles": [
+        "support-matrix-backlog-gpu"
+      ]
+    },
+    {
       "id": "gemma4-26b-a4b-moe-image-text-hf",
       "classification": "published",
       "eligibility": "eligible",
       "support_matrix_lane_id": "gemma4-26b-a4b-moe-image-text-hf",
       "catalog_family_ids": [
         "gemma-4-26b-a4b-moe-image-text-lm"
+      ],
+      "suite_roles": [
+        "support-matrix-backlog-gpu"
+      ]
+    },
+    {
+      "id": "gemma4-31b-image-text-hf",
+      "classification": "published",
+      "eligibility": "eligible",
+      "support_matrix_lane_id": "gemma4-31b-image-text-hf",
+      "catalog_family_ids": [
+        "gemma-4-31b-image-text-lm"
       ],
       "suite_roles": [
         "support-matrix-backlog-gpu"

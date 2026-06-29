@@ -1,0 +1,13 @@
+{
+  "device": "cuda",
+  "execution_mode": "container",
+  "gpu": "NVIDIA H200 141GB HBM3e",
+  "gpu_id": "0",
+  "host": "<cuda-validation-host>",
+  "model_revision": "fc05daec18b0a78c049392ed2e771dde82bdf654",
+  "profile": "release",
+  "runtime_image": "ghcr.io/invarlock/invarlock-runtime:latest@sha256:40b08c74a3ef0defe433f3dc8f4b0b6d5ad586d45ebc04c7f833f3dbf75caf44",
+  "runtime_image_digest": "sha256:40b08c74a3ef0defe433f3dc8f4b0b6d5ad586d45ebc04c7f833f3dbf75caf44",
+  "scope": "self-attention and MLP guard scans; linear-attention modules excluded",
+  "stamp": "20260629Tqwen35_27b_scoped_release"
+}

@@ -77,14 +77,17 @@ contracts.
 
 | Family | Coverage state | Representative models | Notes |
 | --- | --- | --- | --- |
+| Qwen3.5 27B image-text LM (scoped) | `published_basis` | `Qwen/Qwen3.5-27B` | Public release-profile image-text fixture is included on pinned VQAv2 with scoped self-attention and MLP guard scans; linear-attention module coverage remains a separate finding. |
+| Qwen3.6 27B image-text LM (scoped) | `published_basis` | `Qwen/Qwen3.6-27B` | Public release-profile image-text fixture is included on pinned VQAv2 with scoped self-attention and MLP guard scans; linear-attention module coverage remains a separate finding. |
 | Qwen3 30B-A3B MoE causal LM | `published_basis` | `Qwen/Qwen3-30B-A3B-Instruct-2507` | Public release-profile text fixture is included on WikiText-103; the scope is no-op preservation with scoped MoE guard scans. |
 | Gemma 4 26B-A4B MoE image-text LM | `published_basis` | `google/gemma-4-26B-A4B-it` | Public release-profile image-text fixture is included on pinned VQAv2; audio and MoE routing-quality evidence require separate evidence. |
+| Gemma 4 31B image-text LM | `published_basis` | `google/gemma-4-31B-it` | Public release-profile image-text fixture is included on pinned VQAv2; audio and broader any-to-any behavior require separate evidence. |
 | Mixtral 8x7B MoE causal LM | `published_basis` | `mistralai/Mixtral-8x7B-v0.1` | Public release-profile text fixture is included as a no-op preservation basis; guard-overhead measurement is skipped by preset policy. |
 | Llama | `profile_first_class` | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Generic Llama-family profile handling is first-class; declared support lanes remain listed above. |
-| Qwen family aliases (Qwen1.5/Qwen2.5/Qwen3 naming) | `profile_first_class` | `Qwen/Qwen2.5-14B`, `Qwen/Qwen3.5-9B`, `Qwen/Qwen3.5-4B` | Shared qwen-family heuristics cover aliases beyond the declared public lanes listed above. |
+| Qwen family aliases (Qwen1.5/Qwen2.5/Qwen3 naming) | `profile_first_class` | `Qwen/Qwen2.5-14B`, `Qwen/Qwen3.5-9B`, `Qwen/Qwen3.5-4B`, `Qwen/Qwen3.5-27B`, `Qwen/Qwen3.6-27B` | Shared qwen-family heuristics cover aliases beyond the declared public lanes listed above. |
 | Yi | `profile_first_class` | `01-ai/Yi-34B` | Treated as a RoPE decoder family in profile logic. |
 | Phi family | `profile_first_class` | `microsoft/Phi-3-mini-4k-instruct`, `microsoft/Phi-4-reasoning-plus` | Dedicated Phi-family selectors exist; declared Phi support remains text-only. |
-| Gemma family | `profile_first_class` | `google/gemma-4-E2B-it`, `google/gemma-4-E4B-it`, `google/gemma-4-12B-it`, `google/gemma-4-26B-A4B-it` | Gemma-family selectors and loaders are first-class for compatible local or user-supplied checkpoints. |
+| Gemma family | `profile_first_class` | `google/gemma-4-E2B-it`, `google/gemma-4-E4B-it`, `google/gemma-4-12B-it`, `google/gemma-4-26B-A4B-it`, `google/gemma-4-31B-it` | Gemma-family selectors and loaders are first-class for compatible local or user-supplied checkpoints. |
 | OPT / GPT-NeoX / GPT-J | `profile_shared_alias` | `EleutherAI/gpt-neox-20b` | Available through shared GPT-style paths; named support inventory stays limited by repo license policy. |
 | GPT-OSS | `profile_first_class` | `openai/gpt-oss-20b` | Dedicated profile selectors and HF causal decoder spec now cover the open-weight checkpoint directly. |
 | Falcon | `profile_shared_alias` | `tiiuae/falcon-7b` | Falcon-family coverage is available through shared paths; Falcon 7B has a declared support lane. |

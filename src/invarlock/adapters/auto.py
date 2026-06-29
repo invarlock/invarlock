@@ -64,10 +64,16 @@ _MULTIMODAL_ARCH_HINTS = (
 _MULTIMODAL_MODEL_ID_HINTS = (
     "qwen3.5-2b",
     "qwen3.5-4b",
+    "qwen3.5-27b",
+    "qwen3.6-27b",
     "qwen3-5-2b",
     "qwen3-5-4b",
+    "qwen3-5-27b",
+    "qwen3-6-27b",
     "qwen3_5_2b",
     "qwen3_5_4b",
+    "qwen3_5_27b",
+    "qwen3_6_27b",
     "gemma-3-4b",
     "gemma3-4b",
     "gemma-3n",
@@ -79,8 +85,11 @@ _MULTIMODAL_MODEL_ID_HINTS = (
     "gemma_4_12b",
     "gemma_4_e4b",
     "gemma-4-26b-a4b",
+    "gemma-4-31b",
     "gemma4-26b-a4b",
+    "gemma4-31b",
     "gemma_4_26b_a4b",
+    "gemma_4_31b",
 )
 _MODEL_CONFIG_ERRORS = (AttributeError, TypeError, ValueError)
 

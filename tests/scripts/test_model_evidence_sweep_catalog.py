@@ -57,8 +57,11 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
                 "qwen_qwen3_30b_a3b_instruct_2507",
                 "allenai_olmoe_1b_7b_0924",
                 "google_gemma_4_26b_a4b_it",
+                "google_gemma_4_31b_it",
                 "qwen_qwen3_5_4b",
                 "qwen_qwen3_5_2b",
+                "qwen_qwen3_5_27b",
+                "qwen_qwen3_6_27b",
             ],
             lane_ids=[],
             shard_index=0,
@@ -127,9 +130,15 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
         "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml"
     )
     assert specs["google_gemma_4_26b_a4b_it"].adapter == "hf_multimodal"
+    assert specs["google_gemma_4_31b_it"].preset_relpath == (
+        "configs/presets/multimodal/gemma4_31b_public_vqav2_256.yaml"
+    )
+    assert specs["google_gemma_4_31b_it"].adapter == "hf_multimodal"
     for slug, preset in {
         "qwen_qwen3_5_4b": "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
         "qwen_qwen3_5_2b": "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
+        "qwen_qwen3_5_27b": "configs/presets/multimodal/qwen3_5_27b_public_vqav2_scoped_256.yaml",
+        "qwen_qwen3_6_27b": "configs/presets/multimodal/qwen3_6_27b_public_vqav2_scoped_256.yaml",
     }.items():
         assert specs[slug].preset_relpath == preset
         assert specs[slug].adapter == "hf_multimodal"
@@ -209,6 +218,8 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
         "google_gemma_4_e2b_it_image_text",
         "qwen_qwen3_5_4b",
         "qwen_qwen3_5_2b",
+        "qwen_qwen3_5_27b_scoped",
+        "qwen_qwen3_6_27b_scoped",
         "huggingfacetb_smollm3_3b",
         "microsoft_phi_4_mini_instruct",
         "google_flan_t5_base",
@@ -216,6 +227,7 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
         "mistralai_mixtral_8x7b_v0_1",
         "allenai_olmoe_1b_7b_0924",
         "google_gemma_4_26b_a4b_it",
+        "google_gemma_4_31b_it",
     ]
     adapters = {lane.slug: lane.adapter for lane in specs}
     assert adapters["google_gemma_4_12b_it"] == "hf_multimodal"
@@ -226,8 +238,11 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
     assert adapters["mistralai_mixtral_8x7b_v0_1"] == "hf_causal"
     assert adapters["allenai_olmoe_1b_7b_0924"] == "hf_causal"
     assert adapters["google_gemma_4_26b_a4b_it"] == "hf_multimodal"
+    assert adapters["google_gemma_4_31b_it"] == "hf_multimodal"
     assert adapters["qwen_qwen3_5_4b"] == "hf_multimodal"
     assert adapters["qwen_qwen3_5_2b"] == "hf_multimodal"
+    assert adapters["qwen_qwen3_5_27b_scoped"] == "hf_multimodal"
+    assert adapters["qwen_qwen3_6_27b_scoped"] == "hf_multimodal"
     for lane in specs:
         if lane.slug in {
             "huggingfacetb_smollm3_3b",
@@ -273,6 +288,8 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
         elif lane.slug in {
             "qwen_qwen3_5_4b",
             "qwen_qwen3_5_2b",
+            "qwen_qwen3_5_27b_scoped",
+            "qwen_qwen3_6_27b_scoped",
         }:
             assert lane.adapter == "hf_multimodal"
             assert lane.verify_profile == "release"
@@ -290,6 +307,16 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
             assert estimate["estimated_weight_gb_bf16"] == 52.0
             assert estimate["recommended_min_gpus_80gb"] >= 2
             assert estimate["moe_model"] is True
+        elif lane.slug == "google_gemma_4_31b_it":
+            assert lane.verify_profile == "release"
+            assert lane.preset_relpath == (
+                "configs/presets/multimodal/gemma4_31b_public_vqav2_256.yaml"
+            )
+            assert lane.vision_text_materialization is not None
+            estimate = lane.to_manifest_entry()["resource_estimate"]
+            assert estimate["estimated_weight_gb_bf16"] == 62.0
+            assert estimate["recommended_min_gpus_80gb"] >= 2
+            assert estimate["moe_model"] is False
         else:
             assert lane.slug == "google_flan_t5_base"
             assert lane.verify_profile == "release"

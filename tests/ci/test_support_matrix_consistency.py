@@ -85,10 +85,13 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         "Qwen3.5 causal LM",
         "Qwen3.5 4B image-text LM",
         "Qwen3.5 2B image-text LM",
+        "Qwen3.5 27B image-text LM (scoped)",
+        "Qwen3.6 27B image-text LM (scoped)",
         "Gemma 4 E4B image-text LM",
         "Gemma 4 E2B image-text LM",
         "Gemma 4 12B any-to-any LM",
         "Gemma 4 26B-A4B MoE image-text LM",
+        "Gemma 4 31B image-text LM",
         "Mixtral 8x7B MoE causal LM",
         "Qwen3 30B-A3B MoE causal LM",
         "OLMoE 1B-active/7B-total causal LM",
@@ -144,6 +147,20 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         "published_release_strict"
     )
     assert families["Qwen3.5 4B image-text LM"]["docs_label"] == "Yes"
+    assert (
+        families["Qwen3.5 27B image-text LM (scoped)"]["support_tier"]
+        == "published_basis"
+    )
+    assert families["Qwen3.5 27B image-text LM (scoped)"]["evidence_status"] == (
+        "published_release_strict"
+    )
+    assert (
+        families["Qwen3.6 27B image-text LM (scoped)"]["support_tier"]
+        == "published_basis"
+    )
+    assert families["Qwen3.6 27B image-text LM (scoped)"]["evidence_status"] == (
+        "published_release_strict"
+    )
     assert families["Gemma 4 E4B image-text LM"]["support_tier"] == ("published_basis")
     assert families["Gemma 4 E4B image-text LM"]["evidence_status"] == (
         "published_release_strict"
@@ -161,6 +178,10 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         == "published_basis"
     )
     assert families["Gemma 4 26B-A4B MoE image-text LM"]["evidence_status"] == (
+        "published_release_strict"
+    )
+    assert families["Gemma 4 31B image-text LM"]["support_tier"] == "published_basis"
+    assert families["Gemma 4 31B image-text LM"]["evidence_status"] == (
         "published_release_strict"
     )
     assert families["Mixtral 8x7B MoE causal LM"]["support_tier"] == "published_basis"

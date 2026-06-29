@@ -423,10 +423,11 @@ def _public_vqav2_materialization_for_preset(
     preset_name = Path(preset_relpath).name
     if not (
         preset_relpath.startswith("configs/presets/multimodal/")
-        and preset_name.endswith("_public_vqav2_256.yaml")
+        and "public_vqav2" in preset_name
+        and preset_name.endswith(".yaml")
     ):
         return None
-    if preset_name == "qwen3_5_4b_public_vqav2_256.yaml":
+    if preset_name.startswith(("qwen3_5_", "qwen3_6_")):
         return _qwen3_5_4b_vqav2_materialization()
     return _public_vqav2_materialization()
 
@@ -481,6 +482,26 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
         adapter="hf_multimodal",
         verify_profile="release",
         vision_text_materialization=_public_vqav2_materialization(),
+    ),
+    EvidenceLane(
+        slug="qwen_qwen3_5_27b_scoped",
+        lane_id="qwen3-5-27b-image-text-scoped-hf",
+        family="Qwen3.5 27B image-text LM (scoped)",
+        model_id="Qwen/Qwen3.5-27B",
+        preset_relpath="configs/presets/multimodal/qwen3_5_27b_public_vqav2_scoped_256.yaml",
+        adapter="hf_multimodal",
+        verify_profile="release",
+        vision_text_materialization=_qwen3_5_4b_vqav2_materialization(),
+    ),
+    EvidenceLane(
+        slug="qwen_qwen3_6_27b_scoped",
+        lane_id="qwen3-6-27b-image-text-scoped-hf",
+        family="Qwen3.6 27B image-text LM (scoped)",
+        model_id="Qwen/Qwen3.6-27B",
+        preset_relpath="configs/presets/multimodal/qwen3_6_27b_public_vqav2_scoped_256.yaml",
+        adapter="hf_multimodal",
+        verify_profile="release",
+        vision_text_materialization=_qwen3_5_4b_vqav2_materialization(),
     ),
     EvidenceLane(
         slug="huggingfacetb_smollm3_3b",
@@ -542,6 +563,16 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
         family="Gemma 4 26B-A4B MoE image-text LM",
         model_id="google/gemma-4-26B-A4B-it",
         preset_relpath="configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
+        adapter="hf_multimodal",
+        verify_profile="release",
+        vision_text_materialization=_public_vqav2_materialization(),
+    ),
+    EvidenceLane(
+        slug="google_gemma_4_31b_it",
+        lane_id="gemma4-31b-image-text-hf",
+        family="Gemma 4 31B image-text LM",
+        model_id="google/gemma-4-31B-it",
+        preset_relpath="configs/presets/multimodal/gemma4_31b_public_vqav2_256.yaml",
         adapter="hf_multimodal",
         verify_profile="release",
         vision_text_materialization=_public_vqav2_materialization(),

@@ -104,6 +104,8 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "qwen3-5-causal-hf",
         "qwen3-5-2b-image-text-hf",
         "qwen3-5-4b-image-text-hf",
+        "qwen3-5-27b-image-text-scoped-hf",
+        "qwen3-6-27b-image-text-scoped-hf",
         "granite-4-1-3b-causal-hf",
         "granite-4-1-8b-causal-hf",
         "gemma4-e2b-text-causal-hf",
@@ -111,6 +113,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "gemma4-e4b-image-text-hf",
         "gemma4-12b-any-to-any-hf",
         "gemma4-26b-a4b-moe-image-text-hf",
+        "gemma4-31b-image-text-hf",
         "deepseek-r1-distill-qwen-causal-hf",
         "deepseek-r1-0528-qwen3-8b-causal-hf",
         "deepseek-r1-distill-qwen-14b-causal-hf",
@@ -122,7 +125,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
 
     family_catalog = contracts.load_model_family_catalog()
     assert family_catalog["format_version"] == "model-family-catalog-v1"
-    assert family_catalog["as_of"] == "2026-06-14"
+    assert family_catalog["as_of"] == "2026-06-29"
     assert family_catalog["declared_support"][0]["display_name"] == "GPT-2 causal LM"
     declared = {item["display_name"] for item in family_catalog["declared_support"]}
     assert declared == {
@@ -178,6 +181,27 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         for evidence in gemma4_26b["repo_evidence"]
     )
     assert "0.555 final accuracy over 400 examples" in gemma4_26b["notes"]
+    gemma4_31b = implemented["Gemma 4 31B image-text LM"]
+    assert gemma4_31b["state"] == "published_basis"
+    assert any(
+        evidence == "public_evidence/published_basis/gemma4_31b/evidence_pack"
+        for evidence in gemma4_31b["repo_evidence"]
+    )
+    assert "0.610 final accuracy over 400 examples" in gemma4_31b["notes"]
+    qwen35_27b = implemented["Qwen3.5 27B image-text LM (scoped)"]
+    assert qwen35_27b["state"] == "published_basis"
+    assert any(
+        evidence == "public_evidence/published_basis/qwen3_5_27b_scoped/evidence_pack"
+        for evidence in qwen35_27b["repo_evidence"]
+    )
+    assert "Linear-attention module coverage remains" in qwen35_27b["notes"]
+    qwen36_27b = implemented["Qwen3.6 27B image-text LM (scoped)"]
+    assert qwen36_27b["state"] == "published_basis"
+    assert any(
+        evidence == "public_evidence/published_basis/qwen3_6_27b_scoped/evidence_pack"
+        for evidence in qwen36_27b["repo_evidence"]
+    )
+    assert "Linear-attention module coverage remains" in qwen36_27b["notes"]
 
     usage_only = {item["display_name"] for item in family_catalog["usage_only"]}
     assert "QwQ 32B reasoning" not in usage_only

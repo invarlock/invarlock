@@ -52,6 +52,8 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
         "google_gemma_4_e2b_it_image_text",
         "qwen_qwen3_5_4b",
         "qwen_qwen3_5_2b",
+        "qwen_qwen3_5_27b_scoped",
+        "qwen_qwen3_6_27b_scoped",
         "huggingfacetb_smollm3_3b",
         "microsoft_phi_4_mini_instruct",
         "google_flan_t5_base",
@@ -59,6 +61,7 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
         "mistralai_mixtral_8x7b_v0_1",
         "allenai_olmoe_1b_7b_0924",
         "google_gemma_4_26b_a4b_it",
+        "google_gemma_4_31b_it",
     }
     assert specs["google_gemma_4_12b_it"].preset_relpath == (
         "configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml"
@@ -77,6 +80,9 @@ def test_support_matrix_backlog_gpu_suite_covers_prepared_candidate_rows() -> No
         "google_gemma_4_e2b_it_image_text": "configs/presets/multimodal/gemma4_e2b_public_vqav2_256.yaml",
         "qwen_qwen3_5_4b": "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
         "qwen_qwen3_5_2b": "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
+        "qwen_qwen3_5_27b_scoped": "configs/presets/multimodal/qwen3_5_27b_public_vqav2_scoped_256.yaml",
+        "qwen_qwen3_6_27b_scoped": "configs/presets/multimodal/qwen3_6_27b_public_vqav2_scoped_256.yaml",
+        "google_gemma_4_31b_it": "configs/presets/multimodal/gemma4_31b_public_vqav2_256.yaml",
     }.items():
         assert specs[slug].preset_relpath == preset
         assert specs[slug].adapter == "hf_multimodal"
