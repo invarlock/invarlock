@@ -1,0 +1,22 @@
+{
+  "schema": "invarlock.larger_model_queue_drain_findings.hash_inventory.v1",
+  "status": "completed",
+  "description": "SHA-256 and byte inventory for summary-only larger-model queue-drain findings.",
+  "artifacts": [
+    {
+      "path": "README.md",
+      "sha256": "sha256:c24496294a9e59de00f9e1088a256f59499aa917469654b3f21075f154ff8a0e",
+      "bytes": 761
+    },
+    {
+      "path": "findings_summary.json",
+      "sha256": "sha256:f021f1b63cb89945cd1e915888ee7ebd934703f6be0f85de2c63c8e428c0f76b",
+      "bytes": 13181
+    },
+    {
+      "path": "evidence.meta.json",
+      "sha256": "sha256:b7ee41b967e60824d61b348822f969a37152d9373628d1adcf2f808889a24fa8",
+      "bytes": 583
+    }
+  ]
+}
