@@ -7,7 +7,7 @@
       "apache-2.0",
       "mit"
     ],
-    "notes": "Support, promotion, and evidence-sweep lanes are explicit. User-supplied local checkpoints remain BYOE inputs."
+    "notes": "Support, candidate, and evidence-sweep lanes are explicit. User-supplied local checkpoints remain BYOE inputs."
   },
   "classification_values": [
     "published",
@@ -639,10 +639,10 @@
         "broader-bert-like-mlms"
       ],
       "sweep_lane_ids": [
-        "promotion-gap::distilbert_base_uncased"
+        "published-basis-gap::distilbert_base_uncased"
       ],
       "suite_roles": [
-        "promotion-gap-gpu"
+        "published-basis-gap-gpu"
       ],
       "blockers": [
         "approved calibration and evaluation evidence"

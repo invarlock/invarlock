@@ -103,7 +103,7 @@ reports to change proposals.
 4. **Parametric cross-check.** With two-sided tail
    $\mathrm{pTail}(\kappa)=2\big(1-\Phi(\kappa)\big)$, compare the proposed caps
    to modeled Gaussian tails for families covered by the null calibration basis.
-   Treat transferred attention caps in newly promoted no-op reports, and low
+   Treat transferred attention caps in new published-basis no-op reports, and low
    Balanced `embed`/`other` caps, as operational sentinels until a family-specific
    null sweep supports an FPR interpretation.
 

@@ -77,12 +77,19 @@ mkdir -p "${WORKFLOW_DIR}" "${EVIDENCE_PACK_DIR}"
 
 compile_pyproject() {
   local output="$1"
+  local output_arg="$1"
   shift
-  uv pip compile "${ROOT_DIR}/pyproject.toml" \
-    --python-platform x86_64-unknown-linux-gnu \
-    --generate-hashes \
-    --output-file "${output}" \
-    "$@"
+  if [[ "${output}" == "${ROOT_DIR}/"* ]]; then
+    output_arg="${output#${ROOT_DIR}/}"
+  fi
+  (
+    cd "${ROOT_DIR}"
+    uv pip compile pyproject.toml \
+      --python-platform x86_64-unknown-linux-gnu \
+      --generate-hashes \
+      --output-file "${output_arg}" \
+      "$@"
+  )
 }
 
 compile_req_in() {

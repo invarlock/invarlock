@@ -313,7 +313,7 @@ requires all-8 80GB-GPU sharding and uses scoped attention/router/shared-expert
 guard scans; exhaustive expert-bank and MoE routing-quality claims require
 separate evidence.
 The empirical guard manifest includes no-op published-basis summaries for the
-modern promoted families. They are null-behavior evidence and calibration
+modern published-basis families. They are null-behavior evidence and calibration
 inputs, but they do not re-derive the packaged spectral/RMT/variance tier
 constants; transferred attention caps remain budgeted sentinels until a
 family-specific null sweep supports an FPR interpretation.
@@ -342,7 +342,7 @@ separate strict spectral-cap finding.
 targeted tests, smoke/evidence path, and tuned edit-param coverage for the lane
 without claiming a published-basis fixture set. `community_experimental` rows
 are candidate entries; some already have repo pilot presets and
-calibration configs, but still need the remaining promotion artifacts before
+calibration configs, but still need the remaining published-basis artifacts before
 they become release-supported lanes.
 
 Image-text evaluation uses the built-in
@@ -352,7 +352,7 @@ Image-text evaluation uses the built-in
 text-only and image-text public bases; Qwen3.5 2B, Qwen3.5 4B, Gemma 4 E4B,
 scoped Qwen3.5/Qwen3.6 27B, Gemma 4 12B, Gemma 4 26B-A4B, and Gemma 4 31B
 also have public image-text bases. Audio evaluation is deferred. Public
-image-text basis promotion requires
+image-text published-basis inclusion requires
 measured accuracy on a pinned public dataset above the repo floor; preservation
 passing alone is not sufficient.
 
@@ -371,8 +371,8 @@ For large MoE lanes that do not fit comfortably on one GPU, the remote helper
 supports grouped CUDA visibility, for example
 `--gpu-group 0,1,2,3` to launch one sweep shard with all four GPUs exposed
 instead of one shard per GPU.
-Repo-prepared-but-not-yet-promoted lanes are tracked in
-`contracts/model_family_catalog.json`; promotion eligibility and blockers are
+Repo-prepared candidate lanes are tracked in
+`contracts/model_family_catalog.json`; published-basis eligibility and blockers are
 tracked in `contracts/model_classification.json`.
 For the Gemma 4 text lane, the repo-maintained local smoke is the included
 manifest dry-run (`scripts/model_evidence/model_evidence_sweep.py --suite repo-mentioned-gpu --slug gemma4_e2b_public --dry-run`).

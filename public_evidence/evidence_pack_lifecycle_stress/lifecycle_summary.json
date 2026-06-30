@@ -1,7 +1,7 @@
 {
-  "schema": "invarlock.evidence_pack_queue_stress_resume.summary.v1",
+  "schema": "invarlock.evidence_pack_lifecycle_stress.summary.v1",
   "status": "completed",
-  "evidence_scope": "evidence-pack queue stress/resume validation only; no model-quality or assurance claim",
+  "evidence_scope": "evidence-pack task lifecycle stress validation only; no model-quality or assurance claim",
   "validation_environment": "CUDA-capable validation host",
   "raw_logs_published": false,
   "weights_vendored": false,
@@ -18,7 +18,7 @@
         "stale_owner_lock_recovery",
         "atomic_claim_complete_fail_retry_transitions",
         "retry_sanitization_and_max_retry_handling",
-        "dependency_promotion_demotion_and_failed_dependency_cancellation",
+        "dependency_readiness_demotion_and_failed_dependency_cancellation",
         "orphaned_running_task_reclamation",
         "worker_restart_paths",
         "memory_plan_reservation_updates",

@@ -1,7 +1,7 @@
 # Preset: Qwen3.6 27B scoped image-text evaluation on materialized public VQAv2 data.
 #
 # This scoped lane covers self-attention and MLP guard scans. Linear-attention
-# module coverage remains tracked by the larger-model follow-on findings.
+# module coverage remains tracked by the larger-model validation findings.
 
 model:
   id: "Qwen/Qwen3.6-27B"

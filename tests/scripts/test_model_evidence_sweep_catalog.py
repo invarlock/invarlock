@@ -334,11 +334,11 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
         assert lane.preset_path.is_file(), lane.preset_relpath
 
 
-def test_promotion_gap_gpu_suite_targets_repo_prepared_blocked_lanes() -> None:
+def test_published_basis_gap_gpu_suite_targets_repo_prepared_blocked_lanes() -> None:
     mod = load_script_module("model_evidence_sweep")
 
     specs = mod.select_specs(
-        mod.PROMOTION_GAP_GPU_SUITE,
+        mod.PUBLISHED_BASIS_GAP_GPU_SUITE,
         slugs=[],
         lane_ids=[],
         shard_index=0,
@@ -358,19 +358,19 @@ def test_promotion_gap_gpu_suite_targets_repo_prepared_blocked_lanes() -> None:
         assert lane.preset_path.is_file(), lane.preset_relpath
 
 
-def test_model_evidence_sweep_dry_run_supports_promotion_gap_suite_candidates(
+def test_model_evidence_sweep_dry_run_supports_published_basis_gap_suite_candidates(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
-    output_root = tmp_path / "promotion-gap-dry-run"
+    output_root = tmp_path / "published-basis-gap-dry-run"
 
     proc = subprocess.run(
         [
             sys.executable,
             str(script),
             "--suite",
-            "promotion-gap-gpu",
+            "published-basis-gap-gpu",
             "--execution-mode",
             "host",
             "--output-root",

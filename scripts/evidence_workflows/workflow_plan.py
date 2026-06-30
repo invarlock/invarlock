@@ -55,6 +55,7 @@ class WorkflowLanePlan:
     steps: tuple[WorkflowCommandStep, ...]
     resource_preflight: Mapping[str, object] | None = None
     prepared_preset: str | None = None
+    prepared_preset_source: str | None = None
 
     @property
     def evaluate_step(self) -> WorkflowCommandStep:
@@ -103,6 +104,8 @@ class WorkflowLanePlan:
             payload["materialize_dataset"] = list(materialize.command)
         if self.prepared_preset is not None:
             payload["prepared_preset"] = self.prepared_preset
+        if self.prepared_preset_source is not None:
+            payload["prepared_preset_source"] = self.prepared_preset_source
         return payload
 
 

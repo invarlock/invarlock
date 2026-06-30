@@ -13,7 +13,7 @@ Recommended practices for research and production deployments.
   locations and implicit directory creation.
 - Treat models/datasets from untrusted sources as potentially malicious; avoid
   unsafe deserialization.
-- Always run `invarlock verify` on reports before promotion.
+- Always run `invarlock verify` on reports before publication.
 
 ## Production Deployment Checklist
 

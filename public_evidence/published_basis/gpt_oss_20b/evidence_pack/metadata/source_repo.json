@@ -17,6 +17,5 @@
     "scripts/model_evidence/model_evidence_lanes.py": "sha256:5af91ce70ac48967579ec0054f66ad9431570dde0ee64dd109275dfade10b34c",
     "scripts/model_evidence/model_evidence_sweep.py": "sha256:bdf17a6913b7f43e1402239c58df68dc69da240a31746d20e09a784583285f0f"
   },
-  "worktree_branch": "work/modern-model-followon-addendum-20260629",
-  "worktree_sync_note": "Validation checkout used the listed source ref plus the GPT-OSS files staged in this pull request. Release evidence used the recorded preset for 400 paired windows and explicit skip_overhead_check."
+  "worktree_sync_note": "Validation checkout used the listed source ref plus the recorded GPT-OSS lane files. Release evidence used the recorded preset for 400 paired windows and explicit skip_overhead_check."
 }

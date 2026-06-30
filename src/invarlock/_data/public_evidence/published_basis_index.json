@@ -590,21 +590,21 @@
         },
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:5eff616b53857453d153ea4dbc34520e2fc878b349fd96847ddd0f4a0df91098",
-            "manifest.json": "sha256:eb8b397cf070803e9935a36a466b66cd5361f0f08ccc40ba13f27e60396f801d",
-            "manifest.signature.json": "sha256:1dcb8981b0a7e2989b2eff494b8404a4ca49a22c3d1bffea493cde437cdb90db",
+            "checksums.sha256": "sha256:6cd1fc3823cf632f9787c3a5d3669edfe86ecd4570e69f97c941bc1bde56754e",
+            "manifest.json": "sha256:fa9032ada40dd668f2ff16be776946624f459cc6e7c304fd4c6931234a0e97ed",
+            "manifest.signature.json": "sha256:08d5d6d23978902cde5e7f3b01db67fd47b5f85388973ebbed4b1b5085c103bd",
             "results/final_verdict.json": "sha256:a779902ceb9071a737b3c7d65810c7bded73fd91cdae500ece655f7ec1704ae0"
           },
           "file_count": 11,
           "kind": "directory",
           "path": "public_evidence/published_basis/gpt_oss_20b/evidence_pack",
-          "size_bytes": 5603168
+          "size_bytes": 5603085
         },
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/gpt_oss_20b/evidence_pack_recipe.json",
-          "sha256": "sha256:10149de03b05a05c8d318b19c7f10068520d91a4e5af9983f89b42120a2374e7",
-          "size_bytes": 2012
+          "sha256": "sha256:c72532f9902cb95cf1b612777b2c4c5af10e3f0fdd741be13299721c987261dd",
+          "size_bytes": 1987
         },
         "evidence_run_preset": {
           "kind": "file",
@@ -620,7 +620,7 @@
         }
       },
       "evidence_class": "strict_pass_fixture",
-      "expected_fingerprint": "sha256:e008ce065eeb2b32a529b1e8dfd312ed7e5753bc1e6fbfa516bf45ad6a606762",
+      "expected_fingerprint": "sha256:b67ab8a0456a89ad85a4f18f596815d72a74337b8302882be40a16ccc210d82f",
       "lanes": [
         "gpt-oss-20b-causal-hf"
       ],
@@ -1395,8 +1395,8 @@
         "evidence_run_preset": {
           "kind": "file",
           "path": "public_evidence/published_basis/qwen3_5_27b_scoped/evidence_run_preset.yaml",
-          "sha256": "sha256:7041a11a9dac6e0d69449a0c370c65b68b1c1060b550c1ffeb7b655eb5cd76e7",
-          "size_bytes": 1524
+          "sha256": "sha256:61b8cc06f0464b930411447a0141703f1d329e4519808f3dc030450919285863",
+          "size_bytes": 1525
         },
         "runtime_manifest": {
           "kind": "file",
@@ -1575,8 +1575,8 @@
         "evidence_run_preset": {
           "kind": "file",
           "path": "public_evidence/published_basis/qwen3_6_27b_scoped/evidence_run_preset.yaml",
-          "sha256": "sha256:639327394d54e7197e9cc144750485b1e29a0a21e90d2d6b3c9d861c712299ca",
-          "size_bytes": 1524
+          "sha256": "sha256:53f39dd64c8c0d070db09439af3648d3d729ef22767b01aa218c026cac62b598",
+          "size_bytes": 1525
         },
         "runtime_manifest": {
           "kind": "file",
@@ -1730,6 +1730,6 @@
   "format_version": "public-evidence-index-v1",
   "published_basis_count": 39,
   "published_basis_file_count": 573,
-  "published_basis_size_bytes": 239116130,
+  "published_basis_size_bytes": 239116024,
   "source_root": "public_evidence"
 }

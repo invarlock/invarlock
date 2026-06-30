@@ -1,7 +1,7 @@
 # Calibration config: Null sweep for Qwen3.5 27B scoped image-text calibration.
 #
 # This scoped lane covers self-attention and MLP guard scans. Linear-attention
-# module coverage remains tracked by the larger-model follow-on findings.
+# module coverage remains tracked by the larger-model validation findings.
 
 model:
   id: "Qwen/Qwen3.5-27B"
