@@ -1,7 +1,7 @@
 {
-  "schema": "invarlock.evidence_pack_queue_stress_resume.summary.v1",
+  "schema": "invarlock.evidence_pack_lifecycle_stress.summary.v1",
   "status": "completed",
-  "evidence_scope": "evidence-pack queue stress/resume validation only; no model-quality or assurance claim",
+  "evidence_scope": "evidence-pack task lifecycle stress validation only; no model-quality or assurance claim",
   "validation_environment": "CUDA-capable validation host",
   "raw_logs_published": false,
   "weights_vendored": false,
