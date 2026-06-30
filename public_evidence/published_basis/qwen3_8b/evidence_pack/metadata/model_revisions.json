@@ -11,7 +11,7 @@
             "main"
           ],
           "size_on_disk": 16397431693,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--Qwen--Qwen3-8B/snapshots/b968826d9c46dd6066d109eabc6255188de91218"
+          "snapshot_path": "<hf-cache-dir>/hub/models--Qwen--Qwen3-8B/snapshots/b968826d9c46dd6066d109eabc6255188de91218"
         }
       ],
       "slug": "qwen3_8b",

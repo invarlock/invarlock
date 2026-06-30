@@ -24,7 +24,17 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
     yaml = None
     _YAML_AVAILABLE = False
-    _YAML_LOAD_ERRORS = (OSError,)
+_YAML_LOAD_ERRORS = (OSError,)
+
+
+DEFAULT_PRESET_EDIT_TYPES = (
+    "quant_rtn",
+    "fp8_quant",
+    "magnitude_prune",
+    "lowrank_svd",
+    "lora_merge",
+    "fine_tune",
+)
 
 
 def _yaml_safe_load(payload: str) -> Any:
@@ -75,6 +85,7 @@ __all__ = [
     "get_default_guards_order",
     "get_spectral_max_caps",
     "load_records",
+    "DEFAULT_PRESET_EDIT_TYPES",
 ]
 
 
@@ -368,7 +379,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     edit_types = [e.strip() for e in str(args.edit_types).split(",") if e.strip()]
     if not edit_types:
-        edit_types = ["quant_rtn", "fp8_quant", "magnitude_prune", "lowrank_svd"]
+        edit_types = list(DEFAULT_PRESET_EDIT_TYPES)
 
     dataset_provider = _resolve_dataset_provider_spec(str(args.dataset_provider))
 

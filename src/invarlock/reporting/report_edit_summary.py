@@ -477,7 +477,16 @@ def extract_edit_metadata(
         alg_lower = str(algorithm).strip().lower()
     except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
         alg_lower = ""
-    allowed_algorithms = {"quant_rtn", "noop", "custom"}
+    allowed_algorithms = {
+        "fine_tune",
+        "fp8_quant",
+        "lora_merge",
+        "lowrank_svd",
+        "magnitude_prune",
+        "noop",
+        "quant_rtn",
+        "custom",
+    }
     if alg_lower not in allowed_algorithms:
         algorithm = ""
 
@@ -562,6 +571,20 @@ def extract_edit_metadata(
 
     if plan_dict:
         edit_metadata["plan"] = copy.deepcopy(plan_dict)
+
+    for optional_key in (
+        "edit_provenance",
+        "edit_impact",
+        "edit_topology",
+        "delta_privacy",
+    ):
+        optional_value = edit_section.get(optional_key)
+        if not isinstance(optional_value, dict):
+            config_section = edit_section.get("config")
+            if isinstance(config_section, dict):
+                optional_value = config_section.get(optional_key)
+        if isinstance(optional_value, dict):
+            edit_metadata[optional_key] = copy.deepcopy(optional_value)
 
     if not budgets:
         edit_metadata.pop("budgets")

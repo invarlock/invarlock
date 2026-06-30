@@ -1,11 +1,13 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint typecheck mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-dry contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync scripts-inventory-check scripts-audit architecture-fragmentation-check guard-fallback-audit model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda-quant runtime-image-cuda-quant-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-smoke-cuda-quant runtime-smoke-cuda-quant-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-evidence-check
+.PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration test-assurance lint typecheck mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-fast verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-dry contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync scripts-inventory-check scripts-audit architecture-fragmentation-check guard-fallback-audit model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda-quant runtime-image-cuda-quant-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-quant runtime-smoke-cuda-podman runtime-smoke-cuda-quant-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-evidence-check
 
 PYTHON ?= $(shell bash scripts/select_workspace_python.sh)
 PIP := $(PYTHON) -m pip
 PYTEST := $(PYTHON) -m pytest
+PYTEST_WORKERS ?= 0
+PYTEST_WORKER_ARGS := $(if $(filter-out 0,$(PYTEST_WORKERS)),-n $(PYTEST_WORKERS),)
 RUFF := $(PYTHON) -m ruff
 MYPY := $(PYTHON) -m mypy
 COVERAGE := $(PYTHON) -m coverage
@@ -85,6 +87,14 @@ COVERAGE_TESTS_CLI_HELPERS := \
 COVERAGE_TESTS_OBSERVABILITY := \
 	tests/observability
 
+COVERAGE_TESTS_EVIDENCE_PACKS := \
+	tests/evidence_packs/test_edit_metadata_contract.py \
+	tests/evidence_packs/test_generated_edit_lanes.py \
+	tests/evidence_packs/test_evidence_pack_preset_generator.py \
+	tests/evidence_packs/test_evidence_pack_scenarios_manifest.py \
+	tests/scripts/test_evidence_pack_tuned_edit_params.py \
+	tests/reporting/provenance/test_report_provenance_and_edit_summary_helpers.py
+
 COVERAGE_TESTS_ADAPTERS := \
 	tests/adapters/test_adapter_contracts.py \
 	tests/adapters/test_adapter_auto_runtime.py \
@@ -98,6 +108,7 @@ COVERAGE_TESTS_ADAPTERS := \
 	tests/adapters/test_hf_causal_gemma4_paths.py \
 	tests/adapters/test_hf_role_adapters.py \
 	tests/adapters/test_hf_causal_spec_contracts.py \
+	tests/adapters/test_hf_causal_qwen_linear_moe_spec.py \
 	tests/adapters/test_adapters_hf_and_integration.py
 
 COVERAGE_TESTS_RUNTIME := \
@@ -121,7 +132,8 @@ COVERAGE_TESTS := \
 	$(COVERAGE_TESTS_EVAL) \
 	$(COVERAGE_TESTS_CLI_COMMANDS) \
 	$(COVERAGE_TESTS_CLI_HELPERS) \
-	$(COVERAGE_TESTS_OBSERVABILITY)
+	$(COVERAGE_TESTS_OBSERVABILITY) \
+	$(COVERAGE_TESTS_EVIDENCE_PACKS)
 
 COVERAGE_MODULES := \
 	$(shell $(COVERAGE_POLICY) coverage-modules)
@@ -199,12 +211,16 @@ lock-sync:  ## Check uv.lock is in sync with pyproject.toml
 ##@ Development
 test:  ## Run tests
 	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) tests/ -v
+	PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) tests/ -v
 
 test-fast:  ## Run the fast lane with marker selection
 	$(MAKE) ensure-python
 	INVARLOCK_LIGHT_IMPORT=1 INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=0 \
-		PYTHONPATH=src $(PYTEST) -q -m "not integration and not slow and not manual" tests
+		PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q -m "not integration and not slow and not manual" tests
+
+test-parallel: PYTEST_WORKERS ?= auto
+test-parallel:  ## Run the fast non-integration lane with pytest-xdist workers
+	$(MAKE) test-fast PYTEST_WORKERS=$(PYTEST_WORKERS)
 
 test-integration:  ## Run the integration lane
 	$(MAKE) ensure-python
@@ -270,7 +286,7 @@ test-ci: TEST_DIR = ci
 test-ci: ## Run tests/ci
 $(addprefix test-,$(GROUPED_TEST_DIR_TARGETS)):
 	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/$(TEST_DIR)
+	PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q tests/$(TEST_DIR)
 
 test-assurance:  ## Run assurance-related tests only
 	$(MAKE) ensure-python
@@ -344,6 +360,18 @@ verify:  ## Run verification (pytest -q, runtime verifier, lint, format, strict 
 		$(PYTHON) scripts/docs/docs_check.py --api-refs; \
 	fi
 	@echo "Verification completed successfully"
+
+verify-fast:  ## Run fast local verification without model downloads
+	@echo "Running fast verification..."
+	$(MAKE) ensure-python
+	$(MAKE) public-evidence-audit
+	PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q -m "not integration and not slow and not manual" \
+		tests/docs tests/reporting tests/evidence_packs \
+		tests/ci/test_golden_runs_offline.py::test_byoe_examples_verify_release_strict \
+		tests/ci/test_golden_runs_offline.py::test_lora_byoe_metadata_builds_and_verifies_signed_evidence_pack
+	$(MAKE) verify-ruff
+	$(MAKE) docs-lint-strict
+	@echo "Fast verification completed successfully"
 
 verify-ruff:  ## Run the Ruff checks used by make verify
 	$(MAKE) ensure-ruff
@@ -467,7 +495,7 @@ runtime-smoke:  ## Smoke the local container runtime image
 	$(CONTAINER_ENGINE) run --rm \
 		--entrypoint python \
 		$(RUNTIME_IMAGE) \
-		-c "import datasets, safetensors, torch, transformers; print('runtime image imports ok')"
+		-c "import shutil, datasets, safetensors, torch, transformers; assert shutil.which('jq'), 'jq missing from runtime image'; print('runtime image imports ok')"
 
 runtime-smoke-podman: CONTAINER_ENGINE=podman
 runtime-smoke-podman: runtime-smoke  ## Smoke the local container runtime image with Podman

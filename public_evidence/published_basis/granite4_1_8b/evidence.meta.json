@@ -6,7 +6,7 @@
     "runtime_manifest": "runtime.manifest.json"
   },
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:eeb80b76d8e7ed5b052d44f4a5f8834f42b891274b6eec5d4e98910ea961fa36",
+  "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
   "generated_by": "model evidence remote sweep with tokenizer prefetch recovery",
   "model_revision": "1504002f650e656a0a3789d99574df12e3e94ed0",
   "non_goals": [
@@ -17,6 +17,6 @@
   "summary": "Release-strict verifier fixture for the Granite 4.1 8B published-basis lane.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/granite4_1_8b/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/granite4_1_8b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:eeb80b76d8e7ed5b052d44f4a5f8834f42b891274b6eec5d4e98910ea961fa36"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/granite4_1_8b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb"
   ]
 }

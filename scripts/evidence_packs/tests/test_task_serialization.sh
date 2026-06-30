@@ -392,6 +392,10 @@ test_task_serialization_field_access_and_update_error_paths() {
     update_task_field "${task_file}" "status" "ready"
     assert_eq "ready" "$(jq -r '.status' "${task_file}")" "string update writes value"
 
+    update_task_field "${task_file}" "params" '{"nested":{"enabled":true},"items":[1,2]}' true
+    assert_eq "true" "$(jq -r '.params.nested.enabled' "${task_file}")" "json object update writes value"
+    assert_eq "2" "$(jq -r '.params.items | length' "${task_file}")" "json array update preserves elements"
+
     rc=0
     update_task_field "${task_file}" "assigned_gpus" "2"
     assert_eq "2" "$(jq -r '.assigned_gpus' "${task_file}")" "assigned_gpus update replaces value"
@@ -433,34 +437,53 @@ test_validate_task_required_fields_and_enums() {
 
     local task_file="${TEST_TMPDIR}/task.json"
 
+    local rc=0
+
     # Missing file fails
-    run validate_task "${task_file}"
-    assert_rc "1" "${RUN_RC}" "missing file invalid"
+    rc=0
+    validate_task "${task_file}" || rc=$?
+    assert_rc "1" "${rc}" "missing file invalid"
 
     # Invalid JSON fails
     echo "{bad" > "${task_file}"
-    run validate_task "${task_file}"
-    assert_rc "1" "${RUN_RC}" "invalid JSON invalid"
+    rc=0
+    validate_task "${task_file}" || rc=$?
+    assert_rc "1" "${rc}" "invalid JSON invalid"
 
     # Missing required field fails
     jq -n '{task_id:"x", task_type:"SETUP_BASELINE", model_id:"m", status:"pending"}' > "${task_file}"
-    run validate_task "${task_file}"
-    assert_rc "1" "${RUN_RC}" "missing model_name invalid"
+    rc=0
+    validate_task "${task_file}" || rc=$?
+    assert_rc "1" "${rc}" "missing model_name invalid"
 
     # Invalid task_type fails
     jq -n '{task_id:"x", task_type:"NOPE", model_id:"m", model_name:"n", status:"pending"}' > "${task_file}"
-    run validate_task "${task_file}"
-    assert_rc "1" "${RUN_RC}" "invalid task_type invalid"
+    rc=0
+    validate_task "${task_file}" || rc=$?
+    assert_rc "1" "${rc}" "invalid task_type invalid"
 
     # Invalid status fails
     jq -n '{task_id:"x", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"nope"}' > "${task_file}"
-    run validate_task "${task_file}"
-    assert_rc "1" "${RUN_RC}" "invalid status invalid"
+    rc=0
+    validate_task "${task_file}" || rc=$?
+    assert_rc "1" "${rc}" "invalid status invalid"
 
     # Valid succeeds
     jq -n '{task_id:"x", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending"}' > "${task_file}"
-    run validate_task "${task_file}"
-    assert_rc "0" "${RUN_RC}" "valid task"
+    rc=0
+    validate_task "${task_file}" || rc=$?
+    assert_rc "0" "${rc}" "valid task"
+
+    # Cleanup task types emitted by queue generation are valid task files.
+    jq -n '{task_id:"x", task_type:"CLEANUP_EDIT", model_id:"m", model_name:"n", status:"pending"}' > "${task_file}"
+    rc=0
+    validate_task "${task_file}" || rc=$?
+    assert_rc "0" "${rc}" "cleanup edit task valid"
+
+    jq -n '{task_id:"x", task_type:"CLEANUP_ERROR", model_id:"m", model_name:"n", status:"pending"}' > "${task_file}"
+    rc=0
+    validate_task "${task_file}" || rc=$?
+    assert_rc "0" "${rc}" "cleanup error task valid"
 }
 
 test_get_task_fields_and_simple_accessors_return_expected_values() {

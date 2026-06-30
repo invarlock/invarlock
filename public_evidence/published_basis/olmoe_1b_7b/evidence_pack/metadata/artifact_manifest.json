@@ -51,11 +51,11 @@
       "model_id": "allenai/OLMoE-1B-7B-0924",
       "ok": true,
       "preset": "configs/presets/causal_lm/olmoe_1b_7b_0924_512.yaml",
-      "report_path": "/root/model-evidence/20260613Tolmoe1b7bH100A/shard-00-gpu-0/eval/allenai_olmoe_1b_7b_0924/report/evaluation.report.json",
+      "report_path": "<model-evidence-root>/20260613Tolmoe1b7bH100A/shard-00-gpu-0/eval/allenai_olmoe_1b_7b_0924/report/evaluation.report.json",
       "slug": "allenai_olmoe_1b_7b_0924",
       "status": "ok",
       "verify_exit": 0,
-      "verify_path": "/root/model-evidence/20260613Tolmoe1b7bH100A/shard-00-gpu-0/eval/allenai_olmoe_1b_7b_0924/verify.json"
+      "verify_path": "<model-evidence-root>/20260613Tolmoe1b7bH100A/shard-00-gpu-0/eval/allenai_olmoe_1b_7b_0924/verify.json"
     }
   ],
   "ok": true,

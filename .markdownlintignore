@@ -20,6 +20,7 @@ docs/reference/**
 docs/user-guide/**
 !docs/user-guide/quickstart.md
 !docs/user-guide/compare-and-evaluate.md
+!docs/user-guide/knowledge-and-self-edit-workflows.md
 !docs/user-guide/plugins.md
 !docs/user-guide/reading-report.md
 !docs/user-guide/config-gallery.md

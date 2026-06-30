@@ -87,3 +87,53 @@ def test_normalize_run_report_preserves_edit_plan_and_extended_deltas():
     assert rep["edit"]["config"]["quantization_mode"] == "rtn_dequantized_weight_edit"
     assert rep["edit"]["deltas"]["storage_format"] == "float_dequantized"
     assert rep["edit"]["deltas"]["runtime_memory_reduction"] is False
+
+
+def test_normalize_run_report_preserves_optional_edit_provenance_and_impact():
+    raw = {
+        "meta": {"model_id": "m", "adapter": "hf", "seed": 1, "device": "cpu"},
+        "data": {"dataset": "ds"},
+        "edit": {
+            "name": "custom",
+            "plan_digest": "sha256:abc",
+            "edit_provenance": {
+                "edit_family": "self_edit",
+                "edit_method": "custom",
+                "edit_count": 2,
+                "target_set_digest": "sha256:" + "a" * 64,
+                "dynamic_runtime_required": False,
+            },
+            "edit_impact": {"scenario_types": ["target_success"]},
+        },
+        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
+    }
+
+    rep = normalize_run_report(raw)
+
+    assert rep["edit"]["edit_provenance"]["edit_family"] == "self_edit"
+    assert rep["edit"]["edit_provenance"]["edit_count"] == 2
+    assert rep["edit"]["edit_impact"]["scenario_types"] == ["target_success"]
+
+
+def test_normalize_run_report_preserves_optional_evaluation_realism():
+    raw = {
+        "meta": {"model_id": "m", "adapter": "hf", "seed": 1, "device": "cpu"},
+        "data": {"dataset": "ds"},
+        "edit": {"name": "custom", "plan_digest": "sha256:abc"},
+        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
+        "evaluation_realism": {
+            "mode": "teacher_forced",
+            "prompt_template_hash": "sha256:" + "a" * 64,
+            "decoding_config": {"temperature": 0.0, "top_p": 1.0},
+            "max_tokens": 64,
+            "truncation_policy": "left_truncate_to_context",
+            "dataset_or_task_id": "qaedit-locality-smoke",
+            "metric_is_generation_realistic": False,
+            "proxy_metric_warning": "Teacher-forced log-prob is a proxy for live generation behavior.",
+        },
+    }
+
+    rep = normalize_run_report(raw)
+
+    assert rep["evaluation_realism"]["mode"] == "teacher_forced"
+    assert rep["evaluation_realism"]["metric_is_generation_realistic"] is False

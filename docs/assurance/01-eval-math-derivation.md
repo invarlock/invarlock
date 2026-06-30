@@ -10,7 +10,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Derive the paired log-space primary-metric ratio and its displayed confidence interval. |
-| **Audience** | Report verifier maintainers, statistics reviewers, and contributors changing paired metric code. |
+| **Audience** | Report verifier maintainers, statistics auditors, and contributors changing paired metric code. |
 | **Contract scope** | PPL-like metrics on paired evaluation windows with known token counts and non-overlapping schedules. |
 | **Source of truth** | `src/invarlock/core/bootstrap.py`, report pairing logic, and paired-CI contract tests. |
 

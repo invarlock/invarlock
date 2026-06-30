@@ -121,6 +121,15 @@ def _load_report_with_probes(cert_path: Path) -> dict[str, Any] | None:
     return cert
 
 
+def _run_relative_path(path: Path, output_dir: Path | None) -> str:
+    if output_dir is None:
+        return str(path)
+    try:
+        return path.resolve().relative_to(output_dir.resolve()).as_posix()
+    except ValueError:
+        return path.name
+
+
 def _collect_baseline_reports(output_dir: Path) -> dict[str, dict[str, Any]]:
     baselines: dict[str, dict[str, Any]] = {}
 
@@ -151,7 +160,7 @@ def _collect_baseline_reports(output_dir: Path) -> dict[str, dict[str, Any]]:
         for path in sorted(paths, reverse=True):
             cert = _load_json_object(path)
             if cert is not None:
-                cert["_baseline_report_path"] = str(path)
+                cert["_baseline_report_path"] = _run_relative_path(path, output_dir)
                 baselines[model_name] = cert
                 break
 
@@ -252,6 +261,7 @@ def _build_record(
     run_num: int,
     scenario_index: dict[str, dict[str, Any]],
     baseline_cert: dict[str, Any] | None,
+    output_dir: Path | None = None,
 ) -> dict[str, Any]:
     outcome = _evaluate_report(cert)
     spec = scenario_index.get(scenario_id, {})
@@ -310,7 +320,7 @@ def _build_record(
             primary_guard_baseline_relative_required
         ),
         "guard_baseline_relative": guard_baseline_relative,
-        "path": str(cert_path),
+        "path": _run_relative_path(cert_path, output_dir),
     }
     if isinstance(baseline_cert, dict) and isinstance(
         baseline_cert.get("_baseline_report_path"),
@@ -328,6 +338,7 @@ def _collect_records(
     *,
     scenario_index: dict[str, dict[str, Any]],
     baseline_reports: dict[str, dict[str, Any]] | None = None,
+    output_dir: Path | None = None,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     records: list[dict[str, Any]] = []
     models: set[str] = set()
@@ -350,6 +361,7 @@ def _collect_records(
                 run_num=run_num,
                 scenario_index=scenario_index,
                 baseline_cert=baseline_reports.get(model_name),
+                output_dir=output_dir,
             )
         )
     return records, sorted(models)

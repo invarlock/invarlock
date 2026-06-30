@@ -47,6 +47,7 @@ test_setup_remote_install_invarlock_stack_uses_pinned_requirement_repairs() {
     assert_match "python -m pip install -e \\.\[hf\\]" "${log_text}" "editable hf install"
     assert_match "requirements/evidence-packs/huggingface_hub.txt" "${log_text}" "huggingface_hub pinned repair"
     assert_match "requirements/evidence-packs/accelerate.txt" "${log_text}" "accelerate pinned repair"
+    assert_match "requirements/evidence-packs/accelerate.txt --no-deps" "${log_text}" "accelerate repair preserves selected torch backend"
     assert_match "requirements/evidence-packs/pyyaml.txt" "${log_text}" "pyyaml pinned repair"
     assert_match "requirements/evidence-packs/protobuf.txt" "${log_text}" "protobuf pinned repair"
     assert_match "requirements/evidence-packs/sentencepiece.txt" "${log_text}" "sentencepiece pinned repair"
@@ -60,17 +61,18 @@ test_setup_remote_verify_remote_stack_runs_package_native_smoke() {
     pack_activate_venv() { :; }
     pack_run_cmd() { echo "$*" > "${TEST_TMPDIR}/smoke.cmd"; }
 
-    REPO_DIR="/opt/invarlock"
+    REPO_DIR="${TEST_TMPDIR}/repo"
+    mkdir -p "${REPO_DIR}"
 
     verify_remote_stack
 
     local cmd
     cmd="$(cat "${TEST_TMPDIR}/smoke.cmd")"
-    assert_match "python /opt/invarlock/scripts/evidence_packs/python/runtime_tools.py remote-setup-smoke" "${cmd}" "remote smoke helper invoked"
-    assert_match "--repo-root /opt/invarlock" "${cmd}" "repo root forwarded to smoke helper"
+    assert_match "python ${REPO_DIR}/scripts/evidence_packs/python/runtime_tools.py remote-setup-smoke" "${cmd}" "remote smoke helper invoked"
+    assert_match "--repo-root ${REPO_DIR}" "${cmd}" "repo root forwarded to smoke helper"
 }
 
-test_setup_remote_verify_remote_stack_checks_quant_modules_when_requested() {
+test_setup_remote_verify_remote_stack_stays_backend_neutral_for_quant_images() {
     mock_reset
 
     source ./scripts/evidence_packs/lib/core/setup_remote.sh
@@ -78,20 +80,138 @@ test_setup_remote_verify_remote_stack_checks_quant_modules_when_requested() {
     pack_activate_venv() { :; }
     pack_run_cmd() { echo "$*" > "${TEST_TMPDIR}/smoke.cmd"; }
 
-    REPO_DIR="/opt/invarlock"
+    REPO_DIR="${TEST_TMPDIR}/repo"
+    mkdir -p "${REPO_DIR}"
     PACK_RUNTIME_IMAGE_FLAVOR="quant"
 
     verify_remote_stack
 
     local cmd
     cmd="$(cat "${TEST_TMPDIR}/smoke.cmd")"
-    assert_match "--module bitsandbytes" "${cmd}" "quant smoke requires bitsandbytes"
-    assert_match "--module gptqmodel" "${cmd}" "quant smoke requires gptqmodel"
-    assert_match "--module hqq" "${cmd}" "quant smoke requires hqq"
-    assert_match "--module torchao" "${cmd}" "quant smoke requires torchao"
-    assert_match "--repo-root /opt/invarlock" "${cmd}" "repo root forwarded to smoke helper"
+    [[ "${cmd}" != *"--module bitsandbytes"* ]] || t_fail "host smoke must not require bitsandbytes"
+    [[ "${cmd}" != *"--module gptqmodel"* ]] || t_fail "host smoke must not require gptqmodel"
+    [[ "${cmd}" != *"--module hqq"* ]] || t_fail "host smoke must not require hqq"
+    [[ "${cmd}" != *"--module torchao"* ]] || t_fail "host smoke must not require torchao"
+    assert_match "--repo-root ${REPO_DIR}" "${cmd}" "repo root forwarded to smoke helper"
 
     unset PACK_RUNTIME_IMAGE_FLAVOR
+}
+
+test_setup_remote_verify_runtime_image_stack_checks_quant_image() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
+
+    pack_activate_venv() { :; }
+    pack_run_cmd() { echo "$*" > "${TEST_TMPDIR}/runtime-smoke.cmd"; }
+
+    REPO_DIR="${TEST_TMPDIR}/repo"
+    mkdir -p "${REPO_DIR}"
+    INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-quant"
+    PACK_RUNTIME_IMAGE_FLAVOR="quant"
+
+    verify_runtime_image_stack
+
+    local cmd
+    cmd="$(cat "${TEST_TMPDIR}/runtime-smoke.cmd")"
+    assert_match "make RUNTIME_IMAGE_CUDA_QUANT=invarlock-runtime:cuda-quant runtime-smoke-cuda-quant" "${cmd}" "quant runtime image smoke invoked"
+
+    unset INVARLOCK_RUNTIME_IMAGE PACK_RUNTIME_IMAGE_FLAVOR
+}
+
+test_setup_remote_verify_runtime_image_stack_checks_cuda_image() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
+
+    pack_activate_venv() { :; }
+    pack_run_cmd() { echo "$*" > "${TEST_TMPDIR}/runtime-smoke.cmd"; }
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/nvidia-smi" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "${bin_dir}/nvidia-smi"
+    PATH="${bin_dir}:/usr/bin:/bin"
+    export PATH
+
+    REPO_DIR="${TEST_TMPDIR}/repo"
+    mkdir -p "${REPO_DIR}"
+    INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"
+    PACK_RUNTIME_IMAGE_FLAVOR="default"
+
+    verify_runtime_image_stack
+
+    local cmd
+    cmd="$(cat "${TEST_TMPDIR}/runtime-smoke.cmd")"
+    assert_match "make RUNTIME_IMAGE_CUDA=invarlock-runtime:cuda-local runtime-smoke-cuda" "${cmd}" "cuda runtime image smoke invoked"
+
+    unset INVARLOCK_RUNTIME_IMAGE PACK_RUNTIME_IMAGE_FLAVOR
+}
+
+test_setup_remote_verify_runtime_image_stack_checks_cpu_image_without_cuda() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
+
+    pack_activate_venv() { :; }
+    pack_run_cmd() { echo "$*" > "${TEST_TMPDIR}/runtime-smoke.cmd"; }
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    PATH="${bin_dir}:/usr/bin:/bin"
+    export PATH
+
+    REPO_DIR="${TEST_TMPDIR}/repo"
+    mkdir -p "${REPO_DIR}"
+    INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cpu-local"
+    PACK_RUNTIME_IMAGE_FLAVOR="default"
+
+    verify_runtime_image_stack
+
+    local cmd
+    cmd="$(cat "${TEST_TMPDIR}/runtime-smoke.cmd")"
+    assert_match "make RUNTIME_IMAGE=invarlock-runtime:cpu-local runtime-smoke" "${cmd}" "cpu runtime image smoke invoked when cuda is unavailable"
+
+    unset INVARLOCK_RUNTIME_IMAGE PACK_RUNTIME_IMAGE_FLAVOR
+}
+
+test_setup_remote_verify_runtime_image_stack_propagates_flavor_failure() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
+
+    pack_activate_venv() { t_fail "pack_activate_venv should not run when flavor resolution fails"; }
+    pack_run_cmd() { t_fail "pack_run_cmd should not run when flavor resolution fails"; }
+
+    INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:custom"
+    PACK_RUNTIME_IMAGE_FLAVOR="legacy"
+
+    run verify_runtime_image_stack
+    assert_rc "1" "${RUN_RC}" "runtime image smoke propagates invalid flavor"
+    assert_match "unsupported PACK_RUNTIME_IMAGE_FLAVOR=legacy" "${RUN_ERR}" "invalid flavor error is surfaced"
+
+    unset INVARLOCK_RUNTIME_IMAGE PACK_RUNTIME_IMAGE_FLAVOR
+}
+
+test_setup_remote_verify_runtime_image_stack_stays_optional_without_image() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
+
+    local cmd_log="${TEST_TMPDIR}/runtime-smoke.log"
+    : > "${cmd_log}"
+
+    pack_activate_venv() { :; }
+    pack_run_cmd() { printf '%s\n' "$*" >> "${cmd_log}"; }
+
+    unset INVARLOCK_RUNTIME_IMAGE
+
+    verify_runtime_image_stack
+
+    assert_eq "" "$(cat "${cmd_log}")" "runtime image smoke skipped without image"
 }
 
 test_setup_remote_ensure_runtime_image_builds_cuda_local_when_missing() {
@@ -367,16 +487,17 @@ test_setup_remote_post_setup_marks_entrypoints_executable() {
 
     pack_run_cmd() { echo "$*" > "${TEST_TMPDIR}/chmod.cmd"; }
 
-    REPO_DIR="/opt/invarlock"
+    REPO_DIR="${TEST_TMPDIR}/repo"
+    mkdir -p "${REPO_DIR}"
     post_setup
 
     local cmd
     cmd="$(cat "${TEST_TMPDIR}/chmod.cmd")"
     assert_match "chmod" "${cmd}" "chmod invoked"
-    assert_match "/opt/invarlock/scripts/evidence_packs/run_suite.sh" "${cmd}" "run_suite path"
-    assert_match "/opt/invarlock/scripts/evidence_packs/run_pack.sh" "${cmd}" "run_pack path"
-    assert_match "/opt/invarlock/scripts/evidence_packs/verify_pack.sh" "${cmd}" "verify_pack path"
-    assert_match "/opt/invarlock/scripts/evidence_packs/run_mini_pack_gate.sh" "${cmd}" "mini gate path"
+    assert_match "${REPO_DIR}/scripts/evidence_packs/run_suite.sh" "${cmd}" "run_suite path"
+    assert_match "${REPO_DIR}/scripts/evidence_packs/run_pack.sh" "${cmd}" "run_pack path"
+    assert_match "${REPO_DIR}/scripts/evidence_packs/verify_pack.sh" "${cmd}" "verify_pack path"
+    assert_match "${REPO_DIR}/scripts/evidence_packs/run_mini_pack_gate.sh" "${cmd}" "mini gate path"
 }
 
 
@@ -390,15 +511,16 @@ test_setup_remote_ensure_repo_alias_links_canonical_root_when_repo_dir_differs()
 
     pack_run_cmd() { printf '%s\n' "$*" >> "${cmd_log}"; }
 
-    REPO_DIR="/opt/invarlock-a100"
-    CANONICAL_REPO_ALIAS="/root/invarlock-public"
+    REPO_DIR="${TEST_TMPDIR}/repo-a100"
+    mkdir -p "${REPO_DIR}"
+    CANONICAL_REPO_ALIAS="${TEST_TMPDIR}/repo-alias"
 
     ensure_repo_alias
 
     local log_text
     log_text="$(cat "${cmd_log}")"
-    assert_match "mkdir -p /root" "${log_text}" "alias parent directory created"
-    assert_match "ln -sfn /opt/invarlock-a100 /root/invarlock-public" "${log_text}" "canonical alias refreshed"
+    assert_match "mkdir -p ${TEST_TMPDIR}" "${log_text}" "alias parent directory created"
+    assert_match "ln -sfn ${REPO_DIR} ${CANONICAL_REPO_ALIAS}" "${log_text}" "canonical alias refreshed"
 }
 
 
@@ -749,6 +871,7 @@ EOF
     pip_log="$(cat "${TEST_TMPDIR}/pip.calls")"
     assert_match "requirements/evidence-packs/huggingface_hub.txt" "${pip_log}" "huggingface_hub pin installed"
     assert_match "requirements/evidence-packs/accelerate.txt" "${pip_log}" "accelerate pin installed"
+    assert_match "requirements/evidence-packs/accelerate.txt --no-deps" "${pip_log}" "accelerate pin preserves selected torch backend"
     assert_match "requirements/evidence-packs/pyyaml.txt" "${pip_log}" "pyyaml pin installed"
     assert_match "requirements/evidence-packs/protobuf.txt" "${pip_log}" "protobuf pin installed"
     assert_match "requirements/evidence-packs/sentencepiece.txt" "${pip_log}" "sentencepiece pin installed"

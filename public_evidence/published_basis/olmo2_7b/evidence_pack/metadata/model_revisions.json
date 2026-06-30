@@ -11,7 +11,7 @@
             "main"
           ],
           "size_on_disk": 29201682534,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--allenai--OLMo-2-1124-7B/snapshots/7df9a82518afdecae4e8c026b27adccc8c1f0032"
+          "snapshot_path": "<hf-cache-dir>/hub/models--allenai--OLMo-2-1124-7B/snapshots/7df9a82518afdecae4e8c026b27adccc8c1f0032"
         }
       ],
       "slug": "olmo2_7b",

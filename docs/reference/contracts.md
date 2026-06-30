@@ -48,8 +48,8 @@ Compatibility rules:
 | Contract | Path | Purpose |
 | --- | --- | --- |
 | Support matrix | `contracts/support_matrix.json` | Normalized support tiers and public evidence references |
-| Model family catalog | `contracts/model_family_catalog.json` | Broader inventory for declared support, code-level coverage, usage-only checkpoints, and recommended additions |
-| Model classification | `contracts/model_classification.json` | Lifecycle classification for published, backlog, blocked, smoke-only, usage-only, and out-of-scope model inventory, plus blocked named checkpoints |
+| Model family catalog | `contracts/model_family_catalog.json` | Declared support, code-level coverage, usage-only checkpoints, and recommended additions |
+| Model classification | `contracts/model_classification.json` | Lifecycle classification for published, backlog, blocked, smoke-only, usage-only, and out-of-scope model status |
 | Adapter capabilities | `contracts/adapter_capabilities.json` | Snapshot/restore, guard coverage, runtime limits, extras |
 | Plugin compatibility | `contracts/plugin_compatibility.json` | Core ABI policy and failure mode |
 | Runtime manifest | `contracts/runtime_manifest.schema.json` | Runtime provenance schema for `runtime.manifest.json` sidecars |
@@ -100,9 +100,8 @@ For support-related automation, `plugins adapters --json` and `doctor --json`
 expose both the strict `support_matrix` contract and the broader
 `model_family_catalog` contract. Lifecycle decisions such as `published`,
 `backlog`, `blocked`, `usage_only`, and `out_of_scope` live in
-`model_classification`, so license/access changes can be handled by editing the
-manifest and rerunning `make contracts-check` instead of searching every support
-surface by hand. The same JSON surfaces also include the `validation_keys`,
+`model_classification`; update that manifest and rerun `make contracts-check`
+to refresh support surfaces. The same JSON surfaces also include the `validation_keys`,
 `console_labels`, and `metric_kinds` entries from the public contract catalog.
 
 The versioned JSON surfaces are intentionally explicit:

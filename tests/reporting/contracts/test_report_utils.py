@@ -102,6 +102,60 @@ def test_validate_evaluation_report_rejects_unknown_primary_metric_kind() -> Non
     assert schema_mod.validate_report(bad) is False
 
 
+def test_validate_evaluation_report_accepts_optional_evaluation_realism() -> None:
+    report = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "r",
+        "artifacts": {"generated_at": "t"},
+        "plugins": {},
+        "meta": {},
+        "dataset": {
+            "provider": "p",
+            "seq_len": 8,
+            "windows": {"preview": 0, "final": 0, "stats": {}},
+        },
+        "primary_metric": {"kind": "ppl_causal", "final": 10.0},
+        "validation": {"primary_metric_acceptable": True},
+        "evaluation_realism": {
+            "mode": "generation",
+            "prompt_template_hash": "sha256:" + "a" * 64,
+            "decoding_config": {"temperature": 0.2, "top_p": 0.9},
+            "max_tokens": 128,
+            "truncation_policy": "truncate_to_context",
+            "dataset_or_task_id": "qaedit-generation-smoke",
+            "metric_is_generation_realistic": True,
+        },
+    }
+
+    assert schema_mod.validate_report(report) is True
+
+
+def test_validate_evaluation_report_rejects_malformed_evaluation_realism() -> None:
+    report = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "r",
+        "artifacts": {"generated_at": "t"},
+        "plugins": {},
+        "meta": {},
+        "dataset": {
+            "provider": "p",
+            "seq_len": 8,
+            "windows": {"preview": 0, "final": 0, "stats": {}},
+        },
+        "primary_metric": {"kind": "ppl_causal", "final": 10.0},
+        "validation": {"primary_metric_acceptable": True},
+        "evaluation_realism": {
+            "mode": "unrealistic_mode",
+            "prompt_template_hash": "not-a-digest",
+            "decoding_config": "temperature=0",
+            "max_tokens": -1,
+            "metric_is_generation_realistic": "no",
+        },
+    }
+
+    assert schema_mod.validate_report(report) is False
+
+
 def test_console_validation_block_guard_skipped_and_included() -> None:
     base = {
         "schema_version": schema_mod.REPORT_SCHEMA_VERSION,

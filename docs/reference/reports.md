@@ -183,7 +183,7 @@ for verdict states.
 - **Schema stability**: v1 has a stable core around primary metric,
   dataset/window metadata, artifacts, plugins, and report identity. Optional
   policy, guard, provenance, telemetry, and confidence blocks are additive
-  unless promoted into the required core, which requires a schema-version bump.
+  unless moved into the required core, which requires a schema-version bump.
 - **Validation allow-list**: only specific `validation.*` flags are accepted by
   the schema validator.
 - **Baseline pairing**: reports assume paired windows; verification enforces
@@ -505,7 +505,7 @@ invarlock report export \
 | --- | --- | --- |
 | `mlflow-tags` | JSON with `tags` and report artifact path | Set registry tags and log the report as an MLflow artifact from an MLflow-enabled environment. |
 | `model-card-md` | Markdown block | Paste InvarLock evidence into a Hugging Face model card or equivalent model README. |
-| `release-review-md` | Markdown packet | Attach pass/fail, baseline/subject identity, report hash, policy profile, and reviewer checklist to release review. |
+| `release-review-md` | Markdown packet | Attach pass/fail, baseline/subject identity, report hash, policy profile, and acceptance checklist to release review. |
 
 These exports summarize regression evidence only. They do not change verifier
 semantics, replace `invarlock verify`, or provide deployment approval.

@@ -9,6 +9,52 @@ from invarlock.core.exceptions import ModelLoadError
 _MISTRAL3_ARCH = "Mistral3For" + "ConditionalGeneration"
 
 
+def test_hf_causal_direct_fallback_is_lazy_when_auto_loader_succeeds(
+    monkeypatch,
+) -> None:
+    auto_loader = object()
+    calls: list[bool] = []
+
+    def fake_resolve_core_loader_strategy(
+        *,
+        task: str,
+        model_id: str,
+        kwargs: dict[str, object] | None = None,
+        allow_direct_submodule: bool = False,
+    ) -> HFLoaderStrategy:
+        calls.append(allow_direct_submodule)
+        assert task == "causal"
+        assert model_id == "sshleifer/tiny-gpt2"
+        return HFLoaderStrategy(
+            task=task,
+            strategy="auto",
+            loader=auto_loader,
+            loader_label="transformers.AutoModelForCausalLM",
+            model_type="gpt2",
+        )
+
+    monkeypatch.setattr(
+        "invarlock.adapters.hf_causal.resolve_core_loader_strategy",
+        fake_resolve_core_loader_strategy,
+    )
+
+    adapter = HF_Causal_Adapter()
+    monkeypatch.setattr(adapter, "_safe_to_device", lambda model, device: model)
+    monkeypatch.setattr(
+        adapter,
+        "_load_pretrained_model",
+        lambda loader, model_id, **kwargs: SimpleNamespace(
+            config=SimpleNamespace(model_type="gpt2")
+        ),
+    )
+
+    model = adapter.load_model("sshleifer/tiny-gpt2", device="cpu")
+
+    assert getattr(model.config, "model_type", None) == "gpt2"
+    assert calls == [False]
+    assert adapter._last_loader_strategy == "auto"
+
+
 def test_hf_causal_direct_fallback_ignores_remote_code_flag(monkeypatch) -> None:
     auto_loader = object()
     direct_loader = object()

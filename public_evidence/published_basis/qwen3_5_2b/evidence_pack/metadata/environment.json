@@ -3,7 +3,7 @@
   "execution_mode": "container",
   "gpu": "NVIDIA H100 80GB HBM3",
   "gpu_id": "1",
-  "host": "root@31.56.109.46",
+  "host": "<cuda-validation-host>",
   "profile": "release",
   "runtime_image": "ghcr.io/invarlock/invarlock-runtime:latest@sha256:5edf2d5aa7249fd720bbb6885c0cd70c3a53f35ef969cad6cbc92ad05a5f3a9b",
   "runtime_image_digest": "sha256:5edf2d5aa7249fd720bbb6885c0cd70c3a53f35ef969cad6cbc92ad05a5f3a9b",

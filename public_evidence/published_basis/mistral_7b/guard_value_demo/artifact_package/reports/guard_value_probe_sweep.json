@@ -19,7 +19,7 @@
     "baseline_eval_rerun": false,
     "calibration_rerun": false,
     "guard_baseline": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
-    "pm_baseline_runtime_input": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/baseline_reports/ci_balanced_seq512_pv200_fn200/baseline_report.json",
+    "pm_baseline_runtime_input": "<validation-output-root>/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/baseline_reports/ci_balanced_seq512_pv200_fn200/baseline_report.json",
     "probe_windows": {
       "final": 200,
       "preview": 200
@@ -55,7 +55,7 @@
         1.0003945872681685
       ],
       "ratio_vs_baseline": 0.9997699255693849,
-      "remote_report": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json",
+      "remote_report": "<validation-output-root>/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json",
       "report": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json",
       "report_sha256": "b34873741b4a8ad264fbefbc42aa4302be53b3c4ad887f0f9f890ff99b2d37ce",
       "runtime_manifest": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/runtime.manifest.json",
@@ -101,7 +101,7 @@
         1.0006420435767343
       ],
       "ratio_vs_baseline": 0.9998923455298602,
-      "remote_report": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_attn_l31_o_s118/evaluation.report.json",
+      "remote_report": "<validation-output-root>/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_attn_l31_o_s118/evaluation.report.json",
       "scale_factor": 1.18,
       "scenario_id": "spectral_moderate_scale_attn_l31_o_s118",
       "spectral_caps_applied": 3,
@@ -151,7 +151,7 @@
         1.0016488905034564
       ],
       "ratio_vs_baseline": 1.0005911896460107,
-      "remote_report": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_attn_l31_o_s125/evaluation.report.json",
+      "remote_report": "<validation-output-root>/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_attn_l31_o_s125/evaluation.report.json",
       "scale_factor": 1.25,
       "scenario_id": "spectral_moderate_scale_attn_l31_o_s125",
       "spectral_caps_applied": 3,
@@ -224,7 +224,7 @@
         1.0086911227573168
       ],
       "ratio_vs_baseline": 1.0076338080085065,
-      "remote_report": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json",
+      "remote_report": "<validation-output-root>/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json",
       "report": "artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json",
       "report_sha256": "37bc145c7a23c055ae29039673ec2eaf99cec3d5d5eedea8d6010f844a6c4859",
       "runtime_manifest": "artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/runtime.manifest.json",
@@ -277,7 +277,7 @@
         1.0137007513122434
       ],
       "ratio_vs_baseline": 1.0123042565430007,
-      "remote_report": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_mlp_l31_up_s116/evaluation.report.json",
+      "remote_report": "<validation-output-root>/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_mlp_l31_up_s116/evaluation.report.json",
       "scale_factor": 1.16,
       "scenario_id": "spectral_moderate_scale_mlp_l31_up_s116",
       "spectral_caps_applied": 3,
@@ -327,7 +327,7 @@
         1.0199789146584188
       ],
       "ratio_vs_baseline": 1.0181969022618855,
-      "remote_report": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_mlp_l31_up_s120/evaluation.report.json",
+      "remote_report": "<validation-output-root>/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_mlp_l31_up_s120/evaluation.report.json",
       "scale_factor": 1.2,
       "scenario_id": "spectral_moderate_scale_mlp_l31_up_s120",
       "spectral_caps_applied": 3,
@@ -370,7 +370,7 @@
       "log_note": "Manual task log was not retained in this published artifact; the packaged evaluation report, runtime manifest, sidecar probe, and run_pack.log are the audited shipped evidence."
     }
   ],
-  "remote_output_root": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d",
+  "remote_output_root": "<validation-output-root>/mistral_guard_value_real_20260612d",
   "schema": "invarlock.public_evidence.guard_value_probe_sweep.v1",
   "selected_negative_control": "spectral_moderate_scale_attn_l31_o_s112",
   "selected_positive": "spectral_moderate_scale_mlp_l31_up_s112"

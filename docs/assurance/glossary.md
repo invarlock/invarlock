@@ -8,7 +8,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Define key assurance, report, guard, data, policy, and provenance terms in one reference. |
-| **Audience** | Report readers, contributors, reviewers, and operators following cross-document terminology. |
+| **Audience** | Report readers, contributors, auditors, and operators following cross-document terminology. |
 | **Contract scope** | Terminology only; runtime behavior is governed by the linked assurance docs and reference pages. |
 | **Source of truth** | This glossary, linked assurance notes, report schemas, and public contract data under `src/invarlock/_data/contracts/`. |
 

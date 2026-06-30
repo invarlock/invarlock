@@ -237,6 +237,7 @@ all = [
 dev = [
   "pytest>=7.0",
   "pytest-cov>=7.1.0",
+  "pytest-xdist>=3.6",
   "ruff==0.15.17",
   "black>=23.0",
   "mypy>=1.0",
@@ -257,6 +258,7 @@ dev = [
 ci = [
   "pytest>=7.0",
   "pytest-cov>=7.1.0",
+  "pytest-xdist>=3.6",
   "hypothesis>=6.98",
   "ruff==0.15.17",
   "mypy>=1.0",
@@ -290,6 +292,7 @@ release-ci = [
 security-ci = [
   "pip>=26.1.2",
   "pip-audit>=2.8",
+  "msgpack>=1.2.1",
   "requests>=2.33.0",
   "cyclonedx-bom>=4.1",
 ]
@@ -552,6 +555,12 @@ include = [
     "scripts/release/*.py",
     "scripts/evidence_workflows/*.py",
     "scripts/evidence_packs/python/workflow_frontdoor.py",
+    "scripts/evidence_packs/python/create_edit_model.py",
+    "scripts/evidence_packs/python/create_edits_batch.py",
+    "scripts/evidence_packs/python/editing/implementations.py",
+    "scripts/evidence_packs/python/editing/tensor_ops.py",
+    "scripts/evidence_packs/python/preset_generator.py",
+    "scripts/evidence_packs/python/task_tools_reports.py",
     "src/invarlock/eval/*",
     "src/invarlock/guards/*",
     "src/invarlock/calibration.py",

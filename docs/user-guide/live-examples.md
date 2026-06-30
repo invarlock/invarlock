@@ -1,7 +1,7 @@
 # Live Examples
 
-The curated live-example lane keeps the public front door honest without
-dragging CI into every optional dependency surface.
+The curated live-example lane keeps the public front door honest while limiting
+CI to stable dependency surfaces.
 
 ## Curated CI-safe subset
 
@@ -32,8 +32,8 @@ make docs-live
 ```
 
 That verifier replays runnable markdown examples and smoke-runs all notebooks
-under `notebooks/`. Unlike the curated CI lane, this local verifier runs the
-real model-loading and evaluation steps for the runnable surfaces it selects.
+under `notebooks/`. The local lane runs the real model-loading and evaluation
+steps for the runnable surfaces it selects.
 For heavier public examples, the verifier rewrites onto smoke-sized shipped
 assets such as `sshleifer/tiny-gpt2`, `gpt2_smoke_128`, and the smoke calibration
 configs. It also normalizes heavy `ci` / `release` examples onto a local smoke
@@ -43,6 +43,6 @@ downloads, and materially longer runtimes than the curated CI subset.
 
 ## Trust boundary
 
-Notebook examples are host examples. They are meant to be easy to run
-from a checkout or an installed development environment. They do not replace
-the runtime-container path used by the default CLI workflow.
+Notebook examples are host examples. They are meant to be easy to run from a
+checkout or an installed development environment. Use the runtime-container path
+for the default CLI workflow and strict runtime provenance.

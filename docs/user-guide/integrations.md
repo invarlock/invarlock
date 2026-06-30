@@ -7,8 +7,8 @@ examples under `examples/integrations/`. These examples are for checkpoint-edit
 toolchains that want to attach InvarLock regression evidence after producing an
 edited subject checkpoint.
 
-The integration surface is intentionally source-tree only. It is not part of the
-runtime package and should not add required dependencies to the core install.
+The integration surface lives in the source tree and keeps optional target
+dependencies out of the runtime package and core install.
 
 ## Current Scope
 
@@ -125,9 +125,10 @@ same `verify-output` JSON so their pass/fail status reflects the verifier
 result item for the same evaluation report when the action has run
 verification.
 
-This integration layer is intentionally small. It exports evidence into CI,
-model cards, and registries; it does not replace MLflow, Hugging Face Hub,
-Databricks, SageMaker, Vertex, or an organization's approval workflow.
+This integration layer is intentionally small. It exports InvarLock evidence
+for CI and downstream handoff into model cards, registries, MLflow,
+Hugging Face Hub, Databricks, SageMaker, Vertex, or an organization's approval
+workflow.
 
 ## Public Evidence Anchors
 
@@ -140,6 +141,9 @@ invarlock verify --profile release --assurance strict \
 
 invarlock verify --profile release --assurance strict \
   public_evidence/byoe_examples/lora_merge_byoe/evaluation.report.json
+
+invarlock verify --profile release --assurance strict \
+  public_evidence/byoe_examples/fine_tune_byoe/evaluation.report.json
 
 invarlock verify --profile release --assurance strict \
   public_evidence/real_runs/tiny_gpt2_quant_rtn/evaluation.report.json

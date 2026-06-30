@@ -42,6 +42,7 @@ def test_gptqmodel_runner_has_expected_adapter_contract() -> None:
     assert "integration_log_header" in text
     assert "integration_log_step" in text
     assert "lane_artifact_label" in text
+    assert "_patch_gptqmodel_transformers_hub_compat" in text
 
 
 def test_gptqmodel_readme_scopes_strict_evidence_to_tiny_runtime() -> None:
@@ -57,6 +58,9 @@ def test_gptqmodel_readme_scopes_strict_evidence_to_tiny_runtime() -> None:
 
 def test_gptqmodel_helper_writes_local_jsonl_and_preset(tmp_path: Path) -> None:
     helper = _load_helper_module()
+    helper_text = HELPER.read_text(encoding="utf-8")
+    assert "_patch_gptqmodel_transformers_hub_compat" in helper_text
+
     summary = helper.write_text_fixture(
         tmp_path,
         rows=6,

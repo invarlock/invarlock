@@ -1,0 +1,31 @@
+{
+  "config": {
+    "path": null,
+    "sha256": "95d0ae8d07c2ac9bcab144fce99ab5da866615c07133a1f142e5fbbd24f6f050",
+    "source": "inline"
+  },
+  "context": {
+    "assurance": "strict",
+    "command": "evaluate",
+    "execution_mode": "container",
+    "profile": "release",
+    "tier": "balanced"
+  },
+  "execution_mode": "container",
+  "generated_at_utc": "2026-06-29T06:24:34.747506+00:00",
+  "manifest_version": 1,
+  "report": {
+    "filename": "evaluation.report.json",
+    "path": "/workspace/tmp/model_evidence_container/b4daa737b88467de/eval/qwen_qwen3_6_27b_no_linear_attn_spectral/report/evaluation.report.json",
+    "sha256": "bf5240f37983a391871f8b4a3b79d4de17ea7d9435c8eac5e947d7e251e9d4e4"
+  },
+  "runtime": {
+    "allow_network": true,
+    "allow_remote_code": false,
+    "allow_third_party_plugins": false,
+    "container_execution": true,
+    "image_digest": "sha256:40b08c74a3ef0defe433f3dc8f4b0b6d5ad586d45ebc04c7f833f3dbf75caf44",
+    "image_ref": "ghcr.io/invarlock/invarlock-runtime:latest@sha256:40b08c74a3ef0defe433f3dc8f4b0b6d5ad586d45ebc04c7f833f3dbf75caf44"
+  },
+  "verifier_contract_version": "runtime-manifest-v1"
+}

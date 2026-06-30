@@ -366,23 +366,32 @@ YAML
     local config_yaml="${run_dir}/calibration_config.yaml"
     local guards_order_csv="${PACK_GUARDS_ORDER:-}"
     local -a raw_guards_order=()
+    local raw_guards_order_count=0
     if [[ -n "${guards_order_csv}" ]]; then
         IFS=',' read -ra raw_guards_order <<< "${guards_order_csv}"
+        raw_guards_order_count=${#raw_guards_order[@]}
     fi
     local -a guards_order=()
     local g
-    for g in "${raw_guards_order[@]}"; do
-        g="$(echo "${g}" | xargs)"
-        [[ -z "${g}" ]] && continue
-        guards_order+=("${g}")
-    done
-    if [[ ${#guards_order[@]} -eq 0 ]]; then
+    local guards_order_count=0
+    if [[ ${raw_guards_order_count} -gt 0 ]]; then
+        for g in "${raw_guards_order[@]}"; do
+            g="$(echo "${g}" | xargs)"
+            [[ -z "${g}" ]] && continue
+            guards_order+=("${g}")
+            guards_order_count=$((guards_order_count + 1))
+        done
+    fi
+    if [[ ${guards_order_count} -eq 0 ]]; then
         guards_order=("invariants" "spectral" "rmt" "variance" "invariants")
+        guards_order_count=5
     fi
     local guards_order_yaml=""
-    for g in "${guards_order[@]}"; do
-        guards_order_yaml+=$'    - '"${g}"$'\n'
-    done
+    if [[ ${guards_order_count} -gt 0 ]]; then
+        for g in "${guards_order[@]}"; do
+            guards_order_yaml+=$'    - '"${g}"$'\n'
+        done
+    fi
 
     local dataset_provider_yaml
     dataset_provider_yaml="$(pack_render_dataset_provider_yaml "${INVARLOCK_DATASET:-wikitext2}")"
@@ -540,7 +549,7 @@ task_generate_preset() {
         --stride "${stride}" \
         --preview-n "${preview_n}" \
         --final-n "${final_n}" \
-        --edit-types "quant_rtn,fp8_quant,magnitude_prune,lowrank_svd" \
+        --edit-types "quant_rtn,fp8_quant,magnitude_prune,lowrank_svd,lora_merge,fine_tune" \
         >> "${log_file}" 2>&1 || exit_code=$?
 
     return ${exit_code}

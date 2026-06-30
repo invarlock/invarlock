@@ -11,7 +11,7 @@
             "main"
           ],
           "size_on_disk": 14485813893,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--mistralai--Mistral-7B-v0.1/snapshots/27d67f1b5f57dc0953326b2601d68371d40ea8da"
+          "snapshot_path": "<hf-cache-dir>/hub/models--mistralai--Mistral-7B-v0.1/snapshots/27d67f1b5f57dc0953326b2601d68371d40ea8da"
         }
       ],
       "slug": "mistral_7b",

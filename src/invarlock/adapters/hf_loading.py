@@ -25,6 +25,7 @@ _CUDA_CAPABILITY_ERRORS = (AttributeError, RuntimeError, OSError)
 _MEMORY_EFFICIENT_TRUE = {"1", "true", "yes", "on", "auto"}
 _MEMORY_EFFICIENT_FALSE = {"0", "false", "no", "off", "disabled"}
 _AUTO_DEVICE_MAP_PARAM_THRESHOLD_B = 20.0
+_TEXT_ONLY_TASKS = {"causal", "mlm", "mlm_base", "seq2seq"}
 
 _AUTO_LOADER_SPECS: dict[str, tuple[str, str]] = {
     "causal": ("transformers", "AutoModelForCausalLM"),
@@ -244,7 +245,7 @@ class _ChatGLMRemoteCodeCausalLoader:
             auto_model = _resolve_auto_loader("causal")[0]
             return auto_model.from_pretrained(model_id, **loader_kwargs)
 
-        model_cls = get_class_from_dynamic_module(
+        model_cls: Any = get_class_from_dynamic_module(
             class_ref,
             model_id,
             trust_remote_code=trust_remote_code,
@@ -530,6 +531,31 @@ def _import_symbol(module_path: str, symbol_name: str) -> Any:
     return getattr(module, symbol_name)
 
 
+def _disable_torchvision_for_text_only_task(task: str) -> bool:
+    """Keep optional torchvision import failures out of text-only HF loaders."""
+
+    if task not in _TEXT_ONLY_TASKS:
+        return False
+    try:
+        transformers_utils = importlib.import_module("transformers.utils")
+        import_utils = importlib.import_module("transformers.utils.import_utils")
+    except Exception:
+        return False
+
+    patched = False
+    for module in (transformers_utils, import_utils):
+        if hasattr(module, "is_torchvision_available"):
+            module.is_torchvision_available = lambda: False  # type: ignore[attr-defined]
+            patched = True
+        if hasattr(module, "_torchvision_available"):
+            module._torchvision_available = False  # type: ignore[attr-defined]
+            patched = True
+        if hasattr(module, "_torchvision_version"):
+            module._torchvision_version = None  # type: ignore[attr-defined]
+            patched = True
+    return patched
+
+
 def _loader_label(module_path: str, symbol_name: str) -> str:
     return f"{module_path}.{symbol_name}"
 
@@ -607,6 +633,8 @@ def resolve_core_loader_strategy(
 
     if task != "multimodal" and task not in _AUTO_LOADER_SPECS:
         raise KeyError(f"Unknown HF loader task: {task}")
+
+    _disable_torchvision_for_text_only_task(task)
 
     model_type = None
     config_data = _read_local_config(model_id)

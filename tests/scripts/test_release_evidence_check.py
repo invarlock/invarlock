@@ -478,7 +478,7 @@ def test_release_evidence_contract_owner_paths(tmp_path: Path) -> None:
     assert failures == []
 
     failures.clear()
-    from evidence_contracts import DistHashManifest
+    DistHashManifest = module.DistHashManifest
 
     DistHashManifest({}).validate_artifacts(dist_root=root, failures=failures)
     assert failures == ["wheel/sdist hashes file has no valid entries."]
@@ -494,7 +494,8 @@ def test_release_evidence_contract_owner_paths(tmp_path: Path) -> None:
 
 
 def test_release_evidence_contract_edge_paths(tmp_path: Path) -> None:
-    from evidence_contracts import ReleaseEvidenceManifest
+    module = _release_checker_module(_repo_root())
+    ReleaseEvidenceManifest = module.ReleaseEvidenceManifest
 
     dist = tmp_path / "dist"
     release = tmp_path / "release"

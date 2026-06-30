@@ -26,7 +26,7 @@ MODEL_FAMILY_CATALOG_PATH = REPO_ROOT / "contracts" / "model_family_catalog.json
 DEFAULT_SUITE = "current-supported-experimental"
 REPO_MENTIONED_GPU_SUITE = "repo-mentioned-gpu"
 MODEL_CATALOG_GPU_SUITE = "model-catalog-gpu"
-PROMOTION_GAP_GPU_SUITE = "promotion-gap-gpu"
+PUBLISHED_BASIS_GAP_GPU_SUITE = "published-basis-gap-gpu"
 SUPPORT_MATRIX_BACKLOG_GPU_SUITE = "support-matrix-backlog-gpu"
 EXECUTION_MODES = ("container", "host")
 GPU_80GB_USABLE_MEMORY_GB = 72.0
@@ -417,6 +417,21 @@ def _qwen3_5_4b_vqav2_materialization() -> dict[str, object]:
     return materialization
 
 
+def _public_vqav2_materialization_for_preset(
+    preset_relpath: str,
+) -> dict[str, object] | None:
+    preset_name = Path(preset_relpath).name
+    if not (
+        preset_relpath.startswith("configs/presets/multimodal/")
+        and "public_vqav2" in preset_name
+        and preset_name.endswith(".yaml")
+    ):
+        return None
+    if preset_name.startswith(("qwen3_5_", "qwen3_6_")):
+        return _qwen3_5_4b_vqav2_materialization()
+    return _public_vqav2_materialization()
+
+
 SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
     EvidenceLane(
         slug="google_gemma_4_12b_it",
@@ -469,6 +484,26 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
         vision_text_materialization=_public_vqav2_materialization(),
     ),
     EvidenceLane(
+        slug="qwen_qwen3_5_27b_scoped",
+        lane_id="qwen3-5-27b-image-text-scoped-hf",
+        family="Qwen3.5 27B image-text LM (scoped)",
+        model_id="Qwen/Qwen3.5-27B",
+        preset_relpath="configs/presets/multimodal/qwen3_5_27b_public_vqav2_scoped_256.yaml",
+        adapter="hf_multimodal",
+        verify_profile="release",
+        vision_text_materialization=_qwen3_5_4b_vqav2_materialization(),
+    ),
+    EvidenceLane(
+        slug="qwen_qwen3_6_27b_scoped",
+        lane_id="qwen3-6-27b-image-text-scoped-hf",
+        family="Qwen3.6 27B image-text LM (scoped)",
+        model_id="Qwen/Qwen3.6-27B",
+        preset_relpath="configs/presets/multimodal/qwen3_6_27b_public_vqav2_scoped_256.yaml",
+        adapter="hf_multimodal",
+        verify_profile="release",
+        vision_text_materialization=_qwen3_5_4b_vqav2_materialization(),
+    ),
+    EvidenceLane(
         slug="huggingfacetb_smollm3_3b",
         lane_id="smollm3-3b-causal-hf",
         family="SmolLM3 3B causal LM",
@@ -505,6 +540,15 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
         verify_profile="release",
     ),
     EvidenceLane(
+        slug="openai_gpt_oss_20b",
+        lane_id="gpt-oss-20b-causal-hf",
+        family="GPT-OSS 20B causal LM",
+        model_id="openai/gpt-oss-20b",
+        preset_relpath="configs/presets/causal_lm/gpt_oss_20b_512.yaml",
+        adapter="hf_causal",
+        verify_profile="release",
+    ),
+    EvidenceLane(
         slug="mistralai_mixtral_8x7b_v0_1",
         lane_id="mixtral-8x7b-moe-causal-hf",
         family="Mixtral 8x7B MoE causal LM",
@@ -528,6 +572,16 @@ SUPPORT_MATRIX_BACKLOG_GPU_LANES: tuple[EvidenceLane, ...] = (
         family="Gemma 4 26B-A4B MoE image-text LM",
         model_id="google/gemma-4-26B-A4B-it",
         preset_relpath="configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
+        adapter="hf_multimodal",
+        verify_profile="release",
+        vision_text_materialization=_public_vqav2_materialization(),
+    ),
+    EvidenceLane(
+        slug="google_gemma_4_31b_it",
+        lane_id="gemma4-31b-image-text-hf",
+        family="Gemma 4 31B image-text LM",
+        model_id="google/gemma-4-31B-it",
+        preset_relpath="configs/presets/multimodal/gemma4_31b_public_vqav2_256.yaml",
         adapter="hf_multimodal",
         verify_profile="release",
         vision_text_materialization=_public_vqav2_materialization(),
@@ -571,6 +625,9 @@ def _build_model_catalog_gpu_lanes(
                 preset_relpath=defaults.preset_relpath,
                 adapter=defaults.adapter,
                 verify_profile="dev",
+                vision_text_materialization=_public_vqav2_materialization_for_preset(
+                    defaults.preset_relpath
+                ),
             )
         )
         seen.add(model_id)
@@ -580,19 +637,19 @@ def _build_model_catalog_gpu_lanes(
 MODEL_CATALOG_GPU_LANES = _build_model_catalog_gpu_lanes()
 
 
-def _build_promotion_gap_gpu_lanes(
+def _build_published_basis_gap_gpu_lanes(
     payload: dict[str, object] | None = None,
 ) -> tuple[EvidenceLane, ...]:
     catalog = payload or _load_model_family_catalog()
-    section = catalog.get("promotion_candidates_text_le_14b") or {}
+    section = catalog.get("published_basis_candidates_text_le_14b") or {}
     if not isinstance(section, dict):
         raise ValueError(
-            "model_family_catalog.promotion_candidates_text_le_14b must be an object"
+            "model_family_catalog.published_basis_candidates_text_le_14b must be an object"
         )
     candidates = section.get("candidates") or []
     if not isinstance(candidates, list):
         raise ValueError(
-            "model_family_catalog.promotion_candidates_text_le_14b.candidates must be a list"
+            "model_family_catalog.published_basis_candidates_text_le_14b.candidates must be a list"
         )
 
     lanes: list[EvidenceLane] = []
@@ -619,7 +676,7 @@ def _build_promotion_gap_gpu_lanes(
         base_record = next(
             iter(route_index.records_for_model(model_id)),
             ModelFamilyRecord(
-                section="promotion_candidates_text_le_14b",
+                section="published_basis_candidates_text_le_14b",
                 family_id=str(candidate.get("candidate_id") or model_id),
                 display_name=family_label,
                 representative_model=model_id,
@@ -638,7 +695,7 @@ def _build_promotion_gap_gpu_lanes(
             else ()
         )
         defaults_record = ModelFamilyRecord(
-            section="promotion_candidates_text_le_14b",
+            section="published_basis_candidates_text_le_14b",
             family_id=str(candidate.get("candidate_id") or base_record.family_id),
             display_name=family_label,
             representative_model=model_id,
@@ -656,7 +713,7 @@ def _build_promotion_gap_gpu_lanes(
         lanes.append(
             EvidenceLane(
                 slug=catalog_slug(model_id),
-                lane_id=f"promotion-gap::{catalog_slug(model_id)}",
+                lane_id=f"published-basis-gap::{catalog_slug(model_id)}",
                 family=family_label,
                 model_id=model_id,
                 preset_relpath=defaults.preset_relpath,
@@ -667,7 +724,7 @@ def _build_promotion_gap_gpu_lanes(
     return tuple(lanes)
 
 
-PROMOTION_GAP_GPU_LANES = _build_promotion_gap_gpu_lanes()
+PUBLISHED_BASIS_GAP_GPU_LANES = _build_published_basis_gap_gpu_lanes()
 
 SUITES: dict[str, tuple[EvidenceLane, ...]] = {
     DEFAULT_SUITE: CURRENT_SUPPORTED_EXPERIMENTAL_LANES,
@@ -677,7 +734,7 @@ SUITES: dict[str, tuple[EvidenceLane, ...]] = {
         + CURRENT_SUPPORTED_EXPERIMENTAL_LANES
     ),
     MODEL_CATALOG_GPU_SUITE: MODEL_CATALOG_GPU_LANES,
-    PROMOTION_GAP_GPU_SUITE: PROMOTION_GAP_GPU_LANES,
+    PUBLISHED_BASIS_GAP_GPU_SUITE: PUBLISHED_BASIS_GAP_GPU_LANES,
     SUPPORT_MATRIX_BACKLOG_GPU_SUITE: SUPPORT_MATRIX_BACKLOG_GPU_LANES,
 }
 

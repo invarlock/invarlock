@@ -6,8 +6,8 @@ task graph, scheduling, and artifact generation. It complements
 
 > Scope note: in this guide, `CALIBRATION_RUN -> GENERATE_PRESET` is called
 > **Preset Derivation**. It produces run-scoped
-> `calibrated_preset_<model>.yaml/json` files and does not directly modify
-> global `runtime/tiers.yaml`.
+> `calibrated_preset_<model>.yaml/json` files. Global `runtime/tiers.yaml`
+> tuning remains part of the calibration workflow.
 
 ## Overview
 
@@ -18,7 +18,7 @@ task graph, scheduling, and artifact generation. It complements
 | Manifest format | `evidence-pack-v1` |
 | Hardware | NVIDIA GPUs where models fit VRAM; multi-GPU recommended for `full` |
 | Models | `subset` (1 model), `showcase`/`workshop3` (3 models), or `full` (6 models); all ungated public |
-| Edits | Scenario-driven; default suites use 4 clean + 4 stress edit scenarios per model, and filtered manifests may select any subset |
+| Edits | Scenario-driven; default suites use 6 clean + 6 stress edit scenarios per model, and filtered manifests may select any subset |
 | Preset Derivation | `CALIBRATION_RUN` + `GENERATE_PRESET` create run-scoped calibrated presets |
 | Scheduling | Dynamic work-stealing, `small_first` priority strategy |
 | Multi-GPU | Profile-based; `required_gpus` grows only when memory requires it |
@@ -77,7 +77,7 @@ invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000
 - `lib/queue/queue_manager.sh`: compatibility facade for queue state, dependency, and task-generation modules.
 - `lib/queue/queue_core.sh`: queue setup, locking, summaries, and terminal-state helpers.
 - `lib/queue/queue_lifecycle.sh`: task state transitions and orphan reclamation.
-- `lib/queue/queue_dependencies.sh`: dependency resolution and dependent promotion.
+- `lib/queue/queue_dependencies.sh`: dependency resolution and dependent ready-state transitions.
 - `lib/queue/queue_memory_plan.sh`: profile-based memory refresh and memory-plan export.
 - `lib/queue/queue_generation.sh`: progress state, task search, and task graph generation.
 - `lib/queue/scheduler.sh`: compatibility facade for scheduler modules.
@@ -186,7 +186,7 @@ Notes:
 
 ## Edit Types
 
-Each model runs 8 validation-subject edit experiments (4 types × 2 versions)
+Each model runs 12 validation-subject edit experiments (6 types x 2 versions)
 plus optional error-injection tests. `scripts/evidence_packs/scenarios.json`
 is the source of truth for each scenario's `artifact_class`.
 
@@ -200,7 +200,12 @@ quantization.
 The same distinction applies to the other current edits: FP8 round-trips tensors
 through FP8 or float16 and saves ordinary floating-point weights; magnitude
 pruning writes zeros into dense tensors; low-rank SVD writes dense approximated
-tensors instead of factorized low-rank modules.
+tensors instead of factorized low-rank modules; LoRA merge applies a
+deterministic low-rank adapter-style dense delta; and fine-tune applies a
+deterministic tiny gradient-style dense update. These validation-subject
+generators produce regression evidence from materialized subject checkpoints;
+deployable training pipelines are separate BYOE or deployable-artifact
+workflows.
 
 ### Clean edits (tuned)
 
@@ -212,8 +217,10 @@ parameters at runtime.
 | --- | --- | --- | --- |
 | RTN dequantized external-subject simulation | validation subject checkpoint | tuned (`bits`, `group_size`) from tuned params file | FFN only |
 | FP8 dequantized external-subject simulation | validation subject checkpoint | tuned (`format`) from tuned params file | FFN only |
-| Dense magnitude-pruned checkpoint | validation subject checkpoint | tuned (`prune_level`) from tuned params file | FFN only |
+| Dense magnitude-pruned checkpoint | validation subject checkpoint | tuned (`sparsity`) from tuned params file | FFN only |
 | Dense low-rank-SVD approximated checkpoint | validation subject checkpoint | tuned (`rank`) from tuned params file | FFN only |
+| Dense LoRA-merged checkpoint | validation subject checkpoint | tuned (`rank`, `alpha`) from tuned params file | Attention only |
+| Dense tiny fine-tuned checkpoint | validation subject checkpoint | tuned (`learning_rate`, `steps`) from tuned params file | FFN only |
 
 ### Stress edits
 
@@ -236,6 +243,8 @@ rerun.
 | FP8 dequantized external-subject simulation | validation subject checkpoint | `fp8_quant:e5m2:all` | All layers |
 | Dense magnitude-pruned checkpoint | validation subject checkpoint | `magnitude_prune:0.5:all` (50% sparsity) | All layers |
 | Dense low-rank-SVD approximated checkpoint | validation subject checkpoint | `lowrank_svd:32:all` (rank 32) | All layers |
+| Dense LoRA-merged checkpoint | validation subject checkpoint | `lora_merge:8:64:all` (rank 8, alpha 64) | All layers |
+| Dense tiny fine-tuned checkpoint | validation subject checkpoint | `fine_tune:0.0005:3:all` (3 steps) | All layers |
 
 ### Deployable edits
 
@@ -416,7 +425,7 @@ Small/medium models default to batch edit creation:
   peak memory.
 - **Deferred optional report rendering**: `PACK_DEFER_REPORT_RENDERING=1`
   keeps `evaluation.report.json`, `runtime.manifest.json`, and JSON evidence
-  sidecars in the hot path while skipping markdown/reviewer bundle rendering.
+  sidecars in the hot path while skipping markdown/evidence bundle rendering.
   Pack verification does not require those optional rendered files. Release
   review mode enables this default so evaluation workers spend less time on
   report-heavy filesystem writes; pack-level HTML export still runs unless
@@ -424,7 +433,7 @@ Small/medium models default to batch edit creation:
 - **Evaluation-loop telemetry**: each `evaluate_timing.json` records top-level
   evaluate timings plus nested baseline/subject run timings when reports expose
   them. The pack-level `evaluation_optimization_summary.json` aggregates those
-  timings so reviewers can separate process startup savings from model load,
+  timings so readers can separate process startup savings from model load,
   dataset preparation, guard/eval, and report-generation costs.
 
 Large or MoE models can still disable batch edit tasks automatically (or via
@@ -689,7 +698,7 @@ Maintainer evidence-pack packaging also treats source provenance as fail-closed:
 fresh GPU hosts. It clones the repo, creates a venv, installs PyTorch and
 InvarLock, and leaves the host ready to run `run_pack.sh`.
 
-Operational guidance for remote evidence-pack work:
+Operational guidance for evidence-pack validation hosts:
 
 - Prefer a fresh clone or work tree per campaign instead of reusing an older
   editable-install checkout.
@@ -704,18 +713,11 @@ Operational guidance for remote evidence-pack work:
   `INVARLOCK_CONFIG_ROOT`, `HF_HOME`, `HF_HUB_CACHE`, `HF_DATASETS_CACHE`,
   `TRANSFORMERS_CACHE`, `TMPDIR`, `TMP`.
 - If a staged preset or profile uses `!include` outside its config directory,
-  set `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1` on the remote host before the
-  evidence-pack entrypoint; the default runtime-container launcher rejects that config
-  graph before container start when the override is missing.
-- After Qwen2.5-14B campaigns run with `PACK_CLEANUP_MODELS=0`, run
-  `scripts/evidence_packs/run_qwen14_sentinels.sh` from the same fresh work tree to
-  validate saved-model direct evaluate and the public quant smoke. The sentinel
-  helper reloads retained edit subject directories, so default cleanup mode is
-  not sufficient for this follow-up check. The helper defaults to
-  `--profile dev --assurance off` and requires evaluate/verify subprocesses to
-  exit zero.
+  set `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1` on the validation host before
+  the evidence-pack entrypoint; the default runtime-container launcher rejects
+  that config graph before container start when the override is missing.
 
-Recommended remote validation checklist after security-default changes:
+Recommended validation-host checklist after security-default changes:
 
 1. Run an evidence-pack subset lane with explicit external `HF_HOME` and
    `INVARLOCK_CONFIG_ROOT` overrides.
@@ -747,7 +749,7 @@ Common knobs for the setup script:
 | `PACK_REPEATS` | `0` | Determinism repeat metadata |
 | `PACK_MODEL_REVISIONS_FILE` | `OUTPUT_DIR/state/model_revisions.json` | Revisions path |
 | `PACK_USE_BATCH_EDITS` | `auto` | Force/disable batch edit creation |
-| `PACK_DEFER_REPORT_RENDERING` | `0` (`1` under `--release-review`) | Skip optional markdown/reviewer bundle rendering during evaluation |
+| `PACK_DEFER_REPORT_RENDERING` | `0` (`1` under `--release-review`) | Skip optional markdown/evidence bundle rendering during evaluation |
 | `PACK_RUNTIME_IMAGE_FLAVOR` | `default` | Remote setup runtime image flavor; use `quant` on CUDA hosts for optional quant adapter container evidence, including `hf_bnb`, `hf_awq`, `hf_gptq`, `hf_torchao`, `hf_hqq`, `hf_quanto`, and `hf_ct` |
 | `RESUME_MODE` | `true` | Skip completed steps when outputs exist |
 
@@ -858,9 +860,11 @@ Primary metric acceptance/drift gates should be configured via profile/config
 | `PACK_SKIP_HTML` | `0` | Skip HTML rendering |
 | `PACK_VERIFY_PROFILE` | `dev` | Profile for `invarlock verify` |
 | `PACK_REPORT_ASSURANCE` | `report` | Nested report assurance mode passed to report verification (`report`, `strict`, or `off`) |
+| `PACK_EVALUATE_ASSURANCE` | `off` | Assurance mode passed to `invarlock evaluate` when creating evidence-pack reports (`strict` or `off`) |
+| `PACK_RETRY_FAILED_ON_RESUME` | unset | Set to `1` to explicitly retry failed queue tasks during `--resume`; otherwise resume aborts when failed tasks are present |
 | `PACK_REQUIRE_PASS` | `0` | Fail pack generation unless `final_verdict.json` is `PASS` |
 | `PACK_REQUIRE_RUNTIME_MANIFESTS` | `0` | Require report-adjacent runtime manifests during hardened pack generation |
-| `PACK_RELEASE_REVIEW` | `0` | Set by `run_pack.sh --release-review`; requires PASS verdicts, signed manifests, runtime manifests, CI profile, and strict report assurance |
+| `PACK_RELEASE_REVIEW` | `0` | Set by `run_pack.sh --release-review`; requires PASS verdicts, signed manifests, runtime manifests, model revision metadata, a non-empty scenarios manifest, CI profile, strict evaluation assurance, and strict report assurance |
 
 ## Troubleshooting
 

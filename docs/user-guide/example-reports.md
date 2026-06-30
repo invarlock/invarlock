@@ -14,7 +14,7 @@ Use the steps below to reproduce representative artifacts from this repository v
 
 ## Read The Bundle First
 
-For most reviewers, the primary artifact is `evaluation.report.json`, not the
+For most readers, the primary artifact is `evaluation.report.json`, not the
 lower-level run reports. Use it as the front door:
 
 ```bash
@@ -91,7 +91,7 @@ HTML report chrome:
 Header -> Summary chips -> Quick links rail -> Canonical report body
 ```
 
-That layout is intentional: reviewers should be able to confirm overall status,
+That layout is intentional: readers should be able to confirm overall status,
 jump directly to the gate or provenance section they care about, and still read
 the unchanged canonical report content underneath.
 
@@ -102,7 +102,7 @@ For audits, collect the following files:
 | `runs/<name>/**/report.json` | Execution log, metrics, and guard telemetry |
 | `reports/<name>/evaluation.report.json` | Machine-readable evaluation report |
 | `reports/<name>/runtime.manifest.json` | Runtime provenance for container-backed outputs |
-| `reports/<name>/evaluation_report.md` | Human-friendly summary for reviewers |
+| `reports/<name>/evaluation_report.md` | Human-friendly summary for readers |
 
 Reports remain valid only for the same baseline reference, pairing assumptions,
 dataset/tokenizer context, and scoped claim surface, and only while

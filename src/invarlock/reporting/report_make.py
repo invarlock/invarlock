@@ -391,6 +391,10 @@ def _build_evaluation_report(
             else {}
         ),
     }
+    if isinstance(report_map.get("evaluation_realism"), dict):
+        evaluation_report["evaluation_realism"] = copy.deepcopy(
+            report_map["evaluation_realism"]
+        )
     _attach_top_level_guard_outcomes(evaluation_report)
     if edit_name is not None:
         evaluation_report["edit_name"] = edit_name

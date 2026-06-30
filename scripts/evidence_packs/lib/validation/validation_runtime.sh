@@ -164,32 +164,23 @@ estimate_model_weights_gb() {
         return 0
     fi
 
-    case "${lower}" in
-        *"72b"*)
-            echo 144
-            ;;
-        *"70b"*)
-            echo 140
-            ;;
-        *"34b"*)
-            echo 68
-            ;;
-        *"32b"*)
-            echo 64
-            ;;
-        *"14b"*)
-            echo 28
-            ;;
-        *"13b"*)
-            echo 26
-            ;;
-        *"7b"*)
-            echo 14
-            ;;
-        *)
-            return 1
-            ;;
-    esac
+    if [[ "${lower}" =~ (^|[^0-9])([0-9]+)([._][0-9]+)?b([^0-9]|$) ]]; then
+        local major="${BASH_REMATCH[2]}"
+        local fractional="${BASH_REMATCH[3]:-}"
+        if [[ -n "${fractional}" ]]; then
+            fractional="${fractional#[._]}"
+            awk -v major="${major}" -v fractional="${fractional}" 'BEGIN {
+                scale = 10 ^ length(fractional)
+                params = major + fractional / scale
+                printf "%d\n", int(params * 2 + 0.999)
+            }'
+            return 0
+        fi
+        echo $((major * 2))
+        return 0
+    fi
+
+    return 1
 }
 
 estimate_planned_model_storage_gb() {
@@ -314,11 +305,21 @@ disk_preflight() {
 
     local free_gb=""
     free_gb=$(get_free_disk_gb "${OUTPUT_DIR}" 2>/dev/null || echo "")
-    [[ -z "${free_gb}" ]] && return 0
+    if [[ -z "${free_gb}" ]]; then
+        if [[ "${PACK_RELEASE_REVIEW:-0}" == "1" ]]; then
+            error_exit "Release-review disk preflight could not determine free disk for OUTPUT_DIR=${OUTPUT_DIR}."
+        fi
+        return 0
+    fi
 
     local planned_gb=""
     planned_gb=$(estimate_planned_model_storage_gb 2>/dev/null || echo "")
-    [[ -z "${planned_gb}" ]] && return 0
+    if [[ -z "${planned_gb}" ]]; then
+        if [[ "${PACK_RELEASE_REVIEW:-0}" == "1" ]]; then
+            error_exit "Release-review disk preflight could not estimate planned model storage."
+        fi
+        return 0
+    fi
 
     local min_free="${MIN_FREE_DISK_GB:-200}"
     if ! [[ "${min_free}" =~ ^[0-9]+$ ]]; then
@@ -339,7 +340,12 @@ disk_preflight() {
     log "       Fix: mount a larger volume and set OUTPUT_DIR, or run the subset suite, or set RUN_ERROR_INJECTION=false."
     log "       Override (not recommended): PACK_SKIP_DISK_PREFLIGHT=1"
 
-    # Resume mode may already have artifacts; allow user to proceed if explicitly resuming.
+    if [[ "${PACK_RELEASE_REVIEW:-0}" == "1" ]]; then
+        error_exit "Insufficient disk for release-review run (need >= ${required_gb}GB incl MIN_FREE_DISK_GB=${min_free})."
+    fi
+
+    # Resume mode may already have artifacts; allow non-release runs to proceed
+    # if explicitly resuming.
     if [[ "${RESUME_FLAG:-false}" == "true" ]]; then
         log "WARNING: --resume mode enabled; continuing despite preflight estimate."
         return 0
@@ -439,6 +445,91 @@ pack_install_pinned_requirement() {
     python3 -m pip install --require-hashes -r "${requirement_path}" "$@"
 }
 
+pack_configure_pinned_cuda_nvcc() {
+    local cuda_home
+    cuda_home="$(
+        python3 - <<'PY'
+from __future__ import annotations
+
+import site
+import sysconfig
+from pathlib import Path
+
+roots: list[Path] = []
+for raw in site.getsitepackages():
+    roots.append(Path(raw))
+purelib = sysconfig.get_paths().get("purelib")
+if purelib:
+    roots.append(Path(purelib))
+for root in roots:
+    candidates = [root / "nvidia" / "cuda_nvcc"]
+    candidates.extend(sorted((root / "nvidia").glob("cu*")))
+    for candidate in candidates:
+        if (candidate / "bin" / "nvcc").is_file():
+            print(candidate)
+            raise SystemExit(0)
+PY
+    )"
+    if [[ -z "${cuda_home}" ]]; then
+        log "WARNING: pinned cuda-nvcc installed but nvcc was not found, using existing CUDA toolkit"
+        return 1
+    fi
+    export CUDA_HOME="${cuda_home}"
+    export CUDA_PATH="${cuda_home}"
+    export PATH="${cuda_home}/bin:${PATH}"
+    log "CUDA nvcc: using pinned compiler from CUDA nvcc package"
+}
+
+pack_prepare_flash_attn_build_toolchain() {
+    if [[ "${PACK_NET}" != "1" ]]; then
+        return 0
+    fi
+    if [[ "${1:-}" != "true" ]]; then
+        return 0
+    fi
+
+    local cuda_nvcc_requirement
+    cuda_nvcc_requirement="$(pack_evidence_pack_requirement_path "cuda-nvcc")"
+    if [[ ! -f "${cuda_nvcc_requirement}" ]]; then
+        log "WARNING: pinned cuda-nvcc requirement file missing, using existing CUDA toolkit"
+        return 0
+    fi
+
+    log "Installing CUDA nvcc for flash-attn build..."
+    if pack_install_pinned_requirement "cuda-nvcc" --no-deps >> "${LOG_FILE}" 2>&1; then
+        pack_configure_pinned_cuda_nvcc || true
+    else
+        log "WARNING: cuda-nvcc install failed, using existing CUDA toolkit"
+    fi
+}
+
+pack_try_install_flash_attn() {
+    local flash_attn_requirement="$1"
+    local -a pip_args=(
+        python3 -m pip install
+        --require-hashes
+        -r "${flash_attn_requirement}"
+        --no-deps
+    )
+    case "${PACK_FLASH_ATTN_ALLOW_SOURCE_BUILD:-0}" in
+        1|true|TRUE|yes|YES|on|ON)
+            pip_args+=(--no-build-isolation)
+            ;;
+        *)
+            pip_args+=(--only-binary=:all:)
+            ;;
+    esac
+    local old_opts="$-"
+    set +e
+    timeout 600 "${pip_args[@]}" >> "${LOG_FILE}" 2>&1
+    local rc=$?
+    case "${old_opts}" in
+        *e*) set -e ;;
+        *) set +e ;;
+    esac
+    return "${rc}"
+}
+
 check_dependencies() {
     log_section "PHASE 0: DEPENDENCY CHECK"
 
@@ -488,7 +579,12 @@ check_dependencies() {
         if [[ "${PACK_NET}" == "1" ]]; then
             log "Installing accelerate..."
             if [[ "${pip_available}" == "true" ]]; then
-                pack_install_pinned_requirement "accelerate" || missing+=("accelerate")
+                if pack_install_pinned_requirement "accelerate" --no-deps \
+                    && python3 -c "import accelerate" 2>/dev/null; then
+                    :
+                else
+                    missing+=("accelerate")
+                fi
             else
                 missing+=("accelerate")
             fi
@@ -529,8 +625,9 @@ check_dependencies() {
                     log "Flash Attention 2: Not found, attempting install..."
                     local flash_attn_requirement
                     flash_attn_requirement="$(pack_evidence_pack_requirement_path "flash-attn")"
+                    pack_prepare_flash_attn_build_toolchain "${pip_available}"
                     # Use timeout to prevent hanging on slow builds
-                    if [[ "${pip_available}" == "true" ]] && [[ -f "${flash_attn_requirement}" ]] && timeout 600 python3 -m pip install --require-hashes -r "${flash_attn_requirement}" --no-deps --no-build-isolation 2>&1 | tee -a "${LOG_FILE}"; then
+                    if [[ "${pip_available}" == "true" ]] && [[ -f "${flash_attn_requirement}" ]] && pack_try_install_flash_attn "${flash_attn_requirement}"; then
                         # Verify it actually imported
                         if python3 -c "import flash_attn" 2>/dev/null; then
                             export FLASH_ATTENTION_AVAILABLE="true"

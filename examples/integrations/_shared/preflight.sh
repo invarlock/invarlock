@@ -37,7 +37,23 @@ integration_run_source_archive_clean() {
   if [[ -n "${REPO_ROOT:-}" && -d "$REPO_ROOT/.git" ]]; then
     "$@"
   else
-    "$@" 2> >(integration_filter_source_archive_stderr)
+    local stderr_file
+    stderr_file="$(mktemp "${TMPDIR:-/tmp}/invarlock-source-archive-stderr.XXXXXX")" || return 1
+    local had_errexit=0
+    case "$-" in
+      *e*)
+        had_errexit=1
+        set +e
+        ;;
+    esac
+    "$@" 2>"$stderr_file"
+    local rc=$?
+    if [[ "$had_errexit" == "1" ]]; then
+      set -e
+    fi
+    integration_filter_source_archive_stderr <"$stderr_file"
+    rm -f "$stderr_file"
+    return "$rc"
   fi
 }
 

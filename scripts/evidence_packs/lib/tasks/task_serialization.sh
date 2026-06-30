@@ -34,7 +34,8 @@ _task_serialization_require_jq() {
 #   task_type:       One of: SETUP_BASELINE, CALIBRATION_RUN,
 #                    SETUP_EVALUATE_BASELINE_REPORT, CREATE_EDIT,
 #                    CREATE_EDITS_BATCH, evaluate_EDIT, CREATE_ERROR,
-#                    evaluate_ERROR, GENERATE_PRESET
+#                    evaluate_ERROR, GENERATE_PRESET, CLEANUP_EDIT,
+#                    CLEANUP_ERROR
 #   model_id:        Full HuggingFace model ID (e.g., "mistralai/Mistral-7B-v0.1")
 #   model_name:      Sanitized name for paths (e.g., "mistral-7b-v0.1")
 #   model_size_gb:   Estimated GPU memory requirement in GB
@@ -537,7 +538,7 @@ validate_task() {
 
     # Validate task_type
     local task_type=$(get_task_type "${task_file}")
-    local valid_types="SETUP_BASELINE CALIBRATION_RUN SETUP_EVALUATE_BASELINE_REPORT CREATE_EDIT CREATE_EDITS_BATCH evaluate_EDIT CREATE_ERROR evaluate_ERROR GENERATE_PRESET"
+    local valid_types="SETUP_BASELINE CALIBRATION_RUN SETUP_EVALUATE_BASELINE_REPORT CREATE_EDIT CREATE_EDITS_BATCH evaluate_EDIT CLEANUP_EDIT CREATE_ERROR evaluate_ERROR CLEANUP_ERROR GENERATE_PRESET"
     if [[ ! " ${valid_types} " =~ " ${task_type} " ]]; then
         echo "ERROR: Invalid task_type '${task_type}' in: ${task_file}" >&2
         return 1

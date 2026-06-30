@@ -7,6 +7,9 @@ from invarlock.public_contracts import stable_cli_json_surfaces
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REMOVED_HOST_MODE_TOKEN = "trusted" + "-local"
+REMOVED_RUN_COMMAND = "invarlock " + "run"
+REMOVED_SOURCE_FLAG = "--" + "source "
+REMOVED_EDITED_FLAG = "--" + "edited "
 
 
 def _read(path: str) -> str:
@@ -49,7 +52,7 @@ def test_core_docs_do_not_promote_removed_top_level_commands():
         "docs/user-guide/quickstart.md",
     ]
     banned = [
-        "invarlock run",
+        REMOVED_RUN_COMMAND,
         "invarlock evidence-pack",
         "invarlock policy",
         "plugins install",
@@ -61,13 +64,14 @@ def test_core_docs_do_not_promote_removed_top_level_commands():
     for rel_path in surfaces:
         text = _read(rel_path)
         for needle in banned:
-            assert needle not in text, f"{needle} still promoted in {rel_path}"
+            assert needle not in text, f"{needle} still documented in {rel_path}"
 
 
 def test_public_compare_examples_use_baseline_subject_terms() -> None:
     surfaces = [
         "README.md",
         "docs/user-guide/compare-and-evaluate.md",
+        "docs/user-guide/knowledge-and-self-edit-workflows.md",
         "docs/user-guide/quickstart.md",
         "docs/reference/cli.md",
         "configs/presets/causal_lm/hf_text_c4_128.yaml",
@@ -75,8 +79,12 @@ def test_public_compare_examples_use_baseline_subject_terms() -> None:
 
     for rel_path in surfaces:
         text = _read(rel_path)
-        assert "--source " not in text, f"--source still present in {rel_path}"
-        assert "--edited " not in text, f"--edited still present in {rel_path}"
+        assert REMOVED_SOURCE_FLAG not in text, (
+            f"removed source flag still present in {rel_path}"
+        )
+        assert REMOVED_EDITED_FLAG not in text, (
+            f"removed edited flag still present in {rel_path}"
+        )
 
 
 def test_support_surfaces_use_host_mode_assurance_for_public_evaluate_examples():
@@ -97,7 +105,7 @@ def test_support_surfaces_use_host_mode_assurance_for_public_evaluate_examples()
             f"--execution-mode host missing from {rel_path}"
         )
         assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" not in text, (
-            f"legacy host-execution env still promoted in {rel_path}"
+            f"legacy host-execution env still documented in {rel_path}"
         )
 
 
@@ -111,7 +119,7 @@ def test_support_surfaces_do_not_teach_removed_public_top_level_commands():
     ]
 
     banned = [
-        "invarlock run",
+        REMOVED_RUN_COMMAND,
         "invarlock plugins",
         "invarlock calibrate",
     ]
@@ -159,7 +167,7 @@ def test_evidence_pack_docs_keep_repo_wrappers_advanced_and_use_current_verify_s
     assert "repo-only" in text
     assert "invarlock advanced evidence-pack verify" in text
     assert "invarlock evidence-pack verify" not in text
-    assert "invarlock run" not in text
+    assert REMOVED_RUN_COMMAND not in text
     assert "--allow-host-execution" not in text
 
 
@@ -172,6 +180,22 @@ def test_notebook_links_and_docs_navigation_cover_curated_live_examples() -> Non
     assert "notebooks/invarlock_python_api.ipynb" in docs_hub
     assert "notebooks/invarlock_policy_tiers.ipynb" in docs_hub
     assert "Live Examples" in mkdocs
+
+
+def test_knowledge_self_edit_workflow_docs_are_discoverable() -> None:
+    mkdocs = _read("mkdocs.yml")
+    docs_hub = _read("docs/README.md")
+    reference_index = _read("docs/reference/index.md")
+    getting_started = _read("docs/user-guide/getting-started.md")
+    compare = _read("docs/user-guide/compare-and-evaluate.md")
+
+    expected = "user-guide/knowledge-and-self-edit-workflows.md"
+    assert expected in mkdocs
+    assert "Knowledge & Self-Edit Workflows" in mkdocs
+    assert "knowledge-and-self-edit-workflows.md" in docs_hub
+    assert "knowledge-and-self-edit-workflows.md" in reference_index
+    assert "knowledge-and-self-edit-workflows.md" in getting_started
+    assert "knowledge-and-self-edit-workflows.md" in compare
 
 
 def test_programmatic_docs_mark_python_surface_as_advanced_not_contract_stable() -> (

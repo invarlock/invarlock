@@ -26,6 +26,7 @@ def test_causal_lm_family_presets_load() -> None:
         "qwen2_5_14b_512.yaml": "Qwen/Qwen2.5-14B",
         "qwen3_8b_512.yaml": "Qwen/Qwen3-8B",
         "qwen3_30b_a3b_instruct_2507_512.yaml": ("Qwen/Qwen3-30B-A3B-Instruct-2507"),
+        "gpt_oss_20b_512.yaml": "openai/gpt-oss-20b",
         "mixtral_8x7b_512.yaml": "mistralai/Mixtral-8x7B-v0.1",
         "olmoe_1b_7b_0924_512.yaml": "allenai/OLMoE-1B-7B-0924",
         "deepseek_r1_distill_qwen_7b_512.yaml": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
@@ -56,6 +57,7 @@ def test_causal_lm_family_presets_load() -> None:
         "ministral3_8b_512.yaml": "hf_text",
         "ministral3_14b_512.yaml": "hf_text",
         "mixtral_8x7b_512.yaml": "hf_text",
+        "gpt_oss_20b_512.yaml": "hf_text",
         "olmo2_13b_512.yaml": "hf_text",
         "olmo2_7b_512.yaml": "hf_text",
         "olmoe_1b_7b_0924_512.yaml": "hf_text",
@@ -71,6 +73,7 @@ def test_causal_lm_family_presets_load() -> None:
     }
     expected_skip_overhead = {
         "gemma4_e2b_512.yaml",
+        "gpt_oss_20b_512.yaml",
         "mixtral_8x7b_512.yaml",
         "olmoe_1b_7b_0924_512.yaml",
         "phi4_reasoning_plus_512.yaml",
@@ -100,6 +103,26 @@ def test_causal_lm_family_presets_load() -> None:
                 assert (
                     "model.layers.*.mlp.shared_expert*"
                     in guard_cfg["module_include_patterns"]
+                )
+                assert guard_cfg["module_exclude_patterns"] == [
+                    "model.layers.*.mlp.experts.*"
+                ]
+        if name == "gpt_oss_20b_512.yaml":
+            model = cfg.require_section("model")
+            assert model["dtype"] == "bfloat16"
+            assert model["device_map"] == "auto"
+            assert model["low_cpu_mem_usage"] is True
+            assert model["collect_loading_info"] is False
+            guards = cfg.require_section("guards")
+            assert guards["spectral"]["family_caps"]["router"] == 5.0
+            for guard_name in ("spectral", "rmt"):
+                guard_cfg = guards[guard_name]
+                assert (
+                    "model.layers.*.self_attn.*_proj"
+                    in guard_cfg["module_include_patterns"]
+                )
+                assert (
+                    "model.layers.*.mlp.router" in guard_cfg["module_include_patterns"]
                 )
                 assert guard_cfg["module_exclude_patterns"] == [
                     "model.layers.*.mlp.experts.*"
@@ -157,6 +180,7 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
         "null_sweep_qwen3_30b_a3b_instruct_2507.yaml": (
             "Qwen/Qwen3-30B-A3B-Instruct-2507"
         ),
+        "null_sweep_gpt_oss_20b.yaml": "openai/gpt-oss-20b",
         "null_sweep_mixtral_8x7b.yaml": "mistralai/Mixtral-8x7B-v0.1",
         "null_sweep_olmoe_1b_7b_0924.yaml": "allenai/OLMoE-1B-7B-0924",
         "null_sweep_deepseek_r1_distill_qwen_7b.yaml": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
@@ -196,6 +220,7 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
             "null_sweep_gemma4_e2b.yaml",
             "null_sweep_granite4_1_3b.yaml",
             "null_sweep_granite4_1_8b.yaml",
+            "null_sweep_gpt_oss_20b.yaml",
             "null_sweep_ministral3_3b.yaml",
             "null_sweep_ministral3_8b.yaml",
             "null_sweep_ministral3_14b.yaml",
@@ -232,6 +257,24 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
                 assert (
                     "model.layers.*.mlp.shared_expert*"
                     in guard_cfg["module_include_patterns"]
+                )
+                assert guard_cfg["module_exclude_patterns"] == [
+                    "model.layers.*.mlp.experts.*"
+                ]
+        if name == "null_sweep_gpt_oss_20b.yaml":
+            assert data["model"]["dtype"] == "bfloat16"
+            assert data["model"]["device_map"] == "auto"
+            assert data["model"]["low_cpu_mem_usage"] is True
+            assert data["model"]["collect_loading_info"] is False
+            assert data["guards"]["spectral"]["family_caps"]["router"] == 5.0
+            for guard_name in ("spectral", "rmt"):
+                guard_cfg = data["guards"][guard_name]
+                assert (
+                    "model.layers.*.self_attn.*_proj"
+                    in guard_cfg["module_include_patterns"]
+                )
+                assert (
+                    "model.layers.*.mlp.router" in guard_cfg["module_include_patterns"]
                 )
                 assert guard_cfg["module_exclude_patterns"] == [
                     "model.layers.*.mlp.experts.*"

@@ -9,7 +9,7 @@ _calibration_meta:
   - 0.8878
   - 1.086
 model:
-  id: /root/evidence-pack-runs/mistral_guard_value_real_20260612d/models/mistralai__mistral-7b-v01/baseline
+  id: <validation-output-root>/mistral_guard_value_real_20260612d/models/mistralai__mistral-7b-v01/baseline
 dataset:
   provider: wikitext2
   split: validation

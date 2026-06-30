@@ -16,8 +16,8 @@
   "manifest_version": 1,
   "report": {
     "filename": "evaluation.report.json",
-    "path": "/root/evidence-pack-runs/mistral_guard_confirm_20260612a/mistralai__mistral-7b-v01/reports/errors/rmt_norm_noise_l31_ffn_up_b030/evaluation.report.json",
-    "sha256": "3f0fd87d8d9f4a23d8aea19299f7362e58f1a28072e5d4926fac0e7e72f274ff"
+    "path": "<validation-output-root>/mistral_guard_confirm_20260612a/mistralai__mistral-7b-v01/reports/errors/rmt_norm_noise_l31_ffn_up_b030/evaluation.report.json",
+    "sha256": "b159bb5c8d2a96ed927f10a37e44eccec1257edb80e055ab04a1ba89395d41b4"
   },
   "runtime": {
     "allow_network": false,

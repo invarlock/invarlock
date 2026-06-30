@@ -34,7 +34,7 @@ def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
                 ],
                 "implemented_coverage": [],
                 "usage_only": [],
-                "promotion_candidates_text_le_14b": {"candidates": []},
+                "published_basis_candidates_text_le_14b": {"candidates": []},
                 "recommended_additions": [],
             },
             "plugin_compatibility.json": {

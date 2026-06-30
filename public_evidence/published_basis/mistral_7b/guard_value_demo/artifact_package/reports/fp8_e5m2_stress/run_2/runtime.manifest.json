@@ -16,8 +16,8 @@
   "manifest_version": 1,
   "report": {
     "filename": "evaluation.report.json",
-    "path": "/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/reports/fp8_e5m2_stress/run_2/evaluation.report.json",
-    "sha256": "c95711333520911b9b4ae8cd1ae7f3ef0e4c6007031a42efd2cc94b648f81d17"
+    "path": "<validation-output-root>/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/reports/fp8_e5m2_stress/run_2/evaluation.report.json",
+    "sha256": "59874b03e061aaca1b63d2540765be12c03297bd7bc4483c495d99269c4f48fd"
   },
   "runtime": {
     "allow_network": false,

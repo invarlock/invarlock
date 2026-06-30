@@ -51,11 +51,11 @@
       "model_id": "google/flan-t5-base",
       "ok": true,
       "preset": "configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml",
-      "report_path": "/root/model-evidence/20260613TflanT5Seq2SeqReleaseE/shard-00-gpu-0/eval/google_flan_t5_base/report/evaluation.report.json",
+      "report_path": "<model-evidence-root>/20260613TflanT5Seq2SeqReleaseE/shard-00-gpu-0/eval/google_flan_t5_base/report/evaluation.report.json",
       "slug": "google_flan_t5_base",
       "status": "ok",
       "verify_exit": 0,
-      "verify_path": "/root/model-evidence/20260613TflanT5Seq2SeqReleaseE/shard-00-gpu-0/eval/google_flan_t5_base/verify.json"
+      "verify_path": "<model-evidence-root>/20260613TflanT5Seq2SeqReleaseE/shard-00-gpu-0/eval/google_flan_t5_base/verify.json"
     }
   ],
   "ok": true,

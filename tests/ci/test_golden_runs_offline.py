@@ -2,14 +2,28 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
-from invarlock.evidence_pack import EvidencePackStatus, verify_evidence_pack
+from invarlock.evidence_pack import (
+    EvidencePackStatus,
+    _generate_signing_keypair,
+    build_evidence_pack,
+    verify_evidence_pack,
+)
 from invarlock.public_contracts import load_public_evidence_index, published_basis_lanes
 from invarlock.reporting.report_schema import validate_report
 from invarlock.reporting.verify_contract import VerifyOutcome, run_verify_reports
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _write_json_file(path: Path, payload: object) -> None:
+    path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def test_published_basis_lanes_ship_public_evidence_references() -> None:
@@ -71,6 +85,7 @@ def test_offline_golden_runs_public_fixtures() -> None:
         "olmoe_1b_7b",
         "mixtral_8x7b",
         "qwen3_30b_a3b",
+        "gpt_oss_20b",
         "open_llama_7b",
         "falcon_7b",
         "qwen2_7b",
@@ -89,6 +104,9 @@ def test_offline_golden_runs_public_fixtures() -> None:
         "ministral3_3b",
         "smollm3_3b",
         "phi4_mini",
+        "qwen3_5_27b_scoped",
+        "qwen3_6_27b_scoped",
+        "gemma4_31b",
         "flan_t5_base",
     ]
 
@@ -257,8 +275,8 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
             json.dumps(manifest["source_run"], sort_keys=True),
         ]
     )
-    assert "root@86.38.238.232" not in public_narrative
-    assert "86.38.238.232" not in public_narrative
+    assert "root@" not in public_narrative
+    assert re.search(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", public_narrative) is None
     assert "The older FP8" not in public_narrative
     assert "FP8 stress report remains historical context" not in public_narrative
     assert summary["source_run"]["model_id"] == "mistralai/Mistral-7B-v0.1"
@@ -550,6 +568,7 @@ def test_byoe_examples_verify_release_strict() -> None:
     examples = {
         "magnitude_prune_byoe": "magnitude_prune",
         "lora_merge_byoe": "lora_merge",
+        "fine_tune_byoe": "fine_tune",
     }
 
     for directory, edit_type in examples.items():
@@ -567,6 +586,30 @@ def test_byoe_examples_verify_release_strict() -> None:
         assert refs["weights_vendored"] is False
         assert refs["subject_checkpoint"]["external_edit_type"] == edit_type
         assert refs["subject_checkpoint"]["built_in_edit_plugin"] is False
+        if directory in {"lora_merge_byoe", "fine_tune_byoe"}:
+            edit = report["edit"]
+            assert edit["edit_provenance"]["edit_family"] == edit_type
+            assert edit["edit_provenance"]["edit_count"] == 1
+            assert edit["edit_provenance"]["dynamic_runtime_required"] is False
+            if directory == "lora_merge_byoe":
+                assert edit["edit_provenance"]["edit_method"] == "custom"
+                assert edit["edit_impact"]["scenario_types"] == [
+                    "target_success",
+                    "near_neighbor",
+                    "unrelated_locality",
+                    "general_ability_sentinel",
+                ]
+            else:
+                assert (
+                    edit["edit_provenance"]["edit_method"]
+                    == "external_cpu_tiny_fine_tune"
+                )
+            assert (
+                refs["subject_checkpoint"]["edit_provenance"]
+                == (edit["edit_provenance"])
+            )
+            if "edit_impact" in edit:
+                assert refs["subject_checkpoint"]["edit_impact"] == edit["edit_impact"]
 
         result = run_verify_reports(
             [report_path],
@@ -577,3 +620,171 @@ def test_byoe_examples_verify_release_strict() -> None:
         assert result.outcome == VerifyOutcome.OK
         verification = result.payload["results"][0]["verification"]
         assert verification["runtime_provenance"]["status"] == "verified"
+
+
+def test_model_editing_evidence_bundle_v0_lanes_verify_release_strict() -> None:
+    bundle_dir = REPO_ROOT / "public_evidence" / "model_editing_evidence_bundle_v0"
+    manifest_path = bundle_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    summary_path = REPO_ROOT / manifest["verification_summary"]
+    training_plan_path = REPO_ROOT / manifest["training_evidence_matrix_plan"]
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    expected_families = {"quantization", "magnitude_prune", "lora_merge", "fine_tune"}
+    lanes = manifest["lanes"]
+    assert {lane["edit_family"] for lane in lanes} == expected_families
+    assert manifest["evidence_scope"] == "release-evidence wiring only"
+    assert summary["schema"] == (
+        "invarlock.public_evidence.model_editing_bundle_verification.v1"
+    )
+    assert summary["bundle_id"] == manifest["bundle_id"]
+    assert summary["evidence_scope"] == manifest["evidence_scope"]
+    assert summary["verification"] == {
+        "assurance": "strict",
+        "lane_count": 4,
+        "outcome": "all_lanes_verified",
+        "profile": "release",
+    }
+    assert training_plan_path.is_file()
+    training_plan = training_plan_path.read_text(encoding="utf-8")
+    assert "PEFT LoRA train-and-merge subject" in training_plan
+    assert "Full fine-tune subject" in training_plan
+    assert "/private/tmp" not in training_plan
+    assert "root@" not in training_plan
+
+    summary_lanes = {lane["edit_family"]: lane for lane in summary["lanes"]}
+    assert set(summary_lanes) == expected_families
+    assert {
+        summary_lanes["quantization"]["evidence_mode"],
+        summary_lanes["magnitude_prune"]["evidence_mode"],
+    } == {"real_tiny_model_run", "real_tiny_model_external_edit_run"}
+    assert summary_lanes["lora_merge"]["evidence_mode"] == "public_byoe_subject_fixture"
+    assert summary_lanes["fine_tune"]["evidence_mode"] == "public_byoe_subject_fixture"
+
+    for lane in lanes:
+        report_path = REPO_ROOT / lane["evaluation_report"]
+        refs_path = REPO_ROOT / lane["checkpoint_refs"]
+        note_path = REPO_ROOT / lane["evidence_note"]
+        summary_lane = summary_lanes[lane["edit_family"]]
+
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        refs = json.loads(refs_path.read_text(encoding="utf-8"))
+        note = " ".join(note_path.read_text(encoding="utf-8").split())
+
+        assert validate_report(report) is True
+        assert (
+            refs["subject_checkpoint"]["external_edit_type"]
+            == lane["external_edit_type"]
+        )
+        assert "Evidence takeaways" in note
+        assert "Artifact mode:" in note
+        assert "Verification surface:" in note
+        assert "Companion benchmark evidence:" in note
+        assert "/private/tmp" not in note
+        assert "root@" not in note
+        assert summary_lane["external_edit_type"] == lane["external_edit_type"]
+        assert summary_lane["weights_vendored"] is False
+        assert summary_lane["strict_verification"] == {
+            "assurance": "strict",
+            "outcome": "ok",
+            "profile": "release",
+            "runtime_provenance_status": "verified",
+        }
+        for key, expected_path in {
+            "evaluation_report": lane["evaluation_report"],
+            "runtime_manifest": lane["runtime_manifest"],
+            "checkpoint_refs": lane["checkpoint_refs"],
+            "evidence_note": lane["evidence_note"],
+        }.items():
+            artifact = summary_lane["artifacts"][key]
+            assert artifact["path"] == expected_path
+            assert artifact["sha256"] == _sha256_file(REPO_ROOT / expected_path)
+
+        if lane["edit_family"] in {"lora_merge", "fine_tune"}:
+            assert (
+                report["edit"]["edit_provenance"]["edit_family"] == lane["edit_family"]
+            )
+
+        result = run_verify_reports(
+            [report_path],
+            profile="release",
+            assurance_mode="strict",
+        )
+
+        assert result.outcome == VerifyOutcome.OK
+        verification = result.payload["results"][0]["verification"]
+        assert verification["runtime_provenance"]["status"] == "verified"
+
+
+def test_lora_byoe_metadata_builds_and_verifies_signed_evidence_pack(
+    tmp_path: Path,
+) -> None:
+    example_dir = REPO_ROOT / "public_evidence" / "byoe_examples" / "lora_merge_byoe"
+    report_path = example_dir / "evaluation.report.json"
+    refs_path = example_dir / "checkpoint_refs.json"
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    expected_provenance = report["edit"]["edit_provenance"]
+    expected_impact = report["edit"]["edit_impact"]
+
+    final_verdict = tmp_path / "final_verdict.json"
+    signing_key = tmp_path / "evidence-pack-signing-key.pem"
+    public_key = tmp_path / "evidence-pack-signing-key.pub.pem"
+    pack_dir = tmp_path / "lora_byoe_evidence_pack"
+    _write_json_file(
+        final_verdict,
+        {
+            "verdict": "PASS",
+            "scope": "lora_merge_byoe_optional_edit_metadata_fixture",
+        },
+    )
+    fingerprint = _generate_signing_keypair(
+        signing_key,
+        public_key_path=public_key,
+    )
+
+    build_result = build_evidence_pack(
+        pack_dir,
+        final_verdict_path=final_verdict,
+        report_paths=[report_path],
+        material_specs=[("checkpoint_refs", refs_path)],
+        signing_key_path=signing_key,
+        profile="release",
+        report_assurance="strict",
+        release_review=True,
+    )
+
+    assert build_result.status == EvidencePackStatus.OK
+    assert build_result.payload["ok"] is True
+    assert build_result.payload["signature"]["present"] is True
+    assert build_result.payload["signature"]["signer_fingerprint"] == fingerprint
+    assert build_result.payload["verify"]["summary"]["ok"] is True
+    assert build_result.payload["verify"]["results"][0]["ok"] is True
+
+    copied_reports = sorted(pack_dir.glob("reports/**/evaluation.report.json"))
+    assert len(copied_reports) == 1
+    copied_report = json.loads(copied_reports[0].read_text(encoding="utf-8"))
+    assert validate_report(copied_report) is True
+    assert copied_report["edit"]["edit_provenance"] == expected_provenance
+    assert copied_report["edit"]["edit_impact"] == expected_impact
+
+    copied_refs = json.loads(
+        (pack_dir / "metadata" / "checkpoint_refs.json").read_text(encoding="utf-8")
+    )
+    assert copied_refs["subject_checkpoint"]["edit_provenance"] == expected_provenance
+    assert copied_refs["subject_checkpoint"]["edit_impact"] == expected_impact
+
+    verify_result = verify_evidence_pack(
+        pack_dir,
+        strict=True,
+        expected_fingerprint=fingerprint,
+        profile="release",
+        report_assurance="strict",
+    )
+
+    assert verify_result.status == EvidencePackStatus.OK
+    assert verify_result.payload["ok"] is True
+    assert verify_result.payload["authenticity"] == "pinned"
+    assert verify_result.payload["verify"]["summary"]["ok"] is True
+    assert verify_result.payload["verify"]["results"][0]["ok"] is True
+    verification = verify_result.payload["verify"]["results"][0]["verification"]
+    assert verification["runtime_provenance"]["status"] == "verified"

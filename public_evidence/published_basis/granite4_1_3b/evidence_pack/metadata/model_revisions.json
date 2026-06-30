@@ -11,7 +11,7 @@
             "main"
           ],
           "size_on_disk": 6815452719,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--ibm-granite--granite-4.1-3b/snapshots/c0650403e44e78ec0262dab1c90914c65b196c4e"
+          "snapshot_path": "<hf-cache-dir>/hub/models--ibm-granite--granite-4.1-3b/snapshots/c0650403e44e78ec0262dab1c90914c65b196c4e"
         }
       ],
       "slug": "ibm_granite_granite_4_1_3b",

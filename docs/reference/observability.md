@@ -232,7 +232,7 @@ if HTTPServer:
     server.serve_forever()
 ```
 
-Access at `http://localhost:8080/health`:
+Query the health endpoint from the container host:
 
 ```json
 {

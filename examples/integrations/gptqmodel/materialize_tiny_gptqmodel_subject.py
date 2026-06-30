@@ -172,6 +172,10 @@ def _prepare_output_dirs(paths: Sequence[Path], *, force: bool) -> None:
 def _require_dependencies() -> tuple[Any, Any, Any, Any, Any, Any]:
     try:
         import torch
+
+        from invarlock.plugins import _patch_gptqmodel_transformers_hub_compat
+
+        _patch_gptqmodel_transformers_hub_compat()
         from gptqmodel import GPTQModel, QuantizeConfig
         from transformers import AutoTokenizer, LlamaConfig, LlamaForCausalLM
     except (ImportError, ModuleNotFoundError) as exc:

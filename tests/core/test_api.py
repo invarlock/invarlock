@@ -220,7 +220,7 @@ class TestGuardChainComprehensive:
 class TestDataClassesCoverage:
     """Test data classes to improve coverage."""
 
-    def test_run_config_comprehensive(self):
+    def test_run_config_comprehensive(self, tmp_path: Path):
         """Test RunConfig with all field variations."""
         # Test default initialization
         config1 = RunConfig()
@@ -233,7 +233,7 @@ class TestDataClassesCoverage:
         assert config1.context == {}
 
         # Test custom initialization
-        event_path = Path("/tmp/events.log")
+        event_path = tmp_path / "events.log"
         custom_context = {"test": "value"}
         config2 = RunConfig(
             device="cuda:0",

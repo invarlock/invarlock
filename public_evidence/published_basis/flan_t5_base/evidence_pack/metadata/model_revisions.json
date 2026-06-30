@@ -9,7 +9,7 @@
           "commit_hash": "7bcac572ce56db69c1ea7c8af255c5d7c9672fc2",
           "refs": [],
           "size_on_disk": 993567070,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--google--flan-t5-base/snapshots/7bcac572ce56db69c1ea7c8af255c5d7c9672fc2"
+          "snapshot_path": "<hf-cache-dir>/hub/models--google--flan-t5-base/snapshots/7bcac572ce56db69c1ea7c8af255c5d7c9672fc2"
         }
       ],
       "slug": "google_flan_t5_base",

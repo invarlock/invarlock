@@ -433,7 +433,7 @@ def test_empirical_guard_evidence_contract_owner_paths(tmp_path: Path) -> None:
     )
     assert failures == ["model_family_rows[0] must be an object."]
 
-    from evidence_contracts import EmpiricalGuardEvidenceManifest
+    EmpiricalGuardEvidenceManifest = module.EmpiricalGuardEvidenceManifest
 
     payload_none = EmpiricalGuardEvidenceManifest(root=root, payload=None)
     assert any("must be a JSON object" in item for item in payload_none.validate())
@@ -475,7 +475,8 @@ def test_empirical_guard_evidence_wrapper_counts_invalid_dict_rows(
 
 
 def test_empirical_guard_evidence_contract_empty_guard_rows(tmp_path: Path) -> None:
-    from evidence_contracts import EmpiricalGuardEvidenceManifest
+    module = _checker_module()
+    EmpiricalGuardEvidenceManifest = module.EmpiricalGuardEvidenceManifest
 
     manifest = EmpiricalGuardEvidenceManifest(
         root=tmp_path,
@@ -493,8 +494,8 @@ def test_empirical_guard_evidence_contract_empty_guard_rows(tmp_path: Path) -> N
 
 
 def test_offline_bundle_manifest_handles_unreadable_member(monkeypatch, tmp_path: Path):
-    import evidence_contracts
-    from evidence_contracts import OfflineBundleManifest
+    module = _checker_module()
+    OfflineBundleManifest = module.OfflineBundleManifest
 
     class FakeTar:
         def __enter__(self):
@@ -514,7 +515,7 @@ def test_offline_bundle_manifest_handles_unreadable_member(monkeypatch, tmp_path
         def extractfile(self, _member):
             return None
 
-    monkeypatch.setattr(evidence_contracts.tarfile, "open", lambda *_a, **_k: FakeTar())
+    monkeypatch.setattr(module.tarfile, "open", lambda *_a, **_k: FakeTar())
     failures: list[str] = []
 
     manifest = OfflineBundleManifest.load_from_tarball(
@@ -529,7 +530,8 @@ def test_offline_bundle_manifest_handles_unreadable_member(monkeypatch, tmp_path
 def test_empirical_guard_evidence_contract_non_object_manifest(
     tmp_path: Path,
 ) -> None:
-    from evidence_contracts import EmpiricalGuardEvidenceManifest
+    module = _checker_module()
+    EmpiricalGuardEvidenceManifest = module.EmpiricalGuardEvidenceManifest
 
     root = tmp_path / "empirical"
     root.mkdir()

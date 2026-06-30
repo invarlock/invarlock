@@ -21,6 +21,21 @@ test_should_shutdown_checks_global_and_worker_flags() {
     assert_rc "0" "${RUN_RC}" "worker shutdown"
 }
 
+test_gpu_worker_sources_task_serialization_when_not_preloaded() {
+    mock_reset
+
+    find_and_claim_task() { return 1; }
+    execute_task() { return 0; }
+    create_model_variant() { return 0; }
+    unset -f get_task_field 2>/dev/null || true
+
+    # shellcheck source=../gpu_worker.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/gpu_worker.sh"
+
+    declare -F get_task_field >/dev/null 2>&1 || t_fail "gpu_worker should source task_serialization when get_task_field is missing"
+    assert_eq "1" "${TASK_SERIALIZATION_LOADED}" "task serialization load marker set"
+}
+
 test_gpu_worker_sets_waiting_deps_when_only_pending_tasks() {
     mock_reset
     # shellcheck source=../gpu_worker.sh
@@ -61,7 +76,7 @@ test_gpu_worker_sets_waiting_deps_when_only_pending_tasks() {
     wait "${pid}" || true
 
     assert_eq "true" "${saw_waiting}" "waiting_deps status observed"
-    assert_file_exists "${out}/workers/dep_resolve.called" "dependency promotion triggered in worker loop"
+    assert_file_exists "${out}/workers/dep_resolve.called" "dependency ready-state transition triggered in worker loop"
 }
 
 test_gpu_worker_exits_on_poison_context_log() {

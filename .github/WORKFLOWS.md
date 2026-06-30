@@ -75,7 +75,7 @@ job or step, emit container-backed outputs, and verify them without bypasses.
 - Dependabot version-update PRs target `staging/next`.
 - Dependabot security-update PRs still originate against the default branch (`main`) because GitHub security updates do not honor `target-branch`.
 - The `dependabot-main-guard.yml` workflow intentionally fails direct Dependabot PRs to `main`.
-- Maintainers must land the equivalent dependency fix on `staging/next`, validate it there, and let it reach `main` through the normal promotion/release flow.
+- Maintainers must land the equivalent dependency fix on `staging/next`, validate it there, and let it reach `main` through the normal staging-to-release flow.
 - `github/codeql-action` is tracked by Dependabot again; maintainers should review the resulting PRs like any other security-sensitive workflow change.
 - The PR supply-chain workflow scans the pull request git delta with
   `gitleaks`, uploads JSON artifacts, audits the built wheel install surface

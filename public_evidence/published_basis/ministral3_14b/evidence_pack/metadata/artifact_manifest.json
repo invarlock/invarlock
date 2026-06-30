@@ -96,11 +96,11 @@
       "model_id": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
       "ok": true,
       "preset": "configs/presets/causal_lm/tinyllama_1_1b_512.yaml",
-      "report_path": "/root/model-evidence/20260612TremainingExperimentalZ/shard-00-gpu-0/eval/tinyllama_1_1b/report/evaluation.report.json",
+      "report_path": "<model-evidence-root>/20260612TremainingExperimentalZ/shard-00-gpu-0/eval/tinyllama_1_1b/report/evaluation.report.json",
       "slug": "tinyllama_1_1b",
       "status": "ok",
       "verify_exit": 0,
-      "verify_path": "/root/model-evidence/20260612TremainingExperimentalZ/shard-00-gpu-0/eval/tinyllama_1_1b/verify.json"
+      "verify_path": "<model-evidence-root>/20260612TremainingExperimentalZ/shard-00-gpu-0/eval/tinyllama_1_1b/verify.json"
     },
     {
       "detail": null,
@@ -109,11 +109,11 @@
       "model_id": "allenai/OLMo-2-1124-13B-Instruct",
       "ok": true,
       "preset": "configs/presets/causal_lm/olmo2_13b_512.yaml",
-      "report_path": "/root/model-evidence/20260612TremainingExperimentalZ/shard-00-gpu-0/eval/olmo2_13b/report/evaluation.report.json",
+      "report_path": "<model-evidence-root>/20260612TremainingExperimentalZ/shard-00-gpu-0/eval/olmo2_13b/report/evaluation.report.json",
       "slug": "olmo2_13b",
       "status": "ok",
       "verify_exit": 0,
-      "verify_path": "/root/model-evidence/20260612TremainingExperimentalZ/shard-00-gpu-0/eval/olmo2_13b/verify.json"
+      "verify_path": "<model-evidence-root>/20260612TremainingExperimentalZ/shard-00-gpu-0/eval/olmo2_13b/verify.json"
     },
     {
       "detail": "verify_failed",
@@ -122,11 +122,11 @@
       "model_id": "google/gemma-4-E2B-it",
       "ok": false,
       "preset": "configs/presets/causal_lm/gemma4_e2b_512.yaml",
-      "report_path": "/root/model-evidence/20260612TremainingExperimentalZ/shard-00-gpu-0/eval/gemma4_e2b/report/evaluation.report.json",
+      "report_path": "<model-evidence-root>/20260612TremainingExperimentalZ/shard-00-gpu-0/eval/gemma4_e2b/report/evaluation.report.json",
       "slug": "gemma4_e2b",
       "status": "failed",
       "verify_exit": 1,
-      "verify_path": "/root/model-evidence/20260612TremainingExperimentalZ/shard-00-gpu-0/eval/gemma4_e2b/verify.json"
+      "verify_path": "<model-evidence-root>/20260612TremainingExperimentalZ/shard-00-gpu-0/eval/gemma4_e2b/verify.json"
     },
     {
       "detail": null,
@@ -135,11 +135,11 @@
       "model_id": "mistralai/Ministral-3-14B-Instruct-2512-BF16",
       "ok": true,
       "preset": "configs/presets/causal_lm/ministral3_14b_512.yaml",
-      "report_path": "/root/model-evidence/20260612TremainingExperimentalZ/shard-00-gpu-0/eval/ministral3_14b/report/evaluation.report.json",
+      "report_path": "<model-evidence-root>/20260612TremainingExperimentalZ/shard-00-gpu-0/eval/ministral3_14b/report/evaluation.report.json",
       "slug": "ministral3_14b",
       "status": "ok",
       "verify_exit": 0,
-      "verify_path": "/root/model-evidence/20260612TremainingExperimentalZ/shard-00-gpu-0/eval/ministral3_14b/verify.json"
+      "verify_path": "<model-evidence-root>/20260612TremainingExperimentalZ/shard-00-gpu-0/eval/ministral3_14b/verify.json"
     }
   ],
   "ok": false,

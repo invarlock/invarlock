@@ -52,6 +52,52 @@ def test_public_evidence_audit_respects_root_override(tmp_path: Path) -> None:
     assert module.check_public_evidence(evidence_root) == []
 
 
+def test_public_evidence_audit_rejects_private_execution_details(
+    tmp_path: Path,
+) -> None:
+    module = _load_audit_module()
+    evidence_root = tmp_path / "public_evidence"
+    artifact_dir = evidence_root / "fixtures" / "demo"
+    artifact_dir.mkdir(parents=True)
+    (evidence_root / "README.md").write_text("# public evidence\n", encoding="utf-8")
+    (artifact_dir / "evaluation.report.json").write_text("{}", encoding="utf-8")
+    (artifact_dir / "runtime.manifest.json").write_text("{}", encoding="utf-8")
+    (artifact_dir / "evidence_pack_recipe.json").write_text(
+        json.dumps(
+            {
+                "commands": [
+                    "runner --host root@203.0.113.10 --out /root/private-run",
+                    "evaluate --report-out /private/tmp/invarlock-report",
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (artifact_dir / "evidence.meta.json").write_text(
+        json.dumps(
+            {
+                "schema": module.SCHEMA,
+                "evidence_class": "contract_fixture",
+                "summary": "fixture report",
+                "artifact_paths": {
+                    "evaluation_report": "evaluation.report.json",
+                    "runtime_manifest": "runtime.manifest.json",
+                },
+                "verifier_commands": ["invarlock verify evaluation.report.json"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    errors = module.check_public_evidence(evidence_root)
+
+    assert any("root_ssh_target" in error for error in errors)
+    assert any("private_ip_address" in error for error in errors)
+    assert any("absolute_root_path" in error for error in errors)
+    assert any("private_tmp_path" in error for error in errors)
+    assert not any("203.0.113.10" in error for error in errors)
+
+
 def _write_minimal_evidence_dir(
     artifact_dir: Path,
     *,

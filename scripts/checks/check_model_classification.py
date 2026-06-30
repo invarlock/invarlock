@@ -22,7 +22,7 @@ if str(MODEL_EVIDENCE_DIR) not in sys.path:
     sys.path.insert(0, str(MODEL_EVIDENCE_DIR))
 
 from model_evidence_lanes import (  # noqa: E402
-    PROMOTION_GAP_GPU_SUITE,
+    PUBLISHED_BASIS_GAP_GPU_SUITE,
     REPO_MENTIONED_GPU_SUITE,
     SUITES,
     SUPPORT_MATRIX_BACKLOG_GPU_SUITE,
@@ -45,7 +45,7 @@ SUPPORT_MATRIX_CLASSIFICATIONS = {"published", "backlog", "blocked"}
 TARGETED_SUITES = {
     REPO_MENTIONED_GPU_SUITE,
     SUPPORT_MATRIX_BACKLOG_GPU_SUITE,
-    PROMOTION_GAP_GPU_SUITE,
+    PUBLISHED_BASIS_GAP_GPU_SUITE,
 }
 
 
@@ -151,8 +151,8 @@ def _catalog_families(
     return indexed
 
 
-def _promotion_candidates(catalog: Mapping[str, Any]) -> list[Mapping[str, Any]]:
-    section = catalog.get("promotion_candidates_text_le_14b")
+def _published_basis_candidates(catalog: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    section = catalog.get("published_basis_candidates_text_le_14b")
     if not isinstance(section, Mapping):
         return []
     candidates = section.get("candidates")
@@ -208,11 +208,11 @@ def _collect_named_model_sources(
         for model_id in _string_list(family.get("representative_models")):
             sources[model_id].add(f"model_family_catalog:{section}:{family_id}")
 
-    for candidate in _promotion_candidates(catalog):
+    for candidate in _published_basis_candidates(catalog):
         model_id = candidate.get("representative_model")
         candidate_id = candidate.get("candidate_id", "<unknown>")
         if isinstance(model_id, str) and model_id:
-            sources[model_id].add(f"promotion_candidate:{candidate_id}")
+            sources[model_id].add(f"published_basis_candidate:{candidate_id}")
 
     for suite_name, lane in _explicit_suite_lanes():
         sources[lane.model_id].add(f"model_evidence:{suite_name}:{lane.slug}")
@@ -417,7 +417,7 @@ def _check_catalog(
                 )
             )
 
-    for candidate in _promotion_candidates(catalog):
+    for candidate in _published_basis_candidates(catalog):
         candidate_id = candidate.get("candidate_id")
         if not isinstance(candidate_id, str) or not candidate_id:
             continue
@@ -425,7 +425,7 @@ def _check_catalog(
         if decision not in {"blocked_missing_artifacts", "explicitly_out_of_scope"}:
             continue
         entry = by_candidate.get(candidate_id)
-        scope = f"promotion_candidate:{candidate_id}"
+        scope = f"published_basis_candidate:{candidate_id}"
         if entry is None:
             findings.append(
                 Finding("error", scope, "missing model_classification entry")

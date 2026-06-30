@@ -31,7 +31,7 @@ COPY requirements/workflows/runtime-image-quant-py312-cu128.txt /opt/invarlock/r
 # Install only the container runtime execution stack from the pinned
 # requirements surface, then execute the repo source directly via PYTHONPATH.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential \
+    && apt-get install -y --no-install-recommends build-essential jq \
     && if ! command -v python >/dev/null 2>&1; then \
       apt-get install -y --no-install-recommends ca-certificates python3 python3-pip python3-venv python-is-python3; \
     fi \

@@ -59,8 +59,8 @@ from model_evidence_lanes import (  # noqa: E402
     EXECUTION_MODES,
     MODEL_CATALOG_GPU_LANES,
     MODEL_CATALOG_GPU_SUITE,
-    PROMOTION_GAP_GPU_LANES,
-    PROMOTION_GAP_GPU_SUITE,
+    PUBLISHED_BASIS_GAP_GPU_LANES,
+    PUBLISHED_BASIS_GAP_GPU_SUITE,
     REPO_MENTIONED_GPU_SUITE,
     REPO_ROOT,
     SUITES,
@@ -86,8 +86,8 @@ __all__ = [
     "EXECUTION_MODES",
     "MODEL_CATALOG_GPU_LANES",
     "MODEL_CATALOG_GPU_SUITE",
-    "PROMOTION_GAP_GPU_LANES",
-    "PROMOTION_GAP_GPU_SUITE",
+    "PUBLISHED_BASIS_GAP_GPU_LANES",
+    "PUBLISHED_BASIS_GAP_GPU_SUITE",
     "REPO_MENTIONED_GPU_SUITE",
     "SUITES",
     "SUPPORT_MATRIX_BACKLOG_GPU_LANES",
@@ -522,10 +522,16 @@ def write_prepared_preset(
     *,
     lane_root: Path,
     execution_mode: str,
+    preset_source: str | Path | None = None,
 ) -> Path | None:
     if not spec.vision_text_materialization:
         return None
-    preset_data = yaml.safe_load(spec.preset_path.read_text(encoding="utf-8"))
+    source_path = _resolve_preset_source_path(
+        preset_source,
+        default_path=spec.preset_path,
+        execution_mode=execution_mode,
+    )
+    preset_data = yaml.safe_load(source_path.read_text(encoding="utf-8"))
     if not isinstance(preset_data, dict):
         raise ValueError(f"Preset must be a mapping: {spec.preset_relpath}")
     dataset = preset_data.setdefault("dataset", {})
@@ -549,6 +555,25 @@ def write_prepared_preset(
         encoding="utf-8",
     )
     return prepared_path
+
+
+def _resolve_preset_source_path(
+    preset_source: str | Path | None,
+    *,
+    default_path: Path,
+    execution_mode: str,
+) -> Path:
+    if preset_source is None:
+        return default_path
+    source_path = Path(preset_source)
+    if execution_mode == "container" and source_path.is_absolute():
+        try:
+            source_path = REPO_ROOT / source_path.relative_to("/workspace")
+        except ValueError:
+            pass
+    if not source_path.is_absolute():
+        source_path = REPO_ROOT / source_path
+    return source_path
 
 
 def _prefetch_adapter_name(spec: EvidenceLane) -> str:
@@ -771,12 +796,17 @@ def build_lane_plan(
     )
     prepared_preset = None
     preset_arg_override = None
+    preset_source_override = (
+        preset_overrides.get(spec.slug) if preset_overrides is not None else None
+    )
+    prepared_preset_source = None
     steps: list[WorkflowCommandStep] = []
     if materialize_cmd is not None:
         prepared_preset = _command_path(
             lane_root / "prepared_preset.yaml",
             execution_mode=execution_mode,
         )
+        prepared_preset_source = preset_source_override
         preset_arg_override = prepared_preset
         steps.append(
             WorkflowCommandStep(
@@ -785,8 +815,8 @@ def build_lane_plan(
                 log_mode="w",
             )
         )
-    elif preset_overrides:
-        preset_arg_override = preset_overrides.get(spec.slug)
+    elif preset_source_override is not None:
+        preset_arg_override = preset_source_override
 
     if execution_mode == "host":
         steps.append(
@@ -846,6 +876,7 @@ def build_lane_plan(
         steps=tuple(steps),
         resource_preflight=lane_resource_preflight(spec, env=env, device=device),
         prepared_preset=prepared_preset,
+        prepared_preset_source=prepared_preset_source,
     )
 
 
@@ -892,6 +923,7 @@ def _classify_failure(
     evaluate_exit: int,
     verify_exit: int | None,
     phase: str,
+    verify_path: Path | None = None,
 ) -> tuple[str, str | None]:
     if evaluate_exit == 0 and verify_exit == 0:
         return ("ok", None)
@@ -918,6 +950,8 @@ def _classify_failure(
         or "primary metric degraded or non-finite" in text
     ):
         return ("failed", "invalid_primary_metric")
+    if phase == "verify" and verify_exit not in {None, 0}:
+        return ("failed", _verify_failure_detail(verify_path) or "verify_failed")
     if evaluate_exit == 125 and (
         "docker:" in text
         and (
@@ -928,10 +962,57 @@ def _classify_failure(
     ):
         return ("failed", "container_image_pull_denied")
     if evaluate_exit != 0:
-        return ("failed", f"{phase}_failed")
+        return ("failed", _evaluate_failure_detail(text) or f"{phase}_failed")
     if verify_exit not in {None, 0}:
-        return ("failed", "verify_failed")
+        return ("failed", _verify_failure_detail(verify_path) or "verify_failed")
     return ("failed", None)
+
+
+def _evaluate_failure_detail(log_text: str) -> str | None:
+    log_text = log_text.lower()
+    if "no-samples" in log_text or "produced no samples" in log_text:
+        return "no_samples"
+    if (
+        "couldn't find cache for" in log_text
+        and "available configs in the cache" in log_text
+    ):
+        return "dataset_cache_missing"
+    return None
+
+
+def _safe_detail(value: object) -> str | None:
+    text = str(value or "").strip().lower().replace("-", "_")
+    if not text or len(text) > 64:
+        return None
+    allowed = set("abcdefghijklmnopqrstuvwxyz0123456789_")
+    if not all(char in allowed for char in text):
+        return None
+    return text
+
+
+def _verify_failure_detail(verify_path: Path | None) -> str | None:
+    if verify_path is None or not verify_path.is_file():
+        return None
+    try:
+        payload = json.loads(verify_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    summary = payload.get("summary")
+    if isinstance(summary, dict):
+        detail = _safe_detail(summary.get("reason"))
+        if detail:
+            return detail
+    results = payload.get("results")
+    if isinstance(results, list):
+        for result in results:
+            if not isinstance(result, dict):
+                continue
+            detail = _safe_detail(result.get("reason"))
+            if detail:
+                return detail
+    return None
 
 
 def _lane_env_for_spec(spec: EvidenceLane, env: dict[str, str]) -> dict[str, str]:
@@ -952,6 +1033,7 @@ def _after_successful_model_step(
         spec,
         lane_root=plan.lane_root,
         execution_mode=plan.execution_mode,
+        preset_source=plan.prepared_preset_source,
     )
 
 
@@ -987,6 +1069,7 @@ def _model_lane_result_from_state(
             evaluate_exit=base.evaluate_exit,
             verify_exit=base.verify_exit,
             phase="evaluate",
+            verify_path=published_verify_path,
         )
     elif failed_phase.name == "materialize_dataset":
         status, detail = ("failed", "dataset_materialize_failed")
@@ -1003,6 +1086,7 @@ def _model_lane_result_from_state(
             evaluate_exit=phase_exit,
             verify_exit=base.verify_exit,
             phase=failed_phase.name,
+            verify_path=published_verify_path,
         )
 
     return LaneResult(

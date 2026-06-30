@@ -1,0 +1,9 @@
+{
+  "assurance": "strict",
+  "basis": "release-profile container-backed public VQAv2 image-text no-op preservation fixture",
+  "evidence_run": "20260629Tgemma4_31b_release",
+  "model_id": "google/gemma-4-31B-it",
+  "note": "No-op preservation/null-behavior evidence; audio, broader any-to-any behavior, and model-quality claims are out of scope.",
+  "profile": "release",
+  "verdict": "PASS"
+}

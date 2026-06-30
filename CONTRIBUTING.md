@@ -177,6 +177,10 @@ pytest -q -m "not integration and not slow and not manual" tests
 # Same lane via Makefile
 make test-fast
 
+# Optional pytest-xdist workers for the fast lane
+make test-parallel
+make test-fast PYTEST_WORKERS=auto
+
 # Full suite (can be slow)
 pytest -q
 
@@ -188,6 +192,8 @@ make test-integration
 ```
 
 For more curated examples (including the CI subset), see `tests/README.md`.
+Keep coverage runs serial unless the coverage target is explicitly updated to
+combine per-worker data; `make coverage-enforce` writes shared coverage reports.
 
 ### 3.3 Coverage policy
 
@@ -464,10 +470,10 @@ uv run invarlock advanced evidence-pack verify <evidence-dir>/evidence_pack \
 ```
 
 Verifier examples must preserve the provenance link to the matching
-`runtime.manifest.json`; reviewers need that manifest to confirm execution
+`runtime.manifest.json`; readers need that manifest to confirm execution
 context, profile, and artifact integrity.
 
-Evidence metadata should be scanner-friendly and reviewer-friendly. Store file
+Evidence metadata should be scanner-friendly and reader-friendly. Store file
 hashes as records such as `{"path": "...", "sha256": "..."}` instead of using
 file names as JSON keys when those names can look like secret/token fields to
 generic scanners.

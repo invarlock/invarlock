@@ -12,7 +12,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Define the paired bare-vs-guarded overhead measurement and the release-evidence budget. |
-| **Audience** | Release reviewers, runtime maintainers, and operators producing overhead evidence. |
+| **Audience** | Release approvers, runtime maintainers, and operators producing overhead evidence. |
 | **Contract scope** | Guard overhead ratio/percent reporting, soft-pass diagnostics, and release verifier requirements. |
 | **Source of truth** | `src/invarlock/reporting/report_overhead.py`, `src/invarlock/reporting/verify_check_helpers_consistency.py`, and overhead tests. |
 

@@ -1,16 +1,19 @@
 {
-  "schema": "invarlock.public_evidence.artifact_package.v1",
-  "generated_at": "2026-05-29T00:00:00Z",
-  "lane_id": "gpt2-causal-hf",
-  "evidence_level": "strict_pass_fixture",
   "checkpoint_refs": "checkpoint_refs.json",
   "evaluation_report": "../evaluation.report.json",
+  "evidence_level": "strict_pass_fixture",
+  "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
+  "generated_at": "2026-05-29T00:00:00Z",
+  "lane_id": "gpt2-causal-hf",
+  "non_goals": [
+    "This package is weight-free by design.",
+    "Deployable quantization-backend behavior is outside this package."
+  ],
   "runtime_manifest": "../runtime.manifest.json",
+  "schema": "invarlock.public_evidence.artifact_package.v1",
   "signed_evidence_pack": "../evidence_pack",
-  "expected_fingerprint": "sha256:eff9de615ddb03ecd5f90e2ba3fa7cf13a0dddeb651df7a4f587b7ca348f9059",
   "verifier_commands": [
     {
-      "name": "release-report",
       "command": [
         "uv",
         "run",
@@ -22,10 +25,10 @@
         "--assurance",
         "strict"
       ],
-      "expected_exit_code": 0
+      "expected_exit_code": 0,
+      "name": "release-report"
     },
     {
-      "name": "signed-evidence-pack",
       "command": [
         "uv",
         "run",
@@ -40,14 +43,11 @@
         "--report-assurance",
         "strict",
         "--expected-fingerprint",
-        "sha256:eff9de615ddb03ecd5f90e2ba3fa7cf13a0dddeb651df7a4f587b7ca348f9059"
+        "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb"
       ],
+      "expected_authenticity": "pinned",
       "expected_exit_code": 0,
-      "expected_authenticity": "pinned"
+      "name": "signed-evidence-pack"
     }
-  ],
-  "non_goals": [
-    "This package is weight-free by design.",
-    "Deployable quantization-backend behavior is outside this package."
   ]
 }

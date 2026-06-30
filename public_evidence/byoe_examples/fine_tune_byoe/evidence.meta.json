@@ -1,0 +1,18 @@
+{
+  "artifact_paths": {
+    "checkpoint_refs": "checkpoint_refs.json",
+    "evaluation_report": "evaluation.report.json",
+    "runtime_manifest": "runtime.manifest.json"
+  },
+  "evidence_class": "byoe_subject_fixture",
+  "generated_by": "public fixture assembly",
+  "non_goals": [
+    "Model weights are external references.",
+    "Training pipeline quality and edit success are outside this fixture."
+  ],
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "BYOE subject fixture for fine-tuned checkpoint evidence.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/byoe_examples/fine_tune_byoe/evaluation.report.json --profile release --assurance strict"
+  ]
+}

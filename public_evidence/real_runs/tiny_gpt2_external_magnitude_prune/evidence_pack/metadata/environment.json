@@ -4,5 +4,5 @@
   "generated_at_utc": "2026-05-30T06:12:44Z",
   "platform": "macOS-15.6.1-arm64-arm-64bit",
   "python": "3.12.13",
-  "subject_materialized_at": "/private/tmp/invarlock-byoe-magnitude-prune-subject"
+  "subject_materialized_at": "<local-temp-dir>/invarlock-byoe-magnitude-prune-subject"
 }

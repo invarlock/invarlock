@@ -59,7 +59,7 @@ EOF
     chmod +x "${bin_dir}/python-override"
     local had_python_bin="0"
     local previous_python_bin="${PYTHON_BIN:-}"
-    if [[ -v PYTHON_BIN ]]; then
+    if [[ "${PYTHON_BIN+x}" == "x" ]]; then
         had_python_bin="1"
     fi
     export PYTHON_BIN="${bin_dir}/python-override"
@@ -95,8 +95,8 @@ EOF
     local previous_python_bin="${PYTHON_BIN:-}"
     local had_helper="0"
     local had_python_bin="0"
-    [[ -v PACK_HELPER_PYTHON_BIN ]] && had_helper="1"
-    [[ -v PYTHON_BIN ]] && had_python_bin="1"
+    [[ "${PACK_HELPER_PYTHON_BIN+x}" == "x" ]] && had_helper="1"
+    [[ "${PYTHON_BIN+x}" == "x" ]] && had_python_bin="1"
 
     export PACK_HELPER_PYTHON_BIN="${bin_dir}/not-python -m invarlock"
     export PYTHON_BIN="${TEST_REAL_PYTHON3}"
@@ -134,9 +134,9 @@ test_cmd_python_interpreter_discovers_python_and_fails_without_candidates() {
     local had_helper="0"
     local had_python_bin="0"
     local had_virtual_env="0"
-    [[ -v PACK_HELPER_PYTHON_BIN ]] && had_helper="1"
-    [[ -v PYTHON_BIN ]] && had_python_bin="1"
-    [[ -v VIRTUAL_ENV ]] && had_virtual_env="1"
+    [[ "${PACK_HELPER_PYTHON_BIN+x}" == "x" ]] && had_helper="1"
+    [[ "${PYTHON_BIN+x}" == "x" ]] && had_python_bin="1"
+    [[ "${VIRTUAL_ENV+x}" == "x" ]] && had_virtual_env="1"
 
     unset PACK_HELPER_PYTHON_BIN
     unset PYTHON_BIN
@@ -477,10 +477,11 @@ test_shell_tests_do_not_use_raw_python3_stub_fixture() {
 from pathlib import Path
 
 repo_root = Path.cwd()
+test_root = repo_root / "scripts" / "evidence_packs" / "tests"
 pattern = 'fixture_write "' + 'python3.stub' + '"'
 violations = []
 
-for path in sorted(repo_root.rglob("test_*.sh")):
+for path in sorted(test_root.rglob("test_*.sh")):
     if any(part.startswith(".") for part in path.parts):
         continue
     text = path.read_text(encoding="utf-8")

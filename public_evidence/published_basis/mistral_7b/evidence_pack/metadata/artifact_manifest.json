@@ -51,11 +51,11 @@
       "model_id": "mistralai/Mistral-7B-v0.1",
       "ok": true,
       "preset": "configs/presets/causal_lm/mistral_7b_512.yaml",
-      "report_path": "/root/model-evidence/20260611TmistralQwen2ParallelZ/shard-00-gpu-0/eval/mistral_7b/report/evaluation.report.json",
+      "report_path": "<model-evidence-root>/20260611TmistralQwen2ParallelZ/shard-00-gpu-0/eval/mistral_7b/report/evaluation.report.json",
       "slug": "mistral_7b",
       "status": "ok",
       "verify_exit": 0,
-      "verify_path": "/root/model-evidence/20260611TmistralQwen2ParallelZ/shard-00-gpu-0/eval/mistral_7b/verify.json"
+      "verify_path": "<model-evidence-root>/20260611TmistralQwen2ParallelZ/shard-00-gpu-0/eval/mistral_7b/verify.json"
     }
   ],
   "ok": true,

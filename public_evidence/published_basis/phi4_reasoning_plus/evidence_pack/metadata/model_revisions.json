@@ -11,7 +11,7 @@
             "main"
           ],
           "size_on_disk": 29326236860,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--microsoft--Phi-4-reasoning-plus/snapshots/69baf8528e1bcf05f475034d9e5dd32875ed125f"
+          "snapshot_path": "<hf-cache-dir>/hub/models--microsoft--Phi-4-reasoning-plus/snapshots/69baf8528e1bcf05f475034d9e5dd32875ed125f"
         }
       ],
       "slug": "phi4_reasoning_plus",

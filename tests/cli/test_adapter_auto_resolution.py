@@ -224,11 +224,14 @@ def test_resolve_auto_adapter_keeps_mistral3_conditional_generation_causal(
     [
         "Qwen/Qwen3.5-4B",
         "Qwen/Qwen3.5-2B",
+        "Qwen/Qwen3.5-27B",
+        "Qwen/Qwen3.6-27B",
         "demo/gemma3n-compatible-checkpoint",
         "demo/gemma-3-4b-compatible-checkpoint",
         "google/gemma-4-E4B-it",
         "google/gemma-4-12B-it",
         "google/gemma-4-26B-A4B-it",
+        "google/gemma-4-31B-it",
     ],
 )
 def test_resolve_auto_adapter_routes_named_multimodal_model_ids(

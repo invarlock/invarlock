@@ -11,7 +11,7 @@
             "main"
           ],
           "size_on_disk": 7687678167,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--microsoft--Phi-4-mini-instruct/snapshots/cfbefacb99257ffa30c83adab238a50856ac3083"
+          "snapshot_path": "<hf-cache-dir>/hub/models--microsoft--Phi-4-mini-instruct/snapshots/cfbefacb99257ffa30c83adab238a50856ac3083"
         }
       ],
       "slug": "microsoft_phi_4_mini_instruct",

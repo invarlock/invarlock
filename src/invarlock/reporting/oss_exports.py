@@ -433,7 +433,7 @@ def render_release_review_packet(
         "",
         *_validation_checklist(report),
         "",
-        "## Reviewer Checklist",
+        "## Evidence Checklist",
         "",
         "- [ ] Verify the report SHA-256 against the shipped artifact.",
         "- [ ] Confirm baseline and subject identities match the release request.",

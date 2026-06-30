@@ -12,10 +12,14 @@ import torch
 
 try:
     from .editing.implementations import (
+        apply_dense_lora_merge_delta,
         apply_dense_lowrank_approximation,
         apply_dense_magnitude_prune,
         apply_fp8_dequantized_simulation,
         apply_rtn_dequantized_simulation,
+        apply_tiny_fine_tune_update,
+        build_fine_tune_validation_metadata,
+        build_lora_merge_validation_metadata,
         build_validation_edit_metadata,
         parse_edit_specs_json,
         resolve_batch_entry,
@@ -28,10 +32,14 @@ try:
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from editing.implementations import (
+        apply_dense_lora_merge_delta,
         apply_dense_lowrank_approximation,
         apply_dense_magnitude_prune,
         apply_fp8_dequantized_simulation,
         apply_rtn_dequantized_simulation,
+        apply_tiny_fine_tune_update,
+        build_fine_tune_validation_metadata,
+        build_lora_merge_validation_metadata,
         build_validation_edit_metadata,
         parse_edit_specs_json,
         resolve_batch_entry,
@@ -118,6 +126,10 @@ def _get_edit_dir_name(parsed_spec: dict[str, object], version: str) -> str:
         return f"prune_{pct}pct_{version}"
     if edit_type == "lowrank_svd":
         return f"svd_rank{parsed_spec['rank']}_{version}"
+    if edit_type == "lora_merge":
+        return f"lora_rank{parsed_spec['rank']}_{version}"
+    if edit_type == "fine_tune":
+        return f"fine_tune_step{parsed_spec['steps']}_{version}"
     return f"{edit_type}_{version}"
 
 
@@ -183,6 +195,40 @@ def _build_edited_model_and_metadata(
                 "layer_limit": stats.details.get("layer_limit"),
                 "layer": stats.details.get("layer"),
             },
+        )
+        return edited, metadata
+    if edit_type == "lora_merge":
+        rank = int(parsed_spec["rank"])
+        alpha = float(parsed_spec["alpha"])
+        scope = str(parsed_spec["scope"])
+        stats = apply_dense_lora_merge_delta(
+            edited,
+            rank=rank,
+            alpha=alpha,
+            scope=scope,
+        )
+        metadata = build_lora_merge_validation_metadata(
+            scope=scope,
+            rank=rank,
+            alpha=alpha,
+            stats=stats,
+        )
+        return edited, metadata
+    if edit_type == "fine_tune":
+        learning_rate = float(parsed_spec["learning_rate"])
+        steps = int(parsed_spec["steps"])
+        scope = str(parsed_spec["scope"])
+        stats = apply_tiny_fine_tune_update(
+            edited,
+            learning_rate=learning_rate,
+            steps=steps,
+            scope=scope,
+        )
+        metadata = build_fine_tune_validation_metadata(
+            scope=scope,
+            learning_rate=learning_rate,
+            steps=steps,
+            stats=stats,
         )
         return edited, metadata
     if edit_type == "fp8_quant":

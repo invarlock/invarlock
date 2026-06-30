@@ -174,7 +174,7 @@ Return exactly one JSON object like {{"answer":"short phrase"}}. Use a short phr
 
 The generated `manifest.jsonl`, `images/`, and
 `materialization_summary.json` are then consumed by `vision_text`. For evidence
-promotion, pin the dataset revision and keep the materialization summary with
+published-basis inclusion, pin the dataset revision and keep the materialization summary with
 the run artifacts. Public VQA evidence prompts should prefer a structured
 answer field such as `{"answer":"..."}`; the evaluator extracts that field
 before exact-answer scoring and falls back to the raw generation when no JSON

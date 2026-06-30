@@ -3,7 +3,7 @@
   "generated_at": "2026-06-14T10:55:34.190218+00:00",
   "models": [
     {
-      "cache_dir": "/root/invarlock-public-promote/tmp/model_evidence_hf_home/hub",
+      "cache_dir": "<validation-repo>-promote/tmp/model_evidence_hf_home/hub",
       "model_id": "google/gemma-4-E4B-it",
       "revisions": [
         {
@@ -12,7 +12,7 @@
             "main"
           ],
           "size_on_disk": 16024791983,
-          "snapshot_path": "/root/invarlock-public-promote/tmp/model_evidence_hf_home/hub/models--google--gemma-4-E4B-it/snapshots/fee6332c1abaafb77f6f9624236c63aa2f1d0187"
+          "snapshot_path": "<validation-repo>-promote/tmp/model_evidence_hf_home/hub/models--google--gemma-4-E4B-it/snapshots/fee6332c1abaafb77f6f9624236c63aa2f1d0187"
         }
       ],
       "slug": "google_gemma_4_e4b_it",
