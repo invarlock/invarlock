@@ -45,7 +45,7 @@ non-synthetic workflows:
 
 The synthetic guard-validation smoke remains the minimum deterministic release
 floor. Empirical evidence is required when a release claims new or expanded
-guard calibration, model-family calibration, or support promotion beyond the
+guard calibration, model-family calibration, or published-basis expansion beyond the
 currently published basis.
 
 The included empirical manifest may also index published-basis no-op
@@ -105,7 +105,7 @@ An empirical bundle uses this shape:
 }
 ```
 
-The optional `calibration_corpus` block summarizes promoted-family no-op
+The optional `calibration_corpus` block summarizes published-family no-op
 published-basis reports that are present in-tree and hash-linked from the
 family summaries. It is a calibration input surface, not proof that the
 packaged tier constants were re-derived for those families.

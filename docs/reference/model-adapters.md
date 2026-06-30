@@ -223,9 +223,9 @@ model:
   low_cpu_mem_usage: true
 ```
 
-The `vision_text` path above is a local smoke fixture. Public promotion evidence
+The `vision_text` path above is a local smoke fixture. Public evidence
 uses materialized, pinned public datasets with dataset materialization summaries
-stored alongside the run artifacts, and image-text published-basis promotion
+stored alongside the run artifacts, and image-text published-basis inclusion
 requires a measured primary-metric floor rather than preservation pass/fail
 alone.
 

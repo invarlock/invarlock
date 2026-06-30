@@ -170,8 +170,11 @@ def load_model_family_catalog() -> dict[str, Any]:
     data.setdefault("implemented_coverage", [])
     data.setdefault("usage_only", [])
     data.setdefault(
-        "promotion_candidates_text_le_14b",
-        {"format_version": "promotion-candidates-text-le-14b-v1", "candidates": []},
+        "published_basis_candidates_text_le_14b",
+        {
+            "format_version": "published-basis-candidates-text-le-14b-v1",
+            "candidates": [],
+        },
     )
     data.setdefault("recommended_additions", [])
     return data

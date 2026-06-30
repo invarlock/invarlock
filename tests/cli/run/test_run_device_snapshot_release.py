@@ -654,7 +654,7 @@ def test_tokenizer_hash_populated_from_context_when_missing(tmp_path: Path):
 
     class Runner:
         def execute(self, **kwargs):
-            # Provide tokenizer_hash in dataset_meta context to be promoted to meta.tokenizer_hash
+            # Provide tokenizer_hash in dataset_meta context to be copied to meta.tokenizer_hash
             return SimpleNamespace(
                 edit={},
                 metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},

@@ -8,7 +8,7 @@
   },
   "dataset_revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
   "evidence_class": "strict_pass_fixture",
-  "expected_fingerprint": "sha256:e008ce065eeb2b32a529b1e8dfd312ed7e5753bc1e6fbfa516bf45ad6a606762",
+  "expected_fingerprint": "sha256:b67ab8a0456a89ad85a4f18f596815d72a74337b8302882be40a16ccc210d82f",
   "generated_by": "CUDA-capable validation host strict model evidence run",
   "model_revision": "6cee5e81ee83917806bbde320786a8fb61efebee",
   "non_goals": [
@@ -21,6 +21,6 @@
   "summary": "Release-strict verifier fixture for the GPT-OSS 20B HF causal published-basis lane on public WikiText-2 validation.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/gpt_oss_20b/evaluation.report.json --profile release --assurance strict",
-    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/gpt_oss_20b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:e008ce065eeb2b32a529b1e8dfd312ed7e5753bc1e6fbfa516bf45ad6a606762"
+    "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/gpt_oss_20b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:b67ab8a0456a89ad85a4f18f596815d72a74337b8302882be40a16ccc210d82f"
   ]
 }

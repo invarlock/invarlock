@@ -76,7 +76,7 @@ test_gpu_worker_sets_waiting_deps_when_only_pending_tasks() {
     wait "${pid}" || true
 
     assert_eq "true" "${saw_waiting}" "waiting_deps status observed"
-    assert_file_exists "${out}/workers/dep_resolve.called" "dependency promotion triggered in worker loop"
+    assert_file_exists "${out}/workers/dep_resolve.called" "dependency ready-state transition triggered in worker loop"
 }
 
 test_gpu_worker_exits_on_poison_context_log() {

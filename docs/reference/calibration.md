@@ -88,7 +88,7 @@ are attached. Multimodal calibration configs that use `vision_text` expect the
 referenced local manifest to be materialized before the sweep runs.
 
 The empirical guard manifest also indexes no-op published-basis reports for the
-modern promoted families as null-behavior evidence. Those reports are useful
+modern published-basis families as null-behavior evidence. Those reports are useful
 calibration inputs, but they do not update the packaged tier constants by
 themselves. Until a family-specific null sweep re-derives κ, transferred
 attention caps should be interpreted as budgeted sentinels rather than
