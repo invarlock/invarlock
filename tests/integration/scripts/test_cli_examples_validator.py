@@ -12,6 +12,7 @@ def test_cli_examples_validator_accepts_valid_commands(tmp_path: Path) -> None:
         "\n".join(
             [
                 "```bash",
+                "invarlock --help",
                 "invarlock version",
                 "INVARLOCK_ALLOW_NETWORK=0 invarlock doctor",
                 "invarlock evaluate --baseline foo --subject bar --baseline-adapter hf_causal --subject-adapter hf_causal --profile ci --tier none",
