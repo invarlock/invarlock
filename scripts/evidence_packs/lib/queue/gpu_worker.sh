@@ -269,7 +269,7 @@ gpu_worker() {
             local running=$(count_tasks "running")
 
             if [[ ${ready} -eq 0 && ${pending} -gt 0 ]]; then
-                # Fail-safe dependency promotion: if the monitor loop is not running,
+                # Fail-safe dependency ready-state transition: if the monitor loop is not running,
                 # periodically promote pending->ready so workers don't deadlock.
                 local now_resolve
                 now_resolve=$(_now_epoch)
@@ -353,7 +353,7 @@ gpu_worker() {
                 purge_multi_gpu_memory "${assigned_gpus}" 2>/dev/null || true
             fi
 
-            # Dependency promotion is centralized in the main script's monitor loop
+            # Dependency ready-state transitions are centralized in the main script's monitor loop
             # (resolve_dependencies) to avoid lock contention across workers.
 
             consecutive_failures=0

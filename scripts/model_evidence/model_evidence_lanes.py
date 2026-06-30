@@ -26,7 +26,7 @@ MODEL_FAMILY_CATALOG_PATH = REPO_ROOT / "contracts" / "model_family_catalog.json
 DEFAULT_SUITE = "current-supported-experimental"
 REPO_MENTIONED_GPU_SUITE = "repo-mentioned-gpu"
 MODEL_CATALOG_GPU_SUITE = "model-catalog-gpu"
-PROMOTION_GAP_GPU_SUITE = "promotion-gap-gpu"
+PUBLISHED_BASIS_GAP_GPU_SUITE = "published-basis-gap-gpu"
 SUPPORT_MATRIX_BACKLOG_GPU_SUITE = "support-matrix-backlog-gpu"
 EXECUTION_MODES = ("container", "host")
 GPU_80GB_USABLE_MEMORY_GB = 72.0
@@ -637,19 +637,19 @@ def _build_model_catalog_gpu_lanes(
 MODEL_CATALOG_GPU_LANES = _build_model_catalog_gpu_lanes()
 
 
-def _build_promotion_gap_gpu_lanes(
+def _build_published_basis_gap_gpu_lanes(
     payload: dict[str, object] | None = None,
 ) -> tuple[EvidenceLane, ...]:
     catalog = payload or _load_model_family_catalog()
-    section = catalog.get("promotion_candidates_text_le_14b") or {}
+    section = catalog.get("published_basis_candidates_text_le_14b") or {}
     if not isinstance(section, dict):
         raise ValueError(
-            "model_family_catalog.promotion_candidates_text_le_14b must be an object"
+            "model_family_catalog.published_basis_candidates_text_le_14b must be an object"
         )
     candidates = section.get("candidates") or []
     if not isinstance(candidates, list):
         raise ValueError(
-            "model_family_catalog.promotion_candidates_text_le_14b.candidates must be a list"
+            "model_family_catalog.published_basis_candidates_text_le_14b.candidates must be a list"
         )
 
     lanes: list[EvidenceLane] = []
@@ -676,7 +676,7 @@ def _build_promotion_gap_gpu_lanes(
         base_record = next(
             iter(route_index.records_for_model(model_id)),
             ModelFamilyRecord(
-                section="promotion_candidates_text_le_14b",
+                section="published_basis_candidates_text_le_14b",
                 family_id=str(candidate.get("candidate_id") or model_id),
                 display_name=family_label,
                 representative_model=model_id,
@@ -695,7 +695,7 @@ def _build_promotion_gap_gpu_lanes(
             else ()
         )
         defaults_record = ModelFamilyRecord(
-            section="promotion_candidates_text_le_14b",
+            section="published_basis_candidates_text_le_14b",
             family_id=str(candidate.get("candidate_id") or base_record.family_id),
             display_name=family_label,
             representative_model=model_id,
@@ -713,7 +713,7 @@ def _build_promotion_gap_gpu_lanes(
         lanes.append(
             EvidenceLane(
                 slug=catalog_slug(model_id),
-                lane_id=f"promotion-gap::{catalog_slug(model_id)}",
+                lane_id=f"published-basis-gap::{catalog_slug(model_id)}",
                 family=family_label,
                 model_id=model_id,
                 preset_relpath=defaults.preset_relpath,
@@ -724,7 +724,7 @@ def _build_promotion_gap_gpu_lanes(
     return tuple(lanes)
 
 
-PROMOTION_GAP_GPU_LANES = _build_promotion_gap_gpu_lanes()
+PUBLISHED_BASIS_GAP_GPU_LANES = _build_published_basis_gap_gpu_lanes()
 
 SUITES: dict[str, tuple[EvidenceLane, ...]] = {
     DEFAULT_SUITE: CURRENT_SUPPORTED_EXPERIMENTAL_LANES,
@@ -734,7 +734,7 @@ SUITES: dict[str, tuple[EvidenceLane, ...]] = {
         + CURRENT_SUPPORTED_EXPERIMENTAL_LANES
     ),
     MODEL_CATALOG_GPU_SUITE: MODEL_CATALOG_GPU_LANES,
-    PROMOTION_GAP_GPU_SUITE: PROMOTION_GAP_GPU_LANES,
+    PUBLISHED_BASIS_GAP_GPU_SUITE: PUBLISHED_BASIS_GAP_GPU_LANES,
     SUPPORT_MATRIX_BACKLOG_GPU_SUITE: SUPPORT_MATRIX_BACKLOG_GPU_LANES,
 }
 

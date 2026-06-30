@@ -183,7 +183,7 @@ for verdict states.
 - **Schema stability**: v1 has a stable core around primary metric,
   dataset/window metadata, artifacts, plugins, and report identity. Optional
   policy, guard, provenance, telemetry, and confidence blocks are additive
-  unless promoted into the required core, which requires a schema-version bump.
+  unless moved into the required core, which requires a schema-version bump.
 - **Validation allow-list**: only specific `validation.*` flags are accepted by
   the schema validator.
 - **Baseline pairing**: reports assume paired windows; verification enforces

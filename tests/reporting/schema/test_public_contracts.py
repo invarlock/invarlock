@@ -142,10 +142,15 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     assert "QwQ 32B reasoning" not in usage_only
     assert "Qwen2.5 7B" not in usage_only
     assert "Qwen2.5 32B" in usage_only
-    promotion = family_catalog["promotion_candidates_text_le_14b"]
-    assert promotion["format_version"] == "promotion-candidates-text-le-14b-v1"
-    candidates = {item["display_name"]: item for item in promotion["candidates"]}
-    assert candidates["Qwen2.5 7B causal LM"]["decision"] == "promoted_published_basis"
+    candidate_section = family_catalog["published_basis_candidates_text_le_14b"]
+    assert (
+        candidate_section["format_version"]
+        == "published-basis-candidates-text-le-14b-v1"
+    )
+    candidates = {
+        item["display_name"]: item for item in candidate_section["candidates"]
+    }
+    assert candidates["Qwen2.5 7B causal LM"]["decision"] == "published_basis_complete"
     assert (
         candidates["Qwen2.5 7B causal LM"]["current_catalog_state"] == "published_basis"
     )
@@ -155,18 +160,18 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         ]
         == "pass"
     )
-    assert candidates["Qwen2.5 14B causal LM"]["decision"] == "promoted_published_basis"
+    assert candidates["Qwen2.5 14B causal LM"]["decision"] == "published_basis_complete"
     assert (
         candidates["Qwen2.5 14B causal LM"]["current_catalog_state"]
         == "published_basis"
     )
-    assert candidates["Qwen3 8B causal LM"]["decision"] == "promoted_published_basis"
+    assert candidates["Qwen3 8B causal LM"]["decision"] == "published_basis_complete"
     assert (
         candidates["Qwen3 8B causal LM"]["current_catalog_state"] == "published_basis"
     )
     assert (
         candidates["DeepSeek-R1-Distill-Qwen causal LM"]["decision"]
-        == "promoted_published_basis"
+        == "published_basis_complete"
     )
     assert (
         candidates["DeepSeek-R1-Distill-Qwen causal LM"]["current_catalog_state"]
@@ -174,20 +179,20 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     )
     assert (
         candidates["Phi-4 reasoning-plus causal LM"]["decision"]
-        == "promoted_published_basis"
+        == "published_basis_complete"
     )
     assert (
         candidates["Phi-4 reasoning-plus causal LM"]["current_catalog_state"]
         == "published_basis"
     )
     assert (
-        candidates["OpenLLaMA 7B causal LM"]["decision"] == "promoted_published_basis"
+        candidates["OpenLLaMA 7B causal LM"]["decision"] == "published_basis_complete"
     )
     assert (
         candidates["OpenLLaMA 7B causal LM"]["current_catalog_state"]
         == "published_basis"
     )
-    assert candidates["Falcon 7B causal LM"]["decision"] == "promoted_published_basis"
+    assert candidates["Falcon 7B causal LM"]["decision"] == "published_basis_complete"
     assert (
         candidates["Falcon 7B causal LM"]["current_catalog_state"] == "published_basis"
     )

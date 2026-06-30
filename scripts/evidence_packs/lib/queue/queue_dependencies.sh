@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# queue_dependencies.sh - Dependency resolution and dependent promotion
+# queue_dependencies.sh - Dependency resolution and dependent ready-state transitions
 # Version: evidence-packs-v1 (InvarLock Evidence Pack Suite)
 # Usage: sourced by queue_manager.sh
 
