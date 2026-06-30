@@ -57,6 +57,10 @@ def test_dataset_provider_spec_resolves_json_yaml_hf_and_local_overrides(
         monkeypatch.setenv("INVARLOCK_DATASET_PROVIDER_YAML", "[]")
         with pytest.raises(SystemExit, match="must parse to a mapping"):
             preset_generator._resolve_dataset_provider_spec("local_jsonl")
+
+        monkeypatch.setenv("INVARLOCK_DATASET_PROVIDER_YAML", "{")
+        with pytest.raises(SystemExit, match="not valid YAML"):
+            preset_generator._resolve_dataset_provider_spec("local_jsonl")
         monkeypatch.delenv("INVARLOCK_DATASET_PROVIDER_YAML")
 
     monkeypatch.setenv("INVARLOCK_HF_DATASET", "c4")
