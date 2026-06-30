@@ -92,11 +92,11 @@ def test_event_logger_context_manager_and_del(tmp_path: Path) -> None:
     assert lines2[0]["operation"] == "session_start"
 
 
-def test_event_logger_serializer_paths() -> None:
+def test_event_logger_serializer_paths(tmp_path: Path) -> None:
     # Directly exercise serializer utility branches
     from invarlock.core.events import EventLogger
 
-    logger = EventLogger(Path("/tmp/nonexistent.jsonl"), auto_flush=False)
+    logger = EventLogger(tmp_path / "nonexistent.jsonl", auto_flush=False)
 
     # tolist
     class A:

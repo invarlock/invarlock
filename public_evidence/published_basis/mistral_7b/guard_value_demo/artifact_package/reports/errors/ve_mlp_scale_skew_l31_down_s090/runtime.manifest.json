@@ -16,8 +16,8 @@
   "manifest_version": 1,
   "report": {
     "filename": "evaluation.report.json",
-    "path": "/root/evidence-pack-runs/mistral_guard_confirm_20260612a/mistralai__mistral-7b-v01/reports/errors/ve_mlp_scale_skew_l31_down_s090/evaluation.report.json",
-    "sha256": "672fa36f029f0f971082e85db4496f390942a2917e5e5eb64cc7c2a6f8bb71b8"
+    "path": "<validation-output-root>/mistral_guard_confirm_20260612a/mistralai__mistral-7b-v01/reports/errors/ve_mlp_scale_skew_l31_down_s090/evaluation.report.json",
+    "sha256": "8620bc0f25f8a66b95f3607fef5fd4b266467ac98af81542dcdc4ee404645b84"
   },
   "runtime": {
     "allow_network": false,

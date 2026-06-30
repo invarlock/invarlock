@@ -6,15 +6,35 @@
 
 QUEUE_MANAGER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=queue_core.sh
-[[ -z "${QUEUE_CORE_LOADED:-}" ]] && source "${QUEUE_MANAGER_SCRIPT_DIR}/queue_core.sh"
+if ! declare -F init_queue >/dev/null 2>&1; then
+    source "${QUEUE_MANAGER_SCRIPT_DIR}/queue_core.sh"
+fi
+QUEUE_CORE_LOADED=1
+export -n QUEUE_CORE_LOADED 2>/dev/null || true
 # shellcheck source=queue_lifecycle.sh
-[[ -z "${QUEUE_LIFECYCLE_LOADED:-}" ]] && source "${QUEUE_MANAGER_SCRIPT_DIR}/queue_lifecycle.sh" && export QUEUE_LIFECYCLE_LOADED=1
+if ! declare -F claim_task >/dev/null 2>&1; then
+    source "${QUEUE_MANAGER_SCRIPT_DIR}/queue_lifecycle.sh"
+fi
+QUEUE_LIFECYCLE_LOADED=1
+export -n QUEUE_LIFECYCLE_LOADED 2>/dev/null || true
 # shellcheck source=queue_dependencies.sh
-[[ -z "${QUEUE_DEPENDENCIES_LOADED:-}" ]] && source "${QUEUE_MANAGER_SCRIPT_DIR}/queue_dependencies.sh" && export QUEUE_DEPENDENCIES_LOADED=1
+if ! declare -F check_dependencies_met >/dev/null 2>&1; then
+    source "${QUEUE_MANAGER_SCRIPT_DIR}/queue_dependencies.sh"
+fi
+QUEUE_DEPENDENCIES_LOADED=1
+export -n QUEUE_DEPENDENCIES_LOADED 2>/dev/null || true
 # shellcheck source=queue_memory_plan.sh
-[[ -z "${QUEUE_MEMORY_PLAN_LOADED:-}" ]] && source "${QUEUE_MANAGER_SCRIPT_DIR}/queue_memory_plan.sh" && export QUEUE_MEMORY_PLAN_LOADED=1
+if ! declare -F update_model_task_memory >/dev/null 2>&1; then
+    source "${QUEUE_MANAGER_SCRIPT_DIR}/queue_memory_plan.sh"
+fi
+QUEUE_MEMORY_PLAN_LOADED=1
+export -n QUEUE_MEMORY_PLAN_LOADED 2>/dev/null || true
 # shellcheck source=queue_generation.sh
-[[ -z "${QUEUE_GENERATION_LOADED:-}" ]] && source "${QUEUE_MANAGER_SCRIPT_DIR}/queue_generation.sh" && export QUEUE_GENERATION_LOADED=1
+if ! declare -F generate_all_tasks >/dev/null 2>&1; then
+    source "${QUEUE_MANAGER_SCRIPT_DIR}/queue_generation.sh"
+fi
+QUEUE_GENERATION_LOADED=1
+export -n QUEUE_GENERATION_LOADED 2>/dev/null || true
 
 # Keep the aggregator safe to source from strict callers when the final guarded
 # source is skipped because the module was already loaded.

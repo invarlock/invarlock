@@ -18,5 +18,5 @@
     "src/invarlock/model_profile.py": "sha256:556adae9fc9eacd7838b4f484e444023277d9a8c8184cb1ee65f5faad9fe03df"
   },
   "worktree_branch": "work/evidence-sweep-stabilization",
-  "worktree_sync_note": "Remote /root/invarlock-public was manually kept in sync with the listed relevant local file hashes before running with --skip-sync."
+  "worktree_sync_note": "Remote <validation-repo> was manually kept in sync with the listed relevant local file hashes before running with --skip-sync."
 }

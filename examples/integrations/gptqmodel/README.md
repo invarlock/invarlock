@@ -22,7 +22,11 @@ python -m pip install "invarlock[gptq]"
 From a repository checkout, `uv` can provide the optional stack for the run:
 
 ```bash
-uv run --extra gptq python -c "import gptqmodel"
+uv run --extra gptq python - <<'PY'
+from invarlock.plugins import _patch_gptqmodel_transformers_hub_compat
+_patch_gptqmodel_transformers_hub_compat()
+import gptqmodel
+PY
 ```
 
 ## Run

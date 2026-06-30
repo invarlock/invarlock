@@ -76,8 +76,8 @@ def test_policy_checkpoint_chunked_mode(
     assert not Path(snapshot_path).exists()
 
 
-def test_policy_checkpoint_should_rollback_logic():
-    adapter = DummyAdapter(Path("/tmp"))
+def test_policy_checkpoint_should_rollback_logic(tmp_path: Path):
+    adapter = DummyAdapter(tmp_path)
     model = object()
     policy = type("P", (), {"enable_auto_rollback": True})()
     cp = PolicyCheckpoint(model, adapter, policy)
@@ -106,8 +106,10 @@ def test_policy_checkpoint_should_rollback_logic():
     assert not should and reason == ""
 
 
-def test_policy_checkpoint_does_not_auto_rollback_when_policy_disabled() -> None:
-    adapter = DummyAdapter(Path("/tmp"))
+def test_policy_checkpoint_does_not_auto_rollback_when_policy_disabled(
+    tmp_path: Path,
+) -> None:
+    adapter = DummyAdapter(tmp_path)
     model = object()
     policy = type("P", (), {"enable_auto_rollback": False})()
     cp = PolicyCheckpoint(model, adapter, policy)

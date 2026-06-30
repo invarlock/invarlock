@@ -16,7 +16,7 @@
     "strict_blocking": false,
     "verified": true
   },
-  "subject": "/private/tmp/invarlock-byoe-magnitude-prune-subject",
+  "subject": "<local-temp-dir>/invarlock-byoe-magnitude-prune-subject",
   "verdict": "PASS",
   "verify_summary": {
     "ok": true,

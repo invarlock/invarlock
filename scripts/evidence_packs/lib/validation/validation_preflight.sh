@@ -113,13 +113,15 @@ EDIT_BITS="${EDIT_BITS:-8}"
 EDIT_GROUP_SIZE="${EDIT_GROUP_SIZE:-128}"
 EDIT_SCOPE="${EDIT_SCOPE:-ffn}"
 
-# Edit Types to test (4 types × 2 versions each)
+# Edit Types to test (6 generated families × clean/stress variants)
 # Clean specs use tuned edit presets; use "clean" sentinel.
 EDIT_TYPES_CLEAN=(
     "quant_rtn:clean:ffn"        # Clean external RTN simulation artifact (calibrated bits/group_size on FFN)
     "fp8_quant:clean:ffn"        # Clean FP8 (calibrated format on FFN)
     "magnitude_prune:clean:ffn"  # Clean pruning (calibrated sparsity on FFN)
     "lowrank_svd:clean:ffn"      # Clean low-rank (calibrated rank on FFN)
+    "lora_merge:clean:attn"      # Clean deterministic merged LoRA-style delta
+    "fine_tune:clean:ffn"        # Clean deterministic tiny fine-tune-style update
 )
 
 EDIT_TYPES_STRESS=(
@@ -127,6 +129,8 @@ EDIT_TYPES_STRESS=(
     "fp8_quant:e5m2:all"         # FP8 E5M2 on all (stress)
     "magnitude_prune:0.5:all"    # 50% sparsity on all
     "lowrank_svd:32:all"         # rank-32 SVD on all
+    "lora_merge:8:64:all"        # larger deterministic merged LoRA-style delta
+    "fine_tune:0.0005:3:all"     # larger deterministic tiny fine-tune-style update
 )
 
 # Tuned edit presets (external inputs; required for clean edits)
@@ -479,7 +483,8 @@ pack_source_libs() {
     # Source dynamic scheduling modules (required - optimal configuration)
     if [[ -f "${task_serialization_path}" ]]; then
         source "${task_serialization_path}"
-        export TASK_SERIALIZATION_LOADED=1
+        TASK_SERIALIZATION_LOADED=1
+        export -n TASK_SERIALIZATION_LOADED 2>/dev/null || true
     else
         echo "ERROR: task_serialization.sh not found (dynamic scheduling is required)" >&2
         return 1
@@ -487,7 +492,8 @@ pack_source_libs() {
 
     if [[ -f "${queue_manager_path}" ]]; then
         source "${queue_manager_path}"
-        export QUEUE_MANAGER_LOADED=1
+        QUEUE_MANAGER_LOADED=1
+        export -n QUEUE_MANAGER_LOADED 2>/dev/null || true
     else
         echo "ERROR: queue_manager.sh not found" >&2
         return 1
@@ -495,7 +501,8 @@ pack_source_libs() {
 
     if [[ -f "${scheduler_path}" ]]; then
         source "${scheduler_path}"
-        export SCHEDULER_LOADED=1
+        SCHEDULER_LOADED=1
+        export -n SCHEDULER_LOADED 2>/dev/null || true
     else
         echo "ERROR: scheduler.sh not found" >&2
         return 1
@@ -503,7 +510,8 @@ pack_source_libs() {
 
     if [[ -f "${task_functions_path}" ]]; then
         source "${task_functions_path}"
-        export TASK_FUNCTIONS_LOADED=1
+        TASK_FUNCTIONS_LOADED=1
+        export -n TASK_FUNCTIONS_LOADED 2>/dev/null || true
     else
         echo "ERROR: task_functions.sh not found" >&2
         return 1
@@ -511,7 +519,8 @@ pack_source_libs() {
 
     if [[ -f "${gpu_worker_path}" ]]; then
         source "${gpu_worker_path}"
-        export GPU_WORKER_LOADED=1
+        GPU_WORKER_LOADED=1
+        export -n GPU_WORKER_LOADED 2>/dev/null || true
     else
         echo "ERROR: gpu_worker.sh not found" >&2
         return 1
@@ -519,7 +528,8 @@ pack_source_libs() {
 
     if [[ -f "${fault_tolerance_path}" ]]; then
         source "${fault_tolerance_path}"
-        export FAULT_TOLERANCE_LOADED=1
+        FAULT_TOLERANCE_LOADED=1
+        export -n FAULT_TOLERANCE_LOADED 2>/dev/null || true
     fi
 
     return 0

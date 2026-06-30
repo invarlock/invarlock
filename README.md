@@ -20,7 +20,7 @@
   <a href="https://pypi.org/project/invarlock/">
     <img alt="PyPI" src="https://img.shields.io/pypi/v/invarlock?label=PyPI&logo=pypi&labelColor=18150f&color=1f3a7a" />
   </a>
-  <a href="https://invarlock.github.io/invarlock/0.11.0/">
+  <a href="https://invarlock.github.io/invarlock/0.12.0/">
     <img alt="Docs" src="https://img.shields.io/badge/docs-quickstart-1f3a7a?labelColor=18150f" />
   </a>
   <a href="LICENSE">
@@ -46,8 +46,10 @@ come from any external edit workflow: quantization, pruning, LoRA merge,
 fine-tuning, or another weight-edit pipeline. The built-in `quant_rtn` edit is
 for demos and smoke tests; production workflows are
 bring-your-own-edited-checkpoint (BYOE). The repo ships strict-verifiable BYOE
-fixtures for dense magnitude pruning and LoRA-merge style subjects under
-`public_evidence/byoe_examples/`. Real model runs under
+fixtures for dense magnitude pruning, LoRA-merge, and fine-tune subjects under
+`public_evidence/byoe_examples/`. The evidence-pack harness also includes
+deterministic generated validation-subject lanes for quantization, pruning,
+LoRA merge, and fine-tune coverage. Real model runs under
 `public_evidence/real_runs/` include an external magnitude-prune BYOE run and a
 tiny GPT-2 quantization smoke.
 
@@ -96,12 +98,12 @@ runtime provenance; passing reports can then be rendered with
 ## Quick Start
 
 Colab (CPU-friendly):
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/v0.11.0/notebooks/invarlock_quickstart_cpu.ipynb)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/v0.12.0/notebooks/invarlock_quickstart_cpu.ipynb)
 
 The public front door is `evaluate -> verify -> report html`. The README keeps
 the three common onboarding paths separate:
 
-- **Wheel user / reviewer**: install `invarlock`, inspect an existing
+- **Wheel user / report reader**: install `invarlock`, inspect an existing
   `evaluation.report.json`, and render HTML without cloning the repository.
 - **Evaluator**: install `invarlock[hf]` when you want `evaluate` to load
   Hugging Face models and emit a fresh evaluation bundle.
@@ -159,10 +161,10 @@ Artifact model:
 | `report.json` | Baseline/subject run directories under `runs/...` | `invarlock report generate`, `invarlock report explain --subject-report ... --baseline-report ...` |
 
 `invarlock verify` expects `evaluation.report.json`; if you only have a raw
-run directory containing `report.json`, first build the reviewer bundle with
+run directory containing `report.json`, first build the evaluation bundle with
 `invarlock report generate --run <subject report.json> --baseline-run-report <baseline report.json> --format report -o <output-dir>`.
 `invarlock advanced runtime-verify` is narrower: it checks runtime manifest
-binding/provenance; report/gate verification remains the reviewer-facing gate.
+binding/provenance; report/gate verification remains the evidence gate.
 
 Example output (abridged; counts vary by profile/config):
 
@@ -200,7 +202,7 @@ Runtime provenance: reports/eval/runtime.manifest.json
 
 Evidence packs bundle reports + verification metadata into a distributable artifact.
 
-- Guide: <https://invarlock.github.io/invarlock/0.11.0/user-guide/evidence-packs/>
+- Guide: <https://invarlock.github.io/invarlock/0.12.0/user-guide/evidence-packs/>
 - Verify from an installed wheel:
   `invarlock advanced evidence-pack verify <dir> --strict --report-assurance strict --expected-fingerprint sha256:<64-hex-chars>`
 - Repo harness alternative: `scripts/evidence_packs/verify_pack.sh --pack <dir> --strict --report-assurance strict --expected-fingerprint sha256:<64-hex-chars>`
@@ -233,7 +235,7 @@ Optional extras: `invarlock[probes]`, `invarlock[gpu]`,
 `invarlock[awq,gptq]`, `invarlock[torchao]`, `invarlock[hqq]`,
 `invarlock[quanto]`, and `invarlock[compressed-tensors]`. The `awq` and
 `gptq` extras use GPTQModel-backed subject loading. Full setup:
-<https://invarlock.github.io/invarlock/0.11.0/user-guide/getting-started/>.
+<https://invarlock.github.io/invarlock/0.12.0/user-guide/getting-started/>.
 
 The minimal install covers the core verification and reporting flows. Add
 `invarlock[hf]` only for model-loading evaluate runs, and use the installed
@@ -242,14 +244,14 @@ the repository.
 
 ## Documentation
 
-- Docs home: <https://invarlock.github.io/invarlock/0.11.0/>
-- Quickstart: <https://invarlock.github.io/invarlock/0.11.0/user-guide/quickstart/>
-- Compare & evaluate (BYOE): <https://invarlock.github.io/invarlock/0.11.0/user-guide/compare-and-evaluate/>
-- Reading a report: <https://invarlock.github.io/invarlock/0.11.0/user-guide/reading-report/>
-- CLI reference: <https://invarlock.github.io/invarlock/0.11.0/reference/cli/>
-- Assurance case: <https://invarlock.github.io/invarlock/0.11.0/assurance/00-assurance-case/>
+- Docs home: <https://invarlock.github.io/invarlock/0.12.0/>
+- Quickstart: <https://invarlock.github.io/invarlock/0.12.0/user-guide/quickstart/>
+- Compare & evaluate (BYOE): <https://invarlock.github.io/invarlock/0.12.0/user-guide/compare-and-evaluate/>
+- Reading a report: <https://invarlock.github.io/invarlock/0.12.0/user-guide/reading-report/>
+- CLI reference: <https://invarlock.github.io/invarlock/0.12.0/reference/cli/>
+- Assurance case: <https://invarlock.github.io/invarlock/0.12.0/assurance/00-assurance-case/>
   (repo source: `docs/assurance/00-assurance-case.md`)
-- Threat model: <https://invarlock.github.io/invarlock/0.11.0/security/threat-model/>
+- Threat model: <https://invarlock.github.io/invarlock/0.12.0/security/threat-model/>
 
 ## Community
 
@@ -304,6 +306,9 @@ For guidance on where to ask questions, how to report bugs, and what to expect i
 - Contributing guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Local setup: `make dev-install`
 - Everyday checks: `make test`, `make lint`, and `make docs-check`
+- Optional parallel fast tests: `make test-parallel` or
+  `make test-fast PYTEST_WORKERS=auto`. Keep `make coverage-enforce` serial;
+  it writes combined coverage artifacts.
 - Maintainer PR gate: `git diff --check origin/staging/next...HEAD`,
   `make lock-sync`, `pre-commit run --all-files --show-diff-on-failure`,
   `make workflow-lint`, `make docs-check`, `make mypy-typed-surface`,

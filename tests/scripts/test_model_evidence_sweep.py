@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import yaml
+
 from tests.scripts._support_model_evidence_sweep import (
     load_script_module,
     write_fake_python,
@@ -264,6 +266,70 @@ def test_model_evidence_sweep_dry_run_uses_preset_override(tmp_path: Path) -> No
     assert evaluate[evaluate.index("--preset") + 1] == "tmp/smollm3_release.yaml"
 
 
+def test_model_evidence_sweep_materialized_lane_prepares_preset_from_override(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
+    fake_python = tmp_path / "fake-python"
+    write_fake_python(fake_python)
+    output_root = tmp_path / "override-materialized"
+    override_preset = tmp_path / "qwen-linear-only.yaml"
+    override_preset.write_text(
+        """
+model:
+  id: Qwen/Qwen3.5-2B
+dataset:
+  provider:
+    kind: vision_text
+    path: should-be-replaced.jsonl
+guards:
+  order: [spectral, rmt]
+  spectral:
+    module_include_patterns:
+      - override.linear_attn.spectral
+  rmt:
+    module_include_patterns:
+      - override.linear_attn.rmt
+""",
+        encoding="utf-8",
+    )
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--suite",
+            "support-matrix-backlog-gpu",
+            "--slug",
+            "qwen_qwen3_5_2b",
+            "--output-root",
+            str(output_root),
+            "--python",
+            str(fake_python),
+            "--preset-override",
+            f"qwen_qwen3_5_2b={override_preset}",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 1, proc.stderr
+    prepared = output_root / "eval" / "qwen_qwen3_5_2b" / "prepared_preset.yaml"
+    prepared_data = yaml.safe_load(prepared.read_text(encoding="utf-8"))
+    provider = prepared_data["dataset"]["provider"]
+    assert provider["kind"] == "vision_text"
+    assert provider["path"].endswith("eval/qwen_qwen3_5_2b/dataset/manifest.jsonl")
+    assert prepared_data["guards"]["spectral"]["module_include_patterns"] == [
+        "override.linear_attn.spectral"
+    ]
+    assert prepared_data["guards"]["rmt"]["module_include_patterns"] == [
+        "override.linear_attn.rmt"
+    ]
+
+
 def test_model_evidence_sweep_rejects_invalid_preset_override(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
@@ -504,8 +570,54 @@ def test_model_evidence_sweep_returns_failure_when_verify_fails(
     assert result["slug"] == "gemma4_e2b_public"
     assert result["evaluate_exit"] == 0
     assert result["verify_exit"] == 1
+    assert result["detail"] == "policy_fail"
     assert result["ok"] is False
     assert (output_root / "eval" / "gemma4_e2b_public" / "verify.json").is_file()
+
+
+def test_model_evidence_sweep_verify_failure_detail_is_sanitized(
+    tmp_path: Path,
+) -> None:
+    mod = load_script_module("model_evidence_sweep")
+    verify_path = tmp_path / "verify.json"
+
+    verify_path.write_text(
+        json.dumps({"summary": {"reason": "policy-fail"}}),
+        encoding="utf-8",
+    )
+    assert mod._verify_failure_detail(verify_path) == "policy_fail"
+
+    verify_path.write_text(
+        json.dumps({"summary": {"reason": "../policy fail"}}),
+        encoding="utf-8",
+    )
+    assert mod._verify_failure_detail(verify_path) is None
+
+
+def test_model_evidence_sweep_evaluate_failure_detail_classifies_no_samples() -> None:
+    mod = load_script_module("model_evidence_sweep")
+
+    assert (
+        mod._evaluate_failure_detail(
+            "[FAIL] [INVARLOCK:E306] NO-SAMPLES: vision_text produced no samples"
+        )
+        == "no_samples"
+    )
+
+
+def test_model_evidence_sweep_evaluate_failure_detail_classifies_dataset_cache() -> (
+    None
+):
+    mod = load_script_module("model_evidence_sweep")
+
+    assert (
+        mod._evaluate_failure_detail(
+            "Couldn't find cache for Salesforce/wikitext for config "
+            "'wikitext-103-v1'. Available configs in the cache: "
+            "['wikitext-2-raw-v1']"
+        )
+        == "dataset_cache_missing"
+    )
 
 
 def test_model_evidence_sweep_host_mode_rejects_ci_profile(tmp_path: Path) -> None:

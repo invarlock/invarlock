@@ -16,8 +16,8 @@
   "manifest_version": 1,
   "report": {
     "filename": "evaluation.report.json",
-    "path": "/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/reports/errors/rank_collapse/evaluation.report.json",
-    "sha256": "2bc0449e6593cf70e01d5524e4b05630362c770ec13ff02bc3e27d27d4d8b29d"
+    "path": "<validation-output-root>/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/reports/errors/rank_collapse/evaluation.report.json",
+    "sha256": "a0deb82a353924fb19284d6fa5f94997e2c2ad50bf7c8d1fe943bbcf1b460072"
   },
   "runtime": {
     "allow_network": false,

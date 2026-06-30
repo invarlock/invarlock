@@ -78,11 +78,11 @@ def test_manifest_matches_schema(tmp_path: Path):
         "evidence.guards_evidence missing"
     )
     assert manifest["evidence_level"] == "high"
-    assert manifest["files"]["reviewer_summary_txt"]
+    assert manifest["files"]["evidence_summary_txt"]
     assert (out_dir / Path(ev["guards_evidence"]).name).exists(), (
         "guards_evidence.json file missing"
     )
-    assert (out_dir / "reviewer_summary.txt").exists(), "reviewer_summary.txt missing"
+    assert (out_dir / "evidence_summary.txt").exists(), "evidence_summary.txt missing"
 
 
 def test_manifest_does_not_reuse_stale_guard_evidence(tmp_path: Path):

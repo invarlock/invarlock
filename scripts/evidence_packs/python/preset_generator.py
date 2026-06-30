@@ -27,6 +27,16 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
     _YAML_LOAD_ERRORS = (OSError,)
 
 
+DEFAULT_PRESET_EDIT_TYPES = (
+    "quant_rtn",
+    "fp8_quant",
+    "magnitude_prune",
+    "lowrank_svd",
+    "lora_merge",
+    "fine_tune",
+)
+
+
 def _yaml_safe_load(payload: str) -> Any:
     if yaml is None:
         raise RuntimeError("PyYAML is unavailable")
@@ -75,6 +85,7 @@ __all__ = [
     "get_default_guards_order",
     "get_spectral_max_caps",
     "load_records",
+    "DEFAULT_PRESET_EDIT_TYPES",
 ]
 
 
@@ -98,7 +109,12 @@ def _resolve_dataset_provider_spec(
             raise SystemExit(
                 "INVARLOCK_DATASET_PROVIDER_YAML is set but PyYAML is unavailable"
             )
-        parsed = _yaml_safe_load(raw_yaml)
+        try:
+            parsed = _yaml_safe_load(raw_yaml)
+        except _YAML_LOAD_ERRORS as exc:
+            raise SystemExit(
+                f"INVARLOCK_DATASET_PROVIDER_YAML is not valid YAML ({exc})"
+            ) from exc
         if not isinstance(parsed, dict):
             raise SystemExit("INVARLOCK_DATASET_PROVIDER_YAML must parse to a mapping")
         provider = dict(parsed)
@@ -368,7 +384,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     edit_types = [e.strip() for e in str(args.edit_types).split(",") if e.strip()]
     if not edit_types:
-        edit_types = ["quant_rtn", "fp8_quant", "magnitude_prune", "lowrank_svd"]
+        edit_types = list(DEFAULT_PRESET_EDIT_TYPES)
 
     dataset_provider = _resolve_dataset_provider_spec(str(args.dataset_provider))
 

@@ -9,7 +9,8 @@
 # to enable parallel execution across GPUs.
 
 # Source dependencies
-export TASK_COMMON_LOADED=1
+TASK_COMMON_LOADED=1
+export -n TASK_COMMON_LOADED 2>/dev/null || true
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACK_REPO_ROOT="${PACK_REPO_ROOT:-$(cd "${SCRIPT_DIR}/../../../.." && pwd)}"
 PACK_REPO_PYTHONPATH="${PACK_REPO_ROOT}/src"
@@ -17,7 +18,11 @@ PACK_REPO_PYTHONPATH="${PACK_REPO_ROOT}/src"
 source "${SCRIPT_DIR}/../core/runtime.sh"
 # shellcheck source=../config/dataset_provider_config.sh
 source "${SCRIPT_DIR}/../config/dataset_provider_config.sh"
-[[ -z "${QUEUE_MANAGER_LOADED:-}" ]] && source "${SCRIPT_DIR}/../queue/queue_manager.sh" && export QUEUE_MANAGER_LOADED=1
+if ! declare -F get_task_field >/dev/null 2>&1; then
+    source "${SCRIPT_DIR}/../queue/queue_manager.sh"
+fi
+QUEUE_MANAGER_LOADED=1
+export -n QUEUE_MANAGER_LOADED 2>/dev/null || true
 
 # ============ FALLBACK FUNCTIONS ============
 # These provide fallback implementations when main script functions aren't available
@@ -317,6 +322,20 @@ _task_create_model_variant() {
             fi
             create_lowrank_model "${baseline_path}" "${output_path}" "${param1}" "${scope}" "${gpu_id}"
             ;;
+        "lora_merge")
+            if ! type create_lora_merged_model &>/dev/null; then
+                echo "ERROR: create_lora_merged_model not available" >&2
+                return 1
+            fi
+            create_lora_merged_model "${baseline_path}" "${output_path}" "${param1}" "${param2}" "${scope}" "${gpu_id}"
+            ;;
+        "fine_tune")
+            if ! type create_fine_tuned_model &>/dev/null; then
+                echo "ERROR: create_fine_tuned_model not available" >&2
+                return 1
+            fi
+            create_fine_tuned_model "${baseline_path}" "${output_path}" "${param1}" "${param2}" "${scope}" "${gpu_id}"
+            ;;
         *)
             echo "ERROR: Unknown edit type: ${edit_type}" >&2
             return 1
@@ -418,6 +437,29 @@ _validate_evaluate_baseline_report() {
     _cmd_python "${validate_args[@]}"
 }
 
+_validate_reusable_evaluate_baseline_report() {
+    local report_path="$1"
+    local expected_adapter="$2"
+    local expected_profile="$3"
+    local expected_tier="$4"
+    local expected_assurance="${5:-}"
+
+    if [[ -z "${expected_assurance}" ]]; then
+        expected_assurance="$(_pack_evaluate_assurance_mode)" || return 1
+    fi
+
+    # Reusable baseline reports are cache inputs for later paired evaluations.
+    # Dataset de-duplication can reduce the actual window count below the
+    # requested schedule; downstream evaluation normalizes to the report's
+    # concrete window schedule before producing strict comparison reports.
+    _validate_evaluate_baseline_report \
+        "${report_path}" \
+        "${expected_adapter}" \
+        "${expected_profile}" \
+        "${expected_tier}" \
+        "${expected_assurance}"
+}
+
 _stage_runtime_input_for_eval() {
     local source_file="$1"
     local cert_dir="$2"
@@ -507,7 +549,7 @@ _normalize_staged_preset_for_eval() {
 
     local previous_python_bin="${PYTHON_BIN:-}"
     local had_python_bin="0"
-    if [[ -v PYTHON_BIN ]]; then
+    if [[ "${PYTHON_BIN+x}" == "x" ]]; then
         had_python_bin="1"
     fi
     if [[ "${had_python_bin}" != "1" ]]; then
@@ -541,6 +583,49 @@ _normalize_staged_preset_for_eval() {
     fi
 }
 
+_baseline_report_schedule_for_eval() {
+    local baseline_report="$1"
+    local log_file="$2"
+
+    if [[ -z "${baseline_report}" || ! -f "${baseline_report}" ]]; then
+        return 1
+    fi
+
+    local previous_python_bin="${PYTHON_BIN:-}"
+    local had_python_bin="0"
+    if [[ "${PYTHON_BIN+x}" == "x" ]]; then
+        had_python_bin="1"
+    fi
+    if [[ "${had_python_bin}" != "1" ]]; then
+        local active_python=""
+        active_python="$(command -v python 2>/dev/null || true)"
+        if [[ -n "${active_python}" ]] && "${active_python}" -c "import yaml" >/dev/null 2>&1; then
+            export PYTHON_BIN="${active_python}"
+        fi
+    fi
+
+    local schedule=""
+    schedule="$(_runtime_python "task_tools.py" "baseline-report-schedule" "${baseline_report}" 2>> "${log_file}")" || {
+        if [[ "${had_python_bin}" == "1" ]]; then
+            export PYTHON_BIN="${previous_python_bin}"
+        else
+            unset PYTHON_BIN
+        fi
+        return 1
+    }
+    if [[ "${had_python_bin}" == "1" ]]; then
+        export PYTHON_BIN="${previous_python_bin}"
+    else
+        unset PYTHON_BIN
+    fi
+
+    if [[ ! "${schedule}" =~ ^[0-9]+:[0-9]+:[0-9]+:[0-9]+$ ]]; then
+        echo "ERROR: Invalid baseline report schedule: ${schedule}" >> "${log_file}"
+        return 1
+    fi
+    printf '%s\n' "${schedule}"
+}
+
 _ensure_evaluate_baseline_report() {
     local baseline_root="$1"
     local abs_baseline_path="$2"
@@ -572,7 +657,7 @@ _ensure_evaluate_baseline_report() {
     evaluate_assurance="$(_pack_evaluate_assurance_mode)" || return 1
 
     if [[ -f "${baseline_report_file}" ]]; then
-        if _validate_evaluate_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" "${evaluate_assurance}" "${preview_n}" "${final_n}" 2>/dev/null; then
+        if _validate_reusable_evaluate_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" "${evaluate_assurance}" 2>/dev/null; then
             echo "${baseline_report_file}"
             return 0
         fi
@@ -583,7 +668,7 @@ _ensure_evaluate_baseline_report() {
     if mkdir "${lock_dir}" 2>/dev/null; then
         # Re-check after acquiring the lock.
         if [[ -f "${baseline_report_file}" ]]; then
-            if _validate_evaluate_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" "${evaluate_assurance}" "${preview_n}" "${final_n}" 2>/dev/null; then
+            if _validate_reusable_evaluate_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" "${evaluate_assurance}" 2>/dev/null; then
                 rmdir "${lock_dir}" 2>/dev/null || true
                 echo "${baseline_report_file}"
                 return 0
@@ -620,23 +705,32 @@ YAML
 
         local guards_order_csv="${PACK_GUARDS_ORDER:-}"
         local -a raw_guards_order=()
+        local raw_guards_order_count=0
         if [[ -n "${guards_order_csv}" ]]; then
             IFS=',' read -ra raw_guards_order <<< "${guards_order_csv}"
+            raw_guards_order_count=${#raw_guards_order[@]}
         fi
         local -a guards_order=()
         local g
-        for g in "${raw_guards_order[@]}"; do
-            g="$(echo "${g}" | xargs)"
-            [[ -z "${g}" ]] && continue
-            guards_order+=("${g}")
-        done
-        if [[ ${#guards_order[@]} -eq 0 ]]; then
+        local guards_order_count=0
+        if [[ ${raw_guards_order_count} -gt 0 ]]; then
+            for g in "${raw_guards_order[@]}"; do
+                g="$(echo "${g}" | xargs)"
+                [[ -z "${g}" ]] && continue
+                guards_order+=("${g}")
+                guards_order_count=$((guards_order_count + 1))
+            done
+        fi
+        if [[ ${guards_order_count} -eq 0 ]]; then
             guards_order=("invariants" "spectral" "rmt" "variance" "invariants")
+            guards_order_count=5
         fi
         local guards_order_yaml=""
-        for g in "${guards_order[@]}"; do
-            guards_order_yaml+=$'    - '"${g}"$'\n'
-        done
+        if [[ ${guards_order_count} -gt 0 ]]; then
+            for g in "${guards_order[@]}"; do
+                guards_order_yaml+=$'    - '"${g}"$'\n'
+            done
+        fi
 
         local dataset_provider_yaml
         dataset_provider_yaml="$(pack_render_dataset_provider_yaml "${INVARLOCK_DATASET:-wikitext2}")"
@@ -731,7 +825,7 @@ YAML
 
         rmdir "${lock_dir}" 2>/dev/null || true
 
-        if [[ -f "${baseline_report_file}" ]] && _validate_evaluate_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" "${evaluate_assurance}" "${preview_n}" "${final_n}" 2>/dev/null; then
+        if [[ -f "${baseline_report_file}" ]] && _validate_reusable_evaluate_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" "${evaluate_assurance}" 2>/dev/null; then
             echo "${baseline_report_file}"
             return 0
         fi
@@ -752,7 +846,7 @@ YAML
 
     echo "  Waiting for baseline report to be generated by another worker... (timeout=${wait_secs}s)" >> "${log_file}"
     for _ in $(seq 1 "${wait_iters}"); do
-        if [[ -f "${baseline_report_file}" ]] && _validate_evaluate_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" "${evaluate_assurance}" "${preview_n}" "${final_n}" 2>/dev/null; then
+        if [[ -f "${baseline_report_file}" ]] && _validate_reusable_evaluate_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" "${evaluate_assurance}" 2>/dev/null; then
             echo "${baseline_report_file}"
             return 0
         fi

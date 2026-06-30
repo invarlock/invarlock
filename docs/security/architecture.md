@@ -42,14 +42,14 @@ Overview of the core security-related components and defaults.
   as runtime provenance.
 - Product runtime-provenance verification does not depend on an external verifier binary or
   `PATH` lookup, so verifier behavior stays stable across installs.
-- Use it before promotion or later automation to prevent policy regressions.
+- Use it before published-basis inclusion or later automation to prevent policy regressions.
 
 ## Supply chain (reference)
 
 - SBOM generation (see `scripts/security/generate_sbom.sh`), run against the installed-artifact environment in PR/release jobs and the tool environment in the scheduled backstop.
 - `pip-audit` with a small allowlist (see pip-audit page) in CI, run against the base install surface plus the pinned `hf` and `advanced` shipped surfaces in PR jobs, and against the installed-artifact release surface in release jobs.
-- `gitleaks` changed-file scanning with JSON/SARIF artifacts in PR jobs, plus
-  full history scanning in release jobs.
+- `gitleaks` git-delta scanning with JSON artifacts in PR and release jobs,
+  plus scheduled full-history scanning.
 - Pre-commit formatting/linting and version checks in CI to reduce drift.
 
 ## Design principles

@@ -8,17 +8,20 @@ HELPERS_SH="${SCRIPT_DIR}/helpers.sh"
 FILTER_REGEX=""
 DO_BRANCH_COVERAGE="false"
 DO_LINE_COVERAGE="false"
+TEST_JOBS="${EVIDENCE_PACK_TEST_JOBS:-1}"
 COVERAGE_DIR=""
 COVERAGE_RAW_HITS=""
+COVERAGE_RAW_PARTS_DIR=""
 
 usage() {
     cat <<'EOF'
-Usage: scripts/evidence_packs/tests/run.sh [--filter REGEX] [--coverage] [--line-coverage]
+Usage: scripts/evidence_packs/tests/run.sh [--filter REGEX] [--coverage] [--line-coverage] [--jobs N]
 
 Options:
   --filter REGEX     Run only tests whose id matches REGEX (id: test_file::test_fn)
   --coverage         Run tests under xtrace and enforce 100% branch coverage for evidence pack bash scripts
   --line-coverage    Run tests under xtrace and enforce 100% executable-line coverage for evidence pack bash scripts
+  --jobs N           Run up to N tests in parallel (default: EVIDENCE_PACK_TEST_JOBS or 1)
 EOF
 }
 
@@ -36,6 +39,10 @@ while [[ $# -gt 0 ]]; do
             DO_LINE_COVERAGE="true"
             shift
             ;;
+        --jobs)
+            TEST_JOBS="${2:-}"
+            shift 2
+            ;;
         --help|-h)
             usage
             exit 0
@@ -48,6 +55,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if ! [[ "${TEST_JOBS}" =~ ^[0-9]+$ ]] || [[ "${TEST_JOBS}" -lt 1 ]]; then
+    echo "ERROR: --jobs must be a positive integer" >&2
+    exit 2
+fi
+
 if [[ -x "${ROOT_DIR}/.venv/bin/python" ]]; then
     REAL_PYTHON3="${ROOT_DIR}/.venv/bin/python"
 else
@@ -59,6 +71,7 @@ coverage_owner_hint() {
     case "${rel}" in
         scripts/evidence_packs/lib/config/config_generator.sh) echo "scripts/evidence_packs/tests/test_config_generator.sh" ;;
         scripts/evidence_packs/lib/config/dataset_provider_config.sh) echo "scripts/evidence_packs/tests/test_dataset_provider_config.sh" ;;
+        scripts/evidence_packs/lib/config/release_review_policy.sh) echo "scripts/evidence_packs/tests/test_run_pack.sh" ;;
         scripts/evidence_packs/lib/tasks/task_serialization.sh) echo "scripts/evidence_packs/tests/test_task_serialization.sh" ;;
         scripts/evidence_packs/lib/queue/queue_manager.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;
         scripts/evidence_packs/lib/queue/queue_core.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;
@@ -85,7 +98,6 @@ coverage_owner_hint() {
         scripts/evidence_packs/lib/validation/validation_runtime.sh) echo "scripts/evidence_packs/tests/test_validation_suite.sh" ;;
         scripts/evidence_packs/lib/validation/validation_dynamic.sh) echo "scripts/evidence_packs/tests/test_validation_suite.sh" ;;
         scripts/evidence_packs/lib/core/setup_remote.sh) echo "scripts/evidence_packs/tests/test_setup_remote.sh" ;;
-        scripts/evidence_packs/run_qwen14_sentinels.sh) echo "scripts/evidence_packs/tests/test_run_qwen14_sentinels.sh" ;;
         scripts/evidence_packs/run_suite.sh) echo "scripts/evidence_packs/tests/test_run_suite.sh" ;;
         scripts/evidence_packs/run_mini_pack_gate.sh) echo "scripts/evidence_packs/tests/test_run_mini_pack_gate.sh" ;;
         scripts/evidence_packs/run_pack.sh) echo "scripts/evidence_packs/tests/test_run_pack.sh" ;;
@@ -384,6 +396,10 @@ $0 ~ /^_+XTRACE__:/ {
 
     if (file ~ /^\// && index(file, root) == 1) file = substr(file, length(root) + 1)
     sub(/^\.\//, "", file)
+    while (file ~ /\/[^\/]+\/\.\.\//) {
+        sub(/\/[^\/]+\/\.\.\//, "/", file)
+    }
+    gsub(/\/\.\//, "/", file)
     if (index(file, "scripts/") != 1) next
 
     gsub(/[^0-9]/, "", line)
@@ -415,7 +431,20 @@ coverage_ensure_executed() {
         return 1
     fi
     if [[ ! -f "${executed_file}" ]]; then
-        sort -u "${COVERAGE_RAW_HITS}" >"${executed_file}"
+        local merged_file
+        merged_file="${COVERAGE_DIR}/executed.all.raw.tsv"
+        : >"${merged_file}"
+        if [[ -f "${COVERAGE_RAW_HITS}" ]]; then
+            cat "${COVERAGE_RAW_HITS}" >>"${merged_file}"
+        fi
+        if [[ -n "${COVERAGE_RAW_PARTS_DIR}" && -d "${COVERAGE_RAW_PARTS_DIR}" ]]; then
+            local part_file
+            while IFS= read -r part_file; do
+                [[ -f "${part_file}" ]] || continue
+                cat "${part_file}" >>"${merged_file}"
+            done < <(find "${COVERAGE_RAW_PARTS_DIR}" -type f -name '*.tsv' -print 2>/dev/null | sort)
+        fi
+        sort -u "${merged_file}" >"${executed_file}"
     fi
 }
 
@@ -941,20 +970,25 @@ source "$4"
 export PATH="$(mock_install_bin_dir):$PATH"
 source "$5"
 # Keep xtrace prefixes short to avoid bash 3.2 truncation on long absolute paths.
-# Note: bash 3.2 truncates long PS4 expansions; we rely on shorter prod script paths
-# and ignore malformed trace lines from very long absolute paths (e.g., temp dirs).
-export PS4="__XTRACE__:\${BASH_SOURCE[0]:-}:\${LINENO}: "
+# The BASH_SOURCE guard keeps nounset safe for top-level test-function traces.
+export COVERAGE_SOURCE_ROOT="$1/"
+export PS4="__XTRACE__:\${BASH_SOURCE[0]:+\${BASH_SOURCE[0]#\${COVERAGE_SOURCE_ROOT}}}:\${LINENO}: "
 	set -x
 	"$6"
 	        ' -- "${ROOT_DIR}" "${tmp_dir}" "${REAL_PYTHON3}" "${HELPERS_SH}" "${file}" "${fn}" >"${out_file}" 2>"${err_file}" </dev/null
 	    rc=$?
 	    if [[ ${rc} -eq 0 ]]; then
-            local safe_id trace_copy
+            local safe_id trace_copy test_raw_hits previous_raw_hits
             safe_id="$(echo "${id}" | tr -c 'A-Za-z0-9._-' '_')"
             trace_copy="${COVERAGE_DIR}/trace_${safe_id}.log"
             grep -E '^_+XTRACE__:' "${err_file}" >"${trace_copy}" 2>/dev/null || true
+            test_raw_hits="${COVERAGE_RAW_PARTS_DIR}/${safe_id}.tsv"
+            : >"${test_raw_hits}"
+            previous_raw_hits="${COVERAGE_RAW_HITS}"
+            COVERAGE_RAW_HITS="${test_raw_hits}"
             coverage_append_trace_hits "${err_file}"
             coverage_append_trace_hits_from_logs "${tmp_dir}"
+            COVERAGE_RAW_HITS="${previous_raw_hits}"
             rm -rf "${tmp_dir}"
             echo "ok  ${id}"
             return 0
@@ -986,24 +1020,77 @@ export PATH="$(mock_install_bin_dir):$PATH"
     return 1
 }
 
-main() {
-    if [[ "${DO_BRANCH_COVERAGE}" == "true" || "${DO_LINE_COVERAGE}" == "true" ]]; then
-        COVERAGE_DIR="${SCRIPT_DIR}/.coverage"
-        rm -rf "${COVERAGE_DIR}"
-        mkdir -p "${COVERAGE_DIR}"
-        COVERAGE_RAW_HITS="${COVERAGE_DIR}/executed.raw.tsv"
-        : >"${COVERAGE_RAW_HITS}"
-    fi
+test_id_selected() {
+    local file="$1"
+    local fn="$2"
+    local id
+    id="$(basename "${file}")::${fn}"
 
+    if [[ -n "${FILTER_REGEX}" ]]; then
+        [[ "${id}" =~ ${FILTER_REGEX} ]] || return 1
+    fi
+    return 0
+}
+
+active_background_jobs() {
+    jobs -pr | wc -l | tr -d ' '
+}
+
+run_selected_tests_serial() {
     local failures=0
     local file
     while IFS= read -r file; do
         local fn
         while IFS= read -r fn; do
             [[ -n "${fn}" ]] || continue
+            test_id_selected "${file}" "${fn}" || continue
             run_one_test "${file}" "${fn}" || failures=$((failures + 1))
         done < <(list_tests_in_file "${file}")
     done < <(list_test_files)
+    return "${failures}"
+}
+
+run_selected_tests_parallel() {
+    local failures=0
+    local -a pids=()
+    local file
+    while IFS= read -r file; do
+        local fn
+        while IFS= read -r fn; do
+            [[ -n "${fn}" ]] || continue
+            test_id_selected "${file}" "${fn}" || continue
+            while [[ "$(active_background_jobs)" -ge "${TEST_JOBS}" ]]; do
+                sleep 0.1
+            done
+            run_one_test "${file}" "${fn}" &
+            pids+=("$!")
+        done < <(list_tests_in_file "${file}")
+    done < <(list_test_files)
+
+    local pid
+    for pid in "${pids[@]}"; do
+        wait "${pid}" || failures=$((failures + 1))
+    done
+    return "${failures}"
+}
+
+main() {
+    if [[ "${DO_BRANCH_COVERAGE}" == "true" || "${DO_LINE_COVERAGE}" == "true" ]]; then
+        COVERAGE_DIR="${SCRIPT_DIR}/.coverage"
+        rm -rf "${COVERAGE_DIR}"
+        mkdir -p "${COVERAGE_DIR}"
+        COVERAGE_RAW_HITS="${COVERAGE_DIR}/executed.raw.tsv"
+        COVERAGE_RAW_PARTS_DIR="${COVERAGE_DIR}/raw_hits"
+        mkdir -p "${COVERAGE_RAW_PARTS_DIR}"
+        : >"${COVERAGE_RAW_HITS}"
+    fi
+
+    local failures=0
+    if [[ "${TEST_JOBS}" -gt 1 ]]; then
+        run_selected_tests_parallel || failures=$?
+    else
+        run_selected_tests_serial || failures=$?
+    fi
 
     if [[ ${failures} -gt 0 ]]; then
         echo "${failures} test(s) failed" >&2

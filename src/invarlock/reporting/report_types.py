@@ -79,6 +79,10 @@ class EditInfo(TypedDict):
     deltas: EditDeltas  # Computed parameter changes
     plan: NotRequired[dict[str, Any]]
     config: NotRequired[dict[str, Any]]
+    edit_provenance: NotRequired[dict[str, Any]]
+    edit_impact: NotRequired[dict[str, Any]]
+    edit_topology: NotRequired[dict[str, Any]]
+    delta_privacy: NotRequired[dict[str, Any]]
 
 
 class EditDeltas(TypedDict):
@@ -183,6 +187,7 @@ class RunReport(TypedDict):
     guard_overhead: NotRequired[dict[str, Any]]
     provenance: NotRequired[dict[str, Any]]
     context: NotRequired[dict[str, Any]]
+    evaluation_realism: NotRequired[dict[str, Any]]
 
 
 # Utility functions for creating reports

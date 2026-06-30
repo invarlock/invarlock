@@ -8,11 +8,13 @@
 # Hardware-agnostic: runs on NVIDIA GPUs where models fit VRAM.
 # Designed for multi-GPU scheduling with dynamic work-stealing.
 #
-# EDIT TYPES (4 types × 2 versions = 8 tests per model):
+# EDIT TYPES (6 generated families, clean and stress scenario variants):
 # - Quantization RTN (group-wise): clean tuned preset per model, 4-bit stress
 # - FP8 dequantized external-subject simulation: clean tuned preset per model, E5M2 stress
 # - Dense magnitude-pruned validation checkpoint: clean tuned preset per model, 50% stress
 # - Dense low-rank-SVD approximated validation checkpoint: clean tuned preset per model, rank-32 stress
+# - LoRA merged-adapter validation checkpoint: clean tuned preset per model, rank/alpha stress
+# - Tiny fine-tune validation checkpoint: clean tuned preset per model, learning-rate/step stress
 #
 # MODEL SUITES:
 # - Defined in scripts/evidence_packs/run_suite.sh (ungated-only models).
@@ -57,7 +59,8 @@ if [[ ${SCRIPT_DIR+x} ]]; then
 fi
 # shellcheck source=../tasks/model_creation.sh
 source "${_PACK_VALIDATION_LIB_ROOT}/tasks/model_creation.sh"
-export MODEL_CREATION_LOADED=1
+MODEL_CREATION_LOADED=1
+export -n MODEL_CREATION_LOADED 2>/dev/null || true
 if [[ ${_pack_prev_script_dir_was_set} -eq 1 ]]; then
     SCRIPT_DIR="${_pack_prev_script_dir_value}"
 else
@@ -87,12 +90,13 @@ generate_verdict() {
     local root
     root="$(_pack_result_compiler_root)"
 
-    local -a manifest_args=()
     if [[ -f "${OUTPUT_DIR}/state/scenarios.json" ]]; then
-        manifest_args+=(--manifest "${OUTPUT_DIR}/state/scenarios.json")
+        python3 "${root}/python/verdict_generator.py" \
+            --output-dir "${OUTPUT_DIR}" \
+            --manifest "${OUTPUT_DIR}/state/scenarios.json"
+    else
+        python3 "${root}/python/verdict_generator.py" --output-dir "${OUTPUT_DIR}"
     fi
-
-    python3 "${root}/python/verdict_generator.py" --output-dir "${OUTPUT_DIR}" "${manifest_args[@]}"
     log "Wrote: ${OUTPUT_DIR}/reports/final_verdict.txt"
     log "Wrote: ${OUTPUT_DIR}/reports/final_verdict.json"
 }
@@ -103,15 +107,26 @@ cleanup() {
     local exit_code=$?
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Script interrupted or finished with exit code: ${exit_code}"
 
-    # Kill any background processes we spawned
-    # Check if pids array exists and has elements
-    if [[ ${#pids[@]} -gt 0 ]]; then
-        for pid in "${pids[@]}"; do
+    # Kill any background processes we spawned.
+    local had_nounset="0"
+    local spawned_pids=()
+    case "$-" in
+        *u*)
+            had_nounset="1"
+            set +u
+            ;;
+    esac
+    spawned_pids=("${pids[@]}")
+    if [[ ${#spawned_pids[@]} -gt 0 ]]; then
+        for pid in "${spawned_pids[@]}"; do
             if kill -0 "$pid" 2>/dev/null; then
                 echo "Terminating background process: $pid"
                 kill -TERM "$pid" 2>/dev/null || true
             fi
         done
+    fi
+    if [[ "${had_nounset}" == "1" ]]; then
+        set -u
     fi
     # Clean up lock file
     rm -f "${LOG_LOCK:-}" 2>/dev/null || true
@@ -184,11 +199,23 @@ if [[ -n "${PACK_OUTPUT_DIR}" && -z "${OUTPUT_DIR:-}" ]]; then
 fi
 
 # shellcheck source=validation_preflight.sh
-[[ -z "${PACK_VALIDATION_PREFLIGHT_LOADED:-}" ]] && source "${_PACK_VALIDATION_LIB_DIR}/validation_preflight.sh" && export PACK_VALIDATION_PREFLIGHT_LOADED=1
+if ! declare -F pack_apply_network_mode >/dev/null 2>&1; then
+    source "${_PACK_VALIDATION_LIB_DIR}/validation_preflight.sh"
+fi
+PACK_VALIDATION_PREFLIGHT_LOADED=1
+export -n PACK_VALIDATION_PREFLIGHT_LOADED 2>/dev/null || true
 # shellcheck source=validation_runtime.sh
-[[ -z "${PACK_VALIDATION_RUNTIME_LOADED:-}" ]] && source "${_PACK_VALIDATION_LIB_DIR}/validation_runtime.sh" && export PACK_VALIDATION_RUNTIME_LOADED=1
+if ! declare -F check_dependencies >/dev/null 2>&1; then
+    source "${_PACK_VALIDATION_LIB_DIR}/validation_runtime.sh"
+fi
+PACK_VALIDATION_RUNTIME_LOADED=1
+export -n PACK_VALIDATION_RUNTIME_LOADED 2>/dev/null || true
 # shellcheck source=validation_dynamic.sh
-[[ -z "${PACK_VALIDATION_DYNAMIC_LOADED:-}" ]] && source "${_PACK_VALIDATION_LIB_DIR}/validation_dynamic.sh" && export PACK_VALIDATION_DYNAMIC_LOADED=1
+if ! declare -F main_dynamic >/dev/null 2>&1; then
+    source "${_PACK_VALIDATION_LIB_DIR}/validation_dynamic.sh"
+fi
+PACK_VALIDATION_DYNAMIC_LOADED=1
+export -n PACK_VALIDATION_DYNAMIC_LOADED 2>/dev/null || true
 
 # ============ MAIN ============
 # Dynamic scheduling with work-stealing is the only supported mode (v2.1.0)

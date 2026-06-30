@@ -137,7 +137,21 @@ def test_coverage_policy_is_shared_with_makefile_and_expanded_surface() -> None:
     )
     assert policy.CORE_FLOOR_DEFAULT == 0.90
     assert policy.DEFAULT_FLOOR_DEFAULT == 0.90
-    assert set(policy.THRESHOLDS.values()) == {1.00}
+    phased_evidence_pack_thresholds = {
+        "scripts/evidence_packs/python/create_edit_model.py": 0.30,
+        "scripts/evidence_packs/python/create_edits_batch.py": 0.25,
+        "scripts/evidence_packs/python/editing/implementations.py": 0.65,
+        "scripts/evidence_packs/python/editing/tensor_ops.py": 0.35,
+        "scripts/evidence_packs/python/preset_generator.py": 0.30,
+        "scripts/evidence_packs/python/task_tools_reports.py": 0.35,
+    }
+    for path, threshold in phased_evidence_pack_thresholds.items():
+        assert policy.THRESHOLDS[path] == threshold
+    assert {
+        threshold
+        for path, threshold in policy.THRESHOLDS.items()
+        if path not in phased_evidence_pack_thresholds
+    } == {1.00}
 
     assert policy.COVERAGE_MODULE_FLAGS == ("--cov",)
 
@@ -166,9 +180,20 @@ def test_makefile_exposes_marker_based_fast_and_integration_lanes() -> None:
     text = makefile.read_text(encoding="utf-8")
 
     assert "test-fast:" in text
+    assert "test-parallel:" in text
     assert "test-integration:" in text
+    assert "PYTEST_WORKERS ?= 0" in text
+    assert "PYTEST_WORKER_ARGS :=" in text
+    assert "test-parallel: PYTEST_WORKERS ?= auto" in text
+    assert "$(MAKE) test-fast PYTEST_WORKERS=$(PYTEST_WORKERS)" in text
     assert '-m "not integration and not slow and not manual"' in text
+    assert "$(PYTEST) $(PYTEST_WORKER_ARGS) -q -m" in text
+    assert "$(PYTEST) $(PYTEST_WORKER_ARGS) -q tests/$(TEST_DIR)" in text
     assert "-m integration tests/integration" in text
+    assert "$(COVERAGE) run --branch --append -m pytest" in text
+    assert (
+        "$(COVERAGE) run --branch --append -m pytest $(PYTEST_WORKER_ARGS)" not in text
+    )
 
 
 def test_makefile_exposes_actionlint_and_minimal_packaging_smoke_targets() -> None:

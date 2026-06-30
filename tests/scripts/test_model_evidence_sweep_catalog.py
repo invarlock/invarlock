@@ -57,8 +57,11 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
                 "qwen_qwen3_30b_a3b_instruct_2507",
                 "allenai_olmoe_1b_7b_0924",
                 "google_gemma_4_26b_a4b_it",
+                "google_gemma_4_31b_it",
                 "qwen_qwen3_5_4b",
                 "qwen_qwen3_5_2b",
+                "qwen_qwen3_5_27b",
+                "qwen_qwen3_6_27b",
             ],
             lane_ids=[],
             shard_index=0,
@@ -127,12 +130,75 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
         "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml"
     )
     assert specs["google_gemma_4_26b_a4b_it"].adapter == "hf_multimodal"
+    assert specs["google_gemma_4_31b_it"].preset_relpath == (
+        "configs/presets/multimodal/gemma4_31b_public_vqav2_256.yaml"
+    )
+    assert specs["google_gemma_4_31b_it"].adapter == "hf_multimodal"
     for slug, preset in {
         "qwen_qwen3_5_4b": "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
         "qwen_qwen3_5_2b": "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
+        "qwen_qwen3_5_27b": "configs/presets/multimodal/qwen3_5_27b_public_vqav2_scoped_256.yaml",
+        "qwen_qwen3_6_27b": "configs/presets/multimodal/qwen3_6_27b_public_vqav2_scoped_256.yaml",
     }.items():
         assert specs[slug].preset_relpath == preset
         assert specs[slug].adapter == "hf_multimodal"
+        assert specs[slug].vision_text_materialization is not None
+        assert specs[slug].vision_text_materialization["dataset"] == (
+            "Multimodal-Fatima/VQAv2_sample_validation"
+        )
+    assert "Do not explain or include thinking" in str(
+        specs["qwen_qwen3_5_4b"].vision_text_materialization["prompt_template"]
+    )
+    for slug in {
+        "google_gemma_4_e4b_it",
+        "google_gemma_4_26b_a4b_it",
+    }:
+        assert specs[slug].vision_text_materialization is not None
+        assert specs[slug].vision_text_materialization["max_samples"] == 800
+
+
+def test_model_catalog_qwen_dry_run_materializes_public_vqav2(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
+    output_root = tmp_path / "catalog-qwen-vqav2"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--suite",
+            "model-catalog-gpu",
+            "--slug",
+            "qwen_qwen3_5_2b",
+            "--output-root",
+            str(output_root),
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    assert len(payload) == 1
+    item = payload[0]
+    assert item["slug"] == "qwen_qwen3_5_2b"
+    assert item["materialize_dataset"][0] == sys.executable
+    assert "Multimodal-Fatima/VQAv2_sample_validation" in item["materialize_dataset"]
+    assert "99487d2651df3799002b2fb3e455741744514a02" in item["materialize_dataset"]
+    preset_idx = item["evaluate"].index("--preset") + 1
+    assert item["evaluate"][preset_idx].endswith("prepared_preset.yaml")
+
+    manifest = json.loads((output_root / "manifest.json").read_text(encoding="utf-8"))
+    lane = manifest["lanes"][0]
+    assert lane["vision_text_materialization"]["dataset"] == (
+        "Multimodal-Fatima/VQAv2_sample_validation"
+    )
+    assert lane["vision_text_materialization"]["max_samples"] == 800
 
 
 def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> None:
@@ -152,13 +218,17 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
         "google_gemma_4_e2b_it_image_text",
         "qwen_qwen3_5_4b",
         "qwen_qwen3_5_2b",
+        "qwen_qwen3_5_27b_scoped",
+        "qwen_qwen3_6_27b_scoped",
         "huggingfacetb_smollm3_3b",
         "microsoft_phi_4_mini_instruct",
         "google_flan_t5_base",
         "qwen_qwen3_30b_a3b_instruct_2507",
+        "openai_gpt_oss_20b",
         "mistralai_mixtral_8x7b_v0_1",
         "allenai_olmoe_1b_7b_0924",
         "google_gemma_4_26b_a4b_it",
+        "google_gemma_4_31b_it",
     ]
     adapters = {lane.slug: lane.adapter for lane in specs}
     assert adapters["google_gemma_4_12b_it"] == "hf_multimodal"
@@ -166,11 +236,15 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
     assert adapters["google_gemma_4_e2b_it_image_text"] == "hf_multimodal"
     assert adapters["google_flan_t5_base"] == "hf_seq2seq"
     assert adapters["qwen_qwen3_30b_a3b_instruct_2507"] == "hf_causal"
+    assert adapters["openai_gpt_oss_20b"] == "hf_causal"
     assert adapters["mistralai_mixtral_8x7b_v0_1"] == "hf_causal"
     assert adapters["allenai_olmoe_1b_7b_0924"] == "hf_causal"
     assert adapters["google_gemma_4_26b_a4b_it"] == "hf_multimodal"
+    assert adapters["google_gemma_4_31b_it"] == "hf_multimodal"
     assert adapters["qwen_qwen3_5_4b"] == "hf_multimodal"
     assert adapters["qwen_qwen3_5_2b"] == "hf_multimodal"
+    assert adapters["qwen_qwen3_5_27b_scoped"] == "hf_multimodal"
+    assert adapters["qwen_qwen3_6_27b_scoped"] == "hf_multimodal"
     for lane in specs:
         if lane.slug in {
             "huggingfacetb_smollm3_3b",
@@ -183,6 +257,12 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
             assert lane.verify_profile == "release"
             assert lane.preset_relpath == (
                 "configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml"
+            )
+        elif lane.slug == "openai_gpt_oss_20b":
+            assert lane.adapter == "hf_causal"
+            assert lane.verify_profile == "release"
+            assert lane.preset_relpath == (
+                "configs/presets/causal_lm/gpt_oss_20b_512.yaml"
             )
         elif lane.slug == "mistralai_mixtral_8x7b_v0_1":
             assert lane.adapter == "hf_causal"
@@ -216,6 +296,8 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
         elif lane.slug in {
             "qwen_qwen3_5_4b",
             "qwen_qwen3_5_2b",
+            "qwen_qwen3_5_27b_scoped",
+            "qwen_qwen3_6_27b_scoped",
         }:
             assert lane.adapter == "hf_multimodal"
             assert lane.verify_profile == "release"
@@ -233,6 +315,16 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
             assert estimate["estimated_weight_gb_bf16"] == 52.0
             assert estimate["recommended_min_gpus_80gb"] >= 2
             assert estimate["moe_model"] is True
+        elif lane.slug == "google_gemma_4_31b_it":
+            assert lane.verify_profile == "release"
+            assert lane.preset_relpath == (
+                "configs/presets/multimodal/gemma4_31b_public_vqav2_256.yaml"
+            )
+            assert lane.vision_text_materialization is not None
+            estimate = lane.to_manifest_entry()["resource_estimate"]
+            assert estimate["estimated_weight_gb_bf16"] == 62.0
+            assert estimate["recommended_min_gpus_80gb"] >= 2
+            assert estimate["moe_model"] is False
         else:
             assert lane.slug == "google_flan_t5_base"
             assert lane.verify_profile == "release"
@@ -242,11 +334,11 @@ def test_support_matrix_backlog_gpu_suite_targets_prepared_candidate_rows() -> N
         assert lane.preset_path.is_file(), lane.preset_relpath
 
 
-def test_promotion_gap_gpu_suite_targets_repo_prepared_blocked_lanes() -> None:
+def test_published_basis_gap_gpu_suite_targets_repo_prepared_blocked_lanes() -> None:
     mod = load_script_module("model_evidence_sweep")
 
     specs = mod.select_specs(
-        mod.PROMOTION_GAP_GPU_SUITE,
+        mod.PUBLISHED_BASIS_GAP_GPU_SUITE,
         slugs=[],
         lane_ids=[],
         shard_index=0,
@@ -266,19 +358,19 @@ def test_promotion_gap_gpu_suite_targets_repo_prepared_blocked_lanes() -> None:
         assert lane.preset_path.is_file(), lane.preset_relpath
 
 
-def test_model_evidence_sweep_dry_run_supports_promotion_gap_suite_candidates(
+def test_model_evidence_sweep_dry_run_supports_published_basis_gap_suite_candidates(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
-    output_root = tmp_path / "promotion-gap-dry-run"
+    output_root = tmp_path / "published-basis-gap-dry-run"
 
     proc = subprocess.run(
         [
             sys.executable,
             str(script),
             "--suite",
-            "promotion-gap-gpu",
+            "published-basis-gap-gpu",
             "--execution-mode",
             "host",
             "--output-root",

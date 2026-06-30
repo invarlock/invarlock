@@ -89,8 +89,8 @@ security or alignment.
   plugins disabled, and remote model code off unless explicitly allowed.
 - Supply-chain checks in CI and PR validation (install-surface SBOM
   generation, `pip-audit` on the base/`hf`/`advanced` shipped surfaces,
-  `gitleaks` history JSON/SARIF scanning), with tag-gated release backstops
-  for drift detection.
+  `gitleaks` git-delta JSON scanning), with tag-gated release checks and a
+  scheduled full-history secret scan for drift detection.
 - CodeQL scans shipped Python code plus repository helper scripts, and the
   analysis workflow fails closed if upload/analysis cannot complete.
 - Release automation only rebuilds and publishes from validated tags resolved
@@ -99,7 +99,7 @@ security or alignment.
   `invarlock verify`) to detect misconfiguration, schema drift, and runtime
   provenance mismatches.
 - report fields for seeds, windowing, dataset/tokenizer hashes, and guard
-  telemetry so reviewers can audit the assurance evidence.
+  telemetry so auditors can audit the assurance evidence.
 
 ## Attack Scenarios
 
@@ -141,7 +141,7 @@ in report. Manual review of `report.guards[]` evidence.
 ### 4. Configuration Drift Attack
 
 **Threat:** Attacker modifies config to weaken guards (larger ε, disabled
-checks) hoping reviewers don't notice.
+checks) hoping auditors do not notice.
 
 **Mitigation:** reports capture `resolved_policy.*` and `policy_digest`
 for audit. `invarlock verify` enforces schema compliance.

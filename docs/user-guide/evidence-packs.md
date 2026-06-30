@@ -27,8 +27,8 @@ analysis.
 
 > Terminology: the evidence-pack suite includes a run-scoped **Preset Derivation**
 > phase (`CALIBRATION_RUN -> GENERATE_PRESET`) that writes
-> `calibrated_preset_<model>.yaml/json` for that suite run. It does not directly
-> modify global `runtime/tiers.yaml`. For global tier policy tuning, use
+> `calibrated_preset_<model>.yaml/json` for that suite run. Global
+> `runtime/tiers.yaml` tuning still goes through
 > `invarlock advanced calibrate ...` (see [Tier Policy Tuning CLI](../reference/calibration.md)).
 > Calibration entrypoints use the runtime container by default unless
 > a repo-only workflow opts into local host execution.
@@ -97,10 +97,10 @@ Note: clean edits require tuned preset parameters. Either set
 `PACK_TUNED_EDIT_PARAMS_FILE` or place the file at
 `scripts/evidence_packs/tuned_edit_params.json`.
 
-The evidence-pack shell wrappers do not expose the public core
-`--execution-mode` / `--runtime-provenance` flags directly. For host-side
-execution in these repo-only wrappers, set `INVARLOCK_ALLOW_HOST_EXECUTION=1`
-in the environment before calling `run_pack.sh` or `run_suite.sh`.
+The evidence-pack shell wrappers select host-side execution through
+`INVARLOCK_ALLOW_HOST_EXECUTION=1`. Set it in the environment before calling
+`run_pack.sh` or `run_suite.sh` when you intentionally use host execution in
+these repo-only wrappers.
 Installed-wheel/public workflows should use
 `invarlock evaluate --execution-mode host` instead. Otherwise, the
 underlying model-loading commands follow the default runtime-container path
@@ -161,27 +161,28 @@ suite writes the effective (filtered) manifest to `OUTPUT_DIR/state/scenarios.js
 and both task generation and final verdict compilation use that state manifest.
 `--scenario-ids` filters that manifest before queue generation, and the runtime
 honors one-sided selections exactly: clean-only, stress-only, or single-scenario
-smokes do not expand back to the default 8 edit scenarios. Disk estimation uses
+smokes do not expand back to the default 12 edit scenarios. Disk estimation uses
 the same filtered state manifest, so storage preflight reflects the selected
 scenario set rather than the suite defaults.
 
 ## Evidence Pack Artifact Taxonomy
 
-Evidence packs do not package model weights by default. The run directory may
+Evidence packs keep model weights external by default. The run directory may
 contain edited subject checkpoints under each model's `models/` directory, while
 the evidence pack contains reports and digest-backed sidecars about those
 subjects. Scenarios declare one artifact class:
 
 | Artifact class | Meaning |
 | --- | --- |
-| `validation_subject_checkpoint` | A Hugging Face checkpoint-shaped validation subject, not an optimized runtime backend |
+| `validation_subject_checkpoint` | A Hugging Face checkpoint-shaped validation subject for verifier/regression evidence |
 | `deployable_optimized_subject` | A backend-specific deployable subject with packed storage and smoke evidence |
 | `fault_injection_fixture` | An intentionally invalid or degraded fixture used to test detection |
 | `evidence_only_pack` | Evidence without a corresponding edited subject artifact |
 
-Current RTN, FP8, pruning, and low-rank evidence-pack edits are validation
-subjects. They validate InvarLock behavior on external subject checkpoints; they
-do not claim runtime memory reduction or packed deployment storage.
+Current RTN, FP8, pruning, low-rank, LoRA-merge, and fine-tune evidence-pack
+edits are validation subjects. They validate InvarLock behavior on external
+subject checkpoints. Runtime memory reduction and packed deployment storage
+require deployable artifact evidence.
 
 ## Network & Model Revisions
 
@@ -193,40 +194,6 @@ Evidence packs require pinned model revisions for reproducibility:
 - The `PACK_NET` environment variable is exported as `1` or `0` to gate `HF_*_OFFLINE` settings.
 - Bulk evidence-pack runs also require `INVARLOCK_ALLOW_REMOTE_CODE=1`; the
   entrypoint fails fast before queue creation when that opt-in is missing.
-
-## Promotion Sentinels
-
-For Qwen2.5-14B promotion work, run the evidence-pack campaign with
-`PACK_CLEANUP_MODELS=0`, then use the maintained sentinel helper from a fresh
-repo work tree. The sentinel helper reloads the saved validation subjects, so
-the default cleanup mode removes the directories it needs.
-
-```bash
-PACK_CLEANUP_MODELS=0 \
-INVARLOCK_ALLOW_REMOTE_CODE=1 \
-INVARLOCK_ALLOW_NETWORK=1 \
-  ./scripts/evidence_packs/run_qwen14_sentinels.sh \
-    --run-dir /path/to/evidence_pack_run \
-    --model-name qwen__qwen2.5-14b
-```
-
-What it checks:
-
-- saved-model direct evaluate for `quant_4bit_clean`
-- saved-model direct evaluate for `prune_clean`
-- the promotion-grade public quant smoke (`quant_4bit_clean` + `invarlock verify`)
-
-Acceptance for these sentinels is load-path completion, not scientific PASS:
-
-- `evaluation.report.json` must be emitted for each sentinel
-- the public quant smoke must also produce `verify.json`
-- evaluate and verify commands must exit zero
-- the helper defaults to `--profile dev --assurance off`; a primary-metric `FAIL`
-  inside the emitted report is acceptable for this infrastructure/load-path gate
-
-Use a fresh work tree on remote hosts. If you intentionally run from a checkout
-that is not the editable install used by `.venv`, either reinstall the checkout
-or run with `PYTHONPATH=src` so `invarlock` uses the intended source tree.
 
 ## Output Layout
 
@@ -259,7 +226,7 @@ A suite run writes artifacts under `OUTPUT_DIR` (default: `./evidence_pack_runs/
   variance/VE evidence from clean confirmation reruns
 - `reports/**/deployable_artifact_validation.json`, `backend_inventory.json`, `memory_report.json`, `load_smoke.json`, and `inference_smoke.json` for deployable scenarios
 - `reports/**/evaluation.html` + `reports/**/verify.json`
-- `README.md` (reviewer summary), `manifest.json`, `checksums.sha256`
+- `README.md` (evidence summary), `manifest.json`, `checksums.sha256`
 - `manifest.signature.json` when the pack is signed
 - `metadata/source_repo.json`, `metadata/environment.json`, and other input metadata sidecars when present
 
@@ -277,7 +244,7 @@ generation overhead by loading the baseline once for multiple validation edits,
 but each evaluated subject checkpoint is loaded by its own `evaluate_EDIT` task.
 
 `PACK_DEFER_REPORT_RENDERING=1` keeps `evaluation.report.json` and required
-sidecars, but skips optional markdown/reviewer rendering in the hot path.
+sidecars, but skips optional markdown/evidence rendering in the hot path.
 `run_pack.sh --release-review` enables this by default; pack-level HTML export
 and verification still run unless explicitly disabled.
 
@@ -294,7 +261,7 @@ reports record the edit algorithm used:
 | Label | When to Use |
 | --- | --- |
 | `noop` | Baseline model with no edit applied |
-| `quant_rtn`, `magnitude_prune`, etc. | Using InvarLock's built-in edit functions |
+| `quant_rtn`, `magnitude_prune`, `lora_merge`, `fine_tune`, etc. | Using built-in evaluator or evidence-pack generated edit labels |
 | `custom` | BYOE (Bring-Your-Own-Edit) pre-edited models |
 
 For BYOE workflows, use `--edit-label custom` or let InvarLock infer from the model path.
@@ -312,6 +279,8 @@ an edited subject, and pack verification checks that metadata agrees with
 | FP8 dequantized external-subject simulation | validation subject checkpoint | No |
 | Dense magnitude-pruned checkpoint | validation subject checkpoint | No sparse runtime |
 | Dense low-rank-SVD approximated checkpoint | validation subject checkpoint | No factorized runtime |
+| Dense LoRA-merged checkpoint | validation subject checkpoint | No adapter runtime |
+| Dense tiny fine-tuned checkpoint | validation subject checkpoint | No training runtime |
 
 ## Deployable Edit Lane
 
@@ -319,16 +288,15 @@ Deployable edit scenarios are separate from the default validation suite. They
 are opt-in because backends such as bitsandbytes, GPTQ, and AWQ depend
 on specific PyTorch, CUDA, kernel, architecture, and package versions.
 
-There is no default deployable scenario in the OSS evidence-pack suite. A
-deployable lane should be added only after its backend has a generator or
-BYOE-loading path that passes reload, inference, inventory, and memory/storage
-checks on a supported GPU stack.
+The OSS evidence-pack suite keeps deployable scenarios opt-in. Add a deployable
+lane after its backend has a generator or BYOE-loading path that passes reload,
+inference, inventory, and memory/storage checks on a supported GPU stack.
 
 A deployable scenario must produce backend metadata, backend inventory,
 reload-smoke evidence, inference-smoke evidence, storage or memory evidence, an
-InvarLock evaluation report, and verification output. The evidence pack still
-does not include model weights unless explicitly configured; it includes
-digest-backed evidence about the deployable artifact that was validated.
+InvarLock evaluation report, and verification output. The evidence pack keeps
+model weights external unless explicitly configured; it includes digest-backed
+evidence about the deployable artifact that was validated.
 
 ## Determinism
 
@@ -344,7 +312,7 @@ signed manifest cryptographically binds the checksums file (and thus all hashed 
 Newer packs also carry a signed provenance block in the same manifest:
 `builder`, `subject`, `invocation`, `environment`, and digest-backed `materials`.
 The manifest also records a derived `evidence_level` (`low`/`medium`/`high`) so
-reviewers can triage bundles quickly without replacing the underlying strict signed checks.
+readers can triage bundles quickly without replacing the underlying strict signed checks.
 Package-native signed packs store the detached Ed25519 signature bundle in
 `manifest.signature.json` and record `signing_key_fingerprint` in the manifest
 for audit trails.
@@ -382,8 +350,8 @@ them.
 Installed wheels ship the public contracts and support package-native
 inspection, key generation, assembly, and verification via `invarlock advanced evidence-pack inspect`,
 `invarlock advanced evidence-pack keygen`, `invarlock advanced evidence-pack build`,
-and `invarlock advanced evidence-pack verify`. The package-native CLI does not
-depend on external signature binaries for evidence-pack verification.
+and `invarlock advanced evidence-pack verify`. The package-native CLI verifies
+evidence-pack signatures in process.
 
 Use the package-native subcommands:
 
@@ -419,7 +387,7 @@ Use the package-native subcommands:
   digest-backed manifest references, or strict extra-file checks)
 - `7`: report verification failure (`invarlock verify`)
 
-Reviewer checklist:
+Evidence checklist:
 
 - [ ] `invarlock advanced evidence-pack verify <dir> --strict --report-assurance strict` returns `0`
 - [ ] Verification is signer-pinned with `--expected-fingerprint` or a trust
@@ -450,8 +418,8 @@ verification, and PASS final verdict.
   creation when that opt-in is missing.
 - **Unsigned pack rejected**: `verify` fails closed without
   `manifest.signature.json`. Either re-sign with
-  `invarlock advanced evidence-pack keygen` + `--signing-key`, or accept that
-  the bundle is not assurance-grade.
+  `invarlock advanced evidence-pack keygen` + `--signing-key`, or treat the
+  unsigned bundle as debugging evidence only.
 - **YAML `!include` outside config dir**: set
   `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1` or move the included file under
   the config directory.

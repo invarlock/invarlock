@@ -20,5 +20,5 @@
     "tests/core/test_model_profile_local_config.py": "sha256:25cd0c27b01302f1bc39d9e9d1dd299bbc8825d893e27336a83ff68fbafeb954"
   },
   "worktree_branch": "work/evidence-sweep-stabilization",
-  "worktree_sync_note": "Remote /root/invarlock-public was patched by scp with the listed file hashes before running with --skip-sync."
+  "worktree_sync_note": "Remote <validation-repo> was patched by scp with the listed file hashes before running with --skip-sync."
 }

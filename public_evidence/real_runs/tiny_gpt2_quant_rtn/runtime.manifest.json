@@ -17,7 +17,7 @@
   "report": {
     "filename": "evaluation.report.json",
     "path": "public_evidence/real_runs/tiny_gpt2_quant_rtn/evaluation.report.json",
-    "sha256": "01ed52d0c592f0ed69623b05a347b57a49f9f576ca6080af0d2c6782fcca9994"
+    "sha256": "a146142e1d191a5376900d0b2c96aacd1fd664e4ab477e786183e449c420e55d"
   },
   "runtime": {
     "allow_network": true,

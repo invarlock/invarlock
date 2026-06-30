@@ -13,7 +13,7 @@ Recommended practices for research and production deployments.
   locations and implicit directory creation.
 - Treat models/datasets from untrusted sources as potentially malicious; avoid
   unsafe deserialization.
-- Always run `invarlock verify` on reports before promotion.
+- Always run `invarlock verify` on reports before publication.
 
 ## Production Deployment Checklist
 
@@ -64,9 +64,9 @@ Copy-paste checklist for production or CI deployments:
 - Keep Python at 3.12+ and update dependencies regularly.
 - Use the PR-time supply-chain workflow for pre-merge checks (install-surface
   SBOM + `pip-audit` on the base/`hf`/`advanced` shipped surfaces + `gitleaks`
-  changed-file JSON/SARIF artifacts), and keep the tag-gated CI supply-chain
-  job as the slower release backstop. See the allowlist page for documented
-  exceptions.
+  git-delta JSON artifacts), and keep the tag-gated release workflow plus the
+  scheduled full-history secret scan as slower backstops. See the allowlist page
+  for documented exceptions.
 
 ## Release verification
 

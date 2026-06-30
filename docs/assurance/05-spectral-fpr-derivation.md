@@ -13,7 +13,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Explain how spectral guard family caps map to false-positive-rate interpretation under modeled nulls. |
-| **Audience** | Guard maintainers, calibration reviewers, and contributors changing spectral policy. |
+| **Audience** | Guard maintainers, calibration auditors, and contributors changing spectral policy. |
 | **Contract scope** | Spectral z-score caps, multiple-testing policy, sentinel caps, and report observability. |
 | **Source of truth** | `src/invarlock/guards/spectral*.py`, `runtime/tiers.yaml`, and spectral assurance tests. |
 
@@ -66,7 +66,7 @@ rate.
   FFN, attention, embeddings, and other 2-D weights are all monitored. The
   Gaussian-tail FPR interpretation is defensible only for families with a
   matching null calibration basis. In the packaged pilot basis that means the
-  GPT-2/BERT-calibrated high-kappa families; newly promoted published-basis
+  GPT-2/BERT-calibrated high-kappa families; new published-basis
   causal LMs may expose `attn` cap hits in no-op reports and should treat the
   transferred attention cap as a budgeted sentinel until κ is recalibrated for
   that family. The lower `embed` and `other` caps are sentinel thresholds and
@@ -126,7 +126,7 @@ summary.
 - Balanced `max_caps = 5`. After the fifth WARN the guard continues to WARN;
   the sixth triggers `spectral.caps_exceeded=true` and the run aborts.
 - Multiple-testing metadata shows `spectral.multiple_testing = {method: "bh",
-  alpha: 0.05, m: 4}` so reviewers can verify the published policy and compute
+  alpha: 0.05, m: 4}` so readers can verify the published policy and compute
   modeled tails for the calibrated caps.
 
 ## Calibration

@@ -101,7 +101,7 @@ def test_model_classification_catches_blocked_checkpoint_reintroduction(
     )
 
 
-def test_model_classification_catches_promotion_candidate_decision_drift(
+def test_model_classification_catches_published_basis_candidate_decision_drift(
     monkeypatch, tmp_path: Path
 ) -> None:
     mod = _load_script_module()
@@ -127,7 +127,7 @@ def test_model_classification_catches_promotion_candidate_decision_drift(
     findings = mod.audit()
 
     assert any(
-        finding.scope == "promotion_candidate:broader-bert-like-mlms"
+        finding.scope == "published_basis_candidate:broader-bert-like-mlms"
         and "requires classification 'blocked'" in finding.message
         for finding in findings
     )

@@ -119,6 +119,24 @@ EOF
     assert_eq "${bin_dir}/python" "${RUN_OUT}" "python path exported from PATH"
 }
 
+test_verify_pack_source_selects_python_from_path_in_current_shell() {
+    mock_reset
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/python" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "${bin_dir}/python"
+
+    unset PYTHON_BIN TEST_REAL_PYTHON3
+    PATH="${bin_dir}:/usr/bin:/bin"
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    assert_eq "${bin_dir}/python" "${PYTHON_BIN}" "verify_pack source selects python from PATH in the current shell"
+}
+
 
 test_verify_pack_rejects_json_output_inside_pack() {
     mock_reset
@@ -183,6 +201,19 @@ test_verify_pack_manifest_digest_validation_reports_missing_and_empty_fields_dir
     assert_match "checksums_sha256_digest is empty" "${RUN_ERR}" "empty digest error is direct"
 }
 
+test_verify_pack_manifest_digest_mismatch_direct_branch() {
+    mock_reset
+
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    pack_manifest_field() { echo "expected-digest"; }
+    pack_file_sha256() { echo "actual-digest"; }
+
+    run pack_verify_manifest_binds_checksums "${TEST_TMPDIR}/pack" "0"
+    assert_rc "1" "${RUN_RC}" "manifest digest mismatch fails directly"
+    assert_match "checksums\\.sha256 digest mismatch" "${RUN_ERR}" "digest mismatch error is explicit"
+}
+
 test_verify_pack_manifest_provenance_accepts_digest_backed_refs() {
     mock_reset
 
@@ -243,6 +274,48 @@ EOF
 
     run pack_verify_reports "${pack_dir}" ""
     assert_rc "0" "${RUN_RC}" "verify without json_out succeeds"
+}
+
+test_verify_pack_direct_helper_argument_branches() {
+    mock_reset
+
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local calls="${TEST_TMPDIR}/python.calls"
+    _cmd_python() {
+        printf '%s\n' "$*" > "${calls}"
+    }
+
+    run pack_warn "direct warning"
+    assert_rc "0" "${RUN_RC}" "pack_warn returns success"
+    assert_match "WARNING: direct warning" "${RUN_ERR}" "pack_warn writes to stderr"
+
+    run pack_verify_signature_helper "${TEST_TMPDIR}/pack" "1" "sha256:abc"
+    assert_rc "0" "${RUN_RC}" "signature helper accepts strict and expected fingerprint"
+    assert_match "signature --strict --expected-fingerprint sha256:abc ${TEST_TMPDIR}/pack" "$(cat "${calls}")" "signature helper forwards strict and expected fingerprint args"
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/metadata"
+    run pack_scenario_strictness "${pack_dir}" "missing"
+    assert_rc "1" "${RUN_RC}" "scenario strictness rejects missing metadata in verify path"
+
+    mkdir -p "${pack_dir}/reports/model/clean"
+    printf '%s\n' '{"scenarios":[{"id":"clean","strictness":"must_pass"}]}' > "${pack_dir}/metadata/scenarios.json"
+    run pack_report_scenario_id "${pack_dir}" "${pack_dir}/reports/model/clean/evaluation.report.json"
+    assert_rc "0" "${RUN_RC}" "report scenario id helper forwards report path"
+    assert_match "report-scenario-id ${pack_dir} ${pack_dir}/reports/model/clean/evaluation\\.report\\.json" "$(cat "${calls}")" "report scenario id command forwarded"
+
+    run pack_scenario_strictness "${pack_dir}" "clean"
+    assert_rc "0" "${RUN_RC}" "scenario strictness helper forwards metadata path"
+    assert_match "scenario-strictness ${pack_dir}/metadata/scenarios\\.json clean" "$(cat "${calls}")" "scenario strictness command forwarded"
+
+    run pack_report_expects_verify_failure "${pack_dir}" "${pack_dir}/reports/model/clean/evaluation.report.json"
+    assert_rc "0" "${RUN_RC}" "report expected-failure helper forwards report path"
+    assert_match "report-expects-verify-failure ${pack_dir} ${pack_dir}/reports/model/clean/evaluation\\.report\\.json" "$(cat "${calls}")" "report expected-failure command forwarded"
+
+    run pack_verify_reports "${pack_dir}" "${TEST_TMPDIR}/verify.json"
+    assert_rc "0" "${RUN_RC}" "verify reports accepts json_out"
+    assert_match "verify-reports ${pack_dir} --profile dev --report-assurance report --require-clean --json-out ${TEST_TMPDIR}/verify\\.json" "$(cat "${calls}")" "verify reports forwards json_out"
 }
 
 test_verify_pack_manifest_field_reads_values() {
@@ -900,6 +973,11 @@ JSON
 #!/usr/bin/env bash
 set -euo pipefail
 echo "$*" >> "${TEST_TMPDIR}/invarlock.calls"
+for arg in "$@"; do
+    if [[ "${arg}" == */errors/*/evaluation.report.json ]]; then
+        exit 1
+    fi
+done
 echo '{"ok": true}'
 exit 0
 EOF
@@ -964,6 +1042,50 @@ EOF
     PATH="${original_path}"
 }
 
+test_verify_pack_verify_reports_accepts_informational_error_probe_that_verifies_clean() {
+    mock_reset
+
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/metadata"
+    mkdir -p "${pack_dir}/reports/modelA/quant_4bit_clean/run_1"
+    mkdir -p "${pack_dir}/reports/modelA/errors/rmt_norm_noise_probe"
+    cat > "${pack_dir}/metadata/scenarios.json" <<'JSON'
+{
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "quant_4bit_clean", "strictness": "must_pass"},
+    {"id": "rmt_norm_noise_probe", "strictness": "informational"}
+  ]
+}
+JSON
+    echo "{}" > "${pack_dir}/reports/modelA/quant_4bit_clean/run_1/evaluation.report.json"
+    echo "{}" > "${pack_dir}/reports/modelA/errors/rmt_norm_noise_probe/evaluation.report.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "$*" >> "${TEST_TMPDIR}/invarlock.calls"
+exit 0
+EOF
+    chmod +x "${bin_dir}/invarlock"
+
+    local original_path="${PATH}"
+    PATH="${bin_dir}:${PATH}"
+
+    run pack_verify_reports "${pack_dir}" ""
+    assert_rc "0" "${RUN_RC}" "informational error probe may verify clean"
+    assert_match "quant_4bit_clean/run_1/evaluation\\.report\\.json" "$(cat "${TEST_TMPDIR}/invarlock.calls")" "verifies expected-pass report"
+    assert_match "errors/rmt_norm_noise_probe/evaluation\\.report\\.json" "$(cat "${TEST_TMPDIR}/invarlock.calls")" "verifies informational probe report"
+    [[ "${RUN_ERR}" != *"Expected verify failure verified as passing"* ]] || t_fail "informational probe should not be expected to fail verification"
+
+    PATH="${original_path}"
+}
+
 test_verify_pack_verify_reports_rejects_scenario_expected_failure_that_passes() {
     mock_reset
 
@@ -1000,7 +1122,7 @@ EOF
 
     run pack_verify_reports "${pack_dir}" ""
     assert_rc "1" "${RUN_RC}" "verify fails when scenario-declared must_fail report verifies clean"
-    assert_match "Expected verify failure passed" "${RUN_ERR}" "unexpected expected-failure pass is explicit"
+    assert_match "Expected verify failure verified as passing" "${RUN_ERR}" "unexpected expected-failure pass is explicit"
 
     PATH="${original_path}"
 }
@@ -1065,4 +1187,45 @@ test_verify_pack_returns_integrity_error_when_manifest_provenance_fails() {
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
     assert_rc "${PACK_VERIFY_INTEGRITY}" "${RUN_RC}" "manifest provenance failure maps to integrity exit code"
+}
+
+test_verify_pack_exit_code_mappings_direct_branches() {
+    mock_reset
+
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}"
+    echo "{}" > "${pack_dir}/manifest.json"
+    echo "hash payload" > "${pack_dir}/checksums.sha256"
+
+    pack_validate_manifest_schema() { return 0; }
+    pack_verify_signature() { return 0; }
+    pack_verify_manifest_binds_checksums() { return 0; }
+    pack_verify_checksums() { return 0; }
+    pack_verify_manifest_provenance() { return 0; }
+    pack_verify_no_extra_files() { return 0; }
+    pack_verify_reports() { return 0; }
+
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify --report-assurance strict
+    assert_rc "${PACK_VERIFY_OK}" "${RUN_RC}" "strict report assurance parses and succeeds"
+
+    pack_verify_checksums() { return 1; }
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify
+    assert_rc "${PACK_VERIFY_INTEGRITY}" "${RUN_RC}" "checksum verification failure maps to integrity"
+    pack_verify_checksums() { return 0; }
+
+    pack_verify_manifest_provenance() { return 1; }
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify
+    assert_rc "${PACK_VERIFY_INTEGRITY}" "${RUN_RC}" "manifest provenance failure maps to integrity"
+    pack_verify_manifest_provenance() { return 0; }
+
+    pack_verify_no_extra_files() { return 1; }
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify
+    assert_rc "${PACK_VERIFY_INTEGRITY}" "${RUN_RC}" "extra-file verification failure maps to integrity"
+    pack_verify_no_extra_files() { return 0; }
+
+    pack_verify_reports() { return 1; }
+    run pack_verify_pack --pack "${pack_dir}"
+    assert_rc "${PACK_VERIFY_REPORTS}" "${RUN_RC}" "report verification failure maps to report exit code"
 }

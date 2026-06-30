@@ -11,7 +11,7 @@
             "main"
           ],
           "size_on_disk": 15238335532,
-          "snapshot_path": "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-7B/snapshots/916b56a44061fd5cd7d6a8fb632557ed4f724f60"
+          "snapshot_path": "<hf-cache-dir>/hub/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-7B/snapshots/916b56a44061fd5cd7d6a8fb632557ed4f724f60"
         }
       ],
       "slug": "deepseek_r1_distill_qwen_7b",

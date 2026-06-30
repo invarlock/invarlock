@@ -1,0 +1,25 @@
+{
+  "schema": "invarlock.evidence_pack_lifecycle_stress.hash_inventory.v1",
+  "status": "completed",
+  "evidence_scope": "evidence-pack task lifecycle stress validation only; no model-quality or assurance claim",
+  "artifacts": [
+    {
+      "artifact": "readme",
+      "path": "README.md",
+      "bytes": 604,
+      "sha256": "sha256:508e966e7816ce94006a83416be06a2cb29f1fa79b8864a16cac153c2926a5d5"
+    },
+    {
+      "artifact": "lifecycle_summary",
+      "path": "lifecycle_summary.json",
+      "bytes": 1658,
+      "sha256": "sha256:c21a87c3f6e9c483723d45fea31be3350aa58f81b0d51f22f87b4265abc13124"
+    },
+    {
+      "artifact": "evidence_meta",
+      "path": "evidence.meta.json",
+      "bytes": 628,
+      "sha256": "sha256:407627203ac612ccb981419da29b56b30e5ffa86e97db154221c0cbd71241d53"
+    }
+  ]
+}

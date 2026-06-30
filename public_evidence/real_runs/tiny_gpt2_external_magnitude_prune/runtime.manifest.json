@@ -17,7 +17,7 @@
   "report": {
     "filename": "evaluation.report.json",
     "path": "public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json",
-    "sha256": "8fc11124a3013c4b54e67be1ee0a05a5b200326a1394bdd15e9d3907c200c1dd"
+    "sha256": "9d5b442055b2b4cf46ab047a75c3d548f35dc2adccd316d66d64a9e4af1f0165"
   },
   "runtime": {
     "allow_network": true,

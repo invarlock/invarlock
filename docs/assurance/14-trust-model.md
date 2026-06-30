@@ -9,7 +9,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Define the public meaning of an InvarLock strict assurance pass. |
-| **Audience** | Release reviewers, CI owners, operators accepting report evidence. |
+| **Audience** | Release approvers, CI owners, operators accepting report evidence. |
 | **Contract scope** | Current strict assurance behavior, claim set `invarlock-weight-edit-regression-v1`, report v1. |
 | **Source of truth** | `src/invarlock/core/assurance_contract.py`, `src/invarlock/reporting/verify_contract.py`, `docs/assurance/00-assurance-case.md`, `docs/reference/reports.md`. |
 
@@ -28,7 +28,7 @@ Evidence-pack verification is separate from report verification. A signed
 evidence pack validates manifest integrity; signer authenticity requires pinning
 with `--expected-fingerprint` or a local trust store.
 
-Reviewer-facing exports such as `invarlock report export --format release-review-md`
+Release exports such as `invarlock report export --format release-review-md`
 are presentation wrappers around the report and verifier result. They do not
 create a new assurance mode; acceptance still depends on `invarlock verify` and
 the runtime/evidence-pack checks described here.
@@ -78,7 +78,7 @@ outside the published support basis.
 
 Strict reports include a top-level `assurance` section. Generated reports record
 the intended strict claim and leave runtime provenance verification pending
-until `invarlock verify` checks the sibling `runtime.manifest.json`. Reviewers
+until `invarlock verify` checks the sibling `runtime.manifest.json`. Readers
 should require the combination of report-local strict shape and a verified
 runtime-provenance result.
 
@@ -105,7 +105,7 @@ signature over `manifest.json`. The verifier always derives and reports the
 signing-key fingerprint when a signature is present. That check provides
 tamper evidence for the manifest and checksum chain.
 
-Authenticity is stronger: reviewers must decide which signing keys they accept.
+Authenticity is stronger: readers must decide which signing keys they accept.
 For distributable evidence, require one of:
 
 - `invarlock advanced evidence-pack verify <dir> --expected-fingerprint sha256:<64-hex-chars>`
@@ -163,7 +163,7 @@ non-strict shapes are catalogued in [Failure Examples](../user-guide/failure-exa
 ## Related Documentation
 
 - [Assurance Case Overview](00-assurance-case.md)
-- [Strict Assurance Checklist](15-strict-assurance-checklist.md) — Reviewer checklist
+- [Strict Assurance Checklist](15-strict-assurance-checklist.md) — Acceptance checklist
 - [Reports Reference](../reference/reports.md) — Full v1 schema
 - [Runtime Provenance Guide](../security/runtime-provenance-guide.md) — Manifest requirements
 - [Failure Examples](../user-guide/failure-examples.md) — Common non-pass shapes

@@ -2,7 +2,7 @@
   "schema_version": "v1",
   "run_id": "8d05e487f6b45405",
   "meta": {
-    "model_id": "/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/models/fp8_e5m2_stress",
+    "model_id": "<validation-output-root>/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/models/fp8_e5m2_stress",
     "adapter": "hf_causal",
     "device": "cuda:0",
     "ts": "2026-06-12T07:16:47.561483",
@@ -184,7 +184,7 @@
       "source": "explicit_preview_final_hashes"
     },
     "tokenizer": {
-      "name": "/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/models/mistralai__mistral-7b-v01/baseline",
+      "name": "<validation-output-root>/mistral_guard_value_pack_20260612j/models/mistralai__mistral-7b-v01/baseline",
       "hash": "ba2bcc1717805931c80b887e91c17c13",
       "vocab_size": 32000,
       "bos_token": "<s>",
@@ -217,7 +217,7 @@
   },
   "baseline_ref": {
     "run_id": "32cf89e1c9bb508f",
-    "model_id": "/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/models/mistralai__mistral-7b-v01/baseline",
+    "model_id": "<validation-output-root>/mistral_guard_value_pack_20260612j/models/mistralai__mistral-7b-v01/baseline",
     "adapter": null,
     "primary_metric": {
       "kind": "ppl_causal",
@@ -878,7 +878,7 @@
         },
         "dataset_meta": {
           "tokenizer_hash": "ba2bcc1717805931c80b887e91c17c13",
-          "tokenizer_name": "/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/models/mistralai__mistral-7b-v01/baseline",
+          "tokenizer_name": "<validation-output-root>/mistral_guard_value_pack_20260612j/models/mistralai__mistral-7b-v01/baseline",
           "vocab_size": 32000,
           "bos_token": "<s>",
           "eos_token": "</s>",
@@ -3014,7 +3014,7 @@
           },
           "dataset_meta": {
             "tokenizer_hash": "ba2bcc1717805931c80b887e91c17c13",
-            "tokenizer_name": "/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/models/mistralai__mistral-7b-v01/baseline",
+            "tokenizer_name": "<validation-output-root>/mistral_guard_value_pack_20260612j/models/mistralai__mistral-7b-v01/baseline",
             "vocab_size": 32000,
             "bos_token": "<s>",
             "eos_token": "</s>",
@@ -3550,7 +3550,7 @@
     }
   ],
   "artifacts": {
-    "events_path": "/root/evidence-pack-runs/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/reports/fp8_e5m2_stress/run_2/edited/20260612_070944/events.jsonl",
+    "events_path": "<validation-output-root>/mistral_guard_value_pack_20260612j/mistralai__mistral-7b-v01/reports/fp8_e5m2_stress/run_2/edited/20260612_070944/events.jsonl",
     "logs_path": "",
     "checkpoint_path": null,
     "report_path": "",

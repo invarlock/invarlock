@@ -1,10 +1,10 @@
 # InvarLock Documentation
 
 InvarLock provides auditable strict verification for edited model checkpoints. It
-validates baseline-vs-subject comparisons, not a specific edit toolchain. A
-small built-in RTN dequantized weight-edit simulation (`quant_rtn`, 8-bit)
-exists for advanced smoke and demo workflows; production workflows are
-bring-your-own-edited-checkpoint (BYOE). See [Compare & evaluate
+centers on baseline-vs-subject comparisons for artifacts produced by your own
+edit workflow. A small built-in RTN dequantized weight-edit simulation
+(`quant_rtn`, 8-bit) exists for advanced smoke and demo workflows; production
+workflows are bring-your-own-edited-checkpoint (BYOE). See [Compare & evaluate
 (BYOE)](user-guide/compare-and-evaluate.md) and the [Public Evidence
 Walkthrough](user-guide/public-evidence-walkthrough.md).
 
@@ -22,11 +22,12 @@ running paired evaluation on text workflows plus the included image-text path.
 1. **[Getting Started](user-guide/getting-started.md)** – environment setup and the first `evaluate` → `verify` → `report html` loop.
 2. **[Quickstart](user-guide/quickstart.md)** – CLI highlights for common workflows.
 3. **[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)** – baseline ↔ subject paired evaluation with the guard chain.
-4. **[Primary Metric Smoke](user-guide/primary-metric-smoke.md)** – tiny examples for ppl/accuracy kinds.
+4. **[Knowledge & self-edit workflows](user-guide/knowledge-and-self-edit-workflows.md)** – use upstream edit systems as BYOE subject generators.
+5. **[Primary Metric Smoke](user-guide/primary-metric-smoke.md)** – tiny examples for ppl/accuracy kinds.
 
 ### Choose Your Path
 
-- **Wheel user / reviewer**: start with [Quickstart](user-guide/quickstart.md) if you already have an `evaluation.report.json` bundle and want to verify, explain, or render it.
+- **Wheel user / report reader**: start with [Quickstart](user-guide/quickstart.md) if you already have an `evaluation.report.json` bundle and want to verify, explain, or render it.
 - **Evaluator**: start with [Getting Started](user-guide/getting-started.md) if you need to run `invarlock evaluate` and produce a fresh evaluation bundle.
 - **Repo maintainer**: use the same user guides first, then reach for repo-only smokes, `configs/`, and local runtime-image flows after the core path is green.
 
@@ -60,6 +61,7 @@ boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 - [Getting Started](user-guide/getting-started.md)
 - [Quickstart](user-guide/quickstart.md)
 - [Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)
+- [Knowledge & self-edit workflows](user-guide/knowledge-and-self-edit-workflows.md)
 - [Primary Metric Smoke](user-guide/primary-metric-smoke.md)
 - [Live Examples](user-guide/live-examples.md)
 - [Integration Examples](user-guide/integrations.md)
@@ -140,7 +142,7 @@ to change proposals or releases when you update calibration.
 
 ### Governance
 
-- [Contribution Guidelines](https://github.com/invarlock/invarlock/blob/v0.11.0/CONTRIBUTING.md)
+- [Contribution Guidelines](https://github.com/invarlock/invarlock/blob/v0.12.0/CONTRIBUTING.md)
 
 ---
 
@@ -264,10 +266,13 @@ Notes
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | Qwen3.5 2B image-text LM | Yes | Yes | Yes | Yes |
 | Qwen3.5 4B image-text LM | Yes | Yes | Yes | Yes |
+| Qwen3.5 27B image-text LM (scoped) | Yes | Yes | Yes | Yes |
+| Qwen3.6 27B image-text LM (scoped) | Yes | Yes | Yes | Yes |
 | Gemma 4 E2B image-text LM | Yes | Yes | Yes | Yes |
 | Gemma 4 E4B image-text LM | Yes | Yes | Yes | Yes |
 | Gemma 4 12B any-to-any LM | Yes | Yes | Yes | Yes |
 | Gemma 4 26B-A4B MoE image-text LM | Yes | Yes | Yes | Yes |
+| Gemma 4 31B image-text LM | Yes | Yes | Yes | Yes |
 
 ### Large/MoE Published Evidence
 
@@ -276,6 +281,7 @@ Notes
 | OLMoE 1B-active/7B-total causal LM | Yes | Yes | Yes | Yes |
 | Mixtral 8x7B MoE causal LM | Yes | Yes | Yes | Yes |
 | Qwen3 30B-A3B MoE causal LM | Yes | Yes | Yes | Yes |
+| GPT-OSS 20B causal LM | Yes | Yes | Yes | Yes |
 
 ### Seq2Seq Published Evidence
 
@@ -291,20 +297,23 @@ Falcon 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B,
 Qwen3.5 2B image-text, DeepSeek-R1-Distill-Qwen 7B,
 DeepSeek-R1-0528-Qwen3 8B,
 DeepSeek-R1-Distill-Qwen 14B, Phi-4 text-only, Qwen3.5 4B image-text,
-Gemma 4 12B image-text, Gemma 4 26B-A4B image-text MoE, OLMoE
-1B-active/7B-total MoE, Mixtral 8x7B MoE, Qwen3 30B-A3B MoE, and FLAN-T5 base
+scoped Qwen3.5 27B image-text, scoped Qwen3.6 27B image-text,
+Gemma 4 12B image-text, Gemma 4 26B-A4B image-text MoE, Gemma 4 31B
+image-text, OLMoE 1B-active/7B-total MoE, Mixtral 8x7B MoE,
+Qwen3 30B-A3B MoE, GPT-OSS 20B, and FLAN-T5 base
 seq2seq profiles.
 Repo-included presets and pilot calibration configs for prepared practical-pick
 lanes do not become part of the published assurance basis until supporting
 artifacts are attached. OLMoE is the smaller MoE published-basis validation
 lane; Mixtral 8x7B and Qwen3 30B-A3B are larger no-op preservation
 bases. Gemma 4 26B-A4B is a multimodal MoE image-text preservation basis; it is
-not audio, exhaustive expert-bank, or MoE routing-quality evidence. The Qwen3
-30B-A3B fixture requires all-8 80GB-GPU sharding and uses scoped
-attention/router/shared-expert guard scans; it is not an exhaustive expert-bank
-or MoE routing-quality claim.
+scoped to pinned image-text evidence. Audio, exhaustive expert-bank, and MoE
+routing-quality evidence require separate artifacts. The Qwen3 30B-A3B fixture
+requires all-8 80GB-GPU sharding and uses scoped attention/router/shared-expert
+guard scans; exhaustive expert-bank and MoE routing-quality claims require
+separate evidence.
 The empirical guard manifest includes no-op published-basis summaries for the
-modern promoted families. They are null-behavior evidence and calibration
+modern published-basis families. They are null-behavior evidence and calibration
 inputs, but they do not re-derive the packaged spectral/RMT/variance tier
 constants; transferred attention caps remain budgeted sentinels until a
 family-specific null sweep supports an FPR interpretation.
@@ -314,8 +323,8 @@ baseline-relative spectral, RMT, and variance/VE evidence from clean
 confirmation reruns.
 Practical-pick families without tuned edit params or public evidence fixtures
 are tracked as `community_experimental` rows, even when a repo pilot preset and
-calibration config are already present. Access-gated vendor checkpoints are
-intentionally excluded from the included preset inventory.
+calibration config are already present. Access-gated vendor checkpoints are not
+included as repo-shipped presets.
 The Phi-4 public fixture is text-only and skips guard-overhead measurement by
 preset policy; strict release verification accepts that declared skip.
 The FLAN-T5 base public fixture uses pinned CNN/DailyMail validation data via
@@ -324,13 +333,16 @@ while the hard policy gates pass.
 The Qwen3.5 4B image-text lane now includes a public VQAv2 preset, null-sweep
 config, strict public report, runtime manifest, and signed evidence pack after
 the structured JSON-answer prompt fix.
+The scoped Qwen3.5 27B and Qwen3.6 27B image-text lanes cover
+self-attention and MLP guard scans; linear-attention module coverage remains a
+separate strict spectral-cap finding.
 
 `published_basis` remains the narrow public evidence floor, while
 `supported_experimental` means the repo ships the preset, calibration config,
 targeted tests, smoke/evidence path, and tuned edit-param coverage for the lane
 without claiming a published-basis fixture set. `community_experimental` rows
-are candidate inventory entries; some already have repo pilot presets and
-calibration configs, but still need the remaining promotion artifacts before
+are candidate entries; some already have repo pilot presets and
+calibration configs, but still need the remaining published-basis artifacts before
 they become release-supported lanes.
 
 Image-text evaluation uses the built-in
@@ -338,9 +350,9 @@ Image-text evaluation uses the built-in
 `invarlock[multimodal]` for this path; Gemma 4 unified checkpoints require
 `transformers>=5.12.0` and `torchvision>=0.26.0`. Gemma 4 E2B has separate
 text-only and image-text public bases; Qwen3.5 2B, Qwen3.5 4B, Gemma 4 E4B,
-Gemma 4 12B, and Gemma 4 26B-A4B also have public image-text bases. Audio
-evaluation is deferred. Public
-image-text basis promotion requires
+scoped Qwen3.5/Qwen3.6 27B, Gemma 4 12B, Gemma 4 26B-A4B, and Gemma 4 31B
+also have public image-text bases. Audio evaluation is deferred. Public
+image-text published-basis inclusion requires
 measured accuracy on a pinned public dataset above the repo floor; preservation
 passing alone is not sufficient.
 
@@ -349,8 +361,7 @@ the canonical source of truth for normalized support tiers
 (`published_basis`, `supported_experimental`, `community_experimental`) and for
 published-basis evidence references. Model lifecycle decisions live in
 `contracts/model_classification.json`: that file records whether a lane or
-family is published, backlog, blocked, smoke-only, usage-only, or out of scope,
-and centralizes blocked named checkpoints for future license/access changes.
+family is published, backlog, blocked, smoke-only, usage-only, or out of scope.
 
 Model evidence automation lives in
 `scripts/model_evidence/model_evidence_sweep.py`, with tmux-based remote launch support in
@@ -360,8 +371,8 @@ For large MoE lanes that do not fit comfortably on one GPU, the remote helper
 supports grouped CUDA visibility, for example
 `--gpu-group 0,1,2,3` to launch one sweep shard with all four GPUs exposed
 instead of one shard per GPU.
-Repo-prepared-but-not-yet-promoted lanes are tracked in
-`contracts/model_family_catalog.json`; promotion eligibility and blockers are
+Repo-prepared candidate lanes are tracked in
+`contracts/model_family_catalog.json`; published-basis eligibility and blockers are
 tracked in `contracts/model_classification.json`.
 For the Gemma 4 text lane, the repo-maintained local smoke is the included
 manifest dry-run (`scripts/model_evidence/model_evidence_sweep.py --suite repo-mentioned-gpu --slug gemma4_e2b_public --dry-run`).
@@ -387,8 +398,8 @@ materialization pattern through
 `configs/presets/multimodal/*_public_vqav2_256.yaml` and matching
 `configs/calibration/null_sweep_*.yaml` files.
 
-For the broader inventory of declared support, implemented-but-not-public
-coverage, usage-only checkpoint families, and recommended additions, see
+For declared support, implemented-but-not-public coverage, usage-only checkpoint
+families, and recommended additions, see
 [Model Family Catalog](reference/model-family-catalog.md).
 
 ---
@@ -481,4 +492,4 @@ Run with `RUN=1 NET=1` to execute the matrix and allow downloads.
 [CLI Reference](reference/cli.md) ·
 [Primary Metric Smoke](user-guide/primary-metric-smoke.md) ·
 [Example Reports](user-guide/example-reports.md) ·
-[Contributing](https://github.com/invarlock/invarlock/blob/v0.11.0/CONTRIBUTING.md)
+[Contributing](https://github.com/invarlock/invarlock/blob/v0.12.0/CONTRIBUTING.md)

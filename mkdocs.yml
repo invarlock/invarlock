@@ -11,6 +11,7 @@ nav:
       - Quickstart: user-guide/quickstart.md
       - Primary Metric Smoke: user-guide/primary-metric-smoke.md
       - Compare & Evaluate (BYOE): user-guide/compare-and-evaluate.md
+      - Knowledge & Self-Edit Workflows: user-guide/knowledge-and-self-edit-workflows.md
       - Live Examples: user-guide/live-examples.md
       - Integration Examples: user-guide/integrations.md
       - Public Evidence Walkthrough: user-guide/public-evidence-walkthrough.md
@@ -110,8 +111,8 @@ plugins:
 # MathJax is referenced but not fetched during `mkdocs build`; browsers load it
 # when viewing the generated site so Arithmatex formulas render correctly.
 extra_javascript:
-  - javascripts/mathjax.js
+  - assets/javascripts/mathjax.js
   - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js
 
 extra_css:
-  - stylesheets/extra.css
+  - assets/stylesheets/extra.css

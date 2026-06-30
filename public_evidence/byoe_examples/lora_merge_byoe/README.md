@@ -10,6 +10,9 @@ scope.
 - Artifact class: `validation_subject_checkpoint`
 - Model weights vendored: `false`
 - Deployable optimized backend claim: `false`
+- Edit provenance: descriptive BYOE metadata
+- Edit impact scenarios: `target_success`, `near_neighbor`,
+  `unrelated_locality`, `general_ability_sentinel`
 
 Verify it with:
 
@@ -21,4 +24,5 @@ invarlock verify --profile release --assurance strict \
 The fixture validates report/verifier wiring for an external BYOE subject. Its
 scope is artifact verification for the edited checkpoint reference; runtime
 compression, packed storage, and production edit-backend behavior are outside
-this fixture.
+this fixture. Edit-impact scenario labels are descriptive report context, not
+strict verifier gates, and they do not create a deployable backend claim.

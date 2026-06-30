@@ -1,7 +1,7 @@
 {
   "all_guard_probe_sweep": {
     "clean_confirmation_required": true,
-    "clean_confirmation_root": "/root/evidence-pack-runs/mistral_guard_confirm_20260612a",
+    "clean_confirmation_root": "<validation-output-root>/mistral_guard_confirm_20260612a",
     "guard_status": {
       "invariants": "not_a_statistical_margin_sweep",
       "rmt": "published_reproduced_positive",
@@ -373,11 +373,11 @@
     "host": "self-hosted CUDA runner",
     "model_id": "mistralai/Mistral-7B-v0.1",
     "model_revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",
-    "remote_output_root": "/root/evidence-pack-runs/mistral_guard_value_real_20260612d",
+    "remote_output_root": "<validation-output-root>/mistral_guard_value_real_20260612d",
     "remote_output_roots": [
-      "/root/evidence-pack-runs/mistral_guard_value_real_20260612d",
-      "/root/evidence-pack-runs/mistral_guard_all_guards_20260612a",
-      "/root/evidence-pack-runs/mistral_guard_confirm_20260612a"
+      "<validation-output-root>/mistral_guard_value_real_20260612d",
+      "<validation-output-root>/mistral_guard_all_guards_20260612a",
+      "<validation-output-root>/mistral_guard_confirm_20260612a"
     ],
     "scenario_ids": [
       "rmt_norm_noise_l31_ffn_up_b030",

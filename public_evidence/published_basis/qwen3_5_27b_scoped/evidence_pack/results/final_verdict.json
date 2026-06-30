@@ -1,0 +1,9 @@
+{
+  "assurance": "strict",
+  "basis": "release-profile container-backed public VQAv2 image-text no-op preservation fixture with scoped self-attention and MLP guard scans",
+  "evidence_run": "20260629Tqwen35_27b_scoped_release",
+  "model_id": "Qwen/Qwen3.5-27B",
+  "note": "No-op preservation/null-behavior evidence. Linear-attention module coverage remains a separate finding and is not promoted by this fixture.",
+  "profile": "release",
+  "verdict": "PASS"
+}

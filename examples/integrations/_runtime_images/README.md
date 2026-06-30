@@ -49,3 +49,8 @@ Strict shared artifacts should include the digest-pinned image reference recorde
 in `runtime.manifest.json`.
 Rebuilding an example image may produce a different image digest; shared strict
 artifacts should rely on the digest recorded in `runtime.manifest.json`.
+
+The CUDA 12.8 backend compatibility summary for these split images lives at
+`public_evidence/runtime_backend_compat_cuda128/compatibility_summary.json`.
+That summary records build/import-smoke outcomes only; strict example evidence
+still comes from the individual integration reports and runtime manifests.

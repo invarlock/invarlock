@@ -9,6 +9,7 @@ import json
 import math
 import re
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -17,22 +18,113 @@ PUBLIC_EVIDENCE_ROOT = REPO_ROOT / "public_evidence"
 META_FILENAME = "evidence.meta.json"
 SCHEMA = "invarlock.public_evidence.meta.v1"
 
-ALLOWED_CLASSES = {
-    "contract_fixture",
-    "strict_pass_fixture",
-    "caught_regression_fixture",
-    "policy_failure_fixture",
-    "byoe_subject_fixture",
-    "real_model_run",
-    "real_guard_value_demo",
-    "signed_real_model_pack",
+
+EVIDENCE_CLASS_REGISTRY: dict[str, dict[str, str | None]] = {
+    "contract_fixture": {"kind": "fixture", "specialized_checker": None},
+    "strict_pass_fixture": {"kind": "fixture", "specialized_checker": None},
+    "caught_regression_fixture": {"kind": "fixture", "specialized_checker": None},
+    "policy_failure_fixture": {"kind": "fixture", "specialized_checker": None},
+    "byoe_subject_fixture": {"kind": "fixture", "specialized_checker": None},
+    "real_model_run": {"kind": "real", "specialized_checker": None},
+    "real_guard_value_demo": {
+        "kind": "real",
+        "specialized_checker": "guard_value_demo",
+    },
+    "signed_real_model_pack": {"kind": "real", "specialized_checker": None},
+    "runtime_backend_compatibility": {
+        "kind": "summary",
+        "specialized_checker": "runtime_backend_compatibility",
+    },
+    "evidence_pack_lifecycle_stress": {
+        "kind": "summary",
+        "specialized_checker": "evidence_pack_lifecycle_stress",
+    },
+    "attention_backend_compatibility": {
+        "kind": "summary",
+        "specialized_checker": "attention_backend_compatibility",
+    },
+    "larger_model_validation_findings": {
+        "kind": "summary",
+        "specialized_checker": "larger_model_validation_findings",
+    },
 }
-REAL_CLASSES = {"real_model_run", "real_guard_value_demo", "signed_real_model_pack"}
+RUNTIME_BACKEND_COMPATIBILITY_SUMMARY_SCHEMA = (
+    "invarlock.runtime_backend_compatibility.cuda128.summary.v1"
+)
+RUNTIME_BACKEND_COMPATIBILITY_HASH_SCHEMA = (
+    "invarlock.runtime_backend_compatibility.cuda128.hash_inventory.v1"
+)
+EVIDENCE_PACK_LIFECYCLE_STRESS_SUMMARY_SCHEMA = (
+    "invarlock.evidence_pack_lifecycle_stress.summary.v1"
+)
+EVIDENCE_PACK_LIFECYCLE_STRESS_HASH_SCHEMA = (
+    "invarlock.evidence_pack_lifecycle_stress.hash_inventory.v1"
+)
+ATTENTION_BACKEND_SUMMARY_SCHEMA = (
+    "invarlock.attention_backend_compatibility.summary.v1"
+)
+ATTENTION_BACKEND_HASH_SCHEMA = (
+    "invarlock.attention_backend_compatibility.hash_inventory.v1"
+)
+LARGER_MODEL_VALIDATION_LANE_OUTCOMES_SCHEMA = (
+    "invarlock.larger_model_validation_findings.lane_outcomes.v1"
+)
+LARGER_MODEL_VALIDATION_HASH_SCHEMA = (
+    "invarlock.larger_model_validation_findings.hash_inventory.v1"
+)
+RUNTIME_BACKEND_FAMILIES = {
+    "cuda-bnb": ("hf_bnb",),
+    "cuda-compressed-tensors": ("hf_ct",),
+    "cuda-gptqmodel": ("hf_awq", "hf_gptq"),
+    "cuda-hqq": ("hf_hqq",),
+    "cuda-quanto": ("hf_quanto",),
+    "cuda-torchao": ("hf_torchao",),
+}
+RUNTIME_BACKEND_IMAGE_ID_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 PUBLISHED_BASIS_MULTIMODAL_MIN_FINAL_ACCURACY = 0.10
 PUBLISHED_BASIS_MULTIMODAL_MIN_FINAL_EXAMPLES = 200
 PUBLISHED_BASIS_MULTIMODAL_MIN_ANSWER_SHAPE_RATE = 0.95
 PUBLISHED_BASIS_MULTIMODAL_MAX_ANSWER_WORDS = 12
 PUBLISHED_BASIS_MULTIMODAL_MAX_ANSWER_CHARS = 80
+PUBLIC_TEXT_SUFFIXES = {".json", ".jsonl", ".md", ".txt", ".yaml", ".yml"}
+
+PRIVATE_EXECUTION_PATTERNS = (
+    (
+        "root_ssh_target",
+        re.compile(r"\broot@[A-Za-z0-9._-]+\b"),
+        "replace root SSH targets with a generic CUDA validation host label",
+    ),
+    (
+        "private_ip_address",
+        re.compile(
+            r"(?<![A-Za-z0-9])"
+            r"(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}"
+            r"(?:25[0-5]|2[0-4]\d|1?\d?\d)"
+            r"(?![A-Za-z0-9])"
+        ),
+        "replace private host IP addresses with a generic host label",
+    ),
+    (
+        "absolute_root_path",
+        re.compile(r"(?<![A-Za-z0-9._-])/root(?:/[^\s\"'`,)}\]]*)?"),
+        "replace absolute root paths with generic validation-root placeholders",
+    ),
+    (
+        "private_tmp_path",
+        re.compile(r"(?<![A-Za-z0-9._-])/private/tmp(?:/[^\s\"'`,)}\]]*)?"),
+        "replace private temporary paths with generic local-run placeholders",
+    ),
+    (
+        "macos_var_folder_path",
+        re.compile(r"(?<![A-Za-z0-9._-])/var/folders(?:/[^\s\"'`,)}\]]*)?"),
+        "replace macOS temporary paths with generic local-temp placeholders",
+    ),
+    (
+        "home_directory_path",
+        re.compile(r"(?<![A-Za-z0-9._-])/home/[A-Za-z0-9._-]+(?:/[^\s\"'`,)}\]]*)?"),
+        "replace home-directory paths with generic validation-root placeholders",
+    ),
+)
 
 
 def _load_json(path: Path) -> tuple[dict[str, Any] | None, str | None]:
@@ -79,6 +171,21 @@ def _relative(path: Path, root: Path = REPO_ROOT) -> str:
         return path.relative_to(root).as_posix()
     except ValueError:
         return str(path)
+
+
+def _check_public_evidence_privacy(errors: list[str], root: Path) -> None:
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.suffix not in PUBLIC_TEXT_SUFFIXES:
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError) as exc:
+            errors.append(f"{_relative(path)}: unable to scan public text: {exc}")
+            continue
+        for line_number, line in enumerate(lines, start=1):
+            for name, pattern, message in PRIVATE_EXECUTION_PATTERNS:
+                if pattern.search(line):
+                    errors.append(f"{_relative(path)}:{line_number}: {name}: {message}")
 
 
 def _require_path(
@@ -357,6 +464,1470 @@ def _check_guard_value_demo(
             errors.append(f"{_relative(base)}: manifest size mismatch for {rel_path!r}")
 
 
+def _check_runtime_backend_hash_inventory(
+    errors: list[str],
+    base: Path,
+    inventory_path: Path,
+) -> None:
+    inventory, error = _load_json(inventory_path)
+    if error:
+        errors.append(error)
+        return
+    assert inventory is not None
+    if inventory.get("schema") != RUNTIME_BACKEND_COMPATIBILITY_HASH_SCHEMA:
+        errors.append(
+            f"{_relative(inventory_path)}: schema must be {RUNTIME_BACKEND_COMPATIBILITY_HASH_SCHEMA}"
+        )
+    if inventory.get("status") != "completed":
+        errors.append(f"{_relative(inventory_path)}: status must be completed")
+    artifacts = inventory.get("artifacts")
+    if not isinstance(artifacts, list) or not artifacts:
+        errors.append(f"{_relative(inventory_path)}: artifacts must be non-empty")
+        return
+    for index, artifact in enumerate(artifacts):
+        if not isinstance(artifact, dict):
+            errors.append(
+                f"{_relative(inventory_path)}: artifacts[{index}] must be object"
+            )
+            continue
+        rel_path = artifact.get("path")
+        expected_sha = artifact.get("sha256")
+        expected_bytes = artifact.get("bytes")
+        if not isinstance(rel_path, str) or not rel_path:
+            errors.append(
+                f"{_relative(inventory_path)}: artifacts[{index}].path required"
+            )
+            continue
+        if rel_path.startswith("/") or ".." in Path(rel_path).parts:
+            errors.append(
+                f"{_relative(inventory_path)}: artifacts[{index}].path must be relative"
+            )
+            continue
+        path = base / rel_path
+        if not path.is_file():
+            errors.append(
+                f"{_relative(base)}: hash inventory file missing {rel_path!r}"
+            )
+            continue
+        content = path.read_bytes()
+        actual_sha = "sha256:" + hashlib.sha256(content).hexdigest()
+        if actual_sha != expected_sha:
+            errors.append(
+                f"{_relative(base)}: hash inventory mismatch for {rel_path!r}"
+            )
+        if len(content) != expected_bytes:
+            errors.append(
+                f"{_relative(base)}: hash inventory byte mismatch for {rel_path!r}"
+            )
+
+
+def _check_runtime_backend_compatibility(
+    errors: list[str],
+    base: Path,
+    artifact_paths: dict[str, Any],
+) -> None:
+    summary_path = _require_path(errors, base, artifact_paths, "compatibility_summary")
+    inventory_path = _require_path(errors, base, artifact_paths, "hash_inventory")
+    if inventory_path is not None:
+        _check_runtime_backend_hash_inventory(errors, base, inventory_path)
+    if summary_path is None:
+        return
+    summary, error = _load_json(summary_path)
+    if error:
+        errors.append(error)
+        return
+    assert summary is not None
+    if summary.get("schema") != RUNTIME_BACKEND_COMPATIBILITY_SUMMARY_SCHEMA:
+        errors.append(
+            f"{_relative(summary_path)}: schema must be {RUNTIME_BACKEND_COMPATIBILITY_SUMMARY_SCHEMA}"
+        )
+    if summary.get("status") != "completed":
+        errors.append(f"{_relative(summary_path)}: status must be completed")
+    if summary.get("validation_environment") != "CUDA-capable validation host":
+        errors.append(
+            f"{_relative(summary_path)}: validation_environment must be generic"
+        )
+    if summary.get("raw_logs_published") is not False:
+        errors.append(f"{_relative(summary_path)}: raw_logs_published must be false")
+    if summary.get("weights_vendored") is not False:
+        errors.append(f"{_relative(summary_path)}: weights_vendored must be false")
+
+    families = summary.get("families")
+    if not isinstance(families, list) or not families:
+        errors.append(f"{_relative(summary_path)}: families must be non-empty")
+        return
+    observed: set[str] = set()
+    for index, family in enumerate(families):
+        if not isinstance(family, dict):
+            errors.append(
+                f"{_relative(summary_path)}: families[{index}] must be object"
+            )
+            continue
+        family_name = family.get("family")
+        if family_name not in RUNTIME_BACKEND_FAMILIES:
+            errors.append(f"{_relative(summary_path)}: unknown family {family_name!r}")
+            continue
+        observed.add(str(family_name))
+        expected_adapters = list(RUNTIME_BACKEND_FAMILIES[str(family_name)])
+        if family.get("adapter_smoke") != expected_adapters:
+            errors.append(
+                f"{_relative(summary_path)}: {family_name} adapter_smoke mismatch"
+            )
+        if family.get("build_rc") != 0 or family.get("smoke_rc") != 0:
+            errors.append(f"{_relative(summary_path)}: {family_name} rc must be zero")
+        if family.get("gpu_required") is not True:
+            errors.append(f"{_relative(summary_path)}: {family_name} must require GPU")
+        requirements_lock = family.get("requirements_lock")
+        if not isinstance(requirements_lock, str) or not requirements_lock:
+            errors.append(
+                f"{_relative(summary_path)}: {family_name} requirements_lock required"
+            )
+        elif (
+            requirements_lock.startswith("/")
+            or not (REPO_ROOT / requirements_lock).is_file()
+        ):
+            errors.append(
+                f"{_relative(summary_path)}: {family_name} requirements_lock invalid"
+            )
+        for command_key in ("build_command", "smoke_command"):
+            command = family.get(command_key)
+            if not isinstance(command, str) or command.startswith("/"):
+                errors.append(
+                    f"{_relative(summary_path)}: {family_name} {command_key} invalid"
+                )
+        image_id = family.get("image_id")
+        if not isinstance(image_id, str) or not RUNTIME_BACKEND_IMAGE_ID_RE.match(
+            image_id
+        ):
+            errors.append(f"{_relative(summary_path)}: {family_name} image_id invalid")
+        image_size = family.get("image_size_bytes")
+        if not isinstance(image_size, int) or image_size <= 0:
+            errors.append(
+                f"{_relative(summary_path)}: {family_name} image_size_bytes invalid"
+            )
+        smoke_result = family.get("smoke_result")
+        if not isinstance(smoke_result, str) or not smoke_result.startswith(
+            "quant runtime image imports ok:"
+        ):
+            errors.append(
+                f"{_relative(summary_path)}: {family_name} smoke_result invalid"
+            )
+    if observed != set(RUNTIME_BACKEND_FAMILIES):
+        missing = sorted(set(RUNTIME_BACKEND_FAMILIES) - observed)
+        extra = sorted(observed - set(RUNTIME_BACKEND_FAMILIES))
+        errors.append(
+            f"{_relative(summary_path)}: family coverage mismatch "
+            f"missing={missing} extra={extra}"
+        )
+
+
+def _check_lifecycle_stress_hash_inventory(
+    errors: list[str],
+    base: Path,
+    inventory_path: Path,
+) -> None:
+    inventory, error = _load_json(inventory_path)
+    if error:
+        errors.append(error)
+        return
+    assert inventory is not None
+    if inventory.get("schema") != EVIDENCE_PACK_LIFECYCLE_STRESS_HASH_SCHEMA:
+        errors.append(
+            f"{_relative(inventory_path)}: schema must be {EVIDENCE_PACK_LIFECYCLE_STRESS_HASH_SCHEMA}"
+        )
+    if inventory.get("status") != "completed":
+        errors.append(f"{_relative(inventory_path)}: status must be completed")
+    artifacts = inventory.get("artifacts")
+    if not isinstance(artifacts, list) or not artifacts:
+        errors.append(f"{_relative(inventory_path)}: artifacts must be non-empty")
+        return
+    for index, artifact in enumerate(artifacts):
+        if not isinstance(artifact, dict):
+            errors.append(
+                f"{_relative(inventory_path)}: artifacts[{index}] must be object"
+            )
+            continue
+        rel_path = artifact.get("path")
+        expected_sha = artifact.get("sha256")
+        expected_bytes = artifact.get("bytes")
+        if not isinstance(rel_path, str) or not rel_path:
+            errors.append(
+                f"{_relative(inventory_path)}: artifacts[{index}].path required"
+            )
+            continue
+        if rel_path.startswith("/") or ".." in Path(rel_path).parts:
+            errors.append(
+                f"{_relative(inventory_path)}: artifacts[{index}].path must be relative"
+            )
+            continue
+        path = base / rel_path
+        if not path.is_file():
+            errors.append(
+                f"{_relative(base)}: hash inventory file missing {rel_path!r}"
+            )
+            continue
+        content = path.read_bytes()
+        actual_sha = "sha256:" + hashlib.sha256(content).hexdigest()
+        if actual_sha != expected_sha:
+            errors.append(
+                f"{_relative(base)}: hash inventory mismatch for {rel_path!r}"
+            )
+        if len(content) != expected_bytes:
+            errors.append(
+                f"{_relative(base)}: hash inventory byte mismatch for {rel_path!r}"
+            )
+
+
+def _check_evidence_pack_lifecycle_stress(
+    errors: list[str],
+    base: Path,
+    artifact_paths: dict[str, Any],
+) -> None:
+    summary_path = _require_path(errors, base, artifact_paths, "lifecycle_summary")
+    inventory_path = _require_path(errors, base, artifact_paths, "hash_inventory")
+    if inventory_path is not None:
+        _check_lifecycle_stress_hash_inventory(errors, base, inventory_path)
+    if summary_path is None:
+        return
+    summary, error = _load_json(summary_path)
+    if error:
+        errors.append(error)
+        return
+    assert summary is not None
+    if summary.get("schema") != EVIDENCE_PACK_LIFECYCLE_STRESS_SUMMARY_SCHEMA:
+        errors.append(
+            f"{_relative(summary_path)}: schema must be {EVIDENCE_PACK_LIFECYCLE_STRESS_SUMMARY_SCHEMA}"
+        )
+    if summary.get("status") != "completed":
+        errors.append(f"{_relative(summary_path)}: status must be completed")
+    if summary.get("validation_environment") != "CUDA-capable validation host":
+        errors.append(
+            f"{_relative(summary_path)}: validation_environment must be generic"
+        )
+    if summary.get("raw_logs_published") is not False:
+        errors.append(f"{_relative(summary_path)}: raw_logs_published must be false")
+    if summary.get("weights_vendored") is not False:
+        errors.append(f"{_relative(summary_path)}: weights_vendored must be false")
+
+    suites = summary.get("suites")
+    if not isinstance(suites, list) or len(suites) < 2:
+        errors.append(f"{_relative(summary_path)}: suites must include both checks")
+        return
+    observed = {suite.get("name"): suite for suite in suites if isinstance(suite, dict)}
+    expected = {
+        "queue_manager_shell": 74,
+        "queue_state_python": 3,
+    }
+    for name, expected_passed in expected.items():
+        suite = observed.get(name)
+        if not isinstance(suite, dict):
+            errors.append(f"{_relative(summary_path)}: missing suite {name}")
+            continue
+        if suite.get("rc") != 0 or suite.get("tests_failed") != 0:
+            errors.append(f"{_relative(summary_path)}: {name} must pass cleanly")
+        if suite.get("tests_passed") != expected_passed:
+            errors.append(
+                f"{_relative(summary_path)}: {name} tests_passed must be {expected_passed}"
+            )
+        command = suite.get("command")
+        if not isinstance(command, str) or command.startswith("/"):
+            errors.append(f"{_relative(summary_path)}: {name} command invalid")
+        surface = suite.get("coverage_surface")
+        if not isinstance(surface, list) or not surface:
+            errors.append(
+                f"{_relative(summary_path)}: {name} coverage_surface required"
+            )
+
+
+def _check_attention_backend_hash_inventory(
+    errors: list[str],
+    base: Path,
+    inventory_path: Path,
+) -> None:
+    inventory, error = _load_json(inventory_path)
+    if error:
+        errors.append(error)
+        return
+    assert inventory is not None
+    if inventory.get("schema") != ATTENTION_BACKEND_HASH_SCHEMA:
+        errors.append(
+            f"{_relative(inventory_path)}: schema must be {ATTENTION_BACKEND_HASH_SCHEMA}"
+        )
+    if inventory.get("status") != "completed":
+        errors.append(f"{_relative(inventory_path)}: status must be completed")
+    artifacts = inventory.get("artifacts")
+    if not isinstance(artifacts, list) or not artifacts:
+        errors.append(f"{_relative(inventory_path)}: artifacts must be non-empty")
+        return
+    for index, artifact in enumerate(artifacts):
+        if not isinstance(artifact, dict):
+            errors.append(
+                f"{_relative(inventory_path)}: artifacts[{index}] must be object"
+            )
+            continue
+        rel_path = artifact.get("path")
+        expected_sha = artifact.get("sha256")
+        expected_bytes = artifact.get("bytes")
+        if not isinstance(rel_path, str) or not rel_path:
+            errors.append(
+                f"{_relative(inventory_path)}: artifacts[{index}].path required"
+            )
+            continue
+        if rel_path.startswith("/") or ".." in Path(rel_path).parts:
+            errors.append(
+                f"{_relative(inventory_path)}: artifacts[{index}].path must be relative"
+            )
+            continue
+        path = base / rel_path
+        if not path.is_file():
+            errors.append(
+                f"{_relative(base)}: hash inventory file missing {rel_path!r}"
+            )
+            continue
+        content = path.read_bytes()
+        actual_sha = "sha256:" + hashlib.sha256(content).hexdigest()
+        if actual_sha != expected_sha:
+            errors.append(
+                f"{_relative(base)}: hash inventory mismatch for {rel_path!r}"
+            )
+        if len(content) != expected_bytes:
+            errors.append(
+                f"{_relative(base)}: hash inventory byte mismatch for {rel_path!r}"
+            )
+
+
+def _check_attention_backend_compatibility(
+    errors: list[str],
+    base: Path,
+    artifact_paths: dict[str, Any],
+) -> None:
+    summary_path = _require_path(errors, base, artifact_paths, "compatibility_summary")
+    inventory_path = _require_path(errors, base, artifact_paths, "hash_inventory")
+    if inventory_path is not None:
+        _check_attention_backend_hash_inventory(errors, base, inventory_path)
+    if summary_path is None:
+        return
+    summary, error = _load_json(summary_path)
+    if error:
+        errors.append(error)
+        return
+    assert summary is not None
+    if summary.get("schema") != ATTENTION_BACKEND_SUMMARY_SCHEMA:
+        errors.append(
+            f"{_relative(summary_path)}: schema must be {ATTENTION_BACKEND_SUMMARY_SCHEMA}"
+        )
+    if summary.get("status") != "completed":
+        errors.append(f"{_relative(summary_path)}: status must be completed")
+    if summary.get("validation_environment") != "CUDA-capable validation host":
+        errors.append(
+            f"{_relative(summary_path)}: validation_environment must be generic"
+        )
+    if summary.get("raw_logs_published") is not False:
+        errors.append(f"{_relative(summary_path)}: raw_logs_published must be false")
+    if summary.get("weights_vendored") is not False:
+        errors.append(f"{_relative(summary_path)}: weights_vendored must be false")
+    if summary.get("optimized_attention_success_claimed") is not False:
+        errors.append(
+            f"{_relative(summary_path)}: "
+            "optimized_attention_success_claimed must be false"
+        )
+
+    probe = summary.get("cuda_probe")
+    if not isinstance(probe, dict):
+        errors.append(f"{_relative(summary_path)}: cuda_probe must be object")
+    else:
+        if probe.get("rc") != 0:
+            errors.append(f"{_relative(summary_path)}: cuda_probe rc must be zero")
+        if probe.get("torch_cuda_available") is not True:
+            errors.append(f"{_relative(summary_path)}: CUDA must be available")
+        if (
+            not isinstance(probe.get("torch_cuda_device_count"), int)
+            or probe.get("torch_cuda_device_count") < 1
+        ):
+            errors.append(f"{_relative(summary_path)}: CUDA device count invalid")
+        if probe.get("flash_attn_importable") is not False:
+            errors.append(
+                f"{_relative(summary_path)}: flash_attn_importable must be false"
+            )
+        if probe.get("transformers_flash_attn_2_available") is not False:
+            errors.append(
+                f"{_relative(summary_path)}: transformers optimized attention availability must be false"
+            )
+        command = probe.get("command")
+        if not isinstance(command, str) or command.startswith("/"):
+            errors.append(f"{_relative(summary_path)}: cuda_probe command invalid")
+
+    checks = summary.get("checks")
+    if not isinstance(checks, list) or len(checks) < 2:
+        errors.append(f"{_relative(summary_path)}: checks must include both checks")
+        return
+    observed = {check.get("name"): check for check in checks if isinstance(check, dict)}
+    expected = {
+        "flash_attention_dependency_paths": 3,
+        "attention_config_selection": 1,
+    }
+    for name, expected_passed in expected.items():
+        check = observed.get(name)
+        if not isinstance(check, dict):
+            errors.append(f"{_relative(summary_path)}: missing check {name}")
+            continue
+        if check.get("rc") != 0 or check.get("tests_failed") != 0:
+            errors.append(f"{_relative(summary_path)}: {name} must pass cleanly")
+        if check.get("tests_passed") != expected_passed:
+            errors.append(
+                f"{_relative(summary_path)}: {name} tests_passed must be {expected_passed}"
+            )
+        command = check.get("command")
+        if not isinstance(command, str) or command.startswith("/"):
+            errors.append(f"{_relative(summary_path)}: {name} command invalid")
+        surface = check.get("coverage_surface")
+        if not isinstance(surface, list) or not surface:
+            errors.append(
+                f"{_relative(summary_path)}: {name} coverage_surface required"
+            )
+
+
+def _check_summary_hash_inventory(
+    errors: list[str],
+    base: Path,
+    inventory_path: Path,
+    *,
+    expected_schema: str,
+) -> None:
+    inventory, error = _load_json(inventory_path)
+    if error:
+        errors.append(error)
+        return
+    assert inventory is not None
+    if inventory.get("schema") != expected_schema:
+        errors.append(f"{_relative(inventory_path)}: schema must be {expected_schema}")
+    if inventory.get("status") != "completed":
+        errors.append(f"{_relative(inventory_path)}: status must be completed")
+    artifacts = inventory.get("artifacts")
+    if not isinstance(artifacts, list) or not artifacts:
+        errors.append(f"{_relative(inventory_path)}: artifacts must be non-empty")
+        return
+    for index, artifact in enumerate(artifacts):
+        if not isinstance(artifact, dict):
+            errors.append(
+                f"{_relative(inventory_path)}: artifacts[{index}] must be object"
+            )
+            continue
+        rel_path = artifact.get("path")
+        expected_sha = artifact.get("sha256")
+        expected_bytes = artifact.get("bytes")
+        if not isinstance(rel_path, str) or not rel_path:
+            errors.append(
+                f"{_relative(inventory_path)}: artifacts[{index}].path required"
+            )
+            continue
+        if rel_path.startswith("/") or ".." in Path(rel_path).parts:
+            errors.append(
+                f"{_relative(inventory_path)}: artifacts[{index}].path must be relative"
+            )
+            continue
+        path = base / rel_path
+        if not path.is_file():
+            errors.append(
+                f"{_relative(base)}: hash inventory file missing {rel_path!r}"
+            )
+            continue
+        content = path.read_bytes()
+        actual_sha = "sha256:" + hashlib.sha256(content).hexdigest()
+        if actual_sha != expected_sha:
+            errors.append(
+                f"{_relative(base)}: hash inventory mismatch for {rel_path!r}"
+            )
+        if len(content) != expected_bytes:
+            errors.append(
+                f"{_relative(base)}: hash inventory byte mismatch for {rel_path!r}"
+            )
+
+
+def _check_larger_model_validation_bounded_smoke_category(
+    errors: list[str],
+    artifact_path: Path,
+    category: dict[str, Any],
+) -> None:
+    if category.get("source_window") != "bounded_smoke_matrix":
+        errors.append(
+            f"{_relative(artifact_path)}: bounded smoke source_window invalid"
+        )
+    if category.get("suite") != "model-catalog-gpu":
+        errors.append(f"{_relative(artifact_path)}: bounded smoke suite invalid")
+
+    clean_lanes = category.get("clean_lanes")
+    failed_findings = category.get("failed_findings")
+    duplicates = category.get("duplicate_clean_runs")
+    counts = category.get("counts")
+    if not isinstance(clean_lanes, list) or not clean_lanes:
+        errors.append(
+            f"{_relative(artifact_path)}: bounded smoke clean_lanes must be non-empty"
+        )
+        clean_lanes = []
+    if not isinstance(failed_findings, list) or not failed_findings:
+        errors.append(
+            f"{_relative(artifact_path)}: bounded smoke failed_findings must be non-empty"
+        )
+        failed_findings = []
+    if not isinstance(duplicates, list):
+        errors.append(
+            f"{_relative(artifact_path)}: bounded smoke duplicate_clean_runs must be a list"
+        )
+        duplicates = []
+    if not isinstance(counts, dict):
+        errors.append(
+            f"{_relative(artifact_path)}: bounded smoke counts must be object"
+        )
+        counts = {}
+
+    seen_clean: set[str] = set()
+    duplicate_extra_runs = 0
+    for index, lane in enumerate(clean_lanes):
+        if not isinstance(lane, dict):
+            errors.append(
+                f"{_relative(artifact_path)}: bounded smoke clean_lanes[{index}] "
+                "must be object"
+            )
+            continue
+        slug = lane.get("slug")
+        if not isinstance(slug, str) or not slug:
+            errors.append(
+                f"{_relative(artifact_path)}: bounded smoke clean_lanes[{index}].slug "
+                "required"
+            )
+        elif slug in seen_clean:
+            errors.append(f"{_relative(artifact_path)}: duplicate smoke lane {slug!r}")
+        else:
+            seen_clean.add(slug)
+        model_id = lane.get("model_id")
+        preset = lane.get("preset")
+        if not isinstance(model_id, str) or not model_id:
+            errors.append(
+                f"{_relative(artifact_path)}: bounded smoke clean_lanes[{index}]."
+                "model_id required"
+            )
+        if (
+            not isinstance(preset, str)
+            or preset.startswith("/")
+            or not (REPO_ROOT / preset).is_file()
+        ):
+            errors.append(
+                f"{_relative(artifact_path)}: bounded smoke clean_lanes[{index}]."
+                "preset invalid"
+            )
+        if lane.get("rc") != 0:
+            errors.append(f"{_relative(artifact_path)}: {slug} rc must be zero")
+        if lane.get("evaluate_exit") != 0 or lane.get("verify_exit") != 0:
+            errors.append(
+                f"{_relative(artifact_path)}: {slug} evaluate/verify exits must be zero"
+            )
+        if lane.get("report_materialized") is not True:
+            errors.append(f"{_relative(artifact_path)}: {slug} report must materialize")
+        if lane.get("verify_materialized") is not True:
+            errors.append(f"{_relative(artifact_path)}: {slug} verify must materialize")
+        if lane.get("status") != "ok":
+            errors.append(f"{_relative(artifact_path)}: {slug} status must be ok")
+
+    for index, duplicate in enumerate(duplicates):
+        if not isinstance(duplicate, dict):
+            errors.append(
+                f"{_relative(artifact_path)}: bounded smoke duplicate_clean_runs[{index}] "
+                "must be object"
+            )
+            continue
+        slug = duplicate.get("slug")
+        extra = duplicate.get("additional_clean_runs")
+        if slug not in seen_clean:
+            errors.append(
+                f"{_relative(artifact_path)}: bounded smoke duplicate_clean_runs[{index}]."
+                "slug unknown"
+            )
+        if not isinstance(extra, int) or extra <= 0:
+            errors.append(
+                f"{_relative(artifact_path)}: bounded smoke duplicate_clean_runs[{index}] "
+                "additional_clean_runs invalid"
+            )
+        else:
+            duplicate_extra_runs += extra
+
+    unique_failed: set[str] = set()
+    failed_attempts = 0
+    pre_verification_failures = 0
+    for index, finding in enumerate(failed_findings):
+        if not isinstance(finding, dict):
+            errors.append(
+                f"{_relative(artifact_path)}: bounded smoke failed_findings[{index}] "
+                "must be object"
+            )
+            continue
+        slug = finding.get("slug")
+        if not isinstance(slug, str) or not slug:
+            errors.append(
+                f"{_relative(artifact_path)}: bounded smoke failed_findings[{index}]."
+                "slug required"
+            )
+        else:
+            unique_failed.add(slug)
+        preset = finding.get("preset")
+        if (
+            not isinstance(preset, str)
+            or preset.startswith("/")
+            or not (REPO_ROOT / preset).is_file()
+        ):
+            errors.append(
+                f"{_relative(artifact_path)}: bounded smoke failed_findings[{index}]."
+                "preset invalid"
+            )
+        attempts = finding.get("attempts")
+        if not isinstance(attempts, int) or attempts <= 0:
+            errors.append(
+                f"{_relative(artifact_path)}: bounded smoke failed_findings[{index}]."
+                "attempts invalid"
+            )
+            attempts = 0
+        failed_attempts += attempts
+        if finding.get("status") != "evaluate_failed_before_report":
+            errors.append(
+                f"{_relative(artifact_path)}: bounded smoke failed_findings[{index}]."
+                "status invalid"
+            )
+        if finding.get("classification") != "pre_verification_evaluate_failure":
+            errors.append(
+                f"{_relative(artifact_path)}: bounded smoke failed_findings[{index}]."
+                "classification invalid"
+            )
+        if finding.get("evaluate_exit") != 1 or finding.get("verify_exit") is not None:
+            errors.append(
+                f"{_relative(artifact_path)}: bounded smoke failed_findings[{index}] "
+                "exit fields invalid"
+            )
+        if finding.get("report_materialized") is not False:
+            errors.append(
+                f"{_relative(artifact_path)}: bounded smoke failed_findings[{index}] "
+                "report must be false"
+            )
+        if finding.get("verify_materialized") is not False:
+            errors.append(
+                f"{_relative(artifact_path)}: bounded smoke failed_findings[{index}] "
+                "verify must be false"
+            )
+        pre_verification_failures += attempts
+
+    expected_counts = {
+        "unique_clean_lanes": len(seen_clean),
+        "unique_failed_lanes": len(unique_failed),
+        "clean_runs": len(seen_clean) + duplicate_extra_runs,
+        "failed_runs": failed_attempts,
+        "pre_verification_failures": pre_verification_failures,
+        "report_materialized_clean": len(seen_clean) + duplicate_extra_runs,
+        "verify_materialized_clean": len(seen_clean) + duplicate_extra_runs,
+    }
+    expected_counts["completed_runs"] = (
+        expected_counts["clean_runs"] + expected_counts["failed_runs"]
+    )
+    for key, expected in expected_counts.items():
+        if counts.get(key) != expected:
+            errors.append(
+                f"{_relative(artifact_path)}: bounded smoke counts.{key} "
+                f"must be {expected}"
+            )
+
+
+VALIDATION_FAILURE_CLASSIFICATIONS = {
+    "initial_attempt_failed_later_clean",
+    "pre_verification_evaluate_failure",
+    "grouped_execution_cuda_failure_later_clean",
+}
+VALIDATION_FAILURE_STATUSES = {
+    "evaluate_failed_before_verifier",
+    "cuda_launch_failure_before_verifier",
+}
+
+
+def _check_larger_model_validation_findings(
+    errors: list[str],
+    base: Path,
+    artifact_paths: dict[str, Any],
+) -> None:
+    outcomes_path = _require_path(errors, base, artifact_paths, "lane_outcomes")
+    inventory_path = _require_path(errors, base, artifact_paths, "hash_inventory")
+    if inventory_path is not None:
+        _check_summary_hash_inventory(
+            errors,
+            base,
+            inventory_path,
+            expected_schema=LARGER_MODEL_VALIDATION_HASH_SCHEMA,
+        )
+    if outcomes_path is None:
+        return
+
+    outcomes, error = _load_json(outcomes_path)
+    if error:
+        errors.append(error)
+        return
+    assert outcomes is not None
+    if outcomes.get("schema") != LARGER_MODEL_VALIDATION_LANE_OUTCOMES_SCHEMA:
+        errors.append(
+            f"{_relative(outcomes_path)}: schema must be "
+            f"{LARGER_MODEL_VALIDATION_LANE_OUTCOMES_SCHEMA}"
+        )
+    if outcomes.get("status") != "completed":
+        errors.append(f"{_relative(outcomes_path)}: status must be completed")
+    if outcomes.get("validation_environment") != "CUDA-capable validation host":
+        errors.append(
+            f"{_relative(outcomes_path)}: validation_environment must be generic"
+        )
+    for key in (
+        "raw_logs_published",
+        "weights_vendored",
+        "support_matrix_change_claimed",
+        "model_quality_claimed",
+    ):
+        if outcomes.get(key) is not False:
+            errors.append(f"{_relative(outcomes_path)}: {key} must be false")
+    if outcomes.get("execution_mode") != "container":
+        errors.append(f"{_relative(outcomes_path)}: execution_mode must be container")
+
+    categories = outcomes.get("categories")
+    if not isinstance(categories, list) or not categories:
+        errors.append(f"{_relative(outcomes_path)}: categories must be non-empty")
+        return
+    by_category: dict[str, dict[str, Any]] = {}
+    for index, category in enumerate(categories):
+        if not isinstance(category, dict):
+            errors.append(
+                f"{_relative(outcomes_path)}: categories[{index}] must be object"
+            )
+            continue
+        name = category.get("category")
+        if not isinstance(name, str) or not name:
+            errors.append(
+                f"{_relative(outcomes_path)}: categories[{index}].category required"
+            )
+            continue
+        if name in by_category:
+            errors.append(f"{_relative(outcomes_path)}: duplicate category {name!r}")
+            continue
+        by_category[name] = category
+
+    expected_categories = {
+        "bounded_smoke_matrix",
+        "initial_validation_matrix",
+        "clean_resolutions",
+        "followup_lanes",
+        "published_basis_verification",
+    }
+    observed_categories = set(by_category)
+    if observed_categories != expected_categories:
+        errors.append(
+            f"{_relative(outcomes_path)}: category coverage mismatch "
+            f"missing={sorted(expected_categories - observed_categories)} "
+            f"extra={sorted(observed_categories - expected_categories)}"
+        )
+
+    smoke = by_category.get("bounded_smoke_matrix")
+    initial = by_category.get("initial_validation_matrix")
+    resolutions = by_category.get("clean_resolutions")
+    followup = by_category.get("followup_lanes")
+    published_basis = by_category.get("published_basis_verification")
+    if smoke is not None:
+        _check_larger_model_validation_bounded_smoke_category(
+            errors, outcomes_path, smoke
+        )
+    if initial is not None:
+        _check_larger_model_validation_initial_category(errors, outcomes_path, initial)
+    if resolutions is not None:
+        _check_larger_model_validation_clean_resolutions(
+            errors, outcomes_path, resolutions
+        )
+    if followup is not None:
+        _check_larger_model_validation_followup_lanes(errors, outcomes_path, followup)
+    if published_basis is not None:
+        _check_larger_model_validation_published_basis_verification(
+            errors, outcomes_path, published_basis
+        )
+
+    counts = outcomes.get("counts")
+    if not isinstance(counts, dict):
+        errors.append(f"{_relative(outcomes_path)}: counts must be object")
+        return
+
+    def category_list(category: dict[str, Any] | None, key: str) -> list[Any]:
+        if category is None:
+            return []
+        value = category.get(key)
+        return value if isinstance(value, list) else []
+
+    expected_counts = {
+        "categories": len(expected_categories),
+        "bounded_smoke_clean_lanes": len(category_list(smoke, "clean_lanes")),
+        "bounded_smoke_failed_lanes": len(category_list(smoke, "failed_findings")),
+        "initial_clean_lanes": len(category_list(initial, "clean_lanes")),
+        "initial_failed_lanes": len(category_list(initial, "failed_findings")),
+        "clean_resolution_lanes": len(
+            category_list(resolutions, "clean_resolution_lanes")
+        ),
+        "followup_clean_lanes": len(category_list(followup, "clean_followup_lanes")),
+        "followup_diagnostic_lanes": len(category_list(followup, "diagnostic_lanes")),
+        "followup_strict_policy_findings": len(
+            category_list(followup, "strict_policy_findings")
+        ),
+        "published_basis_clean_lanes": len(
+            category_list(published_basis, "published_basis_clean_lanes")
+        ),
+        "published_basis_followup_lanes": len(
+            category_list(published_basis, "followup_clean_lanes")
+        ),
+    }
+    for key, expected in expected_counts.items():
+        if counts.get(key) != expected:
+            errors.append(
+                f"{_relative(outcomes_path)}: counts.{key} must be {expected}"
+            )
+
+
+def _check_larger_model_validation_initial_category(
+    errors: list[str],
+    artifact_path: Path,
+    category: dict[str, Any],
+) -> None:
+    if category.get("source_window") != "initial_validation_matrix":
+        errors.append(f"{_relative(artifact_path)}: initial source_window invalid")
+    if category.get("suite") != "model-catalog-gpu":
+        errors.append(f"{_relative(artifact_path)}: initial suite invalid")
+
+    clean_lanes = category.get("clean_lanes")
+    failed_findings = category.get("failed_findings")
+    duplicates = category.get("duplicate_clean_runs")
+    counts = category.get("counts")
+    if not isinstance(clean_lanes, list) or not clean_lanes:
+        errors.append(f"{_relative(artifact_path)}: clean_lanes must be non-empty")
+        clean_lanes = []
+    if not isinstance(failed_findings, list):
+        errors.append(f"{_relative(artifact_path)}: failed_findings must be a list")
+        failed_findings = []
+    if not isinstance(duplicates, list):
+        errors.append(
+            f"{_relative(artifact_path)}: duplicate_clean_runs must be a list"
+        )
+        duplicates = []
+    if not isinstance(counts, dict):
+        errors.append(f"{_relative(artifact_path)}: initial counts must be object")
+        counts = {}
+
+    seen_clean: set[str] = set()
+    duplicate_extra_runs = 0
+    for index, lane in enumerate(clean_lanes):
+        if not isinstance(lane, dict):
+            errors.append(
+                f"{_relative(artifact_path)}: clean_lanes[{index}] must be object"
+            )
+            continue
+        slug = lane.get("slug")
+        if not isinstance(slug, str) or not slug:
+            errors.append(
+                f"{_relative(artifact_path)}: clean_lanes[{index}].slug required"
+            )
+        elif slug in seen_clean:
+            errors.append(f"{_relative(artifact_path)}: duplicate clean lane {slug!r}")
+        else:
+            seen_clean.add(slug)
+        model_id = lane.get("model_id")
+        preset = lane.get("preset")
+        if not isinstance(model_id, str) or not model_id:
+            errors.append(
+                f"{_relative(artifact_path)}: clean_lanes[{index}].model_id required"
+            )
+        if (
+            not isinstance(preset, str)
+            or preset.startswith("/")
+            or not (REPO_ROOT / preset).is_file()
+        ):
+            errors.append(
+                f"{_relative(artifact_path)}: clean_lanes[{index}].preset invalid"
+            )
+        if lane.get("rc") != 0:
+            errors.append(f"{_relative(artifact_path)}: {slug} rc must be zero")
+        if lane.get("evaluate_exit") != 0 or lane.get("verify_exit") != 0:
+            errors.append(
+                f"{_relative(artifact_path)}: {slug} evaluate/verify exits must be zero"
+            )
+        if lane.get("report_materialized") is not True:
+            errors.append(f"{_relative(artifact_path)}: {slug} report must materialize")
+        if lane.get("verify_materialized") is not True:
+            errors.append(f"{_relative(artifact_path)}: {slug} verify must materialize")
+        if lane.get("status") != "ok":
+            errors.append(f"{_relative(artifact_path)}: {slug} status must be ok")
+
+    for index, duplicate in enumerate(duplicates):
+        if not isinstance(duplicate, dict):
+            errors.append(
+                f"{_relative(artifact_path)}: duplicate_clean_runs[{index}] must be object"
+            )
+            continue
+        slug = duplicate.get("slug")
+        extra = duplicate.get("additional_clean_runs")
+        if slug not in seen_clean:
+            errors.append(
+                f"{_relative(artifact_path)}: duplicate_clean_runs[{index}].slug unknown"
+            )
+        if not isinstance(extra, int) or extra <= 0:
+            errors.append(
+                f"{_relative(artifact_path)}: duplicate_clean_runs[{index}] "
+                "additional_clean_runs invalid"
+            )
+        else:
+            duplicate_extra_runs += extra
+
+    unique_failed: set[str] = set()
+    failed_attempts = 0
+    for index, finding in enumerate(failed_findings):
+        if not isinstance(finding, dict):
+            errors.append(
+                f"{_relative(artifact_path)}: failed_findings[{index}] must be object"
+            )
+            continue
+        slug = finding.get("slug")
+        if not isinstance(slug, str) or not slug:
+            errors.append(
+                f"{_relative(artifact_path)}: failed_findings[{index}].slug required"
+            )
+        else:
+            unique_failed.add(slug)
+        model_id = finding.get("model_id")
+        if not isinstance(model_id, str) or not model_id:
+            errors.append(
+                f"{_relative(artifact_path)}: failed_findings[{index}].model_id required"
+            )
+        preset = finding.get("preset")
+        if (
+            not isinstance(preset, str)
+            or preset.startswith("/")
+            or not (REPO_ROOT / preset).is_file()
+        ):
+            errors.append(
+                f"{_relative(artifact_path)}: failed_findings[{index}].preset invalid"
+            )
+        attempts = finding.get("attempts")
+        if not isinstance(attempts, int) or attempts <= 0:
+            errors.append(
+                f"{_relative(artifact_path)}: failed_findings[{index}].attempts invalid"
+            )
+            attempts = 0
+        failed_attempts += attempts
+        if finding.get("status") not in VALIDATION_FAILURE_STATUSES:
+            errors.append(
+                f"{_relative(artifact_path)}: failed_findings[{index}].status invalid"
+            )
+        if finding.get("classification") not in VALIDATION_FAILURE_CLASSIFICATIONS:
+            errors.append(
+                f"{_relative(artifact_path)}: failed_findings[{index}].classification invalid"
+            )
+        if finding.get("evaluate_exit") != 1 or finding.get("verify_exit") is not None:
+            errors.append(
+                f"{_relative(artifact_path)}: failed_findings[{index}] exit fields invalid"
+            )
+        if not isinstance(finding.get("report_materialized"), bool):
+            errors.append(
+                f"{_relative(artifact_path)}: failed_findings[{index}] report flag invalid"
+            )
+        if finding.get("verify_materialized") is not False:
+            errors.append(
+                f"{_relative(artifact_path)}: failed_findings[{index}] verify must be false"
+            )
+        if not isinstance(finding.get("later_clean_run_observed"), bool):
+            errors.append(
+                f"{_relative(artifact_path)}: failed_findings[{index}] "
+                "later_clean_run_observed must be boolean"
+            )
+
+    expected_counts = {
+        "unique_clean_lanes": len(seen_clean),
+        "unique_failed_lanes": len(unique_failed),
+        "clean_runs": len(seen_clean) + duplicate_extra_runs,
+        "failed_runs": failed_attempts,
+        "pre_verification_failures": failed_attempts,
+        "report_materialized_clean": len(seen_clean) + duplicate_extra_runs,
+        "verify_materialized_clean": len(seen_clean) + duplicate_extra_runs,
+    }
+    expected_counts["completed_runs"] = (
+        expected_counts["clean_runs"] + expected_counts["failed_runs"]
+    )
+    for key, expected in expected_counts.items():
+        if counts.get(key) != expected:
+            errors.append(
+                f"{_relative(artifact_path)}: initial counts.{key} must be {expected}"
+            )
+
+
+def _check_larger_model_validation_clean_resolutions(
+    errors: list[str],
+    artifact_path: Path,
+    payload: dict[str, Any],
+) -> None:
+    if payload.get("source_window") != "validation_resolution_runs":
+        errors.append(f"{_relative(artifact_path)}: source_window invalid")
+
+    counts = payload.get("counts")
+    if not isinstance(counts, dict):
+        errors.append(f"{_relative(artifact_path)}: counts must be object")
+        counts = {}
+
+    clean_lanes = payload.get("clean_resolution_lanes")
+    if not isinstance(clean_lanes, list) or not clean_lanes:
+        errors.append(
+            f"{_relative(artifact_path)}: clean_resolution_lanes must be non-empty"
+        )
+        clean_lanes = []
+
+    seen_clean: set[str] = set()
+    for index, lane in enumerate(clean_lanes):
+        if not isinstance(lane, dict):
+            errors.append(
+                f"{_relative(artifact_path)}: clean_resolution_lanes[{index}] "
+                "must be object"
+            )
+            continue
+        slug = lane.get("slug")
+        if not isinstance(slug, str) or not slug:
+            errors.append(
+                f"{_relative(artifact_path)}: clean_resolution_lanes[{index}].slug "
+                "required"
+            )
+        elif slug in seen_clean:
+            errors.append(f"{_relative(artifact_path)}: duplicate clean lane {slug!r}")
+        else:
+            seen_clean.add(slug)
+        model_id = lane.get("model_id")
+        if not isinstance(model_id, str) or not model_id:
+            errors.append(
+                f"{_relative(artifact_path)}: clean_resolution_lanes[{index}]."
+                "model_id required"
+            )
+        preset = lane.get("preset")
+        if (
+            not isinstance(preset, str)
+            or preset.startswith("/")
+            or not (REPO_ROOT / preset).is_file()
+        ):
+            errors.append(
+                f"{_relative(artifact_path)}: clean_resolution_lanes[{index}].preset "
+                "invalid"
+            )
+        if lane.get("suite") != "model-catalog-gpu":
+            errors.append(
+                f"{_relative(artifact_path)}: clean_resolution_lanes[{index}].suite "
+                "invalid"
+            )
+        if lane.get("rc") != 0:
+            errors.append(f"{_relative(artifact_path)}: {slug} rc must be zero")
+        if lane.get("evaluate_exit") != 0 or lane.get("verify_exit") != 0:
+            errors.append(
+                f"{_relative(artifact_path)}: {slug} evaluate/verify exits must be zero"
+            )
+        if lane.get("report_materialized") is not True:
+            errors.append(f"{_relative(artifact_path)}: {slug} report must materialize")
+        if lane.get("verify_materialized") is not True:
+            errors.append(f"{_relative(artifact_path)}: {slug} verify must materialize")
+        if lane.get("status") != "ok":
+            errors.append(f"{_relative(artifact_path)}: {slug} status must be ok")
+
+    rerun_classifications = payload.get("rerun_classifications")
+    if not isinstance(rerun_classifications, list):
+        errors.append(
+            f"{_relative(artifact_path)}: rerun_classifications must be a list"
+        )
+        rerun_classifications = []
+    for index, classification in enumerate(rerun_classifications):
+        if not isinstance(classification, dict):
+            errors.append(
+                f"{_relative(artifact_path)}: rerun_classifications[{index}] "
+                "must be object"
+            )
+            continue
+        slug = classification.get("slug")
+        if slug not in seen_clean:
+            errors.append(
+                f"{_relative(artifact_path)}: rerun_classifications[{index}].slug "
+                "must reference a clean lane"
+            )
+        if classification.get("previous_classification") not in (
+            VALIDATION_FAILURE_CLASSIFICATIONS
+        ):
+            errors.append(
+                f"{_relative(artifact_path)}: rerun_classifications[{index}] "
+                "previous_classification invalid"
+            )
+        if classification.get("later_clean_run_observed") is not True:
+            errors.append(
+                f"{_relative(artifact_path)}: rerun_classifications[{index}] "
+                "must observe a later clean run"
+            )
+
+    excluded_lanes = payload.get("excluded_lanes")
+    if not isinstance(excluded_lanes, list):
+        errors.append(f"{_relative(artifact_path)}: excluded_lanes must be a list")
+        excluded_lanes = []
+    for index, lane in enumerate(excluded_lanes):
+        if not isinstance(lane, dict):
+            errors.append(
+                f"{_relative(artifact_path)}: excluded_lanes[{index}] must be object"
+            )
+            continue
+        slug = lane.get("slug")
+        model_id = lane.get("model_id")
+        reason = lane.get("reason")
+        if not isinstance(slug, str) or not slug:
+            errors.append(
+                f"{_relative(artifact_path)}: excluded_lanes[{index}].slug required"
+            )
+        if not isinstance(model_id, str) or not model_id:
+            errors.append(
+                f"{_relative(artifact_path)}: excluded_lanes[{index}].model_id required"
+            )
+        if not isinstance(reason, str) or not reason:
+            errors.append(
+                f"{_relative(artifact_path)}: excluded_lanes[{index}].reason required"
+            )
+
+    expected_counts = {
+        "clean_resolution_lanes": len(seen_clean),
+        "rerun_clean_resolutions": len(rerun_classifications),
+        "excluded_lanes": len(excluded_lanes),
+    }
+    for key, expected in expected_counts.items():
+        if counts.get(key) != expected:
+            errors.append(
+                f"{_relative(artifact_path)}: counts.{key} must be {expected}"
+            )
+
+
+def _check_larger_model_validation_followup_lanes(
+    errors: list[str],
+    artifact_path: Path,
+    payload: dict[str, Any],
+) -> None:
+    if payload.get("source_window") != "model_family_followup_runs":
+        errors.append(f"{_relative(artifact_path)}: source_window invalid")
+
+    counts = payload.get("counts")
+    if not isinstance(counts, dict):
+        errors.append(f"{_relative(artifact_path)}: counts must be object")
+        counts = {}
+
+    clean_lanes = payload.get("clean_followup_lanes")
+    if not isinstance(clean_lanes, list) or not clean_lanes:
+        errors.append(
+            f"{_relative(artifact_path)}: clean_followup_lanes must be non-empty"
+        )
+        clean_lanes = []
+    for index, lane in enumerate(clean_lanes):
+        if not isinstance(lane, dict):
+            errors.append(
+                f"{_relative(artifact_path)}: clean_followup_lanes[{index}] "
+                "must be object"
+            )
+            continue
+        if lane.get("rc") != 0 or lane.get("evaluate_exit") != 0:
+            errors.append(
+                f"{_relative(artifact_path)}: clean_followup_lanes[{index}] "
+                "must have clean evaluation"
+            )
+        if lane.get("verify_exit") != 0 or lane.get("status") != "ok":
+            errors.append(
+                f"{_relative(artifact_path)}: clean_followup_lanes[{index}] "
+                "must have clean verification"
+            )
+        preset = lane.get("preset_basis")
+        if not isinstance(preset, str) or not (REPO_ROOT / preset).is_file():
+            errors.append(
+                f"{_relative(artifact_path)}: clean_followup_lanes[{index}] "
+                "preset_basis must be a repo file"
+            )
+
+    diagnostics = payload.get("diagnostic_lanes")
+    if not isinstance(diagnostics, list) or not diagnostics:
+        errors.append(f"{_relative(artifact_path)}: diagnostic_lanes must be non-empty")
+        diagnostics = []
+    for index, lane in enumerate(diagnostics):
+        if not isinstance(lane, dict):
+            errors.append(
+                f"{_relative(artifact_path)}: diagnostic_lanes[{index}] must be object"
+            )
+            continue
+        if lane.get("evaluate_exit") != 0 or lane.get("verify_exit") != 0:
+            errors.append(
+                f"{_relative(artifact_path)}: diagnostic_lanes[{index}] must pass"
+            )
+        if lane.get("support_claimed") is not False:
+            errors.append(
+                f"{_relative(artifact_path)}: diagnostic_lanes[{index}] "
+                "support_claimed must be false"
+            )
+
+    strict_findings = payload.get("strict_policy_findings")
+    if not isinstance(strict_findings, list) or not strict_findings:
+        errors.append(
+            f"{_relative(artifact_path)}: strict_policy_findings must be non-empty"
+        )
+        strict_findings = []
+    for index, finding in enumerate(strict_findings):
+        if not isinstance(finding, dict):
+            errors.append(
+                f"{_relative(artifact_path)}: strict_policy_findings[{index}] "
+                "must be object"
+            )
+            continue
+        if finding.get("detail") != "policy_fail":
+            errors.append(
+                f"{_relative(artifact_path)}: strict_policy_findings[{index}] "
+                "detail must be policy_fail"
+            )
+        if finding.get("verify_exit") != 1 or finding.get("evaluate_exit") != 0:
+            errors.append(
+                f"{_relative(artifact_path)}: strict_policy_findings[{index}] "
+                "must fail only at verification"
+            )
+        if finding.get("classification") != "strict_spectral_cap_budget_boundary":
+            errors.append(
+                f"{_relative(artifact_path)}: strict_policy_findings[{index}] "
+                "classification invalid"
+            )
+
+    dependency_findings = payload.get("dependency_findings")
+    if not isinstance(dependency_findings, list):
+        errors.append(f"{_relative(artifact_path)}: dependency_findings must be a list")
+        dependency_findings = []
+    for index, finding in enumerate(dependency_findings):
+        if not isinstance(finding, dict):
+            errors.append(
+                f"{_relative(artifact_path)}: dependency_findings[{index}] "
+                "must be object"
+            )
+            continue
+        if finding.get("classification") != "runtime_dependency_missing":
+            errors.append(
+                f"{_relative(artifact_path)}: dependency_findings[{index}] "
+                "classification invalid"
+            )
+        if finding.get("verify_exit") is not None:
+            errors.append(
+                f"{_relative(artifact_path)}: dependency_findings[{index}] "
+                "verify_exit must be null"
+            )
+
+    expected_counts = {
+        "followup_clean_lanes": len(clean_lanes),
+        "diagnostic_lanes": len(diagnostics),
+        "strict_policy_findings": len(strict_findings),
+        "dependency_findings": len(dependency_findings),
+    }
+    for key, expected in expected_counts.items():
+        if counts.get(key) != expected:
+            errors.append(
+                f"{_relative(artifact_path)}: counts.{key} must be {expected}"
+            )
+
+
+def _check_larger_model_validation_published_basis_verification(
+    errors: list[str],
+    artifact_path: Path,
+    payload: dict[str, Any],
+) -> None:
+    if payload.get("source_window") != "published_basis_verification_runs":
+        errors.append(f"{_relative(artifact_path)}: source_window invalid")
+
+    counts = payload.get("counts")
+    if not isinstance(counts, dict):
+        errors.append(f"{_relative(artifact_path)}: counts must be object")
+        counts = {}
+
+    published_basis_lanes = payload.get("published_basis_clean_lanes")
+    followup_lanes = payload.get("followup_clean_lanes")
+    if not isinstance(published_basis_lanes, list) or not published_basis_lanes:
+        errors.append(
+            f"{_relative(artifact_path)}: published_basis_clean_lanes must be non-empty"
+        )
+        published_basis_lanes = []
+    if not isinstance(followup_lanes, list) or not followup_lanes:
+        errors.append(
+            f"{_relative(artifact_path)}: followup_clean_lanes must be non-empty"
+        )
+        followup_lanes = []
+
+    expected_published_basis = {
+        "google_gemma_4_e2b_it_image_text",
+        "qwen_qwen3_5_4b",
+        "qwen_qwen3_5_2b",
+    }
+    expected_followup = {"qwen3_8b_public", "qwen3_5_9b_public"}
+    published_basis_seen = _check_published_basis_verification_lanes(
+        errors,
+        artifact_path,
+        published_basis_lanes,
+        "published_basis_clean_lanes",
+        expected_suite="support-matrix-backlog-gpu",
+        expected_metric_kinds={"accuracy"},
+    )
+    followup_seen = _check_published_basis_verification_lanes(
+        errors,
+        artifact_path,
+        followup_lanes,
+        "followup_clean_lanes",
+        expected_suite="repo-mentioned-gpu",
+        expected_metric_kinds={"ppl_causal"},
+    )
+    if published_basis_seen != expected_published_basis:
+        errors.append(
+            f"{_relative(artifact_path)}: published-basis lane coverage mismatch "
+            f"missing={sorted(expected_published_basis - published_basis_seen)} "
+            f"extra={sorted(published_basis_seen - expected_published_basis)}"
+        )
+    if followup_seen != expected_followup:
+        errors.append(
+            f"{_relative(artifact_path)}: follow-up lane coverage mismatch "
+            f"missing={sorted(expected_followup - followup_seen)} "
+            f"extra={sorted(followup_seen - expected_followup)}"
+        )
+
+    all_lanes = [*published_basis_lanes, *followup_lanes]
+    expected_counts = {
+        "published_basis_clean_lanes": len(published_basis_lanes),
+        "followup_clean_lanes": len(followup_lanes),
+        "report_materialized": sum(
+            1
+            for lane in all_lanes
+            if isinstance(lane, dict) and lane.get("report_materialized") is True
+        ),
+        "verify_materialized": sum(
+            1
+            for lane in all_lanes
+            if isinstance(lane, dict) and lane.get("verify_materialized") is True
+        ),
+        "runtime_provenance_verified": sum(
+            1
+            for lane in all_lanes
+            if isinstance(lane, dict)
+            and lane.get("runtime_provenance_verified") is True
+        ),
+        "guard_warning_free": sum(
+            1
+            for lane in all_lanes
+            if isinstance(lane, dict) and lane.get("guard_warnings_present") is False
+        ),
+    }
+    for key, expected in expected_counts.items():
+        if counts.get(key) != expected:
+            errors.append(
+                f"{_relative(artifact_path)}: counts.{key} must be {expected}"
+            )
+
+
+def _check_published_basis_verification_lanes(
+    errors: list[str],
+    artifact_path: Path,
+    lanes: list[Any],
+    field: str,
+    *,
+    expected_suite: str,
+    expected_metric_kinds: set[str],
+) -> set[str]:
+    seen: set[str] = set()
+    for index, lane in enumerate(lanes):
+        if not isinstance(lane, dict):
+            errors.append(
+                f"{_relative(artifact_path)}: {field}[{index}] must be object"
+            )
+            continue
+        slug = lane.get("slug")
+        if not isinstance(slug, str) or not slug:
+            errors.append(f"{_relative(artifact_path)}: {field}[{index}].slug required")
+        elif slug in seen:
+            errors.append(
+                f"{_relative(artifact_path)}: duplicate published-basis lane {slug!r}"
+            )
+        else:
+            seen.add(slug)
+        model_id = lane.get("model_id")
+        if not isinstance(model_id, str) or not model_id:
+            errors.append(
+                f"{_relative(artifact_path)}: {field}[{index}].model_id required"
+            )
+        preset = lane.get("preset")
+        if (
+            not isinstance(preset, str)
+            or preset.startswith("/")
+            or not (REPO_ROOT / preset).is_file()
+        ):
+            errors.append(
+                f"{_relative(artifact_path)}: {field}[{index}].preset invalid"
+            )
+        if lane.get("suite") != expected_suite:
+            errors.append(f"{_relative(artifact_path)}: {slug} suite invalid")
+        if lane.get("rc") != 0:
+            errors.append(f"{_relative(artifact_path)}: {slug} rc must be zero")
+        if lane.get("evaluate_exit") != 0 or lane.get("verify_exit") != 0:
+            errors.append(
+                f"{_relative(artifact_path)}: {slug} evaluate/verify exits must be zero"
+            )
+        for key in ("summary_ok", "verify_summary_ok", "runtime_provenance_verified"):
+            if lane.get(key) is not True:
+                errors.append(f"{_relative(artifact_path)}: {slug} {key} must be true")
+        if lane.get("guard_warnings_present") is not False:
+            errors.append(
+                f"{_relative(artifact_path)}: {slug} guard_warnings_present must be false"
+            )
+        if lane.get("warning_count") != 0:
+            errors.append(f"{_relative(artifact_path)}: {slug} warning_count must be 0")
+        for key in ("report_materialized", "verify_materialized"):
+            if lane.get(key) is not True:
+                errors.append(f"{_relative(artifact_path)}: {slug} {key} must be true")
+        if lane.get("status") != "ok":
+            errors.append(f"{_relative(artifact_path)}: {slug} status must be ok")
+
+        metric = lane.get("metric")
+        if not isinstance(metric, dict):
+            errors.append(f"{_relative(artifact_path)}: {slug} metric must be object")
+        else:
+            if metric.get("kind") not in expected_metric_kinds:
+                errors.append(f"{_relative(artifact_path)}: {slug} metric kind invalid")
+            if _as_finite_float(metric.get("final")) is None:
+                errors.append(
+                    f"{_relative(artifact_path)}: {slug} metric final invalid"
+                )
+            if _as_finite_float(metric.get("ratio_vs_baseline")) is None:
+                errors.append(
+                    f"{_relative(artifact_path)}: {slug} metric ratio invalid"
+                )
+
+        for key in (
+            "existing_public_evidence_report",
+            "existing_public_runtime_manifest",
+        ):
+            rel_path = lane.get(key)
+            if (
+                not isinstance(rel_path, str)
+                or rel_path.startswith("/")
+                or ".." in Path(rel_path).parts
+                or not (REPO_ROOT / rel_path).is_file()
+            ):
+                errors.append(f"{_relative(artifact_path)}: {slug} {key} invalid")
+    return seen
+
+
+EvidenceChecker = Callable[[list[str], Path, dict[str, Any]], None]
+
+
+SPECIALIZED_EVIDENCE_CHECKERS: dict[str, EvidenceChecker] = {
+    "guard_value_demo": _check_guard_value_demo,
+    "runtime_backend_compatibility": _check_runtime_backend_compatibility,
+    "evidence_pack_lifecycle_stress": _check_evidence_pack_lifecycle_stress,
+    "attention_backend_compatibility": _check_attention_backend_compatibility,
+    "larger_model_validation_findings": _check_larger_model_validation_findings,
+}
+
+
 def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
     errors: list[str] = []
     root = root.resolve()
@@ -364,6 +1935,7 @@ def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
         errors.append(f"{_relative(root)}: README.md is required")
     if not root.is_dir():
         return [f"public evidence root not found: {root}"]
+    _check_public_evidence_privacy(errors, root)
 
     for artifact_dir in sorted(_artifact_dirs(root)):
         meta_path = artifact_dir / META_FILENAME
@@ -381,12 +1953,19 @@ def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
             errors.append(f"{_relative(meta_path)}: schema must be {SCHEMA}")
 
         evidence_class = metadata.get("evidence_class")
-        if evidence_class not in ALLOWED_CLASSES:
+        if not isinstance(evidence_class, str):
+            errors.append(f"{_relative(meta_path)}: invalid evidence_class")
+            continue
+        class_spec = EVIDENCE_CLASS_REGISTRY.get(evidence_class)
+        if class_spec is None:
             errors.append(f"{_relative(meta_path)}: invalid evidence_class")
             continue
 
         summary = str(metadata.get("summary") or "").lower()
-        if evidence_class not in REAL_CLASSES and "fixture" not in summary:
+        class_kind = class_spec["kind"]
+        specialized_checker = class_spec["specialized_checker"]
+
+        if class_kind == "fixture" and "fixture" not in summary:
             errors.append(f"{_relative(meta_path)}: fixture evidence must say fixture")
 
         artifact_paths = metadata.get("artifact_paths")
@@ -406,7 +1985,7 @@ def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
                     errors, artifact_dir, report_path
                 )
 
-        if evidence_class in REAL_CLASSES:
+        if class_kind == "real":
             _require_path(errors, artifact_dir, artifact_paths, "run_command")
             if "invarlock evaluate" not in str(metadata.get("generated_by") or ""):
                 errors.append(
@@ -420,8 +1999,9 @@ def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
         if "evidence_pack" in artifact_paths:
             _check_signed_pack(errors, artifact_dir, metadata, artifact_paths)
 
-        if evidence_class == "real_guard_value_demo":
-            _check_guard_value_demo(errors, artifact_dir, artifact_paths)
+        if specialized_checker is not None:
+            checker = SPECIALIZED_EVIDENCE_CHECKERS[specialized_checker]
+            checker(errors, artifact_dir, artifact_paths)
 
         commands = metadata.get("verifier_commands")
         if not isinstance(commands, list) or not commands:

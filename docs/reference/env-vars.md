@@ -98,13 +98,20 @@ tier policy, and report policy. There is no public env var that forces BCa.
 | `INVARLOCK_OMP_THREADS` | `1` | Thread caps for determinism preset. |
 | `INVARLOCK_DEBUG_TRACE` | unset | Verbose debug traces for data/eval paths. |
 | `INVARLOCK_LIGHT_IMPORT` | unset | Avoid heavy imports for docs/tests. |
-| `PACK_DEFER_REPORT_RENDERING` | unset (`1` under `run_pack.sh --release-review`) | Evidence-pack wrapper toggle that skips optional markdown/reviewer rendering during evaluation. |
+| `PACK_DEFER_REPORT_RENDERING` | unset (`1` under `run_pack.sh --release-review`) | Evidence-pack wrapper toggle that skips optional markdown/evidence rendering during evaluation. |
 | `PACK_DEFER_OPTIONAL_REPORT_RENDERING` | unset | Alias for `PACK_DEFER_REPORT_RENDERING`. |
+| `PACK_EVALUATE_ASSURANCE` | `off` (`strict` under `run_pack.sh --release-review`) | Evidence-pack wrapper toggle forwarded to `invarlock evaluate` for generated reports. |
+| `PACK_FLASH_ATTN_ALLOW_SOURCE_BUILD` | `0` | Evidence-pack dependency toggle. Set to `1` only when intentionally allowing a local Flash Attention source build; default FA2 install attempts use wheels only and fall back to eager attention if unavailable. |
+| `PACK_REPORT_ASSURANCE` | `report` (`strict` under `run_pack.sh --release-review`) | Evidence-pack wrapper toggle forwarded to nested `invarlock verify` during pack verification. |
+| `PACK_RETRY_FAILED_ON_RESUME` | unset | Evidence-pack resume toggle. Set to `1` to explicitly move failed queue tasks back to pending during `--resume`; otherwise failed tasks abort resume so they can be inspected first. |
 
 Evidence-pack evaluation-loop toggles are repo-wrapper controls, not public
 `invarlock evaluate` defaults. Required JSON reports and sidecars are still
 written; `PACK_DEFER_REPORT_RENDERING=1` skips optional rendered review files in
-the evaluation hot path.
+the evaluation hot path. Release-review mode requires strict evaluation
+assurance, strict nested report verification, runtime manifests, model revision
+metadata, and a non-empty scenarios manifest so pack verification cannot be
+stricter or less contextual than the reports it is asked to verify.
 
 ### Checkpointing & snapshots
 

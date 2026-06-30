@@ -51,11 +51,11 @@
       "model_id": "google/gemma-4-E2B-it",
       "ok": true,
       "preset": "configs/presets/causal_lm/gemma4_e2b_512.yaml",
-      "report_path": "/root/model-evidence/20260612TgemmaTextScopeReleaseB/shard-00-gpu-0/eval/gemma4_e2b/report/evaluation.report.json",
+      "report_path": "<model-evidence-root>/20260612TgemmaTextScopeReleaseB/shard-00-gpu-0/eval/gemma4_e2b/report/evaluation.report.json",
       "slug": "gemma4_e2b",
       "status": "ok",
       "verify_exit": 0,
-      "verify_path": "/root/model-evidence/20260612TgemmaTextScopeReleaseB/shard-00-gpu-0/eval/gemma4_e2b/verify.json"
+      "verify_path": "<model-evidence-root>/20260612TgemmaTextScopeReleaseB/shard-00-gpu-0/eval/gemma4_e2b/verify.json"
     }
   ],
   "ok": true,

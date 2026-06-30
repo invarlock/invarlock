@@ -84,6 +84,31 @@
       }
     }
   },
+  "edit": {
+    "algorithm": "custom",
+    "algorithm_version": "",
+    "edit_impact": {
+      "scenario_types": [
+        "target_success",
+        "near_neighbor",
+        "unrelated_locality",
+        "general_ability_sentinel"
+      ]
+    },
+    "edit_provenance": {
+      "dynamic_runtime_required": false,
+      "edit_count": 1,
+      "edit_family": "lora_merge",
+      "edit_method": "custom",
+      "editor_artifact_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "self_edit_data_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "target_set_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "implementation": "",
+    "mask_digest": "",
+    "name": "custom",
+    "plan_digest": "lora_merge_byoe_public_fixture"
+  },
   "evaluation_windows": {
     "final": {
       "logloss": [

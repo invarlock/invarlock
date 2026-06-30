@@ -444,6 +444,43 @@ def test_checksum_and_extra_file_helpers_cover_error_paths(tmp_path: Path) -> No
     assert extra_warnings == []
 
 
+def test_control_file_mirrors_must_match_canonical_files(tmp_path: Path) -> None:
+    pack_dir = tmp_path / "pack"
+    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
+    _write_manifest_and_checksums(
+        pack_dir,
+        report_path=report_path,
+        final_verdict=final_verdict,
+        environment=environment,
+    )
+    metadata_dir = pack_dir / "metadata"
+    metadata_dir.mkdir(parents=True, exist_ok=True)
+    (metadata_dir / "manifest.json").write_text(
+        (pack_dir / "manifest.json").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (metadata_dir / "checksums.sha256").write_text(
+        (pack_dir / "checksums.sha256").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+    assert evidence_pack_integrity_mod.verify_control_file_mirrors(pack_dir) == []
+
+    (metadata_dir / "manifest.json").write_text("{}", encoding="utf-8")
+    errors = evidence_pack_integrity_mod.verify_control_file_mirrors(pack_dir)
+
+    assert errors == [
+        "metadata/manifest.json must match canonical manifest.json byte-for-byte."
+    ]
+
+    (pack_dir / "manifest.json").unlink()
+    errors = evidence_pack_integrity_mod.verify_control_file_mirrors(pack_dir)
+
+    assert errors == [
+        "metadata/manifest.json exists but canonical manifest.json is missing."
+    ]
+
+
 def test_verify_signature_covers_missing_signature_failure_and_fingerprint_mismatch(
     tmp_path: Path,
 ) -> None:

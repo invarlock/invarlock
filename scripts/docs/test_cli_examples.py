@@ -190,6 +190,14 @@ def _parse_cli_args(args: list[str]) -> str | None:
 
     from invarlock.cli.app import app as typer_app
 
+    def _exit_error(exc: BaseException) -> str | None:
+        exit_code = getattr(exc, "exit_code", None)
+        if exit_code == 0:
+            return None
+        if exit_code is not None:
+            return f"click.Exit({exit_code})"
+        return f"{type(exc).__name__}: {exc}"
+
     click_cmd: click.Command = click.CommandCollection(sources=[])
     try:
         import typer
@@ -214,9 +222,7 @@ def _parse_cli_args(args: list[str]) -> str | None:
                 try:
                     ctx = cmd.make_context(info_name, remaining, parent=parent)
                 except click.exceptions.Exit as exc:
-                    if exc.exit_code == 0:
-                        return None
-                    return f"click.Exit({exc.exit_code})"
+                    return _exit_error(exc)
 
                 ctx_stack.append(ctx)
 
@@ -238,9 +244,13 @@ def _parse_cli_args(args: list[str]) -> str | None:
                 remaining = list(subargs)
                 info_name = str(name)
                 parent = ctx
+        except click.exceptions.Exit as exc:
+            return _exit_error(exc)
         except click.ClickException as exc:
             return str(exc)
         except _CLI_LOAD_ERRORS as exc:
+            if type(exc).__name__ == "Exit":
+                return _exit_error(exc)
             return f"{type(exc).__name__}: {exc}"
         finally:
             for ctx in reversed(ctx_stack):

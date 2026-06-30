@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock"
-version = "0.11.0"
+version = "0.12.0"
 description = "Auditable strict verification for edited model checkpoints (InvarLock framework)"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
@@ -43,9 +43,9 @@ dependencies = [
 [project.urls]
 Homepage = "https://invarlock.ai"
 Repository = "https://github.com/invarlock/invarlock"
-Documentation = "https://invarlock.github.io/invarlock/0.11.0/"
+Documentation = "https://invarlock.github.io/invarlock/0.12.0/"
 Issues = "https://github.com/invarlock/invarlock/issues"
-Changelog = "https://github.com/invarlock/invarlock/blob/v0.11.0/CHANGELOG.md"
+Changelog = "https://github.com/invarlock/invarlock/blob/v0.12.0/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Core torch dependencies for adapters
@@ -237,7 +237,8 @@ all = [
 dev = [
   "pytest>=7.0",
   "pytest-cov>=7.1.0",
-  "ruff==0.15.17",
+  "pytest-xdist>=3.6",
+  "ruff==0.15.20",
   "black>=23.0",
   "mypy>=1.0",
   "hypothesis>=6.98",
@@ -257,8 +258,9 @@ dev = [
 ci = [
   "pytest>=7.0",
   "pytest-cov>=7.1.0",
+  "pytest-xdist>=3.6",
   "hypothesis>=6.98",
-  "ruff==0.15.17",
+  "ruff==0.15.20",
   "mypy>=1.0",
   "mkdocs>=1.5",
   "mkdocs-material>=9.7.6",
@@ -290,6 +292,7 @@ release-ci = [
 security-ci = [
   "pip>=26.1.2",
   "pip-audit>=2.8",
+  "msgpack>=1.2.1",
   "requests>=2.33.0",
   "cyclonedx-bom>=4.1",
 ]
@@ -552,6 +555,12 @@ include = [
     "scripts/release/*.py",
     "scripts/evidence_workflows/*.py",
     "scripts/evidence_packs/python/workflow_frontdoor.py",
+    "scripts/evidence_packs/python/create_edit_model.py",
+    "scripts/evidence_packs/python/create_edits_batch.py",
+    "scripts/evidence_packs/python/editing/implementations.py",
+    "scripts/evidence_packs/python/editing/tensor_ops.py",
+    "scripts/evidence_packs/python/preset_generator.py",
+    "scripts/evidence_packs/python/task_tools_reports.py",
     "src/invarlock/eval/*",
     "src/invarlock/guards/*",
     "src/invarlock/calibration.py",

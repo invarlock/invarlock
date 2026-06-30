@@ -317,13 +317,22 @@ task_evaluate_edit() {
             || true
     )
     local -a baseline_report_args=()
+    local baseline_report_arg_count=0
     if [[ -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
         local abs_baseline_report_file
         abs_baseline_report_file="$(_stage_baseline_report_for_eval "${baseline_report_file}" "${cert_dir}" "${log_file}")" || {
             echo "ERROR: Failed to stage baseline report for evaluate runtime: ${baseline_report_file}" >> "${log_file}"
             return 1
         }
+        local effective_report_schedule
+        effective_report_schedule="$(_baseline_report_schedule_for_eval "${abs_baseline_report_file}" "${log_file}")" || {
+            echo "ERROR: Failed to read effective schedule from staged baseline report: ${abs_baseline_report_file}" >> "${log_file}"
+            return 1
+        }
+        IFS=':' read -r seq_len stride preview_n final_n <<< "${effective_report_schedule}"
+        echo "  Using effective baseline report schedule for evaluate runtime: seq=${seq_len}, stride=${stride}, preview=${preview_n}, final=${final_n}" >> "${log_file}"
         baseline_report_args=(--baseline-report "${abs_baseline_report_file}")
+        baseline_report_arg_count=2
         echo "  Reusing baseline report: ${baseline_report_file}" >> "${log_file}"
     else
         echo "  WARNING: Baseline report unavailable; will run per-cert baseline evaluation" >> "${log_file}"
@@ -450,18 +459,25 @@ PRESET_YAML
     }
     (
         cd "${work_dir}" || exit 1
-        env "${extra_env[@]}" invarlock evaluate \
-            --baseline "${abs_baseline_path}" \
-            "${baseline_report_args[@]}" \
-            --subject "${abs_edit_path}" \
-            --edit-label "${edit_label}" \
-            --profile "${profile_flag}" \
-            --tier "${tier}" \
-            --out "${cert_dir}" \
-            --report-out "${cert_dir}" \
-            --preset "${abs_preset_file}" \
-            --assurance "${evaluate_assurance}" \
-            "${evaluate_extra_args[@]}" >> "${log_file}" 2>&1
+        local -a evaluate_cmd=(
+            env "${extra_env[@]}" invarlock evaluate
+            --baseline "${abs_baseline_path}"
+        )
+        if [[ ${baseline_report_arg_count} -gt 0 ]]; then
+            evaluate_cmd+=("${baseline_report_args[@]}")
+        fi
+        evaluate_cmd+=(
+            --subject "${abs_edit_path}"
+            --edit-label "${edit_label}"
+            --profile "${profile_flag}"
+            --tier "${tier}"
+            --out "${cert_dir}"
+            --report-out "${cert_dir}"
+            --preset "${abs_preset_file}"
+            --assurance "${evaluate_assurance}"
+            "${evaluate_extra_args[@]}"
+        )
+        "${evaluate_cmd[@]}" >> "${log_file}" 2>&1
     ) || exit_code=$?
 
     # Find and copy report (only the canonical cert)

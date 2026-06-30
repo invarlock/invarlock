@@ -7,7 +7,7 @@
   "repo": "invarlock-public",
   "source_ref": "15ef967f91893988fbd1b3676392ae683b7fdcff",
   "worktree_branch": "work/evidence-sweep-stabilization",
-  "worktree_sync_note": "Remote /root/invarlock-public was patched by scp with the listed file hashes before running with --skip-sync.",
+  "worktree_sync_note": "Remote <validation-repo> was patched by scp with the listed file hashes before running with --skip-sync.",
   "synced_file_hashes": {
     "src/invarlock/guards/spectral.py": "sha256:d53bc3faa2887cc0c81d18698f5db45c1230873a8266283aa1943b61f39004ed",
     "src/invarlock/guards/spectral_policy.py": "sha256:3f5182f786d3f05ffe0f54570c3718099faef1d9ea5ed6b889179585bb9824b9",

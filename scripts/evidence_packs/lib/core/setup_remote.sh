@@ -53,13 +53,14 @@ pack_evidence_pack_requirement_path() {
 
 pack_install_pinned_requirement() {
     local requirement_name="$1"
+    shift
     local requirement_path
     requirement_path="$(pack_evidence_pack_requirement_path "${requirement_name}")"
     if [[ ! -f "${requirement_path}" ]]; then
         echo "ERROR: Missing pinned evidence-pack requirement file: ${requirement_path}" >&2
         return 1
     fi
-    pack_run_cmd python -m pip install --require-hashes -r "${requirement_path}"
+    pack_run_cmd python -m pip install --require-hashes -r "${requirement_path}" "$@"
 }
 
 install_system_deps() {
@@ -133,7 +134,7 @@ install_invarlock_stack() {
 
     pack_run_cmd python -m pip install -e ".[hf]"
     pack_install_pinned_requirement "huggingface_hub"
-    pack_install_pinned_requirement "accelerate"
+    pack_install_pinned_requirement "accelerate" --no-deps
     pack_install_pinned_requirement "pyyaml"
     pack_install_pinned_requirement "protobuf"
     pack_install_pinned_requirement "sentencepiece"
@@ -258,11 +259,34 @@ verify_remote_stack() {
         "${REPO_DIR}/scripts/evidence_packs/python/runtime_tools.py"
         remote-setup-smoke
     )
-    if [[ "$(pack_runtime_image_flavor)" == "quant" ]]; then
-        smoke_args+=(--module bitsandbytes --module gptqmodel --module hqq --module torchao)
-    fi
     smoke_args+=(--repo-root "${REPO_DIR}")
     pack_run_cmd python "${smoke_args[@]}"
+}
+
+verify_runtime_image_stack() {
+    local image_ref="${INVARLOCK_RUNTIME_IMAGE:-}"
+    if [[ -z "${image_ref}" ]]; then
+        log "Skipping runtime image smoke check because INVARLOCK_RUNTIME_IMAGE is unset"
+        return 0
+    fi
+
+    local flavor=""
+    flavor="$(pack_runtime_image_flavor)" || return 1
+
+    pack_activate_venv
+    cd "${REPO_DIR}"
+    if [[ "${flavor}" == "quant" ]]; then
+        log "Running CUDA quant runtime image smoke check"
+        pack_run_cmd make "RUNTIME_IMAGE_CUDA_QUANT=${image_ref}" runtime-smoke-cuda-quant
+        return 0
+    fi
+    if command -v nvidia-smi >/dev/null 2>&1; then
+        log "Running CUDA runtime image smoke check"
+        pack_run_cmd make "RUNTIME_IMAGE_CUDA=${image_ref}" runtime-smoke-cuda
+        return 0
+    fi
+    log "Running runtime image smoke check"
+    pack_run_cmd make "RUNTIME_IMAGE=${image_ref}" runtime-smoke
 }
 
 post_setup() {
@@ -284,6 +308,7 @@ main() {
     ensure_runtime_image
     post_setup
     verify_remote_stack
+    verify_runtime_image_stack
 
     if [[ "${CANONICAL_REPO_ALIAS}" != "${REPO_DIR}" ]]; then
         log "Stable repo alias: ${CANONICAL_REPO_ALIAS} -> ${REPO_DIR}"

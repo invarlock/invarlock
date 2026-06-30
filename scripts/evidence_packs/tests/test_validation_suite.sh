@@ -76,12 +76,76 @@ test_pack_validation_bash4_guard_succeeds_when_bash4_is_reported() {
     pack_require_bash4
 }
 
+test_pack_validation_default_edit_type_sets_include_generated_lora_and_fine_tune() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+
+    local clean_joined stress_joined
+    clean_joined="$(printf '%s\n' "${EDIT_TYPES_CLEAN[@]}")"
+    stress_joined="$(printf '%s\n' "${EDIT_TYPES_STRESS[@]}")"
+
+    assert_match "lora_merge:clean:attn" "${clean_joined}" "clean defaults include generated lora"
+    assert_match "fine_tune:clean:ffn" "${clean_joined}" "clean defaults include generated fine-tune"
+    assert_match "lora_merge:8:64:all" "${stress_joined}" "stress defaults include generated lora"
+    assert_match "fine_tune:0.0005:3:all" "${stress_joined}" "stress defaults include generated fine-tune"
+}
+
+test_pack_validation_source_preserves_callers_script_dir() {
+    mock_reset
+
+    SCRIPT_DIR="${TEST_TMPDIR}/caller-script-dir"
+    export SCRIPT_DIR
+
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+
+    assert_eq "${TEST_TMPDIR}/caller-script-dir" "${SCRIPT_DIR}" "validation suite sourcing preserves caller SCRIPT_DIR"
+    unset SCRIPT_DIR
+}
+
 test_pack_validation_pack_is_bash4_default_impl_executes() {
     mock_reset
 
     source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     pack_is_bash4 || true
+}
+
+test_pack_validation_worker_sources_dependencies_with_inherited_loaded_flags() {
+    mock_reset
+
+    local rc=0
+    (
+        set -euo pipefail
+        export SCHEDULER_LOADED=1
+        export TASK_FUNCTIONS_LOADED=1
+        export MODEL_CREATION_LOADED=1
+        export TASK_SERIALIZATION_LOADED=1
+        export FAULT_TOLERANCE_LOADED=1
+        export QUEUE_CORE_LOADED=1
+        export QUEUE_LIFECYCLE_LOADED=1
+        export QUEUE_DEPENDENCIES_LOADED=1
+        export QUEUE_MEMORY_PLAN_LOADED=1
+        export QUEUE_GENERATION_LOADED=1
+        export SCHEDULER_CORE_LOADED=1
+        export SCHEDULER_GPU_RUNTIME_LOADED=1
+        export SCHEDULER_RESERVATIONS_LOADED=1
+        export SCHEDULER_SELECTION_LOADED=1
+        resolve_edit_params() { :; }
+
+        source ./scripts/evidence_packs/lib/queue/gpu_worker.sh
+
+        declare -F find_and_claim_task >/dev/null
+        declare -F execute_task >/dev/null
+        declare -F create_model_variant >/dev/null
+        declare -F get_task_field >/dev/null
+        declare -F _get_task_timeout >/dev/null
+        declare -F should_retry_task >/dev/null
+        ! env | grep -q '^SCHEDULER_LOADED='
+        ! env | grep -q '^TASK_FUNCTIONS_LOADED='
+    ) || rc=$?
+
+    assert_rc "0" "${rc}" "worker must source dependencies even when child shell inherits stale loaded flags"
 }
 
 test_pack_validation_setup_hf_cache_dirs_errors_when_home_is_file() {
@@ -215,6 +279,29 @@ EOF
     assert_match "VERDICT" "$(cat "${OUTPUT_DIR}/reports/final_verdict.txt")" "verdict content emitted"
 }
 
+test_pack_validation_generate_verdict_passes_state_manifest_when_present() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+    pack_setup_output_dirs
+
+    mkdir -p "${OUTPUT_DIR}/state" "${OUTPUT_DIR}/reports"
+    printf '{"scenarios":[]}\n' > "${OUTPUT_DIR}/state/scenarios.json"
+
+    python3() {
+        printf '%s\n' "$*" > "${TEST_TMPDIR}/verdict.args"
+        mkdir -p "${OUTPUT_DIR}/reports"
+        printf 'PASS\n' > "${OUTPUT_DIR}/reports/final_verdict.txt"
+        printf '{"verdict":"PASS"}\n' > "${OUTPUT_DIR}/reports/final_verdict.json"
+    }
+
+    generate_verdict
+
+    assert_match "--manifest ${OUTPUT_DIR}/state/scenarios.json" "$(cat "${TEST_TMPDIR}/verdict.args")" "state manifest passed to verdict generator"
+    assert_file_exists "${OUTPUT_DIR}/reports/final_verdict.json" "manifest verdict json written"
+}
+
 test_pack_validation_pack_run_suite_runs_dependency_check_before_preflight_when_net_enabled() {
     mock_reset
 
@@ -244,6 +331,7 @@ test_pack_validation_pack_run_suite_runs_dependency_check_before_preflight_when_
         check_dependencies() { calls="${calls}check,"; }
         pack_preflight_models() { calls="${calls}preflight,"; }
         main_dynamic() { calls="${calls}main,"; }
+        pack_require_bash4() { return 0; }
 
         pack_run_suite
         printf '%s' "${calls}" > "${calls_file}"
@@ -327,6 +415,42 @@ test_pack_validation_source_libs_packaged_v2_layout_errors_when_queue_manager_mi
         pack_source_libs
     ) || rc=$?
     assert_ne "0" "${rc}" "expected failure when queue_manager is missing in packaged v2 lib dir"
+}
+
+test_pack_validation_source_libs_legacy_flat_script_dir_layout_succeeds() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+
+    local root="${TEST_TMPDIR}/legacy_flat"
+    mkdir -p "${root}"
+    local file
+    for file in task_serialization.sh queue_manager.sh scheduler.sh task_functions.sh gpu_worker.sh; do
+        printf '%s\n' "#!/usr/bin/env bash" > "${root}/${file}"
+    done
+
+    _pack_script_dir() { echo "${root}"; }
+    pack_source_libs
+    assert_eq "${root}" "${LIB_DIR}" "legacy direct lib layout selected"
+}
+
+test_pack_validation_source_libs_parent_nested_lib_layout_succeeds() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+
+    local root="${TEST_TMPDIR}/parent_nested"
+    mkdir -p "${root}/child" "${root}/lib/tasks" "${root}/lib/queue" "${root}/lib/core"
+    printf '%s\n' "#!/usr/bin/env bash" > "${root}/lib/tasks/task_serialization.sh"
+    printf '%s\n' "#!/usr/bin/env bash" > "${root}/lib/tasks/task_functions.sh"
+    printf '%s\n' "#!/usr/bin/env bash" > "${root}/lib/queue/queue_manager.sh"
+    printf '%s\n' "#!/usr/bin/env bash" > "${root}/lib/queue/scheduler.sh"
+    printf '%s\n' "#!/usr/bin/env bash" > "${root}/lib/queue/gpu_worker.sh"
+    printf '%s\n' "#!/usr/bin/env bash" > "${root}/lib/core/fault_tolerance.sh"
+
+    _pack_script_dir() { echo "${root}/child"; }
+    pack_source_libs
+    assert_eq "${root}/lib" "${LIB_DIR}" "parent nested lib layout selected"
 }
 
 test_pack_validation_list_run_gpu_ids_prefers_gpu_id_list_and_falls_back_to_num_gpus() {
@@ -463,6 +587,10 @@ test_pack_validation_estimate_model_weights_covers_known_patterns_and_local_path
     assert_eq "26" "$(estimate_model_weights_gb "Qwen/Qwen2.5-13B")" "13B"
     assert_eq "14" "$(estimate_model_weights_gb "Qwen/Qwen2.5-7B")" "7B alt"
     assert_eq "14" "$(estimate_model_weights_gb "mistralai/Mistral-7B-v0.1")" "7B"
+    assert_eq "18" "$(estimate_model_weights_gb "Qwen/Qwen3.5-9B")" "9B"
+    assert_eq "16" "$(estimate_model_weights_gb "Qwen/Qwen3-8B")" "8B"
+    assert_eq "4" "$(estimate_model_weights_gb "google/gemma-4-e2b")" "embedded 2B"
+    assert_eq "3" "$(estimate_model_weights_gb "TinyLlama/TinyLlama-1.1B-Chat-v1.0")" "decimal 1.1B"
 }
 
 test_pack_validation_estimate_model_weights_default_case_returns_nonzero() {
@@ -575,6 +703,55 @@ test_pack_validation_disk_preflight_allows_resume_but_aborts_without_resume() {
     assert_eq "99" "${rc}" "non-resume path aborts via error_exit"
 }
 
+test_pack_validation_disk_preflight_fails_closed_for_release_review() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+    pack_setup_output_dirs
+
+    error_exit() { exit 97; }
+    PACK_RELEASE_REVIEW=1
+
+    get_free_disk_gb() { echo ""; }
+    estimate_planned_model_storage_gb() { echo "10"; }
+    local rc=0
+    ( disk_preflight ) || rc=$?
+    assert_eq "97" "${rc}" "release-review aborts when free disk is unknown"
+
+    get_free_disk_gb() { echo "5000"; }
+    estimate_planned_model_storage_gb() { echo ""; }
+    rc=0
+    ( disk_preflight ) || rc=$?
+    assert_eq "97" "${rc}" "release-review aborts when storage estimate is unknown"
+
+    RESUME_FLAG="true"
+    get_free_disk_gb() { echo "10"; }
+    estimate_planned_model_storage_gb() { echo "1000"; }
+    rc=0
+    ( disk_preflight ) || rc=$?
+    assert_eq "97" "${rc}" "release-review resume does not bypass insufficient disk"
+}
+
+test_pack_validation_disk_preflight_non_release_allows_unknown_estimates() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+    pack_setup_output_dirs
+
+    PACK_RELEASE_REVIEW=0
+    get_free_disk_gb() { echo ""; }
+    estimate_planned_model_storage_gb() { t_fail "planned storage should not be requested without free disk"; }
+
+    disk_preflight
+
+    get_free_disk_gb() { echo "5000"; }
+    estimate_planned_model_storage_gb() { echo ""; }
+
+    disk_preflight
+}
+
 test_pack_validation_disk_preflight_returns_ok_when_disk_is_sufficient() {
     mock_reset
 
@@ -605,6 +782,41 @@ test_pack_validation_estimate_planned_storage_counts_snapshot_copy_baseline_mate
     local total
     total="$(estimate_planned_model_storage_gb)"
     assert_eq "30" "${total}" "snapshot_copy counts cache download, baseline materialization, and one edit peak copy"
+}
+
+test_pack_validation_estimate_planned_storage_uses_scenario_error_count_fallback() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+
+    local fake_validation_dir="${TEST_TMPDIR}/fake_pack/lib/validation"
+    mkdir -p "${fake_validation_dir}" "${TEST_TMPDIR}/fake_pack/lib"
+    printf '{"scenarios":[]}\n' > "${TEST_TMPDIR}/fake_pack/lib/scenarios.json"
+    _PACK_VALIDATION_LIB_DIR="${fake_validation_dir}"
+
+    HF_HUB_CACHE=""
+    RUN_ERROR_INJECTION="true"
+    PACK_CLEANUP_MODELS="1"
+    PACK_BASELINE_STORAGE_MODE="snapshot_symlink"
+    PACK_USE_BATCH_EDITS="false"
+    CLEAN_EDIT_RUNS="1"
+    STRESS_EDIT_RUNS="0"
+
+    pack_model_list() { printf '%s\n' "org/model"; }
+    pack_count_edit_scenarios() { printf '%s\n' "1|0|fixture"; }
+    estimate_model_weights_gb() { printf '%s\n' "10"; }
+    _pack_validation_state() {
+        if [[ "${1:-}" == "count-generation-kind" ]]; then
+            printf '%s\n' "not-a-number"
+            return 0
+        fi
+        return 1
+    }
+
+    local total
+    total="$(estimate_planned_model_storage_gb)"
+    assert_eq "30" "${total}" "invalid scenario error count falls back and contributes one cleanup-mode error peak"
 }
 
 test_pack_validation_disk_preflight_describes_cache_backed_symlink_mode() {
@@ -766,12 +978,253 @@ test_pack_validation_check_dependencies_flash_attn_branches_and_package_installs
     fixture_write "timeout.rc" "1"
     check_dependencies
     assert_eq "false" "${FLASH_ATTENTION_AVAILABLE}" "flash-attn install failed"
+    assert_match "flash-attn install failed" "$(cat "${LOG_FILE}")" "flash-attn failed install fallback logged"
+
+    FLASH_ATTN_CHECK_RC=1
+    FLASH_ATTN_VERIFY_RC=1
+    fixture_write "timeout.rc" "137"
+    check_dependencies
+    assert_eq "false" "${FLASH_ATTENTION_AVAILABLE}" "flash-attn killed build falls back"
+    assert_match "flash-attn install failed" "$(cat "${LOG_FILE}")" "flash-attn killed build fallback logged"
+    assert_match "--only-binary=:all:" "$(cat "${TEST_TMPDIR}/fixtures/timeout.calls")" "flash-attn install avoids source builds by default"
+
+    : > "${TEST_TMPDIR}/fixtures/timeout.calls"
+    PACK_FLASH_ATTN_ALLOW_SOURCE_BUILD=1
+    FLASH_ATTN_CHECK_RC=1
+    FLASH_ATTN_VERIFY_RC=1
+    fixture_write "timeout.rc" "1"
+    check_dependencies
+    assert_eq "false" "${FLASH_ATTENTION_AVAILABLE}" "explicit flash-attn source build failure falls back"
+    assert_match "--no-build-isolation" "$(cat "${TEST_TMPDIR}/fixtures/timeout.calls")" "flash-attn source build opt-in preserves source build args"
+    [[ "$(cat "${TEST_TMPDIR}/fixtures/timeout.calls")" != *"--only-binary=:all:"* ]] || t_fail "source-build opt-in must not use only-binary"
+    unset PACK_FLASH_ATTN_ALLOW_SOURCE_BUILD
 
     # protobuf + sentencepiece install branches
     PROTOBUF_IMPORT_RC=1
     SENTENCEPIECE_IMPORT_RC=1
     PIP_RC=0
     check_dependencies
+}
+
+test_pack_validation_prepare_flash_attn_build_toolchain_uses_pinned_nvcc() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    PACK_NET="1"
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+    pack_setup_output_dirs
+
+    local req_dir="${TEST_TMPDIR}/requirements/evidence-packs"
+    mkdir -p "${req_dir}"
+    : > "${req_dir}/cuda-nvcc.txt"
+    pack_evidence_pack_requirement_path() {
+        printf '%s/%s.txt\n' "${req_dir}" "$1"
+    }
+
+    python3() {
+        if [[ "${1:-}" == "-m" && "${2:-}" == "pip" && "${3:-}" == "install" ]]; then
+            printf '%s\n' "$*" > "${TEST_TMPDIR}/pip.args"
+            return 0
+        fi
+        if [[ "${1:-}" == "-" ]]; then
+            cat >/dev/null
+            printf '%s\n' "${TEST_TMPDIR}/site/nvidia/cu12"
+            return 0
+        fi
+        return 0
+    }
+
+    PATH="/usr/bin:/bin"
+    pack_prepare_flash_attn_build_toolchain "true"
+
+    assert_match "requirements/evidence-packs/cuda-nvcc.txt" "$(cat "${TEST_TMPDIR}/pip.args")" "cuda-nvcc lock installed"
+    assert_match "--no-deps" "$(cat "${TEST_TMPDIR}/pip.args")" "cuda-nvcc install stays no-deps"
+    assert_eq "${TEST_TMPDIR}/site/nvidia/cu12" "${CUDA_HOME}" "CUDA_HOME points at pinned cuda-nvcc"
+    assert_eq "${TEST_TMPDIR}/site/nvidia/cu12" "${CUDA_PATH}" "CUDA_PATH points at pinned cuda-nvcc"
+    assert_match "^${TEST_TMPDIR}/site/nvidia/cu12/bin:" "${PATH}" "pinned nvcc is prepended to PATH"
+}
+
+test_pack_validation_flash_attn_toolchain_fallbacks_and_try_install_restore_errexit() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    PACK_NET="0"
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+    pack_setup_output_dirs
+
+    log() { printf '%s\n' "$*" >> "${TEST_TMPDIR}/flash.log"; }
+    pack_prepare_flash_attn_build_toolchain "true"
+
+    PACK_NET="1"
+    pack_prepare_flash_attn_build_toolchain "false"
+
+    local req_dir="${TEST_TMPDIR}/requirements"
+    mkdir -p "${req_dir}"
+    : > "${req_dir}/cuda-nvcc.txt"
+    pack_evidence_pack_requirement_path() {
+        printf '%s/%s.txt\n' "${req_dir}" "$1"
+    }
+    pack_install_pinned_requirement() {
+        return 9
+    }
+
+    pack_prepare_flash_attn_build_toolchain "true"
+    assert_match "cuda-nvcc install failed" "$(cat "${TEST_TMPDIR}/flash.log")" "failed cuda-nvcc install falls back to existing toolkit"
+
+    local flash_req="${TEST_TMPDIR}/flash-attn.txt"
+    : > "${flash_req}"
+    timeout() { return 37; }
+
+    local rc=0
+    local errexit_after="set"
+    set +e
+    pack_try_install_flash_attn "${flash_req}"
+    rc=$?
+    case "$-" in
+        *e*) errexit_after="set" ;;
+        *) errexit_after="unset" ;;
+    esac
+    set -e
+
+    assert_eq "37" "${rc}" "flash-attn install propagates timeout rc"
+    assert_eq "unset" "${errexit_after}" "pack_try_install_flash_attn restores disabled errexit state"
+}
+
+test_pack_validation_check_dependencies_installs_and_records_missing_paths() {
+    mock_reset
+
+    local rc=0
+
+    (
+        OUTPUT_DIR="${TEST_TMPDIR}/deps_bootstrap"
+        PACK_NET="1"
+        source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+        pack_setup_output_dirs
+        command() {
+            if [[ "${1:-}" == "-v" ]]; then
+                return 0
+            fi
+            builtin command "$@"
+        }
+        local pip_checks=0
+        python3() {
+            if [[ "${1:-}" == "-m" && "${2:-}" == "pip" && "${3:-}" == "--version" ]]; then
+                pip_checks=$((pip_checks + 1))
+                [[ ${pip_checks} -ge 2 ]]
+                return $?
+            fi
+            if [[ "${1:-}" == "-m" && "${2:-}" == "ensurepip" ]]; then
+                return 0
+            fi
+            if [[ "${1:-}" == "-c" ]]; then
+                return 0
+            fi
+            return 0
+        }
+        check_dependencies
+    )
+
+    rc=0
+    (
+        OUTPUT_DIR="${TEST_TMPDIR}/deps_offline_missing"
+        PACK_NET="0"
+        source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+        pack_setup_output_dirs
+        error_exit() { exit 31; }
+        command() {
+            if [[ "${1:-}" == "-v" ]]; then
+                return 0
+            fi
+            builtin command "$@"
+        }
+        python3() {
+            if [[ "${1:-}" == "-c" ]]; then
+                local code="${2:-}"
+                case "${code}" in
+                    *"import torch; assert torch.cuda.is_available"*|*"import transformers"*|*"import invarlock"*) return 0 ;;
+                    *"import sysconfig; exit(0 if sysconfig.get_config_var('INCLUDEPY')"*) return 0 ;;
+                    *"print(sysconfig.get_config_var('INCLUDEPY'))"*) printf '%s\n' "${TEST_TMPDIR}/include"; return 0 ;;
+                    *) return 1 ;;
+                esac
+            fi
+            return 0
+        }
+        mkdir -p "${TEST_TMPDIR}/include"
+        : > "${TEST_TMPDIR}/include/Python.h"
+        check_dependencies
+    ) || rc=$?
+    assert_eq "31" "${rc}" "offline missing optional dependencies abort through error_exit"
+
+    rc=0
+    (
+        OUTPUT_DIR="${TEST_TMPDIR}/deps_net_no_pip"
+        PACK_NET="1"
+        source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+        pack_setup_output_dirs
+        error_exit() { exit 32; }
+        command() {
+            if [[ "${1:-}" == "-v" ]]; then
+                return 0
+            fi
+            builtin command "$@"
+        }
+        python3() {
+            if [[ "${1:-}" == "-m" && "${2:-}" == "pip" && "${3:-}" == "--version" ]]; then
+                return 1
+            fi
+            if [[ "${1:-}" == "-m" && "${2:-}" == "ensurepip" ]]; then
+                return 1
+            fi
+            if [[ "${1:-}" == "-c" ]]; then
+                local code="${2:-}"
+                case "${code}" in
+                    *"import torch; assert torch.cuda.is_available"*|*"import transformers"*|*"import invarlock"*) return 0 ;;
+                    *) return 1 ;;
+                esac
+            fi
+            return 0
+        }
+        check_dependencies
+    ) || rc=$?
+    assert_eq "32" "${rc}" "net mode with unavailable pip records missing installable deps"
+
+    rc=0
+    (
+        OUTPUT_DIR="${TEST_TMPDIR}/deps_net_install_fails"
+        PACK_NET="1"
+        source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+        pack_setup_output_dirs
+        error_exit() { exit 33; }
+        command() {
+            if [[ "${1:-}" == "-v" ]]; then
+                return 0
+            fi
+            builtin command "$@"
+        }
+        pack_install_pinned_requirement() { return 1; }
+        pack_prepare_flash_attn_build_toolchain() { :; }
+        pack_try_install_flash_attn() { return 1; }
+        pack_evidence_pack_requirement_path() { printf '%s/%s.txt\n' "${TEST_TMPDIR}" "$1"; }
+        python3() {
+            if [[ "${1:-}" == "-m" && "${2:-}" == "pip" && "${3:-}" == "--version" ]]; then
+                return 0
+            fi
+            if [[ "${1:-}" == "-c" ]]; then
+                local code="${2:-}"
+                case "${code}" in
+                    *"import torch; assert torch.cuda.is_available"*|*"import transformers"*|*"import invarlock"*) return 0 ;;
+                    *"import sysconfig; exit(0 if sysconfig.get_config_var('INCLUDEPY')"*) return 0 ;;
+                    *"print(sysconfig.get_config_var('INCLUDEPY'))"*) printf '%s\n' "${TEST_TMPDIR}/include"; return 0 ;;
+                    *) return 1 ;;
+                esac
+            fi
+            return 0
+        }
+        mkdir -p "${TEST_TMPDIR}/include"
+        : > "${TEST_TMPDIR}/include/Python.h"
+        check_dependencies
+    ) || rc=$?
+    assert_eq "33" "${rc}" "failed pinned installs are reported as missing dependencies"
 }
 
 test_pack_validation_check_dependencies_errors_when_missing() {
@@ -869,6 +1322,7 @@ test_pack_validation_check_dependencies_covers_pip_bootstrap_and_missing_install
     }
 
     local pip_version_calls=0
+    local installed_modules=""
     local mode="bootstrap"
     python3() {
         if [[ "${1:-}" == "-m" && "${2:-}" == "pip" && "${3:-}" == "--version" ]]; then
@@ -892,6 +1346,9 @@ test_pack_validation_check_dependencies_covers_pip_bootstrap_and_missing_install
         fi
         if [[ "${1:-}" == "-m" && "${2:-}" == "pip" && "${3:-}" == "install" ]]; then
             local pip_args="$*"
+            if [[ "${pip_args}" == *"requirements/evidence-packs/accelerate.txt"* && "${pip_args}" != *"--no-deps"* ]]; then
+                return 1
+            fi
             case "${pip_args}" in
                 *"requirements/evidence-packs/huggingface_hub.txt"*|\
                 *"requirements/evidence-packs/accelerate.txt"*|\
@@ -901,6 +1358,13 @@ test_pack_validation_check_dependencies_covers_pip_bootstrap_and_missing_install
                     if [[ "${mode}" == "failinstalls" ]]; then
                         return 1
                     fi
+                    case "${pip_args}" in
+                        *"requirements/evidence-packs/huggingface_hub.txt"*) installed_modules="${installed_modules} huggingface_hub" ;;
+                        *"requirements/evidence-packs/accelerate.txt"*) installed_modules="${installed_modules} accelerate" ;;
+                        *"requirements/evidence-packs/pyyaml.txt"*) installed_modules="${installed_modules} yaml" ;;
+                        *"requirements/evidence-packs/protobuf.txt"*) installed_modules="${installed_modules} google.protobuf" ;;
+                        *"requirements/evidence-packs/sentencepiece.txt"*) installed_modules="${installed_modules} sentencepiece" ;;
+                    esac
                     return 0
                     ;;
                 *"requirements/evidence-packs/flash-attn.txt"*)
@@ -928,18 +1392,23 @@ test_pack_validation_check_dependencies_covers_pip_bootstrap_and_missing_install
                     return 1
                     ;;
                 *"import huggingface_hub"*)
+                    [[ " ${installed_modules} " == *" huggingface_hub "* ]] && return 0
                     return 1
                     ;;
                 *"import accelerate"*)
+                    [[ " ${installed_modules} " == *" accelerate "* ]] && return 0
                     return 1
                     ;;
                 *"import yaml"*)
+                    [[ " ${installed_modules} " == *" yaml "* ]] && return 0
                     return 1
                     ;;
                 *"import google.protobuf"*)
+                    [[ " ${installed_modules} " == *" google.protobuf "* ]] && return 0
                     return 1
                     ;;
                 *"import sentencepiece"*)
+                    [[ " ${installed_modules} " == *" sentencepiece "* ]] && return 0
                     return 1
                     ;;
             esac
@@ -953,6 +1422,7 @@ test_pack_validation_check_dependencies_covers_pip_bootstrap_and_missing_install
 
     mode="failinstalls"
     pip_version_calls=0
+    installed_modules=""
     : > "${TEST_TMPDIR}/dep.log"
     local rc=0
     ( check_dependencies ) || rc=$?
@@ -960,6 +1430,7 @@ test_pack_validation_check_dependencies_covers_pip_bootstrap_and_missing_install
 
     mode="nopip"
     pip_version_calls=0
+    installed_modules=""
     : > "${TEST_TMPDIR}/dep.log"
     rc=0
     ( check_dependencies ) || rc=$?
@@ -1436,6 +1907,7 @@ test_pack_validation_main_dynamic_resume_and_monitoring_branches_offline() {
 
     # Existing queue with tasks for --resume branch coverage.
     RESUME_FLAG="true"
+    PACK_RETRY_FAILED_ON_RESUME="1"
     mkdir -p "${OUTPUT_DIR}/queue"/{pending,ready,running,completed,failed}
     printf '{"id":"t1","status":"running"}\n' > "${OUTPUT_DIR}/queue/running/t1.task"
     printf '{"id":"t2","status":"failed"}\n' > "${OUTPUT_DIR}/queue/failed/t2.task"
@@ -1522,6 +1994,215 @@ EOF
     run main_dynamic
     assert_rc "1" "${RUN_RC}" "main_dynamic fails closed when worker/task failures occur"
     assert_file_exists "${TEST_TMPDIR}/shutdown.calls" "signal_shutdown called on empty queue"
+}
+
+test_pack_validation_main_dynamic_skips_live_worker_and_restarts_stale_heartbeat() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out_live_worker"
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+    pack_setup_output_dirs
+
+    check_dependencies() { :; }
+    configure_gpu_pool() { NUM_GPUS=1; GPU_ID_LIST="0"; export NUM_GPUS GPU_ID_LIST; }
+    pack_model_list_array() { PACK_MODEL_LIST=("org/model"); }
+    pack_model_list() { printf '%s\n' "org/model"; }
+    disk_preflight() { :; }
+    setup_pack_environment() { :; }
+    handle_disk_pressure() { return 0; }
+    get_free_disk_gb() { echo "999"; }
+    pack_count_edit_scenarios() { printf '%s\n' "0|0|fixture"; }
+    _pack_validation_state() {
+        if [[ "${1:-}" == "count-generation-kind" ]]; then
+            printf '%s\n' "0"
+            return 0
+        fi
+        return 0
+    }
+
+    RESUME_FLAG="false"
+    WORKER_TIMEOUT="1"
+    MIN_FREE_DISK_GB="200"
+
+    init_queue() {
+        QUEUE_DIR="${OUTPUT_DIR}/queue"
+        mkdir -p "${QUEUE_DIR}"/{pending,ready,running,completed,failed} "${OUTPUT_DIR}/workers" "${OUTPUT_DIR}/logs"
+        printf '%s\n' "4242" > "${OUTPUT_DIR}/workers/gpu_0.pid"
+        : > "${OUTPUT_DIR}/workers/gpu_0.heartbeat"
+        printf '%s\n' "searching" > "${OUTPUT_DIR}/workers/gpu_0.status"
+        export QUEUE_DIR
+    }
+    generate_all_tasks() { :; }
+    refresh_task_memory_from_profiles() { :; }
+    export_memory_plan() { :; }
+    resolve_dependencies() { echo 0; }
+    reclaim_orphaned_tasks() { echo "reclaim:$1" >> "${TEST_TMPDIR}/reclaim.calls"; }
+    cancel_tasks_with_failed_dependencies() { echo 0; }
+    queue_terminal_state() { echo ""; }
+    apply_work_stealing_boost() { echo "boost" >> "${TEST_TMPDIR}/boost.calls"; }
+    count_tasks() { echo 0; }
+    print_queue_stats() { :; }
+    get_queue_stats() { echo "0:0:1:0:0:1"; }
+    compile_results() { :; }
+    run_analysis() { :; }
+    generate_verdict() {
+        mkdir -p "${OUTPUT_DIR}/reports"
+        printf '%s\n' '{"verdict":"PASS"}' > "${OUTPUT_DIR}/reports/final_verdict.json"
+        printf '%s\n' 'PASS' > "${OUTPUT_DIR}/reports/final_verdict.txt"
+    }
+    pack_read_final_verdict() { echo "PASS"; }
+    signal_shutdown() { echo "shutdown:$1" >> "${TEST_TMPDIR}/shutdown.calls"; }
+
+    local empty_checks=0
+    is_queue_empty() {
+        empty_checks=$((empty_checks + 1))
+        [[ ${empty_checks} -ge 2 ]]
+    }
+    sleep() { :; }
+    date() {
+        case "${1:-}" in
+            +%s) echo "2000" ;;
+            +%Y-%m-%dT%H:%M:%SZ) echo "2025-01-01T00:00:00Z" ;;
+            *) echo "2025-01-01 00:00:00" ;;
+        esac
+    }
+    stat() {
+        if [[ "${1:-}" == "-c" || "${1:-}" == "-f" ]]; then
+            echo "1"
+            return 0
+        fi
+        command stat "$@"
+    }
+    kill() {
+        printf '%s\n' "$*" >> "${TEST_TMPDIR}/kill.calls"
+        if [[ "${1:-}" == "-0" && "${2:-}" == "4242" ]]; then
+            return 0
+        fi
+        return 0
+    }
+    python3() { return 0; }
+
+    main_dynamic
+
+    assert_match "worker already running" "$(cat "${LOG_FILE}")" "live worker pid is not duplicated"
+    assert_match "stuck \\(no heartbeat" "$(cat "${LOG_FILE}")" "stale heartbeat is detected"
+    assert_file_exists "${TEST_TMPDIR}/shutdown.calls" "empty queue signals shutdown"
+    assert_file_exists "${TEST_TMPDIR}/boost.calls" "monitor loop reached progress path"
+}
+
+test_pack_validation_main_dynamic_starts_worker_with_nested_lib_and_logs_source_status() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out_nested_worker"
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+    pack_setup_output_dirs
+
+    check_dependencies() { :; }
+    configure_gpu_pool() { NUM_GPUS=1; GPU_ID_LIST="0"; export NUM_GPUS GPU_ID_LIST; }
+    pack_model_list_array() { PACK_MODEL_LIST=("org/model"); }
+    pack_model_list() { printf '%s\n' "org/model"; }
+    disk_preflight() { :; }
+    setup_pack_environment() { :; }
+    handle_disk_pressure() { return 0; }
+    get_free_disk_gb() { echo "999"; }
+    pack_count_edit_scenarios() { printf '%s\n' "0|0|fixture"; }
+
+    RESUME_FLAG="false"
+
+    init_queue() {
+        QUEUE_DIR="${OUTPUT_DIR}/queue"
+        mkdir -p "${QUEUE_DIR}"/{pending,ready,running,completed,failed} "${OUTPUT_DIR}/workers" "${OUTPUT_DIR}/logs"
+        export QUEUE_DIR
+    }
+    generate_all_tasks() { :; }
+    refresh_task_memory_from_profiles() { :; }
+    export_memory_plan() { :; }
+    resolve_dependencies() { echo 0; }
+    count_tasks() { echo 0; }
+    print_queue_stats() { :; }
+    get_queue_stats() { echo "0:0:0:0:0:0"; }
+    is_queue_empty() { return 0; }
+    sleep() { :; }
+    compile_results() { :; }
+    run_analysis() { :; }
+    generate_verdict() {
+        mkdir -p "${OUTPUT_DIR}/reports"
+        printf '%s\n' '{"verdict":"PASS"}' > "${OUTPUT_DIR}/reports/final_verdict.json"
+        printf '%s\n' 'PASS' > "${OUTPUT_DIR}/reports/final_verdict.txt"
+    }
+    pack_read_final_verdict() { echo "PASS"; }
+    python3() { return 0; }
+
+    local stub_lib="${TEST_TMPDIR}/nested_lib"
+    mkdir -p "${stub_lib}/tasks" "${stub_lib}/queue" "${stub_lib}/core"
+    cat > "${stub_lib}/tasks/task_serialization.sh" <<'EOF'
+#!/usr/bin/env bash
+get_task_id() { echo "task"; }
+EOF
+    cat > "${stub_lib}/queue/queue_manager.sh" <<'EOF'
+#!/usr/bin/env bash
+count_tasks() { echo 0; }
+EOF
+    cat > "${stub_lib}/queue/scheduler.sh" <<'EOF'
+#!/usr/bin/env bash
+return 4
+EOF
+    cat > "${stub_lib}/tasks/task_functions.sh" <<'EOF'
+#!/usr/bin/env bash
+execute_task() { return 0; }
+EOF
+    cat > "${stub_lib}/queue/gpu_worker.sh" <<'EOF'
+#!/usr/bin/env bash
+gpu_worker() {
+    local gpu_id="$1"
+    local output_dir="$2"
+    echo "started" > "${output_dir}/workers/gpu_${gpu_id}.nested_started"
+    return 0
+}
+EOF
+    printf '%s\n' "#!/usr/bin/env bash" > "${stub_lib}/core/fault_tolerance.sh"
+    LIB_DIR="${stub_lib}"
+    export LIB_DIR
+
+    main_dynamic
+
+    assert_file_exists "${OUTPUT_DIR}/workers/gpu_0.nested_started" "nested-layout worker started"
+    assert_match "source status scheduler rc=4" "$(cat "${OUTPUT_DIR}/logs/gpu_0.log")" "nonzero source status is logged"
+}
+
+test_pack_validation_main_dynamic_resume_requires_explicit_failed_retry() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
+    pack_setup_output_dirs
+
+    check_dependencies() { :; }
+    configure_gpu_pool() { NUM_GPUS=1; GPU_ID_LIST="0"; export NUM_GPUS GPU_ID_LIST; }
+    disk_preflight() { :; }
+    setup_pack_environment() { :; }
+
+    RESUME_FLAG="true"
+    mkdir -p "${OUTPUT_DIR}/queue"/{pending,ready,running,completed,failed}
+    printf '{"id":"t2","status":"failed"}\n' > "${OUTPUT_DIR}/queue/failed/t2.task"
+
+    init_queue() {
+        QUEUE_DIR="${OUTPUT_DIR}/queue"
+        GPU_RESERVATION_DIR="${OUTPUT_DIR}/gpu_reservations"
+        mkdir -p "${QUEUE_DIR}"/{pending,ready,running,completed,failed} "${GPU_RESERVATION_DIR}"
+        export QUEUE_DIR GPU_RESERVATION_DIR
+    }
+
+    error_exit() {
+        printf '%s\n' "$*" > "${TEST_TMPDIR}/error_exit.txt"
+        exit 98
+    }
+
+    local rc=0
+    ( main_dynamic ) || rc=$?
+
+    assert_eq "98" "${rc}" "resume aborts when failed tasks exist without explicit retry"
+    assert_match "PACK_RETRY_FAILED_ON_RESUME=1" "$(cat "${TEST_TMPDIR}/error_exit.txt")" "retry opt-in guidance is emitted"
 }
 
 test_pack_validation_main_dynamic_exits_with_resumable_blocked_state() {
@@ -3254,10 +3935,17 @@ test_pack_validation_estimate_planned_model_storage_falls_back_when_mapfile_disa
     pack_model_list() { printf '%s\n' "org/model"; }
     estimate_model_weights_gb() { echo "10"; }
 
-    enable -n mapfile
+    local had_mapfile="0"
+    if command -v mapfile >/dev/null 2>&1; then
+        had_mapfile="1"
+        enable -n mapfile 2>/dev/null || true
+    fi
 
     local total
     total="$(estimate_planned_model_storage_gb)"
+    if [[ "${had_mapfile}" == "1" ]]; then
+        enable mapfile 2>/dev/null || true
+    fi
     assert_eq "20" "${total}" "planned storage sums weights and edits without mapfile"
 }
 
@@ -3643,6 +4331,7 @@ test_pack_validation_main_dynamic_sanitizes_invalid_edit_scenario_counts() {
     OUTPUT_DIR="${TEST_TMPDIR}/out_invalid_counts"
     source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
+    printf '%s\n' '{"scenarios":[]}' > "${OUTPUT_DIR}/state/scenarios.json"
 
     check_dependencies() { :; }
     configure_gpu_pool() { NUM_GPUS=1; GPU_ID_LIST="0"; export NUM_GPUS GPU_ID_LIST; }
@@ -3650,6 +4339,13 @@ test_pack_validation_main_dynamic_sanitizes_invalid_edit_scenario_counts() {
     setup_pack_environment() { :; }
     handle_disk_pressure() { return 0; }
     pack_count_edit_scenarios() { echo "bogus|oops|fixture"; }
+    _pack_validation_state() {
+        if [[ "${1:-}" == "count-generation-kind" ]]; then
+            echo "not-a-number"
+            return 0
+        fi
+        return 0
+    }
 
     init_queue() {
         QUEUE_DIR="${OUTPUT_DIR}/queue"

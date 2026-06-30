@@ -41,6 +41,7 @@ def test_workflow_lane_plan_serializes_compat_dry_run_fields(tmp_path: Path) -> 
         profile="dev",
         resource_preflight={"ok": True},
         prepared_preset="exec/eval/lane/prepared_preset.yaml",
+        prepared_preset_source="configs/override.yaml",
         steps=(
             WorkflowCommandStep("materialize_dataset", ("python", "materialize.py")),
             WorkflowCommandStep("prefetch", ("python", "-c", "prefetch")),
@@ -62,6 +63,7 @@ def test_workflow_lane_plan_serializes_compat_dry_run_fields(tmp_path: Path) -> 
     assert payload["prefetch"] == ["python", "-c", "prefetch"]
     assert payload["materialize_dataset"] == ["python", "materialize.py"]
     assert payload["prepared_preset"] == "exec/eval/lane/prepared_preset.yaml"
+    assert payload["prepared_preset_source"] == "configs/override.yaml"
     assert [step["name"] for step in payload["steps"]] == [
         "materialize_dataset",
         "prefetch",

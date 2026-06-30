@@ -1,0 +1,20 @@
+{
+  "artifacts": [
+    "public_evidence/published_basis/gpt_oss_20b/evaluation.report.json",
+    "public_evidence/published_basis/gpt_oss_20b/runtime.manifest.json",
+    "public_evidence/published_basis/gpt_oss_20b/evidence_run_preset.yaml",
+    "public_evidence/published_basis/gpt_oss_20b/evidence_pack/manifest.json",
+    "public_evidence/published_basis/gpt_oss_20b/evidence_pack/manifest.signature.json",
+    "public_evidence/published_basis/gpt_oss_20b/evidence_pack/checksums.sha256",
+    "public_evidence/published_basis/gpt_oss_20b/evidence_pack/results/final_verdict.json"
+  ],
+  "commands": [
+    "make runtime-image-cuda",
+    "uv run python scripts/model_evidence/run_model_evidence_remote.py --host <cuda-validation-host> --remote-repo <validation-repo> --remote-python <validation-python> --branch <validation-branch> --gpus 0 --suite support-matrix-backlog-gpu --slug openai_gpt_oss_20b --profile release --execution-mode container --remote-env HF_HOME=<hf-cache-dir> --remote-env INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-local --stamp 20260629Tgptoss20bRelease400",
+    "uv run invarlock advanced evidence-pack build public_evidence/published_basis/gpt_oss_20b/evidence_pack --final-verdict tmp/gpt_oss_20b_pack_inputs/final_verdict.json --report public_evidence/published_basis/gpt_oss_20b/evaluation.report.json --source-repo tmp/gpt_oss_20b_pack_inputs/source_repo.json --environment tmp/gpt_oss_20b_pack_inputs/environment.json --material model_revisions=tmp/gpt_oss_20b_pack_inputs/model_revisions.json --material artifact_manifest=tmp/gpt_oss_20b_pack_inputs/artifact_manifest.json --readme tmp/gpt_oss_20b_pack_inputs/README.md --signing-key tmp/gpt_oss_20b_pack_inputs/evidence-pack-signing-key.pem --profile release --report-assurance strict --release-review"
+  ],
+  "format_version": "published-basis-evidence-pack-recipe-v1",
+  "lane_id": "gpt-oss-20b-causal-hf",
+  "network_mode": "online_first_then_offline",
+  "suite": "support-matrix-backlog-gpu"
+}

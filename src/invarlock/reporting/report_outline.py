@@ -530,6 +530,136 @@ def _build_technical_appendix_section(
     )
 
 
+def _build_edit_provenance_section(
+    evaluation_report: dict[str, Any],
+) -> ReportSection | None:
+    edit = _mapping(evaluation_report.get("edit"))
+    provenance = _mapping(edit.get("edit_provenance"))
+    impact = _mapping(edit.get("edit_impact"))
+    topology = _mapping(edit.get("edit_topology"))
+    delta_privacy = _mapping(edit.get("delta_privacy"))
+    if not provenance and not impact and not topology and not delta_privacy:
+        return None
+
+    scenario_types = impact.get("scenario_types")
+    scenario_display = (
+        ", ".join(str(item) for item in scenario_types)
+        if isinstance(scenario_types, list)
+        else "N/A"
+    )
+    facts = (
+        ReportFact(
+            "Edit Family",
+            str(provenance.get("edit_family") or "N/A"),
+            source="edit.edit_provenance.edit_family",
+        ),
+        ReportFact(
+            "Edit Method",
+            str(provenance.get("edit_method") or "N/A"),
+            source="edit.edit_provenance.edit_method",
+        ),
+        ReportFact(
+            "Edit Count",
+            str(provenance.get("edit_count") or "N/A"),
+            source="edit.edit_provenance.edit_count",
+        ),
+        ReportFact(
+            "Dynamic Runtime",
+            str(provenance.get("dynamic_runtime_required", "N/A")),
+            source="edit.edit_provenance.dynamic_runtime_required",
+        ),
+        ReportFact(
+            "Scenario Types",
+            scenario_display,
+            source="edit.edit_impact.scenario_types",
+        ),
+        ReportFact(
+            "Artifact Kind",
+            str(topology.get("artifact_kind") or "N/A"),
+            source="edit.edit_topology.artifact_kind",
+        ),
+        ReportFact(
+            "Runtime Activation",
+            str(topology.get("runtime_activation_policy") or "N/A"),
+            source="edit.edit_topology.runtime_activation_policy",
+        ),
+        ReportFact(
+            "Delta Availability",
+            str(delta_privacy.get("delta_available") or "N/A"),
+            source="edit.delta_privacy.delta_available",
+        ),
+        ReportFact(
+            "Privacy Sensitivity",
+            str(delta_privacy.get("privacy_sensitivity") or "N/A"),
+            source="edit.delta_privacy.privacy_sensitivity",
+        ),
+    )
+    return ReportSection(
+        key="edit_provenance",
+        title="Edit Provenance",
+        summary=(
+            "Optional descriptive metadata about the upstream subject-generation "
+            "workflow."
+        ),
+        priority="review",
+        source_blocks=("edit",),
+        facts=facts,
+    )
+
+
+def _build_evaluation_realism_section(
+    evaluation_report: dict[str, Any],
+) -> ReportSection | None:
+    realism = _mapping(evaluation_report.get("evaluation_realism"))
+    if not realism:
+        return None
+
+    warning = realism.get("proxy_metric_warning")
+    facts = (
+        ReportFact(
+            "Mode",
+            str(realism.get("mode") or "N/A"),
+            source="evaluation_realism.mode",
+        ),
+        ReportFact(
+            "Generation Realistic",
+            str(realism.get("metric_is_generation_realistic", "N/A")),
+            source="evaluation_realism.metric_is_generation_realistic",
+        ),
+        ReportFact(
+            "Task",
+            str(realism.get("dataset_or_task_id") or "N/A"),
+            source="evaluation_realism.dataset_or_task_id",
+        ),
+        ReportFact(
+            "Max Tokens",
+            str(realism.get("max_tokens", "N/A")),
+            source="evaluation_realism.max_tokens",
+        ),
+        ReportFact(
+            "Truncation",
+            str(realism.get("truncation_policy") or "N/A"),
+            source="evaluation_realism.truncation_policy",
+        ),
+        ReportFact(
+            "Proxy Warning",
+            str(warning or "none"),
+            source="evaluation_realism.proxy_metric_warning",
+        ),
+    )
+    return ReportSection(
+        key="evaluation_realism",
+        title="Evaluation Realism",
+        summary=(
+            "Optional context describing whether the metric reflects live generation "
+            "behavior or a proxy evaluation setup."
+        ),
+        priority="review",
+        source_blocks=("evaluation_realism",),
+        facts=facts,
+    )
+
+
 def build_evaluation_report_outline(
     evaluation_report: dict[str, Any],
 ) -> EvaluationReportOutline:
@@ -546,6 +676,12 @@ def build_evaluation_report_outline(
     benchmark = _build_benchmark_section(evaluation_report)
     if benchmark is not None:
         sections.append(benchmark)
+    evaluation_realism = _build_evaluation_realism_section(evaluation_report)
+    if evaluation_realism is not None:
+        sections.append(evaluation_realism)
+    edit_provenance = _build_edit_provenance_section(evaluation_report)
+    if edit_provenance is not None:
+        sections.append(edit_provenance)
     sections.extend(
         [
             _build_evidence_provenance_section(evaluation_report),

@@ -33,6 +33,11 @@ CONTROL_FILES = {
     "metadata/manifest.json",
     f"metadata/{MANIFEST_SIGNATURE_FILENAME}",
 }
+CONTROL_FILE_MIRRORS = {
+    "manifest.json": "metadata/manifest.json",
+    MANIFEST_SIGNATURE_FILENAME: f"metadata/{MANIFEST_SIGNATURE_FILENAME}",
+    "checksums.sha256": "metadata/checksums.sha256",
+}
 CHECKSUM_LINE_RE = re.compile(r"^([A-Fa-f0-9]{64}) [ *](.+)$")
 _MATERIAL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _SHA256_HEX_RE = re.compile(r"^[a-f0-9]{64}$")
@@ -514,6 +519,25 @@ def verify_no_extra_files(
     ]
 
 
+def verify_control_file_mirrors(pack_dir: Path) -> list[str]:
+    errors: list[str] = []
+    for canonical_rel, mirror_rel in CONTROL_FILE_MIRRORS.items():
+        mirror_path = pack_dir / mirror_rel
+        if not mirror_path.is_file():
+            continue
+        canonical_path = pack_dir / canonical_rel
+        if not canonical_path.is_file():
+            errors.append(
+                f"{mirror_rel} exists but canonical {canonical_rel} is missing."
+            )
+            continue
+        if mirror_path.read_bytes() != canonical_path.read_bytes():
+            errors.append(
+                f"{mirror_rel} must match canonical {canonical_rel} byte-for-byte."
+            )
+    return errors
+
+
 def _load_signature_bundle(path: Path) -> tuple[dict[str, Any] | None, list[str]]:
     try:
         payload = _load_json(path)
@@ -659,6 +683,7 @@ def signature_warnings_to_errors(warnings: list[str]) -> list[str]:
 
 __all__ = [
     "CONTROL_FILES",
+    "CONTROL_FILE_MIRRORS",
     "EVIDENCE_PACK_FORMAT",
     "MANIFEST_SIGNATURE_FILENAME",
     "EVIDENCE_PACK_SIGNATURE_FORMAT",
@@ -689,6 +714,7 @@ __all__ = [
     "verify_checksums",
     "verify_signature",
     "verify_manifest_binds_checksums",
+    "verify_control_file_mirrors",
     "verify_manifest_provenance",
     "verify_no_extra_files",
     "write_checksums_file",

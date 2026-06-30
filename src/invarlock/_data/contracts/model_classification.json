@@ -1,13 +1,13 @@
 {
   "format_version": "model-classification-v1",
-  "as_of": "2026-06-14",
+  "as_of": "2026-06-29",
   "policy": {
     "named_checkpoint_license_policy": "strict_apache_2_or_mit",
     "allowed_named_checkpoint_license_ids": [
       "apache-2.0",
       "mit"
     ],
-    "notes": "Repo-maintained support, promotion, and evidence-sweep inventory names only Apache-2.0 or MIT checkpoints. User-supplied local checkpoints are outside this named-checkpoint inventory policy."
+    "notes": "Support, candidate, and evidence-sweep lanes are explicit. User-supplied local checkpoints remain BYOE inputs."
   },
   "classification_values": [
     "published",
@@ -333,12 +333,48 @@
       ]
     },
     {
+      "id": "qwen3-6-27b-image-text-scoped-hf",
+      "classification": "published",
+      "eligibility": "eligible",
+      "support_matrix_lane_id": "qwen3-6-27b-image-text-scoped-hf",
+      "catalog_family_ids": [
+        "qwen-3-6-27b-image-text-scoped-lm"
+      ],
+      "suite_roles": [
+        "support-matrix-backlog-gpu"
+      ]
+    },
+    {
+      "id": "qwen3-5-27b-image-text-scoped-hf",
+      "classification": "published",
+      "eligibility": "eligible",
+      "support_matrix_lane_id": "qwen3-5-27b-image-text-scoped-hf",
+      "catalog_family_ids": [
+        "qwen-3-5-27b-image-text-scoped-lm"
+      ],
+      "suite_roles": [
+        "support-matrix-backlog-gpu"
+      ]
+    },
+    {
       "id": "gemma4-26b-a4b-moe-image-text-hf",
       "classification": "published",
       "eligibility": "eligible",
       "support_matrix_lane_id": "gemma4-26b-a4b-moe-image-text-hf",
       "catalog_family_ids": [
         "gemma-4-26b-a4b-moe-image-text-lm"
+      ],
+      "suite_roles": [
+        "support-matrix-backlog-gpu"
+      ]
+    },
+    {
+      "id": "gemma4-31b-image-text-hf",
+      "classification": "published",
+      "eligibility": "eligible",
+      "support_matrix_lane_id": "gemma4-31b-image-text-hf",
+      "catalog_family_ids": [
+        "gemma-4-31b-image-text-lm"
       ],
       "suite_roles": [
         "support-matrix-backlog-gpu"
@@ -525,10 +561,17 @@
     },
     {
       "id": "gpt-oss-family",
-      "classification": "catalog_only",
+      "classification": "published",
       "eligibility": "eligible",
+      "support_matrix_lane_id": "gpt-oss-20b-causal-hf",
       "catalog_family_ids": [
         "gpt-oss"
+      ],
+      "sweep_lane_ids": [
+        "gpt-oss-20b-causal-hf"
+      ],
+      "suite_roles": [
+        "support-matrix-backlog-gpu"
       ]
     },
     {
@@ -596,10 +639,10 @@
         "broader-bert-like-mlms"
       ],
       "sweep_lane_ids": [
-        "promotion-gap::distilbert_base_uncased"
+        "published-basis-gap::distilbert_base_uncased"
       ],
       "suite_roles": [
-        "promotion-gap-gpu"
+        "published-basis-gap-gpu"
       ],
       "blockers": [
         "approved calibration and evaluation evidence"
@@ -622,47 +665,47 @@
     {
       "model_id": "tiiuae/Falcon-H1R-7B",
       "license_id": "falcon-llm-license",
-      "reason": "custom license outside the repo named-checkpoint Apache-2.0/MIT policy"
+      "reason": "not an active support lane"
     },
     {
       "model_id": "THUDM/glm-4-9b-chat",
       "license_id": "glm-4",
-      "reason": "outside the repo named-checkpoint Apache-2.0/MIT policy"
+      "reason": "not an active support lane"
     },
     {
       "model_id": "zai-org/glm-4-9b-chat",
       "license_id": "glm-4",
-      "reason": "outside the repo named-checkpoint Apache-2.0/MIT policy"
+      "reason": "not an active support lane"
     },
     {
       "model_id": "facebook/opt-1.3b",
       "license_id": "other",
-      "reason": "hosted checkpoint license is not Apache-2.0 or MIT"
+      "reason": "not an active support lane"
     },
     {
       "model_id": "Qwen/Qwen1.5-72B",
       "license_id": "tongyi-qianwen",
-      "reason": "custom license outside the repo named-checkpoint Apache-2.0/MIT policy"
+      "reason": "not an active support lane"
     },
     {
       "model_id": "Qwen/Qwen2.5-72B",
       "license_id": "qwen",
-      "reason": "custom license outside the repo named-checkpoint Apache-2.0/MIT policy"
+      "reason": "not an active support lane"
     },
     {
       "model_id": "Helsinki-NLP/opus-mt-en-de",
       "license_id": "cc-by-4.0",
-      "reason": "CC-BY-only hosted checkpoint is outside the repo named-checkpoint Apache-2.0/MIT policy"
+      "reason": "not an active support lane"
     },
     {
       "model_id": "google/gemma-3n-E4B-it",
       "license_id": "gemma",
-      "reason": "gated Gemma terms/access are outside the repo named-checkpoint Apache-2.0/MIT policy"
+      "reason": "not an active support lane"
     },
     {
       "model_id": "google/gemma-3-4b-it",
       "license_id": "gemma",
-      "reason": "gated Gemma terms/access are outside the repo named-checkpoint Apache-2.0/MIT policy"
+      "reason": "not an active support lane"
     }
   ]
 }

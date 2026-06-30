@@ -152,6 +152,10 @@ def build_edit_artifact_summary(pack_dir: Path, scenarios_path: Path) -> dict[st
             "packed_quantized_storage",
             "runtime_memory_reduction",
             "backend",
+            "edit_provenance",
+            "edit_impact",
+            "edit_topology",
+            "delta_privacy",
         ):
             if field in metadata:
                 record[field] = metadata[field]

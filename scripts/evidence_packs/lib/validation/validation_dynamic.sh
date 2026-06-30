@@ -167,9 +167,14 @@ main_dynamic() {
             done
         fi
 
-        # Move failed tasks back to pending for retry, clearing retry/backoff state for immediate resume.
+        # Move failed tasks back to pending only when explicitly requested.
+        # Failed tasks often mean persistent OOM/config/dependency problems; silently
+        # retrying them during a long resumed evidence run can waste GPU time.
         if [[ ${resume_existing_failed} -gt 0 ]]; then
-            log "Resetting ${resume_existing_failed} failed task(s) back to pending for resume..."
+            if [[ "${PACK_RETRY_FAILED_ON_RESUME:-0}" != "1" ]]; then
+                error_exit "Resume found ${resume_existing_failed} failed task(s). Inspect or fix the failures, then set PACK_RETRY_FAILED_ON_RESUME=1 to retry them explicitly."
+            fi
+            log "Resetting ${resume_existing_failed} failed task(s) back to pending for explicit resume retry..."
             local task_file
             for task_file in "${QUEUE_DIR}/failed"/*.task; do
                 [[ -f "${task_file}" ]] || continue
@@ -413,7 +418,7 @@ EOF
         local deps_moved=0
         deps_moved=$(resolve_dependencies 2>/dev/null) || deps_moved=0
         if [[ ${deps_moved} -gt 0 ]]; then
-            log "Monitor: Promoted ${deps_moved} task(s) from pending to ready queue"
+            log "Monitor: Moved ${deps_moved} task(s) from pending to ready queue"
         fi
         local deps_canceled=0
         if type cancel_tasks_with_failed_dependencies &>/dev/null; then

@@ -162,6 +162,8 @@ def test_cuda_quant_runtime_smoke_covers_supported_quant_adapters() -> None:
         "compressed_tensors",
     ):
         assert backend in smoke_text
+    assert "_patch_gptqmodel_transformers_hub_compat" in smoke_text
+    assert "_apply_runtime_compat_patches()" in smoke_text
 
 
 def test_current_quant_dependency_surfaces_do_not_pin_autoawq() -> None:

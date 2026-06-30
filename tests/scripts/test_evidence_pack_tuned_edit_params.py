@@ -32,6 +32,43 @@ def _deferred_candidate_models() -> list[str]:
     ]
 
 
+GENERATED_CLEAN_EDIT_PARAMS = {
+    "fine_tune": {
+        "edit_dir_name": "fine_tune_step1_clean",
+        "learning_rate": 0.0001,
+        "reason": "deterministic_generator_parity_seed:fine_tune_step1_ffn",
+        "scope": "ffn",
+        "status": "selected",
+        "steps": 1,
+    },
+    "lora_merge": {
+        "alpha": 8,
+        "edit_dir_name": "lora_rank4_clean",
+        "rank": 4,
+        "reason": "deterministic_generator_parity_seed:lora_rank4_attn",
+        "scope": "attn",
+        "status": "selected",
+    },
+}
+
+CORE_EDIT_TYPES = {
+    "fp8_quant",
+    "lowrank_svd",
+    "magnitude_prune",
+    "quant_rtn",
+}
+ALL_CLEAN_EDIT_TYPES = CORE_EDIT_TYPES | set(GENERATED_CLEAN_EDIT_PARAMS)
+
+
+def _core_edit_entries(entry: dict) -> dict:
+    return {key: entry[key] for key in sorted(CORE_EDIT_TYPES)}
+
+
+def _assert_generated_clean_edit_entries(entry: dict) -> None:
+    for edit_type, expected in GENERATED_CLEAN_EDIT_PARAMS.items():
+        assert entry[edit_type] == expected
+
+
 def test_supported_experimental_models_have_selected_clean_tuned_edit_params() -> None:
     payload = _load_tuned_edit_params()
     models = payload["models"]
@@ -39,12 +76,8 @@ def test_supported_experimental_models_have_selected_clean_tuned_edit_params() -
     for model_id in _supported_experimental_models():
         assert model_id in models, model_id
         entry = models[model_id]
-        assert set(entry) == {
-            "fp8_quant",
-            "lowrank_svd",
-            "magnitude_prune",
-            "quant_rtn",
-        }
+        assert set(entry) == ALL_CLEAN_EDIT_TYPES
+        _assert_generated_clean_edit_entries(entry)
 
         assert entry["fp8_quant"]["edit_dir_name"] == "fp8_e5m2_clean"
         assert entry["fp8_quant"]["format"] == "e5m2"
@@ -72,12 +105,8 @@ def test_deferred_candidate_models_have_queue_ready_clean_tuned_edit_params() ->
     for model_id in _deferred_candidate_models():
         assert model_id in models, model_id
         entry = models[model_id]
-        assert set(entry) == {
-            "fp8_quant",
-            "lowrank_svd",
-            "magnitude_prune",
-            "quant_rtn",
-        }
+        assert set(entry) == ALL_CLEAN_EDIT_TYPES
+        _assert_generated_clean_edit_entries(entry)
         assert entry["fp8_quant"]["status"] == "selected"
         assert entry["lowrank_svd"]["status"] == "selected"
         assert entry["magnitude_prune"]["status"] == "selected"
@@ -88,12 +117,8 @@ def test_qwen25_7b_tuned_edit_params_cover_clean_edit_matrix() -> None:
     payload = _load_tuned_edit_params()
 
     qwen25_7b = payload["models"]["Qwen/Qwen2.5-7B"]
-    assert set(qwen25_7b) == {
-        "fp8_quant",
-        "lowrank_svd",
-        "magnitude_prune",
-        "quant_rtn",
-    }
+    assert set(qwen25_7b) == ALL_CLEAN_EDIT_TYPES
+    _assert_generated_clean_edit_entries(qwen25_7b)
     assert qwen25_7b["fp8_quant"] == {
         "edit_dir_name": "fp8_e5m2_clean",
         "format": "e5m2",
@@ -153,7 +178,9 @@ def test_olmo13_tuned_lowrank_clean_is_retuned_and_exact() -> None:
 def test_qwen2_7b_tuned_edit_params_are_exact() -> None:
     payload = _load_tuned_edit_params()
 
-    assert payload["models"]["Qwen/Qwen2-7B"] == {
+    entry = payload["models"]["Qwen/Qwen2-7B"]
+    _assert_generated_clean_edit_entries(entry)
+    assert _core_edit_entries(entry) == {
         "fp8_quant": {
             "edit_dir_name": "fp8_e5m2_clean",
             "format": "e5m2",
@@ -189,7 +216,9 @@ def test_qwen2_7b_tuned_edit_params_are_exact() -> None:
 def test_qwen25_14b_tuned_edit_params_are_exact() -> None:
     payload = _load_tuned_edit_params()
 
-    assert payload["models"]["Qwen/Qwen2.5-14B"] == {
+    entry = payload["models"]["Qwen/Qwen2.5-14B"]
+    _assert_generated_clean_edit_entries(entry)
+    assert _core_edit_entries(entry) == {
         "fp8_quant": {
             "edit_dir_name": "fp8_e5m2_clean",
             "format": "e5m2",
@@ -272,7 +301,9 @@ def test_ministral3_8b_tuned_clean_quant_and_prune_are_retuned_and_exact() -> No
 def test_qwen3_5_9b_tuned_edit_params_are_exact() -> None:
     payload = _load_tuned_edit_params()
 
-    assert payload["models"]["Qwen/Qwen3.5-9B"] == {
+    entry = payload["models"]["Qwen/Qwen3.5-9B"]
+    _assert_generated_clean_edit_entries(entry)
+    assert _core_edit_entries(entry) == {
         "fp8_quant": {
             "edit_dir_name": "fp8_e5m2_clean",
             "format": "e5m2",
@@ -308,7 +339,9 @@ def test_qwen3_5_9b_tuned_edit_params_are_exact() -> None:
 def test_ministral3_14b_tuned_edit_params_are_exact() -> None:
     payload = _load_tuned_edit_params()
 
-    assert payload["models"]["mistralai/Ministral-3-14B-Instruct-2512-BF16"] == {
+    entry = payload["models"]["mistralai/Ministral-3-14B-Instruct-2512-BF16"]
+    _assert_generated_clean_edit_entries(entry)
+    assert _core_edit_entries(entry) == {
         "fp8_quant": {
             "edit_dir_name": "fp8_e5m2_clean",
             "format": "e5m2",
@@ -344,7 +377,9 @@ def test_ministral3_14b_tuned_edit_params_are_exact() -> None:
 def test_phi4_tuned_edit_params_are_exact() -> None:
     payload = _load_tuned_edit_params()
 
-    assert payload["models"]["microsoft/Phi-4-reasoning-plus"] == {
+    entry = payload["models"]["microsoft/Phi-4-reasoning-plus"]
+    _assert_generated_clean_edit_entries(entry)
+    assert _core_edit_entries(entry) == {
         "fp8_quant": {
             "edit_dir_name": "fp8_e5m2_clean",
             "format": "e5m2",
@@ -380,7 +415,9 @@ def test_phi4_tuned_edit_params_are_exact() -> None:
 def test_gemma4_e2b_tuned_edit_params_are_exact() -> None:
     payload = _load_tuned_edit_params()
 
-    assert payload["models"]["google/gemma-4-E2B-it"] == {
+    entry = payload["models"]["google/gemma-4-E2B-it"]
+    _assert_generated_clean_edit_entries(entry)
+    assert _core_edit_entries(entry) == {
         "fp8_quant": {
             "edit_dir_name": "fp8_e5m2_clean",
             "format": "e5m2",
@@ -416,7 +453,9 @@ def test_gemma4_e2b_tuned_edit_params_are_exact() -> None:
 def test_tinyllama_tuned_edit_params_are_exact() -> None:
     payload = _load_tuned_edit_params()
 
-    assert payload["models"]["TinyLlama/TinyLlama-1.1B-Chat-v1.0"] == {
+    entry = payload["models"]["TinyLlama/TinyLlama-1.1B-Chat-v1.0"]
+    _assert_generated_clean_edit_entries(entry)
+    assert _core_edit_entries(entry) == {
         "fp8_quant": {
             "edit_dir_name": "fp8_e5m2_clean",
             "format": "e5m2",
@@ -452,7 +491,9 @@ def test_tinyllama_tuned_edit_params_are_exact() -> None:
 def test_olmo2_7b_tuned_edit_params_are_exact() -> None:
     payload = _load_tuned_edit_params()
 
-    assert payload["models"]["allenai/OLMo-2-1124-7B"] == {
+    entry = payload["models"]["allenai/OLMo-2-1124-7B"]
+    _assert_generated_clean_edit_entries(entry)
+    assert _core_edit_entries(entry) == {
         "fp8_quant": {
             "edit_dir_name": "fp8_e5m2_clean",
             "format": "e5m2",

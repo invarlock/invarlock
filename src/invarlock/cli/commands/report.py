@@ -524,7 +524,7 @@ def report_explain(
         "--evaluation-report",
         help=(
             "Path to evaluation report JSON file or directory containing "
-            "canonical evaluation.report.json. Preferred reviewer input; explains "
+            "canonical evaluation.report.json. Preferred evidence input; explains "
             "the evaluation bundle directly without requiring linked raw run reports."
         ),
     ),

@@ -26,6 +26,17 @@ High-signal workflow front doors:
   tiny model evaluation matrix. Set `RUN=1` to execute it and `NET=1` when model
   downloads are allowed. This covers compact causal-LM, encoder-MLM, and quant
   demo evaluation paths.
+- `python scripts/smoke/run_tiny_fine_tune_byoe_smoke.py`: run the local
+  CPU-only BYOE fine-tune smoke against a cached tiny GPT-2 model, then verify
+  the enriched report with evaluation-realism, topology, and delta/privacy
+  metadata. Generated fine-tune validation-subject coverage lives in the
+  evidence-pack harness.
+- `python scripts/smoke/run_training_evidence_campaign.py --dry-run`: inspect
+  the real PEFT LoRA train-and-merge plus full fine-tune training-evidence
+  campaign. Remove `--dry-run` for local tiny CPU lanes, or use
+  `--execution-lane cuda` on a CUDA-capable validation host for the strict
+  CUDA/container matrix. Generated checkpoints stay local; publish only the
+  public summary and hash inventory after review.
 - `make model-evidence-list`: print the maintained shipped-model evidence lane
   manifest.
 - `make model-evidence-sweep MODEL_EVIDENCE_ARGS='--dry-run'`: inspect the
@@ -39,7 +50,7 @@ High-signal workflow front doors:
 - `scripts/evidence_packs/run_suite.sh`: run evidence-pack scenarios without
   packaging the result. This is for development/debugging.
 - `scripts/evidence_packs/run_pack.sh`: run the suite and build a distributable
-  evidence pack. Prefer this over `run_suite.sh` for release or reviewer-facing
+  evidence pack. Prefer this over `run_suite.sh` for release or public
   artifacts.
 
 Each family records owner, purpose, stability, audience, expected runtime,

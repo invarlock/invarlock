@@ -55,7 +55,7 @@
   "external_edit_type": "magnitude_prune",
   "prune_fraction": 0.0025,
   "schema": "invarlock.public_evidence.external_edit_recipe.v1",
-  "subject_checkpoint_path": "/private/tmp/invarlock-byoe-magnitude-prune-subject",
+  "subject_checkpoint_path": "<local-temp-dir>/invarlock-byoe-magnitude-prune-subject",
   "subject_file_sha256": [
     {
       "path": "config.json",

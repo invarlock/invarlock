@@ -22,6 +22,7 @@ _verify_manifest_binds_checksums = (
 _verify_checksums = evidence_pack_integrity_mod.verify_checksums
 _parse_checksums = evidence_pack_integrity_mod.parse_checksums
 _verify_no_extra_files = evidence_pack_integrity_mod.verify_no_extra_files
+_verify_control_file_mirrors = evidence_pack_integrity_mod.verify_control_file_mirrors
 _validate_signing_key = evidence_pack_integrity_mod.validate_signing_key
 _sha256_bytes = evidence_pack_integrity_mod._sha256_bytes
 _sha256_file = evidence_pack_integrity_mod._sha256_file
@@ -108,7 +109,7 @@ def _render_evidence_pack_readme(
         )
     else:
         lines.append(
-            "- Nested report verification succeeded for the bundled clean reports, but reviewers should still inspect the underlying evaluation.report.json files."
+            "- Nested report verification succeeded for the bundled clean reports, but readers should still inspect the underlying evaluation.report.json files."
         )
     lines.append(
         "- Error-injection reports are expected-failure evidence and should not be interpreted as clean PASS runs."
@@ -411,6 +412,7 @@ def inspect_evidence_pack(pack_dir: Path) -> EvidencePackResult:
 
     bind_errors = _verify_manifest_binds_checksums(pack_dir)
     checksum_errors, covered_paths = _verify_checksums(pack_dir)
+    mirror_errors = _verify_control_file_mirrors(pack_dir)
     provenance_errors = verify_manifest_provenance(pack_dir)
     extra_files = sorted(
         set(_relative_file_paths(pack_dir)) - covered_paths - _CONTROL_FILES
@@ -422,6 +424,7 @@ def inspect_evidence_pack(pack_dir: Path) -> EvidencePackResult:
         )
     issues.extend(bind_errors)
     issues.extend(checksum_errors)
+    issues.extend(mirror_errors)
     issues.extend(provenance_errors)
 
     payload["artifacts"] = {
@@ -431,6 +434,7 @@ def inspect_evidence_pack(pack_dir: Path) -> EvidencePackResult:
     payload["integrity"] = {
         "checksums_bound": not bind_errors,
         "checksums_ok": not checksum_errors,
+        "control_file_mirrors_ok": not mirror_errors,
         "manifest_provenance_ok": not provenance_errors,
         "extra_files": extra_files,
     }

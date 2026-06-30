@@ -16,26 +16,102 @@ jobs:
   scan:
     name: Supply Chain Scan
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.13"
 
       - name: Install supply-chain tools
         run: python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt
 
+      - name: Cache gitleaks binary
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/go/bin/gitleaks
+          key: gitleaks-v8.30.0-${{ runner.os }}-${{ runner.arch }}
+
       - name: Install gitleaks
         run: |
-          go install github.com/zricethezav/gitleaks/v8@v8.30.0
+          gitleaks_bin="$(go env GOPATH)/bin/gitleaks"
+          if [ ! -x "${gitleaks_bin}" ]; then
+            go install github.com/zricethezav/gitleaks/v8@v8.30.0
+          fi
+          "${gitleaks_bin}" version
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Run gitleaks PR git delta scan
+        id: gitleaks_scan
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/supply-chain
+          changed_files="artifacts/supply-chain/gitleaks.changed-files"
+          if [ -n "${PR_BASE_SHA}" ] && [ -n "${PR_HEAD_SHA}" ] \
+            && git cat-file -e "${PR_BASE_SHA}^{commit}" \
+            && git cat-file -e "${PR_HEAD_SHA}^{commit}"; then
+            scan_range="${PR_BASE_SHA}..${PR_HEAD_SHA}"
+            git diff --name-only --diff-filter=ACMRT "${PR_BASE_SHA}" "${PR_HEAD_SHA}" > "${changed_files}"
+          else
+            if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+              scan_range="HEAD~1..HEAD"
+            else
+              scan_range="HEAD"
+            fi
+            git show --pretty="" --name-only --diff-filter=ACMRT HEAD > "${changed_files}"
+          fi
+          echo "scan_range=${scan_range}" >> "$GITHUB_OUTPUT"
+          changed_file_count="$(grep -cve '^[[:space:]]*$' "${changed_files}" || true)"
+          echo "changed_file_count=${changed_file_count}" >> "$GITHUB_OUTPUT"
+          set +e
+          gitleaks git . \
+            --config .gitleaks.toml \
+            --redact \
+            --no-banner \
+            --log-opts "${scan_range}" \
+            --report-format json \
+            --report-path artifacts/supply-chain/gitleaks.json
+          exit_code=$?
+          set -e
+          if [ ! -s artifacts/supply-chain/gitleaks.json ]; then
+            printf '[]\n' > artifacts/supply-chain/gitleaks.json
+          fi
+          echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload gitleaks PR artifacts
+        if: ${{ always() && steps.gitleaks_scan.outcome != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: supply-chain-pr-gitleaks
+          path: |
+            artifacts/supply-chain/gitleaks.changed-files
+            artifacts/supply-chain/gitleaks.json
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Fail on secret findings
+        if: ${{ always() && steps.gitleaks_scan.outcome != 'skipped' }}
+        shell: bash
+        run: |
+          exit_code="${{ steps.gitleaks_scan.outputs.exit_code }}"
+          if [ -z "${exit_code}" ]; then
+            echo "gitleaks scan did not publish an exit code" >&2
+            exit 1
+          fi
+          if [ "${exit_code}" != "0" ]; then
+            echo "gitleaks detected secrets; see uploaded artifact for details" >&2
+            exit 1
+          fi
 
       - name: Build release wheel
         run: |
@@ -66,6 +142,17 @@ jobs:
 
       - name: Generate install-surface SBOM
         run: bash scripts/security/generate_sbom.sh --scope install-surface --python "${{ steps.install_surface.outputs.python }}" artifacts/supply-chain/sbom.json
+
+      - name: Upload supply-chain artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: supply-chain-pr-artifacts
+          path: |
+            artifacts/supply-chain/sbom.json
+            artifacts/supply-chain/gitleaks.changed-files
+            artifacts/supply-chain/gitleaks.json
+          if-no-files-found: error
+          retention-days: 3
 
       - name: Remove install-surface venv
         run: rm -rf .artifact-venv
@@ -118,98 +205,3 @@ jobs:
 
       - name: Run advanced surface pip-audit
         run: python scripts/security/run_pip_audit.py --path "${{ steps.advanced_surface.outputs.site_packages }}"
-
-      - name: Run gitleaks PR file scan
-        id: gitleaks_scan
-        shell: bash
-        env:
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          mkdir -p artifacts/supply-chain
-          changed_files="artifacts/supply-chain/gitleaks.changed-files"
-          scan_root="artifacts/supply-chain/pr-files"
-          rm -rf "${scan_root}"
-          mkdir -p "${scan_root}"
-          if [ -n "${PR_BASE_SHA}" ] && [ -n "${PR_HEAD_SHA}" ] \
-            && git cat-file -e "${PR_BASE_SHA}^{commit}" \
-            && git cat-file -e "${PR_HEAD_SHA}^{commit}"; then
-            scan_range="${PR_BASE_SHA}..${PR_HEAD_SHA}"
-            git diff --name-only --diff-filter=ACMRT "${PR_BASE_SHA}" "${PR_HEAD_SHA}" > "${changed_files}"
-          else
-            scan_range="-1 HEAD"
-            git show --pretty="" --name-only --diff-filter=ACMRT HEAD > "${changed_files}"
-          fi
-          echo "scan_range=${scan_range}" >> "$GITHUB_OUTPUT"
-          changed_file_count="$(grep -cve '^[[:space:]]*$' "${changed_files}" || true)"
-          echo "changed_file_count=${changed_file_count}" >> "$GITHUB_OUTPUT"
-          copied=0
-          while IFS= read -r path; do
-            if [ -z "${path}" ] || [ ! -f "${path}" ]; then
-              continue
-            fi
-            case "${path}" in
-              .git/*|artifacts/supply-chain/*)
-                continue
-                ;;
-            esac
-            mkdir -p "${scan_root}/$(dirname "${path}")"
-            cp -- "${path}" "${scan_root}/${path}"
-            copied=$((copied + 1))
-          done < "${changed_files}"
-          echo "scanned_file_count=${copied}" >> "$GITHUB_OUTPUT"
-          if [ "${copied}" = "0" ]; then
-            printf '[]\n' > artifacts/supply-chain/gitleaks.json
-            printf '{"version":"2.1.0","runs":[]}\n' > artifacts/supply-chain/gitleaks.sarif
-            echo "exit_code=0" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          set +e
-          gitleaks dir "${scan_root}" \
-            --config .gitleaks.toml \
-            --redact \
-            --no-banner \
-            --report-format json \
-            --report-path artifacts/supply-chain/gitleaks.json
-          json_exit=$?
-          gitleaks dir "${scan_root}" \
-            --config .gitleaks.toml \
-            --redact \
-            --no-banner \
-            --report-format sarif \
-            --report-path artifacts/supply-chain/gitleaks.sarif
-          sarif_exit=$?
-          set -e
-          exit_code="${json_exit}"
-          if [ "${sarif_exit}" != "0" ] && [ "${exit_code}" = "0" ]; then
-            exit_code="${sarif_exit}"
-          fi
-          echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
-
-      - name: Upload supply-chain artifacts
-        if: ${{ always() && steps.gitleaks_scan.outcome != 'skipped' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: supply-chain-pr-artifacts
-          path: |
-            artifacts/supply-chain/sbom.json
-            artifacts/supply-chain/gitleaks.changed-files
-            artifacts/supply-chain/gitleaks.json
-            artifacts/supply-chain/gitleaks.sarif
-          if-no-files-found: error
-          retention-days: 3
-
-      - name: Fail on secret findings
-        if: ${{ always() && steps.gitleaks_scan.outcome != 'skipped' }}
-        shell: bash
-        run: |
-          exit_code="${{ steps.gitleaks_scan.outputs.exit_code }}"
-          if [ -z "${exit_code}" ]; then
-            echo "gitleaks scan did not publish an exit code" >&2
-            exit 1
-          fi
-          if [ "${exit_code}" != "0" ]; then
-            echo "gitleaks detected secrets; see uploaded artifact for details" >&2
-            exit 1
-          fi

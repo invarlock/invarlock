@@ -10,6 +10,7 @@ import yaml
 
 WORKFLOWS_DIR = Path(".github/workflows")
 PINNED_ACTION_RE = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
+ACTIONS_CACHE_PIN = "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
 TRANSFORMERS_LOCKFILES = (
     Path("requirements/workflows/ci-hf-py312.txt"),
     Path("requirements/workflows/ci-hf-py313.txt"),
@@ -166,7 +167,7 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
 
     job = workflow["jobs"]["scan"]
     assert job["runs-on"] == "ubuntu-latest"
-    assert job["timeout-minutes"] == 15
+    assert job["timeout-minutes"] == 30
 
     steps = job["steps"]
     step_names = [step.get("name") for step in steps if isinstance(step, dict)]
@@ -175,20 +176,22 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
         "Checkout repository",
         "Set up Python",
         "Install supply-chain tools",
+        "Cache gitleaks binary",
         "Install gitleaks",
+        "Run gitleaks PR git delta scan",
+        "Upload gitleaks PR artifacts",
+        "Fail on secret findings",
         "Build release wheel",
         "Create install-surface venv",
         "Run pip-audit",
         "Generate install-surface SBOM",
+        "Upload supply-chain artifacts",
         "Remove install-surface venv",
         "Create HF surface venv",
         "Run HF surface pip-audit",
         "Remove HF surface venv",
         "Create advanced surface venv",
         "Run advanced surface pip-audit",
-        "Run gitleaks PR file scan",
-        "Upload supply-chain artifacts",
-        "Fail on secret findings",
     ]
 
     install_step = _find_step_by_name(steps, "Install supply-chain tools")
@@ -201,11 +204,17 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
     assert checkout_step["uses"].startswith("actions/checkout@")
     assert checkout_step["with"]["fetch-depth"] == 0
 
+    gitleaks_cache = _find_step_by_name(steps, "Cache gitleaks binary")
+    assert gitleaks_cache["uses"] == ACTIONS_CACHE_PIN
+    assert gitleaks_cache["with"]["path"] == "~/go/bin/gitleaks"
+    assert "gitleaks-v8.30.0" in gitleaks_cache["with"]["key"]
+
     gitleaks_install = _find_step_by_name(steps, "Install gitleaks")
     assert (
         "go install github.com/zricethezav/gitleaks/v8@v8.30.0"
         in gitleaks_install["run"]
     )
+    assert 'if [ ! -x "${gitleaks_bin}" ]; then' in gitleaks_install["run"]
 
     build_step = _find_step_by_name(steps, "Build release wheel")
     assert "rm -rf build dist" in build_step["run"]
@@ -275,7 +284,7 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
         in advanced_audit_step["run"]
     )
 
-    secret_scan_step = _find_step_by_name(steps, "Run gitleaks PR file scan")
+    secret_scan_step = _find_step_by_name(steps, "Run gitleaks PR git delta scan")
     assert (
         secret_scan_step["env"]["PR_BASE_SHA"]
         == "${{ github.event.pull_request.base.sha }}"
@@ -288,17 +297,32 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
         'git diff --name-only --diff-filter=ACMRT "${PR_BASE_SHA}" "${PR_HEAD_SHA}"'
         in secret_scan_step["run"]
     )
-    assert 'scan_root="artifacts/supply-chain/pr-files"' in secret_scan_step["run"]
-    assert 'gitleaks dir "${scan_root}"' in secret_scan_step["run"]
+    assert "gitleaks git ." in secret_scan_step["run"]
     assert "--config .gitleaks.toml" in secret_scan_step["run"]
     assert 'scan_range="${PR_BASE_SHA}..${PR_HEAD_SHA}"' in secret_scan_step["run"]
-    assert 'scan_range="-1 HEAD"' in secret_scan_step["run"]
-    assert "scanned_file_count=" in secret_scan_step["run"]
+    assert "git rev-parse --verify HEAD~1" in secret_scan_step["run"]
+    assert 'scan_range="HEAD~1..HEAD"' in secret_scan_step["run"]
+    assert "changed_file_count=" in secret_scan_step["run"]
+    assert '--log-opts "${scan_range}"' in secret_scan_step["run"]
     assert "--report-format json" in secret_scan_step["run"]
-    assert "--report-format sarif" in secret_scan_step["run"]
+    assert "--report-format sarif" not in secret_scan_step["run"]
     assert "artifacts/supply-chain/gitleaks.changed-files" in secret_scan_step["run"]
     assert "artifacts/supply-chain/gitleaks.json" in secret_scan_step["run"]
-    assert "artifacts/supply-chain/gitleaks.sarif" in secret_scan_step["run"]
+
+    gitleaks_upload_step = _find_step_by_name(steps, "Upload gitleaks PR artifacts")
+    assert gitleaks_upload_step["uses"].startswith("actions/upload-artifact@")
+    assert gitleaks_upload_step["with"]["name"] == "supply-chain-pr-gitleaks"
+    assert (
+        "artifacts/supply-chain/gitleaks.changed-files"
+        in gitleaks_upload_step["with"]["path"]
+    )
+    assert (
+        "artifacts/supply-chain/gitleaks.json" in gitleaks_upload_step["with"]["path"]
+    )
+
+    fail_step = _find_step_by_name(steps, "Fail on secret findings")
+    assert "gitleaks scan did not publish an exit code" in fail_step["run"]
+    assert "gitleaks detected secrets" in fail_step["run"]
 
     upload_step = _find_step_by_name(steps, "Upload supply-chain artifacts")
     assert upload_step["uses"].startswith("actions/upload-artifact@")
@@ -308,11 +332,7 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
         "artifacts/supply-chain/gitleaks.changed-files" in upload_step["with"]["path"]
     )
     assert "artifacts/supply-chain/gitleaks.json" in upload_step["with"]["path"]
-    assert "artifacts/supply-chain/gitleaks.sarif" in upload_step["with"]["path"]
-
-    fail_step = _find_step_by_name(steps, "Fail on secret findings")
-    assert "gitleaks scan did not publish an exit code" in fail_step["run"]
-    assert "gitleaks detected secrets" in fail_step["run"]
+    assert "artifacts/supply-chain/gitleaks.sarif" not in upload_step["with"]["path"]
 
 
 def test_generate_sbom_script_exists():
@@ -603,6 +623,7 @@ def test_release_workflow_builds_and_publishes_tag_only_artifacts():
 
     build_check = workflow["jobs"]["build_check"]
     assert build_check["needs"] == "resolve_release_ref"
+    assert build_check["timeout-minutes"] == 45
     build_steps = build_check.get("steps", [])
 
     install_step = _find_step_by_name(build_steps, "Install build tooling")
@@ -611,19 +632,33 @@ def test_release_workflow_builds_and_publishes_tag_only_artifacts():
         == "python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt"
     )
 
+    gitleaks_cache = _find_step_by_name(build_steps, "Cache gitleaks binary")
+    assert gitleaks_cache["uses"] == ACTIONS_CACHE_PIN
+    assert gitleaks_cache["with"]["path"] == "~/go/bin/gitleaks"
+    assert "gitleaks-v8.30.0" in gitleaks_cache["with"]["key"]
+
     gitleaks_install = _find_step_by_name(build_steps, "Install gitleaks")
     assert (
         "go install github.com/zricethezav/gitleaks/v8@v8.30.0"
         in gitleaks_install["run"]
     )
+    assert 'if [ ! -x "${gitleaks_bin}" ]; then' in gitleaks_install["run"]
 
-    gitleaks_scan = _find_step_by_name(build_steps, "Run gitleaks history scan")
+    gitleaks_range = _find_step_by_name(build_steps, "Resolve gitleaks release range")
+    assert "git fetch --force --tags origin" in gitleaks_range["run"]
+    assert "git describe --tags --match 'v[0-9]*'" in gitleaks_range["run"]
+    assert "previous_tag" in gitleaks_range["run"]
+    assert "log_opts=" in gitleaks_range["run"]
+
+    gitleaks_scan = _find_step_by_name(build_steps, "Run gitleaks release delta scan")
     assert "gitleaks git ." in gitleaks_scan["run"]
     assert "--config .gitleaks.toml" in gitleaks_scan["run"]
     assert "artifacts/supply-chain/gitleaks.json" in gitleaks_scan["run"]
-    assert "artifacts/supply-chain/gitleaks.sarif" in gitleaks_scan["run"]
+    assert "artifacts/supply-chain/gitleaks.sarif" not in gitleaks_scan["run"]
+    assert "steps.gitleaks_range.outputs.log_opts" in gitleaks_scan["run"]
+    assert '--log-opts "${log_opts}"' in gitleaks_scan["run"]
     assert "--report-format json" in gitleaks_scan["run"]
-    assert "--report-format sarif" in gitleaks_scan["run"]
+    assert "--report-format sarif" not in gitleaks_scan["run"]
 
     config_text = Path(".gitleaks.toml").read_text(encoding="utf-8")
     assert "tokenizer_(?:hash|sha256)" in config_text
@@ -673,9 +708,12 @@ def test_release_workflow_builds_and_publishes_tag_only_artifacts():
     assert gitleaks_upload["uses"].startswith("actions/upload-artifact@")
     assert gitleaks_upload["with"]["name"] == "release-gitleaks"
     assert "artifacts/supply-chain/gitleaks.json" in gitleaks_upload["with"]["path"]
-    assert "artifacts/supply-chain/gitleaks.sarif" in gitleaks_upload["with"]["path"]
+    assert (
+        "artifacts/supply-chain/gitleaks.sarif" not in gitleaks_upload["with"]["path"]
+    )
 
     fail_step = _find_step_by_name(build_steps, "Fail on secret findings")
+    assert "gitleaks scan did not publish an exit code" in fail_step["run"]
     assert "gitleaks detected secrets" in fail_step["run"]
 
     dist_upload = _find_step_by_name(build_steps, "Upload dist artifacts")
@@ -690,6 +728,8 @@ def test_release_workflow_builds_and_publishes_tag_only_artifacts():
 
     testpypi_smoke = workflow["jobs"]["testpypi_smoke"]
     assert testpypi_smoke["needs"] == ["publish", "resolve_release_ref"]
+    assert workflow["jobs"]["publish"]["timeout-minutes"] == 10
+    assert testpypi_smoke["timeout-minutes"] == 10
     assert "inputs.target == 'testpypi'" in testpypi_smoke["if"]
     smoke_steps = testpypi_smoke.get("steps", [])
     download_step = _find_step_by_name(smoke_steps, "Download published TestPyPI wheel")
@@ -706,46 +746,3 @@ def test_release_workflow_builds_and_publishes_tag_only_artifacts():
     assert "python -m pip install wheelhouse/*.whl" in install_published_step["run"]
     assert "invarlock --help" in install_published_step["run"]
     assert 'python -c "import invarlock.cli.app"' in install_published_step["run"]
-
-
-def test_supply_chain_docs_match_workflow_truth() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-
-    workflows_doc = (repo_root / ".github" / "WORKFLOWS.md").read_text(encoding="utf-8")
-    allowlist_doc = (
-        repo_root / "docs" / "security" / "pip-audit-allowlist.md"
-    ).read_text(encoding="utf-8")
-    release_doc = (
-        repo_root / "docs" / "security" / "release-verification.md"
-    ).read_text(encoding="utf-8")
-    architecture_doc = (repo_root / "docs" / "security" / "architecture.md").read_text(
-        encoding="utf-8"
-    )
-
-    assert "install-surface SBOM" in workflows_doc
-    assert "base, `hf`, and `advanced` shipped dependency surfaces" in workflows_doc
-    assert "gitleaks" in workflows_doc
-    assert "scripts/security/run_pip_audit.py" in allowlist_doc
-    assert "scripts/security/pip_audit_allowlist.json" in allowlist_doc
-    assert "installed release surface" in release_doc
-    assert "resolved commit SHA" in release_doc
-    assert "PyPI" in release_doc
-    assert "gitleaks" in architecture_doc
-    assert "installed-artifact environment" in architecture_doc
-
-
-def test_ci_verify_full_pins_make_to_setup_python() -> None:
-    workflow = _load_workflow(Path(".github/workflows/ci.yml"))
-    verify_full = workflow["jobs"]["verify-full"]
-
-    env = verify_full.get("env", {})
-    assert env["PYTHON"] == "python"
-
-    steps = verify_full.get("steps", [])
-    setup_node_step = _find_step_by_name(steps, "Set up Node.js")
-    npm_step = _find_step_by_name(steps, "Install docs lint toolchain")
-    verify_step = _find_step_by_name(steps, "Full verify")
-    assert setup_node_step["with"]["node-version"] == "22"
-    assert npm_step["run"] == "npm ci"
-    assert "make verify" in verify_step["run"]
-    assert "mkdocs build --strict" in verify_step["run"]

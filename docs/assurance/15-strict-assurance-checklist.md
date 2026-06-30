@@ -1,6 +1,6 @@
 # Strict Assurance Checklist
 
-> **Plain language:** This is the reviewer checklist for deciding whether a
+> **Plain language:** This is the acceptance checklist for deciding whether a
 > strict report and its sibling runtime manifest can be accepted as assurance
 > evidence.
 
@@ -8,8 +8,8 @@
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Reviewer checklist for accepting strict assurance evidence. |
-| **Audience** | Maintainers, release reviewers, CI gate owners. |
+| **Purpose** | Acceptance checklist for strict assurance evidence. |
+| **Audience** | Maintainers, release approvers, CI gate owners. |
 | **Contract scope** | Current strict assurance behavior, claim set `invarlock-weight-edit-regression-v1`, report v1. |
 | **Source of truth** | `src/invarlock/core/assurance_contract.py`, `src/invarlock/reporting/verify_contract.py`, `docs/assurance/14-trust-model.md`. |
 
@@ -25,10 +25,10 @@ invarlock verify --assurance strict reports/eval/evaluation.report.json
 ```
 
 A green exit from this command satisfies the report/manifest checks that are
-machine-checkable from the submitted evidence. The remaining items are reviewer
+machine-checkable from the submitted evidence. The remaining items are human
 judgment about policy allowances and bundle contents.
 
-`invarlock report export --format release-review-md` can generate a reviewer
+`invarlock report export --format release-review-md` can generate a release
 packet from the same report and an optional `invarlock verify --json` result.
 Use it as a checklist wrapper; it does not replace this checklist or change the
 strict assurance contract.
@@ -41,7 +41,7 @@ strict assurance contract.
 - [ ] Runtime execution was container-backed.
 - [ ] Unverified provenance was not allowed.
 
-## Reviewer-Confirmed Policy Context
+## Confirmed Policy Context
 
 - [ ] Network and remote-code allowances were reviewed and recorded.
 - [ ] The original evaluate command and staged bundle contents match the
@@ -68,7 +68,7 @@ strict assurance contract.
   and do not silently erase the original outlier.
 - [ ] Variance guard preparation/finalization failures fail closed unless an
   explicit monitor-only policy is recorded in the report.
-- [ ] Reviewer-facing reports expose fallback diagnostics under the relevant
+- [ ] Evidence reports expose fallback diagnostics under the relevant
   guard result, and strict assurance blocks unsupported or degraded guard states.
 
 ## Metrics And Windows

@@ -1,0 +1,66 @@
+{
+  "execution_mode": "container",
+  "files": [
+    {
+      "bytes": 5594133,
+      "path": "eval/openai_gpt_oss_20b/report/evaluation.report.json",
+      "sha256": "b656ab5e9cba0f6d56a794861a83f5bb55a595fe214fdafcbbeaeb6132bba58a"
+    },
+    {
+      "bytes": 747,
+      "path": "eval/openai_gpt_oss_20b/verify.json",
+      "sha256": "65fb50a69bdc4ca1a4f6938f2aa42000abc563bd4f95fdd6865b5abfd1e28870"
+    },
+    {
+      "bytes": 7410,
+      "path": "logs/openai_gpt_oss_20b.log",
+      "sha256": "33239b73d9c8854286e15b127b0fc224fd3c3667cdb56bfb45b43b9c45e34acd"
+    },
+    {
+      "bytes": 809,
+      "path": "manifest.json",
+      "sha256": "328c13de5b2fa38bd5adc807d3f8176f5fad3c7a66a4c41be6ec636fda6a297a"
+    },
+    {
+      "bytes": 832,
+      "path": "model_revisions.json",
+      "sha256": "b85eea5774675f527b83ceb221323e91f768d44c67383523ed2d0242b8e5d0a1"
+    },
+    {
+      "bytes": 249,
+      "path": "status.log",
+      "sha256": "4fa2bbc237997621100fd3ef1b9b8b72ccbb2894fc984f2d2fba652a75c6d4c4"
+    },
+    {
+      "bytes": 686,
+      "path": "summary.json",
+      "sha256": "491afb241efef5a818f067422964a3c84457d7fba0c9e5c939520d80ba8ff5ac"
+    },
+    {
+      "bytes": 208,
+      "path": "summary.tsv",
+      "sha256": "81fc5b688aedf85882f007d93ab9fc6bda42cef6a741894505baa6dd921bc96f"
+    }
+  ],
+  "generated_at": "2026-06-29T09:14:24.192967+00:00",
+  "lane_results": [
+    {
+      "detail": null,
+      "evaluate_exit": 0,
+      "lane_id": "gpt-oss-20b-causal-hf",
+      "model_id": "openai/gpt-oss-20b",
+      "ok": true,
+      "preset": "configs/presets/causal_lm/gpt_oss_20b_512.yaml",
+      "report_path": "<model-evidence-root>/20260629Tgptoss20bRelease400/eval/openai_gpt_oss_20b/report/evaluation.report.json",
+      "slug": "openai_gpt_oss_20b",
+      "status": "ok",
+      "verify_exit": 0,
+      "verify_path": "<model-evidence-root>/20260629Tgptoss20bRelease400/eval/openai_gpt_oss_20b/verify.json"
+    }
+  ],
+  "ok": true,
+  "schema": "invarlock/model-evidence-artifact-manifest-v1",
+  "shard_count": 1,
+  "shard_index": 0,
+  "suite": "support-matrix-backlog-gpu"
+}

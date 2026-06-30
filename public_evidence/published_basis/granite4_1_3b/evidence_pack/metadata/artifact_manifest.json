@@ -51,11 +51,11 @@
       "model_id": "ibm-granite/granite-4.1-3b",
       "ok": true,
       "preset": "configs/presets/causal_lm/granite4_1_3b_512.yaml",
-      "report_path": "/root/model-evidence/20260612TgraniteReleaseProfileA/shard-01-gpu-1/eval/ibm_granite_granite_4_1_3b/report/evaluation.report.json",
+      "report_path": "<model-evidence-root>/20260612TgraniteReleaseProfileA/shard-01-gpu-1/eval/ibm_granite_granite_4_1_3b/report/evaluation.report.json",
       "slug": "ibm_granite_granite_4_1_3b",
       "status": "ok",
       "verify_exit": 0,
-      "verify_path": "/root/model-evidence/20260612TgraniteReleaseProfileA/shard-01-gpu-1/eval/ibm_granite_granite_4_1_3b/verify.json"
+      "verify_path": "<model-evidence-root>/20260612TgraniteReleaseProfileA/shard-01-gpu-1/eval/ibm_granite_granite_4_1_3b/verify.json"
     }
   ],
   "ok": true,

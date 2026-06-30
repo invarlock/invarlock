@@ -51,7 +51,7 @@ print(adapter.describe(model)["model_type"])
 > Gemma 4 image-text through `hf_multimodal` plus `vision_text`, and MoE causal
 > lanes such as OLMoE, Mixtral, and Qwen3 30B-A3B. Treat
 > `contracts/support_matrix.json` as authoritative for model-lane status and the
-> Model Family Catalog as the broader inventory of adapter/profile coverage.
+> Model Family Catalog as the broader view of adapter/profile coverage.
 
 ## Support Tiers
 
@@ -85,7 +85,7 @@ Do not infer `published_basis` from adapter availability alone. For example,
 - **Quantized adapters** (`hf_bnb`, `hf_awq`, `hf_gptq`, `hf_torchao`, `hf_hqq`, `hf_quanto`, `hf_ct`) handle
   their own device placement; avoid calling `.to(...)` on the loaded model.
 - **Containerized quant evidence** requires a runtime image with the optional
-  quant backends installed. For remote CUDA evidence-pack setup, set
+  quant backends installed. For CUDA evidence-pack setup, set
   `PACK_RUNTIME_IMAGE_FLAVOR=quant` to select/build
   `invarlock-runtime:cuda-quant` instead of the default CUDA runtime image.
   This opt-in image uses the pinned CUDA devel base and retains the compiler
@@ -223,9 +223,9 @@ model:
   low_cpu_mem_usage: true
 ```
 
-The `vision_text` path above is a local smoke fixture. Public promotion evidence
+The `vision_text` path above is a local smoke fixture. Public evidence
 uses materialized, pinned public datasets with dataset materialization summaries
-stored alongside the run artifacts, and image-text published-basis promotion
+stored alongside the run artifacts, and image-text published-basis inclusion
 requires a measured primary-metric floor rather than preservation pass/fail
 alone.
 

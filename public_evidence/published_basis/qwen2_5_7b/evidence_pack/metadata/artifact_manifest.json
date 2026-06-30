@@ -51,11 +51,11 @@
       "model_id": "Qwen/Qwen2.5-7B",
       "ok": true,
       "preset": "configs/presets/causal_lm/qwen2_5_7b_512.yaml",
-      "report_path": "/root/model-evidence/20260611Tqwen257bCudaContainerZ/shard-00-gpu-0/eval/qwen2_5_7b/report/evaluation.report.json",
+      "report_path": "<model-evidence-root>/20260611Tqwen257bCudaContainerZ/shard-00-gpu-0/eval/qwen2_5_7b/report/evaluation.report.json",
       "slug": "qwen2_5_7b",
       "status": "ok",
       "verify_exit": 0,
-      "verify_path": "/root/model-evidence/20260611Tqwen257bCudaContainerZ/shard-00-gpu-0/eval/qwen2_5_7b/verify.json"
+      "verify_path": "<model-evidence-root>/20260611Tqwen257bCudaContainerZ/shard-00-gpu-0/eval/qwen2_5_7b/verify.json"
     }
   ],
   "ok": true,

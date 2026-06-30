@@ -16,7 +16,7 @@
     "built_in_edit_plugin": false,
     "external_edit_type": "magnitude_prune",
     "materialized_by": "external_edit_recipe.py",
-    "model_id": "/private/tmp/invarlock-byoe-magnitude-prune-subject",
+    "model_id": "<local-temp-dir>/invarlock-byoe-magnitude-prune-subject",
     "revision": "local-materialized",
     "role": "subject",
     "subject_file_sha256": [

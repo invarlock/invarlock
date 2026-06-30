@@ -77,33 +77,58 @@ mkdir -p "${WORKFLOW_DIR}" "${EVIDENCE_PACK_DIR}"
 
 compile_pyproject() {
   local output="$1"
+  local output_arg="$1"
   shift
-  uv pip compile "${ROOT_DIR}/pyproject.toml" \
-    --python-platform x86_64-unknown-linux-gnu \
-    --generate-hashes \
-    --output-file "${output}" \
-    "$@"
+  if [[ "${output}" == "${ROOT_DIR}/"* ]]; then
+    output_arg="${output#${ROOT_DIR}/}"
+  fi
+  (
+    cd "${ROOT_DIR}"
+    uv pip compile pyproject.toml \
+      --python-platform x86_64-unknown-linux-gnu \
+      --generate-hashes \
+      --output-file "${output_arg}" \
+      "$@"
+  )
 }
 
 compile_req_in() {
   local input="$1"
   local output="$2"
+  local input_arg="$1"
+  local output_arg="$2"
   shift 2
-  uv pip compile "${input}" \
-    --universal \
-    --generate-hashes \
-    --output-file "${output}" \
-    "$@"
+  if [[ "${input}" == "${ROOT_DIR}/"* && "${output}" == "${ROOT_DIR}/"* ]]; then
+    input_arg="${input#${ROOT_DIR}/}"
+    output_arg="${output#${ROOT_DIR}/}"
+  fi
+  (
+    cd "${ROOT_DIR}"
+    uv pip compile "${input_arg}" \
+      --universal \
+      --generate-hashes \
+      --output-file "${output_arg}" \
+      "$@"
+  )
 }
 
 compile_req_platform() {
   local input="$1"
   local output="$2"
+  local input_arg="$1"
+  local output_arg="$2"
   shift 2
-  uv pip compile "${input}" \
-    --generate-hashes \
-    --output-file "${output}" \
-    "$@"
+  if [[ "${input}" == "${ROOT_DIR}/"* && "${output}" == "${ROOT_DIR}/"* ]]; then
+    input_arg="${input#${ROOT_DIR}/}"
+    output_arg="${output#${ROOT_DIR}/}"
+  fi
+  (
+    cd "${ROOT_DIR}"
+    uv pip compile "${input_arg}" \
+      --generate-hashes \
+      --output-file "${output_arg}" \
+      "$@"
+  )
 }
 
 run_workflow_locks() {
@@ -187,7 +212,18 @@ run_workflow_locks() {
 run_evidence_pack_locks() {
   compile_req_in \
     "${EVIDENCE_PACK_DIR}/accelerate.in" \
-    "${EVIDENCE_PACK_DIR}/accelerate.txt"
+    "${EVIDENCE_PACK_DIR}/accelerate.txt" \
+    --no-deps
+
+  compile_req_in \
+    "${EVIDENCE_PACK_DIR}/cuda-nvcc.in" \
+    "${EVIDENCE_PACK_DIR}/cuda-nvcc.txt" \
+    --no-deps
+
+  compile_req_in \
+    "${EVIDENCE_PACK_DIR}/flash-attn.in" \
+    "${EVIDENCE_PACK_DIR}/flash-attn.txt" \
+    --no-deps
 
   compile_req_in \
     "${EVIDENCE_PACK_DIR}/huggingface_hub.in" \
