@@ -51,7 +51,7 @@
       
     
     
-      <link rel="stylesheet" href="stylesheets/extra.css">
+      <link rel="stylesheet" href="assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -877,6 +877,34 @@
     
   
     Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user-guide/knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
   
 
     
@@ -3076,10 +3104,10 @@
 
 <h1 id="invarlock-documentation">InvarLock Documentation<a class="headerlink" href="#invarlock-documentation" title="Permanent link">&para;</a></h1>
 <p>InvarLock provides auditable strict verification for edited model checkpoints. It
-validates baseline-vs-subject comparisons, not a specific edit toolchain. A
-small built-in RTN dequantized weight-edit simulation (<code>quant_rtn</code>, 8-bit)
-exists for advanced smoke and demo workflows; production workflows are
-bring-your-own-edited-checkpoint (BYOE). See <a href="user-guide/compare-and-evaluate/">Compare &amp; evaluate
+centers on baseline-vs-subject comparisons for artifacts produced by your own
+edit workflow. A small built-in RTN dequantized weight-edit simulation
+(<code>quant_rtn</code>, 8-bit) exists for advanced smoke and demo workflows; production
+workflows are bring-your-own-edited-checkpoint (BYOE). See <a href="user-guide/compare-and-evaluate/">Compare &amp; evaluate
 (BYOE)</a> and the <a href="user-guide/public-evidence-walkthrough/">Public Evidence
 Walkthrough</a>.</p>
 <p>Welcome to the documentation hub for InvarLock (auditable strict verification for
@@ -3094,11 +3122,12 @@ running paired evaluation on text workflows plus the included image-text path.</
 <li><strong><a href="user-guide/getting-started/">Getting Started</a></strong> – environment setup and the first <code>evaluate</code> → <code>verify</code> → <code>report html</code> loop.</li>
 <li><strong><a href="user-guide/quickstart/">Quickstart</a></strong> – CLI highlights for common workflows.</li>
 <li><strong><a href="user-guide/compare-and-evaluate/">Compare &amp; evaluate (BYOE)</a></strong> – baseline ↔ subject paired evaluation with the guard chain.</li>
+<li><strong><a href="user-guide/knowledge-and-self-edit-workflows/">Knowledge &amp; self-edit workflows</a></strong> – use upstream edit systems as BYOE subject generators.</li>
 <li><strong><a href="user-guide/primary-metric-smoke/">Primary Metric Smoke</a></strong> – tiny examples for ppl/accuracy kinds.</li>
 </ol>
 <h3 id="choose-your-path">Choose Your Path<a class="headerlink" href="#choose-your-path" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Wheel user / reviewer</strong>: start with <a href="user-guide/quickstart/">Quickstart</a> if you already have an <code>evaluation.report.json</code> bundle and want to verify, explain, or render it.</li>
+<li><strong>Wheel user / report reader</strong>: start with <a href="user-guide/quickstart/">Quickstart</a> if you already have an <code>evaluation.report.json</code> bundle and want to verify, explain, or render it.</li>
 <li><strong>Evaluator</strong>: start with <a href="user-guide/getting-started/">Getting Started</a> if you need to run <code>invarlock evaluate</code> and produce a fresh evaluation bundle.</li>
 <li><strong>Repo maintainer</strong>: use the same user guides first, then reach for repo-only smokes, <code>configs/</code>, and local runtime-image flows after the core path is green.</li>
 </ul>
@@ -3126,6 +3155,7 @@ boundary. Advanced runtime-heavy workflows live under <code>invarlock advanced</
 <li><a href="user-guide/getting-started/">Getting Started</a></li>
 <li><a href="user-guide/quickstart/">Quickstart</a></li>
 <li><a href="user-guide/compare-and-evaluate/">Compare &amp; evaluate (BYOE)</a></li>
+<li><a href="user-guide/knowledge-and-self-edit-workflows/">Knowledge &amp; self-edit workflows</a></li>
 <li><a href="user-guide/primary-metric-smoke/">Primary Metric Smoke</a></li>
 <li><a href="user-guide/live-examples/">Live Examples</a></li>
 <li><a href="user-guide/integrations/">Integration Examples</a></li>
@@ -3203,7 +3233,7 @@ to change proposals or releases when you update calibration.</p>
 </ul>
 <h3 id="governance">Governance<a class="headerlink" href="#governance" title="Permanent link">&para;</a></h3>
 <ul>
-<li><a href="https://github.com/invarlock/invarlock/blob/v0.11.0/CONTRIBUTING.md">Contribution Guidelines</a></li>
+<li><a href="https://github.com/invarlock/invarlock/blob/v0.12.0/CONTRIBUTING.md">Contribution Guidelines</a></li>
 </ul>
 <hr />
 <h2 id="core-concepts">Core Concepts<a class="headerlink" href="#core-concepts" title="Permanent link">&para;</a></h2>
@@ -3528,6 +3558,20 @@ configured acceptance envelopes even when aggressive compression is attempted.</
 <td>Yes</td>
 </tr>
 <tr>
+<td>Qwen3.5 27B image-text LM (scoped)</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Qwen3.6 27B image-text LM (scoped)</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
 <td>Gemma 4 E2B image-text LM</td>
 <td>Yes</td>
 <td>Yes</td>
@@ -3550,6 +3594,13 @@ configured acceptance envelopes even when aggressive compression is attempted.</
 </tr>
 <tr>
 <td>Gemma 4 26B-A4B MoE image-text LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Gemma 4 31B image-text LM</td>
 <td>Yes</td>
 <td>Yes</td>
 <td>Yes</td>
@@ -3590,6 +3641,13 @@ configured acceptance envelopes even when aggressive compression is attempted.</
 <td>Yes</td>
 <td>Yes</td>
 </tr>
+<tr>
+<td>GPT-OSS 20B causal LM</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
 </tbody>
 </table>
 <h3 id="seq2seq-published-evidence">Seq2Seq Published Evidence<a class="headerlink" href="#seq2seq-published-evidence" title="Permanent link">&para;</a></h3>
@@ -3621,20 +3679,23 @@ Falcon 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B,
 Qwen3.5 2B image-text, DeepSeek-R1-Distill-Qwen 7B,
 DeepSeek-R1-0528-Qwen3 8B,
 DeepSeek-R1-Distill-Qwen 14B, Phi-4 text-only, Qwen3.5 4B image-text,
-Gemma 4 12B image-text, Gemma 4 26B-A4B image-text MoE, OLMoE
-1B-active/7B-total MoE, Mixtral 8x7B MoE, Qwen3 30B-A3B MoE, and FLAN-T5 base
+scoped Qwen3.5 27B image-text, scoped Qwen3.6 27B image-text,
+Gemma 4 12B image-text, Gemma 4 26B-A4B image-text MoE, Gemma 4 31B
+image-text, OLMoE 1B-active/7B-total MoE, Mixtral 8x7B MoE,
+Qwen3 30B-A3B MoE, GPT-OSS 20B, and FLAN-T5 base
 seq2seq profiles.
 Repo-included presets and pilot calibration configs for prepared practical-pick
 lanes do not become part of the published assurance basis until supporting
 artifacts are attached. OLMoE is the smaller MoE published-basis validation
 lane; Mixtral 8x7B and Qwen3 30B-A3B are larger no-op preservation
 bases. Gemma 4 26B-A4B is a multimodal MoE image-text preservation basis; it is
-not audio, exhaustive expert-bank, or MoE routing-quality evidence. The Qwen3
-30B-A3B fixture requires all-8 80GB-GPU sharding and uses scoped
-attention/router/shared-expert guard scans; it is not an exhaustive expert-bank
-or MoE routing-quality claim.
+scoped to pinned image-text evidence. Audio, exhaustive expert-bank, and MoE
+routing-quality evidence require separate artifacts. The Qwen3 30B-A3B fixture
+requires all-8 80GB-GPU sharding and uses scoped attention/router/shared-expert
+guard scans; exhaustive expert-bank and MoE routing-quality claims require
+separate evidence.
 The empirical guard manifest includes no-op published-basis summaries for the
-modern promoted families. They are null-behavior evidence and calibration
+modern published-basis families. They are null-behavior evidence and calibration
 inputs, but they do not re-derive the packaged spectral/RMT/variance tier
 constants; transferred attention caps remain budgeted sentinels until a
 family-specific null sweep supports an FPR interpretation.
@@ -3644,8 +3705,8 @@ baseline-relative spectral, RMT, and variance/VE evidence from clean
 confirmation reruns.
 Practical-pick families without tuned edit params or public evidence fixtures
 are tracked as <code>community_experimental</code> rows, even when a repo pilot preset and
-calibration config are already present. Access-gated vendor checkpoints are
-intentionally excluded from the included preset inventory.
+calibration config are already present. Access-gated vendor checkpoints are not
+included as repo-shipped presets.
 The Phi-4 public fixture is text-only and skips guard-overhead measurement by
 preset policy; strict release verification accepts that declared skip.
 The FLAN-T5 base public fixture uses pinned CNN/DailyMail validation data via
@@ -3653,22 +3714,25 @@ The FLAN-T5 base public fixture uses pinned CNN/DailyMail validation data via
 while the hard policy gates pass.
 The Qwen3.5 4B image-text lane now includes a public VQAv2 preset, null-sweep
 config, strict public report, runtime manifest, and signed evidence pack after
-the structured JSON-answer prompt fix.</p>
+the structured JSON-answer prompt fix.
+The scoped Qwen3.5 27B and Qwen3.6 27B image-text lanes cover
+self-attention and MLP guard scans; linear-attention module coverage remains a
+separate strict spectral-cap finding.</p>
 <p><code>published_basis</code> remains the narrow public evidence floor, while
 <code>supported_experimental</code> means the repo ships the preset, calibration config,
 targeted tests, smoke/evidence path, and tuned edit-param coverage for the lane
 without claiming a published-basis fixture set. <code>community_experimental</code> rows
-are candidate inventory entries; some already have repo pilot presets and
-calibration configs, but still need the remaining promotion artifacts before
+are candidate entries; some already have repo pilot presets and
+calibration configs, but still need the remaining published-basis artifacts before
 they become release-supported lanes.</p>
 <p>Image-text evaluation uses the built-in
 <code>hf_multimodal</code> adapter and the <code>vision_text</code> provider. Install
 <code>invarlock[multimodal]</code> for this path; Gemma 4 unified checkpoints require
 <code>transformers&gt;=5.12.0</code> and <code>torchvision&gt;=0.26.0</code>. Gemma 4 E2B has separate
 text-only and image-text public bases; Qwen3.5 2B, Qwen3.5 4B, Gemma 4 E4B,
-Gemma 4 12B, and Gemma 4 26B-A4B also have public image-text bases. Audio
-evaluation is deferred. Public
-image-text basis promotion requires
+scoped Qwen3.5/Qwen3.6 27B, Gemma 4 12B, Gemma 4 26B-A4B, and Gemma 4 31B
+also have public image-text bases. Audio evaluation is deferred. Public
+image-text published-basis inclusion requires
 measured accuracy on a pinned public dataset above the repo floor; preservation
 passing alone is not sufficient.</p>
 <p>Machine-readable support metadata lives in <code>contracts/support_matrix.json</code>. It is
@@ -3676,8 +3740,7 @@ the canonical source of truth for normalized support tiers
 (<code>published_basis</code>, <code>supported_experimental</code>, <code>community_experimental</code>) and for
 published-basis evidence references. Model lifecycle decisions live in
 <code>contracts/model_classification.json</code>: that file records whether a lane or
-family is published, backlog, blocked, smoke-only, usage-only, or out of scope,
-and centralizes blocked named checkpoints for future license/access changes.</p>
+family is published, backlog, blocked, smoke-only, usage-only, or out of scope.</p>
 <p>Model evidence automation lives in
 <code>scripts/model_evidence/model_evidence_sweep.py</code>, with tmux-based remote launch support in
 <code>scripts/model_evidence/run_model_evidence_remote.py</code> and a manual runner workflow in
@@ -3686,8 +3749,8 @@ For large MoE lanes that do not fit comfortably on one GPU, the remote helper
 supports grouped CUDA visibility, for example
 <code>--gpu-group 0,1,2,3</code> to launch one sweep shard with all four GPUs exposed
 instead of one shard per GPU.
-Repo-prepared-but-not-yet-promoted lanes are tracked in
-<code>contracts/model_family_catalog.json</code>; promotion eligibility and blockers are
+Repo-prepared candidate lanes are tracked in
+<code>contracts/model_family_catalog.json</code>; published-basis eligibility and blockers are
 tracked in <code>contracts/model_classification.json</code>.
 For the Gemma 4 text lane, the repo-maintained local smoke is the included
 manifest dry-run (<code>scripts/model_evidence/model_evidence_sweep.py --suite repo-mentioned-gpu --slug gemma4_e2b_public --dry-run</code>).
@@ -3712,8 +3775,8 @@ and Qwen3.5 4B public image-text bases use the same pinned VQAv2
 materialization pattern through
 <code>configs/presets/multimodal/*_public_vqav2_256.yaml</code> and matching
 <code>configs/calibration/null_sweep_*.yaml</code> files.</p>
-<p>For the broader inventory of declared support, implemented-but-not-public
-coverage, usage-only checkpoint families, and recommended additions, see
+<p>For declared support, implemented-but-not-public coverage, usage-only checkpoint
+families, and recommended additions, see
 <a href="reference/model-family-catalog/">Model Family Catalog</a>.</p>
 <hr />
 <h2 id="common-workflows">Common Workflows<a class="headerlink" href="#common-workflows" title="Permanent link">&para;</a></h2>
@@ -3790,7 +3853,7 @@ invarlock<span class="w"> </span>verify<span class="w"> </span>reports/eval/eval
 <a href="reference/cli/">CLI Reference</a> ·
 <a href="user-guide/primary-metric-smoke/">Primary Metric Smoke</a> ·
 <a href="user-guide/example-reports/">Example Reports</a> ·
-<a href="https://github.com/invarlock/invarlock/blob/v0.11.0/CONTRIBUTING.md">Contributing</a></p>
+<a href="https://github.com/invarlock/invarlock/blob/v0.12.0/CONTRIBUTING.md">Contributing</a></p>
 
 
 
@@ -3845,7 +3908,7 @@ invarlock<span class="w"> </span>verify<span class="w"> </span>reports/eval/eval
     
       <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="javascripts/mathjax.js"></script>
+        <script src="assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -536,6 +536,34 @@
     
   
     Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
   
 
     
@@ -2622,7 +2650,7 @@
 <p>InvarLock emits both machine-readable reports and human-friendly summaries.
 Use the steps below to reproduce representative artifacts from this repository version.</p>
 <h2 id="read-the-bundle-first">Read The Bundle First<a class="headerlink" href="#read-the-bundle-first" title="Permanent link">&para;</a></h2>
-<p>For most reviewers, the primary artifact is <code>evaluation.report.json</code>, not the
+<p>For most readers, the primary artifact is <code>evaluation.report.json</code>, not the
 lower-level run reports. Use it as the front door:</p>
 <div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>verify<span class="w"> </span>reports/quant8_demo/evaluation.report.json
 invarlock<span class="w"> </span>report<span class="w"> </span>html<span class="w"> </span>-i<span class="w"> </span>reports/quant8_demo/evaluation.report.json<span class="w"> </span>-o<span class="w"> </span>reports/quant8_demo/evaluation.html
@@ -2704,7 +2732,7 @@ invarlock<span class="w"> </span>report<span class="w"> </span>generate<span cla
 <div class="codehilite"><pre><span></span><code>Header -&gt; Summary chips -&gt; Quick links rail -&gt; Canonical report body
 </code></pre></div>
 
-<p>That layout is intentional: reviewers should be able to confirm overall status,
+<p>That layout is intentional: readers should be able to confirm overall status,
 jump directly to the gate or provenance section they care about, and still read
 the unchanged canonical report content underneath.</p>
 <p>For audits, collect the following files:</p>
@@ -2730,7 +2758,7 @@ the unchanged canonical report content underneath.</p>
 </tr>
 <tr>
 <td><code>reports/&lt;name&gt;/evaluation_report.md</code></td>
-<td>Human-friendly summary for reviewers</td>
+<td>Human-friendly summary for readers</td>
 </tr>
 </tbody>
 </table>
@@ -2792,7 +2820,7 @@ against the adjacent <code>runtime.manifest.json</code>.</p>
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -533,6 +533,34 @@
     
   
     Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
   
 
     
@@ -2843,8 +2871,8 @@ security or alignment.</p>
   plugins disabled, and remote model code off unless explicitly allowed.</li>
 <li>Supply-chain checks in CI and PR validation (install-surface SBOM
   generation, <code>pip-audit</code> on the base/<code>hf</code>/<code>advanced</code> shipped surfaces,
-  <code>gitleaks</code> history JSON/SARIF scanning), with tag-gated release backstops
-  for drift detection.</li>
+  <code>gitleaks</code> git-delta JSON scanning), with tag-gated release checks and a
+  scheduled full-history secret scan for drift detection.</li>
 <li>CodeQL scans shipped Python code plus repository helper scripts, and the
   analysis workflow fails closed if upload/analysis cannot complete.</li>
 <li>Release automation only rebuilds and publishes from validated tags resolved
@@ -2853,7 +2881,7 @@ security or alignment.</p>
   <code>invarlock verify</code>) to detect misconfiguration, schema drift, and runtime
   provenance mismatches.</li>
 <li>report fields for seeds, windowing, dataset/tokenizer hashes, and guard
-  telemetry so reviewers can audit the assurance evidence.</li>
+  telemetry so auditors can audit the assurance evidence.</li>
 </ul>
 <h2 id="attack-scenarios">Attack Scenarios<a class="headerlink" href="#attack-scenarios" title="Permanent link">&para;</a></h2>
 <p>Concrete attack scenarios InvarLock is designed to address or explicitly
@@ -2880,7 +2908,7 @@ Tighten tier (conservative) for high-stakes releases.</p>
 in report. Manual review of <code>report.guards[]</code> evidence.</p>
 <h3 id="4-configuration-drift-attack">4. Configuration Drift Attack<a class="headerlink" href="#4-configuration-drift-attack" title="Permanent link">&para;</a></h3>
 <p><strong>Threat:</strong> Attacker modifies config to weaken guards (larger ε, disabled
-checks) hoping reviewers don't notice.</p>
+checks) hoping auditors do not notice.</p>
 <p><strong>Mitigation:</strong> reports capture <code>resolved_policy.*</code> and <code>policy_digest</code>
 for audit. <code>invarlock verify</code> enforces schema compliance.</p>
 <p><strong>Detection:</strong> Policy changes appear in <code>policy_digest.changed = true</code>.
@@ -2960,7 +2988,7 @@ performance (cherry-picked easy examples).</p>
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

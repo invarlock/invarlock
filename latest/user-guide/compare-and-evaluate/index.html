@@ -16,7 +16,7 @@
         <link rel="prev" href="../primary-metric-smoke/">
       
       
-        <link rel="next" href="../live-examples/">
+        <link rel="next" href="../knowledge-and-self-edit-workflows/">
       
       
         
@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -686,6 +686,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -2713,9 +2741,10 @@ report. This avoids coupling to any particular edit stack and keeps your
 existing tooling intact whether you are validating quantization, pruning,
 fine-tuning, or other checkpoint-edit workflows.</p>
 <p>That is the production boundary in InvarLock: guards and verifier policy inspect
-the resulting subject checkpoint and paired metrics, not the external program
-that produced the subject. Built-in edit generation is kept to demo/smoke
-support; production validation should normally use BYOE.</p>
+the resulting subject checkpoint and paired metrics. The external program that
+produced the subject remains upstream provenance context. Built-in edit
+generation is kept to demo/smoke support; production validation should normally
+use BYOE.</p>
 <h2 id="tldr">TL;DR<a class="headerlink" href="#tldr" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Produce your baseline and edited checkpoints (any external tool).</li>
@@ -2798,15 +2827,17 @@ keep <code>seq_len=stride</code> for deterministic non-overlapping windows.</p>
 <li>Portable: reports are self-contained artifacts with provenance.</li>
 <li>Low maintenance: you can update your edit tools without waiting for InvarLock updates.</li>
 <li>Auditable: public BYOE fixtures under <code>public_evidence/byoe_examples/</code> show
-  dense magnitude pruning and LoRA-merge style subjects verifying through the
-  same strict verification path.</li>
+  dense magnitude pruning, LoRA-merge, and fine-tune subjects verifying through
+  the same strict verification path.</li>
 </ul>
 <h2 id="when-to-use-built-in-edits">When to use built-in edits<a class="headerlink" href="#when-to-use-built-in-edits" title="Permanent link">&para;</a></h2>
-<p>InvarLock ships a single built-in edit tuned for portable smokes:</p>
+<p>The evaluator CLI ships a single portable demo edit:</p>
 <ul>
 <li><code>quant_rtn</code> — 8‑bit (attention‑only mode available), CPU/MPS friendly</li>
 </ul>
-<p>Use it for quick local checks. For production edits, prefer Compare &amp; evaluate (BYOE).</p>
+<p>Use it for quick local checks. For production edits, prefer Compare &amp; evaluate (BYOE).
+The repo evidence-pack harness has additional deterministic validation-subject
+generators for quantization, pruning, LoRA merge, and fine-tune lane coverage.</p>
 <h2 id="determinism-pairing">Determinism &amp; pairing<a class="headerlink" href="#determinism-pairing" title="Permanent link">&para;</a></h2>
 <p>InvarLock pairs windows deterministically between baseline and subject runs. This
 ensures reproducible ratios and CI across machines and re‑runs. Keep these in
@@ -2822,6 +2853,7 @@ reports and <code>runtime.manifest.json</code> and revalidated by <code>invarloc
 <h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../../reference/cli/">CLI Reference</a> — Full <code>evaluate</code> command options</li>
+<li><a href="../knowledge-and-self-edit-workflows/">Knowledge &amp; self-edit workflows</a> — External edit systems as BYOE subject generators</li>
 <li><a href="../reading-report/">Reading a report</a> — Understanding output reports</li>
 <li><a href="../../assurance/02-coverage-and-pairing/">Coverage &amp; Pairing (Assurance)</a> — Window pairing invariants</li>
 <li><a href="../../assurance/08-determinism-contracts/">Determinism Contracts (Assurance)</a> — Seed and reproducibility guarantees</li>
@@ -2883,7 +2915,7 @@ reports and <code>runtime.manifest.json</code> and revalidated by <code>invarloc
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

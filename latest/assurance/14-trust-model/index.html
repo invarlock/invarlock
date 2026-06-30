@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -533,6 +533,34 @@
     
   
     Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
   
 
     
@@ -2734,7 +2762,7 @@ configured comparison and the associated report/provenance evidence.</p>
 </tr>
 <tr>
 <td><strong>Audience</strong></td>
-<td>Release reviewers, CI owners, operators accepting report evidence.</td>
+<td>Release approvers, CI owners, operators accepting report evidence.</td>
 </tr>
 <tr>
 <td><strong>Contract scope</strong></td>
@@ -2757,7 +2785,7 @@ for the manifest contract.</p>
 <p>Evidence-pack verification is separate from report verification. A signed
 evidence pack validates manifest integrity; signer authenticity requires pinning
 with <code>--expected-fingerprint</code> or a local trust store.</p>
-<p>Reviewer-facing exports such as <code>invarlock report export --format release-review-md</code>
+<p>Release exports such as <code>invarlock report export --format release-review-md</code>
 are presentation wrappers around the report and verifier result. They do not
 create a new assurance mode; acceptance still depends on <code>invarlock verify</code> and
 the runtime/evidence-pack checks described here.</p>
@@ -2801,7 +2829,7 @@ outside the published support basis.</p>
 <h2 id="report-statuses">Report Statuses<a class="headerlink" href="#report-statuses" title="Permanent link">&para;</a></h2>
 <p>Strict reports include a top-level <code>assurance</code> section. Generated reports record
 the intended strict claim and leave runtime provenance verification pending
-until <code>invarlock verify</code> checks the sibling <code>runtime.manifest.json</code>. Reviewers
+until <code>invarlock verify</code> checks the sibling <code>runtime.manifest.json</code>. Readers
 should require the combination of report-local strict shape and a verified
 runtime-provenance result.</p>
 <table>
@@ -2861,7 +2889,7 @@ runtime-provenance result.</p>
 signature over <code>manifest.json</code>. The verifier always derives and reports the
 signing-key fingerprint when a signature is present. That check provides
 tamper evidence for the manifest and checksum chain.</p>
-<p>Authenticity is stronger: reviewers must decide which signing keys they accept.
+<p>Authenticity is stronger: readers must decide which signing keys they accept.
 For distributable evidence, require one of:</p>
 <ul>
 <li><code>invarlock advanced evidence-pack verify &lt;dir&gt; --expected-fingerprint sha256:&lt;64-hex-chars&gt;</code></li>
@@ -2912,7 +2940,7 @@ non-strict shapes are catalogued in <a href="../../user-guide/failure-examples/"
 <h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../00-assurance-case/">Assurance Case Overview</a></li>
-<li><a href="../15-strict-assurance-checklist/">Strict Assurance Checklist</a> — Reviewer checklist</li>
+<li><a href="../15-strict-assurance-checklist/">Strict Assurance Checklist</a> — Acceptance checklist</li>
 <li><a href="../../reference/reports/">Reports Reference</a> — Full v1 schema</li>
 <li><a href="../../security/runtime-provenance-guide/">Runtime Provenance Guide</a> — Manifest requirements</li>
 <li><a href="../../user-guide/failure-examples/">Failure Examples</a> — Common non-pass shapes</li>
@@ -2973,7 +3001,7 @@ non-strict shapes are catalogued in <a href="../../user-guide/failure-examples/"
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

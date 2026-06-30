@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -533,6 +533,34 @@
     
   
     Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
   
 
     
@@ -2732,12 +2760,12 @@ versioned and intended to be stable within their declared contract versions.</p>
 <tr>
 <td>Model family catalog</td>
 <td><code>contracts/model_family_catalog.json</code></td>
-<td>Broader inventory for declared support, code-level coverage, usage-only checkpoints, and recommended additions</td>
+<td>Declared support, code-level coverage, usage-only checkpoints, and recommended additions</td>
 </tr>
 <tr>
 <td>Model classification</td>
 <td><code>contracts/model_classification.json</code></td>
-<td>Lifecycle classification for published, backlog, blocked, smoke-only, usage-only, and out-of-scope model inventory, plus blocked named checkpoints</td>
+<td>Lifecycle classification for published, backlog, blocked, smoke-only, usage-only, and out-of-scope model status</td>
 </tr>
 <tr>
 <td>Adapter capabilities</td>
@@ -2821,9 +2849,8 @@ core ABI published in <code>contracts/plugin_compatibility.json</code>.</p>
 expose both the strict <code>support_matrix</code> contract and the broader
 <code>model_family_catalog</code> contract. Lifecycle decisions such as <code>published</code>,
 <code>backlog</code>, <code>blocked</code>, <code>usage_only</code>, and <code>out_of_scope</code> live in
-<code>model_classification</code>, so license/access changes can be handled by editing the
-manifest and rerunning <code>make contracts-check</code> instead of searching every support
-surface by hand. The same JSON surfaces also include the <code>validation_keys</code>,
+<code>model_classification</code>; update that manifest and rerun <code>make contracts-check</code>
+to refresh support surfaces. The same JSON surfaces also include the <code>validation_keys</code>,
 <code>console_labels</code>, and <code>metric_kinds</code> entries from the public contract catalog.</p>
 <p>The versioned JSON surfaces are intentionally explicit:</p>
 <ul>
@@ -2966,7 +2993,7 @@ invarlock<span class="w"> </span>advanced<span class="w"> </span>policy<span cla
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

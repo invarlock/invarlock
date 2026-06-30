@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -533,6 +533,34 @@
     
   
     Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
   
 
     
@@ -2626,7 +2654,7 @@
   locations and implicit directory creation.</li>
 <li>Treat models/datasets from untrusted sources as potentially malicious; avoid
   unsafe deserialization.</li>
-<li>Always run <code>invarlock verify</code> on reports before promotion.</li>
+<li>Always run <code>invarlock verify</code> on reports before publication.</li>
 </ul>
 <h2 id="production-deployment-checklist">Production Deployment Checklist<a class="headerlink" href="#production-deployment-checklist" title="Permanent link">&para;</a></h2>
 <p>Copy-paste checklist for production or CI deployments:</p>
@@ -2674,9 +2702,9 @@
 <li>Keep Python at 3.12+ and update dependencies regularly.</li>
 <li>Use the PR-time supply-chain workflow for pre-merge checks (install-surface
   SBOM + <code>pip-audit</code> on the base/<code>hf</code>/<code>advanced</code> shipped surfaces + <code>gitleaks</code>
-  changed-file JSON/SARIF artifacts), and keep the tag-gated CI supply-chain
-  job as the slower release backstop. See the allowlist page for documented
-  exceptions.</li>
+  git-delta JSON artifacts), and keep the tag-gated release workflow plus the
+  scheduled full-history secret scan as slower backstops. See the allowlist page
+  for documented exceptions.</li>
 </ul>
 <h2 id="release-verification">Release verification<a class="headerlink" href="#release-verification" title="Permanent link">&para;</a></h2>
 <ul>
@@ -2753,7 +2781,7 @@
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

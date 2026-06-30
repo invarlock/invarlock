@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -533,6 +533,34 @@
     
   
     Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
   
 
     
@@ -2633,7 +2661,7 @@
 </tr>
 <tr>
 <td><strong>Scope</strong></td>
-<td>Current project positioning; not a vendor compatibility contract.</td>
+<td>Current project positioning and handoff guidance for adjacent toolchains.</td>
 </tr>
 <tr>
 <td><strong>Source of truth</strong></td>
@@ -2641,9 +2669,9 @@
 </tr>
 </tbody>
 </table>
-<p>InvarLock is not a general model benchmark harness or MLOps monitoring system.
-It is a paired, verifier-friendly regression assurance workflow for edited
-weights.</p>
+<p>InvarLock is a paired, verifier-friendly regression assurance workflow for
+edited weights. It fits after edit or compression tooling has produced a subject
+checkpoint and alongside broader benchmark, monitoring, and registry systems.</p>
 <h2 id="when-to-use-invarlock">When To Use InvarLock<a class="headerlink" href="#when-to-use-invarlock" title="Permanent link">&para;</a></h2>
 <ul>
 <li>You produced an edited checkpoint (quantization, pruning, fine-tune) and
@@ -2651,7 +2679,7 @@ weights.</p>
   configured bounds.</li>
 <li>A strict verification workflow needs a fail-closed <code>evaluate -&gt; verify</code> contract with
   pairing, guard evidence, and runtime provenance.</li>
-<li>Reviewers expect a self-contained report bundle they can re-verify offline.</li>
+<li>Auditors expect a self-contained report bundle they can re-verify offline.</li>
 </ul>
 <h2 id="when-to-reach-for-something-else">When To Reach For Something Else<a class="headerlink" href="#when-to-reach-for-something-else" title="Permanent link">&para;</a></h2>
 <ul>
@@ -2686,12 +2714,12 @@ weights.</p>
 <tr>
 <td>MLflow, Evidently, Deepchecks</td>
 <td>Experiment validation, monitoring, drift, and dashboards.</td>
-<td>InvarLock ships a narrow fail-closed artifact contract for weight edits rather than a broad observability platform.</td>
+<td>InvarLock adds a narrow fail-closed artifact contract for weight edits.</td>
 </tr>
 <tr>
 <td>Hugging Face Optimum, Intel Neural Compressor, GPTQModel</td>
 <td>Producing optimized or compressed model artifacts.</td>
-<td>InvarLock validates the artifact after the edit instead of performing the compression.</td>
+<td>InvarLock validates the produced artifact after the edit.</td>
 </tr>
 </tbody>
 </table>
@@ -2710,10 +2738,10 @@ weights.</p>
 <h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../../assurance/14-trust-model/">Trust Model</a> — Strict pass scope</li>
-<li><a href="../../assurance/15-strict-assurance-checklist/">Strict Assurance Checklist</a> — Reviewer acceptance criteria</li>
+<li><a href="../../assurance/15-strict-assurance-checklist/">Strict Assurance Checklist</a> — Evidence acceptance criteria</li>
 <li><a href="../reports/">Reports Reference</a> — Schema, telemetry, and HTML export</li>
 <li><a href="../guards/">Guards Reference</a> — Configuration and evidence</li>
-<li><a href="../model-family-catalog/">Model Family Catalog</a> — Authoritative support inventory</li>
+<li><a href="../model-family-catalog/">Model Family Catalog</a> — Support tiers and backlog</li>
 <li><a href="../../user-guide/compare-and-evaluate/">Compare &amp; evaluate (BYOE)</a> — Primary BYOE workflow</li>
 </ul>
 
@@ -2770,7 +2798,7 @@ weights.</p>
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

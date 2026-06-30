@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -533,6 +533,34 @@
     
   
     Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
   
 
     
@@ -2629,7 +2657,7 @@
 </tr>
 <tr>
 <td><strong>Audience</strong></td>
-<td>Maintainers, reviewers auditing the assurance boundary, contributors tracing failures.</td>
+<td>Maintainers auditing the assurance boundary, contributors tracing failures.</td>
 </tr>
 <tr>
 <td><strong>Contract scope</strong></td>
@@ -2642,7 +2670,7 @@
 </tbody>
 </table>
 <p>This page maps one <code>evaluate -&gt; verify -&gt; report</code> journey to the code and
-artifact surfaces reviewers inspect.</p>
+artifact surfaces readers inspect.</p>
 <h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
 <p>The minimal end-to-end trace for a single comparison:</p>
 <div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>evaluate<span class="w"> </span>--allow-network<span class="w"> </span><span class="se">\</span>
@@ -2657,7 +2685,7 @@ invarlock<span class="w"> </span>verify<span class="w"> </span>--assurance<span 
 invarlock<span class="w"> </span>report<span class="w"> </span>html<span class="w"> </span>-i<span class="w"> </span>reports/eval/evaluation.report.json<span class="w"> </span>-o<span class="w"> </span>reports/eval/evaluation.html
 </code></pre></div>
 
-<p>Each stage emits artifacts the next stage consumes; reviewers can pause at any
+<p>Each stage emits artifacts the next stage consumes; readers can pause at any
 stage to inspect the surface in the table below. The <code>evaluate</code> command uses
 the runtime container by default for model-loading work; host execution must be
 an explicit non-assurance bypass.</p>
@@ -2791,7 +2819,7 @@ where the evidence is recorded.</p>
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

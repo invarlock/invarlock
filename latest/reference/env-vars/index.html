@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -533,6 +533,34 @@
     
   
     Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
   
 
     
@@ -3241,19 +3269,42 @@ tier policy, and report policy. There is no public env var that forces BCa.</p>
 <tr>
 <td><code>PACK_DEFER_REPORT_RENDERING</code></td>
 <td>unset (<code>1</code> under <code>run_pack.sh --release-review</code>)</td>
-<td>Evidence-pack wrapper toggle that skips optional markdown/reviewer rendering during evaluation.</td>
+<td>Evidence-pack wrapper toggle that skips optional markdown/evidence rendering during evaluation.</td>
 </tr>
 <tr>
 <td><code>PACK_DEFER_OPTIONAL_REPORT_RENDERING</code></td>
 <td>unset</td>
 <td>Alias for <code>PACK_DEFER_REPORT_RENDERING</code>.</td>
 </tr>
+<tr>
+<td><code>PACK_EVALUATE_ASSURANCE</code></td>
+<td><code>off</code> (<code>strict</code> under <code>run_pack.sh --release-review</code>)</td>
+<td>Evidence-pack wrapper toggle forwarded to <code>invarlock evaluate</code> for generated reports.</td>
+</tr>
+<tr>
+<td><code>PACK_FLASH_ATTN_ALLOW_SOURCE_BUILD</code></td>
+<td><code>0</code></td>
+<td>Evidence-pack dependency toggle. Set to <code>1</code> only when intentionally allowing a local Flash Attention source build; default FA2 install attempts use wheels only and fall back to eager attention if unavailable.</td>
+</tr>
+<tr>
+<td><code>PACK_REPORT_ASSURANCE</code></td>
+<td><code>report</code> (<code>strict</code> under <code>run_pack.sh --release-review</code>)</td>
+<td>Evidence-pack wrapper toggle forwarded to nested <code>invarlock verify</code> during pack verification.</td>
+</tr>
+<tr>
+<td><code>PACK_RETRY_FAILED_ON_RESUME</code></td>
+<td>unset</td>
+<td>Evidence-pack resume toggle. Set to <code>1</code> to explicitly move failed queue tasks back to pending during <code>--resume</code>; otherwise failed tasks abort resume so they can be inspected first.</td>
+</tr>
 </tbody>
 </table>
 <p>Evidence-pack evaluation-loop toggles are repo-wrapper controls, not public
 <code>invarlock evaluate</code> defaults. Required JSON reports and sidecars are still
 written; <code>PACK_DEFER_REPORT_RENDERING=1</code> skips optional rendered review files in
-the evaluation hot path.</p>
+the evaluation hot path. Release-review mode requires strict evaluation
+assurance, strict nested report verification, runtime manifests, model revision
+metadata, and a non-empty scenarios manifest so pack verification cannot be
+stricter or less contextual than the reports it is asked to verify.</p>
 <h3 id="checkpointing-snapshots">Checkpointing &amp; snapshots<a class="headerlink" href="#checkpointing-snapshots" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -3525,7 +3576,7 @@ Strictness/tiny-relax/overhead-skip are also config/profile policy:
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

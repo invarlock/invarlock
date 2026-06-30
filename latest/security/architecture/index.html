@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -533,6 +533,34 @@
     
   
     Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
   
 
     
@@ -2677,14 +2705,14 @@
   as runtime provenance.</li>
 <li>Product runtime-provenance verification does not depend on an external verifier binary or
   <code>PATH</code> lookup, so verifier behavior stays stable across installs.</li>
-<li>Use it before promotion or later automation to prevent policy regressions.</li>
+<li>Use it before published-basis inclusion or later automation to prevent policy regressions.</li>
 </ul>
 <h2 id="supply-chain-reference">Supply chain (reference)<a class="headerlink" href="#supply-chain-reference" title="Permanent link">&para;</a></h2>
 <ul>
 <li>SBOM generation (see <code>scripts/security/generate_sbom.sh</code>), run against the installed-artifact environment in PR/release jobs and the tool environment in the scheduled backstop.</li>
 <li><code>pip-audit</code> with a small allowlist (see pip-audit page) in CI, run against the base install surface plus the pinned <code>hf</code> and <code>advanced</code> shipped surfaces in PR jobs, and against the installed-artifact release surface in release jobs.</li>
-<li><code>gitleaks</code> changed-file scanning with JSON/SARIF artifacts in PR jobs, plus
-  full history scanning in release jobs.</li>
+<li><code>gitleaks</code> git-delta scanning with JSON artifacts in PR and release jobs,
+  plus scheduled full-history scanning.</li>
 <li>Pre-commit formatting/linting and version checks in CI to reduce drift.</li>
 </ul>
 <h2 id="design-principles">Design principles<a class="headerlink" href="#design-principles" title="Permanent link">&para;</a></h2>
@@ -2752,7 +2780,7 @@
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

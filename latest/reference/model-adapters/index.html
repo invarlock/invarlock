@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -533,6 +533,34 @@
     
   
     Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
   
 
     
@@ -2936,7 +2964,7 @@ DeepSeek, Phi, Gemma text-only, and SmolLM), FLAN-T5 through <code>hf_seq2seq</c
 Gemma 4 image-text through <code>hf_multimodal</code> plus <code>vision_text</code>, and MoE causal
 lanes such as OLMoE, Mixtral, and Qwen3 30B-A3B. Treat
 <code>contracts/support_matrix.json</code> as authoritative for model-lane status and the
-Model Family Catalog as the broader inventory of adapter/profile coverage.</p>
+Model Family Catalog as the broader view of adapter/profile coverage.</p>
 </blockquote>
 <h2 id="support-tiers">Support Tiers<a class="headerlink" href="#support-tiers" title="Permanent link">&para;</a></h2>
 <p>Adapter capability and model-lane support are related but separate contracts.
@@ -2987,7 +3015,7 @@ public evidence support.</p>
 <li><strong>Quantized adapters</strong> (<code>hf_bnb</code>, <code>hf_awq</code>, <code>hf_gptq</code>, <code>hf_torchao</code>, <code>hf_hqq</code>, <code>hf_quanto</code>, <code>hf_ct</code>) handle
   their own device placement; avoid calling <code>.to(...)</code> on the loaded model.</li>
 <li><strong>Containerized quant evidence</strong> requires a runtime image with the optional
-  quant backends installed. For remote CUDA evidence-pack setup, set
+  quant backends installed. For CUDA evidence-pack setup, set
   <code>PACK_RUNTIME_IMAGE_FLAVOR=quant</code> to select/build
   <code>invarlock-runtime:cuda-quant</code> instead of the default CUDA runtime image.
   This opt-in image uses the pinned CUDA devel base and retains the compiler
@@ -3280,9 +3308,9 @@ simple heuristics to choose a concrete built-in adapter name.</p>
 <span class="w">  </span><span class="nt">low_cpu_mem_usage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
 
-<p>The <code>vision_text</code> path above is a local smoke fixture. Public promotion evidence
+<p>The <code>vision_text</code> path above is a local smoke fixture. Public evidence
 uses materialized, pinned public datasets with dataset materialization summaries
-stored alongside the run artifacts, and image-text published-basis promotion
+stored alongside the run artifacts, and image-text published-basis inclusion
 requires a measured primary-metric floor rather than preservation pass/fail
 alone.</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># Bitsandbytes quantized load (Linux + gpu extra)</span>
@@ -3475,7 +3503,7 @@ loads get a hardware-aware <code>dtype</code> when one is not configured, all HF
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

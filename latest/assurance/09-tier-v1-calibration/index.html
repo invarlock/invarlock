@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -533,6 +533,34 @@
     
   
     Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
   
 
     
@@ -2877,7 +2905,7 @@
 (2) the <strong>exact recipe</strong> to recalibrate from scratch on your setup
 (weight-based Spectral κ, activation-based RMT ε, VE min-effect, and window
 sizing).
-Every knob is surfaced in run reports and reports so reviewers can audit or recompute.
+Every knob is surfaced in run reports and reports so readers can audit or recompute.
 The public evidence floor is the source-tree <code>published_basis</code> fixture set.
 That fixture set demonstrates the public report/evidence-pack contract; it is
 not the entire calibration corpus used to justify every numeric tier constant:
@@ -2909,7 +2937,7 @@ source-tree evidence rather than duplicating the full artifact corpus.</p>
 </tr>
 <tr>
 <td><strong>Audience</strong></td>
-<td>Calibration owners, release reviewers, and contributors updating tier thresholds.</td>
+<td>Calibration owners, release approvers, and contributors updating tier thresholds.</td>
 </tr>
 <tr>
 <td><strong>Contract scope</strong></td>
@@ -2943,7 +2971,7 @@ policy under <code>resolved_policy.spectral</code>.</p>
   boundary for the chosen <code>min_effect_lognll</code>), verified on pilot runs.</li>
 <li>CI/Release profiles request stricter counts than the base tier floors. The
   runtime/report gates enforce perfect pairing, zero overlap, and selected
-  tier-floor minima; reviewers should compare requested profile counts to the
+  tier-floor minima; readers should compare requested profile counts to the
   recorded used counts when judging a release evidence package.</li>
 </ul>
 <p><strong>Spectral calibration provenance.</strong> Aggregated null-run stats are derived from
@@ -2994,7 +3022,7 @@ Balanced.</p>
 <p><strong>Parametric cross-check.</strong> With two-sided tail
    <span class="arithmatex">\(\mathrm{pTail}(\kappa)=2\big(1-\Phi(\kappa)\big)\)</span>, compare the proposed caps
    to modeled Gaussian tails for families covered by the null calibration basis.
-   Treat transferred attention caps in newly promoted no-op reports, and low
+   Treat transferred attention caps in new published-basis no-op reports, and low
    Balanced <code>embed</code>/<code>other</code> caps, as operational sentinels until a family-specific
    null sweep supports an FPR interpretation.</p>
 </li>
@@ -3110,7 +3138,7 @@ r_f^{\text{cur}} \le \left(1+\varepsilon(f)\right) r_f^{\text{base}}
 <p><strong>Runtime visibility.</strong> report fields under <code>rmt.*</code> report baseline/current edge‑risk, ε (default and by family), status, and <code>validation.rmt_stable</code>.</p>
 <p><strong>RMT calibration provenance.</strong> Aggregated null-run stats are derived from
 calibration reports. The current repo does not ship a dedicated RMT ε
-calibration CLI summarizer; recalibration is a manual/reviewer-audited procedure
+calibration CLI summarizer; recalibration is a manually audited procedure
 using report JSON fields such as <code>rmt.families.*.{edge_base,edge_cur,delta}</code>.
 Report quantile summaries of Δ(f) = r_cur(f)/r_base(f) − 1 and skip cases with
 missing or zero baseline.</p>
@@ -3253,7 +3281,7 @@ fields make such updates auditable end-to-end.</p>
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

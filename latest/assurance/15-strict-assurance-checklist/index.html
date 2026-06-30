@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -533,6 +533,34 @@
     
   
     Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
   
 
     
@@ -1778,10 +1806,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#reviewer-confirmed-policy-context" class="md-nav__link">
+  <a href="#confirmed-policy-context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Reviewer-Confirmed Policy Context
+        Confirmed Policy Context
       
     </span>
   </a>
@@ -2605,10 +2633,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#reviewer-confirmed-policy-context" class="md-nav__link">
+  <a href="#confirmed-policy-context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Reviewer-Confirmed Policy Context
+        Confirmed Policy Context
       
     </span>
   </a>
@@ -2703,7 +2731,7 @@
 
 <h1 id="strict-assurance-checklist">Strict Assurance Checklist<a class="headerlink" href="#strict-assurance-checklist" title="Permanent link">&para;</a></h1>
 <blockquote>
-<p><strong>Plain language:</strong> This is the reviewer checklist for deciding whether a
+<p><strong>Plain language:</strong> This is the acceptance checklist for deciding whether a
 strict report and its sibling runtime manifest can be accepted as assurance
 evidence.</p>
 </blockquote>
@@ -2718,11 +2746,11 @@ evidence.</p>
 <tbody>
 <tr>
 <td><strong>Purpose</strong></td>
-<td>Reviewer checklist for accepting strict assurance evidence.</td>
+<td>Acceptance checklist for strict assurance evidence.</td>
 </tr>
 <tr>
 <td><strong>Audience</strong></td>
-<td>Maintainers, release reviewers, CI gate owners.</td>
+<td>Maintainers, release approvers, CI gate owners.</td>
 </tr>
 <tr>
 <td><strong>Contract scope</strong></td>
@@ -2743,9 +2771,9 @@ for numbered error codes.</p>
 </code></pre></div>
 
 <p>A green exit from this command satisfies the report/manifest checks that are
-machine-checkable from the submitted evidence. The remaining items are reviewer
+machine-checkable from the submitted evidence. The remaining items are human
 judgment about policy allowances and bundle contents.</p>
-<p><code>invarlock report export --format release-review-md</code> can generate a reviewer
+<p><code>invarlock report export --format release-review-md</code> can generate a release
 packet from the same report and an optional <code>invarlock verify --json</code> result.
 Use it as a checklist wrapper; it does not replace this checklist or change the
 strict assurance contract.</p>
@@ -2757,7 +2785,7 @@ strict assurance contract.</p>
 <li>[ ] Runtime execution was container-backed.</li>
 <li>[ ] Unverified provenance was not allowed.</li>
 </ul>
-<h2 id="reviewer-confirmed-policy-context">Reviewer-Confirmed Policy Context<a class="headerlink" href="#reviewer-confirmed-policy-context" title="Permanent link">&para;</a></h2>
+<h2 id="confirmed-policy-context">Confirmed Policy Context<a class="headerlink" href="#confirmed-policy-context" title="Permanent link">&para;</a></h2>
 <ul>
 <li>[ ] Network and remote-code allowances were reviewed and recorded.</li>
 <li>[ ] The original evaluate command and staged bundle contents match the
@@ -2784,7 +2812,7 @@ strict assurance contract.</p>
   and do not silently erase the original outlier.</li>
 <li>[ ] Variance guard preparation/finalization failures fail closed unless an
   explicit monitor-only policy is recorded in the report.</li>
-<li>[ ] Reviewer-facing reports expose fallback diagnostics under the relevant
+<li>[ ] Evidence reports expose fallback diagnostics under the relevant
   guard result, and strict assurance blocks unsupported or degraded guard states.</li>
 </ul>
 <h2 id="metrics-and-windows">Metrics And Windows<a class="headerlink" href="#metrics-and-windows" title="Permanent link">&para;</a></h2>
@@ -2879,7 +2907,7 @@ strict assurance contract.</p>
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

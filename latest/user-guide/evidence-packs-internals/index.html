@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -536,6 +536,34 @@
     
   
     Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
   
 
     
@@ -3762,8 +3790,8 @@ task graph, scheduling, and artifact generation. It complements
 <blockquote>
 <p>Scope note: in this guide, <code>CALIBRATION_RUN -&gt; GENERATE_PRESET</code> is called
 <strong>Preset Derivation</strong>. It produces run-scoped
-<code>calibrated_preset_&lt;model&gt;.yaml/json</code> files and does not directly modify
-global <code>runtime/tiers.yaml</code>.</p>
+<code>calibrated_preset_&lt;model&gt;.yaml/json</code> files. Global <code>runtime/tiers.yaml</code>
+tuning remains part of the calibration workflow.</p>
 </blockquote>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <table>
@@ -3796,7 +3824,7 @@ global <code>runtime/tiers.yaml</code>.</p>
 </tr>
 <tr>
 <td>Edits</td>
-<td>Scenario-driven; default suites use 4 clean + 4 stress edit scenarios per model, and filtered manifests may select any subset</td>
+<td>Scenario-driven; default suites use 6 clean + 6 stress edit scenarios per model, and filtered manifests may select any subset</td>
 </tr>
 <tr>
 <td>Preset Derivation</td>
@@ -3868,7 +3896,7 @@ invarlock<span class="w"> </span>advanced<span class="w"> </span>evidence-pack<s
 <li><code>lib/queue/queue_manager.sh</code>: compatibility facade for queue state, dependency, and task-generation modules.</li>
 <li><code>lib/queue/queue_core.sh</code>: queue setup, locking, summaries, and terminal-state helpers.</li>
 <li><code>lib/queue/queue_lifecycle.sh</code>: task state transitions and orphan reclamation.</li>
-<li><code>lib/queue/queue_dependencies.sh</code>: dependency resolution and dependent promotion.</li>
+<li><code>lib/queue/queue_dependencies.sh</code>: dependency resolution and dependent ready-state transitions.</li>
 <li><code>lib/queue/queue_memory_plan.sh</code>: profile-based memory refresh and memory-plan export.</li>
 <li><code>lib/queue/queue_generation.sh</code>: progress state, task search, and task graph generation.</li>
 <li><code>lib/queue/scheduler.sh</code>: compatibility facade for scheduler modules.</li>
@@ -4032,7 +4060,7 @@ invarlock<span class="w"> </span>advanced<span class="w"> </span>evidence-pack<s
   run directly without separate suite plumbing.</li>
 </ul>
 <h2 id="edit-types">Edit Types<a class="headerlink" href="#edit-types" title="Permanent link">&para;</a></h2>
-<p>Each model runs 8 validation-subject edit experiments (4 types × 2 versions)
+<p>Each model runs 12 validation-subject edit experiments (6 types x 2 versions)
 plus optional error-injection tests. <code>scripts/evidence_packs/scenarios.json</code>
 is the source of truth for each scenario's <code>artifact_class</code>.</p>
 <p>Evidence-pack <code>quant_rtn</code> scenarios are generated as external subject
@@ -4044,7 +4072,12 @@ quantization.</p>
 <p>The same distinction applies to the other current edits: FP8 round-trips tensors
 through FP8 or float16 and saves ordinary floating-point weights; magnitude
 pruning writes zeros into dense tensors; low-rank SVD writes dense approximated
-tensors instead of factorized low-rank modules.</p>
+tensors instead of factorized low-rank modules; LoRA merge applies a
+deterministic low-rank adapter-style dense delta; and fine-tune applies a
+deterministic tiny gradient-style dense update. These validation-subject
+generators produce regression evidence from materialized subject checkpoints;
+deployable training pipelines are separate BYOE or deployable-artifact
+workflows.</p>
 <h3 id="clean-edits-tuned">Clean edits (tuned)<a class="headerlink" href="#clean-edits-tuned" title="Permanent link">&para;</a></h3>
 <p>Clean edits use tuned parameters supplied via <code>PACK_TUNED_EDIT_PARAMS_FILE</code>.
 The suite uses <code>:clean:</code> as a sentinel in the edit spec and resolves concrete
@@ -4074,13 +4107,25 @@ parameters at runtime.</p>
 <tr>
 <td>Dense magnitude-pruned checkpoint</td>
 <td>validation subject checkpoint</td>
-<td>tuned (<code>prune_level</code>) from tuned params file</td>
+<td>tuned (<code>sparsity</code>) from tuned params file</td>
 <td>FFN only</td>
 </tr>
 <tr>
 <td>Dense low-rank-SVD approximated checkpoint</td>
 <td>validation subject checkpoint</td>
 <td>tuned (<code>rank</code>) from tuned params file</td>
+<td>FFN only</td>
+</tr>
+<tr>
+<td>Dense LoRA-merged checkpoint</td>
+<td>validation subject checkpoint</td>
+<td>tuned (<code>rank</code>, <code>alpha</code>) from tuned params file</td>
+<td>Attention only</td>
+</tr>
+<tr>
+<td>Dense tiny fine-tuned checkpoint</td>
+<td>validation subject checkpoint</td>
+<td>tuned (<code>learning_rate</code>, <code>steps</code>) from tuned params file</td>
 <td>FFN only</td>
 </tr>
 </tbody>
@@ -4129,6 +4174,18 @@ rerun.</p>
 <td>Dense low-rank-SVD approximated checkpoint</td>
 <td>validation subject checkpoint</td>
 <td><code>lowrank_svd:32:all</code> (rank 32)</td>
+<td>All layers</td>
+</tr>
+<tr>
+<td>Dense LoRA-merged checkpoint</td>
+<td>validation subject checkpoint</td>
+<td><code>lora_merge:8:64:all</code> (rank 8, alpha 64)</td>
+<td>All layers</td>
+</tr>
+<tr>
+<td>Dense tiny fine-tuned checkpoint</td>
+<td>validation subject checkpoint</td>
+<td><code>fine_tune:0.0005:3:all</code> (3 steps)</td>
 <td>All layers</td>
 </tr>
 </tbody>
@@ -4282,7 +4339,7 @@ workers/gpu_reservations/
   peak memory.</li>
 <li><strong>Deferred optional report rendering</strong>: <code>PACK_DEFER_REPORT_RENDERING=1</code>
   keeps <code>evaluation.report.json</code>, <code>runtime.manifest.json</code>, and JSON evidence
-  sidecars in the hot path while skipping markdown/reviewer bundle rendering.
+  sidecars in the hot path while skipping markdown/evidence bundle rendering.
   Pack verification does not require those optional rendered files. Release
   review mode enables this default so evaluation workers spend less time on
   report-heavy filesystem writes; pack-level HTML export still runs unless
@@ -4290,7 +4347,7 @@ workers/gpu_reservations/
 <li><strong>Evaluation-loop telemetry</strong>: each <code>evaluate_timing.json</code> records top-level
   evaluate timings plus nested baseline/subject run timings when reports expose
   them. The pack-level <code>evaluation_optimization_summary.json</code> aggregates those
-  timings so reviewers can separate process startup savings from model load,
+  timings so readers can separate process startup savings from model load,
   dataset preparation, guard/eval, and report-generation costs.</li>
 </ul>
 <p>Large or MoE models can still disable batch edit tasks automatically (or via
@@ -4529,7 +4586,7 @@ package-native Ed25519 manifest-signature format as the installed CLI.</p>
 <p><code>scripts/evidence_packs/lib/core/setup_remote.sh</code> is an optional bootstrap script for
 fresh GPU hosts. It clones the repo, creates a venv, installs PyTorch and
 InvarLock, and leaves the host ready to run <code>run_pack.sh</code>.</p>
-<p>Operational guidance for remote evidence-pack work:</p>
+<p>Operational guidance for evidence-pack validation hosts:</p>
 <ul>
 <li>Prefer a fresh clone or work tree per campaign instead of reusing an older
   editable-install checkout.</li>
@@ -4544,18 +4601,11 @@ InvarLock, and leaves the host ready to run <code>run_pack.sh</code>.</p>
   <code>INVARLOCK_CONFIG_ROOT</code>, <code>HF_HOME</code>, <code>HF_HUB_CACHE</code>, <code>HF_DATASETS_CACHE</code>,
   <code>TRANSFORMERS_CACHE</code>, <code>TMPDIR</code>, <code>TMP</code>.</li>
 <li>If a staged preset or profile uses <code>!include</code> outside its config directory,
-  set <code>INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1</code> on the remote host before the
-  evidence-pack entrypoint; the default runtime-container launcher rejects that config
-  graph before container start when the override is missing.</li>
-<li>After Qwen2.5-14B campaigns run with <code>PACK_CLEANUP_MODELS=0</code>, run
-  <code>scripts/evidence_packs/run_qwen14_sentinels.sh</code> from the same fresh work tree to
-  validate saved-model direct evaluate and the public quant smoke. The sentinel
-  helper reloads retained edit subject directories, so default cleanup mode is
-  not sufficient for this follow-up check. The helper defaults to
-  <code>--profile dev --assurance off</code> and requires evaluate/verify subprocesses to
-  exit zero.</li>
+  set <code>INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1</code> on the validation host before
+  the evidence-pack entrypoint; the default runtime-container launcher rejects
+  that config graph before container start when the override is missing.</li>
 </ul>
-<p>Recommended remote validation checklist after security-default changes:</p>
+<p>Recommended validation-host checklist after security-default changes:</p>
 <ol>
 <li>Run an evidence-pack subset lane with explicit external <code>HF_HOME</code> and
    <code>INVARLOCK_CONFIG_ROOT</code> overrides.</li>
@@ -4635,7 +4685,7 @@ InvarLock, and leaves the host ready to run <code>run_pack.sh</code>.</p>
 <tr>
 <td><code>PACK_DEFER_REPORT_RENDERING</code></td>
 <td><code>0</code> (<code>1</code> under <code>--release-review</code>)</td>
-<td>Skip optional markdown/reviewer bundle rendering during evaluation</td>
+<td>Skip optional markdown/evidence bundle rendering during evaluation</td>
 </tr>
 <tr>
 <td><code>PACK_RUNTIME_IMAGE_FLAVOR</code></td>
@@ -5058,6 +5108,16 @@ InvarLock, and leaves the host ready to run <code>run_pack.sh</code>.</p>
 <td>Nested report assurance mode passed to report verification (<code>report</code>, <code>strict</code>, or <code>off</code>)</td>
 </tr>
 <tr>
+<td><code>PACK_EVALUATE_ASSURANCE</code></td>
+<td><code>off</code></td>
+<td>Assurance mode passed to <code>invarlock evaluate</code> when creating evidence-pack reports (<code>strict</code> or <code>off</code>)</td>
+</tr>
+<tr>
+<td><code>PACK_RETRY_FAILED_ON_RESUME</code></td>
+<td>unset</td>
+<td>Set to <code>1</code> to explicitly retry failed queue tasks during <code>--resume</code>; otherwise resume aborts when failed tasks are present</td>
+</tr>
+<tr>
 <td><code>PACK_REQUIRE_PASS</code></td>
 <td><code>0</code></td>
 <td>Fail pack generation unless <code>final_verdict.json</code> is <code>PASS</code></td>
@@ -5070,7 +5130,7 @@ InvarLock, and leaves the host ready to run <code>run_pack.sh</code>.</p>
 <tr>
 <td><code>PACK_RELEASE_REVIEW</code></td>
 <td><code>0</code></td>
-<td>Set by <code>run_pack.sh --release-review</code>; requires PASS verdicts, signed manifests, runtime manifests, CI profile, and strict report assurance</td>
+<td>Set by <code>run_pack.sh --release-review</code>; requires PASS verdicts, signed manifests, runtime manifests, model revision metadata, a non-empty scenarios manifest, CI profile, strict evaluation assurance, and strict report assurance</td>
 </tr>
 </tbody>
 </table>
@@ -5160,7 +5220,7 @@ risk of partial artifacts.</p>
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

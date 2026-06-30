@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -533,6 +533,34 @@
     
   
     Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
   
 
     
@@ -2616,7 +2644,7 @@
 <h1 id="empirical-guard-evidence">Empirical Guard Evidence<a class="headerlink" href="#empirical-guard-evidence" title="Permanent link">&para;</a></h1>
 <blockquote>
 <p><strong>Plain language:</strong> Empirical guard evidence is the portable manifest layer
-that points reviewers to real model/checkpoint runs for spectral, RMT, and
+that points readers to real model/checkpoint runs for spectral, RMT, and
 variance behavior.</p>
 </blockquote>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
@@ -2634,7 +2662,7 @@ variance behavior.</p>
 </tr>
 <tr>
 <td><strong>Audience</strong></td>
-<td>Maintainers, release reviewers, and calibration owners.</td>
+<td>Maintainers, release approvers, and calibration owners.</td>
 </tr>
 <tr>
 <td><strong>Contract scope</strong></td>
@@ -2672,7 +2700,7 @@ non-synthetic workflows:</p>
 </ul>
 <p>The synthetic guard-validation smoke remains the minimum deterministic release
 floor. Empirical evidence is required when a release claims new or expanded
-guard calibration, model-family calibration, or support promotion beyond the
+guard calibration, model-family calibration, or published-basis expansion beyond the
 currently published basis.</p>
 <p>The included empirical manifest may also index published-basis no-op
 model-evidence reports under <code>families/*.json</code>. Those summaries are real
@@ -2727,7 +2755,7 @@ recommends or validates κ for that family.</p>
 <span class="p">}</span>
 </code></pre></div>
 
-<p>The optional <code>calibration_corpus</code> block summarizes promoted-family no-op
+<p>The optional <code>calibration_corpus</code> block summarizes published-family no-op
 published-basis reports that are present in-tree and hash-linked from the
 family summaries. It is a calibration input surface, not proof that the
 packaged tier constants were re-derived for those families.</p>
@@ -2819,7 +2847,7 @@ verifier gates.</p>
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

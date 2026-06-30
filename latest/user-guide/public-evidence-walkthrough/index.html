@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -556,6 +556,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../live-examples/" class="md-nav__link">
         
   
@@ -705,10 +733,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#export-evidence-for-reviewers" class="md-nav__link">
+  <a href="#export-evidence" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Export evidence for reviewers
+        Export Evidence
       
     </span>
   </a>
@@ -2594,10 +2622,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#export-evidence-for-reviewers" class="md-nav__link">
+  <a href="#export-evidence" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Export evidence for reviewers
+        Export Evidence
       
     </span>
   </a>
@@ -2681,7 +2709,7 @@
 
 <h1 id="public-evidence-walkthrough">Public Evidence Walkthrough<a class="headerlink" href="#public-evidence-walkthrough" title="Permanent link">&para;</a></h1>
 <h2 id="purpose">Purpose<a class="headerlink" href="#purpose" title="Permanent link">&para;</a></h2>
-<p>This walkthrough shows the shipped public evidence floor that reviewers can
+<p>This walkthrough shows the shipped public evidence floor that readers can
 verify without downloading model weights. It is deliberately BYOE-oriented:
 InvarLock validates baseline/subject comparison artifacts for externally
 materialized subjects; deployable quantized checkpoint production is outside
@@ -2689,7 +2717,7 @@ this public evidence floor.</p>
 <p><code>public_evidence/README.md</code> defines the evidence taxonomy. In short, fixture
 artifacts validate verifier contracts, while real-run artifacts are produced by
 <code>invarlock evaluate</code> against materialized baseline and subject checkpoints.
-Every public evidence artifact carries <code>evidence.meta.json</code> so reviewers can see
+Every public evidence artifact carries <code>evidence.meta.json</code> so readers can see
 whether they are looking at a fixture or a real run.</p>
 <h2 id="published-basis-pass">Published-basis pass<a class="headerlink" href="#published-basis-pass" title="Permanent link">&para;</a></h2>
 <p>The repository ships strict-pass public-basis examples for GPT-2-style causal LM
@@ -2734,13 +2762,13 @@ invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span cl
 </table>
 <p>The support matrix records these paths under
 <code>contracts/support_matrix.json</code> as the <code>published_basis</code> evidence floor.</p>
-<p>The GPT-2 <code>artifact_package/</code> is intentionally a checkpoint-reference package,
-not a weight dump. It names the baseline and subject checkpoint references, binds
-them to the report, runtime manifest, and signed pack, and keeps the exact
-verification commands in <code>artifact_package/artifact_package.json</code>. Large model
-weights remain external to the repository; the rebuild recipe is the source of
-truth for materializing a fresh BYOE evidence drop.</p>
-<p>The GPT-2 lane also ships a small signed pack so reviewers can exercise the
+<p>The GPT-2 <code>artifact_package/</code> is a checkpoint-reference package. It names the
+baseline and subject checkpoint references, binds them to the report, runtime
+manifest, and signed pack, and keeps the exact verification commands in
+<code>artifact_package/artifact_package.json</code>. Large model weights remain external to
+the repository; the rebuild recipe is the source of truth for materializing a
+fresh BYOE evidence drop.</p>
+<p>The GPT-2 lane also ships a small signed pack so readers can exercise the
 full offline evidence-pack verifier without rebuilding the suite:</p>
 <div class="codehilite"><pre><span></span><code><span class="nv">FPR</span><span class="o">=</span><span class="k">$(</span>python<span class="w"> </span>-<span class="w"> </span><span class="s">&lt;&lt;&#39;PY&#39;</span>
 <span class="s">import json</span>
@@ -2787,8 +2815,8 @@ uv<span class="w"> </span>run<span class="w"> </span>invarlock<span class="w"> <
 <p>The exact <code>invarlock evaluate</code> command is in
 <code>public_evidence/real_runs/tiny_gpt2_quant_rtn/run_command.txt</code>. The pack remains
 small enough for the repo because it references model checkpoints rather than
-vendoring weights. The built-in edit remains a demo/smoke edit, not a deployable
-quantization backend.</p>
+vendoring weights. The built-in edit is a demo/smoke edit; deployable
+quantization backend evidence is covered by separate deployable-artifact lanes.</p>
 <p>The second run is a real external BYOE path. The subject checkpoint is
 materialized outside InvarLock by
 <code>public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/external_edit_recipe.py</code>,
@@ -2806,10 +2834,10 @@ uv<span class="w"> </span>run<span class="w"> </span>invarlock<span class="w"> <
 <span class="w">  </span>--expected-fingerprint<span class="w"> </span>sha256:e01c40a94c89b22306a2670b032f623aa5428351d06e18f9b3e9e6a39b42c41b
 </code></pre></div>
 
-<p>That artifact is the concrete real-run evidence for BYOE/custom subjects: the
-checkpoint weights are not vendored, <code>checkpoint_refs.json</code> records the external
-edit type and file hashes, and the report records <code>edit_name = custom</code>.</p>
-<h2 id="export-evidence-for-reviewers">Export evidence for reviewers<a class="headerlink" href="#export-evidence-for-reviewers" title="Permanent link">&para;</a></h2>
+<p>That artifact is the concrete real-run evidence for BYOE/custom subjects:
+<code>checkpoint_refs.json</code> records the external edit type and file hashes for the
+external checkpoint weights, and the report records <code>edit_name = custom</code>.</p>
+<h2 id="export-evidence">Export Evidence<a class="headerlink" href="#export-evidence" title="Permanent link">&para;</a></h2>
 <p>Existing public reports can be converted into CI and registry handoff artifacts
 without adding generated files to <code>public_evidence/</code>:</p>
 <div class="codehilite"><pre><span></span><code>mkdir<span class="w"> </span>-p<span class="w"> </span>reports/public-evidence-export
@@ -2841,7 +2869,7 @@ invarlock<span class="w"> </span>report<span class="w"> </span><span class="nb">
 <span class="w">  </span>--output<span class="w"> </span>reports/public-evidence-export/release-review.md
 </code></pre></div>
 
-<p>These generated files are reviewer conveniences. The canonical evidence remains
+<p>These generated files are convenience outputs. The canonical evidence remains
 the checked-in <code>evaluation.report.json</code>, <code>runtime.manifest.json</code>, and evidence
 pack.</p>
 <h2 id="byoe-edit-examples">BYOE edit examples<a class="headerlink" href="#byoe-edit-examples" title="Permanent link">&para;</a></h2>
@@ -2855,13 +2883,18 @@ from a built-in edit plugin.</p>
 
 invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span class="w"> </span>release<span class="w"> </span>--assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>public_evidence/byoe_examples/lora_merge_byoe/evaluation.report.json
+
+invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span class="w"> </span>release<span class="w"> </span>--assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/byoe_examples/fine_tune_byoe/evaluation.report.json
 </code></pre></div>
 
 <p>Each example includes <code>checkpoint_refs.json</code> beside the report. The pruning
 fixture is a dense magnitude-pruned subject reference, and the LoRA fixture is a
-merged-adapter/fine-tune style subject reference. Both are validation-subject
-fixtures only; sparse runtime speedups, packed quantized storage, and deployable
-optimized backend behavior are outside their scope.</p>
+merged-adapter subject reference. The fine-tune fixture is a separate
+fine-tuned checkpoint subject reference. These fixtures cover
+validation-subject fixture semantics. Sparse runtime speedups, packed quantized
+storage, deployable optimized backend behavior, and training-method quality
+require separate evidence lanes.</p>
 <h2 id="caught-regressions">Caught regressions<a class="headerlink" href="#caught-regressions" title="Permanent link">&para;</a></h2>
 <p>The caught-regression fixtures keep the naive primary metric acceptable
 (<code>ratio_vs_baseline = 1.0</code>) while one guard fails. They cover the three
@@ -2876,8 +2909,8 @@ invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span cl
 <span class="w">  </span>public_evidence/caught_regressions/variance_guard_failure/evaluation.report.json
 </code></pre></div>
 
-<p>Expected outcome: verification fails. The failure is not a perplexity failure;
-it is a guard/policy failure. For the spectral case, the verifier reports:</p>
+<p>Expected outcome: verification fails. The failing predicate is a guard/policy
+condition rather than perplexity. For the spectral case, the verifier reports:</p>
 <div class="codehilite"><pre><span></span><code>Release verification requires validation.spectral_stable == true
 spectral did not pass
 </code></pre></div>
@@ -2902,10 +2935,10 @@ negative control: the same 1.12x scale on the closest non-baseline attention
 module passes PM and does not add a new baseline-relative cap. The compact sweep
 summary records adjacent scale points showing that the attention target starts
 triggering at 1.18 and the FFN target remains PM-accepted through 1.20.</p>
-<p>This is not a strict spectral-failure example: <code>validation.spectral_stable</code>
-remains true because the spectral cap budget is not exceeded. It is an
-evidence-pack guard-value demonstration: baseline-only guard signals do not count
-as new guard catches, but a PM-passing run that adds a new capped module does.</p>
+<p>This artifact is an evidence-pack guard-value demonstration:
+<code>validation.spectral_stable</code> remains true because the spectral cap budget is
+not exceeded. Baseline-only guard signals do not count as new guard catches, but
+a PM-passing run that adds a new capped module does.</p>
 <h2 id="policy-failures">Policy failures<a class="headerlink" href="#policy-failures" title="Permanent link">&para;</a></h2>
 <p>The policy-failure fixtures show non-guard and provenance predicates that can
 block a strict release:</p>
@@ -2993,7 +3026,7 @@ verification result.</p>
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

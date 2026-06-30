@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -556,6 +556,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../live-examples/" class="md-nav__link">
         
   
@@ -938,17 +966,6 @@
     <span class="md-ellipsis">
       
         Network &amp; Model Revisions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#promotion-sentinels" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Promotion Sentinels
       
     </span>
   </a>
@@ -2726,17 +2743,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#promotion-sentinels" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Promotion Sentinels
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#output-layout" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2902,8 +2908,8 @@ analysis.</p>
 <blockquote>
 <p>Terminology: the evidence-pack suite includes a run-scoped <strong>Preset Derivation</strong>
 phase (<code>CALIBRATION_RUN -&gt; GENERATE_PRESET</code>) that writes
-<code>calibrated_preset_&lt;model&gt;.yaml/json</code> for that suite run. It does not directly
-modify global <code>runtime/tiers.yaml</code>. For global tier policy tuning, use
+<code>calibrated_preset_&lt;model&gt;.yaml/json</code> for that suite run. Global
+<code>runtime/tiers.yaml</code> tuning still goes through
 <code>invarlock advanced calibrate ...</code> (see <a href="../../reference/calibration/">Tier Policy Tuning CLI</a>).
 Calibration entrypoints use the runtime container by default unless
 a repo-only workflow opts into local host execution.</p>
@@ -3006,10 +3012,10 @@ packaged evidence preserves runtime provenance.</p>
 <p>Note: clean edits require tuned preset parameters. Either set
 <code>PACK_TUNED_EDIT_PARAMS_FILE</code> or place the file at
 <code>scripts/evidence_packs/tuned_edit_params.json</code>.</p>
-<p>The evidence-pack shell wrappers do not expose the public core
-<code>--execution-mode</code> / <code>--runtime-provenance</code> flags directly. For host-side
-execution in these repo-only wrappers, set <code>INVARLOCK_ALLOW_HOST_EXECUTION=1</code>
-in the environment before calling <code>run_pack.sh</code> or <code>run_suite.sh</code>.
+<p>The evidence-pack shell wrappers select host-side execution through
+<code>INVARLOCK_ALLOW_HOST_EXECUTION=1</code>. Set it in the environment before calling
+<code>run_pack.sh</code> or <code>run_suite.sh</code> when you intentionally use host execution in
+these repo-only wrappers.
 Installed-wheel/public workflows should use
 <code>invarlock evaluate --execution-mode host</code> instead. Otherwise, the
 underlying model-loading commands follow the default runtime-container path
@@ -3087,11 +3093,11 @@ suite writes the effective (filtered) manifest to <code>OUTPUT_DIR/state/scenari
 and both task generation and final verdict compilation use that state manifest.
 <code>--scenario-ids</code> filters that manifest before queue generation, and the runtime
 honors one-sided selections exactly: clean-only, stress-only, or single-scenario
-smokes do not expand back to the default 8 edit scenarios. Disk estimation uses
+smokes do not expand back to the default 12 edit scenarios. Disk estimation uses
 the same filtered state manifest, so storage preflight reflects the selected
 scenario set rather than the suite defaults.</p>
 <h2 id="evidence-pack-artifact-taxonomy">Evidence Pack Artifact Taxonomy<a class="headerlink" href="#evidence-pack-artifact-taxonomy" title="Permanent link">&para;</a></h2>
-<p>Evidence packs do not package model weights by default. The run directory may
+<p>Evidence packs keep model weights external by default. The run directory may
 contain edited subject checkpoints under each model's <code>models/</code> directory, while
 the evidence pack contains reports and digest-backed sidecars about those
 subjects. Scenarios declare one artifact class:</p>
@@ -3105,7 +3111,7 @@ subjects. Scenarios declare one artifact class:</p>
 <tbody>
 <tr>
 <td><code>validation_subject_checkpoint</code></td>
-<td>A Hugging Face checkpoint-shaped validation subject, not an optimized runtime backend</td>
+<td>A Hugging Face checkpoint-shaped validation subject for verifier/regression evidence</td>
 </tr>
 <tr>
 <td><code>deployable_optimized_subject</code></td>
@@ -3121,9 +3127,10 @@ subjects. Scenarios declare one artifact class:</p>
 </tr>
 </tbody>
 </table>
-<p>Current RTN, FP8, pruning, and low-rank evidence-pack edits are validation
-subjects. They validate InvarLock behavior on external subject checkpoints; they
-do not claim runtime memory reduction or packed deployment storage.</p>
+<p>Current RTN, FP8, pruning, low-rank, LoRA-merge, and fine-tune evidence-pack
+edits are validation subjects. They validate InvarLock behavior on external
+subject checkpoints. Runtime memory reduction and packed deployment storage
+require deployable artifact evidence.</p>
 <h2 id="network-model-revisions">Network &amp; Model Revisions<a class="headerlink" href="#network-model-revisions" title="Permanent link">&para;</a></h2>
 <p>Evidence packs require pinned model revisions for reproducibility:</p>
 <ul>
@@ -3134,36 +3141,6 @@ do not claim runtime memory reduction or packed deployment storage.</p>
 <li>Bulk evidence-pack runs also require <code>INVARLOCK_ALLOW_REMOTE_CODE=1</code>; the
   entrypoint fails fast before queue creation when that opt-in is missing.</li>
 </ul>
-<h2 id="promotion-sentinels">Promotion Sentinels<a class="headerlink" href="#promotion-sentinels" title="Permanent link">&para;</a></h2>
-<p>For Qwen2.5-14B promotion work, run the evidence-pack campaign with
-<code>PACK_CLEANUP_MODELS=0</code>, then use the maintained sentinel helper from a fresh
-repo work tree. The sentinel helper reloads the saved validation subjects, so
-the default cleanup mode removes the directories it needs.</p>
-<div class="codehilite"><pre><span></span><code><span class="nv">PACK_CLEANUP_MODELS</span><span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
-<span class="nv">INVARLOCK_ALLOW_REMOTE_CODE</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
-<span class="nv">INVARLOCK_ALLOW_NETWORK</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>./scripts/evidence_packs/run_qwen14_sentinels.sh<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--run-dir<span class="w"> </span>/path/to/evidence_pack_run<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--model-name<span class="w"> </span>qwen__qwen2.5-14b
-</code></pre></div>
-
-<p>What it checks:</p>
-<ul>
-<li>saved-model direct evaluate for <code>quant_4bit_clean</code></li>
-<li>saved-model direct evaluate for <code>prune_clean</code></li>
-<li>the promotion-grade public quant smoke (<code>quant_4bit_clean</code> + <code>invarlock verify</code>)</li>
-</ul>
-<p>Acceptance for these sentinels is load-path completion, not scientific PASS:</p>
-<ul>
-<li><code>evaluation.report.json</code> must be emitted for each sentinel</li>
-<li>the public quant smoke must also produce <code>verify.json</code></li>
-<li>evaluate and verify commands must exit zero</li>
-<li>the helper defaults to <code>--profile dev --assurance off</code>; a primary-metric <code>FAIL</code>
-  inside the emitted report is acceptable for this infrastructure/load-path gate</li>
-</ul>
-<p>Use a fresh work tree on remote hosts. If you intentionally run from a checkout
-that is not the editable install used by <code>.venv</code>, either reinstall the checkout
-or run with <code>PYTHONPATH=src</code> so <code>invarlock</code> uses the intended source tree.</p>
 <h2 id="output-layout">Output Layout<a class="headerlink" href="#output-layout" title="Permanent link">&para;</a></h2>
 <p>A suite run writes artifacts under <code>OUTPUT_DIR</code> (default: <code>./evidence_pack_runs/&lt;suite&gt;_&lt;timestamp&gt;</code>):</p>
 <ul>
@@ -3194,7 +3171,7 @@ or run with <code>PYTHONPATH=src</code> so <code>invarlock</code> uses the inten
   variance/VE evidence from clean confirmation reruns</li>
 <li><code>reports/**/deployable_artifact_validation.json</code>, <code>backend_inventory.json</code>, <code>memory_report.json</code>, <code>load_smoke.json</code>, and <code>inference_smoke.json</code> for deployable scenarios</li>
 <li><code>reports/**/evaluation.html</code> + <code>reports/**/verify.json</code></li>
-<li><code>README.md</code> (reviewer summary), <code>manifest.json</code>, <code>checksums.sha256</code></li>
+<li><code>README.md</code> (evidence summary), <code>manifest.json</code>, <code>checksums.sha256</code></li>
 <li><code>manifest.signature.json</code> when the pack is signed</li>
 <li><code>metadata/source_repo.json</code>, <code>metadata/environment.json</code>, and other input metadata sidecars when present</li>
 </ul>
@@ -3209,7 +3186,7 @@ and GPU placement remain easy to inspect. Batch edit creation still reduces edit
 generation overhead by loading the baseline once for multiple validation edits,
 but each evaluated subject checkpoint is loaded by its own <code>evaluate_EDIT</code> task.</p>
 <p><code>PACK_DEFER_REPORT_RENDERING=1</code> keeps <code>evaluation.report.json</code> and required
-sidecars, but skips optional markdown/reviewer rendering in the hot path.
+sidecars, but skips optional markdown/evidence rendering in the hot path.
 <code>run_pack.sh --release-review</code> enables this by default; pack-level HTML export
 and verification still run unless explicitly disabled.</p>
 <p>Every run writes <code>results/analysis/evaluation_optimization_summary.json</code>. It
@@ -3232,8 +3209,8 @@ standalone throughput claim.</p>
 <td>Baseline model with no edit applied</td>
 </tr>
 <tr>
-<td><code>quant_rtn</code>, <code>magnitude_prune</code>, etc.</td>
-<td>Using InvarLock's built-in edit functions</td>
+<td><code>quant_rtn</code>, <code>magnitude_prune</code>, <code>lora_merge</code>, <code>fine_tune</code>, etc.</td>
+<td>Using built-in evaluator or evidence-pack generated edit labels</td>
 </tr>
 <tr>
 <td><code>custom</code></td>
@@ -3277,21 +3254,30 @@ an edited subject, and pack verification checks that metadata agrees with
 <td>validation subject checkpoint</td>
 <td>No factorized runtime</td>
 </tr>
+<tr>
+<td>Dense LoRA-merged checkpoint</td>
+<td>validation subject checkpoint</td>
+<td>No adapter runtime</td>
+</tr>
+<tr>
+<td>Dense tiny fine-tuned checkpoint</td>
+<td>validation subject checkpoint</td>
+<td>No training runtime</td>
+</tr>
 </tbody>
 </table>
 <h2 id="deployable-edit-lane">Deployable Edit Lane<a class="headerlink" href="#deployable-edit-lane" title="Permanent link">&para;</a></h2>
 <p>Deployable edit scenarios are separate from the default validation suite. They
 are opt-in because backends such as bitsandbytes, GPTQ, and AWQ depend
 on specific PyTorch, CUDA, kernel, architecture, and package versions.</p>
-<p>There is no default deployable scenario in the OSS evidence-pack suite. A
-deployable lane should be added only after its backend has a generator or
-BYOE-loading path that passes reload, inference, inventory, and memory/storage
-checks on a supported GPU stack.</p>
+<p>The OSS evidence-pack suite keeps deployable scenarios opt-in. Add a deployable
+lane after its backend has a generator or BYOE-loading path that passes reload,
+inference, inventory, and memory/storage checks on a supported GPU stack.</p>
 <p>A deployable scenario must produce backend metadata, backend inventory,
 reload-smoke evidence, inference-smoke evidence, storage or memory evidence, an
-InvarLock evaluation report, and verification output. The evidence pack still
-does not include model weights unless explicitly configured; it includes
-digest-backed evidence about the deployable artifact that was validated.</p>
+InvarLock evaluation report, and verification output. The evidence pack keeps
+model weights external unless explicitly configured; it includes digest-backed
+evidence about the deployable artifact that was validated.</p>
 <h2 id="determinism">Determinism<a class="headerlink" href="#determinism" title="Permanent link">&para;</a></h2>
 <p>Use <code>--determinism strict</code> to disable TF32 and cuDNN benchmarks and align with
 strict InvarLock presets. <code>--repeats N</code> reruns a single edit N times and records
@@ -3303,7 +3289,7 @@ signed manifest cryptographically binds the checksums file (and thus all hashed 
 Newer packs also carry a signed provenance block in the same manifest:
 <code>builder</code>, <code>subject</code>, <code>invocation</code>, <code>environment</code>, and digest-backed <code>materials</code>.
 The manifest also records a derived <code>evidence_level</code> (<code>low</code>/<code>medium</code>/<code>high</code>) so
-reviewers can triage bundles quickly without replacing the underlying strict signed checks.
+readers can triage bundles quickly without replacing the underlying strict signed checks.
 Package-native signed packs store the detached Ed25519 signature bundle in
 <code>manifest.signature.json</code> and record <code>signing_key_fingerprint</code> in the manifest
 for audit trails.</p>
@@ -3335,8 +3321,8 @@ them.</p>
 <p>Installed wheels ship the public contracts and support package-native
 inspection, key generation, assembly, and verification via <code>invarlock advanced evidence-pack inspect</code>,
 <code>invarlock advanced evidence-pack keygen</code>, <code>invarlock advanced evidence-pack build</code>,
-and <code>invarlock advanced evidence-pack verify</code>. The package-native CLI does not
-depend on external signature binaries for evidence-pack verification.</p>
+and <code>invarlock advanced evidence-pack verify</code>. The package-native CLI verifies
+evidence-pack signatures in process.</p>
 <p>Use the package-native subcommands:</p>
 <ul>
 <li><code>invarlock advanced evidence-pack inspect &lt;dir&gt;</code></li>
@@ -3374,7 +3360,7 @@ depend on external signature binaries for evidence-pack verification.</p>
   digest-backed manifest references, or strict extra-file checks)</li>
 <li><code>7</code>: report verification failure (<code>invarlock verify</code>)</li>
 </ul>
-<p>Reviewer checklist:</p>
+<p>Evidence checklist:</p>
 <ul>
 <li>[ ] <code>invarlock advanced evidence-pack verify &lt;dir&gt; --strict --report-assurance strict</code> returns <code>0</code></li>
 <li>[ ] Verification is signer-pinned with <code>--expected-fingerprint</code> or a trust
@@ -3404,8 +3390,8 @@ verification, and PASS final verdict.</p>
   creation when that opt-in is missing.</li>
 <li><strong>Unsigned pack rejected</strong>: <code>verify</code> fails closed without
   <code>manifest.signature.json</code>. Either re-sign with
-  <code>invarlock advanced evidence-pack keygen</code> + <code>--signing-key</code>, or accept that
-  the bundle is not assurance-grade.</li>
+  <code>invarlock advanced evidence-pack keygen</code> + <code>--signing-key</code>, or treat the
+  unsigned bundle as debugging evidence only.</li>
 <li><strong>YAML <code>!include</code> outside config dir</strong>: set
   <code>INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1</code> or move the included file under
   the config directory.</li>
@@ -3485,7 +3471,7 @@ verification, and PASS final verdict.</p>
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

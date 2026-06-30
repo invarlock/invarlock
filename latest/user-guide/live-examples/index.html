@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/live-examples/">
       
       
-        <link rel="prev" href="../compare-and-evaluate/">
+        <link rel="prev" href="../knowledge-and-self-edit-workflows/">
       
       
         <link rel="next" href="../integrations/">
@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -536,6 +536,34 @@
     
   
     Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
   
 
     
@@ -2548,8 +2576,8 @@
 
 
 <h1 id="live-examples">Live Examples<a class="headerlink" href="#live-examples" title="Permanent link">&para;</a></h1>
-<p>The curated live-example lane keeps the public front door honest without
-dragging CI into every optional dependency surface.</p>
+<p>The curated live-example lane keeps the public front door honest while limiting
+CI to stable dependency surfaces.</p>
 <h2 id="curated-ci-safe-subset">Curated CI-safe subset<a class="headerlink" href="#curated-ci-safe-subset" title="Permanent link">&para;</a></h2>
 <p>These paths are exercised by <code>make docs-live-fast</code> and by GitHub Actions:</p>
 <ul>
@@ -2573,8 +2601,8 @@ reports.</p>
 </code></pre></div>
 
 <p>That verifier replays runnable markdown examples and smoke-runs all notebooks
-under <code>notebooks/</code>. Unlike the curated CI lane, this local verifier runs the
-real model-loading and evaluation steps for the runnable surfaces it selects.
+under <code>notebooks/</code>. The local lane runs the real model-loading and evaluation
+steps for the runnable surfaces it selects.
 For heavier public examples, the verifier rewrites onto smoke-sized shipped
 assets such as <code>sshleifer/tiny-gpt2</code>, <code>gpt2_smoke_128</code>, and the smoke calibration
 configs. It also normalizes heavy <code>ci</code> / <code>release</code> examples onto a local smoke
@@ -2582,9 +2610,9 @@ profile and trims calibration seed counts so the lane stays practical while
 still exercising real load/evaluate paths. Expect network fetches, model
 downloads, and materially longer runtimes than the curated CI subset.</p>
 <h2 id="trust-boundary">Trust boundary<a class="headerlink" href="#trust-boundary" title="Permanent link">&para;</a></h2>
-<p>Notebook examples are host examples. They are meant to be easy to run
-from a checkout or an installed development environment. They do not replace
-the runtime-container path used by the default CLI workflow.</p>
+<p>Notebook examples are host examples. They are meant to be easy to run from a
+checkout or an installed development environment. Use the runtime-container path
+for the default CLI workflow and strict runtime provenance.</p>
 
 
 
@@ -2639,7 +2667,7 @@ the runtime-container path used by the default CLI workflow.</p>
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       

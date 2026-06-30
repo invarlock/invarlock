@@ -53,7 +53,7 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -533,6 +533,34 @@
     
   
     Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
   
 
     
@@ -2716,7 +2744,7 @@ not standalone &lt;=5% FPR claims.</p>
 </tr>
 <tr>
 <td><strong>Audience</strong></td>
-<td>Guard maintainers, calibration reviewers, and contributors changing spectral policy.</td>
+<td>Guard maintainers, calibration auditors, and contributors changing spectral policy.</td>
 </tr>
 <tr>
 <td><strong>Contract scope</strong></td>
@@ -2769,7 +2797,7 @@ rate.</p>
   FFN, attention, embeddings, and other 2-D weights are all monitored. The
   Gaussian-tail FPR interpretation is defensible only for families with a
   matching null calibration basis. In the packaged pilot basis that means the
-  GPT-2/BERT-calibrated high-kappa families; newly promoted published-basis
+  GPT-2/BERT-calibrated high-kappa families; new published-basis
   causal LMs may expose <code>attn</code> cap hits in no-op reports and should treat the
   transferred attention cap as a budgeted sentinel until κ is recalibrated for
   that family. The lower <code>embed</code> and <code>other</code> caps are sentinel thresholds and
@@ -2828,7 +2856,7 @@ summary.</p>
 <li>Balanced <code>max_caps = 5</code>. After the fifth WARN the guard continues to WARN;
   the sixth triggers <code>spectral.caps_exceeded=true</code> and the run aborts.</li>
 <li>Multiple-testing metadata shows <code>spectral.multiple_testing = {method: "bh",
-  alpha: 0.05, m: 4}</code> so reviewers can verify the published policy and compute
+  alpha: 0.05, m: 4}</code> so readers can verify the published policy and compute
   modeled tails for the calibrated caps.</li>
 </ul>
 <h2 id="calibration">Calibration<a class="headerlink" href="#calibration" title="Permanent link">&para;</a></h2>
@@ -2908,7 +2936,7 @@ pass.</em></p>
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../assets/javascripts/mathjax.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
       
