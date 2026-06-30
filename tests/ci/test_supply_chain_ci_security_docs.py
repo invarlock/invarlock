@@ -5,6 +5,8 @@ from typing import Any
 
 import yaml
 
+ACTIONS_CACHE_PIN = "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
+
 
 def _load_workflow(path: Path) -> dict[str, Any]:
     workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -36,9 +38,7 @@ def test_secret_history_workflow_runs_scheduled_full_history_gitleaks() -> None:
     assert checkout_step["with"]["fetch-depth"] == 0
 
     cache_step = _find_step_by_name(steps, "Cache gitleaks binary")
-    assert (
-        cache_step["uses"] == "actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae"
-    )
+    assert cache_step["uses"] == ACTIONS_CACHE_PIN
     assert cache_step["with"]["path"] == "~/go/bin/gitleaks"
     assert "gitleaks-v8.30.0" in cache_step["with"]["key"]
 

@@ -10,6 +10,7 @@ import yaml
 
 WORKFLOWS_DIR = Path(".github/workflows")
 PINNED_ACTION_RE = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
+ACTIONS_CACHE_PIN = "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
 TRANSFORMERS_LOCKFILES = (
     Path("requirements/workflows/ci-hf-py312.txt"),
     Path("requirements/workflows/ci-hf-py313.txt"),
@@ -166,7 +167,7 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
 
     job = workflow["jobs"]["scan"]
     assert job["runs-on"] == "ubuntu-latest"
-    assert job["timeout-minutes"] == 15
+    assert job["timeout-minutes"] == 30
 
     steps = job["steps"]
     step_names = [step.get("name") for step in steps if isinstance(step, dict)]
@@ -204,10 +205,7 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
     assert checkout_step["with"]["fetch-depth"] == 0
 
     gitleaks_cache = _find_step_by_name(steps, "Cache gitleaks binary")
-    assert (
-        gitleaks_cache["uses"]
-        == "actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae"
-    )
+    assert gitleaks_cache["uses"] == ACTIONS_CACHE_PIN
     assert gitleaks_cache["with"]["path"] == "~/go/bin/gitleaks"
     assert "gitleaks-v8.30.0" in gitleaks_cache["with"]["key"]
 
@@ -635,10 +633,7 @@ def test_release_workflow_builds_and_publishes_tag_only_artifacts():
     )
 
     gitleaks_cache = _find_step_by_name(build_steps, "Cache gitleaks binary")
-    assert (
-        gitleaks_cache["uses"]
-        == "actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae"
-    )
+    assert gitleaks_cache["uses"] == ACTIONS_CACHE_PIN
     assert gitleaks_cache["with"]["path"] == "~/go/bin/gitleaks"
     assert "gitleaks-v8.30.0" in gitleaks_cache["with"]["key"]
 
