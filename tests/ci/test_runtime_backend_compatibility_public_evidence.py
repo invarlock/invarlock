@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-EVIDENCE_DIR = REPO_ROOT / "public_evidence" / "runtime_backend_compat_cuda128"
+EVIDENCE_DIR = REPO_ROOT / "public_evidence" / "runtime_backend_compatibility_cuda128"
 
 EXPECTED_FAMILIES = {
     "cuda-bnb": ["hf_bnb"],
@@ -39,7 +39,10 @@ def _sha256(path: Path) -> str:
 def test_cuda128_backend_compat_summary_is_public_safe_and_complete() -> None:
     summary = _load_json(EVIDENCE_DIR / "compatibility_summary.json")
 
-    assert summary["schema"] == "invarlock.runtime_backend_compat.cuda128.summary.v1"
+    assert (
+        summary["schema"]
+        == "invarlock.runtime_backend_compatibility.cuda128.summary.v1"
+    )
     assert summary["status"] == "completed"
     assert summary["evidence_scope"] == (
         "runtime backend build/import smoke compatibility only; "
@@ -85,7 +88,7 @@ def test_cuda128_backend_compat_hash_inventory_matches_public_files() -> None:
     inventory = _load_json(EVIDENCE_DIR / "hash_inventory.json")
 
     assert inventory["schema"] == (
-        "invarlock.runtime_backend_compat.cuda128.hash_inventory.v1"
+        "invarlock.runtime_backend_compatibility.cuda128.hash_inventory.v1"
     )
     assert inventory["status"] == "completed"
     artifacts = inventory["artifacts"]
@@ -108,7 +111,7 @@ def test_cuda128_backend_compat_metadata_declares_narrow_scope() -> None:
     metadata = _load_json(EVIDENCE_DIR / "evidence.meta.json")
 
     assert metadata["schema"] == "invarlock.public_evidence.meta.v1"
-    assert metadata["evidence_class"] == "runtime_backend_compat_sweep"
+    assert metadata["evidence_class"] == "runtime_backend_compatibility"
     assert metadata["artifact_paths"] == {
         "compatibility_summary": "compatibility_summary.json",
         "hash_inventory": "hash_inventory.json",

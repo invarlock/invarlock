@@ -1,5 +1,5 @@
 {
-  "schema": "invarlock.runtime_backend_compat.cuda128.summary.v1",
+  "schema": "invarlock.runtime_backend_compatibility.cuda128.summary.v1",
   "status": "completed",
   "evidence_scope": "runtime backend build/import smoke compatibility only; no model-quality or assurance claim",
   "validation_environment": "CUDA-capable validation host",

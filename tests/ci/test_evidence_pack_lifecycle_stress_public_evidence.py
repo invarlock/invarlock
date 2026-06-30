@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-EVIDENCE_DIR = REPO_ROOT / "public_evidence" / "evidence_pack_queue_stress_resume"
+EVIDENCE_DIR = REPO_ROOT / "public_evidence" / "evidence_pack_lifecycle_stress"
 
 PRIVATE_TEXT_PATTERNS = (
     "/private/tmp",
@@ -26,13 +26,13 @@ def _sha256(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def test_queue_stress_summary_is_public_safe_and_complete() -> None:
-    summary = _load_json(EVIDENCE_DIR / "stress_summary.json")
+def test_lifecycle_stress_summary_is_public_safe_and_complete() -> None:
+    summary = _load_json(EVIDENCE_DIR / "lifecycle_summary.json")
 
-    assert summary["schema"] == "invarlock.evidence_pack_queue_stress_resume.summary.v1"
+    assert summary["schema"] == "invarlock.evidence_pack_lifecycle_stress.summary.v1"
     assert summary["status"] == "completed"
     assert summary["evidence_scope"] == (
-        "evidence-pack queue stress/resume validation only; "
+        "evidence-pack task lifecycle stress validation only; "
         "no model-quality or assurance claim"
     )
     assert summary["validation_environment"] == "CUDA-capable validation host"
@@ -66,11 +66,11 @@ def test_queue_stress_summary_is_public_safe_and_complete() -> None:
         assert pattern not in serialized
 
 
-def test_queue_stress_hash_inventory_matches_public_files() -> None:
+def test_lifecycle_stress_hash_inventory_matches_public_files() -> None:
     inventory = _load_json(EVIDENCE_DIR / "hash_inventory.json")
 
     assert inventory["schema"] == (
-        "invarlock.evidence_pack_queue_stress_resume.hash_inventory.v1"
+        "invarlock.evidence_pack_lifecycle_stress.hash_inventory.v1"
     )
     assert inventory["status"] == "completed"
     artifacts = inventory["artifacts"]
@@ -79,7 +79,7 @@ def test_queue_stress_hash_inventory_matches_public_files() -> None:
     by_path = {artifact["path"]: artifact for artifact in artifacts}
     assert set(by_path) == {
         "README.md",
-        "stress_summary.json",
+        "lifecycle_summary.json",
         "evidence.meta.json",
     }
     for rel_path, artifact in by_path.items():
@@ -89,13 +89,13 @@ def test_queue_stress_hash_inventory_matches_public_files() -> None:
         assert artifact["bytes"] == path.stat().st_size
 
 
-def test_queue_stress_metadata_declares_summary_only_scope() -> None:
+def test_lifecycle_stress_metadata_declares_summary_only_scope() -> None:
     metadata = _load_json(EVIDENCE_DIR / "evidence.meta.json")
 
     assert metadata["schema"] == "invarlock.public_evidence.meta.v1"
-    assert metadata["evidence_class"] == "evidence_pack_queue_stress_resume"
+    assert metadata["evidence_class"] == "evidence_pack_lifecycle_stress"
     assert metadata["artifact_paths"] == {
-        "stress_summary": "stress_summary.json",
+        "lifecycle_summary": "lifecycle_summary.json",
         "hash_inventory": "hash_inventory.json",
     }
     assert "invarlock evaluate" not in str(metadata["generated_by"])

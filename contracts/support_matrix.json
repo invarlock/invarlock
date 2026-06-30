@@ -593,7 +593,7 @@
         "evidence_pack_recipe": "public_evidence/published_basis/qwen3_5_27b_scoped/evidence_pack_recipe.json",
         "evidence_pack_fixture": "public_evidence/published_basis/qwen3_5_27b_scoped/evidence_pack"
       },
-      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence using scoped self-attention and MLP guard scans. The no-op report passes strict policy with 0.8975 final accuracy over 400 examples and no guard warnings. Linear-attention module coverage remains a separate strict spectral-cap finding in public_evidence/larger_model_queue_drain_findings/modern_followon_addendum.json; this is no-op preservation/null-behavior evidence and not guard-value proof.",
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence using scoped self-attention and MLP guard scans. The no-op report passes strict policy with 0.8975 final accuracy over 400 examples and no guard warnings. Linear-attention module coverage remains captured as strict spectral-cap findings in public_evidence/larger_model_validation_findings/lane_outcomes.json; this is no-op preservation/null-behavior evidence and not guard-value proof.",
       "provenance_source": "docs/README.md#support-matrix"
     },
     {
@@ -619,7 +619,7 @@
         "evidence_pack_recipe": "public_evidence/published_basis/qwen3_6_27b_scoped/evidence_pack_recipe.json",
         "evidence_pack_fixture": "public_evidence/published_basis/qwen3_6_27b_scoped/evidence_pack"
       },
-      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence using scoped self-attention and MLP guard scans. The no-op report passes strict policy with 0.8825 final accuracy over 400 examples and no guard warnings. Linear-attention module coverage remains a separate strict spectral-cap finding in public_evidence/larger_model_queue_drain_findings/modern_followon_addendum.json; this is no-op preservation/null-behavior evidence and not guard-value proof.",
+      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence using scoped self-attention and MLP guard scans. The no-op report passes strict policy with 0.8825 final accuracy over 400 examples and no guard warnings. Linear-attention module coverage remains captured as strict spectral-cap findings in public_evidence/larger_model_validation_findings/lane_outcomes.json; this is no-op preservation/null-behavior evidence and not guard-value proof.",
       "provenance_source": "docs/README.md#support-matrix"
     },
     {

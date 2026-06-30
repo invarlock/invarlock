@@ -20,7 +20,7 @@ def test_gpt_oss_catalog_row_is_published_with_public_evidence() -> None:
     assert "alternate-seed/window robustness claim" in gpt_oss["notes"]
 
 
-def test_followon_public_evidence_rows_are_declared_support() -> None:
+def test_followup_public_evidence_rows_are_declared_support() -> None:
     declared = _declared_by_name()
 
     expected = {
