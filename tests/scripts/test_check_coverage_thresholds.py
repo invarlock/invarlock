@@ -580,7 +580,7 @@ def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
         assert path in proc.stderr
 
 
-def test_newly_promoted_core_thresholds_are_explicit(tmp_path: Path) -> None:
+def test_new_published_basis_core_thresholds_are_explicit(tmp_path: Path) -> None:
     xml = tmp_path / "cov.xml"
     json_out = tmp_path / "out.json"
     _write_cov_xml(

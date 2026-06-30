@@ -18,7 +18,7 @@
         "stale_owner_lock_recovery",
         "atomic_claim_complete_fail_retry_transitions",
         "retry_sanitization_and_max_retry_handling",
-        "dependency_promotion_demotion_and_failed_dependency_cancellation",
+        "dependency_readiness_demotion_and_failed_dependency_cancellation",
         "orphaned_running_task_reclamation",
         "worker_restart_paths",
         "memory_plan_reservation_updates",

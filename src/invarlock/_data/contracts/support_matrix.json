@@ -8,7 +8,7 @@
   "support_tier_descriptions": {
     "published_basis": "Public evidence fixture set with report, runtime-manifest, and evidence-pack provenance where available.",
     "supported_experimental": "Repo ships preset/config/test/smoke paths and tuned edit-param coverage, but the lane has not yet graduated to the published public evidence basis.",
-    "community_experimental": "Adapter/runtime path is available for community use without a maintained public evidence basis; some rows may include repo pilot presets or calibration configs before promotion."
+    "community_experimental": "Adapter/runtime path is available for community use without a maintained public evidence basis; some rows may include repo pilot presets or calibration configs before published-basis inclusion."
   },
   "lanes": [
     {
@@ -345,7 +345,7 @@
         "evidence_pack_recipe": "public_evidence/published_basis/open_llama_7b/evidence_pack_recipe.json",
         "evidence_pack_fixture": "public_evidence/published_basis/open_llama_7b/evidence_pack"
       },
-      "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack."
+      "notes": "Evidence includes release-profile container-backed public report, runtime manifest, and signed evidence pack."
     },
     {
       "lane_id": "falcon-7b-causal-hf",
@@ -368,7 +368,7 @@
         "evidence_pack_recipe": "public_evidence/published_basis/falcon_7b/evidence_pack_recipe.json",
         "evidence_pack_fixture": "public_evidence/published_basis/falcon_7b/evidence_pack"
       },
-      "notes": "Promoted with release-profile container-backed public report, runtime manifest, and signed evidence pack."
+      "notes": "Evidence includes release-profile container-backed public report, runtime manifest, and signed evidence pack."
     },
     {
       "lane_id": "qwen3-5-causal-hf",
@@ -437,7 +437,7 @@
         "evidence_pack_recipe": "public_evidence/published_basis/flan_t5_base/evidence_pack_recipe.json",
         "evidence_pack_fixture": "public_evidence/published_basis/flan_t5_base/evidence_pack"
       },
-      "notes": "Promoted from the generic seq2seq community lane with release-profile container-backed FLAN-T5 base evidence on pinned CNN/DailyMail validation data. The no-op report passes strict policy with one advisory guard warning; it is not guard-value proof."
+      "notes": "Evidence includes release-profile container-backed FLAN-T5 base evidence on pinned CNN/DailyMail validation data. The no-op report passes strict policy with one advisory guard warning; it is not guard-value proof."
     },
     {
       "lane_id": "gemma4-12b-any-to-any-hf",
@@ -463,7 +463,7 @@
         "evidence_pack_recipe": "public_evidence/published_basis/gemma4_12b/evidence_pack_recipe.json",
         "evidence_pack_fixture": "public_evidence/published_basis/gemma4_12b/evidence_pack"
       },
-      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.565 final accuracy over 400 examples, ratio_vs_baseline 1.009, and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof."
+      "notes": "Evidence includes release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.565 final accuracy over 400 examples, ratio_vs_baseline 1.009, and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof."
     },
     {
       "lane_id": "gemma4-e4b-image-text-hf",
@@ -489,7 +489,7 @@
         "evidence_pack_recipe": "public_evidence/published_basis/gemma4_e4b/evidence_pack_recipe.json",
         "evidence_pack_fixture": "public_evidence/published_basis/gemma4_e4b/evidence_pack"
       },
-      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.500 final accuracy over 400 examples, ratio_vs_baseline 1.010, and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof."
+      "notes": "Evidence includes release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.500 final accuracy over 400 examples, ratio_vs_baseline 1.010, and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof."
     },
     {
       "lane_id": "gemma4-e2b-image-text-hf",
@@ -515,7 +515,7 @@
         "evidence_pack_recipe": "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack_recipe.json",
         "evidence_pack_fixture": "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack"
       },
-      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.388 final accuracy over 400 examples, ratio_vs_baseline 1.013, and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader multimodal behavior remain out of scope, and it is not guard-value proof."
+      "notes": "Evidence includes release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.388 final accuracy over 400 examples, ratio_vs_baseline 1.013, and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader multimodal behavior remain out of scope, and it is not guard-value proof."
     },
     {
       "lane_id": "qwen3-5-4b-image-text-hf",
@@ -536,7 +536,7 @@
       "representative_models": [
         "Qwen/Qwen3.5-4B"
       ],
-      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.855 final accuracy over 400 examples, ratio_vs_baseline 1.036, and no guard warnings. This is no-op preservation/null-behavior evidence; it is not guard-value proof.",
+      "notes": "Evidence includes release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.855 final accuracy over 400 examples, ratio_vs_baseline 1.036, and no guard warnings. This is no-op preservation/null-behavior evidence; it is not guard-value proof.",
       "evidence": {
         "evaluation_report_fixture": "public_evidence/published_basis/qwen3_5_4b/evaluation.report.json",
         "runtime_manifest_fixture": "public_evidence/published_basis/qwen3_5_4b/runtime.manifest.json",
@@ -562,7 +562,7 @@
       "representative_models": [
         "Qwen/Qwen3.5-2B"
       ],
-      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence, runtime manifest, and signed evidence pack. This is a no-op preservation/null-behavior basis with 0.85 final accuracy and no guard warnings; it is not guard-value proof.",
+      "notes": "Evidence includes release-profile container-backed public VQAv2 image-text evidence, runtime manifest, and signed evidence pack. This is a no-op preservation/null-behavior basis with 0.85 final accuracy and no guard warnings; it is not guard-value proof.",
       "evidence": {
         "evaluation_report_fixture": "public_evidence/published_basis/qwen3_5_2b/evaluation.report.json",
         "runtime_manifest_fixture": "public_evidence/published_basis/qwen3_5_2b/runtime.manifest.json",
@@ -593,7 +593,7 @@
         "evidence_pack_recipe": "public_evidence/published_basis/qwen3_5_27b_scoped/evidence_pack_recipe.json",
         "evidence_pack_fixture": "public_evidence/published_basis/qwen3_5_27b_scoped/evidence_pack"
       },
-      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence using scoped self-attention and MLP guard scans. The no-op report passes strict policy with 0.8975 final accuracy over 400 examples and no guard warnings. Linear-attention module coverage remains captured as strict spectral-cap findings in public_evidence/larger_model_validation_findings/lane_outcomes.json; this is no-op preservation/null-behavior evidence and not guard-value proof.",
+      "notes": "Evidence includes release-profile container-backed public VQAv2 image-text evidence using scoped self-attention and MLP guard scans. The no-op report passes strict policy with 0.8975 final accuracy over 400 examples and no guard warnings. Linear-attention module coverage remains captured as strict spectral-cap findings in public_evidence/larger_model_validation_findings/lane_outcomes.json; this is no-op preservation/null-behavior evidence and not guard-value proof.",
       "provenance_source": "docs/README.md#support-matrix"
     },
     {
@@ -619,7 +619,7 @@
         "evidence_pack_recipe": "public_evidence/published_basis/qwen3_6_27b_scoped/evidence_pack_recipe.json",
         "evidence_pack_fixture": "public_evidence/published_basis/qwen3_6_27b_scoped/evidence_pack"
       },
-      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence using scoped self-attention and MLP guard scans. The no-op report passes strict policy with 0.8825 final accuracy over 400 examples and no guard warnings. Linear-attention module coverage remains captured as strict spectral-cap findings in public_evidence/larger_model_validation_findings/lane_outcomes.json; this is no-op preservation/null-behavior evidence and not guard-value proof.",
+      "notes": "Evidence includes release-profile container-backed public VQAv2 image-text evidence using scoped self-attention and MLP guard scans. The no-op report passes strict policy with 0.8825 final accuracy over 400 examples and no guard warnings. Linear-attention module coverage remains captured as strict spectral-cap findings in public_evidence/larger_model_validation_findings/lane_outcomes.json; this is no-op preservation/null-behavior evidence and not guard-value proof.",
       "provenance_source": "docs/README.md#support-matrix"
     },
     {
@@ -647,7 +647,7 @@
         "evidence_pack_recipe": "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack_recipe.json",
         "evidence_pack_fixture": "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack"
       },
-      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.555 final accuracy over 400 examples, ratio_vs_baseline 1.009, and no guard warnings. This is no-op preservation/null-behavior evidence; audio, exhaustive expert-bank behavior, and MoE routing quality remain out of scope, and it is not guard-value proof."
+      "notes": "Evidence includes release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.555 final accuracy over 400 examples, ratio_vs_baseline 1.009, and no guard warnings. This is no-op preservation/null-behavior evidence; audio, exhaustive expert-bank behavior, and MoE routing quality remain out of scope, and it is not guard-value proof."
     },
     {
       "lane_id": "gemma4-31b-image-text-hf",
@@ -672,7 +672,7 @@
         "evidence_pack_recipe": "public_evidence/published_basis/gemma4_31b/evidence_pack_recipe.json",
         "evidence_pack_fixture": "public_evidence/published_basis/gemma4_31b/evidence_pack"
       },
-      "notes": "Promoted with release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.610 final accuracy over 400 examples and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof.",
+      "notes": "Evidence includes release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.610 final accuracy over 400 examples and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof.",
       "provenance_source": "docs/README.md#support-matrix"
     },
     {
@@ -697,7 +697,7 @@
         "evidence_pack_recipe": "public_evidence/published_basis/mixtral_8x7b/evidence_pack_recipe.json",
         "evidence_pack_fixture": "public_evidence/published_basis/mixtral_8x7b/evidence_pack"
       },
-      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 64-window no-op preservation evidence. This is a large MoE preservation basis; it is not a benchmark-quality or routing-quality claim, and the preset skips optional guard-overhead measurement for this lane."
+      "notes": "Evidence includes release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 64-window no-op preservation evidence. This is a large MoE preservation basis; it is not a benchmark-quality or routing-quality claim, and the preset skips optional guard-overhead measurement for this lane."
     },
     {
       "lane_id": "qwen3-30b-a3b-moe-causal-hf",
@@ -721,7 +721,7 @@
         "evidence_pack_recipe": "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack_recipe.json",
         "evidence_pack_fixture": "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack"
       },
-      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window no-op preservation evidence. This is a large MoE preservation basis using scoped attention/router/shared-expert guard scans under all-8 80GB-GPU sharding; it is not a benchmark-quality, fine-tuning, deployment, exhaustive expert-bank, or MoE routing-quality claim."
+      "notes": "Evidence includes release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window no-op preservation evidence. This is a large MoE preservation basis using scoped attention/router/shared-expert guard scans under all-8 80GB-GPU sharding; it is not a benchmark-quality, fine-tuning, deployment, exhaustive expert-bank, or MoE routing-quality claim."
     },
     {
       "lane_id": "gpt-oss-20b-causal-hf",
@@ -745,7 +745,7 @@
         "evidence_pack_recipe": "public_evidence/published_basis/gpt_oss_20b/evidence_pack_recipe.json",
         "evidence_pack_fixture": "public_evidence/published_basis/gpt_oss_20b/evidence_pack"
       },
-      "notes": "Promoted with release-profile container-backed public WikiText-2 validation evidence for the pinned fixture. The no-op report passes strict policy with final perplexity 86.273 over 400 paired windows and no guard warnings. This is no-op preservation evidence; it is not a fine-tuning, benchmark-quality, deployment, safety, or alternate-seed/window robustness claim."
+      "notes": "Evidence includes release-profile container-backed public WikiText-2 validation evidence for the pinned fixture. The no-op report passes strict policy with final perplexity 86.273 over 400 paired windows and no guard warnings. This is no-op preservation evidence; it is not a fine-tuning, benchmark-quality, deployment, safety, or alternate-seed/window robustness claim."
     },
     {
       "lane_id": "olmoe-1b-7b-0924-causal-hf",
@@ -763,7 +763,7 @@
       "representative_models": [
         "allenai/OLMoE-1B-7B-0924"
       ],
-      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window no-op preservation evidence. This is the smaller MoE validation basis; larger MoE assurance is covered by Mixtral, Qwen3 30B-A3B, and Gemma 4 26B-A4B published bases. Gemma 4 26B-A4B is image-text preservation/null-behavior evidence, not audio, exhaustive expert-bank, or MoE routing-quality evidence.",
+      "notes": "Evidence includes release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window no-op preservation evidence. This is the smaller MoE validation basis; larger MoE assurance is covered by Mixtral, Qwen3 30B-A3B, and Gemma 4 26B-A4B published bases. Gemma 4 26B-A4B is image-text preservation/null-behavior evidence, not audio, exhaustive expert-bank, or MoE routing-quality evidence.",
       "evidence": {
         "evaluation_report_fixture": "public_evidence/published_basis/olmoe_1b_7b/evaluation.report.json",
         "runtime_manifest_fixture": "public_evidence/published_basis/olmoe_1b_7b/runtime.manifest.json",
@@ -834,7 +834,7 @@
       "representative_models": [
         "HuggingFaceTB/SmolLM3-3B"
       ],
-      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window preservation evidence. The SmolLM3 preset explicitly skips guard-overhead measurement, so this is preservation evidence and not guard-overhead evidence.",
+      "notes": "Evidence includes release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window preservation evidence. The SmolLM3 preset explicitly skips guard-overhead measurement, so this is preservation evidence and not guard-overhead evidence.",
       "evidence": {
         "evaluation_report_fixture": "public_evidence/published_basis/smollm3_3b/evaluation.report.json",
         "runtime_manifest_fixture": "public_evidence/published_basis/smollm3_3b/runtime.manifest.json",
@@ -858,7 +858,7 @@
       "representative_models": [
         "microsoft/Phi-4-mini-instruct"
       ],
-      "notes": "Promoted with release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window preservation evidence.",
+      "notes": "Evidence includes release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window preservation evidence.",
       "evidence": {
         "evaluation_report_fixture": "public_evidence/published_basis/phi4_mini/evaluation.report.json",
         "runtime_manifest_fixture": "public_evidence/published_basis/phi4_mini/runtime.manifest.json",

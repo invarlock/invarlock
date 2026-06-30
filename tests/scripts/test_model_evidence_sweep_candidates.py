@@ -9,13 +9,13 @@ from pathlib import Path
 from tests.scripts._support_model_evidence_sweep import load_script_module
 
 
-def test_promotion_gap_gpu_suite_covers_prepared_deferred_lanes() -> None:
+def test_published_basis_gap_gpu_suite_covers_prepared_deferred_lanes() -> None:
     mod = load_script_module("model_evidence_sweep")
 
     specs = {
         lane.slug: lane
         for lane in mod.select_specs(
-            mod.PROMOTION_GAP_GPU_SUITE,
+            mod.PUBLISHED_BASIS_GAP_GPU_SUITE,
             slugs=[],
             lane_ids=[],
             shard_index=0,

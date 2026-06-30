@@ -5,7 +5,7 @@ lifecycle and queue-state handling. It does not include raw logs,
 host-specific paths, model weights, or run directories.
 
 The validation covers queue lock recovery, atomic task transitions, retry
-sanitization, dependency promotion and cancellation, orphan reclamation, worker
+sanitization, dependency readiness and cancellation, orphan reclamation, worker
 restart paths, and structured queue-state helpers on a CUDA-capable validation
 host.
 
