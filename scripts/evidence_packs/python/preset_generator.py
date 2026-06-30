@@ -24,7 +24,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
     yaml = None
     _YAML_AVAILABLE = False
-_YAML_LOAD_ERRORS = (OSError,)
+    _YAML_LOAD_ERRORS = (OSError,)
 
 
 DEFAULT_PRESET_EDIT_TYPES = (
@@ -109,7 +109,12 @@ def _resolve_dataset_provider_spec(
             raise SystemExit(
                 "INVARLOCK_DATASET_PROVIDER_YAML is set but PyYAML is unavailable"
             )
-        parsed = _yaml_safe_load(raw_yaml)
+        try:
+            parsed = _yaml_safe_load(raw_yaml)
+        except _YAML_LOAD_ERRORS as exc:
+            raise SystemExit(
+                f"INVARLOCK_DATASET_PROVIDER_YAML is not valid YAML ({exc})"
+            ) from exc
         if not isinstance(parsed, dict):
             raise SystemExit("INVARLOCK_DATASET_PROVIDER_YAML must parse to a mapping")
         provider = dict(parsed)
