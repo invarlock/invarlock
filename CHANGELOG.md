@@ -9,11 +9,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added knowledge/self-edit evidence metadata, public documentation, and
+  report/provenance coverage for self-edit workflows.
+- Added LoRA, full fine-tune, and magnitude-prune integration lanes, including
+  generated evidence-pack lane support and tiny public BYOE smoke entrypoints.
+- Added a training evidence campaign surface for PEFT LoRA merge and full
+  fine-tune runs with checkpoint references, runtime manifests, verification
+  summaries, and hash inventories.
+- Added model-editing evidence-bundle manifests, verification summaries, and
+  training-matrix planning artifacts for release review.
+- Added CUDA 12.8 runtime backend compatibility evidence for bitsandbytes,
+  GPTQModel, HQQ, Quanto, TorchAO, and compressed-tensors lanes.
+- Added attention-backend compatibility evidence covering FA2-unavailable
+  eager execution behavior.
+- Added evidence-pack lifecycle stress/resume evidence and larger-model
+  validation findings as summarized public evidence classes.
+- Added larger-model published-basis evidence and presets for Gemma 4 31B,
+  Qwen3.5 27B scoped, Qwen3.6 27B scoped, and GPT-OSS 20B.
+- Added catalog and support-matrix entries for modern model families, including
+  updated published-basis distinctions for Gemma, Qwen, and GPT-OSS lanes.
+- Added a Qwen linear-MoE causal adapter spec and tests for Qwen MoE model
+  routing.
+- Added scheduled full-history secret scanning and expanded supply-chain PR
+  scan coverage for release and dependency validation.
+
 ### Changed
+
+- Synced the post-`v0.11.0` integration branch and optimized release workflow
+  maintenance so the next release branch starts from current CI and evidence
+  workflow state.
+- Reworked public evidence category naming around runtime backend
+  compatibility, attention-backend behavior, lifecycle stress, and larger-model
+  validation findings.
+- Reorganized the model family catalog and support matrix to better reflect
+  current adapter support, catalog candidates, and published-basis evidence.
+- Expanded public evidence audits and packaged public evidence synchronization
+  for the new training, backend compatibility, lifecycle, and larger-model
+  evidence classes.
+- Improved evidence-pack queue/task tooling for model creation, scheduling,
+  preflight validation, task serialization, runtime checks, and failure
+  classification.
+- Updated evidence-pack docs and public run examples to use repo-relative
+  artifact wording and avoid environment-specific execution details.
+- Consolidated MkDocs JavaScript and stylesheet overrides under
+  `docs/assets/`.
+- Updated workflow and development dependency pins, including Ruff,
+  actions/cache, actions/checkout, actions/setup-python, and
+  actions/attest-build-provenance, and refreshed the affected workflow lock
+  files and contract tests.
 
 ### Removed
 
+- Removed the legacy Qwen14 sentinel script/test entrypoints after replacing
+  that coverage with the model-evidence sweep and catalog-driven validation
+  paths.
+
 ### Fixed
+
+- Fixed evidence-pack reusable baseline schedules and validation harness gaps
+  that could make release-review evidence runs less representative.
+- Fixed generated LoRA and fine-tune evidence-pack parity, including edit
+  metadata propagation and strict verification coverage.
+- Fixed training evidence campaign validation so generated LoRA/full fine-tune
+  reports, manifests, and hashes verify consistently.
+- Fixed model-catalog smoke materialization for VQAv2 and materialized evidence
+  lanes with preset overrides.
+- Fixed verifier failure classification for larger-model catalog evidence so
+  failed, negative, and compatibility findings are reported distinctly.
+- Fixed snapshot reload fallback behavior for large HF model lanes without
+  retrying an already-failed snapshot restore path.
+- Fixed public evidence catalog consistency, support-matrix synchronization,
+  and packaged public evidence indexes after larger-model evidence updates.
+- Fixed dependency workflow contract drift after the merged workflow/action
+  updates and increased the supply-chain PR scan timeout to allow advanced
+  dependency setup to complete.
 
 ## [0.11.0] - 2026-06-16
 
