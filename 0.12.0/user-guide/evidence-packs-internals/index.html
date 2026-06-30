@@ -1,0 +1,5229 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Official documentation for the InvarLock toolkit">
+      
+      
+      
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/evidence-packs-internals/">
+      
+      
+        <link rel="prev" href="../evidence-packs/">
+      
+      
+        <link rel="next" href="../troubleshooting/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Evidence Pack Internals - InvarLock Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#evidence-pack-internals" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            InvarLock Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Evidence Pack Internals
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../getting-started/" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/cli/" class="md-tabs__link">
+          
+  
+  
+  CLI Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../assurance/00-assurance-case/" class="md-tabs__link">
+          
+  
+  
+  Assurance
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../security/best-practices/" class="md-tabs__link">
+          
+  
+  
+  Security
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    InvarLock Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../primary-metric-smoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Primary Metric Smoke
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../compare-and-evaluate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../live-examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bring-your-own-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bring Your Own Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plugins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config-gallery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Gallery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../example-reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../failure-examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Failure Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reading-report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading a Report
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evidence-packs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence Packs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence Pack Internals
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence Pack Internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start (Context)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hardware-target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hardware Target
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#entrypoints-and-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Entrypoints and modules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Entrypoints and modules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#entrypoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Entrypoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#library-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Library modules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#module-dependency-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module dependency graph
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting-decision-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting decision tree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model Suite
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#edit-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Edit Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Edit Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#clean-edits-tuned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clean edits (tuned)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stress-edits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stress edits
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deployable-edits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployable edits
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-injection-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error injection tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scheduling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scheduling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scheduling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#small_first-priority-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        small_first priority strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamic-scheduling-diagram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dynamic scheduling diagram
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#work-stealing-timeline-illustrative" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Work-stealing timeline (illustrative)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-gpu-model-distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-GPU Model Distribution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Multi-GPU Model Distribution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#memory-aware-selection-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory-aware selection example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-reservation-protection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU reservation protection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reservation-state-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reservation state example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task lifecycle
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task lifecycle">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gpu-worker-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU worker loop
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#batch-optimizations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch optimizations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Batch optimizations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-dependency-graphs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task dependency graphs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-breakdown-per-model-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task breakdown per model (defaults)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-phases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution phases
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-directory-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run directory layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run modes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#determinism-vs-throughput" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Determinism vs throughput
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#network-mode-and-model-revisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network mode and model revisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disk-and-cache-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disk and cache behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evidence-pack-packaging-and-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence pack packaging and verification
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Evidence pack packaging and verification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#packaging-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Packaging flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#remote-setup-helper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remote setup helper
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tuning-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tuning reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tuning reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hardware-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hardware selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model-overrides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model overrides
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invarlock-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InvarLock settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tuned-edit-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tuned edit presets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preset-derivation-reuse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preset derivation reuse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#experiment-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Experiment controls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#storage-and-memory-planning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage and memory planning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#worker-reliability-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worker + reliability controls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#packaging-and-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Packaging and verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#missing-model-revisions-offline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing model revisions (offline)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#oom-on-large-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OOM on large models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disk-pressure-preflight-failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disk pressure / preflight failures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-timeouts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task timeouts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stuck-queues-or-dead-workers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stuck queues or dead workers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    CLI Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/one-run-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    One Run Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/programmatic-quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Programmatic Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/guards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/report-outline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Outline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/model-adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/model-family-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Family Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/config-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/tier-policy-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tier Policy Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifact Layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/calibration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/alternatives-comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternatives Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Assurance
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/00-assurance-case/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance Case
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/14-trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/15-strict-assurance-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strict Assurance Checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/01-eval-math-derivation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Math Derivation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/02-coverage-and-pairing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coverage & Pairing Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/03-bca-bootstrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BCa Bootstrap (Paired Δlog)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/04-guard-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Contracts & Primer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/05-spectral-fpr-derivation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral False-Positive Control
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/06-rmt-epsilon-rule/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RMT ε-Rule
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/07-ve-gate-power/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VE Predictive Gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/08-determinism-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Determinism Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/09-tier-v1-calibration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tier Policy v1 Calibration (Pilot)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/10-guard-overhead-method/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Overhead Method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/11-policy-provenance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy Provenance & Digest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/12-device-drift-bands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Device Drift Bands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/13-gpu-mps-first-guards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GPU/MPS-First Guard Measurement Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/16-guard-validation-smoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Validation Smoke
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/17-empirical-guard-evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Empirical Guard Evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best Practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/release-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threat Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/runtime-provenance-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Provenance Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/pip-audit-allowlist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pip Audit Allowlist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start (Context)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hardware-target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hardware Target
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#entrypoints-and-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Entrypoints and modules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Entrypoints and modules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#entrypoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Entrypoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#library-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Library modules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#module-dependency-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module dependency graph
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting-decision-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting decision tree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model Suite
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#edit-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Edit Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Edit Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#clean-edits-tuned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clean edits (tuned)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stress-edits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stress edits
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deployable-edits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployable edits
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-injection-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error injection tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scheduling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scheduling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scheduling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#small_first-priority-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        small_first priority strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamic-scheduling-diagram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dynamic scheduling diagram
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#work-stealing-timeline-illustrative" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Work-stealing timeline (illustrative)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-gpu-model-distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-GPU Model Distribution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Multi-GPU Model Distribution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#memory-aware-selection-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory-aware selection example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-reservation-protection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU reservation protection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reservation-state-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reservation state example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task lifecycle
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task lifecycle">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gpu-worker-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU worker loop
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#batch-optimizations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch optimizations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Batch optimizations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-dependency-graphs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task dependency graphs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-breakdown-per-model-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task breakdown per model (defaults)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-phases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution phases
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-directory-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run directory layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run modes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#determinism-vs-throughput" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Determinism vs throughput
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#network-mode-and-model-revisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network mode and model revisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disk-and-cache-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disk and cache behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evidence-pack-packaging-and-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence pack packaging and verification
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Evidence pack packaging and verification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#packaging-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Packaging flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#remote-setup-helper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remote setup helper
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tuning-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tuning reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tuning reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hardware-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hardware selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model-overrides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model overrides
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invarlock-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InvarLock settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tuned-edit-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tuned edit presets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preset-derivation-reuse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preset derivation reuse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#experiment-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Experiment controls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#storage-and-memory-planning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage and memory planning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#worker-reliability-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worker + reliability controls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#packaging-and-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Packaging and verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#missing-model-revisions-offline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing model revisions (offline)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#oom-on-large-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OOM on large models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disk-pressure-preflight-failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disk pressure / preflight failures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-timeouts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task timeouts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stuck-queues-or-dead-workers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stuck queues or dead workers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="evidence-pack-internals">Evidence Pack Internals<a class="headerlink" href="#evidence-pack-internals" title="Permanent link">&para;</a></h1>
+<p>This guide explains how the evidence pack suite is wired internally: entrypoints,
+task graph, scheduling, and artifact generation. It complements
+<a href="../evidence-packs/">Evidence Packs</a>, which focuses on how to run a suite.</p>
+<blockquote>
+<p>Scope note: in this guide, <code>CALIBRATION_RUN -&gt; GENERATE_PRESET</code> is called
+<strong>Preset Derivation</strong>. It produces run-scoped
+<code>calibrated_preset_&lt;model&gt;.yaml/json</code> files. Global <code>runtime/tiers.yaml</code>
+tuning remains part of the calibration workflow.</p>
+</blockquote>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Purpose</td>
+<td>Hardware-agnostic Phase 0 validation harness for edit detection</td>
+</tr>
+<tr>
+<td>Harness version</td>
+<td><code>evidence-packs-v1</code></td>
+</tr>
+<tr>
+<td>Manifest format</td>
+<td><code>evidence-pack-v1</code></td>
+</tr>
+<tr>
+<td>Hardware</td>
+<td>NVIDIA GPUs where models fit VRAM; multi-GPU recommended for <code>full</code></td>
+</tr>
+<tr>
+<td>Models</td>
+<td><code>subset</code> (1 model), <code>showcase</code>/<code>workshop3</code> (3 models), or <code>full</code> (6 models); all ungated public</td>
+</tr>
+<tr>
+<td>Edits</td>
+<td>Scenario-driven; default suites use 6 clean + 6 stress edit scenarios per model, and filtered manifests may select any subset</td>
+</tr>
+<tr>
+<td>Preset Derivation</td>
+<td><code>CALIBRATION_RUN</code> + <code>GENERATE_PRESET</code> create run-scoped calibrated presets</td>
+</tr>
+<tr>
+<td>Scheduling</td>
+<td>Dynamic work-stealing, <code>small_first</code> priority strategy</td>
+</tr>
+<tr>
+<td>Multi-GPU</td>
+<td>Profile-based; <code>required_gpus</code> grows only when memory requires it</td>
+</tr>
+<tr>
+<td>Output</td>
+<td>Evidence pack with <code>manifest.json</code>, <code>checksums.sha256</code>, and report bundles (<code>--layout v2</code> nests results + metadata)</td>
+</tr>
+<tr>
+<td>Source of truth</td>
+<td><code>scripts/evidence_packs/run_suite.sh</code>, <code>scripts/evidence_packs/run_pack.sh</code>, <code>src/invarlock/evidence_pack.py</code>, <code>src/invarlock/cli/commands/evidence_pack.py</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="quick-start-context">Quick Start (Context)<a class="headerlink" href="#quick-start-context" title="Permanent link">&para;</a></h2>
+<p>The suite wrappers fail closed unless remote model code has been explicitly
+approved. The examples below assume <code>INVARLOCK_ALLOW_REMOTE_CODE=1</code> is exported
+for the shell that launches <code>run_suite.sh</code> or <code>run_pack.sh</code>.</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Run the subset suite (offline by default)</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">INVARLOCK_ALLOW_REMOTE_CODE</span><span class="o">=</span><span class="m">1</span>
+./scripts/evidence_packs/run_suite.sh<span class="w"> </span>--suite<span class="w"> </span>subset
+
+<span class="c1"># Run the full suite and build an evidence pack</span>
+./scripts/evidence_packs/run_pack.sh<span class="w"> </span>--suite<span class="w"> </span>full<span class="w"> </span>--net<span class="w"> </span><span class="m">1</span><span class="w"> </span>--release-review
+
+<span class="c1"># Verify an existing evidence pack</span>
+invarlock<span class="w"> </span>advanced<span class="w"> </span>evidence-pack<span class="w"> </span>verify<span class="w"> </span>./evidence_pack_runs/subset_20250101_000000/evidence_pack<span class="w"> </span>--strict<span class="w"> </span>--report-assurance<span class="w"> </span>strict
+
+<span class="c1"># Verify and pin the expected package-native signer</span>
+invarlock<span class="w"> </span>advanced<span class="w"> </span>evidence-pack<span class="w"> </span>verify<span class="w"> </span>./evidence_pack_runs/subset_20250101_000000/evidence_pack<span class="w"> </span>--strict<span class="w"> </span>--report-assurance<span class="w"> </span>strict<span class="w"> </span>--expected-fingerprint<span class="w"> </span>sha256:&lt;<span class="m">64</span>-hex-chars&gt;
+</code></pre></div>
+
+<h2 id="hardware-target">Hardware Target<a class="headerlink" href="#hardware-target" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Hardware-agnostic by design; run on any NVIDIA GPU topology where the models
+  fit in VRAM.</li>
+<li>Multi-GPU scheduling is enabled automatically when a task’s memory plan
+  exceeds per-device capacity.</li>
+<li>Set <code>GPU_MEMORY_GB</code> or <code>GPU_MEMORY_PER_DEVICE</code> to match your hardware when
+  running on GPUs with unusual memory sizes.</li>
+</ul>
+<h2 id="entrypoints-and-modules">Entrypoints and modules<a class="headerlink" href="#entrypoints-and-modules" title="Permanent link">&para;</a></h2>
+<h3 id="entrypoints">Entrypoints<a class="headerlink" href="#entrypoints" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>scripts/evidence_packs/run_suite.sh</code> runs a suite and sets <code>PACK_*</code> runtime flags
+  before calling the main orchestrator.</li>
+<li><code>scripts/evidence_packs/run_pack.sh</code> runs a suite, then packages artifacts into a
+  portable evidence pack (manifest + checksums + reports).</li>
+<li><code>scripts/evidence_packs/verify_pack.sh</code> validates an evidence pack in repo workflows.</li>
+<li><code>invarlock advanced evidence-pack verify</code> provides the package-native verifier path for
+  installed wheels.</li>
+<li><code>scripts/evidence_packs/run_suite.sh</code> defines the model suites and allows
+  <code>MODEL_1</code>–<code>MODEL_8</code> overrides.</li>
+<li><code>scripts/evidence_packs/lib/validation/validation_suite.sh</code> orchestrates the run: preflight,
+  queue creation, worker launch, and monitoring.</li>
+</ul>
+<h3 id="library-modules">Library modules<a class="headerlink" href="#library-modules" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>lib/task_serialization.sh</code>: task schema, JSON helpers, GPU planning.</li>
+<li><code>lib/queue/queue_manager.sh</code>: compatibility facade for queue state, dependency, and task-generation modules.</li>
+<li><code>lib/queue/queue_core.sh</code>: queue setup, locking, summaries, and terminal-state helpers.</li>
+<li><code>lib/queue/queue_lifecycle.sh</code>: task state transitions and orphan reclamation.</li>
+<li><code>lib/queue/queue_dependencies.sh</code>: dependency resolution and dependent ready-state transitions.</li>
+<li><code>lib/queue/queue_memory_plan.sh</code>: profile-based memory refresh and memory-plan export.</li>
+<li><code>lib/queue/queue_generation.sh</code>: progress state, task search, and task graph generation.</li>
+<li><code>lib/queue/scheduler.sh</code>: compatibility facade for scheduler modules.</li>
+<li><code>lib/queue/scheduler_core.sh</code>: GPU ID/cache helpers, scheduler lock, and GPU-count policy.</li>
+<li><code>lib/queue/scheduler_gpu_runtime.sh</code>: OOM checks, memory probes, utilization, and purge helpers.</li>
+<li><code>lib/queue/scheduler_reservations.sh</code>: GPU reservation and availability helpers.</li>
+<li><code>lib/queue/scheduler_selection.sh</code>: task priority, selection, work stealing, and scheduling metrics.</li>
+<li><code>lib/gpu_worker.sh</code>: worker loop, heartbeats, task execution glue.</li>
+<li><code>lib/tasks/task_functions.sh</code>: compatibility facade and <code>execute_task</code> dispatcher.</li>
+<li><code>lib/tasks/task_common.sh</code>: shared scheduling, model, preset, and reusable baseline-report helpers.</li>
+<li><code>lib/tasks/task_baseline.sh</code>: baseline setup, calibration, preset generation, and shared baseline report preparation.</li>
+<li><code>lib/tasks/task_edit_lifecycle.sh</code>: edit creation, batch edit creation, evaluation, and cleanup.</li>
+<li><code>lib/tasks/task_error_lifecycle.sh</code>: error-model creation, evaluation probes, structural-failure reports, and cleanup.</li>
+<li><code>lib/tasks/model_creation.sh</code>: edit and error-model creation helpers (<code>create_model_variant</code> dispatcher).</li>
+<li><code>lib/config/config_generator.sh</code>: InvarLock config generation and wrapper helpers.</li>
+<li><code>lib/validation/validation_suite.sh</code>: validation orchestration, analysis setup, and verdict compilation.</li>
+<li><code>lib/core/fault_tolerance.sh</code>: error classification and retry/backoff logic.</li>
+<li><code>scripts/evidence_packs/python/manifest_writer.py</code>: evidence pack <code>manifest.json</code> writer.</li>
+<li><code>scripts/evidence_packs/python/preset_generator.py</code>: preset derivation + edit-type variants.</li>
+</ul>
+<h3 id="module-dependency-graph">Module dependency graph<a class="headerlink" href="#module-dependency-graph" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>┌───────────────────────────────────────────────────────────────────────┐
+│                        MODULE DEPENDENCY GRAPH                        │
+├───────────────────────────────────────────────────────────────────────┤
+│ ENTRYPOINTS                                                           │
+│   run_pack.sh | run_suite.sh | verify_pack.sh                         │
+│   (pack+run) | (run only)  | (checksums+reports verify)               │
+│                                   │                                   │
+│                                   ▼                                   │
+│ ORCHESTRATION LAYER                                                   │
+│   lib/validation_suite.sh (main_dynamic)                              │
+│   Phase 0: setup + preflight                                          │
+│   Phase 1: queue init -&gt; Phase 2: worker launch -&gt; Phase 3: monitor   │
+│                                   │                                   │
+│                   ┌───────────────┴───────────────┐                   │
+│                   ▼                               ▼                   │
+│ TASK EXECUTION                                  CORE SERVICES         │
+│   lib/gpu_worker.sh                               queue_* modules     │
+│   task claim -&gt; precheck -&gt; execute -&gt; cleanup    scheduler_* modules │
+│                                                  task_serialization   │
+│                                                  fault_tolerance      │
+│                   │                                                   │
+│                   ▼                                                   │
+│ TASK FUNCTIONS                                                        │
+│   task_functions facade + task_common shared helpers                  │
+│   task_baseline | task_edit_lifecycle | task_error_lifecycle          │
+│   SETUP_BASELINE, CALIBRATION_RUN, GENERATE_PRESET, evaluate_*        │
+└───────────────────────────────────────────────────────────────────────┘
+</code></pre></div>
+
+<h2 id="troubleshooting-decision-tree">Troubleshooting decision tree<a class="headerlink" href="#troubleshooting-decision-tree" title="Permanent link">&para;</a></h2>
+<div class="codehilite"><pre><span></span><code>Evidence pack issues?
+│
+├─ Missing manifest.json/checksums.sha256?
+│  └─ Used run_suite.sh instead of run_pack.sh
+│     → Run: ./scripts/evidence_packs/run_pack.sh --suite ... --net ...
+│
+├─ Spectral guard failing “clean” quantization edits?
+│  ├─ Check: caps_exceeded in report spectral.summary
+│  │  └─ Use edit-type presets (generated from preset derivation) or increase max_caps
+│  └─ Check: high z-scores in attention layers
+│     └─ Expected for quantization; tune thresholds if needed
+│
+├─ OOM errors?
+│  ├─ Lower GPU_MEMORY_PER_DEVICE / GPU_MEMORY_GB
+│  ├─ Disable batching: PACK_USE_BATCH_EDITS=false
+│  └─ Reduce InvarLock batch/seq_len (INVARLOCK_EVAL_BATCH, INVARLOCK_SEQ_LEN)
+│
+└─ Disk pressure / ENOSPC?
+   ├─ Check OUTPUT_DIR filesystem free space
+   └─ Use a larger volume and rerun (suite writes caches under OUTPUT_DIR/.hf)
+</code></pre></div>
+
+<h2 id="model-suite">Model Suite<a class="headerlink" href="#model-suite" title="Permanent link">&para;</a></h2>
+<p>Model suites are defined and applied by
+<code>run_suite.sh</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Suite</th>
+<th>Models</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>subset</code></td>
+<td><code>mistralai/Mistral-7B-v0.1</code></td>
+<td>Single-GPU friendly</td>
+</tr>
+<tr>
+<td><code>showcase</code></td>
+<td><code>mistralai/Mistral-7B-v0.1</code>, <code>Qwen/Qwen2.5-14B</code>, <code>Qwen/Qwen2.5-32B</code></td>
+<td>Multi-GPU recommended; guard-focused scenarios</td>
+</tr>
+<tr>
+<td><code>workshop3</code></td>
+<td><code>mistralai/Mistral-7B-v0.1</code>, <code>mistralai/Mixtral-8x7B-v0.1</code>, <code>01-ai/Yi-34B</code></td>
+<td>Workshop-friendly 3-model suite (architecture diversity)</td>
+</tr>
+<tr>
+<td><code>full</code></td>
+<td><code>mistralai/Mistral-7B-v0.1</code>, <code>Qwen/Qwen2.5-14B</code>, <code>Qwen/Qwen2.5-32B</code>, <code>01-ai/Yi-34B</code>, <code>mistralai/Mixtral-8x7B-v0.1</code>, <code>Qwen/Qwen3-8B</code></td>
+<td>Multi-GPU recommended</td>
+</tr>
+</tbody>
+</table>
+<p>Default full-suite model sizes (weights-only, approximate):</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>VRAM</th>
+<th>Category</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mistralai/Mistral-7B-v0.1</code></td>
+<td>~14 GB</td>
+<td>Small</td>
+<td>Flash Attention 2 compatible</td>
+</tr>
+<tr>
+<td><code>Qwen/Qwen2.5-14B</code></td>
+<td>~28 GB</td>
+<td>Small</td>
+<td>Flash Attention 2 compatible</td>
+</tr>
+<tr>
+<td><code>Qwen/Qwen2.5-32B</code></td>
+<td>~64 GB</td>
+<td>Medium</td>
+<td>Flash Attention 2 compatible</td>
+</tr>
+<tr>
+<td><code>01-ai/Yi-34B</code></td>
+<td>~68 GB</td>
+<td>Medium</td>
+<td>Flash Attention 2 compatible</td>
+</tr>
+<tr>
+<td><code>mistralai/Mixtral-8x7B-v0.1</code></td>
+<td>~90 GB</td>
+<td>MoE</td>
+<td>MoE architecture</td>
+</tr>
+<tr>
+<td><code>Qwen/Qwen3-8B</code></td>
+<td>~16 GB</td>
+<td>Small</td>
+<td>Flash Attention 2 compatible</td>
+</tr>
+</tbody>
+</table>
+<p>Notes:</p>
+<ul>
+<li>Override models via <code>MODEL_1</code>–<code>MODEL_8</code>; set an empty string to disable a slot.</li>
+<li><code>validation_suite.sh</code> includes a fallback list of large causal models if it is
+  run directly without separate suite plumbing.</li>
+</ul>
+<h2 id="edit-types">Edit Types<a class="headerlink" href="#edit-types" title="Permanent link">&para;</a></h2>
+<p>Each model runs 12 validation-subject edit experiments (6 types x 2 versions)
+plus optional error-injection tests. <code>scripts/evidence_packs/scenarios.json</code>
+is the source of truth for each scenario's <code>artifact_class</code>.</p>
+<p>Evidence-pack <code>quant_rtn</code> scenarios are generated as external subject
+artifacts: the helper applies RTN quantize/dequantize simulation and saves
+floating-point dequantized weights. Those scenarios may use <code>bits</code> and
+<code>group_size</code> to shape the generated artifact, but they are not the built-in
+<code>edit.name: quant_rtn</code> plugin plan and they do not produce packed runtime
+quantization.</p>
+<p>The same distinction applies to the other current edits: FP8 round-trips tensors
+through FP8 or float16 and saves ordinary floating-point weights; magnitude
+pruning writes zeros into dense tensors; low-rank SVD writes dense approximated
+tensors instead of factorized low-rank modules; LoRA merge applies a
+deterministic low-rank adapter-style dense delta; and fine-tune applies a
+deterministic tiny gradient-style dense update. These validation-subject
+generators produce regression evidence from materialized subject checkpoints;
+deployable training pipelines are separate BYOE or deployable-artifact
+workflows.</p>
+<h3 id="clean-edits-tuned">Clean edits (tuned)<a class="headerlink" href="#clean-edits-tuned" title="Permanent link">&para;</a></h3>
+<p>Clean edits use tuned parameters supplied via <code>PACK_TUNED_EDIT_PARAMS_FILE</code>.
+The suite uses <code>:clean:</code> as a sentinel in the edit spec and resolves concrete
+parameters at runtime.</p>
+<table>
+<thead>
+<tr>
+<th>Edit Type</th>
+<th>Artifact class</th>
+<th>Parameters</th>
+<th>Scope</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RTN dequantized external-subject simulation</td>
+<td>validation subject checkpoint</td>
+<td>tuned (<code>bits</code>, <code>group_size</code>) from tuned params file</td>
+<td>FFN only</td>
+</tr>
+<tr>
+<td>FP8 dequantized external-subject simulation</td>
+<td>validation subject checkpoint</td>
+<td>tuned (<code>format</code>) from tuned params file</td>
+<td>FFN only</td>
+</tr>
+<tr>
+<td>Dense magnitude-pruned checkpoint</td>
+<td>validation subject checkpoint</td>
+<td>tuned (<code>sparsity</code>) from tuned params file</td>
+<td>FFN only</td>
+</tr>
+<tr>
+<td>Dense low-rank-SVD approximated checkpoint</td>
+<td>validation subject checkpoint</td>
+<td>tuned (<code>rank</code>) from tuned params file</td>
+<td>FFN only</td>
+</tr>
+<tr>
+<td>Dense LoRA-merged checkpoint</td>
+<td>validation subject checkpoint</td>
+<td>tuned (<code>rank</code>, <code>alpha</code>) from tuned params file</td>
+<td>Attention only</td>
+</tr>
+<tr>
+<td>Dense tiny fine-tuned checkpoint</td>
+<td>validation subject checkpoint</td>
+<td>tuned (<code>learning_rate</code>, <code>steps</code>) from tuned params file</td>
+<td>FFN only</td>
+</tr>
+</tbody>
+</table>
+<h3 id="stress-edits">Stress edits<a class="headerlink" href="#stress-edits" title="Permanent link">&para;</a></h3>
+<p>Stress edits are split into required-fail (catastrophic) and informational scenarios.
+Required-fail scenarios are gating in the final verdict; informational scenarios are tracked
+as detection-quality signals and are validated by a minimum signal-fraction criterion.</p>
+<p>Important nuance: some guards remediate without flipping a boolean validation
+gate. For example, Spectral can remain <code>validation.spectral_stable=true</code> while
+applying caps (<code>spectral.caps_applied &gt; 0</code>). Raw remediation events can be
+useful diagnostics, but public guard-value evidence must be baseline-relative:
+a stock cap already present in the noop basis does not count. Published
+guard-value cases must show PM acceptance plus new guard movement relative to
+the matching baseline, then reproduce that movement in a clean confirmation
+rerun.</p>
+<table>
+<thead>
+<tr>
+<th>Edit Type</th>
+<th>Artifact class</th>
+<th>Parameters</th>
+<th>Scope</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RTN dequantized external-subject simulation</td>
+<td>validation subject checkpoint</td>
+<td><code>quant_rtn:8:all</code> (8-bit)</td>
+<td>All layers</td>
+</tr>
+<tr>
+<td>FP8 dequantized external-subject simulation</td>
+<td>validation subject checkpoint</td>
+<td><code>fp8_quant:e5m2:all</code></td>
+<td>All layers</td>
+</tr>
+<tr>
+<td>Dense magnitude-pruned checkpoint</td>
+<td>validation subject checkpoint</td>
+<td><code>magnitude_prune:0.5:all</code> (50% sparsity)</td>
+<td>All layers</td>
+</tr>
+<tr>
+<td>Dense low-rank-SVD approximated checkpoint</td>
+<td>validation subject checkpoint</td>
+<td><code>lowrank_svd:32:all</code> (rank 32)</td>
+<td>All layers</td>
+</tr>
+<tr>
+<td>Dense LoRA-merged checkpoint</td>
+<td>validation subject checkpoint</td>
+<td><code>lora_merge:8:64:all</code> (rank 8, alpha 64)</td>
+<td>All layers</td>
+</tr>
+<tr>
+<td>Dense tiny fine-tuned checkpoint</td>
+<td>validation subject checkpoint</td>
+<td><code>fine_tune:0.0005:3:all</code> (3 steps)</td>
+<td>All layers</td>
+</tr>
+</tbody>
+</table>
+<h3 id="deployable-edits">Deployable edits<a class="headerlink" href="#deployable-edits" title="Permanent link">&para;</a></h3>
+<p>Deployable scenarios use <code>artifact_class: deployable_optimized_subject</code> and are
+not part of the default validation lanes. A deployable scenario must carry a
+backend contract (<code>packed_quantized_storage</code>, reload smoke, inference smoke,
+and memory/storage evidence) and package the corresponding sidecars into the
+evidence pack. The OSS suite currently has no runnable deployable scenario; add
+one only when the backend can produce or load an artifact and provide all
+required sidecars on the target GPU stack.</p>
+<h3 id="error-injection-tests">Error injection tests<a class="headerlink" href="#error-injection-tests" title="Permanent link">&para;</a></h3>
+<p>Enabled when <code>RUN_ERROR_INJECTION=true</code> (default):</p>
+<ul>
+<li>Required detection (<code>must_detect</code>): <code>nan_injection</code>, <code>inf_injection</code>,
+  <code>shape_mismatch</code>, <code>missing_tensors</code>, <code>extreme_quant</code>, <code>scale_explosion</code>,
+  <code>rank_collapse</code>, <code>norm_collapse</code>, <code>weight_tying_break</code></li>
+<li>Informational detection: <code>rmt_norm_noise</code>, <code>spectral_moderate_scale</code>, <code>ve_mlp_scale_skew</code></li>
+</ul>
+<p><code>rmt_norm_noise</code> additionally emits an <code>rmt_probe.json</code> sidecar next to the error report.
+This runs an explicit cross-model RMT probe on shared calibration windows (stored in the
+baseline report) so the evidence pack can demonstrate RMT’s delta policy even when compare-mode
+evaluation keeps <code>validation.rmt_stable=true</code>.</p>
+<p><code>ve_mlp_scale_skew</code> additionally emits a <code>ve_probe.json</code> sidecar next to the error report.
+Variance (DD-VE) is a remediation guard and compare-mode evaluation runs the subject model
+with a no-op edit, which can mute VE’s in-report evidence. The VE probe runs VE calibration
+directly on shared windows and records whether VE proposes scales and produces a meaningful
+primary-metric improvement.</p>
+<p>Source of truth: <code>scripts/evidence_packs/scenarios.json</code> strictness + <code>intent</code> +
+<code>primary_guard</code> metadata.</p>
+<p>The reference public package for this stricter interpretation is
+<code>public_evidence/published_basis/mistral_7b/guard_value_demo/</code>, whose
+<code>artifact_package/reports/guard_value_all_guard_probe_sweep.json</code> records
+baseline-relative spectral, RMT, and variance/VE cases.</p>
+<h2 id="scheduling">Scheduling<a class="headerlink" href="#scheduling" title="Permanent link">&para;</a></h2>
+<p>The suite uses dynamic work-stealing scheduling with a file-backed task queue.
+<code>validation_suite.sh</code> seeds the queue and launches one worker per GPU; workers
+claim tasks under a scheduler lock with GPU reservation files.</p>
+<h3 id="small_first-priority-strategy"><code>small_first</code> priority strategy<a class="headerlink" href="#small_first-priority-strategy" title="Permanent link">&para;</a></h3>
+<p>Base task priorities (queue manager) are combined with dynamic boosts in
+<code>scheduler.sh</code> (model size, blocked dependents, age, and fairness penalties).</p>
+<div class="codehilite"><pre><span></span><code>Priority (base)     Task type
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  90 ┤ SETUP_BASELINE
+  85 ┤ CALIBRATION_RUN
+  75 ┤ GENERATE_PRESET
+  70 ┤ CREATE_EDITS_BATCH / CREATE_EDIT
+  65 ┤ evaluate_EDIT
+  60 ┤ CREATE_ERROR
+  55 ┤ evaluate_ERROR
+</code></pre></div>
+
+<p>Dynamic boosts (scheduler):</p>
+<ul>
+<li>Model size boosts: &lt;30GB (+30), &lt;70GB (+20), &lt;100GB (+10).</li>
+<li>Critical tasks: <code>SETUP_BASELINE</code> (+50), <code>CALIBRATION_RUN</code> (+20).</li>
+<li>Unblock boost: +2 per dependent task (capped).</li>
+<li>Age boost: +1 per 5 minutes in the queue (capped).</li>
+<li>Fairness penalty: -3 per running task for the same model (capped).</li>
+<li>Work-stealing boost: raises priority for lagging models.</li>
+</ul>
+<h3 id="dynamic-scheduling-diagram">Dynamic scheduling diagram<a class="headerlink" href="#dynamic-scheduling-diagram" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>run_pack.sh (optional)
+  -&gt; run_suite.sh
+     -&gt; validation_suite.sh (main_dynamic)
+        -&gt; init_queue + generate_all_tasks
+        -&gt; start gpu_worker per GPU
+        -&gt; monitor loop (resolve deps, progress, restarts)
+</code></pre></div>
+
+<h3 id="work-stealing-timeline-illustrative">Work-stealing timeline (illustrative)<a class="headerlink" href="#work-stealing-timeline-illustrative" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>Time→   T=0                     T=50%                  T=100%
+GPU 0   ████ small ████ small ████ large (helping) ████░░░░░░
+GPU 1   ████ small ████ medium ████ large (helping) ███░░░░░░
+GPU 2   ████ small ████ medium ████ large ████░░░░░░░░░░░░░░░
+GPU 3   ████ medium ████ medium ████ large ████░░░░░░░░░░░░░░
+GPU 4   ████ medium ████ large ████████████████░░░░░░░░░░░░░░
+GPU 5   ████ MoE ████████ large ████████████████░░░░░░░░░░░░░
+</code></pre></div>
+
+<p>Illustrative only; actual scheduling depends on queue state and memory.</p>
+<h2 id="multi-gpu-model-distribution">Multi-GPU Model Distribution<a class="headerlink" href="#multi-gpu-model-distribution" title="Permanent link">&para;</a></h2>
+<p>After baseline setup, the suite writes <code>model_profile.json</code> and updates per-task
+memory estimates. <code>task_serialization.sh</code> calculates <code>required_gpus</code> based on
+<code>GPU_MEMORY_PER_DEVICE</code> and <code>NUM_GPUS</code>:</p>
+<ul>
+<li>Tasks reserve multiple GPUs only when memory exceeds per-device capacity.</li>
+<li>Adaptive under-allocation is disabled by default (<code>get_minimum_gpus</code> matches
+  <code>required_gpus</code>) to avoid OOM.</li>
+<li>Set <code>GPU_MEMORY_PER_DEVICE</code> explicitly for non-80/180GB hardware.</li>
+</ul>
+<h3 id="memory-aware-selection-example">Memory-aware selection example<a class="headerlink" href="#memory-aware-selection-example" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>GPU 2: 80GB total, 28GB free
+
+Ready queue scan (highest-priority fit):
+  qwen-14b_CALIBRATION_RUN_002  req=24GB  pri=85  FITS ✓
+  mixtral_CREATE_EDITS_BATCH_001 req=92GB pri=70  SKIP ✗
+  yi-34b_evaluate_EDIT_001       req=72GB  pri=65  SKIP ✗
+</code></pre></div>
+
+<h3 id="gpu-reservation-protection">GPU reservation protection<a class="headerlink" href="#gpu-reservation-protection" title="Permanent link">&para;</a></h3>
+<p>Reservations are stored under <code>OUTPUT_DIR/workers/gpu_reservations/</code> and guarded
+by a <code>queue/scheduler.lock</code> (mkdir-based). The scheduler also expires stale
+reservations by TTL (<code>GPU_RESERVATION_TTL</code>).</p>
+<h3 id="reservation-state-example">Reservation state example<a class="headerlink" href="#reservation-state-example" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>GPU 0   GPU 1   GPU 2   GPU 3
+FREE    RSVD    FREE    RSVD
+        ^              ^
+        |              |
+      task_a     task_b (multi-GPU: 1,3)
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code>queue/scheduler.lock
+workers/gpu_reservations/
+├── gpu_1.lock
+├── task_&lt;task_id&gt;.gpus
+└── task_&lt;task_id&gt;.meta
+</code></pre></div>
+
+<h2 id="task-lifecycle">Task lifecycle<a class="headerlink" href="#task-lifecycle" title="Permanent link">&para;</a></h2>
+<div class="codehilite"><pre><span></span><code>┌─────────┐    ┌───────┐    ┌─────────┐    ┌───────────┐
+│ PENDING │───▶│ READY │───▶│ RUNNING │───▶│ COMPLETED │
+└─────────┘    └───────┘    └─────────┘    └───────────┘
+                                 │
+                                 ▼
+                             ┌────────┐
+                             │ FAILED │
+                             └────────┘
+</code></pre></div>
+
+<h3 id="gpu-worker-loop">GPU worker loop<a class="headerlink" href="#gpu-worker-loop" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>START gpu_worker
+  │
+  ├─ check shutdown? ── yes → exit
+  │
+  ├─ query GPU memory
+  ├─ find_and_claim_task (scheduler lock + reservation)
+  │     ├─ none → sleep → loop
+  │     └─ task → execute_task → complete/fail → release_gpus
+  └─ update heartbeat/status → loop
+</code></pre></div>
+
+<h2 id="batch-optimizations">Batch optimizations<a class="headerlink" href="#batch-optimizations" title="Permanent link">&para;</a></h2>
+<p>Small/medium models default to batch edit creation:</p>
+<ul>
+<li><strong>Batch edit creation</strong>: <code>CREATE_EDITS_BATCH</code> parses and schedules all edit
+  specs together, but reloads the baseline per edit by default to avoid
+  deep-copying large loaded models. Set <code>PACK_BATCH_EDIT_STRATEGY=deepcopy</code>
+  only for small models where single-load throughput is more important than
+  peak memory.</li>
+<li><strong>Deferred optional report rendering</strong>: <code>PACK_DEFER_REPORT_RENDERING=1</code>
+  keeps <code>evaluation.report.json</code>, <code>runtime.manifest.json</code>, and JSON evidence
+  sidecars in the hot path while skipping markdown/evidence bundle rendering.
+  Pack verification does not require those optional rendered files. Release
+  review mode enables this default so evaluation workers spend less time on
+  report-heavy filesystem writes; pack-level HTML export still runs unless
+  <code>PACK_SKIP_HTML=1</code> is set.</li>
+<li><strong>Evaluation-loop telemetry</strong>: each <code>evaluate_timing.json</code> records top-level
+  evaluate timings plus nested baseline/subject run timings when reports expose
+  them. The pack-level <code>evaluation_optimization_summary.json</code> aggregates those
+  timings so readers can separate process startup savings from model load,
+  dataset preparation, guard/eval, and report-generation costs.</li>
+</ul>
+<p>Large or MoE models can still disable batch edit tasks automatically (or via
+<code>PACK_USE_BATCH_EDITS=false</code>) and fall back to per-edit tasks
+(<code>CREATE_EDIT -&gt; evaluate_EDIT</code>).</p>
+<h3 id="task-dependency-graphs">Task dependency graphs<a class="headerlink" href="#task-dependency-graphs" title="Permanent link">&para;</a></h3>
+<p>Batch (default):</p>
+<div class="codehilite"><pre><span></span><code>SETUP_BASELINE
+  ├─ CALIBRATION_RUN × N ──&gt; GENERATE_PRESET ──┐
+  ├─ CREATE_EDITS_BATCH ------------------------┴─&gt; evaluate_EDIT × runs
+  └─ CREATE_ERROR × types ----------------------┴─&gt; evaluate_ERROR × types
+</code></pre></div>
+
+<p>Notes:</p>
+<ul>
+<li>Error injection tasks (<code>CREATE_ERROR</code> → <code>evaluate_ERROR</code>) branch off
+  <code>SETUP_BASELINE</code> and require the preset for evaluation.</li>
+<li>Grouped edit evaluation is opt-in because it trades some multi-GPU task
+  parallelism for lower per-scenario process startup overhead. It is most useful
+  for many short edit evaluations on one model.</li>
+</ul>
+<p>Per-edit path (large/MoE or <code>PACK_USE_BATCH_EDITS=false</code>):</p>
+<div class="codehilite"><pre><span></span><code>SETUP_BASELINE
+  ├─ CALIBRATION_RUN × N ──&gt; GENERATE_PRESET ──┐
+  ├─ CREATE_EDIT × edits -----------------------┴─&gt; evaluate_EDIT × runs
+  └─ CREATE_ERROR × types ----------------------┴─&gt; evaluate_ERROR × types
+</code></pre></div>
+
+<h2 id="task-breakdown-per-model-defaults">Task breakdown per model (defaults)<a class="headerlink" href="#task-breakdown-per-model-defaults" title="Permanent link">&para;</a></h2>
+<p>Defaults: <code>DRIFT_CALIBRATION_RUNS=5</code>, <code>CLEAN_EDIT_RUNS=3</code>,
+<code>STRESS_EDIT_RUNS=2</code>, <code>RUN_ERROR_INJECTION=true</code>, and
+<code>PACK_USE_BATCH_EDITS=auto</code>.</p>
+<p>The task graph is manifest-driven and may add eager baseline, reusable-baseline,
+and cleanup tasks. Use the generated queue summary as the authoritative count.
+At a high level, each model includes:</p>
+<ul>
+<li>Setup baseline: 1 task</li>
+<li>Preset-derivation runs + preset generation: 6 tasks</li>
+<li>Edit creation: one batch task when grouped edit creation is explicitly
+  enabled, otherwise one creation task per edit</li>
+<li>Edit evaluation: edit count × clean/stress run counts</li>
+<li>Error injection: suite manifest scenarios (12 for <code>subset</code>, 15 for
+  <code>showcase</code>, <code>workshop3</code>, and <code>full</code> by default)</li>
+<li>Cleanup tasks when cleanup mode is enabled</li>
+</ul>
+<p><code>PACK_USE_BATCH_EDITS=auto</code> currently favors the per-edit path for
+cleanup-safe default runs. Set <code>PACK_USE_BATCH_EDITS=true</code> only when the reduced
+startup overhead is worth the lower task-level parallelism for that campaign.</p>
+<h2 id="execution-phases">Execution phases<a class="headerlink" href="#execution-phases" title="Permanent link">&para;</a></h2>
+<div class="codehilite"><pre><span></span><code>PHASE 0: Environment setup
+  - Dependency checks, GPU pool configuration, disk preflight
+PHASE 1: Task queue initialization
+  - Generate tasks for all models, resolve initial dependencies
+PHASE 2: GPU worker launch
+  - Spawn one worker per GPU, dynamic scheduling in loop
+PHASE 3: Reports + verdict
+  - Compile reports into final verdict reports
+  - Write results/analysis/evaluation_optimization_summary.json
+</code></pre></div>
+
+<h2 id="run-directory-layout">Run directory layout<a class="headerlink" href="#run-directory-layout" title="Permanent link">&para;</a></h2>
+<div class="codehilite"><pre><span></span><code>OUTPUT_DIR/
+  analysis/
+    determinism_repeats.json          # optional (when --repeats is used)
+  reports/
+    final_verdict.txt
+    final_verdict.json
+    category_summary.json
+    guard_signal_summary.json
+    guard_intervention_summary.json
+    scenario_signal_summary.json
+  presets/
+  state/
+    model_revisions.json              # pinned HF revisions (when --net 1)
+    progress.json
+    disk_pressure.json
+    tuned_edit_params.json            # copy of PACK_TUNED_EDIT_PARAMS_FILE
+  queue/
+    pending/ ready/ running/ completed/ failed/
+    queue.lock
+    scheduler.lock
+  logs/
+    gpu_&lt;id&gt;.log
+    tasks/&lt;task_id&gt;.log
+  workers/
+    gpu_&lt;id&gt;.pid
+    gpu_&lt;id&gt;.heartbeat
+    gpu_&lt;id&gt;.status
+    gpu_reservations/
+    SHUTDOWN
+  &lt;model_name&gt;/
+    models/
+      baseline/
+      &lt;edit_name&gt;/
+      error_&lt;type&gt;/
+    reports/
+      calibration/
+      &lt;edit_name&gt;/run_&lt;n&gt;/
+      errors/&lt;type&gt;/
+</code></pre></div>
+
+<p>Some scenarios emit additional sidecar artifacts alongside <code>evaluation.report.json</code>
+(for example <code>reports/errors/rmt_norm_noise/rmt_probe.json</code> or
+<code>reports/errors/ve_mlp_scale_skew/ve_probe.json</code>). When present, <code>run_pack.sh</code> copies
+these sidecars into the packaged evidence pack under <code>reports/**/</code>.</p>
+<h2 id="run-modes">Run modes<a class="headerlink" href="#run-modes" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>--calibrate-only</code> / <code>PACK_SUITE_MODE=calibrate-only</code></li>
+<li>Preset derivation only mode.</li>
+<li>Only promotes <code>SETUP_BASELINE</code>, <code>CALIBRATION_RUN</code>, and <code>GENERATE_PRESET</code>
+    tasks.</li>
+<li>The monitor exits after all <code>GENERATE_PRESET</code> tasks complete.</li>
+<li><code>--run-only</code></li>
+<li>Continue a prior run after preset derivation. This is effectively <code>--resume</code> with
+    <code>PACK_SUITE_MODE=full</code>.</li>
+<li><code>--resume</code></li>
+<li>Reuses an existing queue and continues from where the run stopped.</li>
+</ul>
+<h2 id="determinism-vs-throughput">Determinism vs throughput<a class="headerlink" href="#determinism-vs-throughput" title="Permanent link">&para;</a></h2>
+<p><code>PACK_DETERMINISM</code> controls harness-level determinism:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Throughput (default)</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">INVARLOCK_ALLOW_REMOTE_CODE</span><span class="o">=</span><span class="m">1</span>
+<span class="nv">PACK_DETERMINISM</span><span class="o">=</span>throughput<span class="w"> </span>./scripts/evidence_packs/run_suite.sh<span class="w"> </span>--suite<span class="w"> </span>subset
+
+<span class="c1"># Strict</span>
+<span class="nv">PACK_DETERMINISM</span><span class="o">=</span>strict<span class="w"> </span>./scripts/evidence_packs/run_suite.sh<span class="w"> </span>--suite<span class="w"> </span>subset
+</code></pre></div>
+
+<ul>
+<li>Throughput: <code>NVIDIA_TF32_OVERRIDE=1</code>, <code>CUDNN_BENCHMARK=1</code>.</li>
+<li>Strict: <code>NVIDIA_TF32_OVERRIDE=0</code>, <code>CUDNN_BENCHMARK=0</code>,
+  <code>CUBLAS_WORKSPACE_CONFIG=:4096:8</code>.</li>
+</ul>
+<h2 id="network-mode-and-model-revisions">Network mode and model revisions<a class="headerlink" href="#network-mode-and-model-revisions" title="Permanent link">&para;</a></h2>
+<p>Evidence packs are offline by default:</p>
+<ul>
+<li><code>PACK_NET=0</code> sets <code>INVARLOCK_ALLOW_NETWORK=0</code> and enables HF offline modes.</li>
+<li><code>PACK_NET=1</code> enables downloads and writes <code>state/model_revisions.json</code> (ungated
+  models only).</li>
+<li>Offline runs require <code>model_revisions.json</code>; missing revisions trigger a hard
+  error during <code>SETUP_BASELINE</code>.</li>
+</ul>
+<p>Use <code>PACK_MODEL_REVISIONS_FILE</code> to override the revisions path.</p>
+<h2 id="disk-and-cache-behavior">Disk and cache behavior<a class="headerlink" href="#disk-and-cache-behavior" title="Permanent link">&para;</a></h2>
+<p>Large runs can be storage-heavy (baseline + edits + error models):</p>
+<ul>
+<li>Disk preflight estimates required storage and aborts early when insufficient.</li>
+<li>Override with <code>PACK_SKIP_DISK_PREFLIGHT=1</code> (not recommended).</li>
+<li>The minimum free space guard is <code>MIN_FREE_DISK_GB</code> (default 200).</li>
+<li><code>PACK_BASELINE_STORAGE_MODE=snapshot_symlink</code> builds a local symlink tree
+  that points into the Hugging Face cache snapshot. This avoids a second
+  baseline copy under <code>OUTPUT_DIR</code>, but it requires one full model copy in
+  <code>HF_HUB_CACHE</code> when that cache shares the output filesystem.</li>
+<li><code>PACK_BASELINE_STORAGE_MODE=snapshot_copy</code> materializes a full baseline copy
+  under <code>OUTPUT_DIR/models/&lt;model&gt;/baseline</code>.</li>
+<li>Baseline downloads prefer one weight format only. When both <code>.safetensors</code> and
+  <code>.bin</code> weights are published, evidence packs download the safetensors set and
+  ignore the <code>.bin</code> copy.</li>
+<li>HF caches default to <code>OUTPUT_DIR/.hf</code> (override with <code>HF_HOME</code>, <code>HF_HUB_CACHE</code>,
+  <code>HF_DATASETS_CACHE</code>).</li>
+</ul>
+<p>For the default <code>subset</code> suite (<code>mistralai/Mistral-7B-v0.1</code>), the model-weight
+budget is roughly:</p>
+<ul>
+<li>~42 GB on the output filesystem with <code>snapshot_symlink</code> when <code>HF_HUB_CACHE</code>
+  lives on the same filesystem as <code>OUTPUT_DIR</code> (one cached baseline + one clean
+  edit peak + one error-model peak under cleanup mode).</li>
+<li>~28 GB on the output filesystem with <code>snapshot_symlink</code> when <code>HF_HUB_CACHE</code>
+  is on a separate volume.</li>
+<li>~56 GB on the output filesystem with <code>snapshot_copy</code> on the same filesystem.</li>
+</ul>
+<p>Those figures are for model weights only; the default preflight also requires
+<code>MIN_FREE_DISK_GB=200</code> headroom.</p>
+<h2 id="evidence-pack-packaging-and-verification">Evidence pack packaging and verification<a class="headerlink" href="#evidence-pack-packaging-and-verification" title="Permanent link">&para;</a></h2>
+<p><code>run_pack.sh</code> builds a portable pack:</p>
+<ul>
+<li>Copies <code>reports/final_verdict.{txt,json}</code> plus verdict sidecars (<code>category_summary</code>,
+  <code>guard_signal_summary</code>, <code>scenario_signal_summary</code>) and key <code>analysis/*</code> artifacts.</li>
+<li>Collects all reports into <code>evidence_pack/reports/...</code>.</li>
+<li>Generates <code>manifest.json</code>, <code>checksums.sha256</code>, optional
+  <code>manifest.signature.json</code>.</li>
+<li>Writes pack-contained provenance metadata such as <code>metadata/source_repo.json</code>
+  and <code>metadata/environment.json</code> before sealing the pack.</li>
+<li>Stages the pack in a hidden sibling temporary directory and renames it into
+  place only after sealing succeeds, so failed builds do not leave partial
+  <code>evidence_pack/</code> output behind.</li>
+<li>Optional HTML export can be disabled with <code>PACK_SKIP_HTML=1</code>.</li>
+</ul>
+<h3 id="packaging-flow">Packaging flow<a class="headerlink" href="#packaging-flow" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>run_pack.sh
+  ├─ run_suite.sh → OUTPUT_DIR
+  ├─ collect reports + sidecars
+  ├─ write manifest + checksums
+  └─ optional HTML + package-native signature
+</code></pre></div>
+
+<p><code>invarlock advanced evidence-pack verify</code> checks the pack:</p>
+<ul>
+<li>Verifies <code>manifest.json</code> binds <code>checksums.sha256</code> via <code>checksums_sha256_digest</code>.</li>
+<li>Verifies digest-backed manifest references (<code>subject</code>, <code>invocation.config_source</code>,
+  <code>environment</code>, and <code>materials</code>) against on-pack files.</li>
+<li>Verifies <code>checksums.sha256</code> (and thus all hashed artifacts).</li>
+<li>Verifies the package-native Ed25519 signature bundle; a missing
+  <code>manifest.signature.json</code> is a signature failure by default.</li>
+<li>Enforces signer authenticity when <code>--expected-fingerprint</code> or <code>--trust-store</code> is supplied.</li>
+<li>Enforces “no extra files” semantics in <code>--strict</code> mode.</li>
+<li>Runs <code>invarlock verify</code> across all bundled reports (JSON output optional) with
+  runtime-manifest enforcement on; each packaged <code>evaluation.report.json</code>
+  carries an adjacent <code>runtime.manifest.json</code>.</li>
+<li>Returns structured exit codes so callers can distinguish usage, missing-file,
+  manifest-format, signature, integrity, and report-verification failures.</li>
+</ul>
+<p>The installed-wheel package-native CLI is self-contained:</p>
+<ul>
+<li><code>invarlock advanced evidence-pack keygen</code> generates Ed25519 signing keys.</li>
+<li><code>invarlock advanced evidence-pack build --signing-key ...</code> emits <code>manifest.signature.json</code>.</li>
+<li><code>invarlock advanced evidence-pack verify</code> validates the signature bundle in-process and does not depend on external signature binaries.</li>
+</ul>
+<p>The repo shell harness remains a separate maintainer path, but it uses the same
+package-native Ed25519 manifest-signature format as the installed CLI.</p>
+<p>Maintainer evidence-pack packaging also treats source provenance as fail-closed:</p>
+<ul>
+<li><code>run_pack.sh</code> writes <code>metadata/source_repo.json</code> from the active Git checkout.</li>
+<li>If <code>git</code> is unavailable or the repository metadata cannot be collected, pack
+  creation stops instead of silently emitting partial provenance unless an
+  explicit snapshot marker is present.</li>
+<li>Detached artifact-tree runs may provide <code>GPU_RUN_SOURCE.txt</code> in the repository
+  root, or point <code>INVARLOCK_SOURCE_REPO_MARKER</code> at an equivalent key-value file.
+  The marker must include <code>source_commit=&lt;40-hex-commit&gt;</code> and may include
+  <code>source_branch</code>, <code>source_describe</code>, <code>source_uri</code>, and <code>source_dirty</code>.</li>
+<li>If you need to package from a detached artifact tree, write a complete
+  <code>metadata/source_repo.json</code> first or provide that explicit snapshot marker
+  rather than relying on fallback inference.</li>
+</ul>
+<h2 id="remote-setup-helper">Remote setup helper<a class="headerlink" href="#remote-setup-helper" title="Permanent link">&para;</a></h2>
+<p><code>scripts/evidence_packs/lib/core/setup_remote.sh</code> is an optional bootstrap script for
+fresh GPU hosts. It clones the repo, creates a venv, installs PyTorch and
+InvarLock, and leaves the host ready to run <code>run_pack.sh</code>.</p>
+<p>Operational guidance for evidence-pack validation hosts:</p>
+<ul>
+<li>Prefer a fresh clone or work tree per campaign instead of reusing an older
+  editable-install checkout.</li>
+<li>If you intentionally run from a work tree that is not the editable install
+  behind <code>.venv</code>, either reinstall that work tree or export <code>PYTHONPATH=src</code> so
+  <code>invarlock</code> resolves to the intended source tree.</li>
+<li><code>run_suite.sh</code> and <code>run_pack.sh</code> default to <code>SKIP_FLASH_ATTN=true</code> and
+  <code>PACK_BASELINE_STORAGE_MODE=snapshot_copy</code> for bulk default runtime-container runs.</li>
+<li>Bulk evidence-pack runs fail fast unless <code>INVARLOCK_ALLOW_REMOTE_CODE=1</code> is set.</li>
+<li>Export non-default runtime roots before launching the suite when you expect
+  them inside delegated container jobs:
+  <code>INVARLOCK_CONFIG_ROOT</code>, <code>HF_HOME</code>, <code>HF_HUB_CACHE</code>, <code>HF_DATASETS_CACHE</code>,
+  <code>TRANSFORMERS_CACHE</code>, <code>TMPDIR</code>, <code>TMP</code>.</li>
+<li>If a staged preset or profile uses <code>!include</code> outside its config directory,
+  set <code>INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1</code> on the validation host before
+  the evidence-pack entrypoint; the default runtime-container launcher rejects
+  that config graph before container start when the override is missing.</li>
+</ul>
+<p>Recommended validation-host checklist after security-default changes:</p>
+<ol>
+<li>Run an evidence-pack subset lane with explicit external <code>HF_HOME</code> and
+   <code>INVARLOCK_CONFIG_ROOT</code> overrides.</li>
+<li>Run one delegated <code>invarlock evaluate</code> with external <code>--edit-config</code>,
+   <code>TMPDIR</code>, and <code>INVARLOCK_EXPORT_DIR</code> roots.</li>
+<li>Run one <code>scripts/model_evidence/model_evidence_sweep.py --execution-mode container</code> lane
+   with an external output root and confirm the published report path is
+   populated.</li>
+</ol>
+<p>Common knobs for the setup script:</p>
+<ul>
+<li><code>REPO_DIR</code>, <code>REPO_URL</code>, <code>BRANCH</code>, <code>PYTHON_BIN</code>, <code>VENV_DIR</code>.</li>
+<li><code>TORCH_INDEX_URL</code>, <code>TORCH_PACKAGES</code>, <code>PACK_SKIP_TORCH_CHECK</code>.</li>
+<li><code>HF_HOME</code>, <code>HF_HUB_CACHE</code>, <code>HF_DATASETS_CACHE</code>.</li>
+</ul>
+<h2 id="tuning-reference">Tuning reference<a class="headerlink" href="#tuning-reference" title="Permanent link">&para;</a></h2>
+<h3 id="core-configuration">Core configuration<a class="headerlink" href="#core-configuration" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PACK_SUITE</code></td>
+<td><code>subset</code></td>
+<td>Suite name (<code>subset</code>, <code>showcase</code>, <code>workshop3</code>, or <code>full</code>)</td>
+</tr>
+<tr>
+<td><code>PACK_NET</code></td>
+<td><code>0</code></td>
+<td>Enable network preflight/downloads</td>
+</tr>
+<tr>
+<td><code>PACK_OUTPUT_DIR</code></td>
+<td>unset</td>
+<td>Sets <code>OUTPUT_DIR</code> when provided</td>
+</tr>
+<tr>
+<td><code>OUTPUT_DIR</code></td>
+<td>auto</td>
+<td><code>./evidence_pack_runs/&lt;suite&gt;_&lt;timestamp&gt;</code> via entrypoint</td>
+</tr>
+<tr>
+<td><code>PACK_OUTPUT_DIR_ABSOLUTE</code></td>
+<td><code>false</code></td>
+<td>Normalize <code>OUTPUT_DIR</code> to absolute path</td>
+</tr>
+<tr>
+<td><code>PACK_SUITE_MODE</code></td>
+<td><code>full</code></td>
+<td><code>full</code>, <code>calibrate-only</code>, or <code>run-only</code></td>
+</tr>
+<tr>
+<td><code>PACK_DETERMINISM</code></td>
+<td><code>throughput</code></td>
+<td>Harness determinism mode</td>
+</tr>
+<tr>
+<td><code>PACK_REPEATS</code></td>
+<td><code>0</code></td>
+<td>Determinism repeat metadata</td>
+</tr>
+<tr>
+<td><code>PACK_MODEL_REVISIONS_FILE</code></td>
+<td><code>OUTPUT_DIR/state/model_revisions.json</code></td>
+<td>Revisions path</td>
+</tr>
+<tr>
+<td><code>PACK_USE_BATCH_EDITS</code></td>
+<td><code>auto</code></td>
+<td>Force/disable batch edit creation</td>
+</tr>
+<tr>
+<td><code>PACK_DEFER_REPORT_RENDERING</code></td>
+<td><code>0</code> (<code>1</code> under <code>--release-review</code>)</td>
+<td>Skip optional markdown/evidence bundle rendering during evaluation</td>
+</tr>
+<tr>
+<td><code>PACK_RUNTIME_IMAGE_FLAVOR</code></td>
+<td><code>default</code></td>
+<td>Remote setup runtime image flavor; use <code>quant</code> on CUDA hosts for optional quant adapter container evidence, including <code>hf_bnb</code>, <code>hf_awq</code>, <code>hf_gptq</code>, <code>hf_torchao</code>, <code>hf_hqq</code>, <code>hf_quanto</code>, and <code>hf_ct</code></td>
+</tr>
+<tr>
+<td><code>RESUME_MODE</code></td>
+<td><code>true</code></td>
+<td>Skip completed steps when outputs exist</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hardware-selection">Hardware selection<a class="headerlink" href="#hardware-selection" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CUDA_VISIBLE_DEVICES</code></td>
+<td>unset</td>
+<td>Explicit GPU pool (comma-separated)</td>
+</tr>
+<tr>
+<td><code>GPU_ID_LIST</code></td>
+<td>unset</td>
+<td>Alternate GPU pool list</td>
+</tr>
+<tr>
+<td><code>NUM_GPUS</code></td>
+<td>auto</td>
+<td>Number of GPUs to use (clamped to pool)</td>
+</tr>
+<tr>
+<td><code>GPU_MEMORY_GB</code></td>
+<td>auto</td>
+<td>Per-GPU memory hint for planning</td>
+</tr>
+<tr>
+<td><code>GPU_MEMORY_PER_DEVICE</code></td>
+<td><code>GPU_MEMORY_GB</code></td>
+<td>Per-device memory for <code>required_gpus</code></td>
+</tr>
+<tr>
+<td><code>GPU_MIN_FREE_GB</code></td>
+<td><code>10</code></td>
+<td>Minimum free VRAM for eligibility</td>
+</tr>
+<tr>
+<td><code>GPU_REQUIRE_IDLE</code></td>
+<td><code>true</code></td>
+<td>Require GPUs with no compute processes</td>
+</tr>
+<tr>
+<td><code>GPU_CACHE_TTL</code></td>
+<td><code>5</code></td>
+<td>GPU cache TTL (seconds)</td>
+</tr>
+<tr>
+<td><code>GPU_RESERVATION_TTL</code></td>
+<td><code>60</code></td>
+<td>Reservation TTL (seconds)</td>
+</tr>
+<tr>
+<td><code>GPU_RESERVATION_LOCK_TIMEOUT</code></td>
+<td><code>5</code></td>
+<td>Reservation lock timeout (seconds)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="model-overrides">Model overrides<a class="headerlink" href="#model-overrides" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MODEL_1</code>–<code>MODEL_8</code></td>
+<td>suite-defined</td>
+<td>Override model slots; empty disables</td>
+</tr>
+</tbody>
+</table>
+<h3 id="invarlock-settings">InvarLock settings<a class="headerlink" href="#invarlock-settings" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>INVARLOCK_DATASET</code></td>
+<td><code>wikitext2</code></td>
+<td>Dataset provider</td>
+</tr>
+<tr>
+<td><code>INVARLOCK_DATASET_PROVIDER_YAML</code></td>
+<td>unset</td>
+<td>Raw YAML mapping for <code>dataset.provider</code> (advanced; overrides provider kind + args)</td>
+</tr>
+<tr>
+<td><code>INVARLOCK_DATASET_PROVIDER_JSON</code></td>
+<td>unset</td>
+<td>Raw JSON object for <code>dataset.provider</code> (advanced; overrides provider kind + args)</td>
+</tr>
+<tr>
+<td><code>INVARLOCK_HF_DATASET_NAME</code></td>
+<td><code>allenai/c4</code></td>
+<td>HF dataset name when <code>INVARLOCK_DATASET=hf_text</code></td>
+</tr>
+<tr>
+<td><code>INVARLOCK_HF_CONFIG_NAME</code></td>
+<td><code>en</code> (for <code>allenai/c4</code>)</td>
+<td>HF dataset config when <code>INVARLOCK_DATASET=hf_text</code></td>
+</tr>
+<tr>
+<td><code>INVARLOCK_HF_TEXT_FIELD</code></td>
+<td><code>text</code></td>
+<td>Text field when <code>INVARLOCK_DATASET=hf_text</code></td>
+</tr>
+<tr>
+<td><code>INVARLOCK_HF_MAX_SAMPLES</code></td>
+<td><code>2000</code></td>
+<td>Max rows consumed when <code>INVARLOCK_DATASET=hf_text</code></td>
+</tr>
+<tr>
+<td><code>INVARLOCK_HF_TRUST_REMOTE_CODE</code></td>
+<td>unset</td>
+<td>Pass <code>trust_remote_code</code> to HF <code>load_dataset</code> (not needed for <code>allenai/c4</code> Parquet)</td>
+</tr>
+<tr>
+<td><code>INVARLOCK_HF_CACHE_DIR</code></td>
+<td>unset</td>
+<td><code>datasets</code> cache_dir override when <code>INVARLOCK_DATASET=hf_text</code></td>
+</tr>
+<tr>
+<td><code>INVARLOCK_LOCAL_JSONL_FILE</code></td>
+<td>unset</td>
+<td>JSONL file path when <code>INVARLOCK_DATASET=local_jsonl</code></td>
+</tr>
+<tr>
+<td><code>INVARLOCK_LOCAL_JSONL_PATH</code></td>
+<td>unset</td>
+<td>JSONL file/dir path when <code>INVARLOCK_DATASET=local_jsonl</code></td>
+</tr>
+<tr>
+<td><code>INVARLOCK_LOCAL_JSONL_DATA_FILES</code></td>
+<td>unset</td>
+<td>JSONL glob/list when <code>INVARLOCK_DATASET=local_jsonl</code></td>
+</tr>
+<tr>
+<td><code>INVARLOCK_LOCAL_JSONL_TEXT_FIELD</code></td>
+<td><code>text</code></td>
+<td>Text field when <code>INVARLOCK_DATASET=local_jsonl</code></td>
+</tr>
+<tr>
+<td><code>INVARLOCK_LOCAL_JSONL_MAX_SAMPLES</code></td>
+<td><code>2000</code></td>
+<td>Max rows consumed when <code>INVARLOCK_DATASET=local_jsonl</code></td>
+</tr>
+<tr>
+<td><code>INVARLOCK_TIER</code></td>
+<td><code>balanced</code></td>
+<td>Guard tier preset</td>
+</tr>
+<tr>
+<td><code>INVARLOCK_PREVIEW_WINDOWS</code></td>
+<td><code>32</code></td>
+<td>Preview windows</td>
+</tr>
+<tr>
+<td><code>INVARLOCK_FINAL_WINDOWS</code></td>
+<td><code>32</code></td>
+<td>Final windows</td>
+</tr>
+<tr>
+<td><code>INVARLOCK_SEQ_LEN</code></td>
+<td><code>512</code></td>
+<td>Sequence length</td>
+</tr>
+<tr>
+<td><code>INVARLOCK_STRIDE</code></td>
+<td><code>256</code></td>
+<td>Stride</td>
+</tr>
+<tr>
+<td><code>INVARLOCK_EVAL_BATCH</code></td>
+<td><code>32</code></td>
+<td>InvarLock batch size</td>
+</tr>
+<tr>
+<td><code>PACK_GUARDS_ORDER</code></td>
+<td><code>invariants,spectral,rmt,variance,invariants</code></td>
+<td>Guards included in preset derivation and generated presets</td>
+</tr>
+</tbody>
+</table>
+<p>Primary metric acceptance/drift gates should be configured via profile/config
+(<code>primary_metric.acceptance_range</code>, <code>primary_metric.drift_band</code>), not env vars.</p>
+<h3 id="tuned-edit-presets">Tuned edit presets<a class="headerlink" href="#tuned-edit-presets" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PACK_TUNED_EDIT_PARAMS_FILE</code></td>
+<td>unset</td>
+<td>JSON file with tuned clean edit params (required when <code>CLEAN_EDIT_RUNS&gt;0</code>).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="preset-derivation-reuse">Preset derivation reuse<a class="headerlink" href="#preset-derivation-reuse" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PACK_CALIBRATION_PRESET_DIR</code></td>
+<td>unset</td>
+<td>Directory containing <code>calibrated_preset_&lt;model&gt;.yaml/json</code> to reuse; skips preset-derivation runs.</td>
+</tr>
+<tr>
+<td><code>PACK_CALIBRATION_PRESET_FILE</code></td>
+<td>unset</td>
+<td>Single preset file applied to all models (advanced).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="experiment-controls">Experiment controls<a class="headerlink" href="#experiment-controls" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DRIFT_CALIBRATION_RUNS</code></td>
+<td><code>5</code></td>
+<td>Preset-derivation run count</td>
+</tr>
+<tr>
+<td><code>CLEAN_EDIT_RUNS</code></td>
+<td><code>3</code></td>
+<td>Clean edit evaluate runs</td>
+</tr>
+<tr>
+<td><code>STRESS_EDIT_RUNS</code></td>
+<td><code>2</code></td>
+<td>Stress edit evaluate runs</td>
+</tr>
+<tr>
+<td><code>RUN_ERROR_INJECTION</code></td>
+<td><code>true</code></td>
+<td>Enable error injection</td>
+</tr>
+</tbody>
+</table>
+<h3 id="storage-and-memory-planning">Storage and memory planning<a class="headerlink" href="#storage-and-memory-planning" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PACK_BASELINE_STORAGE_MODE</code></td>
+<td><code>snapshot_copy</code></td>
+<td>Baseline storage mode for <code>run_suite.sh</code> and <code>run_pack.sh</code> (<code>snapshot_symlink</code>, <code>snapshot_copy</code>, or <code>save_pretrained</code>)</td>
+</tr>
+<tr>
+<td><code>MIN_FREE_DISK_GB</code></td>
+<td><code>200</code></td>
+<td>Disk pressure threshold</td>
+</tr>
+<tr>
+<td><code>PACK_SKIP_DISK_PREFLIGHT</code></td>
+<td><code>0</code></td>
+<td>Skip storage preflight</td>
+</tr>
+<tr>
+<td><code>CUDA_MEMORY_FRACTION</code></td>
+<td><code>0.92</code></td>
+<td>Target GPU memory fraction</td>
+</tr>
+<tr>
+<td><code>MODEL_LOAD_OVERHEAD_GB</code></td>
+<td><code>4</code></td>
+<td>Load overhead for planning</td>
+</tr>
+<tr>
+<td><code>EDIT_OVERHEAD_GB</code></td>
+<td><code>8</code></td>
+<td>Per-edit overhead for planning</td>
+</tr>
+<tr>
+<td><code>BATCH_EDIT_OVERHEAD_GB</code></td>
+<td><code>8</code></td>
+<td>Batch edit overhead</td>
+</tr>
+<tr>
+<td><code>INVARLOCK_OVERHEAD_GB</code></td>
+<td><code>6</code></td>
+<td>InvarLock overhead</td>
+</tr>
+</tbody>
+</table>
+<h3 id="worker-reliability-controls">Worker + reliability controls<a class="headerlink" href="#worker-reliability-controls" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WORKER_HEARTBEAT_INTERVAL</code></td>
+<td><code>30</code></td>
+<td>Heartbeat interval (seconds)</td>
+</tr>
+<tr>
+<td><code>WORKER_IDLE_SLEEP</code></td>
+<td><code>5</code></td>
+<td>Sleep when idle (seconds)</td>
+</tr>
+<tr>
+<td><code>WORKER_MAX_FAILURES</code></td>
+<td><code>10</code></td>
+<td>Stop worker after N failures</td>
+</tr>
+<tr>
+<td><code>WORKER_TIMEOUT</code></td>
+<td><code>2700</code></td>
+<td>Worker heartbeat timeout (seconds)</td>
+</tr>
+<tr>
+<td><code>CANCEL_BLOCKED_TASKS_GRACE_SECONDS</code></td>
+<td><code>90</code></td>
+<td>Fail blocked tasks after grace</td>
+</tr>
+<tr>
+<td><code>TASK_TIMEOUT_DEFAULT</code></td>
+<td><code>21600</code></td>
+<td>Default task timeout (seconds)</td>
+</tr>
+<tr>
+<td><code>TASK_TIMEOUT_&lt;TASKTYPE&gt;</code></td>
+<td>unset</td>
+<td>Per-task timeout override</td>
+</tr>
+</tbody>
+</table>
+<h3 id="packaging-and-verification">Packaging and verification<a class="headerlink" href="#packaging-and-verification" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PACK_DIR</code></td>
+<td><code>OUTPUT_DIR/evidence_pack</code></td>
+<td>Evidence pack output dir</td>
+</tr>
+<tr>
+<td><code>PACK_SIGN_MANIFEST</code></td>
+<td><code>1</code></td>
+<td>Sign <code>manifest.json</code> with a package-native Ed25519 key (auto-generated if <code>PACK_SIGNING_KEY</code> is unset)</td>
+</tr>
+<tr>
+<td><code>PACK_SIGNING_KEY</code></td>
+<td>unset</td>
+<td>Optional Ed25519 private key PEM for deterministic signer identity</td>
+</tr>
+<tr>
+<td><code>PACK_SKIP_HTML</code></td>
+<td><code>0</code></td>
+<td>Skip HTML rendering</td>
+</tr>
+<tr>
+<td><code>PACK_VERIFY_PROFILE</code></td>
+<td><code>dev</code></td>
+<td>Profile for <code>invarlock verify</code></td>
+</tr>
+<tr>
+<td><code>PACK_REPORT_ASSURANCE</code></td>
+<td><code>report</code></td>
+<td>Nested report assurance mode passed to report verification (<code>report</code>, <code>strict</code>, or <code>off</code>)</td>
+</tr>
+<tr>
+<td><code>PACK_EVALUATE_ASSURANCE</code></td>
+<td><code>off</code></td>
+<td>Assurance mode passed to <code>invarlock evaluate</code> when creating evidence-pack reports (<code>strict</code> or <code>off</code>)</td>
+</tr>
+<tr>
+<td><code>PACK_RETRY_FAILED_ON_RESUME</code></td>
+<td>unset</td>
+<td>Set to <code>1</code> to explicitly retry failed queue tasks during <code>--resume</code>; otherwise resume aborts when failed tasks are present</td>
+</tr>
+<tr>
+<td><code>PACK_REQUIRE_PASS</code></td>
+<td><code>0</code></td>
+<td>Fail pack generation unless <code>final_verdict.json</code> is <code>PASS</code></td>
+</tr>
+<tr>
+<td><code>PACK_REQUIRE_RUNTIME_MANIFESTS</code></td>
+<td><code>0</code></td>
+<td>Require report-adjacent runtime manifests during hardened pack generation</td>
+</tr>
+<tr>
+<td><code>PACK_RELEASE_REVIEW</code></td>
+<td><code>0</code></td>
+<td>Set by <code>run_pack.sh --release-review</code>; requires PASS verdicts, signed manifests, runtime manifests, model revision metadata, a non-empty scenarios manifest, CI profile, strict evaluation assurance, and strict report assurance</td>
+</tr>
+</tbody>
+</table>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="missing-model-revisions-offline">Missing model revisions (offline)<a class="headerlink" href="#missing-model-revisions-offline" title="Permanent link">&para;</a></h3>
+<p>If offline runs fail with “requires model revisions”, run a preflight:</p>
+<div class="codehilite"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">INVARLOCK_ALLOW_REMOTE_CODE</span><span class="o">=</span><span class="m">1</span>
+./scripts/evidence_packs/run_suite.sh<span class="w"> </span>--suite<span class="w"> </span>subset<span class="w"> </span>--net<span class="w"> </span><span class="m">1</span>
+</code></pre></div>
+
+<p>Or point to an existing revisions file with <code>PACK_MODEL_REVISIONS_FILE</code>.</p>
+<h3 id="oom-on-large-models">OOM on large models<a class="headerlink" href="#oom-on-large-models" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Lower <code>GPU_MEMORY_PER_DEVICE</code> so the planner requests more GPUs.</li>
+<li>Disable batch edits: <code>PACK_USE_BATCH_EDITS=false</code>.</li>
+<li>Reduce InvarLock batch/seq_len (e.g., <code>INVARLOCK_EVAL_BATCH=16 INVARLOCK_SEQ_LEN=256</code>).</li>
+<li>Increase memory overhead knobs (<code>MODEL_LOAD_OVERHEAD_GB</code>, <code>EDIT_OVERHEAD_GB</code>).</li>
+</ul>
+<h3 id="disk-pressure-preflight-failures">Disk pressure / preflight failures<a class="headerlink" href="#disk-pressure-preflight-failures" title="Permanent link">&para;</a></h3>
+<p>Check <code>state/disk_pressure.json</code> and ensure the output filesystem has headroom.
+Use <code>MIN_FREE_DISK_GB=0</code> or <code>PACK_SKIP_DISK_PREFLIGHT=1</code> only if you accept
+risk of partial artifacts.</p>
+<h3 id="task-timeouts">Task timeouts<a class="headerlink" href="#task-timeouts" title="Permanent link">&para;</a></h3>
+<p>Increase the default or per-task timeout:</p>
+<div class="codehilite"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">INVARLOCK_ALLOW_REMOTE_CODE</span><span class="o">=</span><span class="m">1</span>
+<span class="nv">TASK_TIMEOUT_DEFAULT</span><span class="o">=</span><span class="m">28800</span><span class="w"> </span>./scripts/evidence_packs/run_suite.sh<span class="w"> </span>--suite<span class="w"> </span>subset
+<span class="nv">TASK_TIMEOUT_CREATE_EDIT</span><span class="o">=</span><span class="m">28800</span><span class="w"> </span>./scripts/evidence_packs/run_suite.sh<span class="w"> </span>--suite<span class="w"> </span>subset
+</code></pre></div>
+
+<h3 id="stuck-queues-or-dead-workers">Stuck queues or dead workers<a class="headerlink" href="#stuck-queues-or-dead-workers" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Inspect <code>state/progress.json</code> and <code>workers/gpu_&lt;id&gt;.status</code>.</li>
+<li>Check worker logs: <code>logs/gpu_&lt;id&gt;.log</code> and <code>logs/tasks/&lt;task_id&gt;.log</code>.</li>
+<li>Re-run with <code>--resume</code> to recover from a crash.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.expand", "navigation.tabs"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../assets/javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

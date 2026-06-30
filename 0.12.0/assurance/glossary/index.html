@@ -1,0 +1,4626 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Official documentation for the InvarLock toolkit">
+      
+      
+      
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/assurance/glossary/">
+      
+      
+        <link rel="prev" href="../15-strict-assurance-checklist/">
+      
+      
+        <link rel="next" href="../01-eval-math-derivation/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Glossary - InvarLock Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#glossary" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            InvarLock Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Glossary
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/getting-started/" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/cli/" class="md-tabs__link">
+          
+  
+  
+  CLI Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../00-assurance-case/" class="md-tabs__link">
+          
+  
+  
+  Assurance
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../security/best-practices/" class="md-tabs__link">
+          
+  
+  
+  Security
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    InvarLock Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/primary-metric-smoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Primary Metric Smoke
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/compare-and-evaluate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/live-examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/bring-your-own-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bring Your Own Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/plugins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/config-gallery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Gallery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/example-reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/failure-examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Failure Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/reading-report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading a Report
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/evidence-packs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence Packs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/evidence-packs-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence Pack Internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    CLI Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/one-run-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    One Run Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/programmatic-quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Programmatic Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/guards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/report-outline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Outline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/model-adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/model-family-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Family Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/config-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/tier-policy-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tier Policy Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifact Layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/calibration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/alternatives-comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternatives Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Assurance
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../00-assurance-case/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance Case
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14-trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15-strict-assurance-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strict Assurance Checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Reference Tables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick Reference Tables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#primary-metric-terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primary Metric Terms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guard-terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guard Terms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Terms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#policy-terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Policy Terms
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#detailed-definitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detailed Definitions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Detailed Definitions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A–B
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="A–B">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Baseline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bca-bootstrap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BCa Bootstrap
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C–D
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="C–D">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#evaluation-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evaluation Report
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compare-evaluate-byoe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compare &amp; evaluate (BYOE)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#eg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E–G
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="E–G">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#evidence-pack-evaluation-bundle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence Pack / Evaluation Bundle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#canonical-guard-chain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Canonical Guard Chain
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guard-chain-canonical-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guard Chain (Canonical Order)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guard-overhead" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guard Overhead
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#km" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        K–M
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="K–M">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#kappa-threshold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        κ (kappa) Threshold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#measurement-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measurement Contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        P–R
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="P–R">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#policy-digest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Policy Digest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#primary-metric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primary Metric
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#primary-metric-tail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primary Metric Tail
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#provider-digest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider Digest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run Report
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rmt-epsilon-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RMT ε (epsilon) Rule
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rmt-guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RMT Guard
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#st" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S–T
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="S–T">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#spectral-cap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spectral Cap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spectral-guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spectral Guard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#subject-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subject Run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telemetry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tier-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier Policy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timing-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timing Summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tokenizer-hash" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tokenizer Hash
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vz" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        V–Z
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="V–Z">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#variance-effect-ve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Variance Effect (VE)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#window-pairing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Window Pairing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#z-score" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        z-score
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See Also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-eval-math-derivation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Math Derivation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-coverage-and-pairing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coverage & Pairing Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-bca-bootstrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BCa Bootstrap (Paired Δlog)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-guard-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Contracts & Primer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-spectral-fpr-derivation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral False-Positive Control
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-rmt-epsilon-rule/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RMT ε-Rule
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-ve-gate-power/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VE Predictive Gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-determinism-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Determinism Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09-tier-v1-calibration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tier Policy v1 Calibration (Pilot)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10-guard-overhead-method/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Overhead Method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11-policy-provenance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy Provenance & Digest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12-device-drift-bands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Device Drift Bands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13-gpu-mps-first-guards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GPU/MPS-First Guard Measurement Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16-guard-validation-smoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Validation Smoke
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17-empirical-guard-evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Empirical Guard Evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best Practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/release-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threat Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/runtime-provenance-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Provenance Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/pip-audit-allowlist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pip Audit Allowlist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Reference Tables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick Reference Tables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#primary-metric-terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primary Metric Terms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guard-terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guard Terms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Terms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#policy-terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Policy Terms
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#detailed-definitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detailed Definitions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Detailed Definitions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A–B
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="A–B">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Baseline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bca-bootstrap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BCa Bootstrap
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C–D
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="C–D">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#evaluation-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evaluation Report
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compare-evaluate-byoe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compare &amp; evaluate (BYOE)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#eg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E–G
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="E–G">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#evidence-pack-evaluation-bundle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence Pack / Evaluation Bundle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#canonical-guard-chain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Canonical Guard Chain
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guard-chain-canonical-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guard Chain (Canonical Order)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guard-overhead" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guard Overhead
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#km" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        K–M
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="K–M">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#kappa-threshold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        κ (kappa) Threshold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#measurement-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measurement Contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        P–R
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="P–R">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#policy-digest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Policy Digest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#primary-metric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primary Metric
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#primary-metric-tail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primary Metric Tail
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#provider-digest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider Digest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run Report
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rmt-epsilon-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RMT ε (epsilon) Rule
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rmt-guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RMT Guard
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#st" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S–T
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="S–T">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#spectral-cap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spectral Cap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spectral-guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spectral Guard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#subject-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subject Run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telemetry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tier-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier Policy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timing-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timing Summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tokenizer-hash" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tokenizer Hash
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vz" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        V–Z
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="V–Z">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#variance-effect-ve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Variance Effect (VE)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#window-pairing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Window Pairing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#z-score" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        z-score
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See Also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="glossary">Glossary<a class="headerlink" href="#glossary" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>Plain language:</strong> When reading a report or debugging a pipeline, use this
+glossary to understand what each field means and where the term originated.</p>
+</blockquote>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Purpose</strong></td>
+<td>Define key assurance, report, guard, data, policy, and provenance terms in one reference.</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>Report readers, contributors, auditors, and operators following cross-document terminology.</td>
+</tr>
+<tr>
+<td><strong>Contract scope</strong></td>
+<td>Terminology only; runtime behavior is governed by the linked assurance docs and reference pages.</td>
+</tr>
+<tr>
+<td><strong>Source of truth</strong></td>
+<td>This glossary, linked assurance notes, report schemas, and public contract data under <code>src/invarlock/_data/contracts/</code>.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>TL;DR:</strong> This glossary defines key terms used across InvarLock documentation,
+reports, and code. Terms are grouped by domain (metrics, guards, data,
+provenance) for quick reference. Each entry includes a definition, context,
+and cross-references to relevant assurance documents.</p>
+</blockquote>
+<h2 id="quick-reference-tables">Quick Reference Tables<a class="headerlink" href="#quick-reference-tables" title="Permanent link">&para;</a></h2>
+<h3 id="primary-metric-terms">Primary Metric Terms<a class="headerlink" href="#primary-metric-terms" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Short Definition</th>
+<th>Report Field</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Primary Metric</td>
+<td>Canonical task metric for gating (ppl or accuracy)</td>
+<td><code>primary_metric.*</code></td>
+</tr>
+<tr>
+<td>BCa Bootstrap</td>
+<td>Bias-corrected accelerated bootstrap for CIs</td>
+<td><code>primary_metric.ci</code>, <code>primary_metric.reps</code></td>
+</tr>
+<tr>
+<td>Ratio vs Baseline</td>
+<td>PPL-like subject final ÷ baseline final (<code>&gt;1</code> is worse); accuracy gates use baseline delta</td>
+<td><code>primary_metric.ratio_vs_baseline</code></td>
+</tr>
+<tr>
+<td>Primary Metric Tail</td>
+<td>Tail regression gate (ΔlogNLL at q95)</td>
+<td><code>primary_metric_tail.*</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="guard-terms">Guard Terms<a class="headerlink" href="#guard-terms" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Short Definition</th>
+<th>Report Field</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Canonical Guard Chain</td>
+<td>invariants (pre) → spectral → RMT → variance → invariants (post)</td>
+<td><code>assurance.{guard_chain_observed,canonical_guard_chain}</code>, <code>validation.{invariants_pass,spectral_stable,rmt_stable}</code></td>
+</tr>
+<tr>
+<td>κ (kappa) Threshold</td>
+<td>Per-family spectral cap for z-score outliers</td>
+<td><code>spectral.family_caps.*.kappa</code></td>
+</tr>
+<tr>
+<td>ε (epsilon) Band</td>
+<td>RMT acceptance threshold for edge-risk</td>
+<td><code>rmt.epsilon_by_family.*</code></td>
+</tr>
+<tr>
+<td>Guard Overhead</td>
+<td>Primary-metric impact of guarded evaluation vs a bare control run</td>
+<td><code>guard_overhead.*</code></td>
+</tr>
+<tr>
+<td>Measurement Contract</td>
+<td>Estimator + sampling policy recorded in reports</td>
+<td><code>spectral.measurement_contract_hash</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="data-terms">Data Terms<a class="headerlink" href="#data-terms" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Short Definition</th>
+<th>Report Field</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Window Pairing</td>
+<td>Aligning baseline and subject eval windows</td>
+<td><code>dataset.windows.stats.paired_windows</code></td>
+</tr>
+<tr>
+<td>Provider Digest</td>
+<td>Hash of dataset identity (ids/tokenizer/masking)</td>
+<td><code>provenance.provider_digest</code></td>
+</tr>
+<tr>
+<td>Tokenizer Hash</td>
+<td>Stable hash of tokenizer settings</td>
+<td><code>meta.tokenizer_hash</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="policy-terms">Policy Terms<a class="headerlink" href="#policy-terms" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Short Definition</th>
+<th>Report Field</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tier Policy</td>
+<td>Guard threshold preset (conservative/balanced/aggressive)</td>
+<td><code>auto.tier</code></td>
+</tr>
+<tr>
+<td>Policy Digest</td>
+<td>Stable hash of resolved policy thresholds</td>
+<td><code>policy_digest.thresholds_hash</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="detailed-definitions">Detailed Definitions<a class="headerlink" href="#detailed-definitions" title="Permanent link">&para;</a></h2>
+<h3 id="ab">A–B<a class="headerlink" href="#ab" title="Permanent link">&para;</a></h3>
+<h4 id="baseline">Baseline<a class="headerlink" href="#baseline" title="Permanent link">&para;</a></h4>
+<p>The unedited reference model run used for comparison and gating.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td><code>baseline</code> report in Compare &amp; evaluate workflow</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Subject Run, Window Pairing, Evaluation Report</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>provenance.baseline.*</code>, <code>baseline_ref.*</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../../user-guide/compare-and-evaluate/">Compare &amp; evaluate</a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong> <code>invarlock evaluate --baseline gpt2 --subject gpt2-quant</code>
+This follows the default runtime-container path unless a host-side,
+non-assurance workflow uses <code>--execution-mode host</code>.</p>
+<hr />
+<h4 id="bca-bootstrap">BCa Bootstrap<a class="headerlink" href="#bca-bootstrap" title="Permanent link">&para;</a></h4>
+<p>Bias-corrected and accelerated bootstrap method for estimating confidence intervals.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td>Applied to paired log-loss deltas for primary metric gating</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Primary Metric, Window Pairing, Confidence Interval</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>primary_metric.ci</code>, <code>primary_metric.reps</code>, <code>dataset.windows.stats.bootstrap</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../03-bca-bootstrap/">BCa Bootstrap Derivation</a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong> BCa bootstrap with 2000 replicates produces a log-space
+<code>ci: [-0.005, 0.008]</code> on paired ΔlogNLL, then exponentiates it to
+<code>display_ci: [0.995, 1.008]</code> for the ratio view.</p>
+<hr />
+<h3 id="cd">C–D<a class="headerlink" href="#cd" title="Permanent link">&para;</a></h3>
+<h4 id="evaluation-report">Evaluation Report<a class="headerlink" href="#evaluation-report" title="Permanent link">&para;</a></h4>
+<p>Structured evidence artifact summarizing an evaluation run and its validation status.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td>Generated by <code>invarlock evaluate</code> or <code>invarlock report generate --format report</code></td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Run Report, Evidence Pack, Evaluation Bundle, Manifest</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>schema_version</code>, <code>run_id</code>, <code>validation.*</code>, <code>artifacts.*</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../../reference/reports/">Reports Reference</a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong> <code>evaluation.report.json</code> with <code>schema_version: v1</code> and <code>validation.primary_metric_acceptable: true</code></p>
+<hr />
+<h4 id="compare-evaluate-byoe">Compare &amp; evaluate (BYOE)<a class="headerlink" href="#compare-evaluate-byoe" title="Permanent link">&para;</a></h4>
+<p>Workflow that compares a subject model to a baseline, optionally with an external edit
+(Bring Your Own Edit).</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td><code>invarlock evaluate --baseline ... --subject ...</code></td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Baseline, Subject Run, Evaluation Report</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>provenance.baseline.*</code>, <code>provenance.edited.*</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../../user-guide/compare-and-evaluate/">Compare &amp; evaluate Guide</a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong> BYOE workflow evaluates an externally edited checkpoint against its
+unmodified baseline.</p>
+<hr />
+<h3 id="eg">E–G<a class="headerlink" href="#eg" title="Permanent link">&para;</a></h3>
+<h4 id="evidence-pack-evaluation-bundle">Evidence Pack / Evaluation Bundle<a class="headerlink" href="#evidence-pack-evaluation-bundle" title="Permanent link">&para;</a></h4>
+<p>Set of files produced for audit. An evidence pack is the portable signed/checksummed
+package shape; an evaluation bundle is the local output directory containing
+reports, runtime-provenance sidecars, events, or derived renderings.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td>Output directory from <code>invarlock evaluate</code> or <code>invarlock report generate --format report</code></td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Run Report, Evaluation Report, Runtime Manifest</td>
+</tr>
+<tr>
+<td><strong>Typical contents</strong></td>
+<td><code>evaluation.report.json</code>, <code>evaluation_report.md</code>, <code>runtime.manifest.json</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../../reference/artifacts/">Artifact Layout</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="canonical-guard-chain">Canonical Guard Chain<a class="headerlink" href="#canonical-guard-chain" title="Permanent link">&para;</a></h4>
+<p>The default guard chain is <code>invariants</code> (pre) → <code>spectral</code> → <code>RMT</code> → <code>variance</code>
+→ <code>invariants</code> (post).</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td>Core guard checks in <code>evaluate</code> and internal config-runner flows</td>
+</tr>
+<tr>
+<td><strong>Canonical order</strong></td>
+<td><code>invariants</code> (pre), <code>spectral</code>, <code>rmt</code>, <code>variance</code>, <code>invariants</code> (post)</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Guard Chain, Guard Overhead</td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../../reference/guards/">Guards Reference</a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Enforcement:</strong> Guards execute in canonical order for reproducibility; strict
+reports can record <code>assurance.guard_chain_observed</code>,
+<code>assurance.canonical_guard_chain</code>, and
+<code>assurance.canonical_guard_chain_enforced</code>. Guard outcomes are also recorded in
+<code>validation.invariants_pass</code>, <code>validation.spectral_stable</code>, and
+<code>validation.rmt_stable</code>.</p>
+<hr />
+<h4 id="guard-chain-canonical-order">Guard Chain (Canonical Order)<a class="headerlink" href="#guard-chain-canonical-order" title="Permanent link">&para;</a></h4>
+<p>Fixed execution order for guard preparation and evaluation ensuring deterministic,
+auditable outcomes.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td>Canonical default enforced by strict assurance; config may request order, but strict reports must match the canonical chain</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Guard Chain (Canonical Order), Guard Overhead</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>assurance.{canonical_guard_chain,guard_chain_observed,canonical_guard_chain_enforced}</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../../reference/guards/">Guards Reference</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="guard-overhead">Guard Overhead<a class="headerlink" href="#guard-overhead" title="Permanent link">&para;</a></h4>
+<p>Primary-metric impact of guard checks vs a bare control run (no guards).
+This is not a wall-clock latency benchmark.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td>Measured in Release profile; gate requires ≤ +1.0% PM overhead</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Canonical Guard Chain, Timing Summary</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>guard_overhead.{bare_ppl,guarded_ppl,overhead_ratio,overhead_percent}</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../10-guard-overhead-method/">Guard Overhead Method</a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong> <code>overhead_percent: +0.12%</code> indicates guards add 0.12% to primary metric.</p>
+<hr />
+<h3 id="km">K–M<a class="headerlink" href="#km" title="Permanent link">&para;</a></h3>
+<h4 id="kappa-threshold">κ (kappa) Threshold<a class="headerlink" href="#kappa-threshold" title="Permanent link">&para;</a></h4>
+<p>Per-family spectral cap used to flag abnormally high z-scores.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td><code>spectral.family_caps.*.kappa</code> in tier policy</td>
+</tr>
+<tr>
+<td><strong>Typical values</strong></td>
+<td>ffn: 3.85, attn: 3.02, embed: 1.05 (Balanced tier)</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Spectral Cap, z-score, Spectral Guard</td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../05-spectral-fpr-derivation/">Spectral FPR Derivation</a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong> <code>kappa=2.8</code> for attention family means z-scores &gt; 2.8 are flagged.</p>
+<hr />
+<h4 id="measurement-contract">Measurement Contract<a class="headerlink" href="#measurement-contract" title="Permanent link">&para;</a></h4>
+<p>Guard measurement procedure signature and digest recorded in reports.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td>Spectral and RMT guards record estimator + sampling policy</td>
+</tr>
+<tr>
+<td><strong>Verified by</strong></td>
+<td><code>invarlock verify --profile ci\|release</code> (plus <code>runtime.manifest.json</code> runtime provenance for container-backed outputs)</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>spectral.{measurement_contract_hash,baseline_measurement_contract_hash,measurement_contract_match}</code>, <code>rmt.{measurement_contract_hash,baseline_measurement_contract_hash,measurement_contract_match}</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../04-guard-contracts/">Guard Contracts</a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Enforcement:</strong> CI/Release profiles require measurement contract match between
+baseline and subject.</p>
+<hr />
+<h3 id="pr">P–R<a class="headerlink" href="#pr" title="Permanent link">&para;</a></h3>
+<h4 id="policy-digest">Policy Digest<a class="headerlink" href="#policy-digest" title="Permanent link">&para;</a></h4>
+<p>Stable hash summarizing resolved policy thresholds for auditability.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td>Stored in report for policy change detection</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Tier Policy, Policy Overrides, Policy Provenance</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>policy_digest.thresholds_hash</code>, <code>policy_provenance.*</code>, <code>auto.policy_digest</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../11-policy-provenance/">Policy Provenance</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="primary-metric">Primary Metric<a class="headerlink" href="#primary-metric" title="Permanent link">&para;</a></h4>
+<p>The canonical task metric used for gating (perplexity for LMs, accuracy for classification).</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Supported kinds</strong></td>
+<td><code>accuracy</code>, <code>bleu</code>, <code>f1</code>, <code>ppl_causal</code>, <code>ppl_mlm</code>, <code>ppl_seq2seq</code>, <code>rouge</code></td>
+</tr>
+<tr>
+<td><strong>Gating logic</strong></td>
+<td>PPL-like kinds gate on ratio vs baseline; accuracy gates on percentage-point delta vs baseline</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Primary Metric Tail, BCa Bootstrap, Window Pairing</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>primary_metric.{kind,preview,final,ratio_vs_baseline,ci}</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../../reference/reports/">Reports Reference</a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong> <code>primary_metric.kind: ppl_causal</code> with <code>ratio_vs_baseline: 1.003</code></p>
+<hr />
+<h4 id="primary-metric-tail">Primary Metric Tail<a class="headerlink" href="#primary-metric-tail" title="Permanent link">&para;</a></h4>
+<p>Optional tail regression gate checking high-loss windows (e.g., q95 ΔlogNLL).</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td>Catches regression in hard examples even when mean is acceptable</td>
+</tr>
+<tr>
+<td><strong>Mode</strong></td>
+<td><code>warn</code> (default) or <code>fail</code></td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Primary Metric, BCa Bootstrap</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>primary_metric_tail.{evaluated,passed,warned,stats}</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../../reference/reports/">Reports Reference</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="provider-digest">Provider Digest<a class="headerlink" href="#provider-digest" title="Permanent link">&para;</a></h4>
+<p>Dataset identity hash covering token IDs, tokenizer config, and masking strategy.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td>Ensures baseline and subject use identical data</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Window Pairing, Tokenizer Hash</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>provenance.provider_digest.ids_sha256</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../02-coverage-and-pairing/">Coverage &amp; Pairing</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="run-report">Run Report<a class="headerlink" href="#run-report" title="Permanent link">&para;</a></h4>
+<p>Run-level artifact with metrics, guard results, and metadata.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td>Generated by <code>invarlock evaluate</code>; input to report generation</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Evaluation Report, Evidence Pack, Evaluation Bundle</td>
+</tr>
+<tr>
+<td><strong>File format</strong></td>
+<td><code>report.json</code> + <code>events.jsonl</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../../reference/artifacts/">Artifact Layout</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="rmt-epsilon-rule">RMT ε (epsilon) Rule<a class="headerlink" href="#rmt-epsilon-rule" title="Permanent link">&para;</a></h4>
+<p>Random Matrix Theory epsilon band used for activation edge-risk stability checks.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td><code>rmt.epsilon_default</code> and <code>rmt.epsilon_by_family.*</code> thresholds</td>
+</tr>
+<tr>
+<td><strong>Calibration</strong></td>
+<td>Derived from null-sweep runs on target model families</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>RMT Guard, κ Threshold</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>rmt.{epsilon_default,epsilon_by_family,epsilon_violations,stable,status,max_edge_ratio,max_edge_delta}</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../06-rmt-epsilon-rule/">RMT ε Rule</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="rmt-guard">RMT Guard<a class="headerlink" href="#rmt-guard" title="Permanent link">&para;</a></h4>
+<p>Guard that checks eigenvalue statistics against Random Matrix Theory bounds.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Focus</strong></td>
+<td>Activation edge-risk growth across model families</td>
+</tr>
+<tr>
+<td><strong>Validation</strong></td>
+<td><code>validation.rmt_stable</code></td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Canonical Guard Chain, RMT ε Rule</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>rmt.{families,stable,status,max_edge_ratio,max_edge_delta}</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../../reference/guards/">Guards Reference</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="st">S–T<a class="headerlink" href="#st" title="Permanent link">&para;</a></h3>
+<h4 id="spectral-cap">Spectral Cap<a class="headerlink" href="#spectral-cap" title="Permanent link">&para;</a></h4>
+<p>Limit on spectral z-scores per family to flag weight instability.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td>Applied by spectral guard; counts violations per family</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>κ Threshold, z-score, Spectral Guard</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>spectral.{caps_applied,caps_exceeded,top_z_scores}</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../05-spectral-fpr-derivation/">Spectral FPR</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="spectral-guard">Spectral Guard<a class="headerlink" href="#spectral-guard" title="Permanent link">&para;</a></h4>
+<p>Guard that monitors spectral norms and z-scores for weight matrices.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Focus</strong></td>
+<td>Baseline-relative weight matrix stability</td>
+</tr>
+<tr>
+<td><strong>Validation</strong></td>
+<td><code>validation.spectral_stable</code></td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Canonical Guard Chain, Spectral Cap, κ Threshold</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>spectral.{caps_applied,family_caps,top_z_scores,summary}</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../../reference/guards/">Guards Reference</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="subject-run">Subject Run<a class="headerlink" href="#subject-run" title="Permanent link">&para;</a></h4>
+<p>The edited or target model run under evaluation (compared against baseline).</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td><code>subject</code> checkpoint in Compare &amp; evaluate</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Baseline, Evaluation Report, Window Pairing</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>provenance.edited.*</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../../user-guide/compare-and-evaluate/">Compare &amp; evaluate</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="telemetry">Telemetry<a class="headerlink" href="#telemetry" title="Permanent link">&para;</a></h4>
+<p>Performance and resource metrics emitted with reports.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td>Optional fields for performance analysis</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Timing Summary, Guard Overhead</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>telemetry.*</code>, <code>metrics.memory_mb_peak</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../../reference/observability/">Observability</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="tier-policy">Tier Policy<a class="headerlink" href="#tier-policy" title="Permanent link">&para;</a></h4>
+<p>Guard threshold preset selecting the tier profile for a run.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Options</strong></td>
+<td><code>conservative</code> (strictest), <code>balanced</code> (default), <code>aggressive</code> (loosest)</td>
+</tr>
+<tr>
+<td><strong>Source</strong></td>
+<td>Packaged <code>runtime/tiers.yaml</code>; overrides use <code>INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml</code></td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Policy Digest, Policy Overrides</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>auto.tier</code>, <code>resolved_policy.*</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../../reference/tier-policy-catalog/">Tier Policy Catalog</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="timing-summary">Timing Summary<a class="headerlink" href="#timing-summary" title="Permanent link">&para;</a></h4>
+<p>Consolidated timing breakdown for an evaluation run.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td>CLI output via <code>print_timing_summary()</code></td>
+</tr>
+<tr>
+<td><strong>Includes</strong></td>
+<td>Model load, dataset load, evaluation, report generation</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Guard Overhead, Telemetry</td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../../reference/observability/">Observability</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="tokenizer-hash">Tokenizer Hash<a class="headerlink" href="#tokenizer-hash" title="Permanent link">&para;</a></h4>
+<p>Stable hash of tokenizer settings and vocabulary for reproducibility.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td>Ensures baseline and subject use identical tokenization</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Provider Digest, Window Pairing</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>meta.tokenizer_hash</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../08-determinism-contracts/">Determinism Contracts</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="vz">V–Z<a class="headerlink" href="#vz" title="Permanent link">&para;</a></h3>
+<h4 id="variance-effect-ve">Variance Effect (VE)<a class="headerlink" href="#variance-effect-ve" title="Permanent link">&para;</a></h4>
+<p>Guard that tracks variance change and applies equalization when beneficial.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context</strong></td>
+<td>A/B test compares bare vs VE-enabled evaluation</td>
+</tr>
+<tr>
+<td><strong>Enabling condition</strong></td>
+<td>Predictive CI upper bound ≤ -min_effect_lognll and mean Δ ≤ -min_effect_lognll; enabled VE also requires A/B provenance</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Canonical Guard Chain, Guard Overhead, Predictive Gate</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>variance.{enabled,gain,predictive_gate.delta_ci,predictive_gate.passed,ab_test}</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../07-ve-gate-power/">VE Gate Power</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="window-pairing">Window Pairing<a class="headerlink" href="#window-pairing" title="Permanent link">&para;</a></h4>
+<p>Alignment of baseline and subject evaluation windows for paired statistical testing.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Requirements</strong></td>
+<td>Same window IDs, zero overlap, 100% match fraction</td>
+</tr>
+<tr>
+<td><strong>Violation</strong></td>
+<td><code>E001</code> pairing error in CI/Release profiles</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>BCa Bootstrap, Primary Metric, Provider Digest</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>dataset.windows.stats.{paired_windows,window_match_fraction,window_overlap_fraction}</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../02-coverage-and-pairing/">Coverage &amp; Pairing</a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong> <code>paired_windows: 200</code>, <code>window_match_fraction: 1.0</code>,
+<code>window_overlap_fraction: 0.0</code></p>
+<hr />
+<h4 id="z-score">z-score<a class="headerlink" href="#z-score" title="Permanent link">&para;</a></h4>
+<p>Standardized deviation used in spectral guard scoring.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Formula</strong></td>
+<td><code>z = (ŝ - μ_f) / σ_f</code> for the guard's measured spectral statistic</td>
+</tr>
+<tr>
+<td><strong>Thresholding</strong></td>
+<td>Compared against family-specific κ caps</td>
+</tr>
+<tr>
+<td><strong>Related terms</strong></td>
+<td>Spectral Cap, κ Threshold</td>
+</tr>
+<tr>
+<td><strong>report fields</strong></td>
+<td><code>spectral.top_z_scores</code>, <code>spectral.family_caps.*.kappa</code></td>
+</tr>
+<tr>
+<td><strong>See also</strong></td>
+<td><a href="../05-spectral-fpr-derivation/">Spectral FPR</a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong> <code>max |z| = 2.1</code> indicates the largest z-score across all weight matrices.</p>
+<hr />
+<h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../00-assurance-case/">Assurance Case Overview</a> — Enumerated claims and evidence</li>
+<li><a href="../04-guard-contracts/">Guard Contracts</a> — Guard behavior specifications</li>
+<li><a href="../../reference/cli/">CLI Reference</a> — Command-line usage</li>
+<li><a href="../../reference/guards/">Guards Reference</a> — Guard configuration</li>
+<li><a href="../../reference/reports/">Reports Reference</a> — report schema</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.expand", "navigation.tabs"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../assets/javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
