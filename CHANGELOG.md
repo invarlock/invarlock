@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.12.0] - 2026-06-30
+
+### Added
+
 - Added knowledge/self-edit evidence metadata, public documentation, and
   report/provenance coverage for self-edit workflows.
 - Added LoRA, full fine-tune, and magnitude-prune integration lanes, including

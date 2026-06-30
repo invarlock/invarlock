@@ -20,7 +20,7 @@
   <a href="https://pypi.org/project/invarlock/">
     <img alt="PyPI" src="https://img.shields.io/pypi/v/invarlock?label=PyPI&logo=pypi&labelColor=18150f&color=1f3a7a" />
   </a>
-  <a href="https://invarlock.github.io/invarlock/0.11.0/">
+  <a href="https://invarlock.github.io/invarlock/0.12.0/">
     <img alt="Docs" src="https://img.shields.io/badge/docs-quickstart-1f3a7a?labelColor=18150f" />
   </a>
   <a href="LICENSE">
@@ -98,7 +98,7 @@ runtime provenance; passing reports can then be rendered with
 ## Quick Start
 
 Colab (CPU-friendly):
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/v0.11.0/notebooks/invarlock_quickstart_cpu.ipynb)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/v0.12.0/notebooks/invarlock_quickstart_cpu.ipynb)
 
 The public front door is `evaluate -> verify -> report html`. The README keeps
 the three common onboarding paths separate:
@@ -202,7 +202,7 @@ Runtime provenance: reports/eval/runtime.manifest.json
 
 Evidence packs bundle reports + verification metadata into a distributable artifact.
 
-- Guide: <https://invarlock.github.io/invarlock/0.11.0/user-guide/evidence-packs/>
+- Guide: <https://invarlock.github.io/invarlock/0.12.0/user-guide/evidence-packs/>
 - Verify from an installed wheel:
   `invarlock advanced evidence-pack verify <dir> --strict --report-assurance strict --expected-fingerprint sha256:<64-hex-chars>`
 - Repo harness alternative: `scripts/evidence_packs/verify_pack.sh --pack <dir> --strict --report-assurance strict --expected-fingerprint sha256:<64-hex-chars>`
@@ -235,7 +235,7 @@ Optional extras: `invarlock[probes]`, `invarlock[gpu]`,
 `invarlock[awq,gptq]`, `invarlock[torchao]`, `invarlock[hqq]`,
 `invarlock[quanto]`, and `invarlock[compressed-tensors]`. The `awq` and
 `gptq` extras use GPTQModel-backed subject loading. Full setup:
-<https://invarlock.github.io/invarlock/0.11.0/user-guide/getting-started/>.
+<https://invarlock.github.io/invarlock/0.12.0/user-guide/getting-started/>.
 
 The minimal install covers the core verification and reporting flows. Add
 `invarlock[hf]` only for model-loading evaluate runs, and use the installed
@@ -244,14 +244,14 @@ the repository.
 
 ## Documentation
 
-- Docs home: <https://invarlock.github.io/invarlock/0.11.0/>
-- Quickstart: <https://invarlock.github.io/invarlock/0.11.0/user-guide/quickstart/>
-- Compare & evaluate (BYOE): <https://invarlock.github.io/invarlock/0.11.0/user-guide/compare-and-evaluate/>
-- Reading a report: <https://invarlock.github.io/invarlock/0.11.0/user-guide/reading-report/>
-- CLI reference: <https://invarlock.github.io/invarlock/0.11.0/reference/cli/>
-- Assurance case: <https://invarlock.github.io/invarlock/0.11.0/assurance/00-assurance-case/>
+- Docs home: <https://invarlock.github.io/invarlock/0.12.0/>
+- Quickstart: <https://invarlock.github.io/invarlock/0.12.0/user-guide/quickstart/>
+- Compare & evaluate (BYOE): <https://invarlock.github.io/invarlock/0.12.0/user-guide/compare-and-evaluate/>
+- Reading a report: <https://invarlock.github.io/invarlock/0.12.0/user-guide/reading-report/>
+- CLI reference: <https://invarlock.github.io/invarlock/0.12.0/reference/cli/>
+- Assurance case: <https://invarlock.github.io/invarlock/0.12.0/assurance/00-assurance-case/>
   (repo source: `docs/assurance/00-assurance-case.md`)
-- Threat model: <https://invarlock.github.io/invarlock/0.11.0/security/threat-model/>
+- Threat model: <https://invarlock.github.io/invarlock/0.12.0/security/threat-model/>
 
 ## Community
 
