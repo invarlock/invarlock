@@ -64,7 +64,7 @@ def test_core_docs_do_not_promote_removed_top_level_commands():
     for rel_path in surfaces:
         text = _read(rel_path)
         for needle in banned:
-            assert needle not in text, f"{needle} still promoted in {rel_path}"
+            assert needle not in text, f"{needle} still documented in {rel_path}"
 
 
 def test_public_compare_examples_use_baseline_subject_terms() -> None:
@@ -105,7 +105,7 @@ def test_support_surfaces_use_host_mode_assurance_for_public_evaluate_examples()
             f"--execution-mode host missing from {rel_path}"
         )
         assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" not in text, (
-            f"legacy host-execution env still promoted in {rel_path}"
+            f"legacy host-execution env still documented in {rel_path}"
         )
 
 

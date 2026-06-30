@@ -187,11 +187,23 @@ def _execute_attempt_core(
                 prefer_local_files_only=prefer_local_files_only,
             )
     except snapshot_restore_failed_type as exc:
+        reload_fallback_already_attempted = bool(
+            execution_state.snapshot_provenance.get("restore_failed")
+        )
         execution_state.snapshot_provenance["restore_failed"] = True
         free_model_memory_fn(execution_state.model)
         execution_state.model = None
         execution_state.restore_fn = None
         emit_diagnostic(code="snapshot_restore_fallback", error=str(exc))
+        if retry_controller is None and not reload_fallback_already_attempted:
+            return _AttemptExecutionState(
+                attempt=attempt,
+                edit_config=edit_config,
+                guard_overhead_payload=None,
+                core_report=None,
+                model=execution_state.model,
+                should_continue=True,
+            )
         retry_transition = decide_failed_retry_transition_fn(
             retry_controller,
             attempt=attempt,

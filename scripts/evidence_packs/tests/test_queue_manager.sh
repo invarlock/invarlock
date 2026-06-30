@@ -34,7 +34,7 @@ test_claim_complete_fail_and_retry_transitions() {
     t1="$(add_task "SETUP_BASELINE" "org/model" "model" "14" "none" '{}' "50")"
 
     # pending -> ready
-    assert_eq "1" "$(resolve_dependencies)" "no-deps task promoted"
+    assert_eq "1" "$(resolve_dependencies)" "no-deps task moved to ready"
     assert_file_exists "${QUEUE_DIR}/ready/${t1}.task" "task in ready"
 
     # ready -> running
@@ -84,14 +84,14 @@ test_resolve_dependencies_filters_non_calibration_tasks_in_calibration_only_mode
     local eval_id
     eval_id="$(add_task "EVAL_BASELINE" "org/model" "model" "14" "${setup_id}" '{}' "50")"
 
-    assert_eq "1" "$(resolve_dependencies)" "setup task promoted"
+    assert_eq "1" "$(resolve_dependencies)" "setup task moved to ready"
     assert_file_exists "${QUEUE_DIR}/ready/${setup_id}.task" "setup ready"
     assert_file_exists "${QUEUE_DIR}/pending/${eval_id}.task" "eval remains pending until deps met"
 
     claim_task "${setup_id}" "0" >/dev/null
     complete_task "${setup_id}" >/dev/null
 
-    assert_eq "0" "$(resolve_dependencies)" "eval not promoted under calibration-only"
+    assert_eq "0" "$(resolve_dependencies)" "eval not moved to ready under calibration-only"
     assert_file_exists "${QUEUE_DIR}/pending/${eval_id}.task" "eval still pending"
     [[ ! -f "${QUEUE_DIR}/ready/${eval_id}.task" ]] || t_fail "eval should not be ready under calibration-only"
 }
@@ -1904,7 +1904,7 @@ test_queue_dependency_cancellation_rechecks_age_and_updates_progress() {
     assert_eq "1" "${progress_updates}" "progress updated after cancellation"
 }
 
-test_queue_dependency_promotion_and_demote_branches_under_calibrate_only() {
+test_queue_dependency_ready_transition_and_demote_branches_under_calibrate_only() {
     mock_reset
     # shellcheck source=../queue_manager.sh
     source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/queue_manager.sh"
@@ -1919,8 +1919,8 @@ test_queue_dependency_promotion_and_demote_branches_under_calibrate_only() {
     jq -n '{task_id:"blocked", task_type:"EVAL_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${QUEUE_DIR}/pending/blocked.task"
 
-    assert_eq "1" "$(resolve_dependencies)" "only calibration task promoted"
-    assert_file_exists "${QUEUE_DIR}/ready/allowed.task" "allowed task promoted"
+    assert_eq "1" "$(resolve_dependencies)" "only calibration task moved to ready"
+    assert_file_exists "${QUEUE_DIR}/ready/allowed.task" "allowed task moved to ready"
     assert_file_exists "${QUEUE_DIR}/pending/blocked.task" "blocked task stays pending"
 
     mv "${QUEUE_DIR}/pending/blocked.task" "${QUEUE_DIR}/ready/blocked.task"
@@ -2116,7 +2116,7 @@ test_queue_manager_remaining_core_dependency_and_lifecycle_branches() {
             > "${QUEUE_DIR}/pending/child.task"
 
         update_dependents "dep"
-        assert_file_exists "${QUEUE_DIR}/ready/child.task" "dependent promoted when completed dependency is present"
+        assert_file_exists "${QUEUE_DIR}/ready/child.task" "dependent moved to ready when completed dependency is present"
     )
 
     (

@@ -1,25 +1,25 @@
 {
-  "schema": "invarlock.runtime_backend_compat.cuda128.hash_inventory.v1",
+  "schema": "invarlock.runtime_backend_compatibility.cuda128.hash_inventory.v1",
   "status": "completed",
   "evidence_scope": "runtime backend build/import smoke compatibility only; no model-quality or assurance claim",
   "artifacts": [
     {
       "artifact": "readme",
       "path": "README.md",
-      "bytes": 615,
-      "sha256": "sha256:3633b51fbb5a8acb62e91400b1a4b12ed43a2e69a7a238e49d8ab95288e7d567"
+      "bytes": 612,
+      "sha256": "sha256:ccf5a8c53b6fa24117dc6e292db7bf33a22a9cbfc2bb781d2484a11676748ad4"
     },
     {
       "artifact": "compatibility_summary",
       "path": "compatibility_summary.json",
-      "bytes": 5294,
-      "sha256": "sha256:26c9e4a7000157d523c3cf83974d8b3d9dab23a0e7c2dbdfce87a722a6d17f1c"
+      "bytes": 5301,
+      "sha256": "sha256:6a42cb3db9975e444db42844a51d780fdbf1dd926dda7ac16366695e311b2963"
     },
     {
       "artifact": "evidence_meta",
       "path": "evidence.meta.json",
-      "bytes": 642,
-      "sha256": "sha256:d58ab0a38e65a798432ef55ed62e4ac52a75978d74773b2aba031572c9d03ee5"
+      "bytes": 644,
+      "sha256": "sha256:1d5a889cfe89a65b9aa18e0539f5f0c2529a2f9971260dc43d2b8c8bff350775"
     }
   ]
 }

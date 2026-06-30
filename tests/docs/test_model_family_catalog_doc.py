@@ -29,9 +29,9 @@ def test_model_family_catalog_doc_matches_contract_sections() -> None:
         "Declared Support": payload["declared_support"],
         "Implemented Coverage": payload["implemented_coverage"],
         "Usage Only": payload["usage_only"],
-        "<=14B Text Candidate Inventory": payload["promotion_candidates_text_le_14b"][
-            "candidates"
-        ],
+        "<=14B Text Candidate Inventory": payload[
+            "published_basis_candidates_text_le_14b"
+        ]["candidates"],
         "Recommended Additions": payload["recommended_additions"],
     }
 
@@ -45,28 +45,28 @@ def test_model_family_catalog_doc_matches_contract_sections() -> None:
         assert entry["priority"] in recommended_text
         assert entry["planned_support_mode"] in recommended_text
 
-    promotion_text = _section(doc_text, "<=14B Text Candidate Inventory")
-    for entry in payload["promotion_candidates_text_le_14b"]["candidates"]:
-        assert entry["decision"] in promotion_text
+    candidate_text = _section(doc_text, "<=14B Text Candidate Inventory")
+    for entry in payload["published_basis_candidates_text_le_14b"]["candidates"]:
+        assert entry["decision"] in candidate_text
 
     assert (
         "| Qwen2.5 7B causal LM | `Qwen/Qwen2.5-7B` | "
-        "`promoted_published_basis` | `published_basis` |" in promotion_text
+        "`published_basis_complete` | `published_basis` |" in candidate_text
     )
     assert (
         "| Qwen2.5 14B causal LM | `Qwen/Qwen2.5-14B` | "
-        "`promoted_published_basis` | `published_basis` |" in promotion_text
+        "`published_basis_complete` | `published_basis` |" in candidate_text
     )
     assert (
         "| Qwen3 8B causal LM | `Qwen/Qwen3-8B` | "
-        "`promoted_published_basis` | `published_basis` |" in promotion_text
+        "`published_basis_complete` | `published_basis` |" in candidate_text
     )
     assert (
         "| DeepSeek-R1-Distill-Qwen causal LM | "
         "`deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` | "
-        "`promoted_published_basis` | `published_basis` |" in promotion_text
+        "`published_basis_complete` | `published_basis` |" in candidate_text
     )
     assert (
         "| Phi-4 reasoning-plus causal LM | `microsoft/Phi-4-reasoning-plus` | "
-        "`promoted_published_basis` | `published_basis` |" in promotion_text
+        "`published_basis_complete` | `published_basis` |" in candidate_text
     )

@@ -77,7 +77,7 @@ invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000
 - `lib/queue/queue_manager.sh`: compatibility facade for queue state, dependency, and task-generation modules.
 - `lib/queue/queue_core.sh`: queue setup, locking, summaries, and terminal-state helpers.
 - `lib/queue/queue_lifecycle.sh`: task state transitions and orphan reclamation.
-- `lib/queue/queue_dependencies.sh`: dependency resolution and dependent promotion.
+- `lib/queue/queue_dependencies.sh`: dependency resolution and dependent ready-state transitions.
 - `lib/queue/queue_memory_plan.sh`: profile-based memory refresh and memory-plan export.
 - `lib/queue/queue_generation.sh`: progress state, task search, and task graph generation.
 - `lib/queue/scheduler.sh`: compatibility facade for scheduler modules.

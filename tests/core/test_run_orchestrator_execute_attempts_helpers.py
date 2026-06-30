@@ -121,6 +121,144 @@ def test_execute_attempt_core_continues_after_retryable_restore_failure() -> Non
     assert transitions[0][0] == "retry_failure"
 
 
+def test_execute_attempt_core_falls_back_to_reload_without_retry_controller() -> None:
+    diagnostics: list[dict[str, object]] = []
+    freed_models: list[object | None] = []
+    retry_decisions: list[object] = []
+
+    execution_state = _RunExecutionState(
+        runner=object(),
+        auto_config={},
+        edit_config={"alpha": 1},
+        model=object(),
+        restore_fn=object(),
+        snapshot_tmpdir=None,
+        snapshot_provenance={"restore_failed": False, "reload_path_used": False},
+        skip_model_load=False,
+        emitted_skip_overhead_warning=False,
+    )
+
+    result = _execute_attempt_core(
+        attempt=1,
+        max_attempts=1,
+        retry_controller=None,
+        seed_bundle={"python": 7},
+        seed_value=7,
+        edit_op=SimpleNamespace(name="noop"),
+        cfg=object(),
+        adapter=object(),
+        run_config=object(),
+        guards=[],
+        calibration_data=[],
+        preview_count=1,
+        final_count=1,
+        resolved_device="cpu",
+        profile_normalized="dev",
+        guard_overhead_threshold=0.01,
+        skip_overhead=False,
+        skip_overhead_source=None,
+        measure_guard_overhead=False,
+        resolved_loss_type="ce",
+        prefer_local_files_only=False,
+        execution_state=execution_state,
+        adjust_edit_params_fn=lambda *_args, **_kwargs: SimpleNamespace(
+            params={"alpha": 1}, diagnostics=()
+        ),
+        run_bare_control_fn=lambda **_kwargs: None,
+        execute_guarded_run_fn=lambda **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("restore failed")
+        ),
+        snapshot_restore_failed_type=RuntimeError,
+        build_restore_failure_attempt_summary_fn=lambda: {},
+        decide_failed_retry_transition_fn=lambda *_args, **_kwargs: (
+            retry_decisions.append(object())
+        ),
+        free_model_memory_fn=lambda model: freed_models.append(model),
+        emit=lambda _event: None,
+        emit_transition=lambda *_args, **_kwargs: None,
+        emit_diagnostic=lambda **kwargs: diagnostics.append(kwargs),
+        halt=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("halt should not run")
+        ),
+        record_timed_step=lambda _label: _TimedStep(),
+    )
+
+    assert result.should_continue is True
+    assert result.attempt == 1
+    assert execution_state.model is None
+    assert execution_state.restore_fn is None
+    assert execution_state.snapshot_provenance["restore_failed"] is True
+    assert len(freed_models) == 1
+    assert diagnostics[0]["code"] == "snapshot_restore_fallback"
+    assert retry_decisions == []
+
+
+def test_execute_attempt_core_halts_after_repeated_reload_restore_failure() -> None:
+    execution_state = _RunExecutionState(
+        runner=object(),
+        auto_config={},
+        edit_config={},
+        model=object(),
+        restore_fn=object(),
+        snapshot_tmpdir=None,
+        snapshot_provenance={"restore_failed": True, "reload_path_used": False},
+        skip_model_load=False,
+        emitted_skip_overhead_warning=False,
+    )
+    halted: list[tuple[str, dict[str, object]]] = []
+
+    with pytest.raises(RuntimeError, match="halted"):
+        _execute_attempt_core(
+            attempt=1,
+            max_attempts=1,
+            retry_controller=None,
+            seed_bundle={"python": 7},
+            seed_value=7,
+            edit_op=SimpleNamespace(name="noop"),
+            cfg=object(),
+            adapter=object(),
+            run_config=object(),
+            guards=[],
+            calibration_data=[],
+            preview_count=1,
+            final_count=1,
+            resolved_device="cpu",
+            profile_normalized="dev",
+            guard_overhead_threshold=0.01,
+            skip_overhead=False,
+            skip_overhead_source=None,
+            measure_guard_overhead=False,
+            resolved_loss_type="ce",
+            prefer_local_files_only=False,
+            execution_state=execution_state,
+            adjust_edit_params_fn=lambda *_args, **_kwargs: SimpleNamespace(
+                params={}, diagnostics=()
+            ),
+            run_bare_control_fn=lambda **_kwargs: None,
+            execute_guarded_run_fn=lambda **_kwargs: (_ for _ in ()).throw(
+                RuntimeError("restore failed again")
+            ),
+            snapshot_restore_failed_type=RuntimeError,
+            build_restore_failure_attempt_summary_fn=lambda: {},
+            decide_failed_retry_transition_fn=lambda *_args, **_kwargs: SimpleNamespace(
+                should_retry=False,
+                next_attempt=1,
+                diagnostics=(),
+            ),
+            free_model_memory_fn=lambda _model: None,
+            emit=lambda _event: None,
+            emit_transition=lambda *_args, **_kwargs: None,
+            emit_diagnostic=lambda **_kwargs: None,
+            halt=lambda code, **kwargs: (
+                halted.append((code, kwargs)),
+                (_ for _ in ()).throw(RuntimeError("halted")),
+            )[1],
+            record_timed_step=lambda _label: _TimedStep(),
+        )
+
+    assert halted[0][0] == "snapshot_restore_failed"
+
+
 def test_execute_attempt_core_halts_with_default_failed_status_message() -> None:
     execution_state = _RunExecutionState(
         runner=object(),

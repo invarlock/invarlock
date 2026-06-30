@@ -418,7 +418,7 @@ EOF
         local deps_moved=0
         deps_moved=$(resolve_dependencies 2>/dev/null) || deps_moved=0
         if [[ ${deps_moved} -gt 0 ]]; then
-            log "Monitor: Promoted ${deps_moved} task(s) from pending to ready queue"
+            log "Monitor: Moved ${deps_moved} task(s) from pending to ready queue"
         fi
         local deps_canceled=0
         if type cancel_tasks_with_failed_dependencies &>/dev/null; then

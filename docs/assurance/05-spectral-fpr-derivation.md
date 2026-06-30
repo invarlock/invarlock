@@ -66,7 +66,7 @@ rate.
   FFN, attention, embeddings, and other 2-D weights are all monitored. The
   Gaussian-tail FPR interpretation is defensible only for families with a
   matching null calibration basis. In the packaged pilot basis that means the
-  GPT-2/BERT-calibrated high-kappa families; newly promoted published-basis
+  GPT-2/BERT-calibrated high-kappa families; new published-basis
   causal LMs may expose `attn` cap hits in no-op reports and should treat the
   transferred attention cap as a budgeted sentinel until κ is recalibrated for
   that family. The lower `embed` and `other` caps are sentinel thresholds and
