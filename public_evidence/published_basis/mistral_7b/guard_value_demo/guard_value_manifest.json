@@ -3,8 +3,8 @@
   "files": [
     {
       "path": "README.md",
-      "sha256": "6604eda2b2fb9c2118673f17100289a6ba6f6be1bca2c4646c56bf54c7c4ff22",
-      "size_bytes": 2177
+      "sha256": "bf424e4195b55682100fc47ac9fdd72364536ef6e3323861b8a433a409d3477a",
+      "size_bytes": 2505
     },
     {
       "path": "artifact_package/logs/run_pack.log",

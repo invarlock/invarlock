@@ -20,11 +20,14 @@ def test_training_evidence_campaign_summary_is_public_safe() -> None:
     assert summary["evidence_scope"] == (
         "empirical training evidence only; no new assurance claim"
     )
+    assert "hash-pinned validation outputs" in summary["artifact_availability"]
+    assert "hash-pinned validation outputs" in summary["public_artifact_policy"]
     assert summary["weights_vendored"] is False
     assert (
         inventory["schema"] == "invarlock.training_evidence_campaign.hash_inventory.v1"
     )
     assert inventory["status"] == "completed"
+    assert "hash-pinned validation outputs" in inventory["artifact_availability"]
     assert inventory["weights_vendored"] is False
     assert {lane["target"] for lane in summary["lanes"]} == {
         "peft_lora",

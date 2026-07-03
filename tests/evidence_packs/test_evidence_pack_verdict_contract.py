@@ -92,8 +92,8 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
             validation=shared_validation,
         )
 
-    # Stress edits (6): two catastrophic required to FAIL, three informational,
-    # and FP8 as a PM-pass spectral-intervention demonstration.
+    # Stress edits (6): two catastrophic required to FAIL and four informational,
+    # with FP8 retained as a historical PM-pass spectral-intervention report.
     for edit in ("prune_50pct_stress", "svd_rank32_stress"):
         write_cert(
             model_dir / "reports" / edit / "run_1" / "evaluation.report.json",
@@ -205,6 +205,29 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
         invariants_status="pass",
         spectral_caps_applied=2,
     )
+    targeted_spectral_cert = (
+        model_dir
+        / "reports"
+        / "errors"
+        / "spectral_moderate_scale_mlp_l31_up_s112"
+        / "evaluation.report.json"
+    )
+    write_cert(
+        targeted_spectral_cert,
+        validation={
+            "invariants_pass": True,
+            "primary_metric_acceptable": True,
+            "spectral_stable": True,
+            "rmt_stable": True,
+            "preview_final_drift_acceptable": True,
+            "guard_overhead_acceptable": True,
+        },
+        invariants_status="pass",
+        spectral_caps_applied=1,
+        spectral_violations=[
+            ("model.layers.31.mlp.up_proj", "ffn", 3.9),
+        ],
+    )
 
     ve_cert = (
         model_dir
@@ -248,13 +271,13 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     assert counts["models_total"] == 1
     assert counts["clean_total"] == 6
     assert counts["stress_total"] == 6
-    assert counts["error_injection_total"] == 12
+    assert counts["error_injection_total"] == 13
     assert counts["informational_stress_signaled"] == 3
     assert counts["primary_guard_required_scenarios"] == 6
     assert counts["primary_guard_required_hits"] == 6
 
     guard_summary = verdict["guard_signal_summary"]
-    assert guard_summary["records_total"] == 24
+    assert guard_summary["records_total"] == 25
     signals = guard_summary["signals"]
     assert signals["primary_metric"]["flagged"] == 13
     assert signals["primary_metric"]["unique"] == 4
@@ -268,7 +291,7 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     assert signals["variance"]["unique"] == 1
 
     interventions = verdict["guard_intervention_summary"]["signals"]
-    assert interventions["spectral_caps"]["flagged"] == 2
+    assert interventions["spectral_caps"]["flagged"] == 3
     assert interventions["ve_signal"]["flagged"] == 1
 
     category = verdict["category_summary"]
@@ -276,7 +299,7 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     assert category["clean"]["any_flag"] == 0
     assert category["stress"]["reports"] == 6
     assert category["stress"]["any_flag"] == 5
-    assert category["error_injection"]["reports"] == 12
+    assert category["error_injection"]["reports"] == 13
     assert category["error_injection"]["any_flag"] == 11
     assert verdict["manifest"]["path"] == "scripts/evidence_packs/scenarios.json"
     for record in verdict["records"]:
@@ -402,8 +425,8 @@ def test_verdict_contract_enforces_informational_stress_signal_fraction(
             },
         )
 
-    # Informational stress edit intentionally PASSes here to drive signal
-    # fraction to 0.0; FP8 still satisfies its required PM-pass guard signal.
+    # Informational stress edits intentionally PASS here to drive signal
+    # fraction to 0.0; FP8 is historical context, not a required guard signal.
     write_cert(
         model_dir
         / "reports"
@@ -466,7 +489,7 @@ def test_verdict_contract_enforces_informational_stress_signal_fraction(
 
     verdict = run_verdict(repo_root, output_dir)
     assert verdict["verdict"] == "FAIL"
-    assert verdict["counts"]["informational_stress_total"] == 1
+    assert verdict["counts"]["informational_stress_total"] == 2
     assert verdict["counts"]["informational_stress_signaled"] == 0
     assert any(
         req.get("requirement") == "informational_stress_min_signal_fraction"

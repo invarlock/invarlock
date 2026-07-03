@@ -64,6 +64,8 @@ def test_training_evidence_campaign_dry_run_writes_public_safe_summary(
     assert summary["campaign_id"] == "training-evidence-test"
     assert summary["status"] == "planned"
     assert summary["evidence_scope"] == module.EVIDENCE_SCOPE
+    assert summary["artifact_availability"] == module.ARTIFACT_AVAILABILITY
+    assert summary["public_artifact_policy"] == module.PUBLIC_ARTIFACT_POLICY
     assert summary["weights_vendored"] is False
     assert {lane["target"] for lane in summary["lanes"]} == {
         "peft_lora",
@@ -91,6 +93,7 @@ def test_training_evidence_campaign_dry_run_writes_public_safe_summary(
         "campaign_id": "training-evidence-test",
         "status": "planned",
         "evidence_scope": module.EVIDENCE_SCOPE,
+        "artifact_availability": module.ARTIFACT_AVAILABILITY,
         "weights_vendored": False,
         "artifacts": [],
     }
