@@ -323,9 +323,11 @@ def test_mistral_guard_value_scenarios_cover_rmt_and_variance_sidecars() -> None
 
     rmt = by_id["rmt_norm_noise_l31_ffn_up_b030"]
     assert rmt["primary_guard"] == "rmt"
+    assert rmt["strictness"] == "must_detect"
     assert "mistral_guard_value" in rmt["suites"]
     rmt_requirements = rmt["requirements"]
     assert isinstance(rmt_requirements, dict)
+    assert rmt_requirements["primary_guard_required"] is True
     rmt_detectors = rmt_requirements["detectors_all_of"]
     assert {
         "kind": "rmt_probe",
@@ -339,9 +341,11 @@ def test_mistral_guard_value_scenarios_cover_rmt_and_variance_sidecars() -> None
 
     variance = by_id["ve_mlp_scale_skew_l31_down_s090"]
     assert variance["primary_guard"] == "variance"
+    assert variance["strictness"] == "must_detect"
     assert "mistral_guard_value" in variance["suites"]
     ve_requirements = variance["requirements"]
     assert isinstance(ve_requirements, dict)
+    assert ve_requirements["primary_guard_required"] is True
     ve_detectors = ve_requirements["detectors_all_of"]
     assert {
         "kind": "ve_probe",

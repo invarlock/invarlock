@@ -1142,7 +1142,7 @@
       ],
       "category": "error_injection",
       "failure_class": "rmt.targeted_ffn_anisotropy",
-      "strictness": "informational",
+      "strictness": "must_detect",
       "intent": "subtle_detectable",
       "primary_guard": "rmt",
       "generation": {
@@ -1164,6 +1164,7 @@
         }
       },
       "requirements": {
+        "primary_guard_required": true,
         "detectors_all_of": [
           {
             "kind": "validation_flag",
@@ -1210,7 +1211,7 @@
       ],
       "category": "error_injection",
       "failure_class": "variance.targeted_mlp_scale_skew",
-      "strictness": "informational",
+      "strictness": "must_detect",
       "intent": "subtle_detectable",
       "primary_guard": "variance",
       "generation": {
@@ -1225,6 +1226,7 @@
         }
       },
       "requirements": {
+        "primary_guard_required": true,
         "detectors_all_of": [
           {
             "kind": "validation_flag",
