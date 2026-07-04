@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from invarlock.evidence_pack import (
@@ -304,7 +304,8 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
         == "27d67f1b5f57dc0953326b2601d68371d40ea8da"
     )
     assert final_verdict["verdict"] == "PASS"
-    assert final_verdict["counts"]["records_total"] == 6
+    assert final_verdict["counts"]["records_total"] == 5
+    assert final_verdict["counts"]["error_injection_total"] == 4
     assert final_verdict["counts"]["primary_guard_required_hits"] == 1
     assert final_verdict["counts"]["error_injection_detected"] == 3
     assert (
@@ -324,13 +325,20 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
         "artifact_package/reports/errors/"
         "spectral_moderate_scale_attn_l31_o_s105/evaluation.report.json",
         "artifact_package/reports/errors/"
-        "spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json",
-        "artifact_package/reports/errors/"
         "rmt_norm_noise_l31_ffn_up_b030/evaluation.report.json",
         "artifact_package/reports/errors/"
         "ve_mlp_scale_skew_l31_down_s090/evaluation.report.json",
     }
     assert expected_manifest_paths <= manifest_paths
+    packaged_attn_reports = {
+        PurePosixPath(path).parts[3]
+        for path in manifest_paths
+        if path.startswith(
+            "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_"
+        )
+        and path.endswith("/evaluation.report.json")
+    }
+    assert packaged_attn_reports == {"spectral_moderate_scale_attn_l31_o_s105"}
     for entry in manifest["files"]:
         path = demo_dir / entry["path"]
         assert path.is_file(), entry["path"]
@@ -373,11 +381,8 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
     control_report_path = demo_dir / control["report"]
     _load_valid_primary_ok_report(control_report_path)
     _assert_report_verifies(control_report_path)
-
-    margin_control = summary["margin_policy_control"]
-    assert margin_control["scenario_id"] == "spectral_moderate_scale_attn_l31_o_s112"
-    assert margin_control["stock_cap_clean"] is False
-    assert margin_control["target_margin_to_stock_kappa"] < 0
+    legacy_control_key = "margin" + "_policy_control"
+    assert legacy_control_key not in summary
 
     all_guard = json.loads(
         (
@@ -394,6 +399,7 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
     ]
     assert all_guard["source_run"]["host"] == "self-hosted CUDA runner"
     assert all_guard["method"]["clean_confirmation_required"] is True
+    assert legacy_control_key not in all_guard["guard_results"]["spectral"]
     assert (
         summary["all_guard_probe_sweep"]["guard_status"]["invariants"]
         == "not_a_statistical_margin_sweep"
@@ -451,6 +457,11 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
         if record.get("log_packaged") is False:
             assert "not retained" in record["log_note"]
     records = {record["scenario_id"]: record for record in sweep["records"]}
+    assert {
+        record["scale_factor"]
+        for record in sweep["records"]
+        if record.get("target", {}).get("family") == "attn"
+    } == {1.05, 1.18, 1.25}
     assert (
         records["spectral_moderate_scale_mlp_l31_up_s112"]["baseline_relative_guard"][
             "new_caps_applied"
@@ -469,12 +480,6 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
             "target_margin_to_stock_kappa"
         ]
         > 0.2
-    )
-    assert (
-        records["spectral_moderate_scale_attn_l31_o_s112"]["baseline_relative_guard"][
-            "new_caps_applied"
-        ]
-        == 0
     )
     assert (
         records["spectral_moderate_scale_attn_l31_o_s118"]["spectral_caps_applied"] == 3

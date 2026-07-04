@@ -106,9 +106,7 @@ That artifact includes a Mistral 7B targeted spectral probe where the primary
 metric passes, but the evidence-pack guard-value comparison records a new FFN
 spectral cap relative to the published noop basis. It also includes a selected
 attention 1.05x negative control that passes PM, adds no new baseline-relative
-cap, and keeps the edited target below the documented stock attention cap. The
-older attention 1.12x record is retained only as margin-policy context and
-should not be reused as the stock-cap-clean negative-control claim.
+cap, and keeps the edited target below the documented stock attention cap.
 
 ## Development Fallback
 

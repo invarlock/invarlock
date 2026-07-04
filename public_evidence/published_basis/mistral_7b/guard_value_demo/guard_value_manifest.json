@@ -3,8 +3,8 @@
   "files": [
     {
       "path": "README.md",
-      "sha256": "6e6757c059d741da448c6ddca7a53b1055505baee33073351a48ab0ca1c7b795",
-      "size_bytes": 2648
+      "sha256": "eeead05fbd461a140a48d0ae39d752afb915091fc2881665c96537cbd4e74b37",
+      "size_bytes": 2360
     },
     {
       "path": "artifact_package/logs/run_pack.log",
@@ -108,7 +108,7 @@
     },
     {
       "path": "artifact_package/reports/category_summary.json",
-      "sha256": "72fd6514168109b8bbc3e590ab5237130c3f5e546910ce5b0d80ae651cf192f0",
+      "sha256": "339a72d231dc4fb3995917e611a656d03fb6d752b007169975f47cf75ce3bf2e",
       "size_bytes": 482
     },
     {
@@ -192,31 +192,6 @@
       "size_bytes": 954
     },
     {
-      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/config_root/runtime/profiles/ci.yaml",
-      "sha256": "f27ccff9c1a9f6d81f0072afb3985ca3c5f894d5cf3a5d061d91a1a323743e26",
-      "size_bytes": 226
-    },
-    {
-      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluate_timing.json",
-      "sha256": "18544202fb8a1dd1b7fe52ab183dfc19ee70e5b35141fbffa21176f9ab785ca0",
-      "size_bytes": 1565
-    },
-    {
-      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json",
-      "sha256": "187743c8e58390cb28540d7a3f4d6d058bfab3dda61ce7fd5e58d643b1897e9f",
-      "size_bytes": 8902283
-    },
-    {
-      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/runtime.manifest.json",
-      "sha256": "efb5c7e6cc586b31cdc0bc5fd95b2bb95ca62f67757c5c74db6f63fb82d842d7",
-      "size_bytes": 1082
-    },
-    {
-      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/runtime_inputs/calibrated_preset_mistralai__mistral-7b-v01.yaml",
-      "sha256": "17b9d7a5d3b5787a9ad66ad74ec43bac68b04d963a39024d79b36d271081e8bf",
-      "size_bytes": 953
-    },
-    {
       "path": "artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/config_root/runtime/profiles/ci.yaml",
       "sha256": "f27ccff9c1a9f6d81f0072afb3985ca3c5f894d5cf3a5d061d91a1a323743e26",
       "size_bytes": 226
@@ -268,12 +243,12 @@
     },
     {
       "path": "artifact_package/reports/final_verdict.json",
-      "sha256": "839fe21daed23326d145a53c16ccbc0906bee950bda0bd9eb7312e4f468b3877",
-      "size_bytes": 17580
+      "sha256": "672b79065d6883f34b802f0656dc45216634faa5f68d9acca43e555328bcc197",
+      "size_bytes": 14696
     },
     {
       "path": "artifact_package/reports/final_verdict.txt",
-      "sha256": "4c3f671000b18c57056bd2e1cb86cb1b6b8df13c948ee0576e7bdedde9694ad7",
+      "sha256": "0651ac4f239bd7e07c9a62a9806ade783fd93a64ba6c8bbcbae9479a4ebd495f",
       "size_bytes": 426
     },
     {
@@ -298,28 +273,28 @@
     },
     {
       "path": "artifact_package/reports/guard_intervention_summary.json",
-      "sha256": "e4d2026712a855c9603f544da7a6785be5dba9e6dc8821d9348535ccd783863c",
+      "sha256": "dfabb20582d1a6419bdc4ae6d973191c01c920fdba83ec2b5b10d82b34cb23ef",
       "size_bytes": 176
     },
     {
       "path": "artifact_package/reports/guard_signal_summary.json",
-      "sha256": "1556f11b77031052ae43323ca8476549f7ab1a80af94f9bbffaf3ff42c3dc6f0",
+      "sha256": "a20557275c7fe66b22d6be7b0ac9b3fb7e605d322d8ccaba76241640cd936074",
       "size_bytes": 362
     },
     {
       "path": "artifact_package/reports/guard_value_all_guard_probe_sweep.json",
-      "sha256": "233801bf1348267fe735b09950b42ce9427af49c4a3b30d2fdc470280ae3b169",
-      "size_bytes": 14726
+      "sha256": "f392b182e73a143db35e9abe87dee7c0bbed3cf90816680a3753b1e0d1b27142",
+      "size_bytes": 13318
     },
     {
       "path": "artifact_package/reports/guard_value_probe_sweep.json",
-      "sha256": "b80631cf038b55228bfd15c45d022e5c79138ec51ae782ec3734c541aec7f2cc",
-      "size_bytes": 16435
+      "sha256": "6a819451cc8dec9f3a88d2d93336fb4594839c4d6aff24910dd5bc464c2609e3",
+      "size_bytes": 14007
     },
     {
       "path": "artifact_package/reports/scenario_signal_summary.json",
-      "sha256": "864702e784064e9603dda9e39b9ceb000e41dd28e56a4c5df9af7d2e5dd33728",
-      "size_bytes": 2069
+      "sha256": "20c9682acc7caef0cd1d0f233780df4eeb00b3a4866b80bdcccb0f15edb2951d",
+      "size_bytes": 1710
     },
     {
       "path": "artifact_package/state/model_revisions.json",
@@ -328,8 +303,8 @@
     },
     {
       "path": "artifact_package/state/scenarios.json",
-      "sha256": "7bdcd5b57e2ea0072cbe607069c8a25b078ba9ed85b90bc187aeaef86e25024d",
-      "size_bytes": 9861
+      "sha256": "53cb3fe5bcfaeca4d553c4177d345c57ca96e4912a206c8a20f2e998b9ec8909",
+      "size_bytes": 8232
     },
     {
       "path": "artifact_package/state/tuned_edit_params.json",
@@ -338,13 +313,13 @@
     },
     {
       "path": "evidence.meta.json",
-      "sha256": "2f25a24c2b97b6638404789be051c63552354afc7ddb6afebd8c0918661c223e",
-      "size_bytes": 2854
+      "sha256": "aeae88e7f03ef244a1162eb526cba5e1d730e23d369ac7624d80a4214c652dc7",
+      "size_bytes": 2751
     },
     {
       "path": "guard_value_summary.json",
-      "sha256": "e1215a254d3a7086a5346d5ee2ef8894f0142ac5745ebb358141b3bdc2afde6f",
-      "size_bytes": 18819
+      "sha256": "53faa1526020b964c7c96aa6c09300b75dfe3eb753e369bdbe5754f8d673813d",
+      "size_bytes": 15221
     },
     {
       "path": "run_command.txt",
@@ -366,7 +341,6 @@
     ],
     "scenario_ids": [
       "rmt_norm_noise_l31_ffn_up_b030",
-      "spectral_moderate_scale_attn_l31_o_s112",
       "spectral_moderate_scale_attn_l31_o_s105",
       "spectral_moderate_scale_attn_l31_o_s118",
       "spectral_moderate_scale_attn_l31_o_s125",

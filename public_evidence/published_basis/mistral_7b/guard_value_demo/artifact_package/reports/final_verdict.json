@@ -39,7 +39,7 @@
     "clean_pass": 0,
     "clean_total": 0,
     "error_injection_detected": 3,
-    "error_injection_total": 5,
+    "error_injection_total": 4,
     "informational_stress_fail": 0,
     "informational_stress_signaled": 0,
     "informational_stress_total": 1,
@@ -48,7 +48,7 @@
     "primary_guard_required_records": 1,
     "primary_guard_required_scenarios": 1,
     "primary_guard_required_scenarios_hit": 1,
-    "records_total": 6,
+    "records_total": 5,
     "stress_fail": 0,
     "stress_total": 1
   },
@@ -387,79 +387,6 @@
       "intent": "negative_control",
       "invariants_status": "pass",
       "model": "mistralai__mistral-7b-v01",
-      "name": "spectral_moderate_scale_attn_l31_o_s112",
-      "passed": true,
-      "path": "<validation-output-root>/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json",
-      "primary_guard": "spectral",
-      "primary_guard_baseline_relative_required": false,
-      "primary_guard_hit": false,
-      "primary_guard_required": false,
-      "reasons": [],
-      "run_num": 0,
-      "spectral_baseline_relative": {
-        "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
-        "baseline_spectral_caps_applied": 2,
-        "delta_caps_applied": 0,
-        "matching_capped_modules": [
-          {
-            "family": "attn",
-            "module": "model.layers.0.self_attn.k_proj"
-          },
-          {
-            "family": "attn",
-            "module": "model.layers.0.self_attn.q_proj"
-          }
-        ],
-        "new_capped_modules": [],
-        "new_caps_applied": 0,
-        "subject_spectral_caps_applied": 2
-      },
-      "spectral_baseline_relative_required": false,
-      "spectral_caps_applied": 2,
-      "strictness": "informational"
-    },
-    {
-      "any_core_guard_flag": false,
-      "category": "error_injection",
-      "detectors": [],
-      "detectors_all_of": [],
-      "detectors_hit": true,
-      "failure_class": "spectral.targeted_attn_scale",
-      "family": "",
-      "guard_baseline_relative": {
-        "spectral": {
-          "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
-          "baseline_spectral_caps_applied": 2,
-          "delta_caps_applied": 0,
-          "matching_capped_modules": [
-            {
-              "family": "attn",
-              "module": "model.layers.0.self_attn.k_proj"
-            },
-            {
-              "family": "attn",
-              "module": "model.layers.0.self_attn.q_proj"
-            }
-          ],
-          "new_capped_modules": [],
-          "new_caps_applied": 0,
-          "subject_spectral_caps_applied": 2
-        }
-      },
-      "guard_flags": {
-        "drift": false,
-        "invariants": false,
-        "invariants_fail": false,
-        "invariants_warn": false,
-        "overhead": false,
-        "primary_metric": false,
-        "rmt": false,
-        "spectral": false,
-        "variance": false
-      },
-      "intent": "negative_control",
-      "invariants_status": "pass",
-      "model": "mistralai__mistral-7b-v01",
       "name": "spectral_moderate_scale_attn_l31_o_s105",
       "passed": true,
       "path": "<validation-output-root>/mistral_guard_stock_clean_20260704a/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_attn_l31_o_s105/evaluation.report.json",
@@ -554,20 +481,6 @@
       "detector_hits": 1,
       "failed": 0,
       "id": "spectral_moderate_scale_attn_l31_o_s105",
-      "intent": "negative_control",
-      "passed": 1,
-      "primary_guard": "spectral",
-      "primary_guard_hits": 0,
-      "primary_guard_required": false,
-      "reports": 1,
-      "signaled": 0,
-      "strictness": "informational"
-    },
-    {
-      "category": "error_injection",
-      "detector_hits": 1,
-      "failed": 0,
-      "id": "spectral_moderate_scale_attn_l31_o_s112",
       "intent": "negative_control",
       "passed": 1,
       "primary_guard": "spectral",

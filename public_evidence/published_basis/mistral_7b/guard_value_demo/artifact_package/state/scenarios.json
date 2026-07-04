@@ -17,7 +17,7 @@
       "scale_explosion",
       "rank_collapse",
       "spectral_moderate_scale_mlp_l31_up_s112",
-      "spectral_moderate_scale_attn_l31_o_s112"
+      "spectral_moderate_scale_attn_l31_o_s105"
     ]
   },
   "scenarios": [
@@ -191,64 +191,25 @@
       ]
     },
     {
-      "id": "spectral_moderate_scale_attn_l31_o_s105",
-      "suites": [
-        "mistral_guard_value"
-      ],
+      "artifact_class": "fault_injection_fixture",
       "category": "error_injection",
+      "contains_model_weights_in_pack": false,
+      "deployable_as_hf_checkpoint": false,
       "failure_class": "spectral.targeted_attn_scale",
-      "strictness": "informational",
-      "intent": "negative_control",
-      "primary_guard": "spectral",
       "generation": {
-        "kind": "error",
-        "error_type": "spectral_moderate_scale_attn_l31_o_s105",
         "env": {
+          "INVARLOCK_SPECTRAL_INCLUDE_QKV": "0",
+          "INVARLOCK_SPECTRAL_MAX_PARAMS": "1",
           "INVARLOCK_SPECTRAL_SCALE_FACTOR": "1.05",
-          "INVARLOCK_SPECTRAL_TARGET_FAMILY": "attn",
-          "INVARLOCK_SPECTRAL_TARGET_LAYERS": "31",
-          "INVARLOCK_SPECTRAL_TARGET_PARAMS": "o_proj",
-          "INVARLOCK_SPECTRAL_MAX_PARAMS": "1",
-          "INVARLOCK_SPECTRAL_INCLUDE_QKV": "0",
-          "INVARLOCK_SPECTRAL_SEED": "11"
-        }
-      },
-      "requirements": {
-        "detectors_all_of": [
-          {
-            "kind": "validation_flag",
-            "flag": "primary_metric_acceptable",
-            "expected": true
-          }
-        ],
-        "notes": "Stock-cap-clean negative control for the Mistral guard-value sweep: a smaller attention layer31 o_proj scale that passes PM, adds no baseline-relative spectral cap, and keeps the edited target below the documented stock attention cap."
-      },
-      "artifact_class": "fault_injection_fixture",
-      "deployable_as_hf_checkpoint": false,
-      "optimized_deployment_backend": false,
-      "contains_model_weights_in_pack": false,
-      "run_directory_contains_edit_artifacts": true
-    },
-    {
-      "artifact_class": "fault_injection_fixture",
-      "category": "error_injection",
-      "contains_model_weights_in_pack": false,
-      "deployable_as_hf_checkpoint": false,
-      "failure_class": "spectral.targeted_attn_scale",
-      "generation": {
-        "env": {
-          "INVARLOCK_SPECTRAL_INCLUDE_QKV": "0",
-          "INVARLOCK_SPECTRAL_MAX_PARAMS": "1",
-          "INVARLOCK_SPECTRAL_SCALE_FACTOR": "1.12",
           "INVARLOCK_SPECTRAL_SEED": "11",
           "INVARLOCK_SPECTRAL_TARGET_FAMILY": "attn",
           "INVARLOCK_SPECTRAL_TARGET_LAYERS": "31",
           "INVARLOCK_SPECTRAL_TARGET_PARAMS": "o_proj"
         },
-        "error_type": "spectral_moderate_scale_attn_l31_o_s112",
+        "error_type": "spectral_moderate_scale_attn_l31_o_s105",
         "kind": "error"
       },
-      "id": "spectral_moderate_scale_attn_l31_o_s112",
+      "id": "spectral_moderate_scale_attn_l31_o_s105",
       "intent": "negative_control",
       "optimized_deployment_backend": false,
       "primary_guard": "spectral",
@@ -260,7 +221,7 @@
             "kind": "validation_flag"
           }
         ],
-        "notes": "Margin-policy context for the Mistral guard-value sweep: the 1.12 attention edit passes PM and adds no baseline-relative cap under the packaged policy, but the edited target is above the documented stock attention cap and must not be used as the stock-cap-clean negative control."
+        "notes": "Stock-cap-clean negative control for the Mistral guard-value sweep: a smaller attention layer31 o_proj scale that passes PM, adds no baseline-relative spectral cap, and keeps the edited target below the documented stock attention cap."
       },
       "run_directory_contains_edit_artifacts": true,
       "strictness": "informational",
@@ -274,8 +235,7 @@
   "suites": {
     "mistral_guard_value": [
       "spectral_moderate_scale_mlp_l31_up_s112",
-      "spectral_moderate_scale_attn_l31_o_s105",
-      "spectral_moderate_scale_attn_l31_o_s112"
+      "spectral_moderate_scale_attn_l31_o_s105"
     ]
   }
 }

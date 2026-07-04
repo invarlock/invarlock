@@ -68,19 +68,5 @@
     "reports": 1,
     "signaled": 0,
     "strictness": "informational"
-  },
-  {
-    "category": "error_injection",
-    "detector_hits": 1,
-    "failed": 0,
-    "id": "spectral_moderate_scale_attn_l31_o_s112",
-    "intent": "negative_control",
-    "passed": 1,
-    "primary_guard": "spectral",
-    "primary_guard_hits": 0,
-    "primary_guard_required": false,
-    "reports": 1,
-    "signaled": 0,
-    "strictness": "informational"
   }
 ]
