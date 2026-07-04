@@ -1050,6 +1050,7 @@ test_verify_pack_verify_reports_accepts_informational_error_probe_that_verifies_
     local pack_dir="${TEST_TMPDIR}/pack"
     mkdir -p "${pack_dir}/metadata"
     mkdir -p "${pack_dir}/reports/modelA/quant_4bit_clean/run_1"
+    mkdir -p "${pack_dir}/reports/modelA/errors/spectral_moderate_scale_mlp_l31_up_s112"
     mkdir -p "${pack_dir}/reports/modelA/errors/rmt_norm_noise_probe"
     cat > "${pack_dir}/metadata/scenarios.json" <<'JSON'
 {
@@ -1057,11 +1058,13 @@ test_verify_pack_verify_reports_accepts_informational_error_probe_that_verifies_
   "schema_version": 1,
   "scenarios": [
     {"id": "quant_4bit_clean", "strictness": "must_pass"},
+    {"id": "spectral_moderate_scale_mlp_l31_up_s112", "strictness": "must_detect"},
     {"id": "rmt_norm_noise_probe", "strictness": "informational"}
   ]
 }
 JSON
     echo "{}" > "${pack_dir}/reports/modelA/quant_4bit_clean/run_1/evaluation.report.json"
+    echo "{}" > "${pack_dir}/reports/modelA/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json"
     echo "{}" > "${pack_dir}/reports/modelA/errors/rmt_norm_noise_probe/evaluation.report.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
@@ -1080,6 +1083,7 @@ EOF
     run pack_verify_reports "${pack_dir}" ""
     assert_rc "0" "${RUN_RC}" "informational error probe may verify clean"
     assert_match "quant_4bit_clean/run_1/evaluation\\.report\\.json" "$(cat "${TEST_TMPDIR}/invarlock.calls")" "verifies expected-pass report"
+    assert_match "errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation\\.report\\.json" "$(cat "${TEST_TMPDIR}/invarlock.calls")" "verifies must_detect probe report"
     assert_match "errors/rmt_norm_noise_probe/evaluation\\.report\\.json" "$(cat "${TEST_TMPDIR}/invarlock.calls")" "verifies informational probe report"
     [[ "${RUN_ERR}" != *"Expected verify failure verified as passing"* ]] || t_fail "informational probe should not be expected to fail verification"
 

@@ -4,9 +4,22 @@ import json
 from pathlib import Path
 
 
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
 def _load_scenarios() -> list[dict[str, object]]:
-    repo_root = Path(__file__).resolve().parents[2]
-    path = repo_root / "scripts/evidence_packs/scenarios.json"
+    path = _repo_root() / "scripts/evidence_packs/scenarios.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return payload.get("scenarios", [])
+
+
+def _load_published_mistral_guard_value_scenarios() -> list[dict[str, object]]:
+    path = (
+        _repo_root()
+        / "public_evidence/published_basis/mistral_7b/guard_value_demo"
+        / "artifact_package/state/scenarios.json"
+    )
     payload = json.loads(path.read_text(encoding="utf-8"))
     return payload.get("scenarios", [])
 
@@ -18,7 +31,9 @@ def test_scenarios_include_intent_and_primary_guard_metadata() -> None:
         "clean_control",
         "catastrophic_failure",
         "subtle_detectable",
+        "historical_sentinel",
         "fault_detection",
+        "negative_control",
         "production_artifact_assurance",
     }
     allowed_guards = {"invariants", "primary_metric", "spectral", "rmt", "variance"}
@@ -149,7 +164,6 @@ def test_scenarios_require_direct_primary_guard_hits_for_demo_probes() -> None:
     by_id = {str(item.get("id")): item for item in scenarios}
 
     required = {
-        "fp8_e5m2_stress",
         "nan_injection",
         "extreme_quant",
         "rmt_norm_noise",
@@ -185,6 +199,38 @@ def test_scenarios_require_direct_primary_guard_hits_for_demo_probes() -> None:
             )
             assert isinstance(value, str), (
                 f"{scenario_id}: env value must be string for {key}"
+            )
+
+    fp8 = by_id["fp8_e5m2_stress"]
+    assert fp8.get("strictness") == "informational"
+    assert fp8.get("intent") == "historical_sentinel"
+    assert isinstance(fp8.get("requirements"), dict)
+    assert fp8["requirements"].get("primary_guard_required") is not True
+
+
+def test_mistral_guard_value_repo_contract_matches_published_snapshot_subset() -> None:
+    repo_by_id = {str(item.get("id")): item for item in _load_scenarios()}
+    published = _load_published_mistral_guard_value_scenarios()
+    contract_fields = (
+        "suites",
+        "category",
+        "strictness",
+        "intent",
+        "primary_guard",
+        "requirements",
+    )
+
+    assert published, "published Mistral guard-value snapshot must not be empty"
+
+    for published_scenario in published:
+        scenario_id = str(published_scenario.get("id"))
+        repo_scenario = repo_by_id.get(scenario_id)
+        assert repo_scenario is not None, (
+            f"{scenario_id}: repo manifest must retain published snapshot scenario"
+        )
+        for field in contract_fields:
+            assert repo_scenario.get(field) == published_scenario.get(field), (
+                f"{scenario_id}: repo field {field!r} must match published snapshot"
             )
 
 
@@ -277,9 +323,11 @@ def test_mistral_guard_value_scenarios_cover_rmt_and_variance_sidecars() -> None
 
     rmt = by_id["rmt_norm_noise_l31_ffn_up_b030"]
     assert rmt["primary_guard"] == "rmt"
+    assert rmt["strictness"] == "must_detect"
     assert "mistral_guard_value" in rmt["suites"]
     rmt_requirements = rmt["requirements"]
     assert isinstance(rmt_requirements, dict)
+    assert rmt_requirements["primary_guard_required"] is True
     rmt_detectors = rmt_requirements["detectors_all_of"]
     assert {
         "kind": "rmt_probe",
@@ -293,9 +341,11 @@ def test_mistral_guard_value_scenarios_cover_rmt_and_variance_sidecars() -> None
 
     variance = by_id["ve_mlp_scale_skew_l31_down_s090"]
     assert variance["primary_guard"] == "variance"
+    assert variance["strictness"] == "must_detect"
     assert "mistral_guard_value" in variance["suites"]
     ve_requirements = variance["requirements"]
     assert isinstance(ve_requirements, dict)
+    assert ve_requirements["primary_guard_required"] is True
     ve_detectors = ve_requirements["detectors_all_of"]
     assert {
         "kind": "ve_probe",

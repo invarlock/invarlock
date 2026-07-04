@@ -20,9 +20,10 @@
   ],
   "profile": "release/report-assurance",
   "schema": "invarlock.public_evidence.meta.v1",
-  "summary": "Real Mistral-7B baseline-relative guard-value demo: PM-only accepts while spectral, RMT, and variance sidecar probes each publish a reproduced guard movement.",
+  "summary": "Mistral 7B guard-value demo with PM-pass spectral, RMT, and VE guard movement plus a stock-cap-clean attention negative control.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json --profile release --assurance report",
+    "uv run invarlock verify public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s105/evaluation.report.json --profile release --assurance report",
     "uv run pytest tests/ci/test_golden_runs_offline.py::test_real_guard_value_demo_publishes_baseline_relative_spectral_catch",
     "uv run invarlock verify public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/errors/rmt_norm_noise_l31_ffn_up_b030/evaluation.report.json --profile release --assurance report",
     "uv run invarlock verify public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/errors/ve_mlp_scale_skew_l31_down_s090/evaluation.report.json --profile release --assurance report"

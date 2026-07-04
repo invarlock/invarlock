@@ -1362,7 +1362,7 @@ test_run_pack_helpers_cover_error_paths() {
     assert_rc "1" "${RUN_RC}" "malformed pack report path has no scenario id"
 
     mkdir -p "${pack_dir}/metadata" "${pack_dir}/reports/model/clean"
-    printf '%s\n' '{"scenarios":[{"id":"clean","strictness":"must_pass"},{"id":"nan_injection","strictness":"must_detect"}]}' > "${pack_dir}/metadata/scenarios.json"
+    printf '%s\n' '{"scenarios":[{"id":"clean","strictness":"must_pass"},{"id":"nan_injection","strictness":"must_detect"},{"id":"shape_mismatch","strictness":"must_fail"}]}' > "${pack_dir}/metadata/scenarios.json"
     echo "{}" > "${pack_dir}/reports/model/clean/evaluation.report.json"
     run pack_scenario_strictness "${pack_dir}" "clean"
     assert_rc "0" "${RUN_RC}" "scenario strictness resolves from metadata"
@@ -1373,7 +1373,11 @@ test_run_pack_helpers_cover_error_paths() {
 
     mkdir -p "${pack_dir}/reports/model/errors/nan_injection"
     run pack_report_expects_verify_failure "${pack_dir}" "${pack_dir}/reports/model/errors/nan_injection/evaluation.report.json"
-    assert_rc "0" "${RUN_RC}" "error-injection report expects verify failure"
+    assert_rc "1" "${RUN_RC}" "must_detect error-injection report may verify clean"
+
+    mkdir -p "${pack_dir}/reports/model/errors/shape_mismatch"
+    run pack_report_expects_verify_failure "${pack_dir}" "${pack_dir}/reports/model/errors/shape_mismatch/evaluation.report.json"
+    assert_rc "0" "${RUN_RC}" "must_fail error-injection report expects verify failure"
 
     local empty_pack_dir="${TEST_TMPDIR}/empty-pack"
     mkdir -p "${empty_pack_dir}/reports"

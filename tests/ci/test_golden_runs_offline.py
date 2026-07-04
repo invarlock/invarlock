@@ -3,7 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from typing import Any
 
 from invarlock.evidence_pack import (
     EvidencePackStatus,
@@ -24,6 +25,22 @@ def _write_json_file(path: Path, payload: object) -> None:
 
 def _sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _load_valid_primary_ok_report(path: Path) -> dict[str, Any]:
+    report = json.loads(path.read_text(encoding="utf-8"))
+    assert validate_report(report) is True
+    assert report["validation"]["primary_metric_acceptable"] is True
+    return report
+
+
+def _assert_report_verifies(path: Path, assurance_mode: str = "report") -> None:
+    result = run_verify_reports(
+        [path],
+        profile="release",
+        assurance_mode=assurance_mode,
+    )
+    assert result.outcome == VerifyOutcome.OK
 
 
 def test_published_basis_lanes_ship_public_evidence_references() -> None:
@@ -287,6 +304,8 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
         == "27d67f1b5f57dc0953326b2601d68371d40ea8da"
     )
     assert final_verdict["verdict"] == "PASS"
+    assert final_verdict["counts"]["records_total"] == 5
+    assert final_verdict["counts"]["error_injection_total"] == 4
     assert final_verdict["counts"]["primary_guard_required_hits"] == 1
     assert final_verdict["counts"]["error_injection_detected"] == 3
     assert (
@@ -298,29 +317,28 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
         == "baseline_relative_guard_value_evidence"
     )
     manifest_paths = {entry["path"] for entry in manifest["files"]}
-    assert "artifact_package/logs/run_pack.log" in manifest_paths
-    assert (
+    expected_manifest_paths = {
+        "artifact_package/logs/run_pack.log",
+        "artifact_package/reports/guard_value_all_guard_probe_sweep.json",
         "artifact_package/reports/errors/"
-        "spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json"
-        in manifest_paths
-    )
-    assert (
+        "spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json",
         "artifact_package/reports/errors/"
-        "spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json"
-        in manifest_paths
-    )
-    assert (
-        "artifact_package/reports/guard_value_all_guard_probe_sweep.json"
-        in manifest_paths
-    )
-    assert (
+        "spectral_moderate_scale_attn_l31_o_s105/evaluation.report.json",
         "artifact_package/reports/errors/"
-        "rmt_norm_noise_l31_ffn_up_b030/evaluation.report.json" in manifest_paths
-    )
-    assert (
+        "rmt_norm_noise_l31_ffn_up_b030/evaluation.report.json",
         "artifact_package/reports/errors/"
-        "ve_mlp_scale_skew_l31_down_s090/evaluation.report.json" in manifest_paths
-    )
+        "ve_mlp_scale_skew_l31_down_s090/evaluation.report.json",
+    }
+    assert expected_manifest_paths <= manifest_paths
+    packaged_attn_reports = {
+        PurePosixPath(path).parts[3]
+        for path in manifest_paths
+        if path.startswith(
+            "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_"
+        )
+        and path.endswith("/evaluation.report.json")
+    }
+    assert packaged_attn_reports == {"spectral_moderate_scale_attn_l31_o_s105"}
     for entry in manifest["files"]:
         path = demo_dir / entry["path"]
         assert path.is_file(), entry["path"]
@@ -344,25 +362,27 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
     assert comparison["strictness"] == "must_detect"
 
     positive_report_path = demo_dir / comparison["report"]
-    positive_report = json.loads(positive_report_path.read_text(encoding="utf-8"))
-    assert validate_report(positive_report) is True
-    assert positive_report["validation"]["primary_metric_acceptable"] is True
+    positive_report = _load_valid_primary_ok_report(positive_report_path)
     assert positive_report["spectral"]["caps_applied"] == 3
     assert positive_report["spectral"]["caps_applied_by_family"]["ffn"] == 1
-
-    result = run_verify_reports(
-        [positive_report_path],
-        profile="release",
-        assurance_mode="report",
-    )
-    assert result.outcome == VerifyOutcome.OK
+    _assert_report_verifies(positive_report_path)
 
     control = summary["negative_control"]
-    assert control["scenario_id"] == "spectral_moderate_scale_attn_l31_o_s112"
+    assert control["scenario_id"] == "spectral_moderate_scale_attn_l31_o_s105"
     assert control["primary_metric_acceptable"] is True
     assert control["baseline_relative_guard_hit"] is False
     assert control["baseline_relative_evidence"]["new_caps_applied"] == 0
     assert control["spectral_caps_applied"] == 2
+    assert control["stock_cap_clean"] is True
+    assert control["stock_attention_kappa"] == 3.018
+    assert control["target_z"] == 2.7987064430328767
+    assert control["target_margin_to_stock_kappa"] > 0.2
+
+    control_report_path = demo_dir / control["report"]
+    _load_valid_primary_ok_report(control_report_path)
+    _assert_report_verifies(control_report_path)
+    legacy_control_key = "margin" + "_policy_control"
+    assert legacy_control_key not in summary
 
     all_guard = json.loads(
         (
@@ -379,6 +399,7 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
     ]
     assert all_guard["source_run"]["host"] == "self-hosted CUDA runner"
     assert all_guard["method"]["clean_confirmation_required"] is True
+    assert legacy_control_key not in all_guard["guard_results"]["spectral"]
     assert (
         summary["all_guard_probe_sweep"]["guard_status"]["invariants"]
         == "not_a_statistical_margin_sweep"
@@ -403,17 +424,8 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
         }
     ]
     rmt_report_path = demo_dir / rmt["clean_confirmation"]["report"]
-    rmt_report = json.loads(rmt_report_path.read_text(encoding="utf-8"))
-    assert validate_report(rmt_report) is True
-    assert rmt_report["validation"]["primary_metric_acceptable"] is True
-    assert (
-        run_verify_reports(
-            [rmt_report_path],
-            profile="release",
-            assurance_mode="report",
-        ).outcome
-        == VerifyOutcome.OK
-    )
+    _load_valid_primary_ok_report(rmt_report_path)
+    _assert_report_verifies(rmt_report_path)
 
     variance = all_guard["guard_results"]["variance"]
     assert variance["status"] == "published_reproduced_positive"
@@ -426,17 +438,8 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
     assert ve_probe["ab_gain"] == 0.003181692426797744
     assert ve_probe["abs_improvement"] == 0.554556828832176
     ve_report_path = demo_dir / variance["clean_confirmation"]["report"]
-    ve_report = json.loads(ve_report_path.read_text(encoding="utf-8"))
-    assert validate_report(ve_report) is True
-    assert ve_report["validation"]["primary_metric_acceptable"] is True
-    assert (
-        run_verify_reports(
-            [ve_report_path],
-            profile="release",
-            assurance_mode="report",
-        ).outcome
-        == VerifyOutcome.OK
-    )
+    _load_valid_primary_ok_report(ve_report_path)
+    _assert_report_verifies(ve_report_path)
 
     sweep = json.loads(
         (
@@ -446,6 +449,7 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
     assert sweep["method"]["calibration_rerun"] is False
     assert sweep["method"]["baseline_eval_rerun"] is False
     assert sweep["selected_positive"] == comparison["scenario_id"]
+    assert sweep["selected_negative_control"] == control["scenario_id"]
     for record in sweep["records"]:
         log = record.get("log")
         if isinstance(log, str):
@@ -453,6 +457,11 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
         if record.get("log_packaged") is False:
             assert "not retained" in record["log_note"]
     records = {record["scenario_id"]: record for record in sweep["records"]}
+    assert {
+        record["scale_factor"]
+        for record in sweep["records"]
+        if record.get("target", {}).get("family") == "attn"
+    } == {1.05, 1.18, 1.25}
     assert (
         records["spectral_moderate_scale_mlp_l31_up_s112"]["baseline_relative_guard"][
             "new_caps_applied"
@@ -460,30 +469,31 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
         == 1
     )
     assert (
-        records["spectral_moderate_scale_attn_l31_o_s112"]["baseline_relative_guard"][
+        records["spectral_moderate_scale_attn_l31_o_s105"]["baseline_relative_guard"][
             "new_caps_applied"
         ]
         == 0
+    )
+    assert records["spectral_moderate_scale_attn_l31_o_s105"]["stock_cap_clean"] is True
+    assert (
+        records["spectral_moderate_scale_attn_l31_o_s105"][
+            "target_margin_to_stock_kappa"
+        ]
+        > 0.2
     )
     assert (
         records["spectral_moderate_scale_attn_l31_o_s118"]["spectral_caps_applied"] == 3
     )
 
-    expected_failures = [
-        demo_dir
-        / "artifact_package"
-        / "reports"
-        / "errors"
-        / "scale_explosion"
-        / "evaluation.report.json",
-        demo_dir
-        / "artifact_package"
-        / "reports"
-        / "errors"
-        / "rank_collapse"
-        / "evaluation.report.json",
-    ]
-    for report_path in expected_failures:
+    for directory in ("scale_explosion", "rank_collapse"):
+        report_path = (
+            demo_dir
+            / "artifact_package"
+            / "reports"
+            / "errors"
+            / directory
+            / "evaluation.report.json"
+        )
         result = run_verify_reports(
             [report_path],
             profile="release",

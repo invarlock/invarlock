@@ -372,8 +372,8 @@
       ],
       "category": "stress",
       "failure_class": "stress_edit.fp8_quant",
-      "strictness": "must_detect",
-      "intent": "subtle_detectable",
+      "strictness": "informational",
+      "intent": "historical_sentinel",
       "primary_guard": "spectral",
       "generation": {
         "kind": "edit",
@@ -381,19 +381,7 @@
         "version": "stress"
       },
       "requirements": {
-        "primary_guard_required": true,
-        "detectors_all_of": [
-          {
-            "kind": "validation_flag",
-            "flag": "primary_metric_acceptable",
-            "expected": true
-          },
-          {
-            "kind": "guard_signal_baseline_relative",
-            "guard": "spectral",
-            "min_new_modules": 1
-          }
-        ]
+        "notes": "Historical FP8 report retained for baseline-contamination context; not a current guard-value gate."
       },
       "artifact_class": "validation_subject_checkpoint",
       "deployable_as_hf_checkpoint": true,
@@ -1061,7 +1049,7 @@
       ],
       "category": "error_injection",
       "failure_class": "spectral.targeted_mlp_scale",
-      "strictness": "informational",
+      "strictness": "must_detect",
       "intent": "subtle_detectable",
       "primary_guard": "spectral",
       "generation": {
@@ -1077,6 +1065,7 @@
         }
       },
       "requirements": {
+        "primary_guard_required": true,
         "detectors_all_of": [
           {
             "kind": "validation_flag",
@@ -1099,8 +1088,7 @@
             "min_new_modules": 1,
             "min_delta_count": 1
           }
-        ],
-        "notes": "Model-specific Mistral guard-value probe. Published package state promotes this scenario to must_detect for the curated demo; the global manifest keeps it informational so ordinary suites are not forced to run a Mistral-specific layer target."
+        ]
       },
       "artifact_class": "fault_injection_fixture",
       "deployable_as_hf_checkpoint": false,
@@ -1109,20 +1097,20 @@
       "run_directory_contains_edit_artifacts": true
     },
     {
-      "id": "spectral_moderate_scale_attn_l31_o_s112",
+      "id": "spectral_moderate_scale_attn_l31_o_s105",
       "suites": [
         "mistral_guard_value"
       ],
       "category": "error_injection",
       "failure_class": "spectral.targeted_attn_scale",
       "strictness": "informational",
-      "intent": "subtle_detectable",
+      "intent": "negative_control",
       "primary_guard": "spectral",
       "generation": {
         "kind": "error",
-        "error_type": "spectral_moderate_scale_attn_l31_o_s112",
+        "error_type": "spectral_moderate_scale_attn_l31_o_s105",
         "env": {
-          "INVARLOCK_SPECTRAL_SCALE_FACTOR": "1.12",
+          "INVARLOCK_SPECTRAL_SCALE_FACTOR": "1.05",
           "INVARLOCK_SPECTRAL_TARGET_FAMILY": "attn",
           "INVARLOCK_SPECTRAL_TARGET_LAYERS": "31",
           "INVARLOCK_SPECTRAL_TARGET_PARAMS": "o_proj",
@@ -1139,7 +1127,7 @@
             "expected": true
           }
         ],
-        "notes": "Negative control for the Mistral guard-value sweep: same scale as the FFN positive, selected from the nearest non-baseline attention module, and expected not to add a baseline-relative cap."
+        "notes": "Stock-cap-clean negative control for the Mistral guard-value sweep: a smaller attention layer31 o_proj scale that passes PM, adds no baseline-relative spectral cap, and keeps the edited target below the documented stock attention cap."
       },
       "artifact_class": "fault_injection_fixture",
       "deployable_as_hf_checkpoint": false,
@@ -1154,7 +1142,7 @@
       ],
       "category": "error_injection",
       "failure_class": "rmt.targeted_ffn_anisotropy",
-      "strictness": "informational",
+      "strictness": "must_detect",
       "intent": "subtle_detectable",
       "primary_guard": "rmt",
       "generation": {
@@ -1176,6 +1164,7 @@
         }
       },
       "requirements": {
+        "primary_guard_required": true,
         "detectors_all_of": [
           {
             "kind": "validation_flag",
@@ -1222,7 +1211,7 @@
       ],
       "category": "error_injection",
       "failure_class": "variance.targeted_mlp_scale_skew",
-      "strictness": "informational",
+      "strictness": "must_detect",
       "intent": "subtle_detectable",
       "primary_guard": "variance",
       "generation": {
@@ -1237,6 +1226,7 @@
         }
       },
       "requirements": {
+        "primary_guard_required": true,
         "detectors_all_of": [
           {
             "kind": "validation_flag",

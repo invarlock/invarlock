@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import math
+import shlex
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -232,7 +233,9 @@ def test_sanitize_script_rewrites_python_script_invocations_to_selected_python()
 
     rendered = module._sanitize_script(block, execution_mode="host")
 
-    assert rendered.startswith(sys.executable)
+    rendered_python = Path(shlex.split(rendered)[0]).resolve()
+    selected_python = Path(sys.executable).resolve()
+    assert rendered_python == selected_python
     assert (
         "scripts/smoke/check_device_drift.py reports/a.json reports/b.json" in rendered
     )

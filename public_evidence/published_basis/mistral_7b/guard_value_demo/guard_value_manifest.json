@@ -3,8 +3,8 @@
   "files": [
     {
       "path": "README.md",
-      "sha256": "6604eda2b2fb9c2118673f17100289a6ba6f6be1bca2c4646c56bf54c7c4ff22",
-      "size_bytes": 2177
+      "sha256": "eeead05fbd461a140a48d0ae39d752afb915091fc2881665c96537cbd4e74b37",
+      "size_bytes": 2360
     },
     {
       "path": "artifact_package/logs/run_pack.log",
@@ -167,29 +167,29 @@
       "size_bytes": 1058
     },
     {
-      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/config_root/runtime/profiles/ci.yaml",
-      "sha256": "f27ccff9c1a9f6d81f0072afb3985ca3c5f894d5cf3a5d061d91a1a323743e26",
-      "size_bytes": 226
+      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s105/config_root/runtime/profiles/ci.yaml",
+      "sha256": "cc20581268df4f04f895251fe5d588cf3023cb6fefb4ac174020653aeb7289d8",
+      "size_bytes": 227
     },
     {
-      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluate_timing.json",
-      "sha256": "18544202fb8a1dd1b7fe52ab183dfc19ee70e5b35141fbffa21176f9ab785ca0",
-      "size_bytes": 1565
+      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s105/evaluate_timing.json",
+      "sha256": "5699e58ac8ac3432e412797435e18be40aec912c18417f28e7d4a662bb1604d8",
+      "size_bytes": 1574
     },
     {
-      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json",
-      "sha256": "187743c8e58390cb28540d7a3f4d6d058bfab3dda61ce7fd5e58d643b1897e9f",
-      "size_bytes": 8902283
+      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s105/evaluation.report.json",
+      "sha256": "363304296b1d6aa9d94301bd363c342c990c5f106ed10ce5a6b5145e3d17a9fc",
+      "size_bytes": 9710687
     },
     {
-      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/runtime.manifest.json",
-      "sha256": "efb5c7e6cc586b31cdc0bc5fd95b2bb95ca62f67757c5c74db6f63fb82d842d7",
-      "size_bytes": 1082
+      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s105/runtime.manifest.json",
+      "sha256": "c6f8f344e1dd4dc7d1a84d765a80c11bc824f98719fbd3e6eaf2109329fb5d99",
+      "size_bytes": 1086
     },
     {
-      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/runtime_inputs/calibrated_preset_mistralai__mistral-7b-v01.yaml",
-      "sha256": "17b9d7a5d3b5787a9ad66ad74ec43bac68b04d963a39024d79b36d271081e8bf",
-      "size_bytes": 953
+      "path": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s105/runtime_inputs/calibrated_preset_mistralai__mistral-7b-v01.yaml",
+      "sha256": "6c3a2a40d78c3ccfec9e92a4b49546486b00be2a74f35e792e977de008a853b3",
+      "size_bytes": 954
     },
     {
       "path": "artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/config_root/runtime/profiles/ci.yaml",
@@ -243,13 +243,13 @@
     },
     {
       "path": "artifact_package/reports/final_verdict.json",
-      "sha256": "38c65732bf3352bc8ff5365a590596d495a8b8cec4b0011ce67db2142ccdbb61",
-      "size_bytes": 14695
+      "sha256": "672b79065d6883f34b802f0656dc45216634faa5f68d9acca43e555328bcc197",
+      "size_bytes": 14696
     },
     {
       "path": "artifact_package/reports/final_verdict.txt",
-      "sha256": "f148ad31d74ea666239d1dc889a35f137b23c611a66b7d76f99a4cd5c153ddd7",
-      "size_bytes": 275
+      "sha256": "0651ac4f239bd7e07c9a62a9806ade783fd93a64ba6c8bbcbae9479a4ebd495f",
+      "size_bytes": 426
     },
     {
       "path": "artifact_package/reports/fp8_e5m2_stress/run_2/edit_metadata.json",
@@ -273,7 +273,7 @@
     },
     {
       "path": "artifact_package/reports/guard_intervention_summary.json",
-      "sha256": "613eba6b85d4978eebfbe6f04593a63ca2fefabc0ae8ad797bf75648706b33b6",
+      "sha256": "dfabb20582d1a6419bdc4ae6d973191c01c920fdba83ec2b5b10d82b34cb23ef",
       "size_bytes": 176
     },
     {
@@ -283,17 +283,17 @@
     },
     {
       "path": "artifact_package/reports/guard_value_all_guard_probe_sweep.json",
-      "sha256": "6fc5caad30403cc2997fbd52fc4ec996fd645985400b9834774f0aac88d2097e",
-      "size_bytes": 12940
+      "sha256": "f392b182e73a143db35e9abe87dee7c0bbed3cf90816680a3753b1e0d1b27142",
+      "size_bytes": 13318
     },
     {
       "path": "artifact_package/reports/guard_value_probe_sweep.json",
-      "sha256": "3cb562a33cddf0dbbb27016e83744948129cfaa799c4c94899eeeb8ca5242117",
-      "size_bytes": 13736
+      "sha256": "6a819451cc8dec9f3a88d2d93336fb4594839c4d6aff24910dd5bc464c2609e3",
+      "size_bytes": 14007
     },
     {
       "path": "artifact_package/reports/scenario_signal_summary.json",
-      "sha256": "f26fdf63674f9803beed2b0da2deeee21b3c360dfc60d7cd8d50203b51f638a3",
+      "sha256": "20c9682acc7caef0cd1d0f233780df4eeb00b3a4866b80bdcccb0f15edb2951d",
       "size_bytes": 1710
     },
     {
@@ -303,8 +303,8 @@
     },
     {
       "path": "artifact_package/state/scenarios.json",
-      "sha256": "c857da89608d7963146223b0a9b5d72feeef7f4056c251bb5b0c8147d04130f8",
-      "size_bytes": 8036
+      "sha256": "53cb3fe5bcfaeca4d553c4177d345c57ca96e4912a206c8a20f2e998b9ec8909",
+      "size_bytes": 8232
     },
     {
       "path": "artifact_package/state/tuned_edit_params.json",
@@ -313,13 +313,13 @@
     },
     {
       "path": "evidence.meta.json",
-      "sha256": "f326fe1ae347055a5c566818860323e7a3b6b666109b41a19cc23d99b6d166b3",
-      "size_bytes": 2558
+      "sha256": "aeae88e7f03ef244a1162eb526cba5e1d730e23d369ac7624d80a4214c652dc7",
+      "size_bytes": 2751
     },
     {
       "path": "guard_value_summary.json",
-      "sha256": "e5c0b963ff6031206d372162b40a7cfd675f719026c35cbe30a15909e3f63a60",
-      "size_bytes": 14623
+      "sha256": "53faa1526020b964c7c96aa6c09300b75dfe3eb753e369bdbe5754f8d673813d",
+      "size_bytes": 15221
     },
     {
       "path": "run_command.txt",
@@ -336,11 +336,12 @@
     "remote_output_roots": [
       "<validation-output-root>/mistral_guard_value_real_20260612d",
       "<validation-output-root>/mistral_guard_all_guards_20260612a",
-      "<validation-output-root>/mistral_guard_confirm_20260612a"
+      "<validation-output-root>/mistral_guard_confirm_20260612a",
+      "<validation-output-root>/mistral_guard_stock_clean_20260704a"
     ],
     "scenario_ids": [
       "rmt_norm_noise_l31_ffn_up_b030",
-      "spectral_moderate_scale_attn_l31_o_s112",
+      "spectral_moderate_scale_attn_l31_o_s105",
       "spectral_moderate_scale_attn_l31_o_s118",
       "spectral_moderate_scale_attn_l31_o_s125",
       "spectral_moderate_scale_mlp_l31_up_s112",

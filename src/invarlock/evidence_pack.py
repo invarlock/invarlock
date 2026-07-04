@@ -193,8 +193,6 @@ def _report_expects_verify_failure(
     scenario_id = _report_scenario_id(pack_dir, report)
     if scenario_id and scenario_id in strictness_by_id:
         strictness = strictness_by_id[scenario_id]
-        if is_error:
-            return strictness in {"must_fail", "must_detect"}
         return strictness == "must_fail"
 
     # Legacy packs did not always carry scenario metadata. Preserve the old

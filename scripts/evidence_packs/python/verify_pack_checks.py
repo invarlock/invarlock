@@ -303,8 +303,6 @@ def _report_expects_verify_failure(pack_dir: Path, report: Path) -> bool:
     scenarios_path = pack_dir / "metadata" / "scenarios.json"
     if scenario_id is not None and scenarios_path.is_file():
         strictness = _scenario_strictness(scenarios_path, scenario_id)
-        if is_error:
-            return strictness in {"must_fail", "must_detect"}
         return strictness == "must_fail"
 
     # Legacy packs did not always carry scenario metadata. Preserve the old
