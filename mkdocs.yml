@@ -108,8 +108,8 @@ plugins:
   - mermaid2:
       enabled: !ENV [INVARLOCK_DOCS_MERMAID, false]
 
-# MathJax is referenced but not fetched during `mkdocs build`; browsers load it
-# when viewing the generated site so Arithmatex formulas render correctly.
+# Load the local MathJax configuration before the runtime loader. The CDN asset is
+# browser-loaded only; `mkdocs build --strict` validates the local config path.
 extra_javascript:
   - assets/javascripts/mathjax.js
   - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js

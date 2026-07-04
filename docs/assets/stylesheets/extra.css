@@ -7,6 +7,7 @@
   --invarlock-teal: #5fcaac;
   --invarlock-teal-deep: #0f7669;
   --invarlock-copper: #b56a3d;
+  --invarlock-focus-ring: rgba(95, 202, 172, 0.48);
 }
 
 [data-md-color-scheme="slate"] {
@@ -62,6 +63,13 @@ body {
 .md-search__form:hover,
 .md-search__input:focus {
   background-color: rgba(243, 234, 220, 0.12);
+}
+
+.md-search__input:focus-visible,
+.md-nav__link:focus-visible,
+.md-typeset a:focus-visible {
+  outline: 2px solid var(--invarlock-focus-ring);
+  outline-offset: 0.15rem;
 }
 
 .md-sidebar,
@@ -153,5 +161,10 @@ body {
 
 mark {
   background-color: rgba(181, 106, 61, 0.24);
+  color: var(--invarlock-cream);
+}
+
+::selection {
+  background-color: rgba(95, 202, 172, 0.32);
   color: var(--invarlock-cream);
 }
