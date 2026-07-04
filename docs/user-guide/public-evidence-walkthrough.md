@@ -238,16 +238,17 @@ PM-only accepts `spectral_moderate_scale_mlp_l31_up_s112`
 comparison finds one new spectral cap relative to the Mistral noop basis:
 `model.layers.31.mlp.up_proj`.
 
-The same artifact includes `spectral_moderate_scale_attn_l31_o_s112` as a
-negative control: the same 1.12x scale on the closest non-baseline attention
-module passes PM and does not add a new baseline-relative cap under the packaged
-policy. Treat that control as margin-policy-dependent rather than a general
-stock-policy no-hit claim: the edited module is boundary-adjacent
-(`z = 3.033867912045445`), above the stock-style cap recorded for the selected
-baseline target (`3.018`) but below the packaged report kappa (`3.068`). The
-compact sweep summary records adjacent scale points showing that the attention
-target starts triggering at 1.18 and the FFN target remains PM-accepted through
-1.20.
+The same artifact includes `spectral_moderate_scale_attn_l31_o_s105` as the
+selected attention negative control: a 1.05x scale on the closest non-baseline
+attention module passes PM, adds no new baseline-relative spectral cap, and
+keeps the edited target below the documented stock attention cap
+(`z = 2.7987064430328767`, stock cap `3.018`). The older
+`spectral_moderate_scale_attn_l31_o_s112` record is retained as
+margin-policy context only: that 1.12x attention edit passes under the packaged
+policy but is boundary-adjacent (`z = 3.033867912045445`), above the
+stock-style cap and below the packaged report kappa (`3.068`). The compact
+sweep summary records adjacent scale points showing that the attention target
+starts triggering at 1.18 and the FFN target remains PM-accepted through 1.20.
 
 This artifact is an evidence-pack guard-value demonstration:
 `validation.spectral_stable` remains true because the spectral cap budget is

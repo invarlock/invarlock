@@ -60,20 +60,26 @@
     "baseline_relative_guard_hit": false,
     "primary_metric_acceptable": true,
     "primary_metric_display_ci": [
-      0.9992408037326699,
-      1.0003945872681685
+      0.9990993770022755,
+      0.9997616569999619
     ],
-    "ratio_vs_baseline": 0.9997699255693849,
-    "report": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json",
-    "runtime_manifest": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/runtime.manifest.json",
-    "scenario_id": "spectral_moderate_scale_attn_l31_o_s112",
+    "ratio_vs_baseline": 0.9994204418834356,
+    "report": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s105/evaluation.report.json",
+    "runtime_manifest": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s105/runtime.manifest.json",
+    "scenario_id": "spectral_moderate_scale_attn_l31_o_s105",
     "spectral_caps_applied": 2,
     "spectral_caps_applied_by_family": {
       "attn": 2,
       "embed": 0,
       "ffn": 0,
       "other": 0
-    }
+    },
+    "stock_cap_clean": true,
+    "stock_policy_basis": "edited_target_below_stock_attention_cap",
+    "stock_attention_kappa": 3.018,
+    "target_module": "model.layers.31.self_attn.o_proj",
+    "target_z": 2.7987064430328767,
+    "target_margin_to_stock_kappa": 0.21929355696712305
   },
   "pm_only_vs_pm_plus_guards": {
     "baseline_relative_evidence": {
@@ -129,7 +135,7 @@
     "strictness": "must_detect"
   },
   "probe_sweep": {
-    "negative_control": "Attention layer31 o_proj at scale 1.12 passes PM and does not add a new cap; attention triggers at 1.18.",
+    "negative_control": "Attention layer31 o_proj at scale 1.05 passes PM, adds no new cap, and keeps the edited target below the stock attention cap; the older 1.12 attention control is retained only as margin-policy-dependent context.",
     "positive_boundary": "FFN layer31 up_proj triggers at scale 1.12 with PM ratio 1.0076.",
     "records_total": 6,
     "report": "artifact_package/reports/guard_value_probe_sweep.json"
@@ -330,6 +336,62 @@
         "subject_spectral_caps_applied": 2
       },
       "baseline_relative_guard_hit": false,
+      "primary_metric_acceptable": true,
+      "primary_metric_display_ci": [
+        0.9990993770022755,
+        0.9997616569999619
+      ],
+      "ratio_vs_baseline": 0.9994204418834356,
+      "report": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s105/evaluation.report.json",
+      "runtime_manifest": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s105/runtime.manifest.json",
+      "scenario_id": "spectral_moderate_scale_attn_l31_o_s105",
+      "spectral_caps_applied": 2,
+      "spectral_caps_applied_by_family": {
+        "attn": 2,
+        "embed": 0,
+        "ffn": 0,
+        "other": 0
+      },
+      "stock_cap_clean": true,
+      "stock_policy_basis": "edited_target_below_stock_attention_cap",
+      "stock_attention_kappa": 3.018,
+      "target_module": "model.layers.31.self_attn.o_proj",
+      "target_z": 2.7987064430328767,
+      "target_margin_to_stock_kappa": 0.21929355696712305,
+      "category": "error_injection",
+      "detectors_hit": true,
+      "failure_class": "spectral.targeted_attn_scale",
+      "intent": "negative_control",
+      "invariants_pass": true,
+      "passed": true,
+      "primary_guard": "spectral",
+      "primary_guard_hit": false,
+      "primary_guard_required": false,
+      "reasons": [],
+      "rmt_stable": true,
+      "spectral_stable": true,
+      "strictness": "informational"
+    },
+    {
+      "baseline_relative_evidence": {
+        "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+        "baseline_spectral_caps_applied": 2,
+        "delta_caps_applied": 0,
+        "matching_capped_modules": [
+          {
+            "family": "attn",
+            "module": "model.layers.0.self_attn.k_proj"
+          },
+          {
+            "family": "attn",
+            "module": "model.layers.0.self_attn.q_proj"
+          }
+        ],
+        "new_capped_modules": [],
+        "new_caps_applied": 0,
+        "subject_spectral_caps_applied": 2
+      },
+      "baseline_relative_guard_hit": false,
       "category": "error_injection",
       "detectors_hit": true,
       "failure_class": "spectral.targeted_attn_scale",
@@ -367,7 +429,7 @@
     "The all-guard extension publishes PM-pass, baseline-relative evidence for spectral, RMT, and variance/VE sidecar guards.",
     "Invariants are structural checks and are required to pass in these PM-pass guard-value cases; no invariant-fail PM-pass flagship case is claimed here.",
     "The selected reports do not mean every stock runtime cap or sidecar signal is an automatic release failure; they demonstrate the evidence-pack PM+guard comparison can detect targeted regressions relative to noop.",
-    "Reports were generated with report assurance, so verifier commands use --assurance report rather than --assurance strict."
+    "The selected attention negative control is stock-cap-clean for the edited target and adds no new baseline-relative cap; the older 1.12 attention control remains margin-policy-dependent context."
   ],
   "source_run": {
     "host": "self-hosted CUDA runner",
@@ -377,11 +439,13 @@
     "remote_output_roots": [
       "<validation-output-root>/mistral_guard_value_real_20260612d",
       "<validation-output-root>/mistral_guard_all_guards_20260612a",
-      "<validation-output-root>/mistral_guard_confirm_20260612a"
+      "<validation-output-root>/mistral_guard_confirm_20260612a",
+      "<validation-output-root>/mistral_guard_stock_clean_20260704a"
     ],
     "scenario_ids": [
       "rmt_norm_noise_l31_ffn_up_b030",
       "spectral_moderate_scale_attn_l31_o_s112",
+      "spectral_moderate_scale_attn_l31_o_s105",
       "spectral_moderate_scale_attn_l31_o_s118",
       "spectral_moderate_scale_attn_l31_o_s125",
       "spectral_moderate_scale_mlp_l31_up_s112",
@@ -391,5 +455,47 @@
     ],
     "suite": "manual_guard_value_probe_plus_all_guard_confirmation"
   },
-  "summary": "Real Mistral-7B baseline-relative guard-value demo: PM-only accepts while spectral, RMT, and variance sidecar probes each publish a reproduced guard movement."
+  "summary": "Real Mistral-7B baseline-relative guard-value demo: PM-only accepts while spectral, RMT, and variance sidecar probes each publish a reproduced guard movement; a separate attention negative control keeps the edited target below the documented stock attention cap.",
+  "margin_policy_control": {
+    "baseline_relative_evidence": {
+      "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+      "baseline_spectral_caps_applied": 2,
+      "delta_caps_applied": 0,
+      "matching_capped_modules": [
+        {
+          "family": "attn",
+          "module": "model.layers.0.self_attn.k_proj"
+        },
+        {
+          "family": "attn",
+          "module": "model.layers.0.self_attn.q_proj"
+        }
+      ],
+      "new_capped_modules": [],
+      "new_caps_applied": 0,
+      "subject_spectral_caps_applied": 2
+    },
+    "baseline_relative_guard_hit": false,
+    "primary_metric_acceptable": true,
+    "primary_metric_display_ci": [
+      0.9992408037326699,
+      1.0003945872681685
+    ],
+    "ratio_vs_baseline": 0.9997699255693849,
+    "report": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json",
+    "runtime_manifest": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/runtime.manifest.json",
+    "scenario_id": "spectral_moderate_scale_attn_l31_o_s112",
+    "spectral_caps_applied": 2,
+    "spectral_caps_applied_by_family": {
+      "attn": 2,
+      "embed": 0,
+      "ffn": 0,
+      "other": 0
+    },
+    "stock_cap_clean": false,
+    "stock_policy_basis": "margin_policy_dependent",
+    "stock_attention_kappa": 3.018,
+    "target_z": 3.033867912045445,
+    "target_margin_to_stock_kappa": -0.01586791204544502
+  }
 }

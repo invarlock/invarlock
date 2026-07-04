@@ -12,8 +12,8 @@
     "invariants_fail": 0,
     "invariants_warn": 0,
     "primary_metric_fail": 2,
-    "reports": 4,
-    "scenarios": 4
+    "reports": 5,
+    "scenarios": 5
   },
   "stress": {
     "any_flag": 0,

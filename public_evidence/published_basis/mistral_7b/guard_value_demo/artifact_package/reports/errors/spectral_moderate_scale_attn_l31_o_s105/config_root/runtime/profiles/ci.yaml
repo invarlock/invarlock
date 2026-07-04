@@ -1,0 +1,15 @@
+model:
+  device_map: "auto"
+  dtype: "bfloat16"
+  trust_remote_code: true
+  low_cpu_mem_usage: true
+dataset:
+  seq_len: 512
+  stride: 512
+  preview_n: 218
+  final_n: 218
+eval:
+  bootstrap:
+    replicates: 2000
+    alpha: 0.05
+

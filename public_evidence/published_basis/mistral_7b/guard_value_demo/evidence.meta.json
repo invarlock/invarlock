@@ -16,13 +16,15 @@
     "The all-guard extension publishes PM-pass, baseline-relative evidence for spectral, RMT, and variance/VE sidecar guards.",
     "Invariants are structural checks and are required to pass in these PM-pass guard-value cases; no invariant-fail PM-pass flagship case is claimed here.",
     "The selected reports do not mean every stock runtime cap or sidecar signal is an automatic release failure; they demonstrate the evidence-pack PM+guard comparison can detect targeted regressions relative to noop.",
-    "Reports were generated with report assurance, so verifier commands use --assurance report rather than --assurance strict."
+    "Reports were generated with report assurance, so verifier commands use --assurance report rather than --assurance strict.",
+    "The older 1.12 attention control is margin-policy-dependent and is not a stock-cap-clean claim."
   ],
   "profile": "release/report-assurance",
   "schema": "invarlock.public_evidence.meta.v1",
-  "summary": "Real Mistral-7B baseline-relative guard-value demo: PM-only accepts while spectral, RMT, and variance sidecar probes each publish a reproduced guard movement.",
+  "summary": "Mistral 7B guard-value demo with PM-pass spectral, RMT, and VE guard movement plus a stock-cap-clean attention negative control.",
   "verifier_commands": [
     "uv run invarlock verify public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json --profile release --assurance report",
+    "uv run invarlock verify public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s105/evaluation.report.json --profile release --assurance report",
     "uv run pytest tests/ci/test_golden_runs_offline.py::test_real_guard_value_demo_publishes_baseline_relative_spectral_catch",
     "uv run invarlock verify public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/errors/rmt_norm_noise_l31_ffn_up_b030/evaluation.report.json --profile release --assurance report",
     "uv run invarlock verify public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/errors/ve_mlp_scale_skew_l31_down_s090/evaluation.report.json --profile release --assurance report"

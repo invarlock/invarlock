@@ -146,20 +146,26 @@
         "baseline_relative_guard_hit": false,
         "primary_metric_acceptable": true,
         "primary_metric_display_ci": [
-          0.9992408037326699,
-          1.0003945872681685
+          0.9990993770022755,
+          0.9997616569999619
         ],
-        "ratio_vs_baseline": 0.9997699255693849,
-        "report": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json",
-        "runtime_manifest": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/runtime.manifest.json",
-        "scenario_id": "spectral_moderate_scale_attn_l31_o_s112",
+        "ratio_vs_baseline": 0.9994204418834356,
+        "report": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s105/evaluation.report.json",
+        "runtime_manifest": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s105/runtime.manifest.json",
+        "scenario_id": "spectral_moderate_scale_attn_l31_o_s105",
         "spectral_caps_applied": 2,
         "spectral_caps_applied_by_family": {
           "attn": 2,
           "embed": 0,
           "ffn": 0,
           "other": 0
-        }
+        },
+        "stock_cap_clean": true,
+        "stock_policy_basis": "edited_target_below_stock_attention_cap",
+        "stock_attention_kappa": 3.018,
+        "target_module": "model.layers.31.self_attn.o_proj",
+        "target_z": 2.7987064430328767,
+        "target_margin_to_stock_kappa": 0.21929355696712305
       },
       "pm_only_vs_pm_plus_guards": {
         "baseline_relative_evidence": {
@@ -219,7 +225,44 @@
         "<validation-output-root>/mistral_guard_all_guards_20260612a"
       ],
       "selected_scenario": "spectral_moderate_scale_mlp_l31_up_s112",
-      "status": "published_reproduced_positive"
+      "status": "published_reproduced_positive",
+      "margin_policy_control": {
+        "baseline_relative_evidence": {
+          "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+          "baseline_spectral_caps_applied": 2,
+          "delta_caps_applied": 0,
+          "matching_capped_modules": [
+            {
+              "family": "attn",
+              "module": "model.layers.0.self_attn.k_proj"
+            },
+            {
+              "family": "attn",
+              "module": "model.layers.0.self_attn.q_proj"
+            }
+          ],
+          "new_capped_modules": [],
+          "new_caps_applied": 0,
+          "subject_spectral_caps_applied": 2
+        },
+        "baseline_relative_guard_hit": false,
+        "primary_metric_acceptable": true,
+        "primary_metric_display_ci": [
+          0.9992408037326699,
+          1.0003945872681685
+        ],
+        "ratio_vs_baseline": 0.9997699255693849,
+        "report": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json",
+        "runtime_manifest": "artifact_package/reports/errors/spectral_moderate_scale_attn_l31_o_s112/runtime.manifest.json",
+        "scenario_id": "spectral_moderate_scale_attn_l31_o_s112",
+        "spectral_caps_applied": 2,
+        "spectral_caps_applied_by_family": {
+          "attn": 2,
+          "embed": 0,
+          "ffn": 0,
+          "other": 0
+        }
+      }
     },
     "variance": {
       "baseline_relative_guard_hit": true,
@@ -313,7 +356,8 @@
     "remote_output_roots": [
       "<validation-output-root>/mistral_guard_value_real_20260612d",
       "<validation-output-root>/mistral_guard_all_guards_20260612a",
-      "<validation-output-root>/mistral_guard_confirm_20260612a"
+      "<validation-output-root>/mistral_guard_confirm_20260612a",
+      "<validation-output-root>/mistral_guard_stock_clean_20260704a"
     ]
   }
 }
