@@ -1,0 +1,3037 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Official documentation for the InvarLock toolkit">
+      
+      
+      
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/public-evidence-walkthrough/">
+      
+      
+        <link rel="prev" href="../integrations/">
+      
+      
+        <link rel="next" href="../bring-your-own-data/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Public Evidence Walkthrough - InvarLock Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#public-evidence-walkthrough" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            InvarLock Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Public Evidence Walkthrough
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../getting-started/" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/cli/" class="md-tabs__link">
+          
+  
+  
+  CLI Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../assurance/00-assurance-case/" class="md-tabs__link">
+          
+  
+  
+  Assurance
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../security/best-practices/" class="md-tabs__link">
+          
+  
+  
+  Security
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    InvarLock Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../primary-metric-smoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Primary Metric Smoke
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../compare-and-evaluate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../knowledge-and-self-edit-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge & Self-Edit Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../live-examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Evidence Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Purpose
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#published-basis-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Published-basis pass
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#real-model-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real model runs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#export-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Export Evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#byoe-edit-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BYOE edit examples
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#caught-regressions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Caught regressions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#real-guard-value-demo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real guard-value demo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#policy-failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Policy failures
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#applying-this-to-your-checkpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Applying this to your checkpoint
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bring-your-own-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bring Your Own Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plugins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config-gallery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Gallery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../example-reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../failure-examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Failure Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reading-report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading a Report
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evidence-packs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence Packs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evidence-packs-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence Pack Internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    CLI Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/one-run-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    One Run Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/programmatic-quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Programmatic Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/guards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/report-outline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Outline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/model-adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/model-family-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Family Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/config-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/tier-policy-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tier Policy Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifact Layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/calibration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/alternatives-comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternatives Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Assurance
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/00-assurance-case/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance Case
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/14-trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/15-strict-assurance-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strict Assurance Checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/01-eval-math-derivation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Math Derivation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/02-coverage-and-pairing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coverage & Pairing Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/03-bca-bootstrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BCa Bootstrap (Paired Δlog)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/04-guard-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Contracts & Primer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/05-spectral-fpr-derivation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral False-Positive Control
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/06-rmt-epsilon-rule/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RMT ε-Rule
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/07-ve-gate-power/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VE Predictive Gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/08-determinism-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Determinism Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/09-tier-v1-calibration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tier Policy v1 Calibration (Pilot)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/10-guard-overhead-method/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Overhead Method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/11-policy-provenance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy Provenance & Digest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/12-device-drift-bands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Device Drift Bands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/13-gpu-mps-first-guards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GPU/MPS-First Guard Measurement Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/16-guard-validation-smoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Validation Smoke
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/17-empirical-guard-evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Empirical Guard Evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best Practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/release-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threat Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/runtime-provenance-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Provenance Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/pip-audit-allowlist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pip Audit Allowlist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Purpose
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#published-basis-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Published-basis pass
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#real-model-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real model runs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#export-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Export Evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#byoe-edit-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BYOE edit examples
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#caught-regressions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Caught regressions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#real-guard-value-demo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real guard-value demo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#policy-failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Policy failures
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#applying-this-to-your-checkpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Applying this to your checkpoint
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="public-evidence-walkthrough">Public Evidence Walkthrough<a class="headerlink" href="#public-evidence-walkthrough" title="Permanent link">&para;</a></h1>
+<h2 id="purpose">Purpose<a class="headerlink" href="#purpose" title="Permanent link">&para;</a></h2>
+<p>This walkthrough shows the shipped public evidence floor that readers can
+verify without downloading model weights. It is deliberately BYOE-oriented:
+InvarLock validates baseline/subject comparison artifacts for externally
+materialized subjects; deployable quantized checkpoint production is outside
+this public evidence floor.</p>
+<p><code>public_evidence/README.md</code> defines the evidence taxonomy. In short, fixture
+artifacts validate verifier contracts, while real-run artifacts are produced by
+<code>invarlock evaluate</code> against materialized baseline and subject checkpoints.
+Every public evidence artifact carries <code>evidence.meta.json</code> so readers can see
+whether they are looking at a fixture or a real run.</p>
+<h2 id="published-basis-pass">Published-basis pass<a class="headerlink" href="#published-basis-pass" title="Permanent link">&para;</a></h2>
+<p>The repository ships strict-pass public-basis examples for GPT-2-style causal LM
+and BERT-style masked LM lanes:</p>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span class="w"> </span>release<span class="w"> </span>--assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/published_basis/gpt2/evaluation.report.json
+
+invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span class="w"> </span>release<span class="w"> </span>--assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/published_basis/bert/evaluation.report.json
+</code></pre></div>
+
+<p>Each directory includes:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>evaluation.report.json</code></td>
+<td>Canonical verifier input with primary metric, guard evidence, policy digest, and assurance section.</td>
+</tr>
+<tr>
+<td><code>runtime.manifest.json</code></td>
+<td>Container runtime provenance manifest bound to the report by SHA-256.</td>
+</tr>
+<tr>
+<td><code>evidence_pack_recipe.json</code></td>
+<td>Recipe pointer for rebuilding a full validation evidence pack.</td>
+</tr>
+<tr>
+<td><code>artifact_package/</code></td>
+<td>Checkpoint references, report/runtime paths, signed-pack path, and exact verifier commands.</td>
+</tr>
+<tr>
+<td><code>evidence_pack/</code></td>
+<td>Signed, checksum-bound GPT-2 public evidence pack that verifies under strict release policy.</td>
+</tr>
+</tbody>
+</table>
+<p>The support matrix records these paths under
+<code>contracts/support_matrix.json</code> as the <code>published_basis</code> evidence floor.</p>
+<p>The GPT-2 <code>artifact_package/</code> is a checkpoint-reference package. It names the
+baseline and subject checkpoint references, binds them to the report, runtime
+manifest, and signed pack, and keeps the exact verification commands in
+<code>artifact_package/artifact_package.json</code>. Large model weights remain external to
+the repository; the rebuild recipe is the source of truth for materializing a
+fresh BYOE evidence drop.</p>
+<p>The GPT-2 lane also ships a small signed pack so readers can exercise the
+full offline evidence-pack verifier without rebuilding the suite:</p>
+<div class="codehilite"><pre><span></span><code><span class="nv">FPR</span><span class="o">=</span><span class="k">$(</span>python<span class="w"> </span>-<span class="w"> </span><span class="s">&lt;&lt;&#39;PY&#39;</span>
+<span class="s">import json</span>
+<span class="s">from pathlib import Path</span>
+
+<span class="s">manifest = json.loads(</span>
+<span class="s">    Path(&quot;public_evidence/published_basis/gpt2/evidence_pack/manifest.json&quot;)</span>
+<span class="s">    .read_text(encoding=&quot;utf-8&quot;)</span>
+<span class="s">)</span>
+<span class="s">print(manifest[&quot;signing_key_fingerprint&quot;])</span>
+<span class="s">PY</span>
+<span class="k">)</span>
+
+invarlock<span class="w"> </span>advanced<span class="w"> </span>evidence-pack<span class="w"> </span>verify<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/published_basis/gpt2/evidence_pack<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--profile<span class="w"> </span>release<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--report-assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--expected-fingerprint<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$FPR</span><span class="s2">&quot;</span>
+</code></pre></div>
+
+<p>The expected pack result is <code>ok=true</code> with <code>authenticity=pinned</code>. Without
+<code>--expected-fingerprint</code>, the signature still confirms integrity but not signer
+authenticity.</p>
+<h2 id="real-model-runs">Real model runs<a class="headerlink" href="#real-model-runs" title="Permanent link">&para;</a></h2>
+<p>The repository includes small real runs generated by the CLI on GPT-2-family
+checkpoints. They verify under the release/strict profile and ship signed
+evidence packs.</p>
+<p>The first run uses <code>sshleifer/tiny-gpt2</code> as the baseline and subject, then
+applies the built-in <code>quant_rtn</code> RTN dequantized weight-edit simulation:</p>
+<div class="codehilite"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>invarlock<span class="w"> </span>verify<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/real_runs/tiny_gpt2_quant_rtn/evaluation.report.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--profile<span class="w"> </span>release<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--assurance<span class="w"> </span>strict
+
+uv<span class="w"> </span>run<span class="w"> </span>invarlock<span class="w"> </span>advanced<span class="w"> </span>evidence-pack<span class="w"> </span>verify<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/real_runs/tiny_gpt2_quant_rtn/evidence_pack<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--profile<span class="w"> </span>release<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--report-assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--expected-fingerprint<span class="w"> </span>sha256:cc17b2af6579f5de01e74d91e93528b04670ff89f907ec3ba786a69065435605
+</code></pre></div>
+
+<p>The exact <code>invarlock evaluate</code> command is in
+<code>public_evidence/real_runs/tiny_gpt2_quant_rtn/run_command.txt</code>. The pack remains
+small enough for the repo because it references model checkpoints rather than
+vendoring weights. The built-in edit is a demo/smoke edit; deployable
+quantization backend evidence is covered by separate deployable-artifact lanes.</p>
+<p>The second run is a real external BYOE path. The subject checkpoint is
+materialized outside InvarLock by
+<code>public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/external_edit_recipe.py</code>,
+then consumed by <code>invarlock evaluate</code> with <code>--edit-label custom</code>:</p>
+<div class="codehilite"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>invarlock<span class="w"> </span>verify<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--profile<span class="w"> </span>release<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--assurance<span class="w"> </span>strict
+
+uv<span class="w"> </span>run<span class="w"> </span>invarlock<span class="w"> </span>advanced<span class="w"> </span>evidence-pack<span class="w"> </span>verify<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--profile<span class="w"> </span>release<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--report-assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--expected-fingerprint<span class="w"> </span>sha256:e01c40a94c89b22306a2670b032f623aa5428351d06e18f9b3e9e6a39b42c41b
+</code></pre></div>
+
+<p>That artifact is the concrete real-run evidence for BYOE/custom subjects:
+<code>checkpoint_refs.json</code> records the external edit type and file hashes for the
+external checkpoint weights, and the report records <code>edit_name = custom</code>.</p>
+<h2 id="export-evidence">Export Evidence<a class="headerlink" href="#export-evidence" title="Permanent link">&para;</a></h2>
+<p>Existing public reports can be converted into CI and registry handoff artifacts
+without adding generated files to <code>public_evidence/</code>:</p>
+<div class="codehilite"><pre><span></span><code>mkdir<span class="w"> </span>-p<span class="w"> </span>reports/public-evidence-export
+
+invarlock<span class="w"> </span>verify<span class="w"> </span>--json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--profile<span class="w"> </span>release<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>&gt;<span class="w"> </span>reports/public-evidence-export/invarlock-verify.json
+
+invarlock<span class="w"> </span>report<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--evaluation-report<span class="w"> </span>public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--format<span class="w"> </span>mlflow-tags<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--policy-profile<span class="w"> </span>release<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--verify-result<span class="w"> </span>reports/public-evidence-export/invarlock-verify.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>reports/public-evidence-export/mlflow-tags.json
+
+invarlock<span class="w"> </span>report<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--evaluation-report<span class="w"> </span>public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--format<span class="w"> </span>model-card-md<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--verify-result<span class="w"> </span>reports/public-evidence-export/invarlock-verify.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>reports/public-evidence-export/model-card-invarlock.md
+
+invarlock<span class="w"> </span>report<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--evaluation-report<span class="w"> </span>public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--format<span class="w"> </span>release-review-md<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--policy-profile<span class="w"> </span>release<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--verify-result<span class="w"> </span>reports/public-evidence-export/invarlock-verify.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>reports/public-evidence-export/release-review.md
+</code></pre></div>
+
+<p>These generated files are convenience outputs. The canonical evidence remains
+the checked-in <code>evaluation.report.json</code>, <code>runtime.manifest.json</code>, and evidence
+pack.</p>
+<h2 id="byoe-edit-examples">BYOE edit examples<a class="headerlink" href="#byoe-edit-examples" title="Permanent link">&para;</a></h2>
+<p>The repository also ships small strict-verifiable BYOE examples for multiple
+external edit workflows. These fixtures make the verifier boundary explicit:
+the subject checkpoint is an external reference, <code>plugins.edits</code> is empty, and
+the report is verified as a baseline-vs-subject comparison rather than as output
+from a built-in edit plugin.</p>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span class="w"> </span>release<span class="w"> </span>--assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/byoe_examples/magnitude_prune_byoe/evaluation.report.json
+
+invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span class="w"> </span>release<span class="w"> </span>--assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/byoe_examples/lora_merge_byoe/evaluation.report.json
+
+invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span class="w"> </span>release<span class="w"> </span>--assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/byoe_examples/fine_tune_byoe/evaluation.report.json
+</code></pre></div>
+
+<p>Each example includes <code>checkpoint_refs.json</code> beside the report. The pruning
+fixture is a dense magnitude-pruned subject reference, and the LoRA fixture is a
+merged-adapter subject reference. The fine-tune fixture is a separate
+fine-tuned checkpoint subject reference. These fixtures cover
+validation-subject fixture semantics. Sparse runtime speedups, packed quantized
+storage, deployable optimized backend behavior, and training-method quality
+require separate evidence lanes.</p>
+<h2 id="caught-regressions">Caught regressions<a class="headerlink" href="#caught-regressions" title="Permanent link">&para;</a></h2>
+<p>The caught-regression fixtures keep the naive primary metric acceptable
+(<code>ratio_vs_baseline = 1.0</code>) while one guard fails. They cover the three
+non-primary guard families exposed in strict verification:</p>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span class="w"> </span>release<span class="w"> </span>--assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/caught_regressions/spectral_guard_failure/evaluation.report.json
+
+invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span class="w"> </span>release<span class="w"> </span>--assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/caught_regressions/rmt_guard_failure/evaluation.report.json
+
+invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span class="w"> </span>release<span class="w"> </span>--assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/caught_regressions/variance_guard_failure/evaluation.report.json
+</code></pre></div>
+
+<p>Expected outcome: verification fails. The failing predicate is a guard/policy
+condition rather than perplexity. For the spectral case, the verifier reports:</p>
+<div class="codehilite"><pre><span></span><code>Release verification requires validation.spectral_stable == true
+spectral did not pass
+</code></pre></div>
+
+<p>That is the intended strict-verification behavior: guard stability is required even
+when the summary metric is clean.</p>
+<h2 id="real-guard-value-demo">Real guard-value demo<a class="headerlink" href="#real-guard-value-demo" title="Permanent link">&para;</a></h2>
+<p>The Mistral 7B published basis also ships a real scenario-pack artifact, separate
+from the fixture-only caught regressions:</p>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span class="w"> </span>release<span class="w"> </span>--assurance<span class="w"> </span>report<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json
+</code></pre></div>
+
+<p>Expected outcome: verification passes for the selected report itself. The
+packaged <code>guard_value_summary.json</code> records the guard-value comparison:
+PM-only accepts <code>spectral_moderate_scale_mlp_l31_up_s112</code>
+(<code>ratio_vs_baseline = 1.0076338080085065</code>), while the evidence-pack PM+guards
+comparison finds one new spectral cap relative to the Mistral noop basis:
+<code>model.layers.31.mlp.up_proj</code>.</p>
+<p>The same artifact includes <code>spectral_moderate_scale_attn_l31_o_s105</code> as the
+selected attention negative control: a 1.05x scale on the closest non-baseline
+attention module passes PM, adds no new baseline-relative spectral cap, and
+keeps the edited target below the documented stock attention cap
+(<code>z = 2.7987064430328767</code>, stock cap <code>3.018</code>). The compact sweep summary
+records adjacent scale points showing that the attention target starts
+triggering at 1.18 and the FFN target remains PM-accepted through 1.20.</p>
+<p>This artifact is an evidence-pack guard-value demonstration:
+<code>validation.spectral_stable</code> remains true because the spectral cap budget is
+not exceeded. Baseline-only guard signals do not count as new guard catches, but
+a PM-passing run that adds a new capped module does.</p>
+<h2 id="policy-failures">Policy failures<a class="headerlink" href="#policy-failures" title="Permanent link">&para;</a></h2>
+<p>The policy-failure fixtures show non-guard and provenance predicates that can
+block a strict release:</p>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span class="w"> </span>release<span class="w"> </span>--assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/policy_failures/invariants_failure/evaluation.report.json
+
+invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span class="w"> </span>release<span class="w"> </span>--assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/policy_failures/primary_metric_failure/evaluation.report.json
+
+invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span class="w"> </span>release<span class="w"> </span>--assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>public_evidence/policy_failures/runtime_provenance_failure/evaluation.report.json
+</code></pre></div>
+
+<p>Expected outcome: each verification fails for its named policy predicate:
+invariant evidence, primary-metric acceptance, or container runtime provenance.</p>
+<h2 id="applying-this-to-your-checkpoint">Applying this to your checkpoint<a class="headerlink" href="#applying-this-to-your-checkpoint" title="Permanent link">&para;</a></h2>
+<p>Use your own edited checkpoint from a quantization, pruning, distillation, or
+fine-tuning pipeline, then run <code>invarlock evaluate</code> or generate an
+<code>evaluation.report.json</code> from paired run reports:</p>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>report<span class="w"> </span>generate<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--run<span class="w"> </span>runs/subject/report.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--baseline-run-report<span class="w"> </span>runs/baseline/report.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--format<span class="w"> </span>report<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-o<span class="w"> </span>reports/eval
+
+invarlock<span class="w"> </span>verify<span class="w"> </span>--profile<span class="w"> </span>release<span class="w"> </span>--assurance<span class="w"> </span>strict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>reports/eval/evaluation.report.json
+</code></pre></div>
+
+<p>Keep <code>evaluation.report.json</code> and <code>runtime.manifest.json</code> together. Use
+<code>invarlock advanced runtime-verify</code> only when you specifically want to inspect
+the manifest/report binding; use <code>invarlock verify</code> for the full strict
+verification result.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.expand", "navigation.tabs"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../assets/javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
