@@ -23,6 +23,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SUMMARY_SCHEMA = "invarlock.training_evidence_campaign.summary.v1"
 HASH_INVENTORY_SCHEMA = "invarlock.training_evidence_campaign.hash_inventory.v1"
 EVIDENCE_SCOPE = "empirical training evidence only; no new assurance claim"
+ARTIFACT_AVAILABILITY = (
+    "hash-pinned validation outputs; lane artifact files are not vendored in this "
+    "public summary bundle"
+)
+PUBLIC_ARTIFACT_POLICY = (
+    "publish public summaries and hash inventories; report manifests, checkpoint "
+    "references, evaluation reports, and verification JSON are recorded as "
+    "hash-pinned validation outputs unless separately vendored"
+)
 DEFAULT_TARGETS = ("peft_lora", "fine_tune")
 PUBLISHABLE_ARTIFACTS = {
     "evaluation_report": "evaluation.report.json",
@@ -344,11 +353,9 @@ def _build_summary(
         "campaign_id": campaign_id,
         "status": status,
         "evidence_scope": EVIDENCE_SCOPE,
+        "artifact_availability": ARTIFACT_AVAILABILITY,
         "weights_vendored": False,
-        "public_artifact_policy": (
-            "publish public summaries, report manifests, checkpoint references, "
-            "evaluation reports, verification JSON, and hash inventories only"
-        ),
+        "public_artifact_policy": PUBLIC_ARTIFACT_POLICY,
         "lanes": lanes,
     }
     repo_relative = _repo_relative(work_root)
@@ -368,6 +375,7 @@ def _build_inventory(
         "campaign_id": campaign_id,
         "status": status,
         "evidence_scope": EVIDENCE_SCOPE,
+        "artifact_availability": ARTIFACT_AVAILABILITY,
         "weights_vendored": False,
         "artifacts": sorted(
             artifacts,

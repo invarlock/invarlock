@@ -104,8 +104,9 @@ For a real model-run counterpart, inspect
 `public_evidence/published_basis/mistral_7b/guard_value_demo/guard_value_summary.json`.
 That artifact includes a Mistral 7B targeted spectral probe where the primary
 metric passes, but the evidence-pack guard-value comparison records a new FFN
-spectral cap relative to the published noop basis. It also includes a matched
-attention 1.12x negative control that passes PM without adding a new cap.
+spectral cap relative to the published noop basis. It also includes a selected
+attention 1.05x negative control that passes PM, adds no new baseline-relative
+cap, and keeps the edited target below the documented stock attention cap.
 
 ## Development Fallback
 

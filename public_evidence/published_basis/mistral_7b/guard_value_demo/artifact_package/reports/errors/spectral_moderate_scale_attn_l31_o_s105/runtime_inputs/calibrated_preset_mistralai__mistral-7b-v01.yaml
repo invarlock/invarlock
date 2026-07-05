@@ -9,14 +9,14 @@ _calibration_meta:
   - 0.8878
   - 1.086
 model:
-  id: <validation-output-root>/mistral_guard_value_real_20260612d/models/mistralai__mistral-7b-v01/baseline
+  id: <validation-output-root>/mistral_guard_stock_clean_20260704a/models/mistralai__mistral-7b-v01/baseline
 dataset:
   provider: wikitext2
   split: validation
   seq_len: 512
   stride: 512
-  preview_n: 200
-  final_n: 200
+  preview_n: 218
+  final_n: 218
   seed: 42
 guards:
   order:
@@ -40,9 +40,9 @@ guards:
     max_caps: 5
   rmt:
     epsilon_by_family:
-      other: 0.01
       ffn: 0.01
       embed: 0.01
+      other: 0.01
       attn: 0.01
   variance:
     deadband: 0.02

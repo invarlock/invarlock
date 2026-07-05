@@ -13,8 +13,8 @@
       "invariants_fail": 0,
       "invariants_warn": 0,
       "primary_metric_fail": 2,
-      "reports": 4,
-      "scenarios": 4
+      "reports": 5,
+      "scenarios": 5
     },
     "stress": {
       "any_flag": 0,
@@ -61,7 +61,7 @@
   },
   "failed_requirements": [],
   "guard_intervention_summary": {
-    "records_total": 5,
+    "records_total": 6,
     "signals": {
       "spectral_caps": {
         "flagged": 5,
@@ -74,7 +74,7 @@
     }
   },
   "guard_signal_summary": {
-    "records_total": 5,
+    "records_total": 6,
     "signals": {
       "invariants": {
         "flagged": 0,
@@ -387,9 +387,9 @@
       "intent": "negative_control",
       "invariants_status": "pass",
       "model": "mistralai__mistral-7b-v01",
-      "name": "spectral_moderate_scale_attn_l31_o_s112",
+      "name": "spectral_moderate_scale_attn_l31_o_s105",
       "passed": true,
-      "path": "<validation-output-root>/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_attn_l31_o_s112/evaluation.report.json",
+      "path": "<validation-output-root>/mistral_guard_stock_clean_20260704a/mistralai__mistral-7b-v01/reports/errors/spectral_moderate_scale_attn_l31_o_s105/evaluation.report.json",
       "primary_guard": "spectral",
       "primary_guard_baseline_relative_required": false,
       "primary_guard_hit": false,
@@ -480,7 +480,7 @@
       "category": "error_injection",
       "detector_hits": 1,
       "failed": 0,
-      "id": "spectral_moderate_scale_attn_l31_o_s112",
+      "id": "spectral_moderate_scale_attn_l31_o_s105",
       "intent": "negative_control",
       "passed": 1,
       "primary_guard": "spectral",

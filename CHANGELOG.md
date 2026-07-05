@@ -15,6 +15,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.12.1] - 2026-07-05
+
+### Added
+
+- Added stock-clean attention guard-value control evidence for the Mistral 7B
+  guard-value demo package.
+
+### Changed
+
+- Updated guard-value scenario contracts so targeted spectral, RMT, and
+  variance/VE probes are required detections while FP8 stress remains
+  informational historical context.
+- Refined docs asset configuration for MathJax loading and documentation
+  focus/selection styling.
+- Updated markdownlint-cli2 to 0.23.0 for docs linting.
+
+### Removed
+
+- Removed the retired attention guard-value control report and references from
+  the current public evidence package.
+
+### Fixed
+
+- Fixed strict verification handling for `must_detect` guard-value probe
+  reports and added coverage for targeted guard-value verdict scenarios.
+
 ## [0.12.0] - 2026-06-30
 
 ### Added

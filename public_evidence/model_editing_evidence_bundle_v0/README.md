@@ -14,3 +14,8 @@ Use `manifest.json` to locate each lane's evaluation report, runtime manifest,
 checkpoint references, and evidence note. Use `verification_summary.json` for
 the deterministic hash inventory and release/strict verification status for the
 bundle lanes.
+
+The training-evidence campaign subdirectory publishes only the public campaign
+summary and hash inventory. Its lane artifacts are hash-pinned validation
+outputs and are not vendored in this bundle unless a later artifact drop adds
+them explicitly.

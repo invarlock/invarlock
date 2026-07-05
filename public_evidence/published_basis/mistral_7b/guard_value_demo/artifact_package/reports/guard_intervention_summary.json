@@ -2,8 +2,8 @@
   "records_total": 5,
   "signals": {
     "spectral_caps": {
-      "flagged": 5,
-      "unique": 5
+      "flagged": 4,
+      "unique": 4
     },
     "ve_signal": {
       "flagged": 0,

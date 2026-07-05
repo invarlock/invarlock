@@ -1,4 +1,5 @@
 {
+  "artifact_availability": "hash-pinned validation outputs; lane artifact files are not vendored in this public summary bundle",
   "artifacts": [
     {
       "artifact": "checkpoint_refs",
