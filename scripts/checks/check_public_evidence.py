@@ -17,6 +17,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PUBLIC_EVIDENCE_ROOT = REPO_ROOT / "public_evidence"
 META_FILENAME = "evidence.meta.json"
 SCHEMA = "invarlock.public_evidence.meta.v1"
+CANONICAL_PACK_REPORT = (
+    Path("evidence_pack") / "reports" / "report-001" / "evaluation.report.json"
+)
+MAX_DUPLICATE_ROOT_REPORT_BYTES = 0
 
 
 EVIDENCE_CLASS_REGISTRY: dict[str, dict[str, str | None]] = {
@@ -186,6 +190,36 @@ def _check_public_evidence_privacy(errors: list[str], root: Path) -> None:
             for name, pattern, message in PRIVATE_EXECUTION_PATTERNS:
                 if pattern.search(line):
                     errors.append(f"{_relative(path)}:{line_number}: {name}: {message}")
+
+
+def _check_duplicate_root_evaluation_reports(errors: list[str], root: Path) -> None:
+    duplicate_pairs: list[tuple[Path, Path, int]] = []
+    for root_report in sorted(root.glob("*/*/evaluation.report.json")):
+        pack_report = root_report.parent / CANONICAL_PACK_REPORT
+        if not pack_report.is_file():
+            continue
+        try:
+            root_bytes = root_report.read_bytes()
+            pack_bytes = pack_report.read_bytes()
+        except OSError as exc:
+            errors.append(f"{_relative(root_report)}: unable to compare reports: {exc}")
+            continue
+        if root_bytes == pack_bytes:
+            duplicate_pairs.append((root_report, pack_report, len(root_bytes)))
+
+    duplicate_bytes = sum(size for _, _, size in duplicate_pairs)
+    if duplicate_bytes <= MAX_DUPLICATE_ROOT_REPORT_BYTES:
+        return
+    errors.append(
+        f"{_relative(root)}: duplicate root evaluation reports waste "
+        f"{duplicate_bytes} bytes across {len(duplicate_pairs)} file(s); "
+        f"budget is {MAX_DUPLICATE_ROOT_REPORT_BYTES} bytes"
+    )
+    for root_report, pack_report, _ in duplicate_pairs:
+        errors.append(
+            f"{_relative(root_report)}: duplicate of canonical pack report "
+            f"{_relative(pack_report)}"
+        )
 
 
 def _require_path(
@@ -1936,6 +1970,7 @@ def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
     if not root.is_dir():
         return [f"public evidence root not found: {root}"]
     _check_public_evidence_privacy(errors, root)
+    _check_duplicate_root_evaluation_reports(errors, root)
 
     for artifact_dir in sorted(_artifact_dirs(root)):
         meta_path = artifact_dir / META_FILENAME
@@ -1973,17 +2008,21 @@ def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
             errors.append(f"{_relative(meta_path)}: artifact_paths must be an object")
             continue
 
-        if (artifact_dir / "evaluation.report.json").is_file():
+        report_path: Path | None = None
+        if "evaluation_report" in artifact_paths:
             report_path = _require_path(
                 errors, artifact_dir, artifact_paths, "evaluation_report"
             )
             _require_path(errors, artifact_dir, artifact_paths, "runtime_manifest")
-            if report_path is not None and _is_direct_published_basis_artifact(
-                artifact_dir, root
-            ):
-                _check_published_basis_multimodal_quality(
-                    errors, artifact_dir, report_path
-                )
+        elif (artifact_dir / "evaluation.report.json").is_file():
+            report_path = _require_path(
+                errors, artifact_dir, artifact_paths, "evaluation_report"
+            )
+            _require_path(errors, artifact_dir, artifact_paths, "runtime_manifest")
+        if report_path is not None and _is_direct_published_basis_artifact(
+            artifact_dir, root
+        ):
+            _check_published_basis_multimodal_quality(errors, artifact_dir, report_path)
 
         if class_kind == "real":
             _require_path(errors, artifact_dir, artifact_paths, "run_command")

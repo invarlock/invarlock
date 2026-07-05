@@ -23,7 +23,7 @@ jobs:
       - run: python -m pip install -e .
       - uses: ./.github/actions/invarlock-report-gate
         with:
-          report: public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json
+          report: public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json
           profile: release
           assurance: strict
           runtime-provenance: container
@@ -51,13 +51,13 @@ Generate a dependency-free MLflow tag export:
 
 ```bash
 invarlock verify --json \
-  public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json \
+  public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json \
   --profile release \
   --assurance strict \
   > reports/eval/invarlock-verify.json
 
 invarlock report export \
-  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json \
+  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json \
   --format mlflow-tags \
   --policy-profile release \
   --verify-result reports/eval/invarlock-verify.json \
@@ -88,7 +88,7 @@ Generate a copy-pasteable evidence block:
 
 ```bash
 invarlock report export \
-  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json \
+  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json \
   --format model-card-md \
   --report-url https://example.test/evaluation.report.json \
   --evidence-url https://example.test/evidence.zip \
@@ -105,7 +105,7 @@ Generate a release-review packet for release maintainers and auditors:
 
 ```bash
 invarlock report export \
-  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json \
+  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json \
   --format release-review-md \
   --policy-profile release \
   --verify-result reports/eval/invarlock-verify.json \

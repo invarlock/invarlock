@@ -9,7 +9,7 @@ Build a local review bundle from the checked-in external-edit public evidence.
 
 Options:
   --report PATH                Source evaluation report.
-                               Default: public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json
+                               Default: public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json
   --output-dir DIR             Output directory for generated handoff artifacts.
                                Default: examples/integrations/public_e2e/reports/tiny-gpt2-external-magnitude-prune
   --profile NAME               InvarLock verification profile. Default: release
@@ -29,7 +29,7 @@ USAGE
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../../.." && pwd)"
 
-report="$REPO_ROOT/public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json"
+report="$REPO_ROOT/public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json"
 output_dir="$SCRIPT_DIR/reports/tiny-gpt2-external-magnitude-prune"
 profile="release"
 assurance="strict"

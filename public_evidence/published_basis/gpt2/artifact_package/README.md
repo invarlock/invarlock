@@ -16,7 +16,7 @@ maintainers can rebuild the checkpoints from
 | --- | --- |
 | `artifact_package.json` | Machine-readable package manifest and verifier commands. |
 | `checkpoint_refs.json` | Baseline and subject checkpoint references for the BYOE lane. |
-| `../evaluation.report.json` | Canonical strict verification report. |
+| `../evidence_pack/reports/report-001/evaluation.report.json` | Canonical strict verification report. |
 | `../runtime.manifest.json` | Container runtime provenance bound to the report. |
 | `../evidence_pack/` | Signed, checksum-bound evidence pack. |
 
@@ -24,7 +24,7 @@ maintainers can rebuild the checkpoints from
 
 ```bash
 uv run invarlock verify \
-  public_evidence/published_basis/gpt2/evaluation.report.json \
+  public_evidence/published_basis/gpt2/evidence_pack/reports/report-001/evaluation.report.json \
   --profile release \
   --assurance strict
 

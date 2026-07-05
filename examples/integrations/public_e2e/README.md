@@ -69,7 +69,7 @@ checked out:
 ```yaml
 - uses: ./.github/actions/invarlock-report-gate
   with:
-    report: public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json
+    report: public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json
     profile: release
     assurance: strict
     runtime-provenance: container

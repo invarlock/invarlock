@@ -890,7 +890,7 @@
             "final": 18.4764781355879,
             "ratio_vs_baseline": 1.0
           },
-          "existing_public_evidence_report": "public_evidence/published_basis/qwen3_8b/evaluation.report.json",
+          "existing_public_evidence_report": "public_evidence/published_basis/qwen3_8b/evidence_pack/reports/report-001/evaluation.report.json",
           "existing_public_runtime_manifest": "public_evidence/published_basis/qwen3_8b/runtime.manifest.json",
           "status": "ok"
         },
@@ -914,7 +914,7 @@
             "final": 13.947773120163413,
             "ratio_vs_baseline": 1.0
           },
-          "existing_public_evidence_report": "public_evidence/published_basis/qwen3_5_9b/evaluation.report.json",
+          "existing_public_evidence_report": "public_evidence/published_basis/qwen3_5_9b/evidence_pack/reports/report-001/evaluation.report.json",
           "existing_public_runtime_manifest": "public_evidence/published_basis/qwen3_5_9b/runtime.manifest.json",
           "status": "ok"
         }
@@ -940,7 +940,7 @@
             "final": 0.385,
             "ratio_vs_baseline": 0.5000000000000004
           },
-          "existing_public_evidence_report": "public_evidence/published_basis/gemma4_e2b_image_text/evaluation.report.json",
+          "existing_public_evidence_report": "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack/reports/report-001/evaluation.report.json",
           "existing_public_runtime_manifest": "public_evidence/published_basis/gemma4_e2b_image_text/runtime.manifest.json",
           "status": "ok"
         },
@@ -964,7 +964,7 @@
             "final": 0.8525,
             "ratio_vs_baseline": 3.2500000000000084
           },
-          "existing_public_evidence_report": "public_evidence/published_basis/qwen3_5_4b/evaluation.report.json",
+          "existing_public_evidence_report": "public_evidence/published_basis/qwen3_5_4b/evidence_pack/reports/report-001/evaluation.report.json",
           "existing_public_runtime_manifest": "public_evidence/published_basis/qwen3_5_4b/runtime.manifest.json",
           "status": "ok"
         },
@@ -988,7 +988,7 @@
             "final": 0.8075,
             "ratio_vs_baseline": 5.249999999999999
           },
-          "existing_public_evidence_report": "public_evidence/published_basis/qwen3_5_2b/evaluation.report.json",
+          "existing_public_evidence_report": "public_evidence/published_basis/qwen3_5_2b/evidence_pack/reports/report-001/evaluation.report.json",
           "existing_public_runtime_manifest": "public_evidence/published_basis/qwen3_5_2b/runtime.manifest.json",
           "status": "ok"
         }

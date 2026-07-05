@@ -21,7 +21,7 @@ and BERT-style masked LM lanes:
 
 ```bash
 invarlock verify --profile release --assurance strict \
-  public_evidence/published_basis/gpt2/evaluation.report.json
+  public_evidence/published_basis/gpt2/evidence_pack/reports/report-001/evaluation.report.json
 
 invarlock verify --profile release --assurance strict \
   public_evidence/published_basis/bert/evaluation.report.json
@@ -86,7 +86,7 @@ applies the built-in `quant_rtn` RTN dequantized weight-edit simulation:
 
 ```bash
 uv run invarlock verify \
-  public_evidence/real_runs/tiny_gpt2_quant_rtn/evaluation.report.json \
+  public_evidence/real_runs/tiny_gpt2_quant_rtn/evidence_pack/reports/report-001/evaluation.report.json \
   --profile release \
   --assurance strict
 
@@ -111,7 +111,7 @@ then consumed by `invarlock evaluate` with `--edit-label custom`:
 
 ```bash
 uv run invarlock verify \
-  public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json \
+  public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json \
   --profile release \
   --assurance strict
 
@@ -136,26 +136,26 @@ without adding generated files to `public_evidence/`:
 mkdir -p reports/public-evidence-export
 
 invarlock verify --json \
-  public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json \
+  public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json \
   --profile release \
   --assurance strict \
   > reports/public-evidence-export/invarlock-verify.json
 
 invarlock report export \
-  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json \
+  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json \
   --format mlflow-tags \
   --policy-profile release \
   --verify-result reports/public-evidence-export/invarlock-verify.json \
   --output reports/public-evidence-export/mlflow-tags.json
 
 invarlock report export \
-  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json \
+  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json \
   --format model-card-md \
   --verify-result reports/public-evidence-export/invarlock-verify.json \
   --output reports/public-evidence-export/model-card-invarlock.md
 
 invarlock report export \
-  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json \
+  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json \
   --format release-review-md \
   --policy-profile release \
   --verify-result reports/public-evidence-export/invarlock-verify.json \

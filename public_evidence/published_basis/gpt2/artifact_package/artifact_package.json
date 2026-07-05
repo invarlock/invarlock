@@ -1,6 +1,6 @@
 {
   "checkpoint_refs": "checkpoint_refs.json",
-  "evaluation_report": "../evaluation.report.json",
+  "evaluation_report": "../evidence_pack/reports/report-001/evaluation.report.json",
   "evidence_level": "strict_pass_fixture",
   "expected_fingerprint": "sha256:0668414f854d1e75cc7514302a2c974aae1141e2acba225afd55acf3e35eacfb",
   "generated_at": "2026-05-29T00:00:00Z",
@@ -19,7 +19,7 @@
         "run",
         "invarlock",
         "verify",
-        "public_evidence/published_basis/gpt2/evaluation.report.json",
+        "public_evidence/published_basis/gpt2/evidence_pack/reports/report-001/evaluation.report.json",
         "--profile",
         "release",
         "--assurance",

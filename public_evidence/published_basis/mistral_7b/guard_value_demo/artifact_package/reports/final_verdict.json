@@ -117,7 +117,7 @@
       "family": "fp8",
       "guard_baseline_relative": {
         "spectral": {
-          "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+          "baseline_reference": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
           "baseline_spectral_caps_applied": 2,
           "delta_caps_applied": 0,
           "matching_capped_modules": [
@@ -159,7 +159,7 @@
       "reasons": [],
       "run_num": 2,
       "spectral_baseline_relative": {
-        "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+        "baseline_reference": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
         "baseline_spectral_caps_applied": 2,
         "delta_caps_applied": 0,
         "matching_capped_modules": [
@@ -272,7 +272,7 @@
       "family": "",
       "guard_baseline_relative": {
         "spectral": {
-          "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+          "baseline_reference": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
           "baseline_spectral_caps_applied": 2,
           "delta_caps_applied": 1,
           "matching_capped_modules": [
@@ -319,7 +319,7 @@
       "reasons": [],
       "run_num": 0,
       "spectral_baseline_relative": {
-        "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+        "baseline_reference": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
         "baseline_spectral_caps_applied": 2,
         "delta_caps_applied": 1,
         "matching_capped_modules": [
@@ -355,7 +355,7 @@
       "family": "",
       "guard_baseline_relative": {
         "spectral": {
-          "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+          "baseline_reference": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
           "baseline_spectral_caps_applied": 2,
           "delta_caps_applied": 0,
           "matching_capped_modules": [
@@ -397,7 +397,7 @@
       "reasons": [],
       "run_num": 0,
       "spectral_baseline_relative": {
-        "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+        "baseline_reference": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
         "baseline_spectral_caps_applied": 2,
         "delta_caps_applied": 0,
         "matching_capped_modules": [

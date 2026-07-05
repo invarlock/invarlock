@@ -13,7 +13,7 @@ Verify the report:
 
 ```bash
 uv run invarlock verify \
-  public_evidence/real_runs/tiny_gpt2_quant_rtn/evaluation.report.json \
+  public_evidence/real_runs/tiny_gpt2_quant_rtn/evidence_pack/reports/report-001/evaluation.report.json \
   --profile release \
   --assurance strict
 ```

@@ -10,7 +10,7 @@
 > The public evidence floor is the source-tree `published_basis` fixture set.
 > That fixture set demonstrates the public report/evidence-pack contract; it is
 > not the entire calibration corpus used to justify every numeric tier constant:
-> `public_evidence/published_basis/gpt2/evaluation.report.json`,
+> `public_evidence/published_basis/gpt2/evidence_pack/reports/report-001/evaluation.report.json`,
 > `public_evidence/published_basis/gpt2/evidence_pack_recipe.json`,
 > `public_evidence/published_basis/gpt2/evidence_pack/`,
 > `public_evidence/published_basis/bert/evaluation.report.json`,

@@ -137,7 +137,7 @@ are being built:
 
 ```bash
 invarlock verify --profile release --assurance strict \
-  public_evidence/published_basis/gpt2/evaluation.report.json
+  public_evidence/published_basis/gpt2/evidence_pack/reports/report-001/evaluation.report.json
 
 invarlock verify --profile release --assurance strict \
   public_evidence/byoe_examples/lora_merge_byoe/evaluation.report.json
@@ -146,10 +146,10 @@ invarlock verify --profile release --assurance strict \
   public_evidence/byoe_examples/fine_tune_byoe/evaluation.report.json
 
 invarlock verify --profile release --assurance strict \
-  public_evidence/real_runs/tiny_gpt2_quant_rtn/evaluation.report.json
+  public_evidence/real_runs/tiny_gpt2_quant_rtn/evidence_pack/reports/report-001/evaluation.report.json
 
 invarlock verify --profile release --assurance strict \
-  public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json
+  public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json
 ```
 
 See the [Public Evidence Walkthrough](public-evidence-walkthrough.md) for the

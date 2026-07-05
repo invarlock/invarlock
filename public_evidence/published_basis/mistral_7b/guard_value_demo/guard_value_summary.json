@@ -40,7 +40,7 @@
   "generated_at_utc": "2026-06-12T15:48:45Z",
   "negative_control": {
     "baseline_relative_evidence": {
-      "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+      "baseline_reference": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
       "baseline_spectral_caps_applied": 2,
       "delta_caps_applied": 0,
       "matching_capped_modules": [
@@ -83,7 +83,7 @@
   },
   "pm_only_vs_pm_plus_guards": {
     "baseline_relative_evidence": {
-      "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+      "baseline_reference": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
       "baseline_spectral_caps_applied": 2,
       "delta_caps_applied": 1,
       "matching_capped_modules": [
@@ -143,7 +143,7 @@
   "scenario_evidence": [
     {
       "baseline_relative_evidence": {
-        "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+        "baseline_reference": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
         "baseline_spectral_caps_applied": 2,
         "delta_caps_applied": 0,
         "matching_capped_modules": [
@@ -263,7 +263,7 @@
     },
     {
       "baseline_relative_evidence": {
-        "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+        "baseline_reference": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
         "baseline_spectral_caps_applied": 2,
         "delta_caps_applied": 1,
         "matching_capped_modules": [
@@ -318,7 +318,7 @@
     },
     {
       "baseline_relative_evidence": {
-        "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+        "baseline_reference": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
         "baseline_spectral_caps_applied": 2,
         "delta_caps_applied": 0,
         "matching_capped_modules": [
