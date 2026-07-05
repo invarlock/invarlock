@@ -14,14 +14,47 @@ def _load_scenarios() -> list[dict[str, object]]:
     return payload.get("scenarios", [])
 
 
-def _load_published_mistral_guard_value_scenarios() -> list[dict[str, object]]:
+def _load_published_basis_index() -> dict[str, object]:
+    path = _repo_root() / "public_evidence/published_basis_index.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    return payload
+
+
+def _load_published_mistral_guard_value_scenarios() -> list[dict[str, object]] | None:
     path = (
         _repo_root()
         / "public_evidence/published_basis/mistral_7b/guard_value_demo"
         / "artifact_package/state/scenarios.json"
     )
+    if not path.is_file():
+        return None
     payload = json.loads(path.read_text(encoding="utf-8"))
     return payload.get("scenarios", [])
+
+
+def _assert_mistral_guard_value_scenarios_snapshot_is_indexed() -> None:
+    index = _load_published_basis_index()
+    entries = index.get("entries")
+    assert isinstance(entries, list)
+    by_slug = {entry.get("slug"): entry for entry in entries if isinstance(entry, dict)}
+    mistral = by_slug.get("mistral_7b")
+    assert isinstance(mistral, dict)
+    artifacts = mistral.get("artifacts")
+    assert isinstance(artifacts, dict)
+    guard_value_demo = artifacts.get("guard_value_demo")
+    assert isinstance(guard_value_demo, dict)
+    assert guard_value_demo["kind"] == "directory"
+    assert guard_value_demo["path"] == (
+        "public_evidence/published_basis/mistral_7b/guard_value_demo"
+    )
+    control_hashes = guard_value_demo.get("control_hashes")
+    assert isinstance(control_hashes, dict)
+    assert control_hashes["artifact_package/state/scenarios.json"].startswith("sha256:")
+    external_asset = guard_value_demo.get("external_asset")
+    assert isinstance(external_asset, dict)
+    assert external_asset["archive_path"] == guard_value_demo["path"]
+    assert external_asset["url"].startswith("https://github.com/invarlock/invarlock/")
 
 
 def test_scenarios_include_intent_and_primary_guard_metadata() -> None:
@@ -219,6 +252,10 @@ def test_mistral_guard_value_repo_contract_matches_published_snapshot_subset() -
         "primary_guard",
         "requirements",
     )
+
+    if published is None:
+        _assert_mistral_guard_value_scenarios_snapshot_is_indexed()
+        return
 
     assert published, "published Mistral guard-value snapshot must not be empty"
 

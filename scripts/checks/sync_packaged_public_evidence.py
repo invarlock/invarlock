@@ -30,6 +30,7 @@ _DIRECTORY_CONTROL_FILES = (
     "guard_value_summary.json",
     "artifact_package.json",
     "checkpoint_refs.json",
+    "artifact_package/state/scenarios.json",
     "artifact_package/reports/final_verdict.json",
     "manifest.json",
 )

@@ -1472,6 +1472,7 @@
         "guard_value_demo": {
           "control_hashes": {
             "artifact_package/reports/final_verdict.json": "sha256:f77b22ab2931549a8b31458c59986944f8d29e8a8efed05bcf77112f4757efd3",
+            "artifact_package/state/scenarios.json": "sha256:53cb3fe5bcfaeca4d553c4177d345c57ca96e4912a206c8a20f2e998b9ec8909",
             "guard_value_manifest.json": "sha256:79408cc30bf8c8fac5240f8daedcbaf3df1de330778664977a1a344807fc5600",
             "guard_value_summary.json": "sha256:fd545a4edf61035bf3adc1d0be60998294b4d0a4747536d03f7eed6644824045"
           },
