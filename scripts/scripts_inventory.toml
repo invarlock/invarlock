@@ -1,44 +1,9 @@
 version = 1
 
 [[large_script_reviews]]
-path = "scripts/evidence_packs/tests/test_validation_suite.sh"
-max_lines = 4500
-rationale = "Large evidence-pack shell regression harness retained until validation-suite cases are migrated to smaller shared helpers."
-
-[[large_script_reviews]]
-path = "scripts/evidence_packs/tests/test_task_functions.sh"
-max_lines = 3900
-rationale = "Large evidence-pack shell regression harness retained until task-function cases are split or moved to Python coverage."
-
-[[large_script_reviews]]
-path = "scripts/evidence_packs/tests/test_queue_manager.sh"
-max_lines = 2400
-rationale = "Large evidence-pack queue-manager harness retained because it covers multi-state scheduler and worker edge cases."
-
-[[large_script_reviews]]
-path = "scripts/evidence_packs/tests/test_run_pack.sh"
-max_lines = 2100
-rationale = "Large evidence-pack run-pack harness retained for end-to-end maintainer workflow coverage."
-
-[[large_script_reviews]]
-path = "scripts/evidence_packs/tests/test_scheduler.sh"
-max_lines = 1400
-rationale = "Large evidence-pack scheduler harness retained while scheduler cases are consolidated around shared assertions."
-
-[[large_script_reviews]]
 path = "scripts/model_evidence/model_evidence_sweep.py"
 max_lines = 1400
 rationale = "Large model-evidence workflow entry point retained until sweep planning and execution surfaces are split safely."
-
-[[large_script_reviews]]
-path = "scripts/evidence_packs/tests/test_verify_pack.sh"
-max_lines = 1400
-rationale = "Large evidence-pack verification harness retained for signed-pack and verifier workflow coverage."
-
-[[large_script_reviews]]
-path = "scripts/evidence_packs/tests/run.sh"
-max_lines = 1250
-rationale = "Large evidence-pack shell test runner retained while shared setup and tracing are consolidated."
 
 [[large_script_reviews]]
 path = "scripts/evidence_packs/python/editing/implementations.py"

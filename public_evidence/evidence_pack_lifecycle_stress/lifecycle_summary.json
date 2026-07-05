@@ -42,7 +42,7 @@
     {
       "finding": "A queue-manager fallback-path test used regex-sensitive matching for a generated JSON row.",
       "status": "fixed",
-      "artifact": "scripts/evidence_packs/tests/test_queue_manager.sh"
+      "artifact": "scripts/evidence_packs/tests/test_queue_manager_generation.sh"
     }
   ]
 }
