@@ -97,6 +97,64 @@ mock_reset() {
     mkdir -p "${TEST_TMPDIR}/fixtures"
 }
 
+queue_fixture_dirs() {
+    local out_dir="${1:-${TEST_TMPDIR}/out}"
+    export QUEUE_DIR="${out_dir}/queue"
+    mkdir -p "${QUEUE_DIR}"/{pending,ready,running,completed,failed}
+}
+
+gpu_reservation_fixture_dir() {
+    export GPU_RESERVATION_DIR="${1:-${TEST_TMPDIR}/gpu_res}"
+    mkdir -p "${GPU_RESERVATION_DIR}"
+}
+
+write_queue_task() {
+    local state="$1"
+    local task_id="$2"
+    local task_type="${3:-SETUP_BASELINE}"
+    local model_name="${4:-n}"
+    local extra_json="${5:-}"
+    [[ -n "${extra_json}" ]] || extra_json="{}"
+
+    mkdir -p "${QUEUE_DIR}/${state}"
+    jq -n \
+        --arg id "${task_id}" \
+        --arg state "${state}" \
+        --arg type "${task_type}" \
+        --arg name "${model_name}" \
+        --argjson extra "${extra_json}" \
+        '{
+            task_id: $id,
+            task_type: $type,
+            model_id: "m",
+            model_name: $name,
+            status: $state,
+            retries: 0,
+            max_retries: 3,
+            created_at: "x",
+            started_at: null,
+            completed_at: null,
+            error_msg: null,
+            assigned_gpus: null,
+            dependencies: [],
+            params: {},
+            priority: 50
+        } + $extra' > "${QUEUE_DIR}/${state}/${task_id}.task"
+}
+
+write_gpu_reservation() {
+    local task_id="$1"
+    local timestamp="${2:-0}"
+    local owner_pid="${3:-123}"
+    local gpu_list="${4:-0}"
+
+    mkdir -p "${GPU_RESERVATION_DIR}"
+    printf "timestamp=%s\nowner_pid=%s\ngpu_list=%s\n" \
+        "${timestamp}" "${owner_pid}" "${gpu_list}" \
+        > "${GPU_RESERVATION_DIR}/task_${task_id}.meta"
+    printf "%s\n" "${gpu_list}" > "${GPU_RESERVATION_DIR}/task_${task_id}.gpus"
+}
+
 mock_install_bin_dir() {
     local bin_dir="${TEST_TMPDIR}/mocks/bin"
     local dispatcher="${bin_dir}/mock-command"

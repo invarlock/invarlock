@@ -21,24 +21,20 @@ test_is_reservation_valid_ttl_and_liveness() {
     # shellcheck source=../scheduler.sh
     source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
-    export QUEUE_DIR="${TEST_TMPDIR}/queue"
-    mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
-    export GPU_RESERVATION_DIR="${TEST_TMPDIR}/gpu_res"
-    mkdir -p "${GPU_RESERVATION_DIR}"
+    queue_fixture_dirs "${TEST_TMPDIR}"
+    gpu_reservation_fixture_dir
 
     _now_epoch() { echo "100"; }
 
     local task_id="t1"
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/ready/${task_id}.task"
+    write_queue_task ready "${task_id}"
 
-    local meta_file="${GPU_RESERVATION_DIR}/task_${task_id}.meta"
-    printf "timestamp=0\nowner_pid=123\ngpu_list=0\n" > "${meta_file}"
+    write_gpu_reservation "${task_id}" 0
     GPU_RESERVATION_TTL=60
     _pid_is_alive() { return 0; }
     ! _is_reservation_valid "${task_id}"
 
-    printf "timestamp=90\nowner_pid=123\ngpu_list=0\n" > "${meta_file}"
+    write_gpu_reservation "${task_id}" 90
     _pid_is_alive() { return 1; }
     ! _is_reservation_valid "${task_id}"
 
@@ -55,21 +51,17 @@ test_is_gpu_available_cleans_stale_reservation() {
     # shellcheck source=../scheduler.sh
     source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
-    export QUEUE_DIR="${TEST_TMPDIR}/queue"
-    mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
-    export GPU_RESERVATION_DIR="${TEST_TMPDIR}/gpu_res"
-    mkdir -p "${GPU_RESERVATION_DIR}"
+    queue_fixture_dirs "${TEST_TMPDIR}"
+    gpu_reservation_fixture_dir
 
     _now_epoch() { echo "100"; }
     GPU_RESERVATION_TTL=60
 
     local task_id="t1"
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/ready/${task_id}.task"
+    write_queue_task ready "${task_id}"
 
     echo "${task_id}" > "${GPU_RESERVATION_DIR}/gpu_0.lock"
-    printf "timestamp=0\nowner_pid=123\ngpu_list=0\n" > "${GPU_RESERVATION_DIR}/task_${task_id}.meta"
-    echo "0" > "${GPU_RESERVATION_DIR}/task_${task_id}.gpus"
+    write_gpu_reservation "${task_id}" 0
 
     _pid_is_alive() { return 0; }
     is_gpu_available 0
@@ -77,8 +69,7 @@ test_is_gpu_available_cleans_stale_reservation() {
     [[ ! -f "${GPU_RESERVATION_DIR}/gpu_0.lock" ]] || t_fail "expected stale gpu lock removed"
 
     echo "${task_id}" > "${GPU_RESERVATION_DIR}/gpu_0.lock"
-    printf "timestamp=90\nowner_pid=123\ngpu_list=0\n" > "${GPU_RESERVATION_DIR}/task_${task_id}.meta"
-    echo "0" > "${GPU_RESERVATION_DIR}/task_${task_id}.gpus"
+    write_gpu_reservation "${task_id}" 90
     _pid_is_alive() { return 0; }
     ! is_gpu_available 0
 }
@@ -88,14 +79,11 @@ test_find_and_claim_task_releases_reservation_when_claim_fails() {
     # shellcheck source=../scheduler.sh
     source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
-    export QUEUE_DIR="${TEST_TMPDIR}/queue"
-    mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
-    export GPU_RESERVATION_DIR="${TEST_TMPDIR}/gpu_res"
-    mkdir -p "${GPU_RESERVATION_DIR}"
+    queue_fixture_dirs "${TEST_TMPDIR}"
+    gpu_reservation_fixture_dir
 
     local task_id="t1"
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", model_size_gb:10, required_gpus:1, retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/ready/${task_id}.task"
+    write_queue_task ready "${task_id}" SETUP_BASELINE n '{"model_size_gb":10, "required_gpus":1}'
 
     find_best_task() { echo "t1"; }
     acquire_scheduler_lock() { return 0; }
@@ -175,15 +163,12 @@ test_is_reservation_valid_sanitizes_invalid_ttl() {
     # shellcheck source=../scheduler.sh
     source "${TEST_ROOT}/scripts/evidence_packs/lib/queue/scheduler.sh"
 
-    export QUEUE_DIR="${TEST_TMPDIR}/queue"
-    mkdir -p "${QUEUE_DIR}"/{ready,running,completed,pending,failed}
-    export GPU_RESERVATION_DIR="${TEST_TMPDIR}/gpu_res"
-    mkdir -p "${GPU_RESERVATION_DIR}"
+    queue_fixture_dirs "${TEST_TMPDIR}"
+    gpu_reservation_fixture_dir
 
     local task_id="t1"
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/ready/${task_id}.task"
-    printf "timestamp=99\nowner_pid=123\ngpu_list=0\n" > "${GPU_RESERVATION_DIR}/task_${task_id}.meta"
+    write_queue_task ready "${task_id}"
+    write_gpu_reservation "${task_id}" 99
 
     GPU_RESERVATION_TTL="bad"
     _now_epoch() { echo "100"; }

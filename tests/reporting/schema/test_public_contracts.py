@@ -12,6 +12,25 @@ from invarlock.cli import constants as cli_constants
 from invarlock.reporting import report_schema, verify_output
 from tests._repo_root import REPO_ROOT
 
+_JSON_CONTRACT_LOADER_CASES = (
+    ("support_matrix.json", contracts.load_support_matrix),
+    ("adapter_capabilities.json", contracts.load_adapter_capabilities),
+    ("model_family_catalog.json", contracts.load_model_family_catalog),
+    ("plugin_compatibility.json", contracts.load_plugin_compatibility),
+    ("policy_pack.schema.json", contracts.load_policy_pack_schema),
+    (
+        "evidence_pack_manifest.schema.json",
+        contracts.load_evidence_pack_manifest_schema,
+    ),
+    ("runtime_manifest.schema.json", contracts.load_runtime_manifest_schema),
+    ("verify_output.schema.json", contracts.load_verify_output_schema),
+)
+
+_PUBLIC_CONTRACT_LOADER_CASES = (
+    *_JSON_CONTRACT_LOADER_CASES,
+    ("published_basis_index.json", contracts.load_public_evidence_index),
+)
+
 
 def _assert_public_evidence_path_available(rel_path: str, *, kind: str) -> None:
     path = REPO_ROOT / rel_path
@@ -670,8 +689,9 @@ def test_packaged_contract_copies_match_repo_contracts() -> None:
         )
 
 
+@pytest.mark.parametrize(("filename", "loader"), _PUBLIC_CONTRACT_LOADER_CASES)
 def test_public_contract_helpers_raise_when_contracts_are_unavailable(
-    monkeypatch,
+    monkeypatch, filename: str, loader
 ) -> None:
     monkeypatch.setattr(
         contracts,
@@ -684,32 +704,14 @@ def test_public_contract_helpers_raise_when_contracts_are_unavailable(
         lambda _filename: (_ for _ in ()).throw(OSError("missing")),
     )
 
-    with pytest.raises(contracts.ContractLoadError, match="support_matrix.json"):
-        contracts.load_support_matrix()
-    with pytest.raises(contracts.ContractLoadError, match="adapter_capabilities.json"):
-        contracts.load_adapter_capabilities()
-    with pytest.raises(contracts.ContractLoadError, match="model_family_catalog.json"):
-        contracts.load_model_family_catalog()
-    with pytest.raises(contracts.ContractLoadError, match="plugin_compatibility.json"):
-        contracts.load_plugin_compatibility()
-    with pytest.raises(contracts.ContractLoadError, match="policy_pack.schema.json"):
-        contracts.load_policy_pack_schema()
-    with pytest.raises(
-        contracts.ContractLoadError, match="evidence_pack_manifest.schema.json"
-    ):
-        contracts.load_evidence_pack_manifest_schema()
-    with pytest.raises(
-        contracts.ContractLoadError, match="runtime_manifest.schema.json"
-    ):
-        contracts.load_runtime_manifest_schema()
-    with pytest.raises(contracts.ContractLoadError, match="verify_output.schema.json"):
-        contracts.load_verify_output_schema()
-    with pytest.raises(contracts.ContractLoadError, match="published_basis_index.json"):
-        contracts.load_public_evidence_index()
-    assert contracts.contract_reference("support_matrix.json") == {
-        "path": "contracts/support_matrix.json",
-        "load_error": "missing",
-    }
+    with pytest.raises(contracts.ContractLoadError, match=filename):
+        loader()
+
+    if filename == "support_matrix.json":
+        assert contracts.contract_reference("support_matrix.json") == {
+            "path": "contracts/support_matrix.json",
+            "load_error": "missing",
+        }
 
 
 def test_public_contract_helpers_wrap_unicode_decode_errors(monkeypatch) -> None:
@@ -725,7 +727,10 @@ def test_public_contract_helpers_wrap_unicode_decode_errors(monkeypatch) -> None
         contracts.load_support_matrix()
 
 
-def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> None:
+@pytest.mark.parametrize(("filename", "loader"), _JSON_CONTRACT_LOADER_CASES)
+def test_public_contract_helpers_reject_non_mapping_payloads(
+    monkeypatch, filename: str, loader
+) -> None:
     payloads = {
         "support_matrix.json": ["unexpected"],
         "model_family_catalog.json": "unexpected",
@@ -742,23 +747,5 @@ def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> Non
         lambda filename: payloads[filename],
     )
 
-    with pytest.raises(contracts.ContractLoadError, match="support_matrix.json"):
-        contracts.load_support_matrix()
-    with pytest.raises(contracts.ContractLoadError, match="adapter_capabilities.json"):
-        contracts.load_adapter_capabilities()
-    with pytest.raises(contracts.ContractLoadError, match="model_family_catalog.json"):
-        contracts.load_model_family_catalog()
-    with pytest.raises(contracts.ContractLoadError, match="plugin_compatibility.json"):
-        contracts.load_plugin_compatibility()
-    with pytest.raises(contracts.ContractLoadError, match="policy_pack.schema.json"):
-        contracts.load_policy_pack_schema()
-    with pytest.raises(
-        contracts.ContractLoadError, match="evidence_pack_manifest.schema.json"
-    ):
-        contracts.load_evidence_pack_manifest_schema()
-    with pytest.raises(
-        contracts.ContractLoadError, match="runtime_manifest.schema.json"
-    ):
-        contracts.load_runtime_manifest_schema()
-    with pytest.raises(contracts.ContractLoadError, match="verify_output.schema.json"):
-        contracts.load_verify_output_schema()
+    with pytest.raises(contracts.ContractLoadError, match=filename):
+        loader()

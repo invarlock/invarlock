@@ -195,8 +195,7 @@ test_retry_task_respects_max_retries() {
     init_queue "${out_dir}" >/dev/null
 
     local task_id="tmax"
-    jq -n '{task_id:"tmax", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:3, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/failed/${task_id}.task"
+    write_queue_task failed "${task_id}" SETUP_BASELINE n '{"retries":3, "error_msg":"x"}'
 
     run retry_task "${task_id}"
     assert_rc "1" "${RUN_RC}" "exceeded retries fails"
@@ -212,8 +211,7 @@ test_retry_task_sanitizes_missing_retry_fields() {
     init_queue "${out_dir}" >/dev/null
 
     local task_id="tmissing"
-    jq -n '{task_id:"tmissing", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:null, max_retries:null, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/failed/${task_id}.task"
+    write_queue_task failed "${task_id}" SETUP_BASELINE n '{"retries":null, "max_retries":null, "error_msg":"x"}'
 
     run retry_task "${task_id}"
     assert_rc "0" "${RUN_RC}" "retry_task succeeds with null retry fields"
@@ -232,12 +230,10 @@ test_cancel_tasks_with_failed_dependencies_moves_pending_to_failed() {
     init_queue "${out_dir}" >/dev/null
 
     # Create failed dep task.
-    jq -n '{task_id:"dep", task_type:"SETUP_BASELINE", model_id:"m", model_name:"d", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/failed/dep.task"
+    write_queue_task failed dep SETUP_BASELINE d '{"error_msg":"x"}'
 
     # Create pending task that depends on failed dep.
-    jq -n '{task_id:"child", task_type:"EVAL_BASELINE", model_id:"m", model_name:"c", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:["dep"], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/pending/child.task"
+    write_queue_task pending child EVAL_BASELINE c '{"dependencies":["dep"]}'
 
     local canceled
     canceled="$(cancel_tasks_with_failed_dependencies 0)"
@@ -283,8 +279,7 @@ test_queue_task_listing_and_count_branches() {
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
 
-    jq -n '{task_id:"a", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/ready/a.task"
+    write_queue_task ready a
 
     local tasks
     tasks="$(get_tasks_by_status "ready")"
@@ -303,8 +298,7 @@ test_mark_task_ready_and_claim_lock_timeout_validation() {
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
 
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/pending/t1.task"
+    write_queue_task pending t1
 
     mark_task_ready "t1"
     assert_file_exists "${QUEUE_DIR}/ready/t1.task" "mark_task_ready moves file"
@@ -327,8 +321,7 @@ test_complete_fail_and_retry_missing_file_branches() {
     rc=0; fail_task "missing" "boom" || rc=$?; assert_rc "1" "${rc}" "fail_task fails when missing"
 
     local task_id="race"
-    jq -n '{task_id:"race", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/failed/${task_id}.task"
+    write_queue_task failed "${task_id}" SETUP_BASELINE n '{"error_msg":"x"}'
 
     acquire_queue_lock() { rm -f "${QUEUE_DIR}/failed/${task_id}.task"; return 0; }
     release_queue_lock() { return 0; }
@@ -365,18 +358,15 @@ test_reclaim_orphaned_tasks_branches() {
     release_gpus() { released_ids+="${1},"; }
 
     # Task A: has pid, kill path taken.
-    jq -n '{task_id:"a", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/running/a.task"
+    write_queue_task running a
     echo "123" > "${QUEUE_DIR}/running/a.pid"
 
     # Task B: owner mismatch => can_kill false (reservation check).
-    jq -n '{task_id:"b", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:"0,1", dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/running/b.task"
+    write_queue_task running b SETUP_BASELINE n '{"assigned_gpus":"0,1"}'
     echo "" > "${reservation_dir}/gpu_0.lock"
 
     # Task C: owners match => kill_gpu_processes + release_gpus.
-    jq -n '{task_id:"c", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:"0,1", dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/running/c.task"
+    write_queue_task running c SETUP_BASELINE n '{"assigned_gpus":"0,1"}'
     echo "c" > "${reservation_dir}/gpu_0.lock"
     echo "c" > "${reservation_dir}/gpu_1.lock"
 
@@ -401,15 +391,13 @@ test_check_dependencies_met_and_update_dependents_branches() {
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
 
-    jq -n '{task_id:"child", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:["dep"], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/pending/child.task"
+    write_queue_task pending child SETUP_BASELINE n '{"dependencies":["dep"]}'
 
     local rc=0
     check_dependencies_met "${QUEUE_DIR}/pending/child.task" || rc=$?
     assert_rc "1" "${rc}" "dependency not completed"
 
-    jq -n '{task_id:"dep", task_type:"SETUP_BASELINE", model_id:"m", model_name:"d", status:"completed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/completed/dep.task"
+    write_queue_task completed dep SETUP_BASELINE d
 
     update_dependents "dep"
     assert_file_exists "${QUEUE_DIR}/ready/child.task" "update_dependents promotes to ready"
@@ -427,11 +415,9 @@ test_cancel_tasks_with_failed_dependencies_invalid_grace_and_mtime_missing_branc
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
 
-    jq -n '{task_id:"dep", task_type:"SETUP_BASELINE", model_id:"m", model_name:"d", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/failed/dep.task"
+    write_queue_task failed dep SETUP_BASELINE d '{"error_msg":"x"}'
 
-    jq -n '{task_id:"child", task_type:"EVAL_BASELINE", model_id:"m", model_name:"c", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:["dep"], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/pending/child.task"
+    write_queue_task pending child EVAL_BASELINE c '{"dependencies":["dep"]}'
 
     assert_eq "1" "$(cancel_tasks_with_failed_dependencies "bad")" "cancels with invalid grace coerced"
     assert_file_exists "${QUEUE_DIR}/failed/child.task" "moved to failed"
@@ -447,20 +433,17 @@ test_update_progress_state_status_and_percent_branches() {
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
 
-    jq -n '{task_id:"t", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"completed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:"x", error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/completed/t.task"
+    write_queue_task completed t SETUP_BASELINE n '{"completed_at":"x"}'
 
     update_progress_state
     assert_match '\"status\": \"completed\"' "$(cat "${out_dir}/state/progress.json")" "completed status"
 
     rm -f "${QUEUE_DIR}/completed/t.task"
-    jq -n '{task_id:"t", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:"x", error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/failed/t.task"
+    write_queue_task failed t SETUP_BASELINE n '{"completed_at":"x", "error_msg":"x"}'
     update_progress_state
     assert_match '\"status\": \"completed_with_failures\"' "$(cat "${out_dir}/state/progress.json")" "completed_with_failures status"
 
-    jq -n '{task_id:"child", task_type:"EVAL_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:["t"], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/pending/child.task"
+    write_queue_task pending child EVAL_BASELINE n '{"dependencies":["t"]}'
     update_progress_state
     assert_match '\"status\": \"blocked_failed_dependencies\"' "$(cat "${out_dir}/state/progress.json")" "blocked dependency state"
 }
@@ -473,8 +456,7 @@ test_find_and_refresh_branches() {
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
 
-    jq -n '{task_id:"m1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"m1", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/pending/m1.task"
+    write_queue_task pending m1 SETUP_BASELINE m1
 
     assert_match 'pending/m1\.task' "$(find_tasks_by_model "m1" "pending")" "find_tasks_by_model with status"
     assert_match 'pending/m1\.task' "$(find_tasks_by_model "m1")" "find_tasks_by_model all statuses"
@@ -819,8 +801,7 @@ test_generate_all_tasks_and_update_model_task_memory_branches() {
 
     _cmd_python() { echo "123 2"; }
 
-    jq -n '{task_id:"t", task_type:"SETUP_BASELINE", model_id:"m", model_name:"m1", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/pending/t.task"
+    write_queue_task pending t SETUP_BASELINE m1
 
     local model_name="m1"
     mkdir -p "${out_dir}/${model_name}"
@@ -852,8 +833,7 @@ test_update_model_task_memory_preserves_existing_reservation_floor() {
 
     _cmd_python() { echo "96 1"; }
 
-    jq -n '{task_id:"t", task_type:"CALIBRATION_RUN", model_id:"mistralai/Mixtral-8x7B-v0.1", model_name:"mixtral", status:"pending", model_size_gb:480, required_gpus:4, retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{run:1}, priority:85}' \
-        > "${QUEUE_DIR}/pending/t.task"
+    write_queue_task pending t CALIBRATION_RUN mixtral '{"model_id":"mistralai/Mixtral-8x7B-v0.1", "model_size_gb":480, "required_gpus":4, "params":{"run":1}, "priority":85}'
 
     mkdir -p "${out_dir}/mixtral"
     local baseline_path="${TEST_TMPDIR}/baseline"
@@ -880,8 +860,7 @@ test_update_model_task_memory_allows_single_gpu_downsize_after_refinement() {
         echo "44 1"
     }
 
-    jq -n '{task_id:"t", task_type:"CALIBRATION_RUN", model_id:"allenai/OLMo-2-1124-7B", model_name:"olmo", status:"ready", model_size_gb:82, required_gpus:1, retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{run:1}, priority:85}' \
-        > "${QUEUE_DIR}/ready/t.task"
+    write_queue_task ready t CALIBRATION_RUN olmo '{"model_id":"allenai/OLMo-2-1124-7B", "model_size_gb":82, "required_gpus":1, "params":{"run":1}, "priority":85}'
 
     mkdir -p "${out_dir}/olmo"
     local baseline_path="${TEST_TMPDIR}/baseline"
@@ -992,12 +971,10 @@ test_print_queue_stats_and_is_queue_complete_cover_success_and_failure() {
     init_queue "${out_dir}" >/dev/null
 
     local task_id="t1"
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/failed/${task_id}.task"
+    write_queue_task failed "${task_id}" SETUP_BASELINE n '{"error_msg":"x"}'
 
     local pending_id="t2"
-    jq -n '{task_id:"t2", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/pending/${pending_id}.task"
+    write_queue_task pending "${pending_id}"
 
     assert_match 'QUEUE STATUS' "$(print_queue_stats)" "queue status header"
     ! is_queue_empty
@@ -1018,10 +995,8 @@ test_queue_terminal_state_reports_blocked_failed_dependencies() {
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
 
-    jq -n '{task_id:"dep", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:"x", error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/failed/dep.task"
-    jq -n '{task_id:"child", task_type:"EVAL_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:["dep"], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/pending/child.task"
+    write_queue_task failed dep SETUP_BASELINE n '{"completed_at":"x", "error_msg":"x"}'
+    write_queue_task pending child EVAL_BASELINE n '{"dependencies":["dep"]}'
 
     assert_eq "1" "$(count_pending_tasks_blocked_by_failed_dependencies)" "blocked pending count"
     assert_eq "blocked_failed_dependencies" "$(queue_terminal_state)" "queue reports blocked terminal state"
@@ -1050,8 +1025,7 @@ test_mark_task_ready_returns_nonzero_when_update_task_status_fails() {
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
 
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/pending/t1.task"
+    write_queue_task pending t1
 
     update_task_status() { return 1; }
 
@@ -1143,8 +1117,7 @@ test_retry_task_short_circuits_when_lock_acquire_fails() {
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
 
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/failed/t1.task"
+    write_queue_task failed t1 SETUP_BASELINE n '{"error_msg":"x"}'
 
     acquire_queue_lock() { return 1; }
     run retry_task "t1"
@@ -1171,8 +1144,7 @@ test_retry_task_atomic_update_failure_triggers_error_block() {
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
 
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/failed/t1.task"
+    write_queue_task failed t1 SETUP_BASELINE n '{"error_msg":"x"}'
 
     _runtime_python() {
         if [[ "${1:-}" == "queue_state.py" && "${2:-}" == "retry-task" ]]; then
@@ -1193,8 +1165,7 @@ test_retry_task_move_failure_returns_error() {
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
 
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/failed/t1.task"
+    write_queue_task failed t1 SETUP_BASELINE n '{"error_msg":"x"}'
 
     mv() {
         if [[ "${2:-}" == "${QUEUE_DIR}/ready/" || "${2:-}" == "${QUEUE_DIR}/pending/" ]]; then
@@ -1230,8 +1201,7 @@ test_queue_manager_find_task_returns_path() {
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
 
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", dependencies:[], params:{}}' \
-        > "${QUEUE_DIR}/ready/t1.task"
+    write_queue_task ready t1
 
     assert_eq "${QUEUE_DIR}/ready/t1.task" "$(find_task "t1")" "find_task returns path"
 
@@ -1249,8 +1219,7 @@ test_queue_manager_resolve_dependencies_skips_disallowed_tasks() {
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
 
-    jq -n '{task_id:"t1", task_type:"EVAL_BASELINE", model_id:"m", model_name:"n", status:"pending", dependencies:[], params:{}}' \
-        > "${QUEUE_DIR}/pending/t1.task"
+    write_queue_task pending t1 EVAL_BASELINE
 
     check_dependencies_met() { return 0; }
 
@@ -1268,8 +1237,7 @@ test_queue_manager_resolve_dependencies_skips_on_second_pass_after_type_change()
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
 
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", dependencies:[], params:{}}' \
-        > "${QUEUE_DIR}/pending/t1.task"
+    write_queue_task pending t1
 
     check_dependencies_met() { return 0; }
     local type_calls_file="${TEST_TMPDIR}/type_calls"
@@ -1853,12 +1821,9 @@ test_queue_lifecycle_move_failures_release_locks() {
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
 
-    jq -n '{task_id:"ready_mv", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/ready/ready_mv.task"
-    jq -n '{task_id:"complete_mv", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/running/complete_mv.task"
-    jq -n '{task_id:"fail_mv", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/running/fail_mv.task"
+    write_queue_task ready ready_mv
+    write_queue_task running complete_mv
+    write_queue_task running fail_mv
 
     mark_task_started() { return 0; }
     mark_task_completed() { return 0; }
@@ -1892,10 +1857,8 @@ test_queue_dependency_cancellation_rechecks_age_and_updates_progress() {
     local progress_updates=0
     update_progress_state() { progress_updates=$((progress_updates + 1)); }
 
-    jq -n '{task_id:"dep", task_type:"SETUP_BASELINE", model_id:"m", model_name:"d", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/failed/dep.task"
-    jq -n '{task_id:"child", task_type:"EVAL_BASELINE", model_id:"m", model_name:"c", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:["dep"], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/pending/child.task"
+    write_queue_task failed dep SETUP_BASELINE d '{"error_msg":"x"}'
+    write_queue_task pending child EVAL_BASELINE c '{"dependencies":["dep"]}'
 
     run cancel_tasks_with_failed_dependencies 10
     assert_rc "0" "${RUN_RC}" "aged failed dependency cancellation succeeds"
@@ -1914,10 +1877,8 @@ test_queue_dependency_ready_transition_and_demote_branches_under_calibrate_only(
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
 
-    jq -n '{task_id:"allowed", task_type:"CALIBRATION_RUN", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/pending/allowed.task"
-    jq -n '{task_id:"blocked", task_type:"EVAL_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/pending/blocked.task"
+    write_queue_task pending allowed CALIBRATION_RUN
+    write_queue_task pending blocked EVAL_BASELINE
 
     assert_eq "1" "$(resolve_dependencies)" "only calibration task moved to ready"
     assert_file_exists "${QUEUE_DIR}/ready/allowed.task" "allowed task moved to ready"
@@ -2014,15 +1975,13 @@ test_queue_memory_plan_profile_fallbacks_and_model_id_candidates() {
 
     _runtime_python() { echo "33 1"; }
 
-    jq -n '{task_id:"direct", task_type:"SETUP_BASELINE", model_id:"m", model_name:"model", status:"pending", model_size_gb:10, required_gpus:1, retries:0, max_retries:3, created_at:"x", dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/pending/direct.task"
+    write_queue_task pending direct SETUP_BASELINE model '{"model_size_gb":10, "required_gpus":1}'
     mkdir -p "${out_dir}/model/models/baseline"
     echo '{}' > "${out_dir}/model/models/baseline/model_profile.json"
     update_model_task_memory "model" "${out_dir}" ""
     assert_eq "33" "$(jq -r '.model_size_gb' "${QUEUE_DIR}/pending/direct.task")" "model-local profile fallback used"
 
-    jq -n '{task_id:"candidate", task_type:"SETUP_BASELINE", model_id:"Org/Other Model", model_name:"candidate", status:"ready", model_size_gb:10, required_gpus:1, retries:0, max_retries:3, created_at:"x", dependencies:[], params:{}, priority:50}' \
-        > "${QUEUE_DIR}/ready/candidate.task"
+    write_queue_task ready candidate SETUP_BASELINE candidate '{"model_id":"Org/Other Model", "model_size_gb":10, "required_gpus":1}'
     mkdir -p "${out_dir}/models/org__other_model/baseline"
     echo '{}' > "${out_dir}/models/org__other_model/baseline/model_profile.json"
     update_model_task_memory "candidate" "${out_dir}" "Org/Other Model"
@@ -2074,8 +2033,7 @@ test_queue_manager_remaining_core_dependency_and_lifecycle_branches() {
         run check_dependencies_met "${QUEUE_DIR}/pending/missing.task"
         assert_rc "1" "${RUN_RC}" "missing dependency file returns unmet"
 
-        jq -n '{task_id:"baddeps", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", dependencies:["dep"], params:{}}' \
-            > "${QUEUE_DIR}/pending/baddeps.task"
+        write_queue_task pending baddeps SETUP_BASELINE n '{"dependencies":["dep"]}'
         get_task_dependencies() { return 1; }
         run check_dependencies_met "${QUEUE_DIR}/pending/baddeps.task"
         assert_rc "1" "${RUN_RC}" "dependency parser failure returns unmet"
@@ -2092,10 +2050,8 @@ test_queue_manager_remaining_core_dependency_and_lifecycle_branches() {
         _now_epoch() { echo "100"; }
         _file_mtime_epoch() { echo ""; }
 
-        jq -n '{task_id:"dep", task_type:"SETUP_BASELINE", model_id:"m", model_name:"d", status:"failed", retries:0, max_retries:3, created_at:"x", dependencies:[], params:{}}' \
-            > "${QUEUE_DIR}/failed/dep.task"
-        jq -n '{task_id:"child", task_type:"EVAL_BASELINE", model_id:"m", model_name:"c", status:"pending", retries:0, max_retries:3, created_at:"x", dependencies:["dep"], params:{}}' \
-            > "${QUEUE_DIR}/pending/child.task"
+        write_queue_task failed dep SETUP_BASELINE d
+        write_queue_task pending child EVAL_BASELINE c '{"dependencies":["dep"]}'
 
         assert_eq "1" "$(cancel_tasks_with_failed_dependencies "not-a-number")" "invalid grace still cancels failed dependency"
         assert_file_exists "${QUEUE_DIR}/failed/child.task" "blocked child moved to failed"
@@ -2110,10 +2066,8 @@ test_queue_manager_remaining_core_dependency_and_lifecycle_branches() {
         local out_dir="${TEST_TMPDIR}/dep_promote_out"
         init_queue "${out_dir}" >/dev/null
 
-        jq -n '{task_id:"dep", task_type:"SETUP_BASELINE", model_id:"m", model_name:"d", status:"completed", retries:0, max_retries:3, created_at:"x", dependencies:[], params:{}}' \
-            > "${QUEUE_DIR}/completed/dep.task"
-        jq -n '{task_id:"child", task_type:"EVAL_BASELINE", model_id:"m", model_name:"c", status:"pending", retries:0, max_retries:3, created_at:"x", dependencies:["dep"], params:{}}' \
-            > "${QUEUE_DIR}/pending/child.task"
+        write_queue_task completed dep SETUP_BASELINE d
+        write_queue_task pending child EVAL_BASELINE c '{"dependencies":["dep"]}'
 
         update_dependents "dep"
         assert_file_exists "${QUEUE_DIR}/ready/child.task" "dependent moved to ready when completed dependency is present"
@@ -2133,8 +2087,7 @@ test_queue_manager_remaining_core_dependency_and_lifecycle_branches() {
         run fail_task "missing" "boom"
         assert_rc "1" "${RUN_RC}" "fail_task releases and fails for missing running task"
 
-        jq -n '{task_id:"race", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:0, max_retries:3, created_at:"x", dependencies:[], params:{}}' \
-            > "${QUEUE_DIR}/failed/race.task"
+        write_queue_task failed race
         acquire_queue_lock() { rm -f "${QUEUE_DIR}/failed/race.task"; return 0; }
         release_queue_lock() { return 0; }
         run retry_task "race"
