@@ -1,9 +1,0 @@
-{
-  "assurance": "strict",
-  "basis": "public_evidence/published_basis/gpt_oss_20b/evaluation.report.json",
-  "evidence_run": "20260629Tgptoss20bRelease400",
-  "model_id": "openai/gpt-oss-20b",
-  "note": "Container-backed release-profile GPT-OSS 20B no-op preservation evidence run on public WikiText-2 validation. The fixture records strict guard behavior for the HF causal lane; it is not a fine-tuning, compression, benchmark-quality, deployment, or safety claim.",
-  "profile": "release",
-  "verdict": "PASS"
-}

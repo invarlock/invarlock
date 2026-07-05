@@ -1,9 +1,0 @@
-{
-  "assurance": "strict",
-  "basis": "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evaluation.report.json",
-  "evidence_run": "20260612TdeepseekOlmo27bParallelZ",
-  "model_id": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
-  "note": "Container-backed CI-profile DeepSeek-R1-Distill-Qwen 7B published-basis evidence run.",
-  "profile": "release",
-  "verdict": "PASS"
-}

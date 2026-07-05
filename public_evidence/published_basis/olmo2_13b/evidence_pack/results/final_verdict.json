@@ -1,9 +1,0 @@
-{
-  "assurance": "strict",
-  "basis": "public_evidence/published_basis/olmo2_13b/evaluation.report.json",
-  "evidence_run": "20260612TremainingExperimentalZ",
-  "model_id": "allenai/OLMo-2-1124-13B-Instruct",
-  "note": "Container-backed CI-profile OLMo 2 13B published-basis evidence run.",
-  "profile": "release",
-  "verdict": "PASS"
-}

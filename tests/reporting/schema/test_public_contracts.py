@@ -13,6 +13,27 @@ from invarlock.reporting import report_schema, verify_output
 from tests._repo_root import REPO_ROOT
 
 
+def _assert_public_evidence_path_available(rel_path: str, *, kind: str) -> None:
+    path = REPO_ROOT / rel_path
+    if kind == "file" and path.is_file():
+        return
+    if kind == "directory" and path.is_dir():
+        return
+    for entry in contracts.load_public_evidence_index()["entries"]:
+        artifacts = entry.get("artifacts", {})
+        if not isinstance(artifacts, dict):
+            continue
+        for summary in artifacts.values():
+            if not isinstance(summary, dict) or summary.get("path") != rel_path:
+                continue
+            assert summary["kind"] == kind
+            external = summary.get("external_asset")
+            assert isinstance(external, dict)
+            assert external["archive_path"] == rel_path
+            return
+    raise AssertionError(rel_path)
+
+
 def test_public_subcontract_versions_are_single_sourced() -> None:
     assert report_schema.REPORT_SCHEMA_VERSION == contracts.REPORT_SCHEMA_VERSION
     assert (
@@ -355,12 +376,18 @@ def test_support_matrix_published_basis_evidence_uses_public_evidence_paths() ->
             assert evidence["artifact_package"].startswith(
                 "public_evidence/published_basis/"
             )
-            assert (REPO_ROOT / evidence["artifact_package"]).is_dir()
+            _assert_public_evidence_path_available(
+                evidence["artifact_package"],
+                kind="directory",
+            )
         if "guard_value_demo" in evidence:
             assert evidence["guard_value_demo"].startswith(
                 "public_evidence/published_basis/"
             )
-            assert (REPO_ROOT / evidence["guard_value_demo"]).is_dir()
+            _assert_public_evidence_path_available(
+                evidence["guard_value_demo"],
+                kind="directory",
+            )
         assert "tests/fixtures/" not in evidence["evaluation_report_fixture"]
         assert "tests/fixtures/" not in evidence["runtime_manifest_fixture"]
         assert "tests/fixtures/" not in evidence["evidence_pack_recipe"]

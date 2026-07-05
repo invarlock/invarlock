@@ -1,9 +1,0 @@
-{
-  "assurance": "strict",
-  "basis": "public_evidence/published_basis/qwen3_5_4b/evaluation.report.json",
-  "evidence_run": "20260614Tqwen35_4b_json_sanity",
-  "model_id": "Qwen/Qwen3.5-4B",
-  "note": "Container-backed release-profile Qwen3.5 4B image-text published-basis evidence run with structured JSON answer prompt.",
-  "profile": "release",
-  "verdict": "PASS"
-}

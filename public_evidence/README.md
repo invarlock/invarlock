@@ -15,13 +15,20 @@ The real-run set includes both a built-in edit smoke run and an external BYOE
 run where the subject checkpoint is materialized outside InvarLock and consumed
 with `--edit-label custom`.
 
+Published-basis full artifacts are no longer duplicated directly in the source
+checkout. The compact index at `public_evidence/published_basis_index.json`
+records each logical `public_evidence/published_basis/...` path, hashes, sizes,
+and the GitHub Release asset that contains the full archived tree. The packaged
+copy under `src/invarlock/_data/public_evidence/published_basis_index.json`
+matches this source index.
+
 The strongest public added-value artifact is
 `public_evidence/published_basis/mistral_7b/guard_value_demo/`. That package is
-real scenario-pack evidence, not a fixture: PM-only accepts the published
-Mistral 7B edits, while the PM+guards comparison records baseline-relative
-spectral, RMT, and variance/VE movement from clean confirmation reruns. It is
-the reference artifact for the claim that guards add evidence beyond the primary
-metric.
+real scenario-pack evidence, not a fixture, and is available inside the
+published-basis release asset: PM-only accepts the published Mistral 7B edits,
+while the PM+guards comparison records baseline-relative spectral, RMT, and
+variance/VE movement from clean confirmation reruns. It is the reference
+artifact for the claim that guards add evidence beyond the primary metric.
 
 Older `caught_regressions/` entries remain useful verifier fixtures, but they
 are not substitutes for this real-model scenario evidence. No-op
@@ -72,6 +79,13 @@ Run the audit with:
 
 ```bash
 make public-evidence-audit
+```
+
+To also download referenced release assets and verify their archive SHA-256 and
+size, run:
+
+```bash
+python scripts/checks/check_public_evidence.py --fetch-external-assets
 ```
 
 When guard-value detector semantics change, update the scenario summary,

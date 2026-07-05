@@ -1,7 +1,0 @@
-{
-  "assurance": "strict",
-  "basis": "public_evidence/published_basis/gpt2/evaluation.report.json",
-  "note": "Fixture pack assembled from the public GPT-2 published-basis report.",
-  "profile": "release",
-  "verdict": "PASS"
-}

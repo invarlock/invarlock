@@ -93,6 +93,156 @@ def test_public_evidence_audit_rejects_duplicate_root_pack_report(
     assert any("duplicate of canonical pack report" in error for error in errors)
 
 
+def test_public_evidence_audit_validates_packaged_index_local_artifacts(
+    tmp_path: Path,
+) -> None:
+    module = _load_audit_module()
+    evidence_root = tmp_path / "public_evidence"
+    artifact_dir = evidence_root / "published_basis" / "demo"
+    artifact_dir.mkdir(parents=True)
+    (evidence_root / "README.md").write_text("# public evidence\n", encoding="utf-8")
+    report_path = artifact_dir / "evaluation.report.json"
+    report_path.write_text('{"ok": true}\n', encoding="utf-8")
+    index_path = tmp_path / "published_basis_index.json"
+    index_path.write_text(
+        json.dumps(
+            {
+                "format_version": module.PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION,
+                "carrier_policy": {"installed_wheel": "compact_index_only"},
+                "published_basis_count": 1,
+                "entries": [
+                    {
+                        "slug": "demo",
+                        "path": "public_evidence/published_basis/demo",
+                        "artifacts": {
+                            "evaluation_report": {
+                                "kind": "file",
+                                "path": (
+                                    "public_evidence/published_basis/demo/"
+                                    "evaluation.report.json"
+                                ),
+                                "size_bytes": report_path.stat().st_size,
+                                "sha256": module._sha256_file(report_path),
+                            }
+                        },
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    errors: list[str] = []
+    module._check_packaged_public_evidence_index(
+        errors,
+        evidence_root.resolve(),
+        index_path=index_path,
+    )
+
+    assert errors == []
+
+
+def test_public_evidence_audit_requires_external_asset_for_missing_index_artifact(
+    tmp_path: Path,
+) -> None:
+    module = _load_audit_module()
+    evidence_root = tmp_path / "public_evidence"
+    evidence_root.mkdir(parents=True)
+    index_path = tmp_path / "published_basis_index.json"
+    index_path.write_text(
+        json.dumps(
+            {
+                "format_version": module.PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION,
+                "carrier_policy": {"installed_wheel": "compact_index_only"},
+                "published_basis_count": 1,
+                "entries": [
+                    {
+                        "slug": "demo",
+                        "path": "public_evidence/published_basis/demo",
+                        "artifacts": {
+                            "evaluation_report": {
+                                "kind": "file",
+                                "path": (
+                                    "public_evidence/published_basis/demo/"
+                                    "evaluation.report.json"
+                                ),
+                                "size_bytes": 11,
+                                "sha256": "sha256:" + "0" * 64,
+                            }
+                        },
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    errors: list[str] = []
+    module._check_packaged_public_evidence_index(
+        errors,
+        evidence_root.resolve(),
+        index_path=index_path,
+    )
+
+    assert any(
+        "missing local artifact and external_asset reference" in error
+        for error in errors
+    )
+
+
+def test_public_evidence_audit_accepts_external_asset_for_missing_index_artifact(
+    tmp_path: Path,
+) -> None:
+    module = _load_audit_module()
+    evidence_root = tmp_path / "public_evidence"
+    evidence_root.mkdir(parents=True)
+    index_path = tmp_path / "published_basis_index.json"
+    index_path.write_text(
+        json.dumps(
+            {
+                "format_version": module.PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION,
+                "carrier_policy": {"installed_wheel": "compact_index_only"},
+                "published_basis_count": 1,
+                "entries": [
+                    {
+                        "slug": "demo",
+                        "path": "public_evidence/published_basis/demo",
+                        "artifacts": {
+                            "evaluation_report": {
+                                "kind": "file",
+                                "path": (
+                                    "public_evidence/published_basis/demo/"
+                                    "evaluation.report.json"
+                                ),
+                                "size_bytes": 11,
+                                "sha256": "sha256:" + "0" * 64,
+                                "external_asset": {
+                                    "url": (
+                                        "https://github.com/example/repo/"
+                                        "releases/download/v1/demo.tar.zst"
+                                    ),
+                                    "size_bytes": 11,
+                                    "sha256": "sha256:" + "0" * 64,
+                                },
+                            }
+                        },
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    errors: list[str] = []
+    module._check_packaged_public_evidence_index(
+        errors,
+        evidence_root.resolve(),
+        index_path=index_path,
+    )
+
+    assert errors == []
+
+
 def test_public_evidence_audit_rejects_private_execution_details(
     tmp_path: Path,
 ) -> None:

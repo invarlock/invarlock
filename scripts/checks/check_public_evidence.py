@@ -9,14 +9,25 @@ import json
 import math
 import re
 import sys
+import tempfile
+import urllib.request
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PUBLIC_EVIDENCE_ROOT = REPO_ROOT / "public_evidence"
+PACKAGED_PUBLIC_EVIDENCE_INDEX = (
+    REPO_ROOT
+    / "src"
+    / "invarlock"
+    / "_data"
+    / "public_evidence"
+    / "published_basis_index.json"
+)
 META_FILENAME = "evidence.meta.json"
 SCHEMA = "invarlock.public_evidence.meta.v1"
+PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION = "public-evidence-index-v1"
 CANONICAL_PACK_REPORT = (
     Path("evidence_pack") / "reports" / "report-001" / "evaluation.report.json"
 )
@@ -177,6 +188,26 @@ def _relative(path: Path, root: Path = REPO_ROOT) -> str:
         return str(path)
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return "sha256:" + digest.hexdigest()
+
+
+def _directory_counts(path: Path) -> tuple[int, int]:
+    files = [item for item in path.rglob("*") if item.is_file()]
+    return len(files), sum(item.stat().st_size for item in files)
+
+
+def _resolve_public_evidence_path(public_evidence_root: Path, raw_path: str) -> Path:
+    path = Path(raw_path)
+    if path.parts and path.parts[0] == "public_evidence":
+        return public_evidence_root.joinpath(*path.parts[1:])
+    return REPO_ROOT / path
+
+
 def _check_public_evidence_privacy(errors: list[str], root: Path) -> None:
     for path in sorted(root.rglob("*")):
         if not path.is_file() or path.suffix not in PUBLIC_TEXT_SUFFIXES:
@@ -220,6 +251,289 @@ def _check_duplicate_root_evaluation_reports(errors: list[str], root: Path) -> N
             f"{_relative(root_report)}: duplicate of canonical pack report "
             f"{_relative(pack_report)}"
         )
+
+
+def _check_packaged_public_evidence_index(
+    errors: list[str],
+    public_evidence_root: Path,
+    *,
+    index_path: Path = PACKAGED_PUBLIC_EVIDENCE_INDEX,
+    fetch_external_assets: bool = False,
+) -> None:
+    if not index_path.is_file():
+        if public_evidence_root == PUBLIC_EVIDENCE_ROOT.resolve():
+            errors.append(
+                f"{_relative(index_path)}: packaged public evidence index missing"
+            )
+        return
+
+    index, error = _load_json(index_path)
+    if error:
+        errors.append(error)
+        return
+    assert index is not None
+    if index.get("format_version") != PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION:
+        errors.append(
+            f"{_relative(index_path)}: format_version must be "
+            f"{PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION}"
+        )
+    carrier_policy = index.get("carrier_policy")
+    if not isinstance(carrier_policy, dict):
+        errors.append(f"{_relative(index_path)}: carrier_policy must be object")
+    elif carrier_policy.get("installed_wheel") != "compact_index_only":
+        errors.append(
+            f"{_relative(index_path)}: installed_wheel carrier policy must be "
+            "compact_index_only"
+        )
+
+    entries = index.get("entries")
+    if not isinstance(entries, list) or not entries:
+        errors.append(f"{_relative(index_path)}: entries must be non-empty")
+        return
+    if index.get("published_basis_count") != len(entries):
+        errors.append(
+            f"{_relative(index_path)}: published_basis_count must match entries"
+        )
+
+    external_assets: dict[tuple[str, str, int], dict[str, Any]] = {}
+    for entry_index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            errors.append(
+                f"{_relative(index_path)}: entries[{entry_index}] must be object"
+            )
+            continue
+        slug = entry.get("slug")
+        entry_path = entry.get("path")
+        if not isinstance(slug, str) or not slug:
+            errors.append(
+                f"{_relative(index_path)}: entries[{entry_index}].slug required"
+            )
+        if (
+            not isinstance(entry_path, str)
+            or not entry_path.startswith("public_evidence/published_basis/")
+            or ".." in Path(entry_path).parts
+        ):
+            errors.append(
+                f"{_relative(index_path)}: entries[{entry_index}].path invalid"
+            )
+        artifacts = entry.get("artifacts")
+        if not isinstance(artifacts, dict) or not artifacts:
+            errors.append(
+                f"{_relative(index_path)}: entries[{entry_index}].artifacts "
+                "must be non-empty"
+            )
+            continue
+        for artifact_name, summary in sorted(artifacts.items()):
+            if not isinstance(artifact_name, str) or not isinstance(summary, dict):
+                errors.append(
+                    f"{_relative(index_path)}: entries[{entry_index}].artifacts "
+                    "must map names to objects"
+                )
+                continue
+            artifact_path_raw = summary.get("path")
+            kind = summary.get("kind")
+            if (
+                not isinstance(artifact_path_raw, str)
+                or not artifact_path_raw.startswith("public_evidence/published_basis/")
+                or ".." in Path(artifact_path_raw).parts
+            ):
+                errors.append(
+                    f"{_relative(index_path)}: {slug}.{artifact_name}.path invalid"
+                )
+                continue
+            artifact_path = _resolve_public_evidence_path(
+                public_evidence_root,
+                artifact_path_raw,
+            )
+            if kind == "file":
+                if not artifact_path.is_file():
+                    _check_external_artifact_reference(
+                        errors, index_path, slug, artifact_name, summary
+                    )
+                    _collect_external_asset(external_assets, summary)
+                    continue
+                expected_size = summary.get("size_bytes")
+                if expected_size != artifact_path.stat().st_size:
+                    errors.append(
+                        f"{_relative(index_path)}: {slug}.{artifact_name} "
+                        "size_bytes mismatch"
+                    )
+                expected_sha = summary.get("sha256")
+                if expected_sha != _sha256_file(artifact_path):
+                    errors.append(
+                        f"{_relative(index_path)}: {slug}.{artifact_name} "
+                        "sha256 mismatch"
+                    )
+            elif kind == "directory":
+                if not artifact_path.is_dir():
+                    _check_external_artifact_reference(
+                        errors, index_path, slug, artifact_name, summary
+                    )
+                    _collect_external_asset(external_assets, summary)
+                    continue
+                expected_count = summary.get("file_count")
+                expected_size = summary.get("size_bytes")
+                file_count, size_bytes = _directory_counts(artifact_path)
+                if expected_count != file_count:
+                    errors.append(
+                        f"{_relative(index_path)}: {slug}.{artifact_name} "
+                        "file_count mismatch"
+                    )
+                if expected_size != size_bytes:
+                    errors.append(
+                        f"{_relative(index_path)}: {slug}.{artifact_name} "
+                        "size_bytes mismatch"
+                    )
+                control_hashes = summary.get("control_hashes")
+                if isinstance(control_hashes, dict):
+                    for rel_path, expected_hash in sorted(control_hashes.items()):
+                        if not isinstance(rel_path, str) or not isinstance(
+                            expected_hash, str
+                        ):
+                            errors.append(
+                                f"{_relative(index_path)}: {slug}.{artifact_name} "
+                                "control_hashes must map strings to strings"
+                            )
+                            continue
+                        control_path = artifact_path / rel_path
+                        if not control_path.is_file():
+                            errors.append(
+                                f"{_relative(index_path)}: {slug}.{artifact_name} "
+                                f"control hash file missing {rel_path!r}"
+                            )
+                        elif expected_hash != _sha256_file(control_path):
+                            errors.append(
+                                f"{_relative(index_path)}: {slug}.{artifact_name} "
+                                f"control hash mismatch for {rel_path!r}"
+                            )
+            else:
+                errors.append(
+                    f"{_relative(index_path)}: {slug}.{artifact_name}.kind invalid"
+                )
+    if fetch_external_assets:
+        _check_external_asset_downloads(errors, index_path, external_assets)
+
+
+def _check_external_artifact_reference(
+    errors: list[str],
+    index_path: Path,
+    slug: Any,
+    artifact_name: str,
+    summary: dict[str, Any],
+) -> None:
+    external = summary.get("external_asset")
+    if not isinstance(external, dict):
+        errors.append(
+            f"{_relative(index_path)}: {slug}.{artifact_name} missing local "
+            "artifact and external_asset reference"
+        )
+        return
+    url = external.get("url")
+    sha256 = external.get("sha256")
+    size_bytes = external.get("size_bytes")
+    if not isinstance(url, str) or not url.startswith(("https://", "http://")):
+        errors.append(
+            f"{_relative(index_path)}: {slug}.{artifact_name}.external_asset.url "
+            "must be absolute HTTP(S)"
+        )
+    if not isinstance(sha256, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", sha256):
+        errors.append(
+            f"{_relative(index_path)}: {slug}.{artifact_name}.external_asset.sha256 "
+            "invalid"
+        )
+    if not isinstance(size_bytes, int) or size_bytes <= 0:
+        errors.append(
+            f"{_relative(index_path)}: {slug}.{artifact_name}.external_asset."
+            "size_bytes invalid"
+        )
+    archive_path = external.get("archive_path")
+    if archive_path is not None and (
+        not isinstance(archive_path, str)
+        or archive_path.startswith("/")
+        or ".." in Path(archive_path).parts
+    ):
+        errors.append(
+            f"{_relative(index_path)}: {slug}.{artifact_name}.external_asset."
+            "archive_path invalid"
+        )
+
+
+def _collect_external_asset(
+    external_assets: dict[tuple[str, str, int], dict[str, Any]],
+    summary: dict[str, Any],
+) -> None:
+    external = summary.get("external_asset")
+    if not isinstance(external, dict):
+        return
+    url = external.get("url")
+    sha256 = external.get("sha256")
+    size_bytes = external.get("size_bytes")
+    if isinstance(url, str) and isinstance(sha256, str) and isinstance(size_bytes, int):
+        external_assets.setdefault((url, sha256, size_bytes), external)
+
+
+def _check_external_asset_downloads(
+    errors: list[str],
+    index_path: Path,
+    external_assets: dict[tuple[str, str, int], dict[str, Any]],
+) -> None:
+    for url, expected_sha, expected_size in sorted(external_assets):
+        try:
+            with (
+                urllib.request.urlopen(url, timeout=60) as response,
+                tempfile.NamedTemporaryFile() as handle,
+            ):
+                digest = hashlib.sha256()
+                total = 0
+                for chunk in iter(lambda: response.read(1024 * 1024), b""):
+                    handle.write(chunk)
+                    digest.update(chunk)
+                    total += len(chunk)
+        except OSError as exc:
+            errors.append(
+                f"{_relative(index_path)}: external asset download failed {url}: {exc}"
+            )
+            continue
+        actual_sha = "sha256:" + digest.hexdigest()
+        if actual_sha != expected_sha:
+            errors.append(
+                f"{_relative(index_path)}: external asset sha256 mismatch {url}"
+            )
+        if total != expected_size:
+            errors.append(
+                f"{_relative(index_path)}: external asset size mismatch {url}"
+            )
+
+
+def _indexed_public_evidence_paths() -> set[str]:
+    if not PACKAGED_PUBLIC_EVIDENCE_INDEX.is_file():
+        return set()
+    index, error = _load_json(PACKAGED_PUBLIC_EVIDENCE_INDEX)
+    if error or index is None:
+        return set()
+    paths: set[str] = set()
+    entries = index.get("entries")
+    if not isinstance(entries, list):
+        return paths
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        artifacts = entry.get("artifacts")
+        if not isinstance(artifacts, dict):
+            continue
+        for summary in artifacts.values():
+            if not isinstance(summary, dict):
+                continue
+            path = summary.get("path")
+            if isinstance(path, str):
+                paths.add(path)
+    return paths
+
+
+def _public_evidence_file_exists_or_indexed(rel_path: str) -> bool:
+    if (REPO_ROOT / rel_path).is_file():
+        return True
+    return rel_path in _indexed_public_evidence_paths()
 
 
 def _require_path(
@@ -1944,7 +2258,7 @@ def _check_published_basis_verification_lanes(
                 not isinstance(rel_path, str)
                 or rel_path.startswith("/")
                 or ".." in Path(rel_path).parts
-                or not (REPO_ROOT / rel_path).is_file()
+                or not _public_evidence_file_exists_or_indexed(rel_path)
             ):
                 errors.append(f"{_relative(artifact_path)}: {slug} {key} invalid")
     return seen
@@ -1962,7 +2276,11 @@ SPECIALIZED_EVIDENCE_CHECKERS: dict[str, EvidenceChecker] = {
 }
 
 
-def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
+def check_public_evidence(
+    root: Path = PUBLIC_EVIDENCE_ROOT,
+    *,
+    fetch_external_assets: bool = False,
+) -> list[str]:
     errors: list[str] = []
     root = root.resolve()
     if not (root / "README.md").is_file():
@@ -1971,6 +2289,12 @@ def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
         return [f"public evidence root not found: {root}"]
     _check_public_evidence_privacy(errors, root)
     _check_duplicate_root_evaluation_reports(errors, root)
+    if root == PUBLIC_EVIDENCE_ROOT.resolve():
+        _check_packaged_public_evidence_index(
+            errors,
+            root,
+            fetch_external_assets=fetch_external_assets,
+        )
 
     for artifact_dir in sorted(_artifact_dirs(root)):
         meta_path = artifact_dir / META_FILENAME
@@ -2059,12 +2383,20 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=PUBLIC_EVIDENCE_ROOT,
         help="Public evidence root to audit.",
     )
+    parser.add_argument(
+        "--fetch-external-assets",
+        action="store_true",
+        help="Download external public-evidence assets and verify size/SHA256.",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
-    errors = check_public_evidence(args.root)
+    errors = check_public_evidence(
+        args.root,
+        fetch_external_assets=args.fetch_external_assets,
+    )
     if errors:
         for error in errors:
             print(error, file=sys.stderr)
