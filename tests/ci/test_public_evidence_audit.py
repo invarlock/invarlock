@@ -52,6 +52,47 @@ def test_public_evidence_audit_respects_root_override(tmp_path: Path) -> None:
     assert module.check_public_evidence(evidence_root) == []
 
 
+def test_public_evidence_audit_rejects_duplicate_root_pack_report(
+    tmp_path: Path,
+) -> None:
+    module = _load_audit_module()
+    evidence_root = tmp_path / "public_evidence"
+    artifact_dir = evidence_root / "fixtures" / "demo"
+    pack_report = artifact_dir / "evidence_pack" / "reports" / "report-001"
+    pack_report.mkdir(parents=True)
+    (evidence_root / "README.md").write_text("# public evidence\n", encoding="utf-8")
+    report_payload = json.dumps({"ok": True})
+    (artifact_dir / "evaluation.report.json").write_text(
+        report_payload,
+        encoding="utf-8",
+    )
+    (pack_report / "evaluation.report.json").write_text(
+        report_payload,
+        encoding="utf-8",
+    )
+    (artifact_dir / "runtime.manifest.json").write_text("{}", encoding="utf-8")
+    (artifact_dir / "evidence.meta.json").write_text(
+        json.dumps(
+            {
+                "schema": module.SCHEMA,
+                "evidence_class": "contract_fixture",
+                "summary": "fixture report",
+                "artifact_paths": {
+                    "evaluation_report": "evaluation.report.json",
+                    "runtime_manifest": "runtime.manifest.json",
+                },
+                "verifier_commands": ["invarlock verify evaluation.report.json"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    errors = module.check_public_evidence(evidence_root)
+
+    assert any("duplicate root evaluation reports waste" in error for error in errors)
+    assert any("duplicate of canonical pack report" in error for error in errors)
+
+
 def test_public_evidence_audit_rejects_private_execution_details(
     tmp_path: Path,
 ) -> None:
@@ -126,6 +167,12 @@ def _write_minimal_evidence_dir(
         ),
         encoding="utf-8",
     )
+
+
+def _metadata_artifact_path(evidence_dir: Path, metadata: dict, key: str) -> Path:
+    rel_path = metadata["artifact_paths"][key]
+    assert isinstance(rel_path, str)
+    return evidence_dir / rel_path
 
 
 def test_public_evidence_audit_rejects_low_quality_published_image_text(
@@ -251,7 +298,9 @@ def test_real_run_reports_and_signed_packs_verify_release_strict() -> None:
         if metadata.get("evidence_class") != "real_model_run":
             continue
 
-        report_path = evidence_dir / "evaluation.report.json"
+        report_path = _metadata_artifact_path(
+            evidence_dir, metadata, "evaluation_report"
+        )
 
         result = run_verify_reports(
             [report_path],
@@ -283,7 +332,7 @@ def test_external_byoe_real_run_uses_custom_subject_checkpoint() -> None:
     metadata = json.loads(
         (evidence_dir / "evidence.meta.json").read_text(encoding="utf-8")
     )
-    report_path = evidence_dir / "evaluation.report.json"
+    report_path = _metadata_artifact_path(evidence_dir, metadata, "evaluation_report")
     refs_path = evidence_dir / "checkpoint_refs.json"
 
     report = json.loads(report_path.read_text(encoding="utf-8"))

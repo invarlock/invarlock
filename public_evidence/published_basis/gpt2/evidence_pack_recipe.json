@@ -8,7 +8,7 @@
     "./scripts/evidence_packs/verify_pack.sh --pack ./evidence_pack_runs/subset_<timestamp>/evidence_pack --strict"
   ],
   "artifacts": [
-    "public_evidence/published_basis/gpt2/evaluation.report.json",
+    "public_evidence/published_basis/gpt2/evidence_pack/reports/report-001/evaluation.report.json",
     "public_evidence/published_basis/gpt2/runtime.manifest.json",
     "public_evidence/published_basis/gpt2/evidence_pack/manifest.json",
     "public_evidence/published_basis/gpt2/evidence_pack/manifest.signature.json",

@@ -10,7 +10,7 @@
           "sha256": "496be45df203d91e991f1783e52477f2fe7fd605033a8518e70169cba59269ca"
         },
         "evaluation_report": {
-          "path": "public_evidence/real_runs/tiny_gpt2_quant_rtn/evaluation.report.json",
+          "path": "public_evidence/real_runs/tiny_gpt2_quant_rtn/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "a146142e1d191a5376900d0b2c96aacd1fd664e4ab477e786183e449c420e55d"
         },
         "evidence_note": {
@@ -40,7 +40,7 @@
           "sha256": "f0b1b75ff6ef3ac46ef28d4365ef0aa7a5e995361f30df4191de508acc9a9bf5"
         },
         "evaluation_report": {
-          "path": "public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json",
+          "path": "public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "9d5b442055b2b4cf46ab047a75c3d548f35dc2adccd316d66d64a9e4af1f0165"
         },
         "evidence_note": {

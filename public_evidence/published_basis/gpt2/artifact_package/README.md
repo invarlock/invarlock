@@ -24,7 +24,7 @@ maintainers can rebuild the checkpoints from
 
 ```bash
 uv run invarlock verify \
-  public_evidence/published_basis/gpt2/evaluation.report.json \
+  public_evidence/published_basis/gpt2/evidence_pack/reports/report-001/evaluation.report.json \
   --profile release \
   --assurance strict
 

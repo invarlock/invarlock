@@ -1,6 +1,6 @@
 {
   "artifact_paths": {
-    "evaluation_report": "evaluation.report.json",
+    "evaluation_report": "evidence_pack/reports/report-001/evaluation.report.json",
     "evidence_pack": "evidence_pack",
     "evidence_pack_recipe": "evidence_pack_recipe.json",
     "evidence_run_preset": "evidence_run_preset.yaml",
@@ -20,7 +20,7 @@
   "schema": "invarlock.public_evidence.meta.v1",
   "summary": "Release-strict verifier fixture for the GPT-OSS 20B HF causal published-basis lane on public WikiText-2 validation.",
   "verifier_commands": [
-    "uv run invarlock verify public_evidence/published_basis/gpt_oss_20b/evaluation.report.json --profile release --assurance strict",
+    "uv run invarlock verify public_evidence/published_basis/gpt_oss_20b/evidence_pack/reports/report-001/evaluation.report.json --profile release --assurance strict",
     "uv run invarlock advanced evidence-pack verify public_evidence/published_basis/gpt_oss_20b/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:b67ab8a0456a89ad85a4f18f596815d72a74337b8302882be40a16ccc210d82f"
   ]
 }

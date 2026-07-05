@@ -37,7 +37,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evaluation.report.json",
+          "path": "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:ee3ea714b029b85ce427576aba9e6ef74a9fbd3f69bc2dd88f8aa5d9e753a7a1",
           "size_bytes": 5603263
         },
@@ -56,8 +56,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evidence_pack_recipe.json",
-          "sha256": "sha256:2bf2af9353be30bc00bb890fcebd806c30f1b44186ef5f77cb6635b5517e5e50",
-          "size_bytes": 2149
+          "sha256": "sha256:91112c825e55825b98a425fc821a829100b0ad7edcbb64d51cea020345a37f1f",
+          "size_bytes": 2215
         },
         "runtime_manifest": {
           "kind": "file",
@@ -79,7 +79,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evaluation.report.json",
+          "path": "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:a667b00c011e564107d0525cda7df872c447fcaf74a23e33df263529fee3dd20",
           "size_bytes": 5618532
         },
@@ -98,8 +98,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evidence_pack_recipe.json",
-          "sha256": "sha256:3bcdb6e4a88cb45db3353e1d55addeff06edb080909ac785dfd40809f47c169d",
-          "size_bytes": 2599
+          "sha256": "sha256:c8d09e690c33bc949863b5c55f40cd840975dc5207825af34c92661a5541abc9",
+          "size_bytes": 2665
         },
         "runtime_manifest": {
           "kind": "file",
@@ -121,7 +121,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evaluation.report.json",
+          "path": "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:3c182e475163a08c28ea47be27bb9bb49bb2a3136de50cb3c2e9da84b2478f0e",
           "size_bytes": 3391169
         },
@@ -140,8 +140,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evidence_pack_recipe.json",
-          "sha256": "sha256:33caab43dd923b2c153f1807e57489e54649a3f389123e8c674ee13bc1c4a12d",
-          "size_bytes": 2146
+          "sha256": "sha256:2a892bd294be6263235e88312a7ae29804b3636c4283c326e73a4d2bb05e09bc",
+          "size_bytes": 2212
         },
         "runtime_manifest": {
           "kind": "file",
@@ -163,7 +163,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/falcon_7b/evaluation.report.json",
+          "path": "public_evidence/published_basis/falcon_7b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:6a04e8d121089875fe6e2e80ca90ba5520bf08f7dbae6a527311736dd3be9964",
           "size_bytes": 2373871
         },
@@ -182,8 +182,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/falcon_7b/evidence_pack_recipe.json",
-          "sha256": "sha256:b142bb55ab9d155b7a39fd9047a115480a73aa779c5758759a5554e52126e97b",
-          "size_bytes": 2000
+          "sha256": "sha256:40725e8acabfb3c4f306f6675f88404b3cbc2120ec80628d78a12c33bce503ce",
+          "size_bytes": 2066
         },
         "runtime_manifest": {
           "kind": "file",
@@ -205,7 +205,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/flan_t5_base/evaluation.report.json",
+          "path": "public_evidence/published_basis/flan_t5_base/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:79950658c4577e398fa482c7882ef59b9b4360439ce5eb053d7b4ea5a34597a5",
           "size_bytes": 2268703
         },
@@ -224,8 +224,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/flan_t5_base/evidence_pack_recipe.json",
-          "sha256": "sha256:d9b256b570ec733a37b962b48fe4e10106bbe5fe4d45bb3a7ce213ab66a4d269",
-          "size_bytes": 2120
+          "sha256": "sha256:a3a9f20fcc1de97650adf847b4a5eaa2b9ffe9dee455659b9986718334ea8b86",
+          "size_bytes": 2186
         },
         "evidence_run_preset": {
           "kind": "file",
@@ -253,7 +253,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/gemma4_12b/evaluation.report.json",
+          "path": "public_evidence/published_basis/gemma4_12b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:16db3277cd79c7b1672a3c23d26c21dc20552486bb3a73a27e1c3928f2c10fca",
           "size_bytes": 1037313
         },
@@ -272,8 +272,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/gemma4_12b/evidence_pack_recipe.json",
-          "sha256": "sha256:fd0de22b388a92a3d1daf0c883e22652b6820096bb915df61a03e977e75441ab",
-          "size_bytes": 1998
+          "sha256": "sha256:b6a182157e76a7dd41be6c9bc3d06cf342ca49cafe340b1c0bf57327c6d20418",
+          "size_bytes": 2064
         },
         "evidence_run_preset": {
           "kind": "file",
@@ -301,7 +301,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json",
+          "path": "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:80ce570e171ffc351a1fe8488a44c71a1cb5b3ddf5f39a6fa49cd0087d47babc",
           "size_bytes": 1019442
         },
@@ -320,8 +320,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack_recipe.json",
-          "sha256": "sha256:cae28b083e4d97d80bbdc2569a6d2b0b48f77bd9d1436aa93d5ac6d559c275f0",
-          "size_bytes": 2112
+          "sha256": "sha256:98ba3ff3a5456f81a90546056be079d5b749253d501cceda0dc472c22efddd68",
+          "size_bytes": 2178
         },
         "evidence_run_preset": {
           "kind": "file",
@@ -349,7 +349,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/gemma4_31b/evaluation.report.json",
+          "path": "public_evidence/published_basis/gemma4_31b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:6fe2ad0e53831158712ff7ed354771df0d381c3c9c0c51acc80c12e57e36a5f1",
           "size_bytes": 1050587
         },
@@ -368,8 +368,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/gemma4_31b/evidence_pack_recipe.json",
-          "sha256": "sha256:62e8b67071165da3bf5bb8c3e40b9c85f4512e6b604ef3662067fcff06e458bd",
-          "size_bytes": 2008
+          "sha256": "sha256:1776fc2c35097938836aedfa94acba4fb9b07c541dc6cb85301adf7591c05860",
+          "size_bytes": 2074
         },
         "evidence_run_preset": {
           "kind": "file",
@@ -397,7 +397,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/gemma4_e2b/evaluation.report.json",
+          "path": "public_evidence/published_basis/gemma4_e2b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:2274a10df15c319ffb48d0d5f25e69648f5d8b09de1b101bcd8a9e39c33b94fc",
           "size_bytes": 4087874
         },
@@ -416,8 +416,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/gemma4_e2b/evidence_pack_recipe.json",
-          "sha256": "sha256:78578ab9e3a3fc4b437c89eeec16fd68e05efa314bdd6015a3fcfd992ad6a8e3",
-          "size_bytes": 1910
+          "sha256": "sha256:8d4683bda593ad2982d264cbf0da46a4dedddba8d78ab12f8903454e25df6319",
+          "size_bytes": 1976
         },
         "runtime_manifest": {
           "kind": "file",
@@ -439,7 +439,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/gemma4_e2b_image_text/evaluation.report.json",
+          "path": "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:1edc1325aa0807ac0516a8906552561790f2dc4aa10714fedf75fd5c387f35e8",
           "size_bytes": 1053970
         },
@@ -458,8 +458,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack_recipe.json",
-          "sha256": "sha256:403215f7d4730d4bd354dfdd98175b51f0d31fb58f9fcc07ebdd6e12dfbd1d4c",
-          "size_bytes": 2543
+          "sha256": "sha256:0ec61294adea56deeb8f80e00443750ae3822ad4418341ccde3d9875e70f9c2c",
+          "size_bytes": 2609
         },
         "evidence_run_preset": {
           "kind": "file",
@@ -487,7 +487,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/gemma4_e4b/evaluation.report.json",
+          "path": "public_evidence/published_basis/gemma4_e4b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:acbc6ae7e4b1565e0cbca98ba53fe4cdb6e1a2c0610d0f302f6a49d0f088d8c5",
           "size_bytes": 1038956
         },
@@ -506,8 +506,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/gemma4_e4b/evidence_pack_recipe.json",
-          "sha256": "sha256:2b548b5bc7106c2dc22ef8d5115bf8e46f5d350c77e1cf5df4778eb8f030cc3f",
-          "size_bytes": 2378
+          "sha256": "sha256:86927afaf1d2c72195f72ea521117b259c6f4e5145d7e7e949d7762bfffb239a",
+          "size_bytes": 2444
         },
         "evidence_run_preset": {
           "kind": "file",
@@ -538,11 +538,11 @@
           "file_count": 3,
           "kind": "directory",
           "path": "public_evidence/published_basis/gpt2/artifact_package",
-          "size_bytes": 4165
+          "size_bytes": 4231
         },
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/gpt2/evaluation.report.json",
+          "path": "public_evidence/published_basis/gpt2/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:e0ffd8143b48ae1d171345aa606753b4ff9d4436adb46d366a041b6e131942f0",
           "size_bytes": 6254
         },
@@ -561,8 +561,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/gpt2/evidence_pack_recipe.json",
-          "sha256": "sha256:4842736e9b1ec38612df322546e0563778c87b125a1dd278c6c3ee1846c66cdf",
-          "size_bytes": 913
+          "sha256": "sha256:df6ca300c7e4b3b169be31b9e66e46c8951bc6590812405b18e2089a16673be5",
+          "size_bytes": 946
         },
         "runtime_manifest": {
           "kind": "file",
@@ -584,7 +584,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/gpt_oss_20b/evaluation.report.json",
+          "path": "public_evidence/published_basis/gpt_oss_20b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:b656ab5e9cba0f6d56a794861a83f5bb55a595fe214fdafcbbeaeb6132bba58a",
           "size_bytes": 5594133
         },
@@ -603,8 +603,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/gpt_oss_20b/evidence_pack_recipe.json",
-          "sha256": "sha256:c72532f9902cb95cf1b612777b2c4c5af10e3f0fdd741be13299721c987261dd",
-          "size_bytes": 1987
+          "sha256": "sha256:f44dd01fa59c467d89b65cbe24f4a52f62b02ff74c13f55f360ff1749b1504fd",
+          "size_bytes": 2053
         },
         "evidence_run_preset": {
           "kind": "file",
@@ -632,7 +632,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/granite4_1_3b/evaluation.report.json",
+          "path": "public_evidence/published_basis/granite4_1_3b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:4f0974e2a5bedece359cae07420fc4bfeb57b9eee8222215079fd439b9e09ad1",
           "size_bytes": 5633409
         },
@@ -651,8 +651,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/granite4_1_3b/evidence_pack_recipe.json",
-          "sha256": "sha256:a9fe151380ffa5a5b8434aef701ecf64e18a9fa710c41e99e6bd520793e7c9ab",
-          "size_bytes": 1989
+          "sha256": "sha256:dfe3660b9efdf8b30f65adc89b1346695653b20a1ce9ad55377856497ec4e4f5",
+          "size_bytes": 2055
         },
         "runtime_manifest": {
           "kind": "file",
@@ -674,7 +674,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/granite4_1_8b/evaluation.report.json",
+          "path": "public_evidence/published_basis/granite4_1_8b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:60c3f83074bc85683bef73521699160f8e56ac219dab5e6b3ea3c4312807ccd6",
           "size_bytes": 5633873
         },
@@ -693,8 +693,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/granite4_1_8b/evidence_pack_recipe.json",
-          "sha256": "sha256:1749ae5a1fc4beaa54568c6a3fd115c69251cd1f955a8753db6ab9e8d570fdbb",
-          "size_bytes": 1962
+          "sha256": "sha256:d59e3bed9771314178b367b5f7ba15014270c862cfca992e6781d3522fd0b7dd",
+          "size_bytes": 2028
         },
         "runtime_manifest": {
           "kind": "file",
@@ -716,7 +716,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/ministral3_14b/evaluation.report.json",
+          "path": "public_evidence/published_basis/ministral3_14b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:feb3ade45956fc108664db1317020a48672a97065213778ea546875fbb0189bc",
           "size_bytes": 2723027
         },
@@ -735,8 +735,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/ministral3_14b/evidence_pack_recipe.json",
-          "sha256": "sha256:5cef3cbb8b2bc0de733b12ffea36aecfca96caf5d3ea2e2c84765eca87aae6c8",
-          "size_bytes": 2063
+          "sha256": "sha256:1f49987102720f9257e9c478850cd88a26212703fd97769abff1b4894988eb05",
+          "size_bytes": 2129
         },
         "runtime_manifest": {
           "kind": "file",
@@ -758,7 +758,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/ministral3_3b/evaluation.report.json",
+          "path": "public_evidence/published_basis/ministral3_3b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:a6066734c49a10290adcc5be31d99baf8e5139fe2490f27b28e650437f662807",
           "size_bytes": 4444793
         },
@@ -777,8 +777,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/ministral3_3b/evidence_pack_recipe.json",
-          "sha256": "sha256:3690aa78f32e7a38d7013ad187eb586f3383a9a54f6587ec9beebad01514a71d",
-          "size_bytes": 1966
+          "sha256": "sha256:79437491f32c7821e874e5279ee4185a30e842246e3b6e986309f45e4b827234",
+          "size_bytes": 2032
         },
         "runtime_manifest": {
           "kind": "file",
@@ -800,7 +800,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/ministral3_8b/evaluation.report.json",
+          "path": "public_evidence/published_basis/ministral3_8b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:7ac9072bd52f575e28a627535e357db28b4c8863bbedada1a91384fde4ed1e67",
           "size_bytes": 2711160
         },
@@ -819,8 +819,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/ministral3_8b/evidence_pack_recipe.json",
-          "sha256": "sha256:5d87abd64758c78ac96a522feff80eabb971837d2b56fc9121dda9c23288664e",
-          "size_bytes": 2047
+          "sha256": "sha256:0c8fd5d1a89713bb438c8b3387c534c6e3ee1d8b367d46cba800be062eefcb41",
+          "size_bytes": 2113
         },
         "runtime_manifest": {
           "kind": "file",
@@ -842,7 +842,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+          "path": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:79029a9227dd4ec89763e828cca0f30aca85b09ad1caa15e1cfb82bccce5f3f7",
           "size_bytes": 2069696
         },
@@ -861,8 +861,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/mistral_7b/evidence_pack_recipe.json",
-          "sha256": "sha256:12bde9aff6485cb801bf1e388e5db9cec76f3af67593a564b51488e42d21f967",
-          "size_bytes": 1904
+          "sha256": "sha256:057be9263b14cb6fd9ea49a607d771f5dff456c838c9258851befcdebaf012d1",
+          "size_bytes": 1970
         },
         "runtime_manifest": {
           "kind": "file",
@@ -884,7 +884,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/mixtral_8x7b/evaluation.report.json",
+          "path": "public_evidence/published_basis/mixtral_8x7b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:79655793a5f52eec22629774ce8932ac00c2047074750f2c90ca16df005af8af",
           "size_bytes": 4041668
         },
@@ -903,8 +903,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/mixtral_8x7b/evidence_pack_recipe.json",
-          "sha256": "sha256:c11f9d355c273430e2248d607b504e8c31ec5227af403ffa47bc5520016fb8fe",
-          "size_bytes": 2167
+          "sha256": "sha256:761dd4b236e2ca5d782a676c7def9774dbf90f494ae847886bf406b960684da9",
+          "size_bytes": 2233
         },
         "evidence_run_preset": {
           "kind": "file",
@@ -932,7 +932,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/olmo2_13b/evaluation.report.json",
+          "path": "public_evidence/published_basis/olmo2_13b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:fa46234edd062cfb5820af58370167cf3a22caab4e9292cea0cf6acc82eabd35",
           "size_bytes": 3416165
         },
@@ -951,8 +951,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/olmo2_13b/evidence_pack_recipe.json",
-          "sha256": "sha256:eaf570d91e91a601c2cd5fa5c70f545409aa4b623c8211a4483641fd30f67008",
-          "size_bytes": 1993
+          "sha256": "sha256:a7e7792f374af64da16b85549a139101d60dab5894e578ddaef64e686c6d18b7",
+          "size_bytes": 2059
         },
         "runtime_manifest": {
           "kind": "file",
@@ -974,7 +974,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/olmo2_7b/evaluation.report.json",
+          "path": "public_evidence/published_basis/olmo2_7b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:f6e5ce83c7ba72418feb73e9f5c71cbee63703b922e3d682581825ca9d3296d4",
           "size_bytes": 3406568
         },
@@ -993,8 +993,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/olmo2_7b/evidence_pack_recipe.json",
-          "sha256": "sha256:1f7b187b47d171c61ce501668364592e9662325ae3fba74548126d28e31c6cda",
-          "size_bytes": 1822
+          "sha256": "sha256:184aa00a12151d4bb4eeb20e95065c65619b354ce8ff6d99bf39183c6ffe87ed",
+          "size_bytes": 1888
         },
         "runtime_manifest": {
           "kind": "file",
@@ -1016,7 +1016,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/olmoe_1b_7b/evaluation.report.json",
+          "path": "public_evidence/published_basis/olmoe_1b_7b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:65aa136996f9d5e74f789b04490b1f28fa14265f82d93d326e4ccd12df4ca593",
           "size_bytes": 3964439
         },
@@ -1035,8 +1035,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/olmoe_1b_7b/evidence_pack_recipe.json",
-          "sha256": "sha256:1cca53e854eaa303072f0b2486a616de17c391bbc011ac3d41513cdfbb896040",
-          "size_bytes": 1970
+          "sha256": "sha256:7cf3dc871a0eda6eb39ae461335fc1610b4522a95e5bf970bc4a297511d9c767",
+          "size_bytes": 2036
         },
         "evidence_run_preset": {
           "kind": "file",
@@ -1064,7 +1064,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/open_llama_7b/evaluation.report.json",
+          "path": "public_evidence/published_basis/open_llama_7b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:208cad90280a21b9c16203393d766f89a12737a7847fc2647da78299d2c61716",
           "size_bytes": 2258775
         },
@@ -1083,8 +1083,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/open_llama_7b/evidence_pack_recipe.json",
-          "sha256": "sha256:a951705d9dedd2788dcde7ba958d11d1a0898f181b043377c78e6342c15892f6",
-          "size_bytes": 2065
+          "sha256": "sha256:bb38820c4d049a3b0e75eaeee11ca0c77dec66f1d3149b7aa18c67ebf64e4ae7",
+          "size_bytes": 2131
         },
         "runtime_manifest": {
           "kind": "file",
@@ -1106,7 +1106,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/phi4_mini/evaluation.report.json",
+          "path": "public_evidence/published_basis/phi4_mini/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:4efaee6b0d6abeef4838b9845ba923f1efeadb7abc8ae30920709553e8cc06a1",
           "size_bytes": 5639462
         },
@@ -1125,8 +1125,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/phi4_mini/evidence_pack_recipe.json",
-          "sha256": "sha256:3a2f9e999866e9421240d2c128e46ea165dd10db904c5b1cce7e5fed6f990472",
-          "size_bytes": 2212
+          "sha256": "sha256:0f612cd00c2f98b800288bcd6ae7ec8ed411629edd04862360377395c97ddf37",
+          "size_bytes": 2278
         },
         "evidence_run_preset": {
           "kind": "file",
@@ -1154,7 +1154,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/phi4_reasoning_plus/evaluation.report.json",
+          "path": "public_evidence/published_basis/phi4_reasoning_plus/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:2f6dc4a49adec73e3f21c8b9051348514e1bb23990abdc62e4b429cfdf0e5226",
           "size_bytes": 3407877
         },
@@ -1173,8 +1173,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/phi4_reasoning_plus/evidence_pack_recipe.json",
-          "sha256": "sha256:5c332e83bd51573ebc214b460546ed200b4d0dd18505baa251b7ae2dc3f346cd",
-          "size_bytes": 1965
+          "sha256": "sha256:8b663ef52bbc62b4f34295a34be52e4e39bd31df87bc57a00830c2311682ff4b",
+          "size_bytes": 2031
         },
         "runtime_manifest": {
           "kind": "file",
@@ -1196,7 +1196,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/qwen2_5_14b/evaluation.report.json",
+          "path": "public_evidence/published_basis/qwen2_5_14b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:cdb99756fb708b90dbd73913907eb9df657a1a00db11b084de4778f4bcd9ebb5",
           "size_bytes": 3412221
         },
@@ -1215,8 +1215,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/qwen2_5_14b/evidence_pack_recipe.json",
-          "sha256": "sha256:ae5e2548f40272c797761ea134569723523b8eda41fca0d2b0a95e5b10339fc0",
-          "size_bytes": 1928
+          "sha256": "sha256:47dcdf723ca289eda731e70f4d95e3b6c2abfb9a0ea9c17c3a8019c645b7f8cc",
+          "size_bytes": 1994
         },
         "runtime_manifest": {
           "kind": "file",
@@ -1238,7 +1238,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/qwen2_5_7b/evaluation.report.json",
+          "path": "public_evidence/published_basis/qwen2_5_7b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:ab741370e297103cf63561580bc19cbfdf78c58478093c8cb57c4a8468c37030",
           "size_bytes": 3388755
         },
@@ -1257,8 +1257,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/qwen2_5_7b/evidence_pack_recipe.json",
-          "sha256": "sha256:d0236452739e8e080fe00dc3c730920acc4631b929189611be24ce4db12aa2ac",
-          "size_bytes": 1882
+          "sha256": "sha256:bdfdf374cdb31662d0481a513d1391198aac9e6d0f529c89d0ebd70abcdefc00",
+          "size_bytes": 1948
         },
         "runtime_manifest": {
           "kind": "file",
@@ -1280,7 +1280,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/qwen2_7b/evaluation.report.json",
+          "path": "public_evidence/published_basis/qwen2_7b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:d703f68ecad3aca7f5919f9687ae08f4fde0349a651afb14095c457f1562e071",
           "size_bytes": 3388470
         },
@@ -1299,8 +1299,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/qwen2_7b/evidence_pack_recipe.json",
-          "sha256": "sha256:fe48e38880702eb16999e404bf26f5b649db00c55fe102abeb4f21ffe799df92",
-          "size_bytes": 1878
+          "sha256": "sha256:3eae430447dd655240355df8b1b1b4896086947dd721e162111c5e8038a11e62",
+          "size_bytes": 1944
         },
         "runtime_manifest": {
           "kind": "file",
@@ -1322,7 +1322,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/qwen3_30b_a3b/evaluation.report.json",
+          "path": "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:5f7075908f14450ca569fd9369c064eb9a43d90e78cffa495fa11fe93ba9f400",
           "size_bytes": 5606680
         },
@@ -1341,8 +1341,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack_recipe.json",
-          "sha256": "sha256:35cf810c2e09c57c8f599d8ce38ca984b2615b7f31fa0412d7c4845389736631",
-          "size_bytes": 2275
+          "sha256": "sha256:caa3109e3eca27227e94be3b4a92ccb8de3c586d36d06034f9b4478b588a8158",
+          "size_bytes": 2341
         },
         "evidence_run_preset": {
           "kind": "file",
@@ -1370,7 +1370,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/qwen3_5_27b_scoped/evaluation.report.json",
+          "path": "public_evidence/published_basis/qwen3_5_27b_scoped/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:1b4a11507db64ffe2eb463a384cf684c42bf23931ac8be3ddc5f5e1cb5b7877a",
           "size_bytes": 1078353
         },
@@ -1389,8 +1389,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/qwen3_5_27b_scoped/evidence_pack_recipe.json",
-          "sha256": "sha256:d0d41bd45d5b3b67d250891d4f915113aab91c981c5603035ef8f6bdfd1a373e",
-          "size_bytes": 2186
+          "sha256": "sha256:d534b9c182da4a0882860cc0908d31fbb721d617f881ede2732356766b5ead22",
+          "size_bytes": 2252
         },
         "evidence_run_preset": {
           "kind": "file",
@@ -1418,7 +1418,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/qwen3_5_2b/evaluation.report.json",
+          "path": "public_evidence/published_basis/qwen3_5_2b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:be75968ca4674aa69d554d123a799e6c7f9afccef1d52bc48badad96f4a89ba7",
           "size_bytes": 910510
         },
@@ -1437,8 +1437,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/qwen3_5_2b/evidence_pack_recipe.json",
-          "sha256": "sha256:460c6c8c0f9a2154983b98eec3c213901010aba7993bd501f45822cab1c0654e",
-          "size_bytes": 1904
+          "sha256": "sha256:e811a2e64ae392a388be8c7ed3e38e2e821f04cd0c002935b4d6756720317695",
+          "size_bytes": 1970
         },
         "runtime_manifest": {
           "kind": "file",
@@ -1460,7 +1460,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/qwen3_5_4b/evaluation.report.json",
+          "path": "public_evidence/published_basis/qwen3_5_4b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:c1da4ef9d00e39893901920079b693017e66d0f39f2ba7de3823b74ac18b087b",
           "size_bytes": 1043830
         },
@@ -1479,8 +1479,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/qwen3_5_4b/evidence_pack_recipe.json",
-          "sha256": "sha256:5ae371cc6072ba2d1f6cdf83de6bbee6dca91155e88ae0eb0216e451d68e3527",
-          "size_bytes": 1990
+          "sha256": "sha256:046b8795f56e4d7bbfd0db6b6ec58d3051be15edf9c655ea48104e5bec4bd007",
+          "size_bytes": 2056
         },
         "evidence_run_preset": {
           "kind": "file",
@@ -1508,7 +1508,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/qwen3_5_9b/evaluation.report.json",
+          "path": "public_evidence/published_basis/qwen3_5_9b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:1138495e3297abe5dda9ddec46c8fde699fdd7ed4905a7ace35f70a109195ded",
           "size_bytes": 3396221
         },
@@ -1527,8 +1527,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/qwen3_5_9b/evidence_pack_recipe.json",
-          "sha256": "sha256:87adf5be9b0b9eb079f2b6a31f2ba0b6c166f68267df32cfc5acb70364e1a333",
-          "size_bytes": 2002
+          "sha256": "sha256:51761416dafdc7bef413779ff760d6c35359d3a5df7929dcbef76eec79feb950",
+          "size_bytes": 2068
         },
         "runtime_manifest": {
           "kind": "file",
@@ -1550,7 +1550,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/qwen3_6_27b_scoped/evaluation.report.json",
+          "path": "public_evidence/published_basis/qwen3_6_27b_scoped/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:bf5240f37983a391871f8b4a3b79d4de17ea7d9435c8eac5e947d7e251e9d4e4",
           "size_bytes": 1078178
         },
@@ -1569,8 +1569,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/qwen3_6_27b_scoped/evidence_pack_recipe.json",
-          "sha256": "sha256:fecd7002389a4507411342abc7be4126a981c83401482996d1e25727214fd419",
-          "size_bytes": 2186
+          "sha256": "sha256:7962aac21169c4ee18ba235e66f956f18e8ba066b4758d1713f7d318f5b43d89",
+          "size_bytes": 2252
         },
         "evidence_run_preset": {
           "kind": "file",
@@ -1598,7 +1598,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/qwen3_8b/evaluation.report.json",
+          "path": "public_evidence/published_basis/qwen3_8b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:a9e87c55b961b792bcde2178de681a55ca15b31793cc280bae670290058bf386",
           "size_bytes": 3396543
         },
@@ -1617,8 +1617,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/qwen3_8b/evidence_pack_recipe.json",
-          "sha256": "sha256:f58d6b12fe759dda42b3ae7856e540ece826ee861a6dc9c575d350b7a64e0a11",
-          "size_bytes": 1886
+          "sha256": "sha256:5939519a0abf19fcd4d62112cd519945dd0a73703db273315d953ea49f664a31",
+          "size_bytes": 1952
         },
         "runtime_manifest": {
           "kind": "file",
@@ -1640,7 +1640,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/smollm3_3b/evaluation.report.json",
+          "path": "public_evidence/published_basis/smollm3_3b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:1a3cd4638d51b9484d8670463a1b436416acc997c9b3daa687c2c42b233dd957",
           "size_bytes": 5628255
         },
@@ -1659,8 +1659,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/smollm3_3b/evidence_pack_recipe.json",
-          "sha256": "sha256:912e21cddaa3a99c260fa7192fd6094d50a564b9f08f49f69249cc02c91b4706",
-          "size_bytes": 2216
+          "sha256": "sha256:63559ef243343cc696b289210755a1b9ff4b08f25103c813dfb339444ff5d071",
+          "size_bytes": 2282
         },
         "evidence_run_preset": {
           "kind": "file",
@@ -1688,7 +1688,7 @@
       "artifacts": {
         "evaluation_report": {
           "kind": "file",
-          "path": "public_evidence/published_basis/tinyllama_1_1b/evaluation.report.json",
+          "path": "public_evidence/published_basis/tinyllama_1_1b/evidence_pack/reports/report-001/evaluation.report.json",
           "sha256": "sha256:d66bb7e2e247d5f5fd09290412076804198f0617252885377ad1d2a20e51c10a",
           "size_bytes": 2059539
         },
@@ -1707,8 +1707,8 @@
         "evidence_pack_recipe": {
           "kind": "file",
           "path": "public_evidence/published_basis/tinyllama_1_1b/evidence_pack_recipe.json",
-          "sha256": "sha256:5d369030cb3e2317ad3cd5c647cbd9222cea68788a36d8ad7ccf2f4ce45ea76b",
-          "size_bytes": 2057
+          "sha256": "sha256:bdd02e3544a384a2f6703a741d7dd3bc565f894a39e03eb18a6834ec620ac2c1",
+          "size_bytes": 2123
         },
         "runtime_manifest": {
           "kind": "file",
@@ -1730,6 +1730,6 @@
   "format_version": "public-evidence-index-v1",
   "published_basis_count": 39,
   "published_basis_file_count": 573,
-  "published_basis_size_bytes": 239116024,
+  "published_basis_size_bytes": 239118565,
   "source_root": "public_evidence"
 }

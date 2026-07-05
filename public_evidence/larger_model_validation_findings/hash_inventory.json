@@ -12,8 +12,8 @@
     {
       "artifact": "lane_outcomes",
       "path": "lane_outcomes.json",
-      "bytes": 35033,
-      "sha256": "sha256:cf2fa2e457da83c42559c5b934f7c75613fb2b376812e68746694bc0c8022743"
+      "bytes": 35198,
+      "sha256": "sha256:220112a1529d5b64d76ec0c5dda05081a915339e62bef015cb4d732bc4d2ece7"
     },
     {
       "artifact": "evidence_meta",

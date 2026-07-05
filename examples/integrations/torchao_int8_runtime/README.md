@@ -123,7 +123,7 @@ The repository also ships a small quantization-style public fixture:
 
 ```bash
 invarlock verify --profile release --assurance strict \
-  public_evidence/real_runs/tiny_gpt2_quant_rtn/evaluation.report.json
+  public_evidence/real_runs/tiny_gpt2_quant_rtn/evidence_pack/reports/report-001/evaluation.report.json
 ```
 
 Use that fixture as the stable public reference when the local example

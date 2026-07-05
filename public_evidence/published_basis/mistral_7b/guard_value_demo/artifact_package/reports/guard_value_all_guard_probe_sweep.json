@@ -99,7 +99,7 @@
     },
     "spectral": {
       "baseline_relative_evidence": {
-        "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+        "baseline_reference": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
         "baseline_spectral_caps_applied": 2,
         "delta_caps_applied": 1,
         "matching_capped_modules": [
@@ -126,7 +126,7 @@
       "nearest_margin_target": "model.layers.31.mlp.up_proj",
       "negative_control": {
         "baseline_relative_evidence": {
-          "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+          "baseline_reference": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
           "baseline_spectral_caps_applied": 2,
           "delta_caps_applied": 0,
           "matching_capped_modules": [
@@ -169,7 +169,7 @@
       },
       "pm_only_vs_pm_plus_guards": {
         "baseline_relative_evidence": {
-          "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+          "baseline_reference": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
           "baseline_spectral_caps_applied": 2,
           "delta_caps_applied": 1,
           "matching_capped_modules": [
@@ -312,7 +312,7 @@
   ],
   "schema": "invarlock.public_evidence.guard_value_all_guard_probe_sweep.v1",
   "source_run": {
-    "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+    "baseline_reference": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
     "host": "self-hosted CUDA runner",
     "model_id": "mistralai/Mistral-7B-v0.1",
     "model_revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",

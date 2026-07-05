@@ -60,7 +60,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/mistral_7b_512.yaml",
         "configs/calibration/null_sweep_mistral_7b.yaml",
-        "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+        "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/mistral_7b/runtime.manifest.json",
         "public_evidence/published_basis/mistral_7b/evidence_pack"
       ],
@@ -85,7 +85,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/ministral3_8b_512.yaml",
         "configs/calibration/null_sweep_ministral3_8b.yaml",
-        "public_evidence/published_basis/ministral3_8b/evaluation.report.json",
+        "public_evidence/published_basis/ministral3_8b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/ministral3_8b/runtime.manifest.json",
         "public_evidence/published_basis/ministral3_8b/evidence_pack"
       ],
@@ -112,7 +112,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/ministral3_14b_512.yaml",
         "configs/calibration/null_sweep_ministral3_14b.yaml",
-        "public_evidence/published_basis/ministral3_14b/evaluation.report.json",
+        "public_evidence/published_basis/ministral3_14b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/ministral3_14b/runtime.manifest.json",
         "public_evidence/published_basis/ministral3_14b/evidence_pack"
       ],
@@ -138,7 +138,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen2_7b_512.yaml",
         "configs/calibration/null_sweep_qwen2_7b.yaml",
-        "public_evidence/published_basis/qwen2_7b/evaluation.report.json",
+        "public_evidence/published_basis/qwen2_7b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/qwen2_7b/runtime.manifest.json",
         "public_evidence/published_basis/qwen2_7b/evidence_pack"
       ],
@@ -162,7 +162,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen2_5_7b_512.yaml",
         "configs/calibration/null_sweep_qwen2_5_7b.yaml",
-        "public_evidence/published_basis/qwen2_5_7b/evaluation.report.json",
+        "public_evidence/published_basis/qwen2_5_7b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/qwen2_5_7b/runtime.manifest.json",
         "public_evidence/published_basis/qwen2_5_7b/evidence_pack"
       ],
@@ -186,7 +186,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen2_5_14b_512.yaml",
         "configs/calibration/null_sweep_qwen2_5_14b.yaml",
-        "public_evidence/published_basis/qwen2_5_14b/evaluation.report.json",
+        "public_evidence/published_basis/qwen2_5_14b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/qwen2_5_14b/runtime.manifest.json",
         "public_evidence/published_basis/qwen2_5_14b/evidence_pack"
       ],
@@ -210,7 +210,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen3_8b_512.yaml",
         "configs/calibration/null_sweep_qwen3_8b.yaml",
-        "public_evidence/published_basis/qwen3_8b/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_8b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/qwen3_8b/runtime.manifest.json",
         "public_evidence/published_basis/qwen3_8b/evidence_pack"
       ],
@@ -235,7 +235,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/deepseek_r1_distill_qwen_7b_512.yaml",
         "configs/calibration/null_sweep_deepseek_r1_distill_qwen_7b.yaml",
-        "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evaluation.report.json",
+        "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/runtime.manifest.json",
         "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evidence_pack"
       ],
@@ -260,7 +260,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/phi4_reasoning_plus_512.yaml",
         "configs/calibration/null_sweep_phi4_reasoning_plus.yaml",
-        "public_evidence/published_basis/phi4_reasoning_plus/evaluation.report.json",
+        "public_evidence/published_basis/phi4_reasoning_plus/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/phi4_reasoning_plus/runtime.manifest.json",
         "public_evidence/published_basis/phi4_reasoning_plus/evidence_pack"
       ],
@@ -285,7 +285,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/gemma4_e2b_512.yaml",
         "configs/calibration/null_sweep_gemma4_e2b.yaml",
-        "public_evidence/published_basis/gemma4_e2b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_e2b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/gemma4_e2b/runtime.manifest.json",
         "public_evidence/published_basis/gemma4_e2b/evidence_pack"
       ],
@@ -311,7 +311,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/tinyllama_1_1b_512.yaml",
         "configs/calibration/null_sweep_tinyllama_1_1b.yaml",
-        "public_evidence/published_basis/tinyllama_1_1b/evaluation.report.json",
+        "public_evidence/published_basis/tinyllama_1_1b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/tinyllama_1_1b/runtime.manifest.json",
         "public_evidence/published_basis/tinyllama_1_1b/evidence_pack"
       ],
@@ -336,7 +336,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/olmo2_7b_512.yaml",
         "configs/calibration/null_sweep_olmo2_7b.yaml",
-        "public_evidence/published_basis/olmo2_7b/evaluation.report.json",
+        "public_evidence/published_basis/olmo2_7b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/olmo2_7b/runtime.manifest.json",
         "public_evidence/published_basis/olmo2_7b/evidence_pack"
       ],
@@ -360,7 +360,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/olmo2_13b_512.yaml",
         "configs/calibration/null_sweep_olmo2_13b.yaml",
-        "public_evidence/published_basis/olmo2_13b/evaluation.report.json",
+        "public_evidence/published_basis/olmo2_13b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/olmo2_13b/runtime.manifest.json",
         "public_evidence/published_basis/olmo2_13b/evidence_pack"
       ],
@@ -384,7 +384,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/open_llama_7b_512.yaml",
         "configs/calibration/null_sweep_open_llama_7b.yaml",
-        "public_evidence/published_basis/open_llama_7b/evaluation.report.json",
+        "public_evidence/published_basis/open_llama_7b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/open_llama_7b/runtime.manifest.json",
         "public_evidence/published_basis/open_llama_7b/evidence_pack"
       ],
@@ -408,7 +408,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/falcon_7b_512.yaml",
         "configs/calibration/null_sweep_falcon_7b.yaml",
-        "public_evidence/published_basis/falcon_7b/evaluation.report.json",
+        "public_evidence/published_basis/falcon_7b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/falcon_7b/runtime.manifest.json",
         "public_evidence/published_basis/falcon_7b/evidence_pack"
       ],
@@ -432,7 +432,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen3_5_9b_512.yaml",
         "configs/calibration/null_sweep_qwen3_5_9b.yaml",
-        "public_evidence/published_basis/qwen3_5_9b/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_5_9b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/qwen3_5_9b/runtime.manifest.json",
         "public_evidence/published_basis/qwen3_5_9b/evidence_pack"
       ],
@@ -458,7 +458,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/granite4_1_3b_512.yaml",
         "configs/calibration/null_sweep_granite4_1_3b.yaml",
-        "public_evidence/published_basis/granite4_1_3b/evaluation.report.json",
+        "public_evidence/published_basis/granite4_1_3b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/granite4_1_3b/runtime.manifest.json",
         "public_evidence/published_basis/granite4_1_3b/evidence_pack"
       ],
@@ -484,7 +484,7 @@
         "contracts/support_matrix.json",
         "configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml",
         "configs/calibration/null_sweep_flan_t5_base.yaml",
-        "public_evidence/published_basis/flan_t5_base/evaluation.report.json",
+        "public_evidence/published_basis/flan_t5_base/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/flan_t5_base/runtime.manifest.json",
         "public_evidence/published_basis/flan_t5_base/evidence_pack"
       ],
@@ -515,7 +515,7 @@
         "configs/calibration/null_sweep_gemma4_12b.yaml",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
         "src/invarlock/adapters/hf_loading.py",
-        "public_evidence/published_basis/gemma4_12b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_12b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/gemma4_12b/runtime.manifest.json",
         "public_evidence/published_basis/gemma4_12b/evidence_pack"
       ],
@@ -547,7 +547,7 @@
         "scripts/model_evidence/model_evidence_sweep.py",
         "tests/cli/test_preset_multimodal_presets.py",
         "tests/scripts/test_model_evidence_sweep_catalog.py",
-        "public_evidence/published_basis/gemma4_e4b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_e4b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/gemma4_e4b/runtime.manifest.json",
         "public_evidence/published_basis/gemma4_e4b/evidence_pack"
       ],
@@ -579,7 +579,7 @@
         "scripts/model_evidence/model_evidence_sweep.py",
         "tests/cli/test_preset_multimodal_presets.py",
         "tests/scripts/test_model_evidence_sweep_catalog.py",
-        "public_evidence/published_basis/gemma4_e2b_image_text/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/gemma4_e2b_image_text/runtime.manifest.json",
         "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack"
       ],
@@ -611,7 +611,7 @@
         "scripts/model_evidence/model_evidence_sweep.py",
         "tests/cli/test_preset_multimodal_presets.py",
         "tests/scripts/test_model_evidence_sweep_catalog.py",
-        "public_evidence/published_basis/qwen3_5_4b/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_5_4b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/qwen3_5_4b/runtime.manifest.json",
         "public_evidence/published_basis/qwen3_5_4b/evidence_pack"
       ],
@@ -644,7 +644,7 @@
         "scripts/model_evidence/model_evidence_sweep.py",
         "tests/cli/test_preset_multimodal_presets.py",
         "tests/scripts/test_model_evidence_sweep_catalog.py",
-        "public_evidence/published_basis/qwen3_5_2b/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_5_2b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/qwen3_5_2b/runtime.manifest.json",
         "public_evidence/published_basis/qwen3_5_2b/evidence_pack"
       ],
@@ -680,7 +680,7 @@
         "src/invarlock/adapters/hf_loading.py",
         "configs/presets/multimodal/qwen3_5_27b_public_vqav2_scoped_256.yaml",
         "configs/calibration/null_sweep_qwen3_5_27b_scoped.yaml",
-        "public_evidence/published_basis/qwen3_5_27b_scoped/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_5_27b_scoped/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/qwen3_5_27b_scoped/runtime.manifest.json",
         "public_evidence/published_basis/qwen3_5_27b_scoped/evidence_pack",
         "public_evidence/larger_model_validation_findings/lane_outcomes.json",
@@ -715,7 +715,7 @@
         "src/invarlock/adapters/hf_loading.py",
         "configs/presets/multimodal/qwen3_6_27b_public_vqav2_scoped_256.yaml",
         "configs/calibration/null_sweep_qwen3_6_27b_scoped.yaml",
-        "public_evidence/published_basis/qwen3_6_27b_scoped/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_6_27b_scoped/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/qwen3_6_27b_scoped/runtime.manifest.json",
         "public_evidence/published_basis/qwen3_6_27b_scoped/evidence_pack",
         "public_evidence/larger_model_validation_findings/lane_outcomes.json",
@@ -744,7 +744,7 @@
         "src/invarlock/adapters/hf_loading.py",
         "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
         "configs/calibration/null_sweep_gemma4_26b_a4b.yaml",
-        "public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/gemma4_26b_a4b/runtime.manifest.json",
         "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
@@ -785,7 +785,7 @@
         "src/invarlock/adapters/hf_loading.py",
         "configs/presets/multimodal/gemma4_31b_public_vqav2_256.yaml",
         "configs/calibration/null_sweep_gemma4_31b.yaml",
-        "public_evidence/published_basis/gemma4_31b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_31b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/gemma4_31b/runtime.manifest.json",
         "public_evidence/published_basis/gemma4_31b/evidence_pack",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
@@ -813,7 +813,7 @@
         "src/invarlock/adapters/auto.py",
         "configs/presets/causal_lm/mixtral_8x7b_512.yaml",
         "configs/calibration/null_sweep_mixtral_8x7b.yaml",
-        "public_evidence/published_basis/mixtral_8x7b/evaluation.report.json",
+        "public_evidence/published_basis/mixtral_8x7b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/mixtral_8x7b/runtime.manifest.json",
         "public_evidence/published_basis/mixtral_8x7b/evidence_pack",
         "scripts/model_evidence/model_evidence_sweep.py",
@@ -847,7 +847,7 @@
         "tests/cli/test_preset_causal_presets.py",
         "tests/scripts/test_model_evidence_sweep_catalog.py",
         "contracts/support_matrix.json",
-        "public_evidence/published_basis/qwen3_30b_a3b/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/qwen3_30b_a3b/runtime.manifest.json",
         "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack"
       ],
@@ -880,7 +880,7 @@
         "src/invarlock/adapters/auto.py",
         "configs/presets/causal_lm/gpt_oss_20b_512.yaml",
         "configs/calibration/null_sweep_gpt_oss_20b.yaml",
-        "public_evidence/published_basis/gpt_oss_20b/evaluation.report.json",
+        "public_evidence/published_basis/gpt_oss_20b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/gpt_oss_20b/runtime.manifest.json",
         "public_evidence/published_basis/gpt_oss_20b/evidence_pack",
         "scripts/model_evidence/model_evidence_sweep.py",
@@ -905,7 +905,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/olmoe_1b_7b_0924_512.yaml",
         "configs/calibration/null_sweep_olmoe_1b_7b_0924.yaml",
-        "public_evidence/published_basis/olmoe_1b_7b/evaluation.report.json",
+        "public_evidence/published_basis/olmoe_1b_7b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/olmoe_1b_7b/runtime.manifest.json",
         "public_evidence/published_basis/olmoe_1b_7b/evidence_pack"
       ],
@@ -930,7 +930,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/ministral3_3b_512.yaml",
         "configs/calibration/null_sweep_ministral3_3b.yaml",
-        "public_evidence/published_basis/ministral3_3b/evaluation.report.json",
+        "public_evidence/published_basis/ministral3_3b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/ministral3_3b/runtime.manifest.json",
         "public_evidence/published_basis/ministral3_3b/evidence_pack"
       ],
@@ -956,7 +956,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/granite4_1_8b_512.yaml",
         "configs/calibration/null_sweep_granite4_1_8b.yaml",
-        "public_evidence/published_basis/granite4_1_8b/evaluation.report.json",
+        "public_evidence/published_basis/granite4_1_8b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/granite4_1_8b/runtime.manifest.json",
         "public_evidence/published_basis/granite4_1_8b/evidence_pack"
       ],
@@ -981,7 +981,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/smollm3_3b_512.yaml",
         "configs/calibration/null_sweep_smollm3_3b.yaml",
-        "public_evidence/published_basis/smollm3_3b/evaluation.report.json",
+        "public_evidence/published_basis/smollm3_3b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/smollm3_3b/runtime.manifest.json",
         "public_evidence/published_basis/smollm3_3b/evidence_pack"
       ],
@@ -1005,7 +1005,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/phi4_mini_512.yaml",
         "configs/calibration/null_sweep_phi4_mini.yaml",
-        "public_evidence/published_basis/phi4_mini/evaluation.report.json",
+        "public_evidence/published_basis/phi4_mini/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/phi4_mini/runtime.manifest.json",
         "public_evidence/published_basis/phi4_mini/evidence_pack"
       ],
@@ -1030,7 +1030,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/deepseek_r1_distill_qwen_14b_512.yaml",
         "configs/calibration/null_sweep_deepseek_r1_distill_qwen_14b.yaml",
-        "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evaluation.report.json",
+        "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/runtime.manifest.json",
         "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evidence_pack"
       ],
@@ -1055,7 +1055,7 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/deepseek_r1_0528_qwen3_8b_512.yaml",
         "configs/calibration/null_sweep_deepseek_r1_0528_qwen3_8b.yaml",
-        "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evaluation.report.json",
+        "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/runtime.manifest.json",
         "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evidence_pack"
       ],
@@ -1108,9 +1108,9 @@
         "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
         "configs/calibration/null_sweep_qwen3_5_4b.yaml",
         "configs/calibration/null_sweep_qwen3_5_2b.yaml",
-        "public_evidence/published_basis/qwen3_5_2b/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_5_2b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/qwen3_5_2b/evidence_pack",
-        "public_evidence/published_basis/qwen3_5_4b/evaluation.report.json",
+        "public_evidence/published_basis/qwen3_5_4b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/qwen3_5_4b/evidence_pack",
         "configs/presets/multimodal/qwen3_5_27b_public_vqav2_scoped_256.yaml",
         "configs/calibration/null_sweep_qwen3_5_27b_scoped.yaml",
@@ -1187,17 +1187,17 @@
         "configs/calibration/null_sweep_gemma4_e4b.yaml",
         "configs/calibration/null_sweep_gemma4_12b.yaml",
         "configs/calibration/null_sweep_gemma4_26b_a4b.yaml",
-        "public_evidence/published_basis/gemma4_e2b_image_text/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack",
-        "public_evidence/published_basis/gemma4_e4b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_e4b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/gemma4_e4b/evidence_pack",
-        "public_evidence/published_basis/gemma4_12b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_12b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/gemma4_12b/evidence_pack",
-        "public_evidence/published_basis/gemma4_26b_a4b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack",
         "configs/presets/multimodal/gemma4_31b_public_vqav2_256.yaml",
         "configs/calibration/null_sweep_gemma4_31b.yaml",
-        "public_evidence/published_basis/gemma4_31b/evaluation.report.json",
+        "public_evidence/published_basis/gemma4_31b/evidence_pack/reports/report-001/evaluation.report.json",
         "public_evidence/published_basis/gemma4_31b/evidence_pack"
       ],
       "notes": "Gemma-family selectors and loaders are first-class for compatible local or user-supplied checkpoints. Repo-declared published Gemma support includes Gemma 4 E2B text-only plus Gemma 4 E2B, E4B, 12B, 26B-A4B, and 31B image-text published-basis evidence."
@@ -1408,7 +1408,7 @@
           "tests/cli/test_preset_causal_presets.py",
           "tests/scripts/test_model_evidence_sweep.py",
           "scripts/model_evidence/model_evidence_sweep.py",
-          "public_evidence/published_basis/qwen2_5_14b/evaluation.report.json",
+          "public_evidence/published_basis/qwen2_5_14b/evidence_pack/reports/report-001/evaluation.report.json",
           "public_evidence/published_basis/qwen2_5_14b/evidence_pack"
         ],
         "missing_artifacts": [],
@@ -1436,7 +1436,7 @@
           "tests/cli/test_preset_causal_presets.py",
           "tests/scripts/test_model_evidence_sweep.py",
           "scripts/model_evidence/model_evidence_sweep.py",
-          "public_evidence/published_basis/qwen3_8b/evaluation.report.json",
+          "public_evidence/published_basis/qwen3_8b/evidence_pack/reports/report-001/evaluation.report.json",
           "public_evidence/published_basis/qwen3_8b/evidence_pack"
         ],
         "missing_artifacts": [],
@@ -1464,7 +1464,7 @@
           "tests/cli/test_preset_causal_presets.py",
           "tests/scripts/test_model_evidence_sweep.py",
           "scripts/model_evidence/model_evidence_sweep.py",
-          "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evaluation.report.json",
+          "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evidence_pack/reports/report-001/evaluation.report.json",
           "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evidence_pack"
         ],
         "missing_artifacts": [],
@@ -1492,7 +1492,7 @@
           "tests/cli/test_preset_causal_presets.py",
           "tests/scripts/test_model_evidence_sweep.py",
           "scripts/model_evidence/model_evidence_sweep.py",
-          "public_evidence/published_basis/phi4_reasoning_plus/evaluation.report.json",
+          "public_evidence/published_basis/phi4_reasoning_plus/evidence_pack/reports/report-001/evaluation.report.json",
           "public_evidence/published_basis/phi4_reasoning_plus/evidence_pack"
         ],
         "missing_artifacts": [],
@@ -1520,7 +1520,7 @@
           "src/invarlock/adapters/auto.py",
           "tests/core/test_model_profiles.py",
           "tests/cli/test_preset_causal_presets.py",
-          "public_evidence/published_basis/open_llama_7b/evaluation.report.json",
+          "public_evidence/published_basis/open_llama_7b/evidence_pack/reports/report-001/evaluation.report.json",
           "public_evidence/published_basis/open_llama_7b/evidence_pack"
         ],
         "missing_artifacts": [],
@@ -1570,7 +1570,7 @@
           "src/invarlock/adapters/auto.py",
           "tests/adapters/test_hf_causal_variant_paths.py",
           "tests/cli/test_preset_causal_presets.py",
-          "public_evidence/published_basis/falcon_7b/evaluation.report.json",
+          "public_evidence/published_basis/falcon_7b/evidence_pack/reports/report-001/evaluation.report.json",
           "public_evidence/published_basis/falcon_7b/evidence_pack"
         ],
         "missing_artifacts": [],

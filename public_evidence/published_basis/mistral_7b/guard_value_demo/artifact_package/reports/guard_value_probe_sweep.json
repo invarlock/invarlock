@@ -18,7 +18,7 @@
   "method": {
     "baseline_eval_rerun": false,
     "calibration_rerun": false,
-    "guard_baseline": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+    "guard_baseline": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
     "pm_baseline_runtime_input": "<validation-output-root>/mistral_guard_value_real_20260612d/mistralai__mistral-7b-v01/baseline_reports/ci_balanced_seq512_pv200_fn200/baseline_report.json",
     "probe_windows": {
       "final": 200,
@@ -34,7 +34,7 @@
   "records": [
     {
       "baseline_relative_guard": {
-        "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+        "baseline_reference": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
         "baseline_spectral_caps_applied": 2,
         "delta_caps_applied": 0,
         "matching_capped_modules": [
@@ -202,7 +202,7 @@
     },
     {
       "baseline_relative_guard": {
-        "baseline_reference": "public_evidence/published_basis/mistral_7b/evaluation.report.json",
+        "baseline_reference": "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
         "baseline_spectral_caps_applied": 2,
         "delta_caps_applied": 1,
         "matching_capped_modules": [

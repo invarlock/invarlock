@@ -1,7 +1,7 @@
 {
   "artifact_paths": {
     "checkpoint_refs": "checkpoint_refs.json",
-    "evaluation_report": "evaluation.report.json",
+    "evaluation_report": "evidence_pack/reports/report-001/evaluation.report.json",
     "evidence_pack": "evidence_pack",
     "external_edit_recipe": "external_edit_recipe.py",
     "external_edit_summary": "external_edit_summary.json",
@@ -22,7 +22,7 @@
   "schema": "invarlock.public_evidence.meta.v1",
   "summary": "Container-backed real BYOE run for sshleifer/tiny-gpt2 with an externally materialized magnitude-pruned subject checkpoint.",
   "verifier_commands": [
-    "uv run invarlock verify public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json --profile release --assurance strict",
+    "uv run invarlock verify public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json --profile release --assurance strict",
     "uv run invarlock advanced evidence-pack verify public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:a7f269c8134e005b8d8e6a1843c58d4accacfbad5035e66b62a6a1bce9738104"
   ]
 }
