@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import fnmatch
 import json
 import sys
@@ -10,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 DEFAULT_INVENTORY = Path("scripts/scripts_inventory.toml")
+LARGE_MAINTAINER_SCRIPT_LINE_THRESHOLD = 1000
 IGNORED_PATH_PATTERNS = (
     "scripts/.DS_Store",
     "scripts/**/.DS_Store",
@@ -47,6 +49,13 @@ class ScriptFamily:
     paths: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class LargeScriptReview:
+    path: str
+    max_lines: int
+    rationale: str
+
+
 def _repo_root_from_script() -> Path:
     return Path(__file__).resolve().parents[1]
 
@@ -59,13 +68,15 @@ def _path_is_ignored(rel_path: str) -> bool:
     return any(fnmatch.fnmatch(rel_path, pattern) for pattern in IGNORED_PATH_PATTERNS)
 
 
-def _load_inventory(path: Path) -> tuple[list[ScriptFamily], list[str]]:
+def _load_inventory(
+    path: Path,
+) -> tuple[list[ScriptFamily], dict[str, LargeScriptReview], list[str]]:
     try:
         raw = tomllib.loads(path.read_text(encoding="utf-8"))
     except OSError as exc:
-        return [], [f"inventory unreadable: {path}: {exc}"]
+        return [], {}, [f"inventory unreadable: {path}: {exc}"]
     except tomllib.TOMLDecodeError as exc:
-        return [], [f"inventory invalid TOML: {path}: {exc}"]
+        return [], {}, [f"inventory invalid TOML: {path}: {exc}"]
 
     errors: list[str] = []
     if raw.get("version") != 1:
@@ -74,7 +85,7 @@ def _load_inventory(path: Path) -> tuple[list[ScriptFamily], list[str]]:
     family_entries = raw.get("families")
     if not isinstance(family_entries, list):
         errors.append("inventory must define a [[families]] array")
-        return [], errors
+        return [], {}, errors
 
     families: list[ScriptFamily] = []
     seen_names: set[str] = set()
@@ -147,7 +158,54 @@ def _load_inventory(path: Path) -> tuple[list[ScriptFamily], list[str]]:
                     paths=tuple(normalized_paths),
                 )
             )
-    return families, errors
+    large_reviews: dict[str, LargeScriptReview] = {}
+    review_entries = raw.get("large_script_reviews", [])
+    if review_entries is None:
+        review_entries = []
+    if not isinstance(review_entries, list):
+        errors.append("large_script_reviews must be a [[large_script_reviews]] array")
+    else:
+        for index, entry in enumerate(review_entries, start=1):
+            if not isinstance(entry, dict):
+                errors.append(f"large_script_reviews #{index} must be a table")
+                continue
+            review_path = entry.get("path")
+            max_lines = entry.get("max_lines")
+            rationale = entry.get("rationale")
+            if not isinstance(review_path, str) or not review_path.startswith(
+                "scripts/"
+            ):
+                errors.append(
+                    f"large_script_reviews #{index} has invalid scripts/ path"
+                )
+                continue
+            if review_path.startswith("/") or ".." in Path(review_path).parts:
+                errors.append(
+                    f"large_script_reviews #{index} has unsafe path {review_path!r}"
+                )
+                continue
+            if not isinstance(max_lines, int) or max_lines < (
+                LARGE_MAINTAINER_SCRIPT_LINE_THRESHOLD + 1
+            ):
+                errors.append(
+                    f"large_script_reviews {review_path!r} must set max_lines above "
+                    f"{LARGE_MAINTAINER_SCRIPT_LINE_THRESHOLD}"
+                )
+                continue
+            if not isinstance(rationale, str) or not rationale.strip():
+                errors.append(
+                    f"large_script_reviews {review_path!r} must include rationale"
+                )
+                continue
+            if review_path in large_reviews:
+                errors.append(f"large_script_reviews {review_path!r} is duplicated")
+                continue
+            large_reviews[review_path] = LargeScriptReview(
+                path=review_path,
+                max_lines=max_lines,
+                rationale=rationale,
+            )
+    return families, large_reviews, errors
 
 
 def _script_files(root: Path) -> list[str]:
@@ -205,10 +263,136 @@ def _reference_index(root: Path) -> dict[str, str]:
     return index
 
 
-def _referenced_by(rel_path: str, index: dict[str, str]) -> list[str]:
-    return sorted(
+def _script_rel_if_file(root: Path, path: Path) -> str | None:
+    if not path.is_file():
+        return None
+    try:
+        rel = _normalize_rel(path, root)
+    except ValueError:
+        return None
+    if not rel.startswith("scripts/") or _path_is_ignored(rel):
+        return None
+    return rel
+
+
+def _resolve_python_module(
+    *,
+    root: Path,
+    importer: Path,
+    module: str | None,
+    level: int,
+    aliases: tuple[str, ...] = (),
+) -> set[str]:
+    module_parts = tuple(part for part in (module or "").split(".") if part)
+    base_dirs: list[Path] = []
+
+    if level > 0:
+        base = importer.parent
+        for _ in range(level - 1):
+            base = base.parent
+        base_dirs.append(base)
+    elif module_parts[:1] == ("scripts",):
+        base_dirs.append(root)
+    else:
+        scripts_root = root / "scripts"
+        for parent in (importer.parent, *importer.parent.parents):
+            if parent == root:
+                break
+            if parent == scripts_root or scripts_root in parent.parents:
+                base_dirs.append(parent)
+        base_dirs.append(scripts_root)
+
+    candidates: set[str] = set()
+    seen_bases: set[Path] = set()
+    for base in base_dirs:
+        if base in seen_bases:
+            continue
+        seen_bases.add(base)
+        module_path = base.joinpath(*module_parts)
+        for path in (module_path.with_suffix(".py"), module_path / "__init__.py"):
+            rel = _script_rel_if_file(root, path)
+            if rel is not None:
+                candidates.add(rel)
+        for alias in aliases:
+            alias_path = module_path / f"{alias}.py"
+            rel = _script_rel_if_file(root, alias_path)
+            if rel is not None:
+                candidates.add(rel)
+
+    if not candidates and len(module_parts) == 1:
+        module_filename = f"{module_parts[0]}.py"
+        matches = [
+            _normalize_rel(path, root)
+            for path in (root / "scripts").rglob(module_filename)
+            if path.is_file()
+        ]
+        if len(matches) == 1:
+            candidates.add(matches[0])
+    return candidates
+
+
+def _import_reference_index(root: Path, index: dict[str, str]) -> dict[str, list[str]]:
+    imports: dict[str, set[str]] = defaultdict(set)
+    for rel_path, text in index.items():
+        if not rel_path.endswith(".py"):
+            continue
+        source_path = root / rel_path
+        try:
+            tree = ast.parse(text, filename=rel_path)
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            targets: set[str] = set()
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    targets.update(
+                        _resolve_python_module(
+                            root=root,
+                            importer=source_path,
+                            module=alias.name,
+                            level=0,
+                        )
+                    )
+            elif isinstance(node, ast.ImportFrom):
+                alias_names = tuple(alias.name for alias in node.names)
+                targets.update(
+                    _resolve_python_module(
+                        root=root,
+                        importer=source_path,
+                        module=node.module,
+                        level=node.level,
+                        aliases=alias_names,
+                    )
+                )
+            for target in targets:
+                if target != rel_path:
+                    imports[target].add(rel_path)
+    return {path: sorted(sources) for path, sources in imports.items()}
+
+
+def _referenced_by(
+    rel_path: str,
+    index: dict[str, str],
+    import_index: dict[str, list[str]],
+) -> list[str]:
+    referenced = {
         path for path, text in index.items() if path != rel_path and rel_path in text
-    )
+    }
+    referenced.update(import_index.get(rel_path, []))
+    return sorted(referenced)
+
+
+def _line_count(path: Path) -> int:
+    try:
+        return len(path.read_text(encoding="utf-8", errors="ignore").splitlines())
+    except OSError:
+        return 0
+
+
+def _requires_large_script_review(family: ScriptFamily, line_count: int) -> bool:
+    if line_count <= LARGE_MAINTAINER_SCRIPT_LINE_THRESHOLD:
+        return False
+    return family.stability == "maintainer-workflow" or family.audience == "maintainer"
 
 
 def build_audit_payload(
@@ -216,18 +400,22 @@ def build_audit_payload(
     root: Path,
     inventory_path: Path,
 ) -> tuple[dict[str, object], list[str]]:
-    families, errors = _load_inventory(inventory_path)
+    families, large_reviews, errors = _load_inventory(inventory_path)
     files = _script_files(root)
     family_by_name = {family.name: family for family in families}
     refs = _reference_index(root)
+    import_refs = _import_reference_index(root, refs)
     file_rows: list[dict[str, object]] = []
     for rel_path in files:
         matches = _matching_families(rel_path, families)
         if len(matches) != 1:
             continue
         family = family_by_name[matches[0]]
-        referenced = _referenced_by(rel_path, refs)
         path = root / rel_path
+        line_count = _line_count(path)
+        size_review_required = _requires_large_script_review(family, line_count)
+        review = large_reviews.get(rel_path)
+        referenced = _referenced_by(rel_path, refs, import_refs)
         file_rows.append(
             {
                 "path": rel_path,
@@ -243,6 +431,9 @@ def build_audit_payload(
                 "referenced_by": referenced,
                 "referenced": bool(referenced),
                 "executable": path.stat().st_mode & 0o111 != 0,
+                "line_count": line_count,
+                "size_review_required": size_review_required,
+                "size_reviewed": review is not None,
             }
         )
     return (
@@ -262,10 +453,12 @@ def check_inventory(
     root: Path,
     inventory_path: Path,
 ) -> tuple[bool, list[str], dict[str, int]]:
-    families, errors = _load_inventory(inventory_path)
+    families, large_reviews, errors = _load_inventory(inventory_path)
     files = _script_files(root)
     counts: dict[str, int] = defaultdict(int)
     matched_patterns: set[str] = set()
+    observed_review_paths: set[str] = set()
+    family_by_name = {family.name: family for family in families}
 
     for rel_path in files:
         matches = _matching_families(rel_path, families)
@@ -278,13 +471,30 @@ def check_inventory(
                 + ", ".join(matches)
             )
             continue
-        counts[matches[0]] += 1
-        for family in families:
-            if family.name != matches[0]:
-                continue
-            for pattern in family.paths:
-                if fnmatch.fnmatch(rel_path, pattern):
-                    matched_patterns.add(pattern)
+        family = family_by_name[matches[0]]
+        counts[family.name] += 1
+        line_count = _line_count(root / rel_path)
+        review = large_reviews.get(rel_path)
+        if review is not None:
+            observed_review_paths.add(rel_path)
+        if _requires_large_script_review(family, line_count):
+            if review is None:
+                errors.append(
+                    f"large maintainer script lacks size review: {rel_path} "
+                    f"({line_count} lines, threshold "
+                    f"{LARGE_MAINTAINER_SCRIPT_LINE_THRESHOLD})"
+                )
+            elif line_count > review.max_lines:
+                errors.append(
+                    f"large maintainer script exceeds reviewed max_lines: {rel_path} "
+                    f"({line_count} > {review.max_lines})"
+                )
+        for pattern in family.paths:
+            if fnmatch.fnmatch(rel_path, pattern):
+                matched_patterns.add(pattern)
+
+    for rel_path in sorted(set(large_reviews) - observed_review_paths):
+        errors.append(f"large script review references missing file: {rel_path}")
 
     for family in families:
         for pattern in family.paths:

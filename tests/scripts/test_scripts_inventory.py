@@ -91,6 +91,117 @@ paths = ["scripts/known.py", "scripts/scripts_inventory.toml"]
     assert rows["scripts/known.py"]["referenced_by"] == ["Makefile"]
 
 
+def test_scripts_inventory_reference_index_resolves_python_imports(
+    tmp_path: Path,
+) -> None:
+    scripts_pkg = tmp_path / "scripts" / "pkg"
+    scripts_pkg.mkdir(parents=True)
+    (scripts_pkg / "helper.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (tmp_path / "scripts" / "consumer.py").write_text(
+        "from scripts.pkg import helper\nprint(helper.VALUE)\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "scripts" / "scripts_inventory.toml").write_text(
+        """
+version = 1
+
+[[families]]
+name = "known"
+owner = "maintainers"
+stability = "repo-internal"
+audience = "ci-only"
+expected_runtime = "fast"
+network = "never"
+gpu = "never"
+invoked_by = ["manual"]
+description = "Test scripts."
+paths = ["scripts/consumer.py", "scripts/pkg/helper.py", "scripts/scripts_inventory.toml"]
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--root", str(tmp_path), "--json"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    payload = json.loads(result.stdout)
+    rows = {row["path"]: row for row in payload["files"]}
+    assert rows["scripts/pkg/helper.py"]["referenced_by"] == ["scripts/consumer.py"]
+    assert "scripts/pkg/helper.py" not in payload["unreferenced"]
+
+
+def test_scripts_inventory_rejects_large_maintainer_script_without_review(
+    tmp_path: Path,
+) -> None:
+    scripts_dir = tmp_path / "scripts"
+    scripts_dir.mkdir()
+    (scripts_dir / "large.py").write_text("print('x')\n" * 1001, encoding="utf-8")
+    (scripts_dir / "scripts_inventory.toml").write_text(
+        """
+version = 1
+
+[[families]]
+name = "maintainer"
+owner = "maintainers"
+stability = "maintainer-workflow"
+audience = "maintainer"
+expected_runtime = "long"
+network = "optional"
+gpu = "optional"
+invoked_by = ["manual"]
+description = "Maintainer scripts."
+paths = ["scripts/large.py", "scripts/scripts_inventory.toml"]
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    result = _run(tmp_path)
+
+    assert result.returncode == 1
+    assert (
+        "large maintainer script lacks size review: scripts/large.py" in result.stderr
+    )
+
+
+def test_scripts_inventory_accepts_large_maintainer_script_with_review(
+    tmp_path: Path,
+) -> None:
+    scripts_dir = tmp_path / "scripts"
+    scripts_dir.mkdir()
+    (scripts_dir / "large.py").write_text("print('x')\n" * 1001, encoding="utf-8")
+    (scripts_dir / "scripts_inventory.toml").write_text(
+        """
+version = 1
+
+[[large_script_reviews]]
+path = "scripts/large.py"
+max_lines = 1100
+rationale = "Synthetic large maintainer script review."
+
+[[families]]
+name = "maintainer"
+owner = "maintainers"
+stability = "maintainer-workflow"
+audience = "maintainer"
+expected_runtime = "long"
+network = "optional"
+gpu = "optional"
+invoked_by = ["manual"]
+description = "Maintainer scripts."
+paths = ["scripts/large.py", "scripts/scripts_inventory.toml"]
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    result = _run(tmp_path)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_scripts_inventory_rejects_unclassified_files(tmp_path: Path) -> None:
     scripts_dir = tmp_path / "scripts"
     scripts_dir.mkdir()
