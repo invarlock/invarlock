@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.12.1] - 2026-07-05
+
+### Added
+
 - Added stock-clean attention guard-value control evidence for the Mistral 7B
   guard-value demo package.
 
