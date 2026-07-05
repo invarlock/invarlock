@@ -16,8 +16,12 @@ whether they are looking at a fixture or a real run.
 
 ## Published-basis pass
 
-The repository ships strict-pass public-basis examples for GPT-2-style causal LM
-and BERT-style masked LM lanes:
+The repository ships a compact index for strict-pass public-basis examples,
+including GPT-2-style causal LM and BERT-style masked LM lanes. The full
+published-basis artifact tree is distributed as a GitHub Release asset recorded
+in `public_evidence/published_basis_index.json`. After verifying and unpacking
+that archive at the repository root, the logical paths in the index resolve for
+direct verifier use:
 
 ```bash
 invarlock verify --profile release --assurance strict \
@@ -27,7 +31,7 @@ invarlock verify --profile release --assurance strict \
   public_evidence/published_basis/bert/evaluation.report.json
 ```
 
-Each directory includes:
+Each indexed lane records:
 
 | File | Role |
 | --- | --- |
@@ -38,7 +42,9 @@ Each directory includes:
 | `evidence_pack/` | Signed, checksum-bound GPT-2 public evidence pack that verifies under strict release policy. |
 
 The support matrix records these paths under
-`contracts/support_matrix.json` as the `published_basis` evidence floor.
+`contracts/support_matrix.json` as the `published_basis` evidence floor. The
+compact index records hashes, sizes, archive paths, and release-asset metadata
+for the full artifact tree.
 
 The GPT-2 `artifact_package/` is a checkpoint-reference package. It names the
 baseline and subject checkpoint references, binds them to the report, runtime
@@ -47,8 +53,9 @@ manifest, and signed pack, and keeps the exact verification commands in
 the repository; the rebuild recipe is the source of truth for materializing a
 fresh BYOE evidence drop.
 
-The GPT-2 lane also ships a small signed pack so readers can exercise the
-full offline evidence-pack verifier without rebuilding the suite:
+The GPT-2 lane also includes a small signed pack in the published-basis archive
+so readers can exercise the full offline evidence-pack verifier without
+rebuilding the suite:
 
 ```bash
 FPR=$(python - <<'PY'

@@ -1,8 +1,0 @@
-VERDICT: PASS
-Models: 1
-Records: 5
-Primary-guard-required hits: 1/1
-Selected guard-value evidence case: spectral_moderate_scale_mlp_l31_up_s112
-PM-only accepts: ratio_vs_baseline=1.0076338080085065
-PM+guards detects: new baseline-relative FFN cap model.layers.31.mlp.up_proj
-Selected negative control: spectral_moderate_scale_attn_l31_o_s105 keeps edited target below stock attention cap and adds no new baseline-relative cap

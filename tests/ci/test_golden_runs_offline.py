@@ -43,6 +43,44 @@ def _assert_report_verifies(path: Path, assurance_mode: str = "report") -> None:
     assert result.outcome == VerifyOutcome.OK
 
 
+def _indexed_artifacts_by_path() -> dict[str, dict[str, Any]]:
+    artifacts: dict[str, dict[str, Any]] = {}
+    for entry in load_public_evidence_index()["entries"]:
+        entry_artifacts = entry.get("artifacts", {})
+        if not isinstance(entry_artifacts, dict):
+            continue
+        for summary in entry_artifacts.values():
+            if not isinstance(summary, dict):
+                continue
+            path = summary.get("path")
+            if isinstance(path, str):
+                artifacts[path] = summary
+    return artifacts
+
+
+def _assert_local_or_indexed_artifact(
+    rel_path: str,
+    *,
+    kind: str,
+) -> dict[str, Any]:
+    path = REPO_ROOT / rel_path
+    if kind == "file" and path.is_file():
+        return {"kind": "file", "path": rel_path}
+    if kind == "directory" and path.is_dir():
+        return {"kind": "directory", "path": rel_path}
+
+    summary = _indexed_artifacts_by_path().get(rel_path)
+    assert summary is not None, rel_path
+    assert summary["kind"] == kind
+    external = summary.get("external_asset")
+    assert isinstance(external, dict), rel_path
+    assert external["archive_path"] == rel_path
+    assert external["sha256"].startswith("sha256:")
+    assert external["size_bytes"] > 0
+    assert external["url"].startswith("https://github.com/invarlock/invarlock/")
+    return summary
+
+
 def test_published_basis_lanes_ship_public_evidence_references() -> None:
     for lane in published_basis_lanes():
         evidence = lane.get("evidence", {})
@@ -53,13 +91,13 @@ def test_published_basis_lanes_ship_public_evidence_references() -> None:
         runtime_manifest = evidence.get("runtime_manifest_fixture")
         assert isinstance(runtime_manifest, str) and runtime_manifest
         assert isinstance(evidence_pack_recipe, str) and evidence_pack_recipe
-        assert (REPO_ROOT / report_fixture).is_file(), report_fixture
-        assert (REPO_ROOT / runtime_manifest).is_file(), runtime_manifest
-        assert (REPO_ROOT / evidence_pack_recipe).is_file(), evidence_pack_recipe
+        _assert_local_or_indexed_artifact(report_fixture, kind="file")
+        _assert_local_or_indexed_artifact(runtime_manifest, kind="file")
+        _assert_local_or_indexed_artifact(evidence_pack_recipe, kind="file")
         evidence_pack_fixture = evidence.get("evidence_pack_fixture")
         if evidence_pack_fixture is not None:
             assert isinstance(evidence_pack_fixture, str) and evidence_pack_fixture
-            assert (REPO_ROOT / evidence_pack_fixture).is_dir(), evidence_pack_fixture
+            _assert_local_or_indexed_artifact(evidence_pack_fixture, kind="directory")
 
 
 def test_packaged_public_evidence_index_matches_repo_public_evidence() -> None:
@@ -72,8 +110,6 @@ def test_packaged_public_evidence_index_matches_repo_public_evidence() -> None:
         report_fixture = evidence.get("evaluation_report_fixture")
         assert isinstance(report_fixture, str)
         basis_id = Path(report_fixture).parts[2]
-        source_dir = REPO_ROOT / "public_evidence" / "published_basis" / basis_id
-        assert source_dir.is_dir(), source_dir
         assert basis_id in indexed
         assert lane["lane_id"] in indexed[basis_id]["lanes"]
 
@@ -81,9 +117,13 @@ def test_packaged_public_evidence_index_matches_repo_public_evidence() -> None:
         for key in ("evaluation_report", "runtime_manifest"):
             artifact = artifacts[key]
             source_path = REPO_ROOT / artifact["path"]
-            assert source_path.is_file(), source_path
-            expected = "sha256:" + hashlib.sha256(source_path.read_bytes()).hexdigest()
-            assert artifact["sha256"] == expected
+            if source_path.is_file():
+                expected = (
+                    "sha256:" + hashlib.sha256(source_path.read_bytes()).hexdigest()
+                )
+                assert artifact["sha256"] == expected
+            else:
+                _assert_local_or_indexed_artifact(artifact["path"], kind="file")
 
 
 def test_offline_golden_runs_public_fixtures() -> None:
@@ -129,6 +169,9 @@ def test_offline_golden_runs_public_fixtures() -> None:
 
     for lane in manifest["lanes"]:
         report_path = REPO_ROOT / lane["report"]
+        if not report_path.is_file():
+            _assert_local_or_indexed_artifact(lane["report"], kind="file")
+            continue
         report = json.loads(report_path.read_text(encoding="utf-8"))
         assert validate_report(report) is True
         assert report["meta"]["model_id"] == lane["model_id"]
@@ -144,6 +187,10 @@ def test_published_basis_public_evidence_verifies_release_strict() -> None:
         assert isinstance(report_fixture, str) and report_fixture
         assert isinstance(runtime_manifest, str) and runtime_manifest
         report_path = REPO_ROOT / report_fixture
+        if not report_path.is_file():
+            _assert_local_or_indexed_artifact(report_fixture, kind="file")
+            _assert_local_or_indexed_artifact(runtime_manifest, kind="file")
+            continue
         assert (REPO_ROOT / runtime_manifest).is_file()
 
         result = run_verify_reports(
@@ -167,6 +214,12 @@ def test_public_signed_evidence_pack_verifies_release_strict_pinned() -> None:
 
     assert packs
     for pack_dir in packs:
+        if not pack_dir.is_dir():
+            _assert_local_or_indexed_artifact(
+                pack_dir.relative_to(REPO_ROOT).as_posix(),
+                kind="directory",
+            )
+            continue
         manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
         fingerprint = manifest["signing_key_fingerprint"]
 
@@ -269,6 +322,14 @@ def test_real_guard_value_demo_publishes_baseline_relative_spectral_catch() -> N
         / "mistral_7b"
         / "guard_value_demo"
     )
+    if not demo_dir.is_dir():
+        summary = _assert_local_or_indexed_artifact(
+            "public_evidence/published_basis/mistral_7b/guard_value_demo",
+            kind="directory",
+        )
+        assert summary["file_count"] > 0
+        assert summary["size_bytes"] > 0
+        return
     summary = json.loads(
         (demo_dir / "guard_value_summary.json").read_text(encoding="utf-8")
     )

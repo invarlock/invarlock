@@ -213,10 +213,11 @@ Note: `configs/` and most `scripts/` remain repo resources and are not included 
 wheels. Installed wheels include the public contracts and the
 `invarlock advanced evidence-pack verify` verifier, so installed packages can
 check bundles without cloning the repository.
-Full published-basis public evidence artifacts live in the source tree and
-release tags under `public_evidence/`; wheels carry the compact
-`published_basis_index.json` summary with hashes, sizes, coverage, and source
-paths instead of duplicating the full artifact corpus.
+Full published-basis public evidence artifacts are distributed as GitHub
+Release assets. Source checkouts and wheels carry the compact
+`published_basis_index.json` summary with hashes, sizes, coverage, logical
+source paths, and release-asset download metadata instead of duplicating the
+full artifact corpus.
 
 ## Installation
 

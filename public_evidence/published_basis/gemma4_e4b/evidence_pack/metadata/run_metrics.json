@@ -1,8 +1,0 @@
-{
-  "final_accuracy": 0.5,
-  "guard_warning_count": 0,
-  "model_revision": "fee6332c1abaafb77f6f9624236c63aa2f1d0187",
-  "paired_windows": 400,
-  "ratio_vs_baseline": 1.0101010101010102,
-  "schema": "invarlock/published-basis-run-metrics-v1"
-}

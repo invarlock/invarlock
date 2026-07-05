@@ -152,18 +152,18 @@ carriers.
 
 The support-matrix published-basis evidence paths remain logical
 `public_evidence/published_basis/...` references. Source repository tags carry
-the full public evidence artifacts at those paths: reports, runtime manifests,
-evidence-pack recipes, signed packs where present, and guard-value demo
-packages.
+the compact public-evidence index with those logical paths, per-artifact hashes,
+sizes, directory control-file hashes, and release-asset download metadata for
+the full published-basis archive.
 
-Installed wheels intentionally do not duplicate the full published-basis
-artifact tree. Instead, they ship the compact generated index at
+Installed wheels also intentionally avoid duplicating the full published-basis
+artifact tree. They ship the same compact generated index at
 `invarlock/_data/public_evidence/published_basis_index.json`. That index records
 the published-basis entries, logical source paths, lane IDs, file hashes, sizes,
-directory control-file hashes, and the carrier policy. Wheel users can inspect
-which public evidence exists and where it lives in the source tag; verifying or
-rendering the full public evidence artifacts requires the repository source
-tree or an explicit artifact copy.
+directory control-file hashes, external release-asset metadata, and the carrier
+policy. Users can inspect which public evidence exists from the source tree or
+wheel; verifying or rendering the full published-basis artifacts requires
+downloading and verifying the referenced release asset.
 
 ## Policy packs
 

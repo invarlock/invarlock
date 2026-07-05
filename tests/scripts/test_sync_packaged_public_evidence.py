@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -155,3 +156,47 @@ def test_sync_packaged_public_evidence_write_removes_legacy_tree(
     assert written.returncode == 0, written.stderr
     assert "removed_legacy_tree=True" in written.stdout
     assert not (packaged_root / "published_basis").exists()
+
+
+def test_sync_packaged_public_evidence_uses_source_index_after_externalization(
+    tmp_path: Path,
+) -> None:
+    source_root, support_matrix = _write_fixture(tmp_path)
+    packaged_root = tmp_path / "packaged"
+
+    written = _run(
+        source_root=source_root,
+        support_matrix=support_matrix,
+        packaged_root=packaged_root,
+        args=[
+            "--write",
+            "--write-source-index",
+            "--external-asset-url",
+            "https://github.com/example/repo/releases/download/public-evidence/"
+            "published-basis.tar.gz",
+            "--external-asset-sha256",
+            "sha256:" + "a" * 64,
+            "--external-asset-size-bytes",
+            "12345",
+        ],
+    )
+
+    assert written.returncode == 0, written.stderr
+    source_index_path = source_root / "published_basis_index.json"
+    index = json.loads(source_index_path.read_text(encoding="utf-8"))
+    artifact = index["entries"][0]["artifacts"]["evaluation_report"]
+    assert artifact["external_asset"]["archive_path"] == (
+        "public_evidence/published_basis/demo/evaluation.report.json"
+    )
+    assert artifact["external_asset"]["sha256"] == "sha256:" + "a" * 64
+
+    shutil.rmtree(source_root / "published_basis")
+    checked = _run(
+        source_root=source_root,
+        support_matrix=support_matrix,
+        packaged_root=packaged_root,
+        args=["--check"],
+    )
+
+    assert checked.returncode == 0, checked.stderr
+    assert "in sync" in checked.stdout
