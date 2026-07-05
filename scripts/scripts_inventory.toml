@@ -12,7 +12,7 @@ rationale = "Large evidence-pack shell regression harness retained until task-fu
 
 [[large_script_reviews]]
 path = "scripts/evidence_packs/tests/test_queue_manager.sh"
-max_lines = 2500
+max_lines = 2400
 rationale = "Large evidence-pack queue-manager harness retained because it covers multi-state scheduler and worker edge cases."
 
 [[large_script_reviews]]
@@ -22,7 +22,7 @@ rationale = "Large evidence-pack run-pack harness retained for end-to-end mainta
 
 [[large_script_reviews]]
 path = "scripts/evidence_packs/tests/test_scheduler.sh"
-max_lines = 1500
+max_lines = 1400
 rationale = "Large evidence-pack scheduler harness retained while scheduler cases are consolidated around shared assertions."
 
 [[large_script_reviews]]
