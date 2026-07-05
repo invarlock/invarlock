@@ -538,7 +538,7 @@
           "file_count": 3,
           "kind": "directory",
           "path": "public_evidence/published_basis/gpt2/artifact_package",
-          "size_bytes": 4231
+          "size_bytes": 4330
         },
         "evaluation_report": {
           "kind": "file",
@@ -1730,6 +1730,6 @@
   "format_version": "public-evidence-index-v1",
   "published_basis_count": 39,
   "published_basis_file_count": 573,
-  "published_basis_size_bytes": 239118565,
+  "published_basis_size_bytes": 239118664,
   "source_root": "public_evidence"
 }

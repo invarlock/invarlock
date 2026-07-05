@@ -23,7 +23,7 @@
     "purpose": "No-op subject checkpoint reference used to validate strict verifier wiring"
   },
   "rebuild_recipe": "../evidence_pack_recipe.json",
-  "report": "../evaluation.report.json",
+  "report": "../evidence_pack/reports/report-001/evaluation.report.json",
   "runtime_manifest": "../runtime.manifest.json",
   "signed_evidence_pack": "../evidence_pack"
 }
