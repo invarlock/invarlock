@@ -116,7 +116,7 @@ CLAIM_REQUIRED_BY_FILE = {
         "strict verification",
         "PASS final verdict",
     ],
-    "scripts/evidence_packs/tests/test_run_pack.sh": [
+    "scripts/evidence_packs/tests/test_run_pack_core.sh": [
         "signed manifest, strict verification, and a PASS final verdict",
     ],
     "Makefile": ["eval-loop:"],
