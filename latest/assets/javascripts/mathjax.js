@@ -11,14 +11,16 @@ window.MathJax = {
   },
 };
 
-function typesetMath() {
-  if (window.MathJax && window.MathJax.typesetPromise) {
-    window.MathJax.typesetPromise();
+(function () {
+  function typesetMath() {
+    if (window.MathJax && typeof window.MathJax.typesetPromise === "function") {
+      window.MathJax.typesetPromise();
+    }
   }
-}
 
-if (typeof document$ !== "undefined") {
-  document$.subscribe(typesetMath);
-} else {
-  window.addEventListener("load", typesetMath);
-}
+  if (window.document$ && typeof window.document$.subscribe === "function") {
+    window.document$.subscribe(typesetMath);
+  } else {
+    window.addEventListener("load", typesetMath);
+  }
+})();

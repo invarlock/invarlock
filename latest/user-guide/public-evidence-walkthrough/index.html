@@ -2930,10 +2930,12 @@ PM-only accepts <code>spectral_moderate_scale_mlp_l31_up_s112</code>
 (<code>ratio_vs_baseline = 1.0076338080085065</code>), while the evidence-pack PM+guards
 comparison finds one new spectral cap relative to the Mistral noop basis:
 <code>model.layers.31.mlp.up_proj</code>.</p>
-<p>The same artifact includes <code>spectral_moderate_scale_attn_l31_o_s112</code> as a
-negative control: the same 1.12x scale on the closest non-baseline attention
-module passes PM and does not add a new baseline-relative cap. The compact sweep
-summary records adjacent scale points showing that the attention target starts
+<p>The same artifact includes <code>spectral_moderate_scale_attn_l31_o_s105</code> as the
+selected attention negative control: a 1.05x scale on the closest non-baseline
+attention module passes PM, adds no new baseline-relative spectral cap, and
+keeps the edited target below the documented stock attention cap
+(<code>z = 2.7987064430328767</code>, stock cap <code>3.018</code>). The compact sweep summary
+records adjacent scale points showing that the attention target starts
 triggering at 1.18 and the FFN target remains PM-accepted through 1.20.</p>
 <p>This artifact is an evidence-pack guard-value demonstration:
 <code>validation.spectral_stable</code> remains true because the spectral cap budget is
