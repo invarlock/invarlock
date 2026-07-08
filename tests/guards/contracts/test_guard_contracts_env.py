@@ -12,7 +12,7 @@ from tests._repo_root import REPO_ROOT
 
 def test_guard_assert_disabled_noop(monkeypatch):
     monkeypatch.delenv("INVARLOCK_ASSERT_GUARDS", raising=False)
-    guard_assert(False, "msg")  # should not raise
+    assert guard_assert(False, "msg") is None
 
 
 def test_guard_assert_enabled_raises(monkeypatch):

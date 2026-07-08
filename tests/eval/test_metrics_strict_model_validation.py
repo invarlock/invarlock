@@ -52,4 +52,7 @@ def test_pre_eval_checks_warn_when_context_length_exceeded(tmp_path) -> None:
     }
     dataloader = [batch]
     cfg = MetricsConfig(use_cache=False)
-    _perform_pre_eval_checks(DummyModel(), dataloader, torch.device("cpu"), cfg)
+    result = _perform_pre_eval_checks(
+        DummyModel(), dataloader, torch.device("cpu"), cfg
+    )
+    assert result is None

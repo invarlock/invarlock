@@ -78,26 +78,13 @@ Run the slower integration/smoke backstop separately:
 make test-integration
 ```
 
-Run the curated CI subset locally:
+Run the same fast PR gate locally:
 
 ```bash
-INVARLOCK_LIGHT_IMPORT=1 INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=0 \
-pytest -q \
-  tests/cli/test_python_m_invarlock.py \
-  tests/cli/test_report_help_and_html.py \
-  tests/cli/test_doctor_json.py \
-  tests/cli/test_doctor_cross_checks.py \
-  tests/cli/test_doctor_json_cls_pseudo_counts.py \
-  tests/cli/test_doctor_json_cls_measured_no_d012.py \
-  tests/cli/test_doctor_json_tiny_relax_note.py \
-  tests/integration/scripts/test_tiny_matrix_checklist.py \
-  tests/reporting/test_report_schema_v1_accuracy_tags.py \
-  tests/reporting/test_report_markdown_estimated_suffix.py \
-  tests/reporting/test_report_markdown_no_estimated_for_measured.py
+make test-fast
 ```
 
-The curated CI subset is intentionally narrower than `make test-fast`; use it
-when reproducing the fast PR gate selection or debugging that specific lane.
+PR CI runs the complete non-integration, non-slow, non-manual fast lane.
 `tests/integration/scripts/test_tiny_matrix_checklist.py` covers the dry-run
 checklist shape for `scripts/smoke/run_tiny_all_matrix.sh`; it does not execute
 the downloaded model matrix.

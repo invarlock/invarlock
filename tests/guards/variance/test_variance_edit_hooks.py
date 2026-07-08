@@ -29,3 +29,4 @@ def test_before_edit_and_after_edit_branches():
     # after_edit when prepared calls refresh metrics and logs
     g._prepared = True
     g.after_edit(M())
+    assert isinstance(g.events, list)

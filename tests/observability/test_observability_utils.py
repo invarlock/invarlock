@@ -151,7 +151,7 @@ class TestTimer:
         with timer:
             pass
 
-        # No exception means logging worked
+        assert timer.duration is not None
 
 
 # =============================================================================

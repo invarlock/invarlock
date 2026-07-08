@@ -529,9 +529,11 @@ class TestNotifications:
         manager.add_rule(AlertRule(name="test_rule", metric="test", threshold=0.0))
 
         # Trigger alert - should not attempt to send
-        manager.check_metric_against_rules("test", 1.0)
+        with patch("invarlock.observability.alerting.requests.post") as mock_post:
+            manager.check_metric_against_rules("test", 1.0)
 
-        # No error means disabled channel was skipped
+        mock_post.assert_not_called()
+        assert "rule_test_rule" in manager.active_alerts
 
     def test_notification_severity_filter(self):
         """Test notifications respect severity filter."""
@@ -555,7 +557,13 @@ class TestNotifications:
         )
 
         # Trigger - channel should not be notified due to severity filter
-        manager.check_metric_against_rules("test", 1.0)
+        with patch("invarlock.observability.alerting.requests.post") as mock_post:
+            manager.check_metric_against_rules("test", 1.0)
+
+        mock_post.assert_not_called()
+        assert (
+            manager.active_alerts["rule_warning_rule"].severity is AlertSeverity.WARNING
+        )
 
     @patch("invarlock.observability.alerting.requests.post")
     def test_webhook_notification(self, mock_post):

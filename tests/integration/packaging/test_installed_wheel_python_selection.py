@@ -115,8 +115,7 @@ def test_install_core_dependencies_noops_when_core_deps_are_already_available(
             AssertionError("requirements install should not run")
         ),
     )
-
-    support._install_core_dependencies(tmp_path, tmp_path / "python3.12")
+    assert support._install_core_dependencies(tmp_path, tmp_path / "python") is None
 
 
 def test_install_core_dependencies_skips_when_offline_fallback_install_fails(

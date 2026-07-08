@@ -40,8 +40,8 @@ def test_free_model_memory_invokes_cuda(monkeypatch):
 
 def test_free_model_memory_tolerates_missing_torch(monkeypatch):
     monkeypatch.setattr(run_runtime, "torch", None)
-    # Should not raise when torch is unavailable
     run_runtime.free_model_memory(object())
+    assert run_runtime.torch is None or hasattr(run_runtime.torch, "cuda")
 
 
 def test_free_model_memory_swallows_cuda_exceptions(monkeypatch):
@@ -51,6 +51,7 @@ def test_free_model_memory_swallows_cuda_exceptions(monkeypatch):
 
     monkeypatch.setattr(run_runtime, "torch", SimpleNamespace(cuda=FakeCuda()))
     run_runtime.free_model_memory(object())
+    assert isinstance(run_runtime.torch.cuda, FakeCuda)
 
 
 def test_release_process_memory_invokes_cuda_and_malloc_trim(monkeypatch):

@@ -293,7 +293,9 @@ def test_propagate_pairing_stats_adds_missing_fields():
 
 
 def test_propagate_pairing_stats_ignores_missing_dataset():
-    pm_policy.propagate_pairing_stats({}, {"stats": {}})
+    report: dict[str, object] = {}
+    pm_policy.propagate_pairing_stats(report, {"stats": {}})
+    assert report == {"dataset": {"windows": {"stats": {}}}}
 
 
 def test_normalize_baseline_handles_v1_schema_structure():

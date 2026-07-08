@@ -97,6 +97,7 @@ def test_overhead_threshold_bad_type_uses_default(tmp_path: Path):
         run_command(
             config=str(cfg), device="cpu", profile="ci", out=str(tmp_path / "runs")
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_typer_optioninfo_import_failure(tmp_path: Path):
@@ -143,6 +144,7 @@ def test_typer_optioninfo_import_failure(tmp_path: Path):
             timeout=None,
             baseline=None,
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_baseline_json_decode_error_fallback(tmp_path: Path):
@@ -194,6 +196,7 @@ def test_baseline_json_decode_error_fallback(tmp_path: Path):
             baseline=str(baseline),
             out=str(tmp_path / "runs"),
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_psutil_virtual_memory_failure(tmp_path: Path):
@@ -247,6 +250,7 @@ def test_psutil_virtual_memory_failure(tmp_path: Path):
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_success))
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_save_report_failure_bubbles_to_exit(tmp_path: Path):

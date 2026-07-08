@@ -28,6 +28,12 @@ def test_ci_adds_actionlint_and_packaging_smoke_gates() -> None:
         in actionlint_step["run"]
     )
     assert "make actionlint" in actionlint_step["run"]
+    fast_step = _find_step_by_name(docs_steps, "Run complete fast lane")
+    assert fast_step["run"] == "make test-fast"
+    local_hf_step = _find_step_by_name(docs_steps, "Run local HF pipeline smoke")
+    assert local_hf_step["run"] == "make local-hf-pipeline-smoke"
+    mutation_step = _find_step_by_name(docs_steps, "Run mutation smoke")
+    assert mutation_step["run"] == "make mutation-smoke"
     docs_live_fast_step = _find_step_by_name(docs_steps, "Run curated live examples")
     assert docs_live_fast_step["run"] == "make docs-live-fast"
 

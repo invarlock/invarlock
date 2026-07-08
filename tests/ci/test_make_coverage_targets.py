@@ -241,6 +241,26 @@ def test_makefile_exposes_actionlint_and_minimal_packaging_smoke_targets() -> No
     assert "--skip-notebook-model-loading" not in docs_live_block
 
 
+def test_makefile_exposes_offline_local_hf_pipeline_smoke_target() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    text = makefile.read_text(encoding="utf-8")
+
+    assert "local-hf-pipeline-smoke:" in text
+    assert "tests/integration/test_local_hf_pipeline_smoke.py" in text
+    assert "INVARLOCK_ALLOW_NETWORK=0" in text
+    assert "HF_HUB_OFFLINE=1" in text
+    assert "TRANSFORMERS_OFFLINE=1" in text
+    assert "TOKENIZERS_PARALLELISM=false" in text
+
+
+def test_makefile_exposes_mutation_smoke_target() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    text = makefile.read_text(encoding="utf-8")
+
+    assert "mutation-smoke:" in text
+    assert "scripts/coverage/mutation_smoke.py" in text
+
+
 def test_makefile_exposes_front_door_packaging_smoke_target() -> None:
     makefile = Path(__file__).resolve().parents[2] / "Makefile"
     text = makefile.read_text(encoding="utf-8")

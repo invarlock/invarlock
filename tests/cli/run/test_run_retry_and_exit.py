@@ -346,6 +346,7 @@ output:
             max_attempts=2,
             out=str(tmp_path / "runs"),
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 # --------------------
@@ -510,6 +511,7 @@ def test_until_pass_retry_summary_printed(tmp_path: Path):
             max_attempts=1,
             out=str(tmp_path / "runs"),
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 # --------------------

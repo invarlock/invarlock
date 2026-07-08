@@ -221,6 +221,7 @@ def test_vars_failure_in_to_serialisable_dict(tmp_path: Path):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_invalid_file_encoding_baseline(tmp_path: Path):
@@ -260,6 +261,7 @@ def test_invalid_file_encoding_baseline(tmp_path: Path):
             baseline=str(baseline),
             out=str(tmp_path / "runs"),
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_env_var_poisoning_for_tmpdir_and_debug(tmp_path: Path, monkeypatch):
@@ -338,6 +340,7 @@ def test_env_var_poisoning_for_tmpdir_and_debug(tmp_path: Path, monkeypatch):
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider_min())
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_debug_trace_with_mlm_masks_prints(tmp_path: Path, monkeypatch):
@@ -423,6 +426,7 @@ def test_debug_trace_with_mlm_masks_prints(tmp_path: Path, monkeypatch):
             baseline=str(baseline),
             out=str(tmp_path / "runs"),
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_nan_inf_metrics_propagation(tmp_path: Path):
@@ -454,6 +458,7 @@ def test_nan_inf_metrics_propagation(tmp_path: Path):
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_mlm_probability_inversion(tmp_path: Path):
@@ -571,3 +576,4 @@ def test_mlm_probability_inversion(tmp_path: Path):
             baseline=str(baseline),
             out=str(tmp_path / "runs"),
         )
+    assert (tmp_path / "runs").is_dir()

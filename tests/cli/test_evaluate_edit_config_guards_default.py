@@ -42,6 +42,8 @@ def test_evaluate_edit_config_includes_guard_order(tmp_path: Path, monkeypatch):
         encoding="utf-8",
     )
 
+    written_reports: list[Path] = []
+
     def _fake_run_command(*, config: str, out: str, **kwargs):  # noqa: ARG001
         cfg_path = Path(config)
         import yaml
@@ -61,6 +63,7 @@ def test_evaluate_edit_config_includes_guard_order(tmp_path: Path, monkeypatch):
         out_dir.mkdir(parents=True, exist_ok=True)
         report_path = out_dir / "report.json"
         report_path.write_text("{}", encoding="utf-8")
+        written_reports.append(report_path)
         return str(report_path)
 
     from invarlock.cli.commands import evaluate as evaluate_mod
@@ -85,3 +88,5 @@ def test_evaluate_edit_config_includes_guard_order(tmp_path: Path, monkeypatch):
         quiet=True,
         assurance="off",
     )
+    assert written_reports
+    assert all(path.is_file() for path in written_reports)

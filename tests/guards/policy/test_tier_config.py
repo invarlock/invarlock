@@ -203,7 +203,8 @@ class TestDriftDetection:
         """Drift detection can identify value mismatches."""
         # This is a structural test - we can't easily mock the YAML
         # but we verify the function runs without error
-        _ = check_drift(silent=True)
+        drift = check_drift(silent=True)
+        assert isinstance(drift, dict)
 
     def test_check_drift_warns_when_not_silent(self) -> None:
         with (

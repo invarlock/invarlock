@@ -69,6 +69,7 @@ def test_overhead_percent_display_release_profile(tmp_path: Path):
         run_command(
             config=str(cfg), device="cpu", profile="release", out=str(tmp_path / "runs")
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_counts_mismatch_exit_after_stratification(tmp_path: Path):
@@ -285,6 +286,7 @@ def test_snapshot_auto_bytes_and_chunked_paths(tmp_path: Path):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_bytes_only_adapter_path(tmp_path: Path):
@@ -347,6 +349,7 @@ def test_bytes_only_adapter_path(tmp_path: Path):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_chunked_only_adapter_path(tmp_path: Path):
@@ -409,6 +412,7 @@ def test_chunked_only_adapter_path(tmp_path: Path):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_top_level_exception_with_debug_trace(tmp_path: Path, monkeypatch):
@@ -462,3 +466,4 @@ def test_tokenizer_digest_nonstring_keys_fallback(tmp_path: Path):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()

@@ -85,6 +85,7 @@ def test_ve_sweep_covers_guard_search_and_ci_width_exceptions(tmp_path: Path) ->
             device=None,
             safety_margin=0.0,
         )
+    assert (out / "ve_sweep_runs.csv").is_file()
 
 
 def test_ve_sweep_covers_non_dict_variance_config_and_guard_loop_continue(

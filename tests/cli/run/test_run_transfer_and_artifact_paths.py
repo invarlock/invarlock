@@ -309,6 +309,7 @@ def test_transfer_guard_extras_and_guard_recovered_flag(tmp_path: Path):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_artifacts_events_path_empty_path(tmp_path: Path):
@@ -336,6 +337,7 @@ def test_artifacts_events_path_empty_path(tmp_path: Path):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_seed_bundle_fallbacks(tmp_path: Path, monkeypatch):
@@ -366,6 +368,7 @@ def test_seed_bundle_fallbacks(tmp_path: Path, monkeypatch):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_invariants_profile_checks_merged(tmp_path: Path):
@@ -389,6 +392,7 @@ def test_invariants_profile_checks_merged(tmp_path: Path):
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_min))
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_baseline_pairing_capacity_meta_skip_window_capacity_assignment(tmp_path: Path):
@@ -425,6 +429,7 @@ def test_baseline_pairing_capacity_meta_skip_window_capacity_assignment(tmp_path
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_edit_name_invalid_exits(tmp_path: Path):
@@ -570,6 +575,7 @@ def test_bare_overhead_measurement_pass(monkeypatch, tmp_path):
         "invarlock.core.runner.CoreRunner", lambda: DummyRunner(bare_status_ok=True)
     )
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile="ci")
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_dataset_meta_tokenizer_hash_passthrough(monkeypatch, tmp_path):
@@ -647,6 +653,7 @@ def test_dataset_meta_tokenizer_hash_passthrough(monkeypatch, tmp_path):
         ),
     )
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_auto_adapter_apply_fails_closed_on_error(monkeypatch, tmp_path):

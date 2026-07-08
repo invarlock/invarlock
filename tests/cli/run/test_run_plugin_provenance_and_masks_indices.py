@@ -66,3 +66,4 @@ def test_provider_indices_various_types(tmp_path: Path, indices_type: str):
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
+    assert (tmp_path / "runs").is_dir()

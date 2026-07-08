@@ -205,6 +205,7 @@ class TestVarianceGuardEdgeCases:
             clamp_range=(0.8, 1.2),
             allow_empty=True,
         )
+        assert len(model.transformer.h) == 1
 
 
 class TestSpectralGuardExceptionPaths:

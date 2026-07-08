@@ -162,3 +162,4 @@ def test_run_command_until_pass_auto_tune_head_budget_paths(tmp_path: Path) -> N
                 until_pass=True,
                 max_attempts=1,
             )
+    assert (tmp_path / "runs").is_dir()

@@ -232,3 +232,4 @@ def test_provider_indices_fallback_iteration(tmp_path: Path):
             out=str(tmp_path / "runs"),
             until_pass=False,
         )
+    assert (tmp_path / "runs").is_dir()

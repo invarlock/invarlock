@@ -119,4 +119,5 @@ def test_render_markdown_plugins_overhead_and_rmt_variants():
         "overrides": ["p1"],
         "policy_digest": "abcd",
     }
-    _ = render_report_markdown(cert)
+    markdown = render_report_markdown(cert)
+    assert "abcd" in markdown

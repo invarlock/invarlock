@@ -375,10 +375,11 @@ def test_emit_primary_metric_summary_from_report_swallows_emit_failures() -> Non
         }
     }
 
-    _emit_primary_metric_summary_from_report(
+    result = _emit_primary_metric_summary_from_report(
         report=report,
         emit=lambda _event: (_ for _ in ()).throw(TypeError("emit boom")),
     )
+    assert result is None
     _emit_primary_metric_summary_from_report(
         report={"metrics": {"primary_metric": {"preview": "bad", "final": 2.0}}},
         emit=lambda _event: (_ for _ in ()).throw(AssertionError("should not emit")),

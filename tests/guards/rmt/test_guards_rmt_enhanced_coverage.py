@@ -383,6 +383,8 @@ class TestRMTEnhancedCoverage:
             torch.randn(64, 128)
         )
 
+        with torch.no_grad():
+            test_layer.weight.mul_(10.0)
         _apply_rmt_correction(
             test_layer,
             0.8,
@@ -406,6 +408,7 @@ class TestRMTEnhancedCoverage:
         _apply_rmt_correction(
             bad_layer, 0.9, None, None, "bad_layer", deadband=0.0, verbose=True
         )
+        mock_adapter.get_tying_map.assert_called_once()
 
     def test_clip_full_svd_edge_cases(self):
         """Test clip_full_svd with edge cases (lines 861-865)."""

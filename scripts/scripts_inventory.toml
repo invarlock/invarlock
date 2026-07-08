@@ -89,6 +89,7 @@ invoked_by = ["make coverage-enforce", "CI"]
 description = "Coverage surface selection and threshold enforcement."
 paths = [
   "scripts/coverage/check_coverage_thresholds.py",
+  "scripts/coverage/mutation_smoke.py",
 ]
 
 [[families]]

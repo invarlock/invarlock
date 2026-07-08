@@ -108,6 +108,7 @@ def test_baseline_attention_masks_inferred_and_labels_sanitized(tmp_path: Path):
             out=str(tmp_path / "runs"),
             until_pass=False,
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_baseline_labels_longer_than_input_trimmed(tmp_path: Path):
@@ -168,6 +169,7 @@ def test_baseline_labels_longer_than_input_trimmed(tmp_path: Path):
             out=str(tmp_path / "runs"),
             until_pass=False,
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_provider_attention_mask_tolist_tuple_path(tmp_path: Path):
@@ -214,6 +216,7 @@ def test_provider_attention_mask_tolist_tuple_path(tmp_path: Path):
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 @pytest.mark.parametrize(

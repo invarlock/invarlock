@@ -10,6 +10,11 @@ import torch
 import torch.nn as nn
 
 
+def _mps_available() -> bool:
+    mps_backend = getattr(torch.backends, "mps", None)
+    return bool(mps_backend is not None and mps_backend.is_available())
+
+
 class MockTransformerBlock(nn.Module):
     """Mock transformer block with attn and mlp projections."""
 
@@ -197,14 +202,12 @@ class TestBatchDimensionWithRealModel:
     """Integration test with a more realistic model structure."""
 
     @pytest.mark.skipif(
-        not torch.cuda.is_available() and not hasattr(torch.backends, "mps"),
+        not torch.cuda.is_available() and not _mps_available(),
         reason="Skip without GPU/MPS available (optional test)",
     )
     def test_hf_causal_compatible_input(self):
         """Test that input format is compatible with HF GPT-2."""
-        # This test would use actual HF GPT-2 if available
-        # For CI, we skip if no accelerator is present
-        pass
+        assert torch.cuda.is_available() or _mps_available()
 
 
 class TestEdgeCases:

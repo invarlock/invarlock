@@ -206,7 +206,7 @@ def summarize_family_z_scores(
     for family, values in family_values.items():
         arr = np.array(values, dtype=float)
         cap = family_caps.get(family, {}).get("kappa")
-        violations = int(np.sum(arr > float(cap))) if cap is not None else 0
+        violations = int(np.sum(np.abs(arr) > float(cap))) if cap is not None else 0
         summary[family] = {
             "max": float(arr.max()),
             "mean": float(arr.mean()),

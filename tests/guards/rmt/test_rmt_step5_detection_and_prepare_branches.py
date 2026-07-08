@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+import torch
 import torch.nn as nn
 
 import invarlock.guards.rmt as R
 import invarlock.guards.rmt_detection as rmt_detection
+from invarlock.guards.rmt_analysis import layer_svd_stats
 
 
 class _TinyBlock(nn.Module):
@@ -59,6 +62,67 @@ def test_rmt_apply_step5_detection_and_correction_branches(monkeypatch) -> None:
     out = guard._apply_rmt_detection_and_correction(model)
     assert out["corrected_layers"] == 1
     assert out["n_layers_flagged"] == 1
+
+
+def test_rmt_step5_synthetic_boundary_is_strictly_greater() -> None:
+    at_threshold = nn.Linear(1, 1, bias=False)
+    above_threshold = nn.Linear(1, 1, bias=False)
+    with torch.no_grad():
+        at_threshold.weight.fill_(1.65)
+        above_threshold.weight.fill_(1.650001)
+
+    modules = [("at_threshold", at_threshold), ("above_threshold", above_threshold)]
+    baseline_sigmas = {"at_threshold": 1.0, "above_threshold": 1.0}
+    baseline_mp_stats = {
+        name: {"sigma_base": 1.0, "mp_bulk_edge_base": 1.0} for name in baseline_sigmas
+    }
+
+    out = rmt_detection.step5_detect_and_correct_modules(
+        modules,
+        baseline_sigmas=baseline_sigmas,
+        baseline_mp_stats=baseline_mp_stats,
+        deadband=0.10,
+        margin=1.5,
+        correct=False,
+    )
+
+    assert out["per_layer"][0]["has_outlier"] is False
+    assert out["per_layer"][0]["sigma_max"] == pytest.approx(1.65, rel=1e-6)
+    assert out["per_layer"][0]["skip_reason"] == ("≤ threshold (ratio=1.65 ≤ 1.65)")
+    assert out["per_layer"][1]["has_outlier"] is True
+    assert out["per_layer"][1]["sigma_max"] == pytest.approx(1.650001, rel=1e-6)
+    assert out["flagged_layers"] == [1]
+    assert out["n_layers_flagged"] == 1
+
+
+def test_rmt_no_baseline_spike_spectrum_uses_percentile_oracle() -> None:
+    layer = nn.Linear(51, 51, bias=False)
+    singular_values = torch.ones(51)
+    singular_values[0] = 100.0
+    with torch.no_grad():
+        layer.weight.copy_(torch.diag(singular_values))
+
+    stats = layer_svd_stats(layer, module_name="spike")
+    details = stats["worst_details"]
+
+    assert details["normalization"] == "98th_percentile"
+    assert details["s_max"] == pytest.approx(100.0)
+    assert details["s_98"] == pytest.approx(1.0)
+    assert details["ratio"] == pytest.approx(100.0)
+    assert details["mp_edge"] == pytest.approx(14.2828568570857)
+
+    out = rmt_detection.step5_detect_and_correct_modules(
+        [("block.attn.c_proj", layer)],
+        baseline_sigmas={},
+        baseline_mp_stats={},
+        deadband=0.0,
+        margin=50.0,
+        correct=False,
+    )
+
+    assert out["has_outliers"] is True
+    assert out["n_layers_flagged"] == 1
+    assert out["per_layer"][0]["details"]["ratio"] == pytest.approx(100.0)
 
 
 def test_rmt_prepare_policy_parsing_and_activation_required_paths(monkeypatch) -> None:

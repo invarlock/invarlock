@@ -270,6 +270,7 @@ class TestExportOrRaise:
 
         exporter = JSONExporter()
         metrics = [ExportedMetric(name="test", value=1.0, timestamp=time.time())]
+        assert export_or_raise(exporter, metrics) is None
 
         # Should not raise
         export_or_raise(exporter, metrics)

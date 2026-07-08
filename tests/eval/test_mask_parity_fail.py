@@ -17,5 +17,5 @@ def test_mask_parity_mismatch_aborts_in_ci():
 def test_mask_parity_dev_profile_no_abort():
     subj = {"ids_sha256": "ids", "tokenizer_sha256": "abc", "masking_sha256": "mask-A"}
     base = {"ids_sha256": "ids", "tokenizer_sha256": "abc", "masking_sha256": "mask-B"}
-    # Should not raise outside CI/Release profiles
     enforce_provider_parity(subj, base, profile="dev")
+    assert subj["masking_sha256"] == "mask-A"

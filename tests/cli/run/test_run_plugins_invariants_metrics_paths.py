@@ -57,6 +57,7 @@ def test_provider_non_evalwindow_mismatch_counts_no_exit(tmp_path: Path):
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_provider_indices_not_iterable_fallback(tmp_path: Path):
@@ -99,6 +100,7 @@ def test_provider_indices_not_iterable_fallback(tmp_path: Path):
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_metrics_merges_masked_totals_from_context(tmp_path: Path):
@@ -261,6 +263,7 @@ def test_drift_gate_fail_nonfatal(tmp_path: Path):
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_retry_controller_until_pass_two_attempts(tmp_path: Path):
@@ -364,3 +367,4 @@ def test_retry_controller_until_pass_two_attempts(tmp_path: Path):
             until_pass=True,
             max_attempts=2,
         )
+    assert (tmp_path / "runs").is_dir()

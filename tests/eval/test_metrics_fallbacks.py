@@ -44,7 +44,7 @@ def test_pre_eval_checks_warnings():
 
             return _gen()
 
-    # Should not raise
-    _perform_pre_eval_checks(
+    result = _perform_pre_eval_checks(
         DummyLM(), BadData(), torch.device("cpu"), M.MetricsConfig()
     )
+    assert result is None

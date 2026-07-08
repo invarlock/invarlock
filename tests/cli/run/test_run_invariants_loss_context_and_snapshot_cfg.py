@@ -357,6 +357,7 @@ def test_loss_cfg_nan_values_coerced(tmp_path: Path):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_snapshot_auto_ram_fraction_env(tmp_path: Path, monkeypatch):

@@ -32,6 +32,7 @@ jobs:
     env:
       INVARLOCK_LIGHT_IMPORT: "1"
       PYTHONPATH: ${{ github.workspace }}/src
+      PYTHON: "python"
       PYTHONWARNINGS: "default"
     timeout-minutes: 20
     steps:
@@ -61,35 +62,14 @@ jobs:
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
           make actionlint
 
-      - name: Curated tests (light import for help/doctor)
-        run: |
-          pytest -q \
-            tests/cli/test_python_m_invarlock.py \
-            tests/cli/test_report_help_and_html.py \
-            tests/cli/test_doctor_json.py \
-            tests/cli/test_doctor_cross_checks.py \
-            tests/cli/test_doctor_json_cls_pseudo_counts.py \
-            tests/cli/test_doctor_json_cls_measured_no_d012.py \
-            tests/cli/test_doctor_json_tiny_relax_note.py \
-            tests/integration/scripts/test_tiny_matrix_checklist.py \
-            tests/reporting/schema/test_report_schema_v1_accuracy_tags.py \
-            tests/reporting/render/test_report_markdown_estimated_suffix.py \
-            tests/reporting/render/test_report_markdown_no_estimated_for_measured.py
+      - name: Run complete fast lane
+        run: make test-fast
 
-      - name: Allow-list contracts (fast unit set)
-        run: |
-          pytest -q \
-            tests/reporting/builder/test_report_acceptance.py \
-            tests/cli/test_console_validation_block.py \
-            tests/cli/test_verify_json_shape.py::test_verify_json_envelope_is_stable \
-            tests/cli/test_verify_json_single_line.py::test_verify_json_single_line \
-            tests/cli/test_plugins_json_shape.py \
-            tests/cli/test_doctor_json_format_version.py \
-            tests/docs/test_docs_lexicon.py \
-            tests/docs/test_docs_schema_label.py \
-            tests/reporting/evidence_pack/test_evidence_bundle.py \
-            tests/ci/test_golden_runs_offline.py \
-            tests/ci/test_public_evidence_handoffs.py
+      - name: Run local HF pipeline smoke
+        run: make local-hf-pipeline-smoke
+
+      - name: Run mutation smoke
+        run: make mutation-smoke
 
       - name: Docs build (strict)
         run: |

@@ -308,9 +308,10 @@ def test_perform_pre_eval_checks_handles_missing_context_attr_and_no_warning_pat
 
     cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     dataloader = [{"input_ids": torch.zeros(1, 2, dtype=torch.long)}]
-    activation_mod._perform_pre_eval_checks(
+    result = activation_mod._perform_pre_eval_checks(
         _Model(), dataloader, torch.device("cpu"), cfg
     )
+    assert result is None
 
 
 def test_perform_pre_eval_checks_skips_warning_when_seq_len_within_model_limit() -> (
@@ -331,9 +332,10 @@ def test_perform_pre_eval_checks_skips_warning_when_seq_len_within_model_limit()
 
     cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     dataloader = [{"input_ids": torch.zeros(1, 5, dtype=torch.long)}]
-    activation_mod._perform_pre_eval_checks(
+    result = activation_mod._perform_pre_eval_checks(
         _Model(), dataloader, torch.device("cpu"), cfg
     )
+    assert result is None
 
 
 def test_extract_fc1_activations_skips_blocks_without_mlp(monkeypatch) -> None:
