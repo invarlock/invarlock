@@ -12,7 +12,7 @@ via `tests/integration/conftest.py`.
 ## Organization
 
 - Keep executable tests under the directory that matches the production owner surface.
-- Final executable owner dirs: `tests/adapters`, `tests/calibration`, `tests/ci`, `tests/cli`, `tests/core`, `tests/docs`, `tests/edits`, `tests/eval`, `tests/fuzzing`, `tests/guards`, `tests/integration`, `tests/lint`, `tests/observability`, `tests/plugins`, `tests/evidence_packs`, `tests/reporting`, `tests/runtime`, `tests/scripts`.
+- Final executable owner dirs: `tests/adapters`, `tests/calibration`, `tests/ci`, `tests/cli`, `tests/core`, `tests/docs`, `tests/edits`, `tests/eval`, `tests/guards`, `tests/integration`, `tests/lint`, `tests/observability`, `tests/plugins`, `tests/evidence_packs`, `tests/reporting`, `tests/runtime`, `tests/scripts`.
 - Non-executable support and data dirs stay isolated: `tests/_stubs`, `tests/artifacts`, `tests/fixtures`, `tests/schemas`.
 - `tests/artifacts` is the golden-data bucket. Keep stable report fixtures, evidence-pack payloads, and other maintainer-owned artifact snapshots there instead of folding them into `tests/fixtures`.
 - Nested owner buckets are allowed when they clarify ownership. Maintained

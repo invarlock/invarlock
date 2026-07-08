@@ -8,8 +8,9 @@ def test_events_dump_matches_window_count(tmp_path: Path):
     # Arrange: create a tiny golden report with preview/final windows
     ev_path = tmp_path / "events.jsonl"
     # 3 preview + 2 final = 5 total lines expected
-    for _ in range(5):
-        ev_path.write_text("{}\n", append=True)  # simple JSONL placeholders
+    with ev_path.open("a", encoding="utf-8") as events:
+        for _ in range(5):
+            events.write("{}\n")  # simple JSONL placeholders
     report = {
         "artifacts": {"events_path": str(ev_path)},
         "evaluation_windows": {
