@@ -80,6 +80,10 @@ def _write_local_inputs(tmp_path: Path, model_dir: Path) -> tuple[Path, Path]:
         {"text": "epsilon zeta eta theta"},
         {"text": "alpha gamma epsilon eta"},
         {"text": "beta delta zeta theta"},
+        {"text": "theta eta zeta epsilon"},
+        {"text": "delta gamma beta alpha"},
+        {"text": "alpha theta beta eta"},
+        {"text": "gamma zeta delta epsilon"},
     ]
     dataset.write_text(
         "\n".join(json.dumps(sample) for sample in samples) + "\n",
@@ -94,12 +98,12 @@ dataset:
     kind: local_jsonl
     file: "{dataset.as_posix()}"
     text_field: text
-    max_samples: 4
+    max_samples: 8
   split: validation
   seq_len: 8
   stride: 8
-  preview_n: 1
-  final_n: 1
+  preview_n: 3
+  final_n: 3
   seed: 7
 eval:
   metric:
