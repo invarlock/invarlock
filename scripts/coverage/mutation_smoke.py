@@ -43,10 +43,14 @@ def _apply_mutant(repo: Path, worktree: Path, mutant: Mutant) -> None:
         raise RuntimeError(
             f"{mutant.name}: mutation anchor not found in {repo / mutant.path}"
         )
-    source.write_text(text.replace(mutant.original, mutant.mutated, 1), encoding="utf-8")
+    source.write_text(
+        text.replace(mutant.original, mutant.mutated, 1), encoding="utf-8"
+    )
 
 
-def _run_pytest(repo: Path, worktree: Path, tests: tuple[str, ...]) -> subprocess.CompletedProcess[str]:
+def _run_pytest(
+    repo: Path, worktree: Path, tests: tuple[str, ...]
+) -> subprocess.CompletedProcess[str]:
     env = dict(os.environ)
     env["PYTHONPATH"] = str(worktree / "src")
     return subprocess.run(

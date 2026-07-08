@@ -22,7 +22,11 @@ def _require_local_hf_runtime() -> tuple[object, object, object]:
     except Exception as exc:  # pragma: no cover - host dependency guard
         pytest.skip(f"local HF runtime is unavailable: {exc}")
 
-    return (GPT2Config, GPT2LMHeadModel, (Tokenizer, WordLevel, Whitespace, PreTrainedTokenizerFast))
+    return (
+        GPT2Config,
+        GPT2LMHeadModel,
+        (Tokenizer, WordLevel, Whitespace, PreTrainedTokenizerFast),
+    )
 
 
 def _materialize_tiny_gpt2(model_dir: Path) -> None:
@@ -105,7 +109,7 @@ eval:
 guards:
   order: ["invariants", "spectral", "rmt"]
 output:
-  dir: "{(tmp_path / 'unused-runs').as_posix()}"
+  dir: "{(tmp_path / "unused-runs").as_posix()}"
   save_model: false
   save_report: true
 model:
@@ -154,7 +158,9 @@ def _offline_env(tmp_path: Path) -> dict[str, str]:
     return env
 
 
-def _run_cli(args: list[str], *, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+def _run_cli(
+    args: list[str], *, env: dict[str, str]
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, "-m", "invarlock", *args],
         cwd=REPO_ROOT,
