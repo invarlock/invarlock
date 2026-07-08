@@ -224,7 +224,7 @@ def test_local_hf_pipeline_evaluate_verify_and_report_html(tmp_path: Path) -> No
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["meta"]["adapter"] == "hf_causal"
     assert report["edit"]["name"] == "quant_rtn"
-    assert report["metrics"]["primary_metric"]["kind"] == "ppl_causal"
+    assert report["primary_metric"]["kind"] == "ppl_causal"
     assert {guard["name"] for guard in report["guards"]} >= {
         "invariants",
         "spectral",
