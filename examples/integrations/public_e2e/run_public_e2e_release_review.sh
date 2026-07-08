@@ -116,6 +116,25 @@ fi
 
 source_dir="$(cd -- "$(dirname -- "$report")" && pwd)"
 mkdir -p "$output_dir"
+sidecar_search_dirs=(
+  "$source_dir"
+  "$source_dir/../../metadata"
+  "$source_dir/../.."
+  "$source_dir/../../.."
+)
+
+copy_first_sidecar() {
+  local sidecar="$1"
+  local destination="$2"
+  local candidate_dir
+  for candidate_dir in "${sidecar_search_dirs[@]}"; do
+    if [[ -f "$candidate_dir/$sidecar" ]]; then
+      cp "$candidate_dir/$sidecar" "$destination"
+      return 0
+    fi
+  done
+  return 1
+}
 
 bundle_report="$output_dir/evaluation.report.json"
 verify_out="$output_dir/invarlock-verify.json"
@@ -128,13 +147,9 @@ run_summary_out="$output_dir/run_summary.txt"
 
 cp "$report" "$bundle_report"
 for sidecar in runtime.manifest.json checkpoint_refs.json external_edit_summary.json evidence.meta.json; do
-  if [[ -f "$source_dir/$sidecar" ]]; then
-    cp "$source_dir/$sidecar" "$output_dir/$sidecar"
-  fi
+  copy_first_sidecar "$sidecar" "$output_dir/$sidecar" || true
 done
-if [[ -f "$source_dir/run_command.txt" ]]; then
-  cp "$source_dir/run_command.txt" "$output_dir/source_run_command.txt"
-fi
+copy_first_sidecar "run_command.txt" "$output_dir/source_run_command.txt" || true
 
 export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 

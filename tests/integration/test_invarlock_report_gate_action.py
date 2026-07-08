@@ -74,6 +74,9 @@ def test_report_gate_command_sequence_smoke(tmp_path: Path) -> None:
         / "public_evidence"
         / "real_runs"
         / "tiny_gpt2_external_magnitude_prune"
+        / "evidence_pack"
+        / "reports"
+        / "report-001"
         / "evaluation.report.json"
     )
     verify_out = tmp_path / "invarlock-verify.json"

@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import sys
 from importlib import import_module
-from pathlib import Path
 
 import pytest
 
@@ -95,33 +94,6 @@ def _default_security_bypass_for_local_tests(monkeypatch: pytest.MonkeyPatch):
     # security-default path explicitly.
     monkeypatch.setenv("INVARLOCK_ALLOW_HOST_EXECUTION", "1")
     monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", _VALID_TEST_IMAGE_DIGEST)
-    yield
-
-
-@pytest.fixture(autouse=True)
-def _path_write_text_with_append(monkeypatch: pytest.MonkeyPatch):
-    # Some tests use Path.write_text(..., append=True) which is not available
-    # in all Python versions. Provide a local append-capable test helper.
-    def _write_text(
-        self: Path,
-        data: str,
-        encoding: str | None = None,
-        errors: str | None = None,
-        newline: str | None = None,
-        *,
-        append: bool = False,
-    ) -> int:
-        if append:
-            # Append mode
-            self.parent.mkdir(parents=True, exist_ok=True)
-            with self.open(
-                "a", encoding=encoding, errors=errors, newline=newline
-            ) as fh:
-                return fh.write(data)
-        with self.open("w", encoding=encoding, errors=errors, newline=newline) as fh:
-            return fh.write(data)
-
-    monkeypatch.setattr(Path, "write_text", _write_text, raising=True)
     yield
 
 

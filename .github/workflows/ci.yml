@@ -88,7 +88,8 @@ jobs:
             tests/docs/test_docs_lexicon.py \
             tests/docs/test_docs_schema_label.py \
             tests/reporting/evidence_pack/test_evidence_bundle.py \
-            tests/ci/test_golden_runs_offline.py
+            tests/ci/test_golden_runs_offline.py \
+            tests/ci/test_public_evidence_handoffs.py
 
       - name: Docs build (strict)
         run: |

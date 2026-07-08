@@ -190,7 +190,7 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/runtime_security.py \
 	src/invarlock/runtime_security_helpers.py
 
-TEST_DIR_TARGETS := adapters calibration ci cli core docs edits eval fuzzing guards integration lint observability plugins evidence_packs reporting runtime scripts
+TEST_DIR_TARGETS := adapters calibration ci cli core docs edits eval guards integration lint observability plugins evidence_packs reporting runtime scripts
 GROUPED_TEST_DIR_TARGETS := $(filter-out integration,$(TEST_DIR_TARGETS))
 
 help:  ## Show this help message
@@ -266,8 +266,6 @@ test-calibration: TEST_DIR = calibration
 test-calibration: ## Run tests/calibration
 test-docs: TEST_DIR = docs
 test-docs: ## Run tests/docs
-test-fuzzing: TEST_DIR = fuzzing
-test-fuzzing: ## Run tests/fuzzing
 test-lint: TEST_DIR = lint
 test-lint: ## Run tests/lint
 test-observability: TEST_DIR = observability
@@ -292,6 +290,7 @@ test-assurance:  ## Run assurance-related tests only
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) -q \
 		tests/ci/test_golden_runs_offline.py \
+		tests/ci/test_public_evidence_handoffs.py \
 		tests/ci/test_support_matrix_consistency.py \
 		tests/adapters/test_adapter_capability_contract.py \
 		tests/core/test_bootstrap.py::test_compute_paired_delta_and_ratio_ci_consistency \
@@ -367,8 +366,8 @@ verify-fast:  ## Run fast local verification without model downloads
 	$(MAKE) public-evidence-audit
 	PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q -m "not integration and not slow and not manual" \
 		tests/docs tests/reporting tests/evidence_packs \
-		tests/ci/test_golden_runs_offline.py::test_byoe_examples_verify_release_strict \
-		tests/ci/test_golden_runs_offline.py::test_lora_byoe_metadata_builds_and_verifies_signed_evidence_pack
+		tests/ci/test_public_evidence_handoffs.py::test_byoe_examples_verify_release_strict \
+		tests/ci/test_public_evidence_handoffs.py::test_lora_byoe_metadata_builds_and_verifies_signed_evidence_pack
 	$(MAKE) verify-ruff
 	$(MAKE) docs-lint-strict
 	@echo "Fast verification completed successfully"

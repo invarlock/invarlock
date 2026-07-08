@@ -15,7 +15,6 @@ EXPECTED_TEST_DIR_TARGETS = {
     "docs",
     "edits",
     "eval",
-    "fuzzing",
     "guards",
     "integration",
     "lint",
