@@ -46,6 +46,11 @@ TRANSITIONAL_TOKENS = (
     "tail",
     "part2",
 )
+ASSERTION_FREE_ALLOWLIST = {
+    "tests/reporting/schema/test_policy_pack_contract.py::test_policy_pack_fuzz_target_handles_arbitrary_bytes": (
+        "Hypothesis fuzz target where success means no unexpected exception"
+    )
+}
 
 
 def _tracked_test_files() -> list[Path]:
@@ -119,6 +124,62 @@ def _call_name(node: ast.AST) -> str:
     return ""
 
 
+class _DirectAssertionSignalVisitor(ast.NodeVisitor):
+    def __init__(self) -> None:
+        self.found = False
+
+    def visit_Assert(self, node: ast.Assert) -> None:
+        self.found = True
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        return
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        return
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        return
+
+    def visit_Call(self, node: ast.Call) -> None:
+        call_name = _call_name(node.func)
+        leaf_name = call_name.rsplit(".", 1)[-1]
+        if call_name in {
+            "pytest.raises",
+            "pytest.warns",
+            "pytest.deprecated_call",
+            "pytest.fail",
+        }:
+            self.found = True
+        elif leaf_name.startswith("assert") or leaf_name.startswith("_assert"):
+            self.found = True
+        elif ".assert" in call_name:
+            self.found = True
+        self.generic_visit(node)
+
+
+def _has_direct_assertion_signal(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    visitor = _DirectAssertionSignalVisitor()
+    for statement in node.body:
+        visitor.visit(statement)
+    return visitor.found
+
+
+def _iter_test_nodes(
+    tree: ast.Module,
+) -> list[tuple[str, ast.FunctionDef | ast.AsyncFunctionDef]]:
+    tests: list[tuple[str, ast.FunctionDef | ast.AsyncFunctionDef]] = []
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            if node.name.startswith("test_"):
+                tests.append((node.name, node))
+        elif isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
+            for child in node.body:
+                if isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef):
+                    if child.name.startswith("test_"):
+                        tests.append((f"{node.name}.{child.name}", child))
+    return tests
+
+
 def test_test_modules_do_not_import_other_test_modules() -> None:
     offenders: list[str] = []
     for path in _tracked_test_files():
@@ -163,3 +224,23 @@ def test_test_modules_do_not_import_other_test_modules() -> None:
                 ):
                     offenders.append(f"{path.as_posix()}:{node.lineno}:{imported_path}")
     assert offenders == []
+
+
+def test_test_functions_have_direct_assertion_signal() -> None:
+    offenders: list[str] = []
+    allowlist_seen: set[str] = set()
+
+    for path in _tracked_test_files():
+        relative_path = path.relative_to(REPO_ROOT).as_posix()
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for qualified_name, node in _iter_test_nodes(tree):
+            test_id = f"{relative_path}::{qualified_name}"
+            if _has_direct_assertion_signal(node):
+                continue
+            if test_id in ASSERTION_FREE_ALLOWLIST:
+                allowlist_seen.add(test_id)
+                continue
+            offenders.append(f"{path.as_posix()}:{node.lineno}:{qualified_name}")
+
+    assert offenders == []
+    assert sorted(set(ASSERTION_FREE_ALLOWLIST) - allowlist_seen) == []

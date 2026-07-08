@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 import pytest
 import typer
 
@@ -51,3 +53,4 @@ def test_maybe_delegate_model_command_respects_shell_host_exec_env(
     )
 
     security_helpers.maybe_delegate_model_command()
+    assert os.environ["INVARLOCK_ALLOW_HOST_EXECUTION"] == "1"

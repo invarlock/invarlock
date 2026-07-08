@@ -336,7 +336,9 @@ def test_enforce_pairing_and_coverage_path_matrix() -> None:
 
 def test_propagate_pairing_stats_early_returns() -> None:
     pm_policy.propagate_pairing_stats(evaluation_report=None, ppl_analysis=None)
-    pm_policy.propagate_pairing_stats(evaluation_report={}, ppl_analysis=None)
+    empty_report: dict[str, object] = {}
+    pm_policy.propagate_pairing_stats(evaluation_report=empty_report, ppl_analysis=None)
+    assert empty_report == {"dataset": {"windows": {"stats": {}}}}
     pm_policy.propagate_pairing_stats(
         evaluation_report={"dataset": None}, ppl_analysis={}
     )

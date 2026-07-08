@@ -193,6 +193,7 @@ output:
             until_pass=False,
             baseline=str(baseline),
         )
+    assert outdir.is_dir()
 
 
 def _write_cfg(tmp_path: Path) -> Path:

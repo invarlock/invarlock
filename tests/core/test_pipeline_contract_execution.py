@@ -1,11 +1,11 @@
 # ruff: noqa: I001
 
 """
-End-to-End Pipeline Integration Tests
-====================================
+Legacy Mocked Pipeline Contract Tests
+=====================================
 
-Comprehensive integration tests that validate the complete INVARLOCK pipeline
-from configuration loading through model editing to evaluation.
+These regression tests exercise mocked pipeline wiring and synthetic model
+contracts. They do not provide integration-lane evidence.
 """
 
 import json
@@ -53,7 +53,7 @@ with patch.dict(
 
 
 class MockGPT2Model(nn.Module):
-    """Mock GPT-2 model for integration testing."""
+    """Mock GPT-2 model for pipeline contract tests."""
 
     def __init__(self, n_layers: int = 2, hidden_size: int = 128):
         super().__init__()
@@ -220,8 +220,8 @@ class TestEndToEndPipeline:
 
     # Plugin tests focus on quantization and core guards
 
-    def test_guard_chain_integration(self):
-        """Test integration with guard chain."""
+    def test_guard_chain_contract_flow(self):
+        """Test mocked guard chain flow."""
         # Create guard instances
         spectral_guard = SpectralGuard(sigma_quantile=0.95, deadband=0.1)
         rmt_guard = RMTGuard(margin=1.5, deadband=0.1)

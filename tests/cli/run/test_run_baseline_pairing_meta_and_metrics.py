@@ -541,3 +541,4 @@ def test_dataset_meta_context_non_dict_path(tmp_path: Path):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()

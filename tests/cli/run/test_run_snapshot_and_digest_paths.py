@@ -267,6 +267,7 @@ def test_tokenizer_digest_with_get_vocab_str_and_nonstr(monkeypatch, tmp_path):
 
     cfg = _basic_yaml(tmp_path)
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_gfm_invariants_profile_checks_existing_string_and_model_invariants_merge(
@@ -304,6 +305,7 @@ def test_gfm_invariants_profile_checks_existing_string_and_model_invariants_merg
     )
     cfg = _cfg_gfm(tmp_path)
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_snapshot_mode_bytes(monkeypatch, tmp_path):
@@ -337,6 +339,7 @@ def test_snapshot_mode_bytes(monkeypatch, tmp_path):
     )
     monkeypatch.setenv("INVARLOCK_SNAPSHOT_MODE", "bytes")
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_snapshot_mode_chunked(monkeypatch, tmp_path):
@@ -370,6 +373,7 @@ def test_snapshot_mode_chunked(monkeypatch, tmp_path):
     )
     monkeypatch.setenv("INVARLOCK_SNAPSHOT_MODE", "chunked")
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_snapshot_mode_reload_fallback(monkeypatch, tmp_path):
@@ -397,6 +401,7 @@ def test_snapshot_mode_reload_fallback(monkeypatch, tmp_path):
         lambda: _SNS(execute=lambda **k: _std_core_report_gfm()),
     )
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_snapshot_mode_auto_prefers_bytes(monkeypatch, tmp_path):
@@ -444,6 +449,7 @@ def test_snapshot_mode_auto_prefers_bytes(monkeypatch, tmp_path):
         "invarlock.cli.run_runtime_exec.shutil.disk_usage", lambda path: DU
     )
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_tokenizer_digest_no_get_vocab_vocab_list(monkeypatch, tmp_path):
@@ -464,6 +470,7 @@ def test_tokenizer_digest_no_get_vocab_vocab_list(monkeypatch, tmp_path):
 
     cfg = _basic_yaml(tmp_path)
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_tokenizer_digest_get_vocab_raises(monkeypatch, tmp_path):
@@ -485,6 +492,7 @@ def test_tokenizer_digest_get_vocab_raises(monkeypatch, tmp_path):
 
     cfg = _basic_yaml(tmp_path)
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_baseline_sanitize_attention_masks_and_labels(monkeypatch, tmp_path):
@@ -516,6 +524,7 @@ def test_baseline_sanitize_attention_masks_and_labels(monkeypatch, tmp_path):
         profile=None,
         baseline=str(baseline),
     )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_baseline_sanitize_non_list_input_ids_ignored(monkeypatch, tmp_path):
@@ -541,6 +550,7 @@ def test_baseline_sanitize_non_list_input_ids_ignored(monkeypatch, tmp_path):
         profile=None,
         baseline=str(baseline),
     )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_snapshot_cfg_bytes_fallback_to_chunked(monkeypatch, tmp_path):
@@ -613,6 +623,7 @@ context:
         """,
     )
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_snapshot_cfg_chunked_fallback_to_bytes(monkeypatch, tmp_path):
@@ -685,3 +696,4 @@ context:
         """,
     )
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
+    assert (tmp_path / "runs").is_dir()

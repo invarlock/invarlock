@@ -1,11 +1,11 @@
 # ruff: noqa: I001
 
 """
-End-to-End Pipeline Integration Tests
-====================================
+Legacy Mocked Pipeline Performance Contracts
+============================================
 
-Comprehensive integration tests that validate the complete INVARLOCK pipeline
-from configuration loading through model editing to evaluation.
+These regression tests exercise synthetic model performance and mocked adapter
+contracts. They do not provide integration-lane evidence.
 """
 
 import json
@@ -51,7 +51,7 @@ with patch.dict(
 
 
 class MockGPT2Model(nn.Module):
-    """Mock GPT-2 model for integration testing."""
+    """Mock GPT-2 model for pipeline contract tests."""
 
     def __init__(self, n_layers: int = 2, hidden_size: int = 128):
         super().__init__()

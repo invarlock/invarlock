@@ -148,8 +148,8 @@ class TestBaseAdapter:
     def test_base_adapter_cleanup(self):
         """Test adapter cleanup."""
         adapter = ConcreteAdapter({})
-        # Should not raise any errors
         adapter.cleanup()
+        assert adapter.state == AdapterState.INITIALIZED
 
     def test_concrete_adapter_methods(self):
         """Test concrete adapter method implementations."""
@@ -309,9 +309,10 @@ class TestDeviceManager:
         """Test device context manager."""
         manager = DeviceManager({})
 
-        # Should not raise any errors
+        entered = False
         with manager.device_context("cuda:0"):
-            pass
+            entered = True
+        assert entered is True
 
 
 class TestAdapterCache:
@@ -357,6 +358,6 @@ class TestAdapterCache:
         """Test cache save/load (stubs)."""
         cache = AdapterCache({"enabled": True})
 
-        # Should not raise errors (stubs)
         cache.save()
         cache.load()
+        assert cache.get("missing") is None

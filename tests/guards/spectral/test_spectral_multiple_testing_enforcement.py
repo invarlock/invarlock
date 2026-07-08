@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import pytest
 import torch
 
 from invarlock.guards.spectral import SpectralGuard
+from invarlock.guards.spectral_detection import summarize_family_z_scores
 
 
 class _TinySpectralModel(torch.nn.Module):
@@ -78,6 +80,23 @@ def test_spectral_multiple_testing_changes_selected_violations() -> None:
     assert bh_mt.get("alpha") == 0.05
     assert bh_mt.get("m") == 4
 
+    expected_pvalues = {
+        "ffn": 0.009995064631470036,
+        "attn": 0.02001855068173534,
+        "embed": 0.03000684594746441,
+        "other": 0.07186063822585162,
+    }
+    bh_selection = bh["metrics"]["multiple_testing_selection"]
+    bonf_selection = bonf["metrics"]["multiple_testing_selection"]
+
+    assert bh_selection["families_selected"] == ["attn", "embed", "ffn"]
+    assert bonf_selection["families_selected"] == ["ffn"]
+    assert bh["metrics"]["caps_applied"] == 3
+    assert bonf["metrics"]["caps_applied"] == 1
+    for family, expected in expected_pvalues.items():
+        assert bh_selection["family_pvalues"][family] == pytest.approx(expected)
+        assert bonf_selection["family_pvalues"][family] == pytest.approx(expected)
+
 
 def test_spectral_max_caps_applied_after_multiple_testing() -> None:
     # With max_caps=2: BH selects 3 families -> abort; Bonferroni selects 1 -> warn.
@@ -89,3 +108,42 @@ def test_spectral_max_caps_applied_after_multiple_testing() -> None:
 
     assert bonf.get("decision") == "monitor"
     assert bonf.get("passed") is True
+
+
+def test_spectral_negative_z_decision_and_summary_match_production_oracle() -> None:
+    model = _TinySpectralModel()
+    _set_scalar_weight(model.mlp, 2.0)
+
+    guard = SpectralGuard(
+        scope="all",
+        deadband=0.0,
+        max_caps=10,
+        family_caps={"ffn": {"kappa": 3.0}, "other": {"kappa": 10.0}},
+        multiple_testing={"method": "bh", "alpha": 0.05, "m": 1},
+    )
+    guard.prepare(
+        model=model,
+        adapter=None,
+        calib=None,
+        policy={
+            "baseline_family_stats": {"ffn": {"mean": 2.0, "std": 0.25}},
+        },
+    )
+    guard.module_include_patterns = ["mlp"]
+    guard._scoped_modules = ()
+    guard._scoped_modules_model_id = None
+    _set_scalar_weight(model.mlp, 1.0)
+
+    result = guard.validate(model=model, adapter=None, context={})
+
+    assert result.passed is True
+    assert result.decision == "monitor"
+    assert result["final_z_scores"]["mlp"] == pytest.approx(-4.0)
+    assert result.violations[0]["p_value"] == pytest.approx(6.334248366623992e-05)
+    assert result.metrics["multiple_testing_selection"]["families_selected"] == ["ffn"]
+    assert result.metrics["family_z_summary"]["ffn"]["violations"] == 1
+
+    summary = summarize_family_z_scores(
+        result["final_z_scores"], {"mlp": "ffn"}, {"ffn": {"kappa": 3.0}}
+    )
+    assert summary["ffn"]["violations"] == 1

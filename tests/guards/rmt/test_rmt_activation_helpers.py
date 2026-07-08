@@ -292,6 +292,20 @@ def test_rmt_activation_edge_risk_is_scale_invariant() -> None:
     assert risk1 == pytest.approx(risk2, rel=1e-3, abs=1e-6)
 
 
+def test_rmt_activation_edge_risk_matches_synthetic_mp_oracle() -> None:
+    guard = RMTGuard()
+    guard.estimator = {"type": "power_iter", "iters": 2, "init": "ones"}
+    activations = torch.tensor([[1.0, 0.0], [-1.0, 0.0], [0.0, 1.0], [0.0, -1.0]])
+
+    out = guard._activation_edge_risk(activations)
+
+    assert out is not None
+    risk, sigma, mp_edge = out
+    assert sigma == pytest.approx(2.0)
+    assert mp_edge == pytest.approx(3.414213562373095)
+    assert risk == pytest.approx(0.585786437626905)
+
+
 def test_rmt_compute_activation_edge_risk_smoke_and_token_weight() -> None:
     guard = RMTGuard()
     guard.estimator = {"type": "power_iter", "iters": 2, "init": "ones"}

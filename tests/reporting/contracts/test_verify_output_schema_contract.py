@@ -31,6 +31,12 @@ def test_verify_output_success_payload_matches_public_schema(tmp_path: Path) -> 
     )
 
     jsonschema.validate(instance=payload, schema=load_verify_output_schema())
+    assert payload["summary"] == {"ok": True, "reason": "ok"}
+    assert payload["evaluation_report"]["count"] == 1
+    assert payload["results"][0]["id"] == str(report_path)
+    assert payload["results"][0]["kind"] == "ppl_causal"
+    assert payload["results"][0]["ratio_vs_baseline"] == 1.0
+    assert payload["results"][0]["ci"] == [0.99, 1.01]
 
 
 def test_verify_output_error_payload_matches_public_schema(tmp_path: Path) -> None:
@@ -41,3 +47,7 @@ def test_verify_output_error_payload_matches_public_schema(tmp_path: Path) -> No
     )
 
     jsonschema.validate(instance=payload, schema=load_verify_output_schema())
+    assert payload["summary"] == {"ok": False, "reason": "malformed"}
+    assert payload["results"][0]["id"] == str(tmp_path / "bad.report.json")
+    assert payload["results"][0]["reason"] == "malformed"
+    assert payload["error"]["code"] == "E601"

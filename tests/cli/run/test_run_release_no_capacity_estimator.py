@@ -139,3 +139,4 @@ output:
             probes=0,
             until_pass=False,
         )
+    assert outdir.is_dir()

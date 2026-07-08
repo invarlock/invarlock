@@ -510,7 +510,8 @@ def test_enforce_validation_gate_no_violations():
         "primary_metric_ratio": 1.01,
         "branch_balance_ok": True,
     }
-    enforce_validation_gate(metrics, gate)
+    result = enforce_validation_gate(metrics, gate)
+    assert result is None
 
 
 def test_enforce_validation_gate_ignores_malformed_primary_metric_ratio() -> None:
@@ -526,17 +527,20 @@ def test_enforce_validation_gate_ignores_malformed_primary_metric_ratio() -> Non
 
     gate = get_validation_gate("standard")
 
-    enforce_validation_gate(Metrics(), gate)
+    assert enforce_validation_gate(Metrics(), gate) is None
 
     # total_layers == 0 exercises the false branch of the capping-rate check.
-    enforce_validation_gate(
-        {
-            "caps_applied": 5,
-            "total_layers": 0,
-            "primary_metric_ratio": 1.0,
-            "branch_balance_ok": True,
-        },
-        gate,
+    assert (
+        enforce_validation_gate(
+            {
+                "caps_applied": 5,
+                "total_layers": 0,
+                "primary_metric_ratio": 1.0,
+                "branch_balance_ok": True,
+            },
+            gate,
+        )
+        is None
     )
 
 
@@ -631,7 +635,7 @@ def test_enforce_validation_gate_ignores_bool_numeric_metrics() -> None:
         "branch_balance_ok": True,
     }
 
-    enforce_validation_gate(metrics, gate)
+    assert enforce_validation_gate(metrics, gate) is None
 
 
 def test_check_policy_drift_returns_dict():

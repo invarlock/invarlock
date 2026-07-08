@@ -526,13 +526,6 @@ markers = [
     "extras: Tests requiring optional dependencies (e.g., gptq, awq)",
     "manual: Requires manual setup; excluded from default CI runs",
 ]
-filterwarnings = [
-    "ignore::UserWarning",
-    "ignore::RuntimeWarning",
-    "ignore::FutureWarning",
-    "ignore::DeprecationWarning",
-]
-
 [tool.coverage.run]
 branch = true
 source = [

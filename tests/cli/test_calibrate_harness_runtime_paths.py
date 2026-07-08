@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import builtins
+import csv
 import json
 import types
 from pathlib import Path
@@ -598,6 +599,10 @@ def test_null_sweep_handles_missing_spectral_and_bad_metrics(tmp_path: Path) -> 
             target_any_warning_rate=0.01,
         )
 
+    rows = list(csv.DictReader((out / "null_sweep_runs.csv").open(encoding="utf-8")))
+    assert rows[0]["caps_applied"] == "0"
+    assert rows[0]["caps_exceeded"] == "False"
+
 
 def test_null_sweep_covers_guard_search_empty_and_non_dict_guards(
     tmp_path: Path,
@@ -626,6 +631,10 @@ def test_null_sweep_covers_guard_search_empty_and_non_dict_guards(
             safety_margin=0.05,
             target_any_warning_rate=0.01,
         )
+
+    rows = list(csv.DictReader((out / "null_sweep_runs.csv").open(encoding="utf-8")))
+    assert [row["caps_applied"] for row in rows] == ["0", "0"]
+    assert [row["selected_families"] for row in rows] == ["", ""]
 
 
 def test_ve_sweep_emits_json_csv_power_curve_and_tier_patch(tmp_path: Path) -> None:

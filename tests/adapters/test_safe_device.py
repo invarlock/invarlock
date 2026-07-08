@@ -244,9 +244,8 @@ class TestDetectCapabilities:
         mock_model = MagicMock()
 
         with patch.dict("sys.modules", {"invarlock.adapters.capabilities": None}):
-            # This should handle the import error gracefully
-            _ = mixin._detect_capabilities(mock_model)
-            # May return None or the actual capabilities depending on import state
+            result = mixin._detect_capabilities(mock_model)
+            assert result is None or hasattr(result, "device_movable")
 
 
 class TestFilteredLoadingInfo:

@@ -161,6 +161,7 @@ def test_dataset_meta_context_non_dict_path(tmp_path: Path):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_guard_overhead_threshold_parse_fallback(tmp_path: Path):
@@ -202,6 +203,7 @@ def test_guard_overhead_threshold_parse_fallback(tmp_path: Path):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_retry_summary_prints_and_snapshot_cleanup(tmp_path: Path, monkeypatch):

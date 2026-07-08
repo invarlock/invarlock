@@ -54,7 +54,7 @@ def test_pre_eval_checks_dry_run_failure():
                 "attention_mask": torch.ones(1, 6, dtype=torch.long),
             }
 
-    # Should not raise
-    _perform_pre_eval_checks(
+    result = _perform_pre_eval_checks(
         CrashOnForward(), Loader(), device=torch.device("cpu"), config=M.MetricsConfig()
     )
+    assert result is None

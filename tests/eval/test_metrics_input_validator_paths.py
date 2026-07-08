@@ -10,7 +10,8 @@ from invarlock.eval.metrics import InputValidator, MetricsConfig
 def test_validate_model_noop_when_model_has_parameters() -> None:
     cfg = MetricsConfig(strict_validation=True, use_cache=False)
     model = nn.Linear(2, 2)
-    InputValidator.validate_model(model, cfg)
+    result = InputValidator.validate_model(model, cfg)
+    assert result is None
 
 
 def test_validate_tensor_raises_on_non_tensor_input() -> None:

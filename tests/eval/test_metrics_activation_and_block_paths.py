@@ -50,4 +50,5 @@ def test_pre_eval_checks_context_length_try_except():
             return SimpleNamespace(ok=True)
 
     dl = [{"input_ids": torch.ones(1, 2, dtype=torch.long)}]
-    _perform_pre_eval_checks(NoCfg(), dl, torch.device("cpu"), MetricsConfig())
+    result = _perform_pre_eval_checks(NoCfg(), dl, torch.device("cpu"), MetricsConfig())
+    assert result is None

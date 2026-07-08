@@ -299,6 +299,7 @@ def test_guard_overhead_ratio_display_path(monkeypatch, tmp_path):
         "invarlock.cli.device.validate_device_for_config", lambda d: (True, "")
     )
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile="ci")
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_release_baseline_missing_windows_exits(monkeypatch, tmp_path):
@@ -398,6 +399,7 @@ def test_baseline_pairing_valid_schedule(monkeypatch, tmp_path):
         profile=None,
         baseline=str(baseline),
     )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_baseline_missing_eval_windows_fallback(monkeypatch, tmp_path):
@@ -443,6 +445,7 @@ def test_baseline_missing_eval_windows_fallback(monkeypatch, tmp_path):
         profile=None,
         baseline=str(baseline),
     )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_release_capacity_planner_path():
@@ -496,3 +499,4 @@ def test_persist_ref_masks_positive(tmp_path: Path):
             out=str(tmp_path / "runs"),
             baseline=str(baseline),
         )
+    assert (tmp_path / "runs").is_dir()

@@ -320,6 +320,7 @@ output:
             baseline=str(baseline),
             until_pass=False,
         )
+    assert outdir.is_dir()
 
 
 # --------------------
@@ -456,6 +457,7 @@ def test_to_serialisable_dict_uses_dict_method(tmp_path: Path):
             )
         )
         run_command(config=str(cfg_path), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()
 
 
 # --------------------

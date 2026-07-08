@@ -23,10 +23,10 @@ def test_pre_eval_checks_dry_run_failure_logs_warning():
             raise RuntimeError("boom")
 
     dl = [{"input_ids": torch.ones(1, 4, dtype=torch.long)}]
-    # Should not raise; just exercise warn path
-    _perform_pre_eval_checks(
+    result = _perform_pre_eval_checks(
         BadForward().eval(), dl, torch.device("cpu"), MetricsConfig()
     )
+    assert result is None
 
 
 def test_sigma_max_no_name_column_and_all_nonfinite_gains():

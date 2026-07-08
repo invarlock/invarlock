@@ -203,7 +203,8 @@ class TestDriftDetection:
         """Drift detection can identify value mismatches."""
         # This is a structural test - we can't easily mock the YAML
         # but we verify the function runs without error
-        _ = check_drift(silent=True)
+        drift = check_drift(silent=True)
+        assert isinstance(drift, dict)
 
     def test_check_drift_warns_when_not_silent(self) -> None:
         with (
@@ -318,7 +319,7 @@ class TestYAMLLoadingEdgeCases:
             with mock.patch("builtins.open", mock.mock_open(read_data="just a string")):
                 # Should return None since "just a string" is not a dict
                 # Note: depends on yaml parsing - a bare string might parse as string
-                _ = tc._load_yaml()
+                assert tc._load_yaml() is None
 
     def test_yaml_exception_uses_fallback(self) -> None:
         """If yaml.safe_load raises, fallback is used."""

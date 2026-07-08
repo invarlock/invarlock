@@ -181,7 +181,8 @@ def test_compute_ppl_empty_sample_and_fallback_tuple():
     # Window with an empty sample should be skipped
     model = DummyCausalLM()
     win = EvaluationWindow([[], list(range(12))], [[0] * 0, [1] * 12], [0, 1])
-    _ = compute_ppl(model, window=win, device="cpu")
+    ppl = compute_ppl(model, window=win, device="cpu")
+    assert ppl >= 1.0
 
     # Model raising in try path triggers fallback to tuple
     class TupleOut(nn.Module):
@@ -194,7 +195,8 @@ def test_compute_ppl_empty_sample_and_fallback_tuple():
     seq = list(range(1, 6))
     attn = [1] * len(seq)
     win2 = EvaluationWindow([seq], [attn], [0])
-    _ = compute_ppl(TupleOut(), window=win2, device="cpu")
+    fallback_ppl = compute_ppl(TupleOut(), window=win2, device="cpu")
+    assert fallback_ppl >= 1.0
 
 
 def test_measure_memory_break_and_continue_and_latency_total_tokens_zero():

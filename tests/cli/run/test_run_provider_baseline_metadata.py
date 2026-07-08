@@ -83,6 +83,7 @@ def test_evaluation_window_provider_success(tmp_path: Path):
             out=str(tmp_path / "runs"),
             until_pass=False,
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_report_flags_guard_recovered(tmp_path: Path):
@@ -459,6 +460,7 @@ def test_tokenizer_digest_vocab_attribute_non_mapping(tmp_path: Path):
             out=str(tmp_path / "runs"),
             until_pass=False,
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_baseline_not_found_fallback_to_dataset(tmp_path: Path):
@@ -508,6 +510,7 @@ def test_baseline_not_found_fallback_to_dataset(tmp_path: Path):
             out=str(tmp_path / "runs"),
             until_pass=False,
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_baseline_adjust_counts_success(tmp_path: Path):
@@ -579,3 +582,4 @@ def test_baseline_adjust_counts_success(tmp_path: Path):
             baseline=str(baseline),
             until_pass=False,
         )
+    assert (tmp_path / "runs").is_dir()

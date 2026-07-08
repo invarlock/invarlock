@@ -38,7 +38,7 @@ def test_input_validator_paths():
             return iter([])
 
     cfg = M.MetricsConfig(strict_validation=False)
-    M.InputValidator.validate_model(NoParam(), cfg)
+    assert M.InputValidator.validate_model(NoParam(), cfg) is None
 
     # Dataloader empty with allow_empty_data=True
     class Empty:
@@ -46,7 +46,7 @@ def test_input_validator_paths():
             return iter(())
 
     cfg2 = M.MetricsConfig(allow_empty_data=True)
-    M.InputValidator.validate_dataloader(Empty(), cfg2)
+    assert M.InputValidator.validate_dataloader(Empty(), cfg2) is None
 
 
 def test_gini_and_cache_and_blocks():

@@ -27,8 +27,8 @@ def test_deterministic_worker_init_fn_handles_seed_errors(
     monkeypatch.setattr(random, "seed", bad_seed, raising=False)
     monkeypatch.setattr(np.random, "seed", bad_np_seed, raising=False)
 
-    # Should not raise even if seeding fails
-    deterministic_worker_init_fn(worker_id=1, base_seed=42)
+    result = deterministic_worker_init_fn(worker_id=1, base_seed=42)
+    assert result is None
 
 
 def test_deterministic_worker_init_fn_uses_torch_when_available(

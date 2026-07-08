@@ -689,3 +689,4 @@ def test_tokenizer_hash_populated_from_context_when_missing(tmp_path: Path):
             out=str(tmp_path / "runs"),
             until_pass=False,
         )
+    assert (tmp_path / "runs").is_dir()

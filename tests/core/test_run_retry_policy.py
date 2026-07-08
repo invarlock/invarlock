@@ -115,12 +115,13 @@ class _FakeRetryController:
 
 
 def test_record_retry_attempt_noops_without_controller() -> None:
-    record_retry_attempt(
+    result = record_retry_attempt(
         None,
         attempt=2,
         attempt_summary={"passed": False},
         edit_config={"energy_keep": 0.99},
     )
+    assert result is None
 
 
 def test_record_retry_attempt_normalizes_payloads() -> None:

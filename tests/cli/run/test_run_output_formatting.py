@@ -37,15 +37,17 @@ def test_format_kv_line_alignment() -> None:
 
 def test_suppress_noisy_warnings_env_override(monkeypatch) -> None:
     monkeypatch.setenv("INVARLOCK_SUPPRESS_WARNINGS", "1")
-    with suppress_noisy_warnings("dev"):
-        warnings.warn("noisy", UserWarning, stacklevel=2)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        with suppress_noisy_warnings("dev"):
+            warnings.warn("noisy", UserWarning, stacklevel=2)
+    assert caught == []
 
 
 def test_suppress_noisy_warnings_passthrough(monkeypatch) -> None:
     monkeypatch.delenv("INVARLOCK_SUPPRESS_WARNINGS", raising=False)
-    with suppress_noisy_warnings("dev"):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+    with pytest.warns(UserWarning, match="noisy"):
+        with suppress_noisy_warnings("dev"):
             warnings.warn("noisy", UserWarning, stacklevel=2)
 
 

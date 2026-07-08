@@ -54,15 +54,25 @@ def test_enforce_ratio_ci_alignment_raises_on_mismatch():
 
 
 def test_enforce_ratio_ci_alignment_ignores_non_paired_sources():
-    pm_policy.enforce_ratio_ci_alignment("manual", (1.0, 1.1), (0.0, 0.1))
+    assert (
+        pm_policy.enforce_ratio_ci_alignment("manual", (1.0, 1.1), (0.0, 0.1)) is None
+    )
 
 
 def test_enforce_ratio_ci_alignment_returns_on_bad_intervals():
-    pm_policy.enforce_ratio_ci_alignment("paired_baseline", (1.0,), (0.0, 0.1))
+    assert (
+        pm_policy.enforce_ratio_ci_alignment("paired_baseline", (1.0,), (0.0, 0.1))
+        is None
+    )
 
 
 def test_enforce_ratio_ci_alignment_skips_non_finite_bounds():
-    pm_policy.enforce_ratio_ci_alignment("paired_baseline", (math.nan, 1.0), (0.0, 0.0))
+    assert (
+        pm_policy.enforce_ratio_ci_alignment(
+            "paired_baseline", (math.nan, 1.0), (0.0, 0.0)
+        )
+        is None
+    )
 
 
 def test_enforce_display_ci_alignment_backfills_ci_and_display_ci_in_dev():
@@ -118,7 +128,10 @@ def test_enforce_display_ci_alignment_noop_for_non_ppl_metric():
 
 
 def test_enforce_display_ci_alignment_returns_on_empty_metric():
-    pm_policy.enforce_display_ci_alignment("paired_baseline", {}, (0.0, 0.1), "dev")
+    assert (
+        pm_policy.enforce_display_ci_alignment("paired_baseline", {}, (0.0, 0.1), "dev")
+        is None
+    )
 
 
 def test_enforce_display_ci_alignment_returns_on_kind_coercion_error() -> None:
@@ -126,8 +139,11 @@ def test_enforce_display_ci_alignment_returns_on_kind_coercion_error() -> None:
         def get(self, *_a, **_k):  # noqa: ANN001
             raise RuntimeError("boom")
 
-    pm_policy.enforce_display_ci_alignment(
-        "paired_baseline", _BadGet({"kind": "ppl_causal"}), (0.0, 0.1), "dev"
+    assert (
+        pm_policy.enforce_display_ci_alignment(
+            "paired_baseline", _BadGet({"kind": "ppl_causal"}), (0.0, 0.1), "dev"
+        )
+        is None
     )
 
 
@@ -138,8 +154,11 @@ def test_enforce_display_ci_alignment_returns_on_ci_lookup_error() -> None:
                 return "ppl_causal"
             raise RuntimeError("boom")
 
-    pm_policy.enforce_display_ci_alignment(
-        "paired_baseline", _BadSecondGet({"kind": "ppl_causal"}), (0.0, 0.1), "dev"
+    assert (
+        pm_policy.enforce_display_ci_alignment(
+            "paired_baseline", _BadSecondGet({"kind": "ppl_causal"}), (0.0, 0.1), "dev"
+        )
+        is None
     )
 
 
@@ -230,14 +249,20 @@ def test_enforce_pairing_and_coverage_uses_fallback_counts():
         },
         "bootstrap": {"replicates": 1200},
     }
-    pm_policy.enforce_pairing_and_coverage(
-        stats, window_plan_profile="ci", tier="balanced"
+    assert (
+        pm_policy.enforce_pairing_and_coverage(
+            stats, window_plan_profile="ci", tier="balanced"
+        )
+        is None
     )
 
 
 def test_enforce_pairing_and_coverage_returns_on_dev_profile():
-    pm_policy.enforce_pairing_and_coverage(
-        {}, window_plan_profile="dev", tier="balanced"
+    assert (
+        pm_policy.enforce_pairing_and_coverage(
+            {}, window_plan_profile="dev", tier="balanced"
+        )
+        is None
     )
 
 

@@ -24,8 +24,9 @@ def test_cleanup_snapshot_tmpdir_swallows_emit_failures() -> None:
     def _emit(_event: object) -> None:
         raise TypeError("sink unavailable")
 
-    _cleanup_snapshot_tmpdir(
+    result = _cleanup_snapshot_tmpdir(
         snapshot_tmpdir="unused",
         no_cleanup=True,
         emit=_emit,
     )
+    assert result is None

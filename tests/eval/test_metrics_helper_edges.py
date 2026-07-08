@@ -1,3 +1,4 @@
+import logging
 import types
 
 import torch
@@ -43,9 +44,11 @@ def test_resource_manager_cpu_fallback_path(monkeypatch):
     assert rm.should_use_cpu_fallback(estimated_memory_gb=0.3) is True
 
 
-def test_input_validator_validate_dataloader_allow_empty():
+def test_input_validator_validate_dataloader_allow_empty(caplog):
     cfg = MetricsConfig(allow_empty_data=True)
+    caplog.set_level(logging.WARNING)
     InputValidator.validate_dataloader(iter(()), cfg)
+    assert "Dataloader is empty" in caplog.text
 
 
 def test_locate_transformer_blocks_enhanced_fallback_and_none():
@@ -86,14 +89,18 @@ def test_resource_manager_cleanup_cuda_path(monkeypatch):
 
     # Pretend CUDA is available to exercise cuda.empty_cache branch
     class DummyCuda:
+        empty_cache_calls = 0
+
         def empty_cache(self):
-            pass
+            self.empty_cache_calls += 1
 
         def is_available(self):
             return True
 
-    monkeypatch.setattr(torch, "cuda", DummyCuda(), raising=False)
+    dummy_cuda = DummyCuda()
+    monkeypatch.setattr(torch, "cuda", dummy_cuda, raising=False)
     rm.cleanup()
+    assert dummy_cuda.empty_cache_calls == 1
 
 
 def test_validate_dataloader_raises_and_model_no_params_warns(monkeypatch):

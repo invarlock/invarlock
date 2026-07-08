@@ -48,6 +48,7 @@ def test_warn_adapter_family_mismatch_covers_baseline_paths(
         payload,
         trusted_baseline_path=baseline_path,
     )
+    assert baseline_path.is_file()
 
     # baseline file exists, adapter is not a dict
     baseline_path = _write_json(
@@ -61,6 +62,7 @@ def test_warn_adapter_family_mismatch_covers_baseline_paths(
         payload,
         trusted_baseline_path=baseline_path,
     )
+    assert baseline_path.is_file()
 
     # baseline file exists, provenance is not a dict
     baseline_path = _write_json(
@@ -114,6 +116,12 @@ def test_warn_adapter_family_mismatch_swallows_invalid_baseline_json(
         "plugins": {"adapter": {"provenance": {"family": "hf"}}},
         "provenance": {"baseline": {"report_path": str(baseline_path)}},
     }
+    verify_mod._warn_adapter_family_mismatch(
+        cert_path,
+        payload,
+        trusted_baseline_path=baseline_path,
+    )
+    assert baseline_path.is_file()
 
     verify_mod._warn_adapter_family_mismatch(
         cert_path,

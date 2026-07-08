@@ -151,6 +151,7 @@ def test_edit_override_ok(tmp_path: Path):
             out=str(tmp_path / "runs"),
             until_pass=False,
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 @pytest.mark.parametrize("tier", ["fast", "turbo"])  # invalid tiers
@@ -353,6 +354,7 @@ def test_tokenizer_digest_unknown_path(tmp_path: Path):
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_mlm_mask_prob_zero_sets_labels_and_zero_counts(tmp_path: Path):
@@ -428,6 +430,7 @@ def test_mlm_mask_prob_zero_sets_labels_and_zero_counts(tmp_path: Path):
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_mlm_missing_mask_token_exits(tmp_path: Path):
@@ -609,3 +612,4 @@ def test_runner_context_none_is_coerced(tmp_path: Path):
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
+    assert (tmp_path / "runs").is_dir()

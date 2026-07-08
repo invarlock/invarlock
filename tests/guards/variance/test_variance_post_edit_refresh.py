@@ -26,3 +26,4 @@ def test_refresh_after_edit_metrics_early_returns_and_logging():
     g._post_edit_evaluated = False
     g._calibration_batches = []
     g._refresh_after_edit_metrics(m)
+    assert isinstance(g.events, list)

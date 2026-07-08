@@ -161,6 +161,7 @@ def test_explain_gates_dataset_split_handles_exception(monkeypatch, tmp_path):
         subject_report=str(rep),
         baseline_report=str(base),
     )
+    assert calls["count"] >= 2
 
 
 def test_explain_gates_missing_and_load_failures(tmp_path, monkeypatch) -> None:

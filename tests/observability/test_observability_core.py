@@ -250,6 +250,8 @@ class TestTelemetryCollector:
 
         # Should not raise, just log warning
         collector.end_operation("unknown_op")
+        assert collector.active_operations == {}
+        assert list(collector.operation_history) == []
 
     def test_get_operation_stats(self):
         """Test getting operation statistics."""

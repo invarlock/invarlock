@@ -246,3 +246,4 @@ def test_guard_order_permutations(tmp_path: Path, order):
         )
         # Should not crash regardless of guard order
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert (tmp_path / "runs").is_dir()

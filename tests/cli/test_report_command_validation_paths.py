@@ -649,6 +649,7 @@ def test_report_validate_success(monkeypatch, tmp_path):
         raising=False,
     )
     report_mod.report_validate(report=str(report))
+    assert report.is_file()
 
 
 def test_report_validate_accepts_canonical_directory(monkeypatch, tmp_path):
@@ -669,6 +670,7 @@ def test_report_validate_accepts_canonical_directory(monkeypatch, tmp_path):
     )
 
     report_mod.report_validate(report=str(report_dir))
+    assert (report_dir / "evaluation.report.json").is_file()
 
 
 def test_report_validate_rejects_noncanonical_directory(monkeypatch, tmp_path):

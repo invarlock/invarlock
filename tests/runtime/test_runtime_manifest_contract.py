@@ -43,6 +43,8 @@ def test_runtime_manifest_fixture_matches_public_contract() -> None:
         ).read_text(encoding="utf-8")
     )
     jsonschema.validate(instance=manifest, schema=schema)
+    assert manifest["manifest_version"] == 1
+    assert manifest["verifier_contract_version"] == "runtime-manifest-v1"
 
 
 def test_write_runtime_manifest_matches_public_contract(
