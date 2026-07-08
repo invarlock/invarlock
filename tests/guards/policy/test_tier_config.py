@@ -318,7 +318,7 @@ class TestYAMLLoadingEdgeCases:
             with mock.patch("builtins.open", mock.mock_open(read_data="just a string")):
                 # Should return None since "just a string" is not a dict
                 # Note: depends on yaml parsing - a bare string might parse as string
-                _ = tc._load_yaml()
+                assert tc._load_yaml() is None
 
     def test_yaml_exception_uses_fallback(self) -> None:
         """If yaml.safe_load raises, fallback is used."""

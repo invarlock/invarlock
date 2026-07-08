@@ -80,13 +80,16 @@ def test_release_process_memory_invokes_cuda_and_malloc_trim(monkeypatch):
 
 def test_release_process_memory_swallows_malloc_trim_exceptions(monkeypatch):
     monkeypatch.setattr(run_runtime, "torch", None)
+    calls = []
 
     def _boom() -> bool:
+        calls.append("malloc_trim")
         raise OSError("boom")
 
     monkeypatch.setattr(run_runtime, "_malloc_trim", _boom)
 
     run_runtime.release_process_memory()
+    assert calls == ["malloc_trim"]
 
 
 def test_execute_guarded_run_releases_process_memory_after_runner(monkeypatch):

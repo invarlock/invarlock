@@ -95,18 +95,3 @@ def _default_security_bypass_for_local_tests(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("INVARLOCK_ALLOW_HOST_EXECUTION", "1")
     monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", _VALID_TEST_IMAGE_DIGEST)
     yield
-
-
-@pytest.fixture(autouse=True)
-def _stabilize_memory_for_integration(request: pytest.FixtureRequest):
-    # Some environments fluctuate in memory accounting. For the integration
-    # pipeline memory test, hold a temporary buffer alive across the test to
-    # normalize baseline vs final deltas without affecting functionality.
-    if request.node.name == "test_memory_management":
-        buf = bytearray(200 * 1024 * 1024)
-        try:
-            yield
-        finally:
-            del buf
-    else:
-        yield

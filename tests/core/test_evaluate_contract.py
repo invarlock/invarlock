@@ -188,7 +188,9 @@ def test_load_validated_baseline_report_accepts_legacy_identity_locations(
             },
         },
     )
-    load_validated_baseline_report(context_tier, **kwargs)
+    resolved, payload = load_validated_baseline_report(context_tier, **kwargs)
+    assert resolved == context_tier.resolve()
+    assert payload["context"]["tier"] == "balanced"
 
     top_level_auto = _write_json(
         tmp_path / "top-level-auto.json",
@@ -198,7 +200,9 @@ def test_load_validated_baseline_report_accepts_legacy_identity_locations(
             "auto": {"tier": "balanced"},
         },
     )
-    load_validated_baseline_report(top_level_auto, **kwargs)
+    resolved, payload = load_validated_baseline_report(top_level_auto, **kwargs)
+    assert resolved == top_level_auto.resolve()
+    assert payload["auto"]["tier"] == "balanced"
 
     meta_auto = _write_json(
         tmp_path / "meta-auto.json",
@@ -212,7 +216,9 @@ def test_load_validated_baseline_report_accepts_legacy_identity_locations(
             "context": {"profile": "dev", "assurance": {"mode": "off"}},
         },
     )
-    load_validated_baseline_report(meta_auto, **kwargs)
+    resolved, payload = load_validated_baseline_report(meta_auto, **kwargs)
+    assert resolved == meta_auto.resolve()
+    assert payload["meta"]["auto"]["tier"] == "balanced"
 
     top_level_assurance = _write_json(
         tmp_path / "top-level-assurance.json",
@@ -222,7 +228,9 @@ def test_load_validated_baseline_report_accepts_legacy_identity_locations(
             "assurance": {"mode": "off"},
         },
     )
-    load_validated_baseline_report(top_level_assurance, **kwargs)
+    resolved, payload = load_validated_baseline_report(top_level_assurance, **kwargs)
+    assert resolved == top_level_assurance.resolve()
+    assert payload["assurance"]["mode"] == "off"
 
 
 def test_load_validated_baseline_report_accepts_path_equivalent_model_ids(
@@ -239,7 +247,9 @@ def test_load_validated_baseline_report_accepts_path_equivalent_model_ids(
         "expected_model_id": str(model_dir.resolve()),
     }
 
-    load_validated_baseline_report(report, **kwargs)
+    resolved, payload = load_validated_baseline_report(report, **kwargs)
+    assert resolved == report.resolve()
+    assert payload["meta"]["model_id"] == str(model_dir)
 
 
 def test_load_validated_baseline_report_rejects_identity_mismatches(
@@ -311,7 +321,9 @@ def test_load_validated_baseline_report_accepts_partial_expected_dataset(
         "expected_dataset": {"provider": "wikitext2"},
     }
 
-    load_validated_baseline_report(report, **kwargs)
+    resolved, payload = load_validated_baseline_report(report, **kwargs)
+    assert resolved == report.resolve()
+    assert payload["data"]["provider"] == "wikitext2"
 
 
 def test_load_validated_baseline_report_accepts_missing_seed_with_windows(
@@ -362,7 +374,10 @@ def test_load_validated_baseline_report_accepts_hf_provider_kind_report(
         },
     }
 
-    load_validated_baseline_report(report, **kwargs)
+    resolved, payload = load_validated_baseline_report(report, **kwargs)
+    assert resolved == report.resolve()
+    assert payload["data"]["dataset"] == "hf_text"
+    assert payload["data"]["split"] == "train"
 
 
 def test_load_validated_baseline_report_rejects_hf_provider_kind_mismatch(
