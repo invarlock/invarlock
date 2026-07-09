@@ -244,3 +244,24 @@ def test_test_functions_have_direct_assertion_signal() -> None:
 
     assert offenders == []
     assert sorted(set(ASSERTION_FREE_ALLOWLIST) - allowlist_seen) == []
+
+
+def test_assert_true_placeholders_are_absent() -> None:
+    offenders: list[str] = []
+    for path in _tracked_test_files():
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assert) and isinstance(node.test, ast.Constant):
+                if node.test.value is True:
+                    offenders.append(f"{path.as_posix()}:{node.lineno}")
+    assert offenders == []
+
+
+def test_run_tests_do_not_only_assert_parent_runs_dir() -> None:
+    offenders: list[str] = []
+    legacy_assertion = 'assert (tmp_path / "runs").is_dir()'
+    for path in (TESTS_ROOT / "cli" / "run").glob("test_*.py"):
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if line.strip() == legacy_assertion:
+                offenders.append(f"{path.as_posix()}:{lineno}")
+    assert offenders == []

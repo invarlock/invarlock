@@ -13,6 +13,7 @@ import pytest
 
 from invarlock.cli.commands.run import run_command
 from tests.cli.run._support_run_common import (
+    assert_single_run_output_artifacts,
     common_ce_patches,
     write_base_run_config,
 )
@@ -132,7 +133,7 @@ def test_cleanup_rmtree_exception_is_swallowed(tmp_path: Path, monkeypatch):
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_success))
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)
 
 
 @pytest.mark.parametrize(
@@ -192,7 +193,7 @@ def test_overhead_display_fallbacks(tmp_path: Path, percent, ratio, expect_na):
         run_command(
             config=str(cfg), device="cpu", profile="ci", out=str(tmp_path / "runs")
         )
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)
 
 
 def test_baseline_schedule_skips_provider_windows(tmp_path: Path):
@@ -524,7 +525,7 @@ def test_drift_boundary_precision_failure(tmp_path: Path):
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)
 
 
 def test_guard_overhead_failure_exits(tmp_path: Path):

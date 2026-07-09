@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_common import assert_single_run_output_artifacts
 
 _SNS = SimpleNamespace
 
@@ -311,7 +312,7 @@ def test_snapshot_env_bytes_fallback_to_chunked(monkeypatch, tmp_path):
     )
     cfg = _basic_yaml(tmp_path)
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)
 
 
 def test_snapshot_env_chunked_fallback_to_bytes(monkeypatch, tmp_path):
@@ -378,7 +379,7 @@ def test_snapshot_env_chunked_fallback_to_bytes(monkeypatch, tmp_path):
     )
     cfg = _basic_yaml(tmp_path)
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)
 
 
 def test_stratification_count_mismatch_final_only(monkeypatch, tmp_path):
@@ -468,4 +469,4 @@ def test_snapshot_auto_both_memory_disk_queries_fail(monkeypatch, tmp_path):
 
     cfg = _basic_yaml(tmp_path)
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)

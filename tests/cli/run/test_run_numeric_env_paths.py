@@ -11,6 +11,7 @@ import pytest
 
 from invarlock.cli.commands.run import run_command
 from tests.cli.run._support_run_common import (
+    assert_single_run_output_artifacts,
     common_ce_detect_ce_patches,
     offline_registry_patch,
     write_base_run_config,
@@ -246,4 +247,4 @@ def test_guard_order_permutations(tmp_path: Path, order):
         )
         # Should not crash regardless of guard order
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)

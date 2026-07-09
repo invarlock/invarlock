@@ -10,6 +10,7 @@ import click
 import pytest
 
 from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_common import assert_single_run_output_artifacts
 
 
 def _cfg(tmp_path: Path, preview=1, final=1) -> Path:
@@ -161,7 +162,7 @@ def test_dataset_meta_context_non_dict_path(tmp_path: Path):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)
 
 
 def test_guard_overhead_threshold_parse_fallback(tmp_path: Path):
@@ -203,19 +204,31 @@ def test_guard_overhead_threshold_parse_fallback(tmp_path: Path):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)
 
 
 def test_retry_summary_prints_and_snapshot_cleanup(tmp_path: Path, monkeypatch):
     cfg = _cfg(tmp_path)
+    snapdir = tmp_path / "snapdir"
+    restore_paths: list[str | None] = []
+    attempt_summaries: list[dict[str, object]] = []
+    cert_reports: list[dict[str, object]] = []
+
+    def snapshot_chunked(_model):
+        snapdir.mkdir()
+        (snapdir / "weights.bin").write_text("snapshot", encoding="utf-8")
+        return str(snapdir)
+
+    def restore_chunked(_model, path=None):
+        restore_paths.append(path)
 
     class Reg:
         def get_adapter(self, name):
             return SimpleNamespace(
                 name=name,
                 load_model=lambda model_id, device=None: SimpleNamespace(),
-                snapshot_chunked=lambda model: str(tmp_path / "snapdir"),
-                restore_chunked=lambda model, path=None: None,
+                snapshot_chunked=snapshot_chunked,
+                restore_chunked=restore_chunked,
             )
 
         def get_edit(self, name):
@@ -236,11 +249,13 @@ def test_retry_summary_prints_and_snapshot_cleanup(tmp_path: Path, monkeypatch):
 
         def record_attempt(self, attempt, result_summary, edit_config):
             self.attempt_history.append(result_summary)
+            attempt_summaries.append(result_summary)
 
         def get_attempt_summary(self):
             return {"total_attempts": len(self.attempt_history), "elapsed_time": 0.42}
 
     def make_cert(report, baseline):
+        cert_reports.append(report)
         return {"validation": {"gate": False}}
 
     def runner_exec(**kwargs):
@@ -327,7 +342,14 @@ def test_retry_summary_prints_and_snapshot_cleanup(tmp_path: Path, monkeypatch):
             max_attempts=1,
             out=str(tmp_path / "runs"),
         )
-    assert True
+    assert_single_run_output_artifacts(tmp_path)
+    assert not snapdir.exists()
+    assert restore_paths
+    assert set(restore_paths) == {str(snapdir)}
+    assert len(cert_reports) == 1
+    assert attempt_summaries == [
+        {"passed": False, "failures": ["gate"], "validation": {"gate": False}}
+    ]
 
 
 def test_dataset_provider_tokenizer_resolution_exception_exit(tmp_path: Path):

@@ -52,11 +52,6 @@ def test_is_ppl_kind_handles_str_exception() -> None:
     assert _is_ppl_kind("ppl_causal") is True
 
 
-def test_get_ppl_final_handles_bad_metrics_get() -> None:
-    # Legacy _get_ppl_final removed; rely on primary_metric parsing in evaluation_report generation.
-    assert True
-
-
 def test_coerce_int_variants() -> None:
     assert _coerce_int(5) == 5
     # Non-integer float rejected (only near-integers accepted)

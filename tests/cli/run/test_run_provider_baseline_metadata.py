@@ -9,6 +9,7 @@ from unittest.mock import patch
 from invarlock.cli.commands.run import run_command
 from invarlock.cli.run_overhead import plan_release_windows
 from tests.cli.run._support_run_common import (
+    assert_single_run_output_artifacts,
     common_ce_patches,
 )
 from tests.cli.run._support_run_common import (
@@ -83,7 +84,7 @@ def test_evaluation_window_provider_success(tmp_path: Path):
             out=str(tmp_path / "runs"),
             until_pass=False,
         )
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)
 
 
 def test_report_flags_guard_recovered(tmp_path: Path):
@@ -460,7 +461,7 @@ def test_tokenizer_digest_vocab_attribute_non_mapping(tmp_path: Path):
             out=str(tmp_path / "runs"),
             until_pass=False,
         )
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)
 
 
 def test_baseline_not_found_fallback_to_dataset(tmp_path: Path):
@@ -510,7 +511,7 @@ def test_baseline_not_found_fallback_to_dataset(tmp_path: Path):
             out=str(tmp_path / "runs"),
             until_pass=False,
         )
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)
 
 
 def test_baseline_adjust_counts_success(tmp_path: Path):
@@ -582,4 +583,4 @@ def test_baseline_adjust_counts_success(tmp_path: Path):
             baseline=str(baseline),
             until_pass=False,
         )
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)

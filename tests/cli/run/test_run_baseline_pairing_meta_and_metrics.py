@@ -14,6 +14,9 @@ from invarlock.cli.commands.run import run_command
 from tests.cli.run._support_run_common import (
     SNS as _SNS,
 )
+from tests.cli.run._support_run_common import (
+    assert_single_run_output_artifacts,
+)
 from tests.cli.run._support_run_pairing import (
     baseline_pairing_common_patches_ce as _common_patches_ce,
 )
@@ -541,4 +544,4 @@ def test_dataset_meta_context_non_dict_path(tmp_path: Path):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)

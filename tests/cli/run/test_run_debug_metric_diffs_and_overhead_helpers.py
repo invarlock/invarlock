@@ -70,6 +70,33 @@ def test_merge_primary_metric_health_returns_empty_for_non_mapping() -> None:
     assert merge_primary_metric_health(None, {"invalid": True}) == {}
 
 
+def test_merge_primary_metric_health_prefers_core_flags() -> None:
+    primary_metric = {
+        "kind": "ppl_causal",
+        "preview": 1.0,
+        "final": 2.0,
+        "ratio_vs_baseline": 2.0,
+        "invalid": False,
+        "degraded": False,
+    }
+    core_primary_metric = {
+        "preview": None,
+        "final": None,
+        "invalid": True,
+        "degraded": True,
+        "degraded_reason": "non_finite_pm",
+    }
+
+    merged = merge_primary_metric_health(primary_metric, core_primary_metric)
+
+    assert merged["preview"] == primary_metric["preview"]
+    assert merged["final"] == primary_metric["final"]
+    assert merged["ratio_vs_baseline"] == primary_metric["ratio_vs_baseline"]
+    assert merged["invalid"] is True
+    assert merged["degraded"] is True
+    assert merged["degraded_reason"] == "non_finite_pm"
+
+
 def test_normalize_overhead_result_marks_missing_ratio_as_not_evaluated() -> None:
     out = normalize_guard_overhead_result(None)
     assert out["evaluated"] is False

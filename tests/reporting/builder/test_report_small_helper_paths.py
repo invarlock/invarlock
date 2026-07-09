@@ -46,8 +46,3 @@ def test_pair_logloss_windows_insufficient_and_none() -> None:
     assert _pair_logloss_windows(run_w, base_w) is None
     # Non-dicts return None
     assert _pair_logloss_windows([], {}) is None
-
-
-def test_get_ppl_final_missing_and_present() -> None:
-    # Legacy _get_ppl_final removed; rely on primary_metric parsing in evaluation_reports.
-    assert True
