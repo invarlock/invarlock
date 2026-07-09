@@ -37,10 +37,16 @@ if [[ "${INVARLOCK_SMOKE_PLAN:-0}" == "1" ]]; then
   SMOKE_PLAN_EDIT_CFG="$EDIT_CFG" \
   SMOKE_PLAN_RUN_ROOT="$RUN_ROOT" \
   SMOKE_PLAN_REPORT_ROOT="$REPORT_ROOT" \
+  SMOKE_PLAN_POST_CHECKS="$(smoke_plan_markers post-check "${BASH_SOURCE[0]}")" \
   "$PYTHON_BIN" - <<'PY'
 import json
 import os
 
+post_checks = [
+    check.strip()
+    for check in os.environ["SMOKE_PLAN_POST_CHECKS"].splitlines()
+    if check.strip()
+]
 plan = {
     "script": "run_cpu_telemetry",
     "model_id": os.environ["SMOKE_PLAN_MODEL_ID"],
@@ -58,7 +64,7 @@ plan = {
         "subject_adapter": "auto",
     },
     "runtime_image": {"mode": "container", "device": "cpu"},
-    "post_checks": ["report validate"],
+    "post_checks": post_checks,
 }
 print(json.dumps(plan, sort_keys=True))
 PY
@@ -88,6 +94,7 @@ if [[ "${EVAL_RC}" != "0" ]]; then
   exit "${EVAL_RC}"
 fi
 
+# smoke-plan-post-check: report validate
 "${CLI[@]}" report validate "${REPORT_ROOT}/evaluation.report.json" >/dev/null
 
 echo "Telemetry reports written to ${REPORT_ROOT}"

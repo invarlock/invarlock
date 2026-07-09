@@ -90,6 +90,8 @@ if [[ "${INVARLOCK_SMOKE_PLAN:-0}" == "1" ]]; then
   SMOKE_PLAN_QUANT_EDIT_CONFIG="$QUANT_EDIT_CONFIG" \
   SMOKE_PLAN_CUSTOM_EDIT_CONFIG="$CUSTOM_EDIT_CONFIG" \
   SMOKE_PLAN_HOST_HF_CACHE_ROOT="${INVARLOCK_SMOKE_HOST_HF_CACHE_ROOT:-${HF_HOME:-${HOME}/.cache/huggingface}}" \
+  SMOKE_PLAN_COMMANDS="$(smoke_plan_markers command "${BASH_SOURCE[0]}")" \
+  SMOKE_PLAN_HELPER_CONTRACTS="$(smoke_plan_markers helper "${BASH_SOURCE[0]}")" \
   "$PYTHON_BIN" - <<'PY'
 import json
 import os
@@ -98,6 +100,16 @@ journeys = [
     journey.strip()
     for journey in os.environ["SMOKE_PLAN_JOURNEYS"].split(",")
     if journey.strip()
+]
+commands = [
+    command.strip()
+    for command in os.environ["SMOKE_PLAN_COMMANDS"].splitlines()
+    if command.strip()
+]
+helper_contracts = [
+    helper.strip()
+    for helper in os.environ["SMOKE_PLAN_HELPER_CONTRACTS"].splitlines()
+    if helper.strip()
 ]
 plan = {
     "script": "run_gpt2_user_journey_smoke",
@@ -117,25 +129,8 @@ plan = {
         "quantized": os.environ["SMOKE_PLAN_QUANT_EDIT_CONFIG"],
         "custom": os.environ["SMOKE_PLAN_CUSTOM_EDIT_CONFIG"],
     },
-    "commands": [
-        "evaluate",
-        "verify",
-        "report validate",
-        "report html",
-        "report explain",
-        "advanced evidence-pack keygen",
-        "advanced evidence-pack build",
-        "advanced evidence-pack inspect",
-        "advanced evidence-pack verify",
-    ],
-    "helper_contracts": [
-        "write_strict_bundle_fixture",
-        "run_strict_bundle_journey",
-        "run_all_mode_journeys",
-        "append_child_results",
-        "run_child_suite",
-        "verify-rejects",
-    ],
+    "commands": commands,
+    "helper_contracts": helper_contracts,
     "child_suites": [
         {"suite": "local", "mode": "local", "assurance": "off"},
         {"suite": "container", "mode": "container", "assurance": "off"},
@@ -251,6 +246,7 @@ write_final_verdict() {
   "$PYTHON_BIN" "$GPT2_HELPER" write-final-verdict "$RESULTS_TSV" "$WORK_ROOT/final_verdict.json" "$verdict"
 }
 
+# smoke-plan-helper: run_evidence_pack_journey
 run_evidence_pack_journey() {
   local journey="$1"
   local eval_report="$2"
@@ -270,6 +266,7 @@ run_evidence_pack_journey() {
 
   local rc=0
   set +e
+  # smoke-plan-command: advanced evidence-pack keygen
   "${CLI[@]}" advanced evidence-pack keygen "$signing_key" \
     --public-key-out "$public_key" \
     --json
@@ -281,6 +278,7 @@ run_evidence_pack_journey() {
   fi
 
   set +e
+  # smoke-plan-command: advanced evidence-pack build
   "${CLI[@]}" advanced evidence-pack build "$pack_dir" \
     --final-verdict "$verdict_json" \
     --report "$eval_report" \
@@ -294,8 +292,10 @@ run_evidence_pack_journey() {
     return 0
   fi
 
+  # smoke-plan-command: advanced evidence-pack inspect
   "${CLI[@]}" advanced evidence-pack inspect "$pack_dir" --json
   set +e
+  # smoke-plan-command: advanced evidence-pack verify
   "${CLI[@]}" advanced evidence-pack verify "$pack_dir" --json > "$pack_verify_json"
   rc=$?
   set -e
@@ -308,6 +308,7 @@ run_evidence_pack_journey() {
   record_result "$journey/evidence-pack" "build and verify evidence pack" "PASS" "ok" "-" "$pack_dir" "container mode"
 }
 
+# smoke-plan-helper: run_eval_journey
 run_eval_journey() {
   local journey="$1"
   local edit_config="$2"
@@ -337,6 +338,7 @@ run_eval_journey() {
 
   local rc=0
   set +e
+  # smoke-plan-command: evaluate
   "${CLI[@]}" evaluate \
     --baseline gpt2 \
     --subject gpt2 \
@@ -375,6 +377,7 @@ run_eval_journey() {
   echo "[journey] evaluation_report=$eval_report"
 
   set +e
+  # smoke-plan-command: verify
   "${CLI[@]}" verify "$eval_report" "${VERIFY_ARGS[@]}" --json > "$verify_json"
   rc=$?
   set -e
@@ -385,18 +388,21 @@ run_eval_journey() {
     return 0
   fi
 
+  # smoke-plan-command: report validate
   if ! "${CLI[@]}" report validate "$eval_report"; then
     record_result "$journey/report-validate" "schema validates" "FAIL" "ok" "$(metric_summary "$eval_report")" "$eval_report" "schema validation failed"
     echo "==== END journey:$journey ===="
     return 0
   fi
 
+  # smoke-plan-command: report html
   if ! "${CLI[@]}" report html -i "$eval_report" -o "$export_dir/evaluation.html" --force; then
     record_result "$journey/report-html" "HTML renders" "FAIL" "ok" "$(metric_summary "$eval_report")" "$export_dir/evaluation.html" "HTML render failed"
     echo "==== END journey:$journey ===="
     return 0
   fi
 
+  # smoke-plan-command: report explain
   if ! "${CLI[@]}" report explain --subject-report "$edited_report" --baseline-report "$baseline_report" > "$explain_txt"; then
     record_result "$journey/report-explain" "explain renders" "FAIL" "ok" "$(metric_summary "$eval_report")" "$explain_txt" "explain failed"
     echo "==== END journey:$journey ===="
@@ -414,6 +420,7 @@ run_eval_journey() {
   echo "==== END journey:$journey ===="
 }
 
+# smoke-plan-helper: run_negative_journey
 run_negative_journey() {
   local source_report="${FIRST_EVAL_REPORT:-$LAST_EVAL_REPORT}"
   local journey="negative"
@@ -438,6 +445,7 @@ run_negative_journey() {
 
   local rc=0
   set +e
+  # smoke-plan-command: verify
   "${CLI[@]}" verify "$eval_report" "${VERIFY_ARGS[@]}" --json > "$verify_json"
   rc=$?
   set -e
@@ -451,27 +459,32 @@ run_negative_journey() {
     return 0
   fi
 
+  # smoke-plan-command: report validate
   if ! "${CLI[@]}" report validate "$eval_report"; then
     record_result "$journey/report-validate" "mutated report remains schema-valid" "FAIL" "reason=$reason" "$(metric_summary "$eval_report")" "$eval_report" "schema validation failed"
     echo "==== END journey:$journey ===="
     return 0
   fi
 
+  # smoke-plan-command: report html
   if ! "${CLI[@]}" report html -i "$eval_report" -o "$export_dir/evaluation.html" --force; then
     record_result "$journey/report-html" "HTML renders rejected report" "FAIL" "reason=$reason" "$(metric_summary "$eval_report")" "$export_dir/evaluation.html" "HTML render failed"
     echo "==== END journey:$journey ===="
     return 0
   fi
 
+  # smoke-plan-helper: verify-rejects
   record_result "$journey/verify-rejects" "verify rejects mutated report" "PASS" "verify_rc=$rc reason=$reason" "$(metric_summary "$eval_report")" "$export_dir/evaluation.html" "schema valid; HTML rendered for inspection"
   echo "==== END journey:$journey ===="
 }
 
+# smoke-plan-helper: write_strict_bundle_fixture
 write_strict_bundle_fixture() {
   local eval_report="$1"
   "$PYTHON_BIN" "$GPT2_HELPER" write-strict-bundle-fixture "$eval_report"
 }
 
+# smoke-plan-helper: run_strict_bundle_journey
 run_strict_bundle_journey() {
   local journey="strict-bundle"
   local journey_root="$WORK_ROOT/journeys/$journey"
@@ -488,6 +501,7 @@ run_strict_bundle_journey() {
 
   local rc=0
   set +e
+  # smoke-plan-command: verify
   "${CLI[@]}" verify "$eval_report" --assurance strict --profile ci --json > "$verify_json"
   rc=$?
   set -e
@@ -498,12 +512,14 @@ run_strict_bundle_journey() {
     return 0
   fi
 
+  # smoke-plan-command: report validate
   if ! "${CLI[@]}" report validate "$eval_report"; then
     record_result "$journey/report-validate" "schema validates" "FAIL" "ok" "$(metric_summary "$eval_report")" "$eval_report" "schema validation failed"
     echo "==== END journey:$journey ===="
     return 0
   fi
 
+  # smoke-plan-command: report html
   if ! "${CLI[@]}" report html -i "$eval_report" -o "$export_dir/evaluation.html" --force; then
     record_result "$journey/report-html" "HTML renders" "FAIL" "ok" "$(metric_summary "$eval_report")" "$export_dir/evaluation.html" "HTML render failed"
     echo "==== END journey:$journey ===="
@@ -515,6 +531,7 @@ run_strict_bundle_journey() {
   echo "==== END journey:$journey ===="
 }
 
+# smoke-plan-helper: append_child_results
 append_child_results() {
   local suite="$1"
   local child_root="$2"
@@ -528,6 +545,7 @@ append_child_results() {
   "$PYTHON_BIN" "$GPT2_HELPER" append-child-results "$RESULTS_TSV" "$final_verdict" "$suite"
 }
 
+# smoke-plan-helper: run_child_suite
 run_child_suite() {
   local suite="$1"
   local child_mode="$2"
@@ -560,6 +578,7 @@ run_child_suite() {
   return "$rc"
 }
 
+# smoke-plan-helper: run_all_mode_journeys
 run_all_mode_journeys() {
   local default_local_journeys="noop,quantized,negative"
   local default_container_journeys="strict-bundle,noop,quantized,edited,negative"

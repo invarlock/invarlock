@@ -106,7 +106,7 @@ def test_gpt2_user_journey_smoke_script_declares_execution_plan(
         {"suite": "container", "mode": "container", "assurance": "off"},
     ]
     assert {"noop", "quantized", "negative"} <= set(plan["journeys"])
-    assert {
+    assert set(plan["commands"]) == {
         "evaluate",
         "verify",
         "report validate",
@@ -114,16 +114,20 @@ def test_gpt2_user_journey_smoke_script_declares_execution_plan(
         "report explain",
         "advanced evidence-pack keygen",
         "advanced evidence-pack build",
+        "advanced evidence-pack inspect",
         "advanced evidence-pack verify",
-    } <= set(plan["commands"])
-    assert {
+    }
+    assert set(plan["helper_contracts"]) == {
+        "run_evidence_pack_journey",
+        "run_eval_journey",
+        "run_negative_journey",
         "write_strict_bundle_fixture",
         "run_strict_bundle_journey",
-        "run_all_mode_journeys",
         "append_child_results",
         "run_child_suite",
+        "run_all_mode_journeys",
         "verify-rejects",
-    } <= set(plan["helper_contracts"])
+    }
 
 
 def test_tiny_container_smoke_script_declares_runtime_plan(tmp_path: Path) -> None:
@@ -145,7 +149,7 @@ def test_tiny_container_smoke_script_declares_runtime_plan(tmp_path: Path) -> No
         "final_n": 2,
         "tiny_relax": True,
     }
-    assert {
+    assert set(plan["commands"]) == {
         "evaluate",
         "verify",
         "report validate",
@@ -153,8 +157,9 @@ def test_tiny_container_smoke_script_declares_runtime_plan(tmp_path: Path) -> No
         "report explain",
         "advanced evidence-pack keygen",
         "advanced evidence-pack build",
+        "advanced evidence-pack inspect",
         "advanced evidence-pack verify",
-    } <= set(plan["commands"])
+    }
 
 
 def test_cli_smoke_fast_declares_repo_python_and_command_groups(
@@ -170,7 +175,7 @@ def test_cli_smoke_fast_declares_repo_python_and_command_groups(
         "configs/calibration/null_sweep_smoke.yaml",
         "configs/calibration/rmt_ve_sweep_smoke.yaml",
     ]
-    assert {
+    assert set(plan["command_groups"]) == {
         "help",
         "plugins",
         "fixture_report",
@@ -181,15 +186,20 @@ def test_cli_smoke_fast_declares_repo_python_and_command_groups(
         "network_evaluate",
         "calibration",
         "container_local_parity",
-    } <= set(plan["command_groups"])
-    assert "invarlock.reporting.verify_contract" in plan["fixture_contracts"]
+    }
+    assert set(plan["fixture_contracts"]) == {
+        "invarlock.reporting.verify_contract",
+        "runtime manifest",
+        "evaluation report",
+        "run reports",
+    }
     assert plan["removed_public_commands"] == ["run"]
-    assert {
+    assert set(plan["forbidden_command_surfaces"]) == {
         "report verify --help",
         "invarlock run --help",
         "--source sshleifer/tiny-gpt2",
         "--edited sshleifer/tiny-gpt2",
-    } <= set(plan["forbidden_command_surfaces"])
+    }
 
 
 def test_cli_smoke_negative_declares_failure_category_matrix(

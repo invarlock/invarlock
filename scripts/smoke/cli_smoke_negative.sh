@@ -113,57 +113,28 @@ mkdir -p "$FIXTURE_ROOT" "$VERIFY_OUT"
 if [[ "${INVARLOCK_SMOKE_PLAN:-0}" == "1" ]]; then
   SMOKE_PLAN_WORK_ROOT="$WORK_ROOT" \
   SMOKE_PLAN_GOLDEN_REPORT="$GOLDEN_REPORT" \
+  SMOKE_PLAN_FAILURE_CASES="$(smoke_plan_markers failure-case "${BASH_SOURCE[0]}")" \
   "$PYTHON_BIN" - <<'PY'
 import json
 import os
+
+failure_cases = []
+for raw_case in os.environ["SMOKE_PLAN_FAILURE_CASES"].splitlines():
+    parts = [part.strip() for part in raw_case.split("|")]
+    if len(parts) < 2:
+        raise SystemExit(f"invalid smoke-plan-failure-case marker: {raw_case!r}")
+    case = {"label": parts[0], "expected_exit": parts[1]}
+    if len(parts) > 2 and parts[2]:
+        case["expected_reason"] = parts[2]
+    if len(parts) > 3 and parts[3]:
+        case["expected_fragment"] = parts[3]
+    failure_cases.append(case)
 
 plan = {
     "script": "cli_smoke_negative",
     "work_root": os.environ["SMOKE_PLAN_WORK_ROOT"],
     "golden_report": os.environ["SMOKE_PLAN_GOLDEN_REPORT"],
-    "failure_cases": [
-        {
-            "label": "invarlock run (removed public command)",
-            "expected_exit": "2",
-            "expected_fragment": "No such command 'run'",
-        },
-        {
-            "label": "invarlock verify --json (malformed fixture)",
-            "expected_exit": "2",
-            "expected_reason": "malformed",
-            "expected_fragment": '"code": "E601"',
-        },
-        {
-            "label": "invarlock verify --json (primary metric policy fail)",
-            "expected_exit": "3",
-            "expected_reason": "policy_fail",
-        },
-        {
-            "label": "invarlock verify --json (invariants policy fail)",
-            "expected_exit": "3",
-            "expected_reason": "policy_fail",
-        },
-        {
-            "label": "invarlock verify --json (spectral policy fail)",
-            "expected_exit": "3",
-            "expected_reason": "policy_fail",
-        },
-        {
-            "label": "invarlock verify --json (rmt policy fail)",
-            "expected_exit": "3",
-            "expected_reason": "policy_fail",
-        },
-        {
-            "label": "invarlock report generate (failed subject run report)",
-            "expected_exit": "2",
-            "expected_fragment": "subject run report with status",
-        },
-        {
-            "label": "invarlock advanced calibrate null-sweep (missing config)",
-            "expected_exit": "2",
-            "expected_fragment": "Invalid value for '--config'",
-        },
-    ],
+    "failure_cases": failure_cases,
 }
 print(json.dumps(plan, sort_keys=True))
 PY
@@ -238,6 +209,7 @@ write("baseline_run.json", baseline_run)
 write("failed_subject_run.json", failed_subject)
 PY
 
+# smoke-plan-failure-case: invarlock run (removed public command)|2||No such command 'run'
 run_capture \
   "invarlock run (removed public command)" \
   "$VERIFY_OUT/run_removed.out" \
@@ -245,6 +217,7 @@ run_capture \
   "2"
 assert_contains "$VERIFY_OUT/run_removed.out" "No such command 'run'"
 
+# smoke-plan-failure-case: invarlock verify --json (malformed fixture)|2|malformed|"code": "E601"
 run_capture \
   "invarlock verify --json (malformed fixture)" \
   "$VERIFY_OUT/malformed.out" \
@@ -253,6 +226,7 @@ run_capture \
 assert_verify_reason "$VERIFY_OUT/malformed.out" "malformed"
 assert_contains "$VERIFY_OUT/malformed.out" "\"code\": \"E601\""
 
+# smoke-plan-failure-case: invarlock verify --json (primary metric policy fail)|3|policy_fail|
 run_capture \
   "invarlock verify --json (primary metric policy fail)" \
   "$VERIFY_OUT/pm_fail.out" \
@@ -260,6 +234,7 @@ run_capture \
   "3"
 assert_verify_reason "$VERIFY_OUT/pm_fail.out" "policy_fail"
 
+# smoke-plan-failure-case: invarlock verify --json (invariants policy fail)|3|policy_fail|
 run_capture \
   "invarlock verify --json (invariants policy fail)" \
   "$VERIFY_OUT/invariants_fail.out" \
@@ -267,6 +242,7 @@ run_capture \
   "3"
 assert_verify_reason "$VERIFY_OUT/invariants_fail.out" "policy_fail"
 
+# smoke-plan-failure-case: invarlock verify --json (spectral policy fail)|3|policy_fail|
 run_capture \
   "invarlock verify --json (spectral policy fail)" \
   "$VERIFY_OUT/spectral_fail.out" \
@@ -274,6 +250,7 @@ run_capture \
   "3"
 assert_verify_reason "$VERIFY_OUT/spectral_fail.out" "policy_fail"
 
+# smoke-plan-failure-case: invarlock verify --json (rmt policy fail)|3|policy_fail|
 run_capture \
   "invarlock verify --json (rmt policy fail)" \
   "$VERIFY_OUT/rmt_fail.out" \
@@ -281,6 +258,7 @@ run_capture \
   "3"
 assert_verify_reason "$VERIFY_OUT/rmt_fail.out" "policy_fail"
 
+# smoke-plan-failure-case: invarlock report generate (failed subject run report)|2||subject run report with status
 run_capture \
   "invarlock report generate (failed subject run report)" \
   "$VERIFY_OUT/report_generate_failed_subject.out" \
@@ -288,6 +266,7 @@ run_capture \
   "2"
 assert_contains "$VERIFY_OUT/report_generate_failed_subject.out" "subject run report with status"
 
+# smoke-plan-failure-case: invarlock advanced calibrate null-sweep (missing config)|2||Invalid value for '--config'
 run_capture \
   "invarlock advanced calibrate null-sweep (missing config)" \
   "$VERIFY_OUT/calibrate_missing_config.out" \

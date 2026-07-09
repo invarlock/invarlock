@@ -228,10 +228,28 @@ if [[ "${INVARLOCK_SMOKE_PLAN:-0}" == "1" ]]; then
   SMOKE_PLAN_CALIBRATE_NULL_CONFIG="$SMOKE_CALIBRATE_NULL_CONFIG" \
   SMOKE_PLAN_CALIBRATE_VE_CONFIG="$SMOKE_CALIBRATE_VE_CONFIG" \
   SMOKE_PLAN_PYTHON_BIN="$PYTHON_BIN" \
+  SMOKE_PLAN_COMMAND_GROUPS="$(smoke_plan_markers command-group "${BASH_SOURCE[0]}")" \
+  SMOKE_PLAN_FIXTURE_CONTRACTS="$(smoke_plan_markers fixture-contract "${BASH_SOURCE[0]}")" \
+  SMOKE_PLAN_FORBIDDEN_COMMAND_SURFACES="$(smoke_plan_markers forbidden-command-surface "${BASH_SOURCE[0]}")" \
   "$PYTHON_BIN" - <<'PY'
 import json
 import os
 
+command_groups = [
+    group.strip()
+    for group in os.environ["SMOKE_PLAN_COMMAND_GROUPS"].splitlines()
+    if group.strip()
+]
+fixture_contracts = [
+    contract.strip()
+    for contract in os.environ["SMOKE_PLAN_FIXTURE_CONTRACTS"].splitlines()
+    if contract.strip()
+]
+forbidden_command_surfaces = [
+    surface.strip()
+    for surface in os.environ["SMOKE_PLAN_FORBIDDEN_COMMAND_SURFACES"].splitlines()
+    if surface.strip()
+]
 plan = {
     "script": "cli_smoke_fast",
     "work_root": os.environ["SMOKE_PLAN_WORK_ROOT"],
@@ -244,24 +262,8 @@ plan = {
         os.environ["SMOKE_PLAN_CALIBRATE_NULL_CONFIG"],
         os.environ["SMOKE_PLAN_CALIBRATE_VE_CONFIG"],
     ],
-    "command_groups": [
-        "help",
-        "plugins",
-        "fixture_report",
-        "report_generation",
-        "evidence_pack",
-        "policy",
-        "offline_evaluate",
-        "network_evaluate",
-        "calibration",
-        "container_local_parity",
-    ],
-    "fixture_contracts": [
-        "invarlock.reporting.verify_contract",
-        "runtime manifest",
-        "evaluation report",
-        "run reports",
-    ],
+    "command_groups": command_groups,
+    "fixture_contracts": fixture_contracts,
     "removed_public_commands": ["run"],
     "failure_modes": [
         "missing adapters stack skips model lanes",
@@ -269,12 +271,7 @@ plan = {
         "missing docker daemon skips container lanes",
         "missing network skips network lanes",
     ],
-    "forbidden_command_surfaces": [
-        "report verify --help",
-        "invarlock run --help",
-        "--source sshleifer/tiny-gpt2",
-        "--edited sshleifer/tiny-gpt2",
-    ],
+    "forbidden_command_surfaces": forbidden_command_surfaces,
 }
 print(json.dumps(plan, sort_keys=True))
 PY
@@ -371,6 +368,7 @@ run_env() {
 }
 
 # Top-level and core commands (help-only: safe)
+# smoke-plan-command-group: help
 run "invarlock --help"                "$CLI --help"
 run "invarlock version"               "$CLI version"
 run "invarlock evaluate --help"       "$CLI evaluate --help"
@@ -395,6 +393,7 @@ run "invarlock advanced calibrate null-sweep --help" "$CLI advanced calibrate nu
 run "invarlock advanced calibrate ve-sweep --help" "$CLI advanced calibrate ve-sweep --help"
 
 # Plugins listings (safe; JSON and text variants)
+# smoke-plan-command-group: plugins
 run "invarlock advanced plugins --help"        "$CLI advanced plugins --help"
 run "invarlock advanced plugins list --help"   "$CLI advanced plugins list --help"
 run "invarlock advanced plugins list (text)"   "$CLI advanced plugins list"
@@ -422,6 +421,10 @@ printf '%s\n' '{"support_tiers":["published_basis"]}' >"$TMP_DIR/policy_compatib
 EVIDENCE_PACK_SIGNING_KEY="$TMP_DIR/evidence_pack_signing_key.pem"
 EVIDENCE_PACK_REPORT_DIR="$TMP_DIR/evidence_pack_report"
 mkdir -p "$EVIDENCE_PACK_REPORT_DIR"
+# smoke-plan-fixture-contract: invarlock.reporting.verify_contract
+# smoke-plan-fixture-contract: runtime manifest
+# smoke-plan-fixture-contract: evaluation report
+# smoke-plan-fixture-contract: run reports
 EVIDENCE_PACK_REPORT_DIR="$EVIDENCE_PACK_REPORT_DIR" "$PYTHON_BIN" - <<'PY'
 import hashlib
 import json
@@ -690,15 +693,19 @@ runtime_manifest = {
 )
 PY
 
+# smoke-plan-command-group: fixture_report
 run "invarlock verify --json (fixture report)" "$CLI verify --json --profile ci \"$EVIDENCE_PACK_REPORT_DIR/evaluation.report.json\""
+# smoke-plan-command-group: report_generation
 run "invarlock report generate (demo run reports)" "$CLI report generate --run \"$TMP_DIR/runs/subject/report.json\" --baseline-run-report \"$TMP_DIR/runs/source/report.json\" --format report -o \"$TMP_DIR/generated_report\""
 run "invarlock report validate (demo generated report)" "$CLI report validate \"$TMP_DIR/generated_report/evaluation.report.json\""
 run "invarlock report html (demo generated report)" "$CLI report html -i \"$TMP_DIR/generated_report/evaluation.report.json\" -o \"$TMP_DIR/generated_report/evaluation.html\" --force"
 run "invarlock report explain (demo run reports)" "$CLI report explain --subject-report \"$TMP_DIR/runs/subject/report.json\" --baseline-report \"$TMP_DIR/runs/source/report.json\""
+# smoke-plan-command-group: evidence_pack
 run "invarlock advanced evidence-pack keygen --json" "$CLI advanced evidence-pack keygen \"$EVIDENCE_PACK_SIGNING_KEY\" --json"
 run "invarlock advanced evidence-pack build" "$CLI advanced evidence-pack build \"$TMP_DIR/evidence_pack_cli\" --final-verdict \"$TMP_DIR/final_verdict.json\" --source-repo \"$TMP_DIR/source_repo.json\" --environment \"$TMP_DIR/environment.json\" --material model_revisions=\"$TMP_DIR/model_revisions.json\" --report \"$EVIDENCE_PACK_REPORT_DIR/evaluation.report.json\" --signing-key \"$EVIDENCE_PACK_SIGNING_KEY\" --profile ci --json"
 run "invarlock advanced evidence-pack inspect --json" "$CLI advanced evidence-pack inspect \"$TMP_DIR/evidence_pack_cli\" --json"
 run "invarlock advanced evidence-pack verify --json" "$CLI advanced evidence-pack verify \"$TMP_DIR/evidence_pack_cli\" --json"
+# smoke-plan-command-group: policy
 run "invarlock advanced policy build" "$CLI advanced policy build --resolved-policy \"$TMP_DIR/resolved_policy.json\" --overrides \"$TMP_DIR/policy_overrides.json\" --compatibility \"$TMP_DIR/policy_compatibility.json\" --out \"$TMP_DIR/policy-pack.json\" --owner smoke"
 run "invarlock advanced policy verify --json" "$CLI advanced policy verify \"$TMP_DIR/policy-pack.json\" --json"
 
@@ -708,6 +715,7 @@ OFFLINE_EVAL_ENV="$OFFLINE_ENV INVARLOCK_DEDUP_TEXTS=1 INVARLOCK_TINY_RELAX=1"
 
 if have_adapters_stack; then
   if have_smoke_model_cache; then
+    # smoke-plan-command-group: offline_evaluate
     run_to "invarlock evaluate (offline, local)" "$EVALUATE_TIMEOUT_SECONDS" "$OFFLINE_EVAL_ENV $CLI evaluate --execution-mode host --baseline \"$SMOKE_MODEL_ID\" --subject \"$SMOKE_MODEL_ID\" --baseline-adapter auto --subject-adapter auto --profile dev --assurance off --preset \"$SMOKE_PRESET\" --device cpu --out \"$TMP_DIR/report_offline_local\" --report-out \"$TMP_DIR/report_offline_local_out\""
   else
     skip_run "invarlock evaluate (offline, local)" "smoke model cache not available"
@@ -722,9 +730,11 @@ NET_EVAL_ENV="$NET_ENV INVARLOCK_DEDUP_TEXTS=1 INVARLOCK_TINY_RELAX=1"
 if have_adapters_stack; then
   if have_network_access; then
     if have_docker_daemon; then
+      # smoke-plan-command-group: network_evaluate
       run_to "invarlock evaluate (network, container)" "$EVALUATE_TIMEOUT_SECONDS" "$NET_EVAL_ENV $CLI evaluate --allow-network --baseline \"$SMOKE_MODEL_ID\" --subject \"$SMOKE_MODEL_ID\" --baseline-adapter auto --subject-adapter auto --profile dev --assurance off --preset \"$SMOKE_PRESET\" --device cpu --out \"$TMP_DIR/report_net\" --report-out \"$TMP_DIR/report_net_out\""
       run "invarlock verify (network container output)" "if [ -f \"$TMP_DIR/report_net_out/evaluation.report.json\" ]; then $CLI verify --json \"$TMP_DIR/report_net_out/evaluation.report.json\"; else echo '[error] report missing'; exit 1; fi"
       run "invarlock report validate (network container output)" "if [ -f \"$TMP_DIR/report_net_out/evaluation.report.json\" ]; then $CLI report validate \"$TMP_DIR/report_net_out/evaluation.report.json\"; else echo '[error] report missing'; exit 1; fi"
+      # smoke-plan-command-group: calibration
       run_to "invarlock advanced calibrate null-sweep (network, container)" "$CALIBRATE_NULL_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate null-sweep --allow-network --config \"$SMOKE_CALIBRATE_NULL_CONFIG\" --out \"$TMP_DIR/calibrate_null\" --profile ci --device cpu --tier balanced --n-seeds 1 --seed-start 42"
       run_to "invarlock advanced calibrate ve-sweep (network, container)" "$CALIBRATE_VE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate ve-sweep --allow-network --config \"$SMOKE_CALIBRATE_VE_CONFIG\" --out \"$TMP_DIR/calibrate_ve\" --profile ci --device cpu --tier balanced --window 6 --n-seeds 1 --seed-start 42"
     else
@@ -741,6 +751,7 @@ if have_adapters_stack; then
     run_to "invarlock advanced calibrate ve-sweep (network, host)" "$CALIBRATE_VE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate ve-sweep --allow-network --allow-host-execution --config \"$SMOKE_CALIBRATE_VE_CONFIG\" --out \"$TMP_DIR/calibrate_ve_host\" --profile ci --device cpu --tier balanced --window 6 --n-seeds 1 --seed-start 42"
     if have_docker_daemon; then
       if [[ -f "$TMP_DIR/report_net_out/evaluation.report.json" && -f "$TMP_DIR/report_net_local_out/evaluation.report.json" ]]; then
+        # smoke-plan-command-group: container_local_parity
         run_tiny_eval_parity \
           "invarlock evaluate parity (container vs local)" \
           "$TMP_DIR/report_net_out/evaluation.report.json" \
@@ -777,6 +788,11 @@ else
   skip_run "invarlock advanced calibrate ve-sweep (network, host)" "adapters stack (torch/transformers) not available"
   skip_run "invarlock evaluate parity (container vs local)" "adapters stack (torch/transformers) not available"
 fi
+
+# smoke-plan-forbidden-command-surface: report verify --help
+# smoke-plan-forbidden-command-surface: invarlock run --help
+# smoke-plan-forbidden-command-surface: --source sshleifer/tiny-gpt2
+# smoke-plan-forbidden-command-surface: --edited sshleifer/tiny-gpt2
 
 echo "[summary] $(ts) total=${TOTAL_COMMANDS} skipped=${SKIPPED_COMMANDS} unexpected_failures=${UNEXPECTED_FAILURES}" | tee -a "$LOG_FILE"
 echo "[done] $(ts) Log captured to: $LOG_FILE"
