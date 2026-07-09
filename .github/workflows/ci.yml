@@ -66,6 +66,8 @@ jobs:
         run: make test-fast
 
       - name: Run local HF pipeline smoke
+        env:
+          INVARLOCK_REQUIRE_LOCAL_HF: "1"
         run: make local-hf-pipeline-smoke
 
       - name: Run mutation smoke

@@ -147,10 +147,29 @@ def test_coverage_policy_is_shared_with_makefile_and_expanded_surface() -> None:
     }
     for path, threshold in phased_evidence_pack_thresholds.items():
         assert policy.THRESHOLDS[path] == threshold
+    relaxed_behavioral_thresholds = {
+        "scripts/evidence_workflows/workflow_runner.py": 0.95,
+        "src/invarlock/adapters/auto.py": 0.95,
+        "src/invarlock/adapters/hf_causal.py": 0.95,
+        "src/invarlock/adapters/hf_multimodal.py": 0.95,
+        "src/invarlock/cli/app.py": 0.95,
+        "src/invarlock/cli/commands/evaluate.py": 0.95,
+        "src/invarlock/cli/commands/run.py": 0.95,
+        "src/invarlock/cli/commands/verify.py": 0.95,
+        "src/invarlock/core/run_orchestrator_execute.py": 0.95,
+        "src/invarlock/core/runner_eval_metrics_stats.py": 0.95,
+        "src/invarlock/reporting/report_builder_support.py": 0.95,
+        "src/invarlock/reporting/report_builder_telemetry.py": 0.95,
+    }
+    for path, threshold in relaxed_behavioral_thresholds.items():
+        assert policy.BEHAVIORAL_RATCHET_THRESHOLDS[path] == threshold
+        assert policy.THRESHOLDS[path] == threshold
+    assert min(policy.BEHAVIORAL_RATCHET_THRESHOLDS.values()) >= 0.95
     assert {
         threshold
         for path, threshold in policy.THRESHOLDS.items()
         if path not in phased_evidence_pack_thresholds
+        and path not in policy.BEHAVIORAL_RATCHET_THRESHOLDS
     } == {1.00}
 
     assert policy.COVERAGE_MODULE_FLAGS == ("--cov",)

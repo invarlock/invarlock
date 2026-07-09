@@ -88,7 +88,14 @@ def _materialize_patch_targets(request: pytest.FixtureRequest):
 
 
 @pytest.fixture(autouse=True)
-def _default_security_bypass_for_local_tests(monkeypatch: pytest.MonkeyPatch):
+def _default_security_bypass_for_local_tests(
+    monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
+):
+    nodeid = request.node.nodeid
+    if nodeid.startswith(("tests/runtime/", "tests/cli/test_container")):
+        yield
+        return
+
     # The product is container-first, but the general pytest harness stays on
     # host execution unless an individual test opts back into the
     # security-default path explicitly.

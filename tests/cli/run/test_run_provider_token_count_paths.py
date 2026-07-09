@@ -11,6 +11,7 @@ import pytest
 
 from invarlock.cli.commands.run import run_command
 from tests.cli.run._support_run_common import (
+    assert_single_run_report_artifact,
     common_ce_patches,
 )
 from tests.cli.run._support_run_common import (
@@ -232,4 +233,13 @@ def test_provider_indices_fallback_iteration(tmp_path: Path):
             out=str(tmp_path / "runs"),
             until_pass=False,
         )
-    assert (tmp_path / "runs").is_dir()
+    report = assert_single_run_report_artifact(tmp_path)
+    windows = report["evaluation_windows"]
+
+    assert windows["preview"]["window_ids"] == [0]
+    assert windows["final"]["window_ids"] == [1]
+    assert windows["preview"]["input_ids"] == [[1, 2, 3]]
+    assert windows["final"]["input_ids"] == [[4, 5, 6]]
+    provider_digest = report["provenance"]["provider_digest"]
+    assert provider_digest["ids_sha256"]
+    assert provider_digest["tokenizer_sha256"] == report["meta"]["tokenizer_hash"]

@@ -10,6 +10,7 @@ import pytest
 
 from invarlock.cli.commands.run import run_command
 from tests.cli.run._support_run_common import (
+    assert_single_run_report_artifact,
     common_ce_patches,
     synthetic_provider_min,
 )
@@ -69,7 +70,10 @@ def test_overhead_percent_display_release_profile(tmp_path: Path):
         run_command(
             config=str(cfg), device="cpu", profile="release", out=str(tmp_path / "runs")
         )
-    assert (tmp_path / "runs").is_dir()
+    payload = assert_single_run_report_artifact(tmp_path, profile="release")
+    assert payload["context"]["primary_metric"]["overhead_threshold"] == pytest.approx(
+        0.01
+    )
 
 
 def test_counts_mismatch_exit_after_stratification(tmp_path: Path):
@@ -234,6 +238,8 @@ def test_snapshot_auto_bytes_and_chunked_paths(tmp_path: Path):
         def restore_chunked(self, model, path):
             return None
 
+    adapter = Adapter()
+
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
@@ -255,7 +261,7 @@ def test_snapshot_auto_bytes_and_chunked_paths(tmp_path: Path):
             patch(
                 "invarlock.core.registry.get_registry",
                 lambda: SimpleNamespace(
-                    get_adapter=lambda n: Adapter(),
+                    get_adapter=lambda n: adapter,
                     get_edit=lambda n: SimpleNamespace(name=n),
                     get_guard=lambda n: SimpleNamespace(name=n),
                     get_plugin_metadata=lambda n, t: {
@@ -286,7 +292,9 @@ def test_snapshot_auto_bytes_and_chunked_paths(tmp_path: Path):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
-    assert (tmp_path / "runs").is_dir()
+    payload = assert_single_run_report_artifact(tmp_path)
+    assert adapter.snapshots == ["chunked"]
+    assert payload["provenance"]["restore_failed"] is False
 
 
 def test_bytes_only_adapter_path(tmp_path: Path):
@@ -294,6 +302,10 @@ def test_bytes_only_adapter_path(tmp_path: Path):
 
     class Adapter:
         name = "hf_causal"
+        calls: list[str]
+
+        def __init__(self) -> None:
+            self.calls = []
 
         def load_model(self, model_id, device=None):
             class M:
@@ -306,10 +318,14 @@ def test_bytes_only_adapter_path(tmp_path: Path):
             return M()
 
         def snapshot(self, model):
+            self.calls.append("snapshot")
             return b"x"
 
         def restore(self, model, blob):
+            self.calls.append("restore")
             return None
+
+    adapter = Adapter()
 
     with ExitStack() as stack:
         for ctx in _common_ce():
@@ -318,7 +334,7 @@ def test_bytes_only_adapter_path(tmp_path: Path):
             patch(
                 "invarlock.core.registry.get_registry",
                 lambda: SimpleNamespace(
-                    get_adapter=lambda n: Adapter(),
+                    get_adapter=lambda n: adapter,
                     get_edit=lambda n: SimpleNamespace(name=n),
                     get_guard=lambda n: SimpleNamespace(name=n),
                     get_plugin_metadata=lambda n, t: {
@@ -349,7 +365,9 @@ def test_bytes_only_adapter_path(tmp_path: Path):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
-    assert (tmp_path / "runs").is_dir()
+    payload = assert_single_run_report_artifact(tmp_path)
+    assert adapter.calls == ["snapshot", "restore"]
+    assert payload["provenance"]["restore_failed"] is False
 
 
 def test_chunked_only_adapter_path(tmp_path: Path):
@@ -357,6 +375,10 @@ def test_chunked_only_adapter_path(tmp_path: Path):
 
     class Adapter:
         name = "hf_causal"
+        calls: list[str]
+
+        def __init__(self) -> None:
+            self.calls = []
 
         def load_model(self, model_id, device=None):
             class M:
@@ -369,10 +391,14 @@ def test_chunked_only_adapter_path(tmp_path: Path):
             return M()
 
         def snapshot_chunked(self, model):
+            self.calls.append("snapshot_chunked")
             return str(tmp_path / "snapdir")
 
         def restore_chunked(self, model, path):
+            self.calls.append("restore_chunked")
             return None
+
+    adapter = Adapter()
 
     with ExitStack() as stack:
         for ctx in _common_ce():
@@ -381,7 +407,7 @@ def test_chunked_only_adapter_path(tmp_path: Path):
             patch(
                 "invarlock.core.registry.get_registry",
                 lambda: SimpleNamespace(
-                    get_adapter=lambda n: Adapter(),
+                    get_adapter=lambda n: adapter,
                     get_edit=lambda n: SimpleNamespace(name=n),
                     get_guard=lambda n: SimpleNamespace(name=n),
                     get_plugin_metadata=lambda n, t: {
@@ -412,7 +438,9 @@ def test_chunked_only_adapter_path(tmp_path: Path):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
-    assert (tmp_path / "runs").is_dir()
+    payload = assert_single_run_report_artifact(tmp_path)
+    assert adapter.calls == ["snapshot_chunked", "restore_chunked"]
+    assert payload["provenance"]["restore_failed"] is False
 
 
 def test_top_level_exception_with_debug_trace(tmp_path: Path, monkeypatch):
@@ -466,4 +494,6 @@ def test_tokenizer_digest_nonstring_keys_fallback(tmp_path: Path):
             )
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
-    assert (tmp_path / "runs").is_dir()
+    payload = assert_single_run_report_artifact(tmp_path)
+    assert "tokenizer_hash" not in payload["meta"]
+    assert "tokenizer_sha256" not in payload["provenance"]["provider_digest"]
