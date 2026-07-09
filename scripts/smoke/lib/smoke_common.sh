@@ -112,6 +112,23 @@ smoke_expected_exit_match() {
   return 1
 }
 
+smoke_plan_markers() {
+  local kind="$1"
+  local source_path="$2"
+  local marker="# smoke-plan-${kind}:"
+  awk -v marker="$marker" '
+    index($0, marker) {
+      value = substr($0, index($0, marker) + length(marker))
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      if (value != "" && !(value in seen)) {
+        seen[value] = 1
+        print value
+      }
+    }
+  ' "$source_path"
+}
+
 smoke_resolve_container_engine() {
   if command -v docker >/dev/null 2>&1; then
     echo "docker"

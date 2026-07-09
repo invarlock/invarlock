@@ -100,9 +100,10 @@ audience = "ci-only"
 expected_runtime = "medium"
 network = "optional"
 gpu = "optional"
-invoked_by = ["make verify", "make smoke-fast", "runtime smoke CI"]
+invoked_by = ["make verify", "make smoke-fast", "make local-hf-env-check", "runtime smoke CI"]
 description = "Local smoke, runtime, tiny-model, and guard-validation entry points."
 paths = [
+  "scripts/checks/check_local_hf_runtime.py",
   "scripts/smoke/README.md",
   "scripts/smoke/check_device_drift.py",
   "scripts/smoke/cli_smoke_matrix.sh",

@@ -27,11 +27,17 @@ if [[ "${INVARLOCK_SMOKE_PLAN:-0}" == "1" ]]; then
   SMOKE_PLAN_MODE="$MODE" \
   SMOKE_PLAN_PROFILE="$PROFILE" \
   SMOKE_PLAN_DEVICE="$SMOKE_DEVICE" \
+  SMOKE_PLAN_COMMANDS="$(smoke_plan_markers command "${BASH_SOURCE[0]}")" \
   "$PYTHON_BIN" - <<'PY'
 import json
 import os
 
 mode = os.environ["SMOKE_PLAN_MODE"]
+commands = [
+    command.strip()
+    for command in os.environ["SMOKE_PLAN_COMMANDS"].splitlines()
+    if command.strip()
+]
 plan = {
     "script": "run_tiny_container_smoke",
     "work_root": os.environ["SMOKE_PLAN_WORK_ROOT"],
@@ -48,17 +54,7 @@ plan = {
         "final_n": 2,
         "tiny_relax": True,
     },
-    "commands": [
-        "evaluate",
-        "verify",
-        "report validate",
-        "report html",
-        "report explain",
-        "advanced evidence-pack keygen",
-        "advanced evidence-pack build",
-        "advanced evidence-pack inspect",
-        "advanced evidence-pack verify",
-    ],
+    "commands": commands,
     "runtime_image": {
         "seed_local_image": mode == "container",
         "seed_digest": mode == "container",
@@ -239,6 +235,7 @@ if [[ "$MODE" == "local" ]]; then
   RUNTIME_PROVENANCE="host"
 fi
 
+# smoke-plan-command: evaluate
 "${CLI[@]}" evaluate \
   --baseline "$MODEL_ID" \
   --subject "$MODEL_ID" \
@@ -268,6 +265,7 @@ echo "[smoke] evaluation_report=$EVAL_REPORT"
 VERIFY_ARGS=(--runtime-provenance "$RUNTIME_PROVENANCE")
 
 VERIFY_RC=0
+# smoke-plan-command: verify
 "${CLI[@]}" verify "$EVAL_REPORT" "${VERIFY_ARGS[@]}" --profile "$PROFILE" --assurance off --json || VERIFY_RC=$?
 VERIFY_RC="${VERIFY_RC:-0}"
 echo "[smoke] verify_rc=$VERIFY_RC"
@@ -277,9 +275,12 @@ if [[ "$VERIFY_RC" != "0" ]]; then
   exit "$VERIFY_RC"
 fi
 assert_semantic_pass "$EVAL_REPORT"
+# smoke-plan-command: report validate
 "${CLI[@]}" report validate "$EVAL_REPORT"
 mkdir -p "$SMOKE_EXPORT_DIR"
+# smoke-plan-command: report html
 "${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_EXPORT_DIR/evaluation.html"
+# smoke-plan-command: report explain
 "${CLI[@]}" report explain --subject-report "$EDITED_REPORT" --baseline-report "$BASELINE_REPORT"
 
 printf '%s\n' '{"verdict":"PASS","note":"tiny container smoke campaign"}' > "$WORK_ROOT/final_verdict.json"
@@ -292,17 +293,21 @@ if [[ "$MODE" == "local" ]]; then
   exit 0
 fi
 
+# smoke-plan-command: advanced evidence-pack keygen
 "${CLI[@]}" advanced evidence-pack keygen "$EVIDENCE_PACK_SIGNING_KEY" \
   --public-key-out "$EVIDENCE_PACK_PUBLIC_KEY" \
   --json
+# smoke-plan-command: advanced evidence-pack build
 "${CLI[@]}" advanced evidence-pack build "$EVIDENCE_PACK_DIR" \
   --final-verdict "$WORK_ROOT/final_verdict.json" \
   --report "$EVAL_REPORT" \
   --signing-key "$EVIDENCE_PACK_SIGNING_KEY" \
   --profile "$PROFILE" \
   --json
+# smoke-plan-command: advanced evidence-pack inspect
 "${CLI[@]}" advanced evidence-pack inspect "$EVIDENCE_PACK_DIR" --json
 EVIDENCE_PACK_VERIFY_RC=0
+# smoke-plan-command: advanced evidence-pack verify
 "${CLI[@]}" advanced evidence-pack verify "$EVIDENCE_PACK_DIR" --json || EVIDENCE_PACK_VERIFY_RC=$?
 EVIDENCE_PACK_VERIFY_RC="${EVIDENCE_PACK_VERIFY_RC:-0}"
 echo "[smoke] evidence_pack_verify_rc=$EVIDENCE_PACK_VERIFY_RC"

@@ -265,7 +265,11 @@ def test_makefile_exposes_offline_local_hf_pipeline_smoke_target() -> None:
     text = makefile.read_text(encoding="utf-8")
 
     assert "local-hf-pipeline-smoke:" in text
+    assert "local-hf-env-check:" in text
+    assert "local-hf-env-refresh:" in text
     assert "local-hf-pipeline-smoke-locked:" in text
+    assert "scripts/checks/check_local_hf_runtime.py" in text
+    assert "uv sync --locked --extra hf --extra ci" in text
     assert "tests/integration/test_local_hf_pipeline_smoke.py" in text
     assert "INVARLOCK_ALLOW_NETWORK=0" in text
     assert "HF_HUB_OFFLINE=1" in text
@@ -286,6 +290,9 @@ def test_makefile_exposes_slow_statistical_calibration_target() -> None:
     makefile = Path(__file__).resolve().parents[2] / "Makefile"
     text = makefile.read_text(encoding="utf-8")
 
+    assert "statistical-calibration-fast:" in text
+    assert "test_logloss_ci_empirical_coverage_smoke" in text
+    assert "test_paired_delta_log_ci_property_strict_identity" in text
     assert "statistical-calibration-slow:" in text
     assert "-m slow tests/core/test_bootstrap_calibration_slow.py" in text
 

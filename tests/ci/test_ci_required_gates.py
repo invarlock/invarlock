@@ -30,6 +30,10 @@ def test_ci_adds_actionlint_and_packaging_smoke_gates() -> None:
     assert "make actionlint" in actionlint_step["run"]
     fast_step = _find_step_by_name(docs_steps, "Run complete fast lane")
     assert fast_step["run"] == "make test-fast"
+    calibration_step = _find_step_by_name(
+        docs_steps, "Run statistical calibration fast lane"
+    )
+    assert calibration_step["run"] == "make statistical-calibration-fast"
     local_hf_step = _find_step_by_name(docs_steps, "Run local HF pipeline smoke")
     assert local_hf_step["run"] == "make local-hf-pipeline-smoke"
     assert local_hf_step["env"]["INVARLOCK_REQUIRE_LOCAL_HF"] == "1"

@@ -65,6 +65,9 @@ jobs:
       - name: Run complete fast lane
         run: make test-fast
 
+      - name: Run statistical calibration fast lane
+        run: make statistical-calibration-fast
+
       - name: Run local HF pipeline smoke
         env:
           INVARLOCK_REQUIRE_LOCAL_HF: "1"
