@@ -37,7 +37,9 @@ def test_validate_model_raises_when_parameter_iteration_fails() -> None:
     assert exc_info.value.details["error"] == "boom"
 
 
-def test_pre_eval_checks_warn_when_context_length_exceeded(tmp_path) -> None:
+def test_pre_eval_checks_warn_when_context_length_exceeded(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     class DummyModel(nn.Module):
         def __init__(self):
             super().__init__()
@@ -51,8 +53,11 @@ def test_pre_eval_checks_warn_when_context_length_exceeded(tmp_path) -> None:
         "attention_mask": torch.ones((1, 3), dtype=torch.long),
     }
     dataloader = [batch]
+    caplog.set_level("WARNING", logger="invarlock.eval.metrics_activation")
+
     cfg = MetricsConfig(use_cache=False)
     result = _perform_pre_eval_checks(
         DummyModel(), dataloader, torch.device("cpu"), cfg
     )
     assert result is None
+    assert "Input sequence length 3 exceeds model limit 2" in caplog.text

@@ -10,6 +10,7 @@ TDD tests for safe device movement in adapters:
 
 from __future__ import annotations
 
+import builtins
 import logging
 from unittest.mock import MagicMock, patch
 
@@ -242,10 +243,18 @@ class TestDetectCapabilities:
         mixin = SimpleMixin()
 
         mock_model = MagicMock()
+        real_import = builtins.__import__
 
-        with patch.dict("sys.modules", {"invarlock.adapters.capabilities": None}):
+        def blocked_import(  # noqa: ANN001
+            name, globals=None, locals=None, fromlist=(), level=0
+        ):
+            if name == "capabilities" and level == 1:
+                raise ImportError("blocked capabilities import")
+            return real_import(name, globals, locals, fromlist, level)
+
+        with patch("builtins.__import__", side_effect=blocked_import):
             result = mixin._detect_capabilities(mock_model)
-            assert result is None or hasattr(result, "device_movable")
+            assert result is None
 
 
 class TestFilteredLoadingInfo:

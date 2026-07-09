@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+import pytest
 import torch
 import torch.nn as nn
 
@@ -42,7 +43,7 @@ def test_locate_transformer_blocks_enhanced_base_model_path():
     assert isinstance(blocks, list) and len(blocks) == 1
 
 
-def test_pre_eval_checks_context_length_try_except():
+def test_pre_eval_checks_context_length_try_except(caplog: pytest.LogCaptureFixture):
     # No config attributes -> context length check falls to except path
     class NoCfg(nn.Module):
         def forward(self, *a, **k):
@@ -50,5 +51,9 @@ def test_pre_eval_checks_context_length_try_except():
             return SimpleNamespace(ok=True)
 
     dl = [{"input_ids": torch.ones(1, 2, dtype=torch.long)}]
+    caplog.set_level("DEBUG", logger="invarlock.eval.metrics_activation")
+
     result = _perform_pre_eval_checks(NoCfg(), dl, torch.device("cpu"), MetricsConfig())
     assert result is None
+    assert "Context length check failed:" in caplog.text
+    assert "Pre-evaluation dry run failed" not in caplog.text

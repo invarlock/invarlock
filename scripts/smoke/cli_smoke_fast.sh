@@ -220,6 +220,67 @@ SMOKE_PRESET="${INVARLOCK_SMOKE_PRESET:-configs/presets/causal_lm/wikitext2_512.
 SMOKE_CALIBRATE_NULL_CONFIG="${INVARLOCK_SMOKE_CALIBRATE_NULL_CONFIG:-configs/calibration/null_sweep_smoke.yaml}"
 SMOKE_CALIBRATE_VE_CONFIG="${INVARLOCK_SMOKE_CALIBRATE_VE_CONFIG:-configs/calibration/rmt_ve_sweep_smoke.yaml}"
 
+if [[ "${INVARLOCK_SMOKE_PLAN:-0}" == "1" ]]; then
+  SMOKE_PLAN_WORK_ROOT="$WORK_ROOT" \
+  SMOKE_PLAN_LOG_FILE="$LOG_FILE" \
+  SMOKE_PLAN_MODEL_ID="$SMOKE_MODEL_ID" \
+  SMOKE_PLAN_PRESET="$SMOKE_PRESET" \
+  SMOKE_PLAN_CALIBRATE_NULL_CONFIG="$SMOKE_CALIBRATE_NULL_CONFIG" \
+  SMOKE_PLAN_CALIBRATE_VE_CONFIG="$SMOKE_CALIBRATE_VE_CONFIG" \
+  SMOKE_PLAN_PYTHON_BIN="$PYTHON_BIN" \
+  "$PYTHON_BIN" - <<'PY'
+import json
+import os
+
+plan = {
+    "script": "cli_smoke_fast",
+    "work_root": os.environ["SMOKE_PLAN_WORK_ROOT"],
+    "log_file": os.environ["SMOKE_PLAN_LOG_FILE"],
+    "python_bin": os.environ["SMOKE_PLAN_PYTHON_BIN"],
+    "cli": [os.environ["SMOKE_PLAN_PYTHON_BIN"], "-m", "invarlock"],
+    "model_id": os.environ["SMOKE_PLAN_MODEL_ID"],
+    "preset": os.environ["SMOKE_PLAN_PRESET"],
+    "calibration_configs": [
+        os.environ["SMOKE_PLAN_CALIBRATE_NULL_CONFIG"],
+        os.environ["SMOKE_PLAN_CALIBRATE_VE_CONFIG"],
+    ],
+    "command_groups": [
+        "help",
+        "plugins",
+        "fixture_report",
+        "report_generation",
+        "evidence_pack",
+        "policy",
+        "offline_evaluate",
+        "network_evaluate",
+        "calibration",
+        "container_local_parity",
+    ],
+    "fixture_contracts": [
+        "invarlock.reporting.verify_contract",
+        "runtime manifest",
+        "evaluation report",
+        "run reports",
+    ],
+    "removed_public_commands": ["run"],
+    "failure_modes": [
+        "missing adapters stack skips model lanes",
+        "missing smoke model cache skips offline evaluation",
+        "missing docker daemon skips container lanes",
+        "missing network skips network lanes",
+    ],
+    "forbidden_command_surfaces": [
+        "report verify --help",
+        "invarlock run --help",
+        "--source sshleifer/tiny-gpt2",
+        "--edited sshleifer/tiny-gpt2",
+    ],
+}
+print(json.dumps(plan, sort_keys=True))
+PY
+  exit 0
+fi
+
 # Run a single command string via bash -lc, capturing stdout+stderr and exit code.
 run() {
   local label="$1"

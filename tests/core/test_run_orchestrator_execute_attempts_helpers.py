@@ -6,7 +6,10 @@ from types import SimpleNamespace
 import pytest
 
 from invarlock.core.exceptions import InvarlockError
-from invarlock.core.run_orchestrator import RunAttemptStartedEvent
+from invarlock.core.run_orchestrator import (
+    RunAttemptStartedEvent,
+    RunPrimaryMetricSummaryEvent,
+)
 from invarlock.core.run_orchestrator_execute_attempts import (
     _emit_attempt_start,
     _emit_primary_metric_summary_from_report,
@@ -364,6 +367,12 @@ def test_resolve_export_model_dir_uses_override_when_output_is_none(
 
 
 def test_emit_primary_metric_summary_from_report_swallows_emit_failures() -> None:
+    events: list[object] = []
+
+    def _emit(event: object) -> None:
+        events.append(event)
+        raise TypeError("emit boom")
+
     report = {
         "metrics": {
             "primary_metric": {
@@ -377,9 +386,15 @@ def test_emit_primary_metric_summary_from_report_swallows_emit_failures() -> Non
 
     result = _emit_primary_metric_summary_from_report(
         report=report,
-        emit=lambda _event: (_ for _ in ()).throw(TypeError("emit boom")),
+        emit=_emit,
     )
     assert result is None
+    assert len(events) == 1
+    assert isinstance(events[0], RunPrimaryMetricSummaryEvent)
+    assert events[0].metric_kind == "ppl_causal"
+    assert events[0].preview == 1.0
+    assert events[0].final == 2.0
+    assert events[0].ratio_vs_baseline == 1.5
     _emit_primary_metric_summary_from_report(
         report={"metrics": {"primary_metric": {"preview": "bad", "final": 2.0}}},
         emit=lambda _event: (_ for _ in ()).throw(AssertionError("should not emit")),

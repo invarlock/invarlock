@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration test-assurance lint typecheck mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-fast verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce mutation-smoke docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-dry contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync scripts-inventory-check scripts-audit architecture-fragmentation-check guard-fallback-audit model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda-quant runtime-image-cuda-quant-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-quant runtime-smoke-cuda-podman runtime-smoke-cuda-quant-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door local-hf-pipeline-smoke ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-evidence-check
+.PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration test-assurance lint typecheck mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-fast verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce mutation-smoke statistical-calibration-slow docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-dry contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync scripts-inventory-check scripts-audit architecture-fragmentation-check guard-fallback-audit model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda-quant runtime-image-cuda-quant-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-quant runtime-smoke-cuda-podman runtime-smoke-cuda-quant-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door local-hf-pipeline-smoke local-hf-pipeline-smoke-locked ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-evidence-check
 
 PYTHON ?= $(shell bash scripts/select_workspace_python.sh)
 PIP := $(PYTHON) -m pip
@@ -231,6 +231,11 @@ local-hf-pipeline-smoke:  ## Run the real offline local HF evaluate→verify→r
 	INVARLOCK_ALLOW_NETWORK=0 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 TOKENIZERS_PARALLELISM=false \
 		PYTHONPATH=src $(PYTEST) -q tests/integration/test_local_hf_pipeline_smoke.py
 
+local-hf-pipeline-smoke-locked:  ## Run local HF smoke in the locked hf+ci dependency environment
+	INVARLOCK_ALLOW_NETWORK=0 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 TOKENIZERS_PARALLELISM=false \
+		PYTHONPATH=src uv run --isolated --locked --extra hf --extra ci \
+		python -m pytest -q tests/integration/test_local_hf_pipeline_smoke.py
+
 ##@ Coverage
 coverage:  ## Run tests with coverage and generate XML
 	$(MAKE) ensure-python
@@ -256,6 +261,10 @@ coverage-enforce:  ## Run coverage and enforce per-file thresholds
 mutation-smoke:  ## Run a scoped mutation smoke against trust-critical oracle tests
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTHON) scripts/coverage/mutation_smoke.py
+
+statistical-calibration-slow:  ## Run higher-power slow bootstrap calibration checks
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTHON) -m pytest -q -m slow tests/core/test_bootstrap_calibration_slow.py
 
 # Grouped test targets
 .PHONY: $(addprefix test-,$(GROUPED_TEST_DIR_TARGETS))

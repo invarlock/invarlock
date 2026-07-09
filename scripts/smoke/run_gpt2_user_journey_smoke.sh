@@ -79,6 +79,73 @@ export INVARLOCK_ALLOW_NETWORK="${INVARLOCK_ALLOW_NETWORK:-1}"
 export INVARLOCK_DEDUP_TEXTS="${INVARLOCK_DEDUP_TEXTS:-1}"
 export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 
+if [[ "${INVARLOCK_SMOKE_PLAN:-0}" == "1" ]]; then
+  SMOKE_PLAN_WORK_ROOT="$WORK_ROOT" \
+  SMOKE_PLAN_PRESET="$PRESET" \
+  SMOKE_PLAN_MODE="$MODE" \
+  SMOKE_PLAN_PROFILE="$PROFILE" \
+  SMOKE_PLAN_ASSURANCE="$ASSURANCE" \
+  SMOKE_PLAN_DEVICE="$SMOKE_DEVICE" \
+  SMOKE_PLAN_JOURNEYS="$JOURNEYS_RAW" \
+  SMOKE_PLAN_QUANT_EDIT_CONFIG="$QUANT_EDIT_CONFIG" \
+  SMOKE_PLAN_CUSTOM_EDIT_CONFIG="$CUSTOM_EDIT_CONFIG" \
+  SMOKE_PLAN_HOST_HF_CACHE_ROOT="${INVARLOCK_SMOKE_HOST_HF_CACHE_ROOT:-${HF_HOME:-${HOME}/.cache/huggingface}}" \
+  "$PYTHON_BIN" - <<'PY'
+import json
+import os
+
+journeys = [
+    journey.strip()
+    for journey in os.environ["SMOKE_PLAN_JOURNEYS"].split(",")
+    if journey.strip()
+]
+plan = {
+    "script": "run_gpt2_user_journey_smoke",
+    "work_root": os.environ["SMOKE_PLAN_WORK_ROOT"],
+    "preset": os.environ["SMOKE_PLAN_PRESET"],
+    "mode": os.environ["SMOKE_PLAN_MODE"],
+    "profile": os.environ["SMOKE_PLAN_PROFILE"],
+    "assurance": os.environ["SMOKE_PLAN_ASSURANCE"],
+    "device": os.environ["SMOKE_PLAN_DEVICE"],
+    "journeys": journeys,
+    "cache": {
+        "host_hf_cache_root": os.environ["SMOKE_PLAN_HOST_HF_CACHE_ROOT"],
+        "worktree_hf_cache": ".hf",
+        "offline_when_cache_complete": True,
+    },
+    "edit_configs": {
+        "quantized": os.environ["SMOKE_PLAN_QUANT_EDIT_CONFIG"],
+        "custom": os.environ["SMOKE_PLAN_CUSTOM_EDIT_CONFIG"],
+    },
+    "commands": [
+        "evaluate",
+        "verify",
+        "report validate",
+        "report html",
+        "report explain",
+        "advanced evidence-pack keygen",
+        "advanced evidence-pack build",
+        "advanced evidence-pack inspect",
+        "advanced evidence-pack verify",
+    ],
+    "helper_contracts": [
+        "write_strict_bundle_fixture",
+        "run_strict_bundle_journey",
+        "run_all_mode_journeys",
+        "append_child_results",
+        "run_child_suite",
+        "verify-rejects",
+    ],
+    "child_suites": [
+        {"suite": "local", "mode": "local", "assurance": "off"},
+        {"suite": "container", "mode": "container", "assurance": "off"},
+    ],
+}
+print(json.dumps(plan, sort_keys=True))
+PY
+  exit 0
+fi
+
 mkdir -p "$WORK_ROOT"
 
 RESULTS_TSV="$WORK_ROOT/journey-results.tsv"

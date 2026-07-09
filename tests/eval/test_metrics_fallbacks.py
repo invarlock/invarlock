@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 from invarlock.eval import metrics as M
@@ -26,7 +27,7 @@ def test_compute_perplexity_tuple_fallback():
     assert ppl >= 1.0
 
 
-def test_pre_eval_checks_warnings():
+def test_pre_eval_checks_warnings(caplog: pytest.LogCaptureFixture):
     class DummyLM:
         def parameters(self):
             # Provide at least one parameter
@@ -44,7 +45,10 @@ def test_pre_eval_checks_warnings():
 
             return _gen()
 
+    caplog.set_level("WARNING", logger="invarlock.eval.metrics_activation")
+
     result = _perform_pre_eval_checks(
         DummyLM(), BadData(), torch.device("cpu"), M.MetricsConfig()
     )
     assert result is None
+    assert "Pre-evaluation dry run failed:" in caplog.text

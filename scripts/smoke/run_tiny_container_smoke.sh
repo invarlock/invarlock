@@ -20,6 +20,55 @@ export INVARLOCK_ALLOW_NETWORK="${INVARLOCK_ALLOW_NETWORK:-1}"
 export INVARLOCK_DEDUP_TEXTS="${INVARLOCK_DEDUP_TEXTS:-1}"
 export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 
+if [[ "${INVARLOCK_SMOKE_PLAN:-0}" == "1" ]]; then
+  SMOKE_PLAN_WORK_ROOT="$WORK_ROOT" \
+  SMOKE_PLAN_MODEL_ID="$MODEL_ID" \
+  SMOKE_PLAN_MODEL_CACHE_NAME="$MODEL_CACHE_NAME" \
+  SMOKE_PLAN_MODE="$MODE" \
+  SMOKE_PLAN_PROFILE="$PROFILE" \
+  SMOKE_PLAN_DEVICE="$SMOKE_DEVICE" \
+  "$PYTHON_BIN" - <<'PY'
+import json
+import os
+
+mode = os.environ["SMOKE_PLAN_MODE"]
+plan = {
+    "script": "run_tiny_container_smoke",
+    "work_root": os.environ["SMOKE_PLAN_WORK_ROOT"],
+    "model_id": os.environ["SMOKE_PLAN_MODEL_ID"],
+    "model_cache_name": os.environ["SMOKE_PLAN_MODEL_CACHE_NAME"],
+    "mode": mode,
+    "profile": os.environ["SMOKE_PLAN_PROFILE"],
+    "device": os.environ["SMOKE_PLAN_DEVICE"],
+    "runtime_provenance": "host" if mode == "local" else "container",
+    "dataset": {
+        "provider": {"kind": "local_jsonl"},
+        "seq_len": 16,
+        "preview_n": 2,
+        "final_n": 2,
+        "tiny_relax": True,
+    },
+    "commands": [
+        "evaluate",
+        "verify",
+        "report validate",
+        "report html",
+        "report explain",
+        "advanced evidence-pack keygen",
+        "advanced evidence-pack build",
+        "advanced evidence-pack inspect",
+        "advanced evidence-pack verify",
+    ],
+    "runtime_image": {
+        "seed_local_image": mode == "container",
+        "seed_digest": mode == "container",
+    },
+}
+print(json.dumps(plan, sort_keys=True))
+PY
+  exit 0
+fi
+
 if [[ "$MODE" == "container" && -z "${INVARLOCK_RUNTIME_IMAGE:-}" ]]; then
   smoke_seed_local_runtime_image "$SMOKE_DEVICE"
 fi

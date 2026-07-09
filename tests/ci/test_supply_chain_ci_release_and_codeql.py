@@ -409,6 +409,31 @@ def test_gpt2_smoke_workflow_is_configured() -> None:
     assert "scripts/smoke/run_gpt2_user_journey_smoke.sh" in smoke["run"]
 
 
+def test_statistical_calibration_workflow_is_configured() -> None:
+    workflow = _load_workflow(Path(".github/workflows/statistical-calibration.yml"))
+    triggers = workflow["on"]
+
+    assert "workflow_dispatch" in triggers
+    assert triggers["schedule"] == [{"cron": "30 5 * * 1"}]
+    assert "push" not in triggers
+    assert workflow["permissions"] == {"contents": "read"}
+
+    job = workflow["jobs"]["bootstrap-calibration"]
+    assert job["runs-on"] == "ubuntu-latest"
+    assert job["timeout-minutes"] == 20
+    assert job["env"]["PYTHONPATH"] == "${{ github.workspace }}/src"
+
+    steps = job["steps"]
+    install = _find_step_by_name(steps, "Install dependencies")
+    assert (
+        install["run"]
+        == "python -m pip install --require-hashes -r requirements/workflows/assurance-ci-py313.txt"
+    )
+
+    calibration = _find_step_by_name(steps, "Run slow statistical calibration")
+    assert calibration["run"] == "make statistical-calibration-slow"
+
+
 def test_ci_hf_lockfiles_include_hypothesis_for_property_tests() -> None:
     for path in (
         Path("requirements/workflows/ci-hf-py312.txt"),

@@ -1,6 +1,5 @@
 import json
 import re
-import subprocess
 import tomllib
 from datetime import date
 from pathlib import Path
@@ -98,6 +97,21 @@ def _extract_transformers_512_hashes(path: Path) -> set[str]:
     match = TRANSFORMERS_512_RE.search(path.read_text(encoding="utf-8"))
     assert match is not None, f"transformers==5.12.0 stanza missing in {path}"
     return {match.group("digest1"), match.group("digest2")}
+
+
+def _locked_requirement_version(path: Path, package: str) -> str:
+    pattern = re.compile(rf"^{re.escape(package)}==(?P<version>[^\s\\]+) \\", re.M)
+    match = pattern.search(path.read_text(encoding="utf-8"))
+    assert match is not None, f"{package} missing from {path}"
+    return match.group("version")
+
+
+def _uv_locked_version(package: str) -> str:
+    lock = tomllib.loads(Path("uv.lock").read_text(encoding="utf-8"))
+    for entry in lock["package"]:
+        if entry.get("name") == package:
+            return entry["version"]
+    raise AssertionError(f"{package} missing from uv.lock")
 
 
 def test_precommit_workflow_uses_named_check_context() -> None:
@@ -335,30 +349,6 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
     assert "artifacts/supply-chain/gitleaks.sarif" not in upload_step["with"]["path"]
 
 
-def test_generate_sbom_script_exists():
-    script_path = Path("scripts/security/generate_sbom.sh")
-    assert script_path.exists(), "SBOM generator script missing"
-
-    contents = script_path.read_text(encoding="utf-8")
-    assert "cyclonedx-bom" in contents
-    assert "--scope install-surface" in contents
-    assert "SBOM written to" in contents
-
-
-def test_generate_sbom_rejects_unknown_scope_before_tool_lookup() -> None:
-    script_path = Path("scripts/security/generate_sbom.sh")
-
-    result = subprocess.run(
-        ["bash", str(script_path), "--scope", "unknown"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    assert result.returncode == 2
-    assert "--scope must be environment" in result.stderr
-
-
 def test_pip_audit_allowlist_is_owned_and_time_boxed() -> None:
     allowlist_path = Path("scripts/security/pip_audit_allowlist.json")
     payload = json.loads(allowlist_path.read_text(encoding="utf-8"))
@@ -392,8 +382,16 @@ def test_ruff_toolchain_pins_are_aligned() -> None:
     ruff_pin = next(dep for dep in ci_deps if dep.startswith("ruff=="))
     ruff_version = ruff_pin.removeprefix("ruff==")
 
-    precommit_config = Path(".pre-commit-config.yaml").read_text(encoding="utf-8")
-    assert f"rev: v{ruff_version}" in precommit_config
+    precommit_config = yaml.safe_load(
+        Path(".pre-commit-config.yaml").read_text(encoding="utf-8")
+    )
+    ruff_repo = next(
+        repo
+        for repo in precommit_config["repos"]
+        if repo["repo"] == "https://github.com/astral-sh/ruff-pre-commit"
+    )
+    assert ruff_repo["rev"] == f"v{ruff_version}"
+    assert {hook["id"] for hook in ruff_repo["hooks"]} >= {"ruff", "ruff-format"}
 
     for lockfile in (
         Path("requirements/workflows/ci-hf-py312.txt"),
@@ -401,24 +399,27 @@ def test_ruff_toolchain_pins_are_aligned() -> None:
         Path("requirements/workflows/docs-ci-py313.txt"),
         Path("requirements/workflows/assurance-ci-py313.txt"),
     ):
-        text = lockfile.read_text(encoding="utf-8")
-        assert f"ruff=={ruff_version} \\" in text
+        assert _locked_requirement_version(lockfile, "ruff") == ruff_version
 
 
-def test_security_workflow_lxml_pin_is_remediated() -> None:
+def test_security_workflow_known_vulnerable_pins_are_remediated() -> None:
     for lockfile in (
         Path("requirements/workflows/security-ci-py313.txt"),
         Path("requirements/workflows/release-security-py313.txt"),
     ):
-        text = lockfile.read_text(encoding="utf-8")
-        match = re.search(r"^lxml==(?P<version>\d+\.\d+\.\d+) \\", text, re.MULTILINE)
-        assert match is not None
-        assert match.group("version") == "6.1.0"
-        assert "lxml==6.0.2" not in text
+        assert _locked_requirement_version(lockfile, "lxml") == "6.1.0"
 
-    uv_lock = Path("uv.lock").read_text(encoding="utf-8")
-    assert 'name = "lxml"\nversion = "6.1.0"' in uv_lock
-    assert 'name = "lxml"\nversion = "6.0.2"' not in uv_lock
+    assert _uv_locked_version("lxml") == "6.1.0"
+
+    for lockfile in (
+        Path("requirements/workflows/ci-hf-py312.txt"),
+        Path("requirements/workflows/ci-hf-py313.txt"),
+        Path("requirements/workflows/docs-ci-py313.txt"),
+        Path("requirements/workflows/assurance-ci-py313.txt"),
+    ):
+        assert _locked_requirement_version(lockfile, "soupsieve") == "2.8.4"
+
+    assert _uv_locked_version("soupsieve") == "2.8.4"
 
 
 def test_codeowners_protect_security_control_surfaces() -> None:
@@ -438,15 +439,6 @@ def test_codeowners_protect_security_control_surfaces() -> None:
         "scripts/security/",
     ):
         assert required_entry in codeowners
-
-
-def test_offline_bundle_script_exists():
-    script_path = Path("scripts/release/make_offline_bundle.sh")
-    assert script_path.exists(), "offline bundle generator script missing"
-
-    contents = script_path.read_text(encoding="utf-8")
-    assert "release-offline-bundle-v1" in contents
-    assert "Offline release bundle written to" in contents
 
 
 def test_workflows_pin_github_actions_to_full_shas():
@@ -660,9 +652,21 @@ def test_release_workflow_builds_and_publishes_tag_only_artifacts():
     assert "--report-format json" in gitleaks_scan["run"]
     assert "--report-format sarif" not in gitleaks_scan["run"]
 
-    config_text = Path(".gitleaks.toml").read_text(encoding="utf-8")
-    assert "tokenizer_(?:hash|sha256)" in config_text
-    assert "public_evidence/published_basis" in config_text
+    gitleaks_config = tomllib.loads(Path(".gitleaks.toml").read_text(encoding="utf-8"))
+    allowlists = gitleaks_config["allowlists"]
+    tokenizer_allowlist = next(
+        entry
+        for entry in allowlists
+        if entry["description"].startswith("Tokenizer digest fields")
+    )
+    assert tokenizer_allowlist["condition"] == "AND"
+    assert tokenizer_allowlist["regexTarget"] == "match"
+    assert tokenizer_allowlist["paths"] == [
+        r"public_evidence/published_basis/.*/(?:evaluation\.report\.json|evidence_pack/reports/report-[0-9]+/evaluation\.report\.json)$"
+    ]
+    assert tokenizer_allowlist["regexes"] == [
+        r'tokenizer_(?:hash|sha256)"\s*:\s*"[0-9A-Fa-f]{32,128}"'
+    ]
 
     smoke_step = _find_step_by_name(build_steps, "Install smoke from wheel")
     assert (

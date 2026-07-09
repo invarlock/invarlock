@@ -3,12 +3,20 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from invarlock.cli import run_execution as masking_mod
 from invarlock.cli.run_execution import persist_ref_masks
-from invarlock.cli.run_pairing import compute_provider_digest, extract_pairing_schedule
+from invarlock.cli.run_pairing import (
+    _compute_mask_positions_digest,
+    _hash_sequences,
+    compute_provider_digest,
+    enforce_provider_parity,
+    extract_pairing_schedule,
+)
 from invarlock.core.exceptions import resolve_command_exit_code
 from invarlock.core.exceptions import (
     ConfigError,
@@ -16,7 +24,7 @@ from invarlock.core.exceptions import (
     InvarlockError,
     ValidationError,
 )
-from invarlock.core.run_policy import should_measure_overhead
+from invarlock.core.run_policy import choose_dataset_split, should_measure_overhead
 
 
 def test_should_measure_overhead_respects_config_and_profile() -> None:
@@ -45,6 +53,105 @@ def test_persist_ref_masks_returns_none_when_missing_payload(tmp_path: Path) -> 
     assert persist_ref_masks({}, tmp_path) is None
     assert persist_ref_masks({"edit": {}}, tmp_path) is None
     assert persist_ref_masks({"edit": {"artifacts": {}}}, tmp_path) is None
+
+
+def test_persist_ref_masks_from_dict_and_object_preserves_generated_at(
+    tmp_path: Path,
+) -> None:
+    payload = {"keep": [1, 2], "meta": {"generated_at": "existing-ts"}}
+    core_report = {"edit": {"artifacts": {"mask_payload": payload}}}
+
+    mask_path = persist_ref_masks(core_report, tmp_path)
+    assert mask_path == tmp_path / "artifacts" / "edit_masks" / "masks.json"
+    written = json.loads(mask_path.read_text(encoding="utf-8"))
+    assert written == payload
+    assert mask_path.read_text(encoding="utf-8").endswith("\n")
+
+    obj = SimpleNamespace(edit={"artifacts": {"mask_payload": {"keep": [3]}}})
+    object_mask_path = persist_ref_masks(obj, tmp_path)
+    object_written = json.loads(object_mask_path.read_text(encoding="utf-8"))
+    assert object_written["keep"] == [3]
+    assert "generated_at" in object_written["meta"]
+
+
+@pytest.mark.parametrize(
+    "core_report",
+    [
+        {},
+        {"edit": []},
+        {"edit": {}},
+        {"edit": {"artifacts": []}},
+        {"edit": {"artifacts": {}}},
+        {"edit": {"artifacts": {"mask_payload": {}}}},
+        {"edit": {"artifacts": {"mask_payload": []}}},
+    ],
+)
+def test_persist_ref_masks_rejects_missing_sections(
+    tmp_path: Path, core_report: object
+) -> None:
+    assert persist_ref_masks(core_report, tmp_path) is None
+
+
+def test_choose_dataset_split_behaviors() -> None:
+    split, used_fallback = choose_dataset_split(
+        requested="test", available=["train", "test"]
+    )
+    assert split == "test"
+    assert used_fallback is False
+
+    split, used_fallback = choose_dataset_split(
+        requested=None, available=["val", "train"]
+    )
+    assert split in {"validation", "val"}
+    assert used_fallback is True
+
+    split, used_fallback = choose_dataset_split(requested=None, available=None)
+    assert split == "validation"
+    assert used_fallback is True
+
+
+def test_hash_sequences_stability() -> None:
+    digest = _hash_sequences([[1, 2, 3], [4, 5]])
+    assert isinstance(digest, str)
+    assert len(digest) == 32
+
+
+def test_hash_sequences_respects_boundaries() -> None:
+    assert _hash_sequences([[1, 2], [3]]) != _hash_sequences([[1], [2, 3]])
+
+
+def test_compute_mask_positions_digest_roundtrip() -> None:
+    windows = {
+        "preview": {"labels": [np.array([-100, 2, -100], dtype=np.int32)]},
+        "final": {"labels": [np.array([-100, -100, 7], dtype=np.int32)]},
+    }
+    digest = _compute_mask_positions_digest(windows)
+    assert isinstance(digest, str)
+    assert len(digest) > 0
+    assert _compute_mask_positions_digest({"preview": {"labels": []}}) is None
+
+
+def test_enforce_provider_parity_missing_tokenizer_digest_in_ci_raises() -> None:
+    with pytest.raises(InvarlockError) as excinfo:
+        enforce_provider_parity(
+            {"ids_sha256": "abc"}, {"ids_sha256": "def"}, profile="ci"
+        )
+    assert excinfo.value.code == "E004"
+
+
+def test_enforce_provider_parity_uses_explicit_error_class() -> None:
+    class _CustomParityError(Exception):
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            super().__init__(*args)
+            self.kwargs = kwargs
+
+    with pytest.raises(_CustomParityError):
+        enforce_provider_parity(
+            {"ids_sha256": "abc"},
+            {"ids_sha256": "def"},
+            profile="ci",
+            invarlock_error_cls=_CustomParityError,
+        )
 
 
 def test_resolve_exit_code_covers_known_exceptions() -> None:

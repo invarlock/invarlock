@@ -110,6 +110,66 @@ FIXTURE_ROOT="$WORK_ROOT/fixtures"
 VERIFY_OUT="$WORK_ROOT/verify"
 mkdir -p "$FIXTURE_ROOT" "$VERIFY_OUT"
 
+if [[ "${INVARLOCK_SMOKE_PLAN:-0}" == "1" ]]; then
+  SMOKE_PLAN_WORK_ROOT="$WORK_ROOT" \
+  SMOKE_PLAN_GOLDEN_REPORT="$GOLDEN_REPORT" \
+  "$PYTHON_BIN" - <<'PY'
+import json
+import os
+
+plan = {
+    "script": "cli_smoke_negative",
+    "work_root": os.environ["SMOKE_PLAN_WORK_ROOT"],
+    "golden_report": os.environ["SMOKE_PLAN_GOLDEN_REPORT"],
+    "failure_cases": [
+        {
+            "label": "invarlock run (removed public command)",
+            "expected_exit": "2",
+            "expected_fragment": "No such command 'run'",
+        },
+        {
+            "label": "invarlock verify --json (malformed fixture)",
+            "expected_exit": "2",
+            "expected_reason": "malformed",
+            "expected_fragment": '"code": "E601"',
+        },
+        {
+            "label": "invarlock verify --json (primary metric policy fail)",
+            "expected_exit": "3",
+            "expected_reason": "policy_fail",
+        },
+        {
+            "label": "invarlock verify --json (invariants policy fail)",
+            "expected_exit": "3",
+            "expected_reason": "policy_fail",
+        },
+        {
+            "label": "invarlock verify --json (spectral policy fail)",
+            "expected_exit": "3",
+            "expected_reason": "policy_fail",
+        },
+        {
+            "label": "invarlock verify --json (rmt policy fail)",
+            "expected_exit": "3",
+            "expected_reason": "policy_fail",
+        },
+        {
+            "label": "invarlock report generate (failed subject run report)",
+            "expected_exit": "2",
+            "expected_fragment": "subject run report with status",
+        },
+        {
+            "label": "invarlock advanced calibrate null-sweep (missing config)",
+            "expected_exit": "2",
+            "expected_fragment": "Invalid value for '--config'",
+        },
+    ],
+}
+print(json.dumps(plan, sort_keys=True))
+PY
+  exit 0
+fi
+
 GOLDEN_REPORT="$GOLDEN_REPORT" FIXTURE_ROOT="$FIXTURE_ROOT" "$PYTHON_BIN" - <<'PY'
 import json
 import math

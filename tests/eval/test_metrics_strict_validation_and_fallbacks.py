@@ -290,9 +290,9 @@ def test_calculate_lens_metrics_continues_after_pre_eval_check_failure(
     assert all(math.isnan(out[key]) for key in ("sigma_max", "head_energy", "mi_gini"))
 
 
-def test_perform_pre_eval_checks_handles_missing_context_attr_and_no_warning_path() -> (
-    None
-):
+def test_perform_pre_eval_checks_handles_missing_context_attr_and_no_warning_path(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     class _Cfg:
         n_positions = None
         max_position_embeddings = None
@@ -308,15 +308,19 @@ def test_perform_pre_eval_checks_handles_missing_context_attr_and_no_warning_pat
 
     cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     dataloader = [{"input_ids": torch.zeros(1, 2, dtype=torch.long)}]
+    caplog.set_level("WARNING", logger="invarlock.eval.metrics_activation")
+
     result = activation_mod._perform_pre_eval_checks(
         _Model(), dataloader, torch.device("cpu"), cfg
     )
     assert result is None
+    assert "Input sequence length" not in caplog.text
+    assert "Pre-evaluation dry run failed" not in caplog.text
 
 
-def test_perform_pre_eval_checks_skips_warning_when_seq_len_within_model_limit() -> (
-    None
-):
+def test_perform_pre_eval_checks_skips_warning_when_seq_len_within_model_limit(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     class _Cfg:
         n_positions = 10
         max_position_embeddings = None
@@ -332,10 +336,14 @@ def test_perform_pre_eval_checks_skips_warning_when_seq_len_within_model_limit()
 
     cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     dataloader = [{"input_ids": torch.zeros(1, 5, dtype=torch.long)}]
+    caplog.set_level("WARNING", logger="invarlock.eval.metrics_activation")
+
     result = activation_mod._perform_pre_eval_checks(
         _Model(), dataloader, torch.device("cpu"), cfg
     )
     assert result is None
+    assert "Input sequence length" not in caplog.text
+    assert "Pre-evaluation dry run failed" not in caplog.text
 
 
 def test_extract_fc1_activations_skips_blocks_without_mlp(monkeypatch) -> None:
