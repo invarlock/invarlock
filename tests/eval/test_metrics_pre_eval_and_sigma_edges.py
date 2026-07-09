@@ -1,3 +1,4 @@
+import pytest
 import torch
 import torch.nn as nn
 
@@ -8,7 +9,7 @@ from invarlock.eval.metrics_activation import (
 )
 
 
-def test_pre_eval_checks_dry_run_failure_logs_warning():
+def test_pre_eval_checks_dry_run_failure_logs_warning(caplog: pytest.LogCaptureFixture):
     class BadForward(nn.Module):
         def __init__(self):
             super().__init__()
@@ -23,10 +24,14 @@ def test_pre_eval_checks_dry_run_failure_logs_warning():
             raise RuntimeError("boom")
 
     dl = [{"input_ids": torch.ones(1, 4, dtype=torch.long)}]
+    caplog.set_level("WARNING", logger="invarlock.eval.metrics_activation")
+
     result = _perform_pre_eval_checks(
         BadForward().eval(), dl, torch.device("cpu"), MetricsConfig()
     )
     assert result is None
+    assert "Input sequence length 4 exceeds model limit 2" in caplog.text
+    assert "Pre-evaluation dry run failed: boom" in caplog.text
 
 
 def test_sigma_max_no_name_column_and_all_nonfinite_gains():

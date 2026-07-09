@@ -1,6 +1,8 @@
+import json
 import os
 import subprocess
 from pathlib import Path
+from typing import Any
 
 from invarlock.core.config_loader import load_config
 
@@ -14,17 +16,59 @@ EXPECTED_CONFIGS = [
 ]
 
 
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
 def _assert_shell_syntax(path: Path) -> None:
     subprocess.run(["bash", "-n", str(path)], check=True, text=True)
 
 
-def _assert_required_tokens(text: str, tokens: set[str]) -> None:
-    missing = sorted(token for token in tokens if token not in text)
-    assert missing == []
+def _assert_smoke_script_ready(script_name: str) -> Path:
+    repo_root = _repo_root()
+    script_path = repo_root / "scripts" / "smoke" / script_name
+    assert script_path.exists(), f"Expected scripts/smoke/{script_name} to exist"
+    assert os.access(script_path, os.X_OK), f"{script_name} should be executable"
+    _assert_shell_syntax(script_path)
+    return script_path
+
+
+def _run_smoke_plan(
+    script_name: str,
+    tmp_path: Path,
+    env_overrides: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    repo_root = _repo_root()
+    script_path = _assert_smoke_script_ready(script_name)
+    common_path = repo_root / "scripts" / "smoke" / "lib" / "smoke_common.sh"
+    _assert_shell_syntax(common_path)
+
+    env = {
+        **os.environ,
+        "INVARLOCK_SMOKE_PLAN": "1",
+        "INVARLOCK_ALLOW_NETWORK": "0",
+        "TOKENIZERS_PARALLELISM": "false",
+    }
+    if env_overrides:
+        env.update(env_overrides)
+
+    result = subprocess.run(
+        ["bash", str(script_path), str(tmp_path / script_path.stem)],
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    output_lines = [line for line in result.stdout.splitlines() if line.strip()]
+    assert output_lines, "smoke plan did not emit JSON"
+    return json.loads(output_lines[-1])
 
 
 def test_small_workflow_configs_present() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = _repo_root()
     configs_dir = repo_root / "configs"
 
     for subdir, primary, fallback in EXPECTED_CONFIGS:
@@ -47,299 +91,188 @@ def test_small_workflow_configs_present() -> None:
         # Presets carry tier context via profile; auto tier may not be set at top-level
 
 
-def test_gpt2_user_journey_smoke_script_is_executable() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "smoke" / "run_gpt2_user_journey_smoke.sh"
-    assert script_path.exists(), (
-        "Expected scripts/smoke/run_gpt2_user_journey_smoke.sh to exist"
-    )
-    assert os.access(script_path, os.X_OK), (
-        "run_gpt2_user_journey_smoke.sh should be executable"
-    )
-    helper_path = repo_root / "scripts" / "smoke" / "gpt2_journey_helpers.py"
-    common_path = repo_root / "scripts" / "smoke" / "lib" / "smoke_common.sh"
-    _assert_shell_syntax(script_path)
-    _assert_shell_syntax(common_path)
-    contents = script_path.read_text(encoding="utf-8")
-    helper_contents = helper_path.read_text(encoding="utf-8")
-    common_contents = common_path.read_text(encoding="utf-8")
-    _assert_required_tokens(
-        contents,
-        {
-            "smoke_common.sh",
-            "gpt2_journey_helpers.py",
-            "smoke_select_python",
-            "smoke_setup_pythonpath",
-            "smoke_ensure_writable_hf_cache",
-            "INVARLOCK_SMOKE_HOST_HF_CACHE_ROOT",
-            "PYTHON_BIN",
-            "invarlock",
-        },
-    )
-    assert "command -v invarlock" not in contents
-    _assert_required_tokens(
-        contents,
-        {
-            "INVARLOCK_SMOKE_CACHE_COMPLETE",
-            "INVARLOCK_SMOKE_MODE",
-            "PROFILE",
-            "INVARLOCK_SMOKE_ASSURANCE",
-            "INVARLOCK_SMOKE_EDIT_CONFIG",
-            "INVARLOCK_SMOKE_QUANT_EDIT_CONFIG",
-            "INVARLOCK_SMOKE_CUSTOM_EDIT_CONFIG",
-            "INVARLOCK_SMOKE_DEVICE",
-            "INVARLOCK_SMOKE_JOURNEYS",
-            "INVARLOCK_SMOKE_QUANTIZED",
-            "strict-bundle,noop,quantized,edited,negative",
-            "write_strict_bundle_fixture",
-            "run_strict_bundle_journey",
-        },
-    )
-    assert "write_strict_bundle_fixture" in helper_contents
-    _assert_required_tokens(
-        contents,
-        {
-            "verify",
-            "--assurance",
-            "--profile",
-            "--json",
-            "run_all_mode_journeys",
-            "append_child_results",
-            "run_child_suite",
-            "container",
-            "INVARLOCK_SMOKE_CONTAINER_PROFILE",
-            "INVARLOCK_SMOKE_CONTAINER_ASSURANCE",
-            "INVARLOCK_SMOKE_CONTAINER_JOURNEYS",
-            "SMOKE_DEVICE",
-            "record_result",
-            "verify-rejects",
-        },
-    )
-    assert "GPT-2 User Journey Smoke Results" in helper_contents
-    _assert_required_tokens(
-        contents,
-        {
-            "journey-results.tsv",
-            "prefetch_hf_assets_on_host",
-            "smoke_ensure_current_runtime_image",
-            "prefetching GPT-2 + WikiText-2 into host HF cache",
-            "run_evidence_pack_journey",
-            "verify rejects mutated report",
-            "report html",
-            "evaluation.html",
-        },
-    )
-    _assert_required_tokens(
-        common_contents,
-        {
-            "refreshing local container runtime image",
-            "refreshing local CUDA container runtime image",
-            "make runtime-image",
-            "make runtime-image-cuda",
-            "invarlock-runtime:cuda-local",
-        },
-    )
+def test_gpt2_user_journey_smoke_script_declares_execution_plan(
+    tmp_path: Path,
+) -> None:
+    plan = _run_smoke_plan("run_gpt2_user_journey_smoke.sh", tmp_path)
+
+    assert plan["script"] == "run_gpt2_user_journey_smoke"
+    assert plan["mode"] == "all"
+    assert plan["profile"] == "dev"
+    assert plan["assurance"] == "off"
+    assert plan["cache"]["offline_when_cache_complete"] is True
+    assert plan["child_suites"] == [
+        {"suite": "local", "mode": "local", "assurance": "off"},
+        {"suite": "container", "mode": "container", "assurance": "off"},
+    ]
+    assert {"noop", "quantized", "negative"} <= set(plan["journeys"])
+    assert {
+        "evaluate",
+        "verify",
+        "report validate",
+        "report html",
+        "report explain",
+        "advanced evidence-pack keygen",
+        "advanced evidence-pack build",
+        "advanced evidence-pack verify",
+    } <= set(plan["commands"])
+    assert {
+        "write_strict_bundle_fixture",
+        "run_strict_bundle_journey",
+        "run_all_mode_journeys",
+        "append_child_results",
+        "run_child_suite",
+        "verify-rejects",
+    } <= set(plan["helper_contracts"])
 
 
-def test_tiny_container_smoke_campaign_script_is_executable() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "smoke" / "run_tiny_container_smoke.sh"
-    assert script_path.exists(), (
-        "Expected scripts/smoke/run_tiny_container_smoke.sh to exist"
-    )
-    assert os.access(script_path, os.X_OK), (
-        "run_tiny_container_smoke.sh should be executable"
-    )
-    common_path = repo_root / "scripts" / "smoke" / "lib" / "smoke_common.sh"
-    _assert_shell_syntax(script_path)
-    _assert_shell_syntax(common_path)
-    contents = script_path.read_text(encoding="utf-8")
-    common_contents = common_path.read_text(encoding="utf-8")
-    assert 'source "$SCRIPT_DIR/lib/smoke_common.sh"' in contents
-    assert 'smoke_select_python "$REPO_ROOT"' in contents
-    assert 'smoke_setup_pythonpath "$REPO_ROOT"' in contents
-    assert "kind: local_jsonl" in contents
-    assert "sshleifer/tiny-gpt2" in contents
-    assert "tiny_relax: true" in contents
-    assert "prefetch_tiny_model_on_host" in contents
-    assert "smoke_ensure_current_runtime_image" in contents
-    assert 'echo "[smoke] refreshing local container runtime image"' in common_contents
-    assert (
-        'echo "[smoke] refreshing local CUDA container runtime image"'
-        in common_contents
-    )
-    assert "make runtime-image" in common_contents
-    assert "make runtime-image-cuda" in common_contents
-    assert "INVARLOCK_RUNTIME_IMAGE_DIGEST" in contents
-    assert 'MODEL_CACHE_NAME="models--${MODEL_ID//\\//--}"' in contents
-    assert 'MODEL_ID="$MODEL_ID"' in contents
-    assert (
-        'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"'
-        in common_contents
-    )
-    assert 'SMOKE_DEVICE="${INVARLOCK_SMOKE_DEVICE:-auto}"' in contents
-    assert 'echo "[smoke] device=$SMOKE_DEVICE"' in contents
-    assert "runtime_verify_diagnostics" in contents
-    assert "assert_semantic_pass" in contents
-    assert "resolve_tiny_relax_from_report" in contents
-    assert 'VERIFY_RC=0\n"${CLI[@]}" verify' in contents
-    assert (
-        'EVIDENCE_PACK_VERIFY_RC=0\n"${CLI[@]}" advanced evidence-pack verify'
-        in contents
-    )
-    assert '--profile "$PROFILE" --assurance off --json' in contents
-    assert '--device "$SMOKE_DEVICE"' in contents
-    assert 'mkdir -p "$SMOKE_EXPORT_DIR"' in contents
-    assert (
-        '"${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_EXPORT_DIR/evaluation.html"'
-        in contents
-    )
-    assert 'advanced evidence-pack keygen "$EVIDENCE_PACK_SIGNING_KEY"' in contents
-    assert '--signing-key "$EVIDENCE_PACK_SIGNING_KEY"' in contents
-    assert "evaluation report verification failed" in contents
-    assert "evidence-pack verification failed" in contents
+def test_tiny_container_smoke_script_declares_runtime_plan(tmp_path: Path) -> None:
+    plan = _run_smoke_plan("run_tiny_container_smoke.sh", tmp_path)
+
+    assert plan["script"] == "run_tiny_container_smoke"
+    assert plan["model_id"] == "sshleifer/tiny-gpt2"
+    assert plan["model_cache_name"] == "models--sshleifer--tiny-gpt2"
+    assert plan["mode"] == "container"
+    assert plan["runtime_provenance"] == "container"
+    assert plan["runtime_image"] == {
+        "seed_digest": True,
+        "seed_local_image": True,
+    }
+    assert plan["dataset"] == {
+        "provider": {"kind": "local_jsonl"},
+        "seq_len": 16,
+        "preview_n": 2,
+        "final_n": 2,
+        "tiny_relax": True,
+    }
+    assert {
+        "evaluate",
+        "verify",
+        "report validate",
+        "report html",
+        "report explain",
+        "advanced evidence-pack keygen",
+        "advanced evidence-pack build",
+        "advanced evidence-pack verify",
+    } <= set(plan["commands"])
 
 
-def test_cli_smoke_fast_uses_repo_selected_python() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "smoke" / "cli_smoke_fast.sh"
-    assert script_path.exists(), "Expected scripts/smoke/cli_smoke_fast.sh to exist"
-    assert os.access(script_path, os.X_OK), "cli_smoke_fast.sh should be executable"
+def test_cli_smoke_fast_declares_repo_python_and_command_groups(
+    tmp_path: Path,
+) -> None:
+    plan = _run_smoke_plan("cli_smoke_fast.sh", tmp_path)
 
-    _assert_shell_syntax(script_path)
-    contents = script_path.read_text(encoding="utf-8")
-    assert 'source "$SCRIPT_DIR/lib/smoke_common.sh"' in contents
-    assert 'smoke_select_python "$ROOT"' in contents
-    assert 'smoke_setup_pythonpath "$ROOT"' in contents
-    assert 'smoke_expected_exit_match "$@"' in contents
-    assert (
-        'WORK_ROOT="${1:-$(mktemp -d -t invarlock_cli_fast_smoke.XXXXXX.dir)}"'
-        in contents
+    assert plan["script"] == "cli_smoke_fast"
+    assert plan["cli"][1:] == ["-m", "invarlock"]
+    assert plan["model_id"] == "sshleifer/tiny-gpt2"
+    assert plan["preset"] == "configs/presets/causal_lm/wikitext2_512.yaml"
+    assert plan["calibration_configs"] == [
+        "configs/calibration/null_sweep_smoke.yaml",
+        "configs/calibration/rmt_ve_sweep_smoke.yaml",
+    ]
+    assert {
+        "help",
+        "plugins",
+        "fixture_report",
+        "report_generation",
+        "evidence_pack",
+        "policy",
+        "offline_evaluate",
+        "network_evaluate",
+        "calibration",
+        "container_local_parity",
+    } <= set(plan["command_groups"])
+    assert "invarlock.reporting.verify_contract" in plan["fixture_contracts"]
+    assert plan["removed_public_commands"] == ["run"]
+    assert {
+        "report verify --help",
+        "invarlock run --help",
+        "--source sshleifer/tiny-gpt2",
+        "--edited sshleifer/tiny-gpt2",
+    } <= set(plan["forbidden_command_surfaces"])
+
+
+def test_cli_smoke_negative_declares_failure_category_matrix(
+    tmp_path: Path,
+) -> None:
+    plan = _run_smoke_plan("cli_smoke_negative.sh", tmp_path)
+
+    assert plan["script"] == "cli_smoke_negative"
+    cases = {case["label"]: case for case in plan["failure_cases"]}
+    assert cases["invarlock run (removed public command)"]["expected_exit"] == "2"
+    assert cases["invarlock run (removed public command)"]["expected_fragment"] == (
+        "No such command 'run'"
     )
-    assert 'TMP_DIR="$WORK_ROOT/tmp"' in contents
-    assert "printf -v CLI '%q ' \"$PYTHON_BIN\" -m invarlock" in contents
-    assert "\"$PYTHON_BIN\" - <<'PY'" in contents
-    assert 'run "invarlock evaluate --help"' in contents
-    assert "invarlock run --help" not in contents
+    assert cases["invarlock verify --json (malformed fixture)"] == {
+        "label": "invarlock verify --json (malformed fixture)",
+        "expected_exit": "2",
+        "expected_reason": "malformed",
+        "expected_fragment": '"code": "E601"',
+    }
+    policy_fail_labels = {
+        "invarlock verify --json (primary metric policy fail)",
+        "invarlock verify --json (invariants policy fail)",
+        "invarlock verify --json (spectral policy fail)",
+        "invarlock verify --json (rmt policy fail)",
+    }
+    assert {
+        label
+        for label in policy_fail_labels
+        if cases[label]["expected_reason"] == "policy_fail"
+        and cases[label]["expected_exit"] == "3"
+    } == policy_fail_labels
     assert (
-        'SMOKE_CALIBRATE_NULL_CONFIG="${INVARLOCK_SMOKE_CALIBRATE_NULL_CONFIG:-configs/calibration/null_sweep_smoke.yaml}"'
-        in contents
+        cases["invarlock report generate (failed subject run report)"][
+            "expected_fragment"
+        ]
+        == "subject run report with status"
     )
     assert (
-        'SMOKE_CALIBRATE_VE_CONFIG="${INVARLOCK_SMOKE_CALIBRATE_VE_CONFIG:-configs/calibration/rmt_ve_sweep_smoke.yaml}"'
-        in contents
-    )
-    assert (
-        'run "invarlock report generate --help" "$CLI report generate --help"'
-        in contents
-    )
-    assert 'run "invarlock advanced evidence-pack keygen --help"' in contents
-    assert 'run "invarlock doctor --json"' in contents
-    assert (
-        '--baseline \\"$SMOKE_MODEL_ID\\" --subject \\"$SMOKE_MODEL_ID\\"' in contents
-    )
-    assert 'run "invarlock report generate (demo run reports)"' in contents
-    assert "assert_tiny_eval_parity" in contents
-    assert "run_tiny_eval_parity" in contents
-    assert contents.count("--profile dev --assurance off --preset") == 3
-    assert "unexpected_failures=${UNEXPECTED_FAILURES}" in contents
-    assert "else echo '[error] report missing'; exit 1; fi" in contents
-    assert "echo '[skip] report missing'" not in contents
-    assert "report verify --help" not in contents
-    assert "command -v invarlock" not in contents
-    assert "evaluate/run" not in contents
-    assert "--source sshleifer/tiny-gpt2" not in contents
-    assert "--edited sshleifer/tiny-gpt2" not in contents
-
-
-def test_cli_smoke_negative_exercises_failure_categories() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "smoke" / "cli_smoke_negative.sh"
-    assert script_path.exists(), "Expected scripts/smoke/cli_smoke_negative.sh to exist"
-    assert os.access(script_path, os.X_OK), "cli_smoke_negative.sh should be executable"
-
-    _assert_shell_syntax(script_path)
-    contents = script_path.read_text(encoding="utf-8")
-    assert "tests/artifacts/golden_runs/gpt2/evaluation.report.json" in contents
-    assert 'source "$SCRIPT_DIR/lib/smoke_common.sh"' in contents
-    assert 'smoke_select_python "$ROOT"' in contents
-    assert 'smoke_setup_pythonpath "$ROOT"' in contents
-    assert 'smoke_expected_exit_match "$@"' in contents
-    assert "invarlock verify --json (malformed fixture)" in contents
-    assert "invarlock verify --json (primary metric policy fail)" in contents
-    assert "invarlock verify --json (invariants policy fail)" in contents
-    assert "invarlock verify --json (spectral policy fail)" in contents
-    assert "invarlock verify --json (rmt policy fail)" in contents
-    assert "invarlock run (removed public command)" in contents
-    assert "invarlock report generate (failed subject run report)" in contents
-    assert "invarlock advanced calibrate null-sweep (missing config)" in contents
-    assert "summary.reason" in contents
-    assert "Invalid value for '--config'" in contents
-    assert (
-        'assert_contains "$VERIFY_OUT/malformed.out" "\\"code\\": \\"E601\\""'
-        in contents
+        cases["invarlock advanced calibrate null-sweep (missing config)"][
+            "expected_fragment"
+        ]
+        == "Invalid value for '--config'"
     )
 
 
-def test_cli_smoke_matrix_dispatches_lane_matrix() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "smoke" / "cli_smoke_matrix.sh"
-    assert script_path.exists(), "Expected scripts/smoke/cli_smoke_matrix.sh to exist"
-    assert os.access(script_path, os.X_OK), "cli_smoke_matrix.sh should be executable"
-
-    _assert_shell_syntax(script_path)
-    contents = script_path.read_text(encoding="utf-8")
-    assert 'LANES_RAW="${INVARLOCK_SMOKE_LANES:-fast,negative,realistic}"' in contents
-    assert 'script_path="$REPO_ROOT/scripts/smoke/cli_smoke_fast.sh"' in contents
-    assert 'script_path="$REPO_ROOT/scripts/smoke/cli_smoke_negative.sh"' in contents
-    assert (
-        'script_path="$REPO_ROOT/scripts/smoke/run_gpt2_user_journey_smoke.sh"'
-        in contents
+def test_cli_smoke_matrix_dispatches_lane_matrix(tmp_path: Path) -> None:
+    repo_root = _repo_root()
+    script_path = _assert_smoke_script_ready("cli_smoke_matrix.sh")
+    work_root = tmp_path / "matrix-unknown-lane-contract"
+    env = {**os.environ, "INVARLOCK_SMOKE_LANES": "unknown-lane"}
+    result = subprocess.run(
+        ["bash", str(script_path), str(work_root)],
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
     )
-    assert 'mode="${INVARLOCK_REALISTIC_SMOKE_MODE:-local}"' in contents
-    assert 'journeys="${INVARLOCK_REALISTIC_SMOKE_JOURNEYS:-noop,negative}"' in contents
-    assert (
-        'INVARLOCK_SMOKE_MODE="$mode" INVARLOCK_SMOKE_JOURNEYS="$journeys"' in contents
-    )
-    assert "lane=realistic exit_code=$rc" in contents
-    assert "unknown smoke lane" in contents
-    assert "failed=${FAILED_LANES}" in contents
+
+    assert result.returncode == 2
+    output = result.stdout + result.stderr
+    assert "unknown smoke lane: unknown-lane" in output
+    assert "lanes=unknown-lane" in output
+    assert "[summary]" not in output
 
 
-def test_run_cpu_telemetry_uses_repo_selected_python() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "smoke" / "run_cpu_telemetry.sh"
-    assert script_path.exists(), "Expected scripts/smoke/run_cpu_telemetry.sh to exist"
-    assert os.access(script_path, os.X_OK), "run_cpu_telemetry.sh should be executable"
+def test_run_cpu_telemetry_declares_container_cpu_report_plan(
+    tmp_path: Path,
+) -> None:
+    plan = _run_smoke_plan("run_cpu_telemetry.sh", tmp_path)
 
-    _assert_shell_syntax(script_path)
-    contents = script_path.read_text(encoding="utf-8")
-    assert 'source "$SCRIPT_DIR/lib/smoke_common.sh"' in contents
-    assert 'smoke_select_python "$ROOT"' in contents
-    assert 'smoke_setup_pythonpath "$ROOT"' in contents
-    assert 'CLI=("$PYTHON_BIN" -m invarlock)' in contents
-    assert "INVARLOCK_CPU_TELEMETRY_OUT_ROOT" in contents
-    assert "INVARLOCK_CPU_TELEMETRY_RUN_ROOT" in contents
-    assert "INVARLOCK_CPU_TELEMETRY_REPORT_ROOT" in contents
-    assert (
-        'PRESET="${PRESET:-configs/presets/causal_lm/wikitext2_512.yaml}"' in contents
-    )
-    assert 'INVARLOCK_ALLOW_NETWORK=1 "${CLI[@]}" evaluate' in contents
-    assert "--assurance off" in contents
-    assert 'smoke_ensure_current_runtime_image "container" "cpu"' in contents
-    assert "--device cpu" in contents
-    assert "EVAL_RC=$?" in contents
-    assert 'exit "${EVAL_RC}"' in contents
-    assert "using emitted report artifacts" not in contents
-    assert '"${CLI[@]}" report validate' in contents
-    assert '"${CLI[@]}" verify' not in contents
-    assert "command -v invarlock" not in contents
-
-
-def test_cli_smoke_fast_uses_reporting_verify_contract_helpers() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "smoke" / "cli_smoke_fast.sh"
-    contents = script_path.read_text(encoding="utf-8")
-
-    assert "from invarlock.reporting import verify_contract as verify_mod" in contents
-    assert "from invarlock.cli.commands import verify as verify_mod" not in contents
+    assert plan["script"] == "run_cpu_telemetry"
+    assert plan["model_id"] == "sshleifer/tiny-gpt2"
+    assert plan["profile"] == "ci_cpu"
+    assert plan["tier"] == "balanced"
+    assert plan["preset"] == "configs/presets/causal_lm/wikitext2_512.yaml"
+    assert plan["edit_config"] == "configs/overlays/edits/quant_rtn/8bit_attn.yaml"
+    assert plan["runtime_image"] == {"mode": "container", "device": "cpu"}
+    assert plan["evaluate"] == {
+        "allow_network": True,
+        "assurance": "off",
+        "device": "cpu",
+        "baseline_adapter": "auto",
+        "subject_adapter": "auto",
+    }
+    assert plan["post_checks"] == ["report validate"]

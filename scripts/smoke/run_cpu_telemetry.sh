@@ -29,6 +29,42 @@ EDIT_CFG="${EDIT_CFG:-configs/overlays/edits/quant_rtn/8bit_attn.yaml}"
 RUN_ROOT="${INVARLOCK_CPU_TELEMETRY_RUN_ROOT:-${ROOT}/runs/telemetry_cpu/quant8}"
 REPORT_ROOT="${INVARLOCK_CPU_TELEMETRY_REPORT_ROOT:-${OUT_ROOT}/quant8}"
 
+if [[ "${INVARLOCK_SMOKE_PLAN:-0}" == "1" ]]; then
+  SMOKE_PLAN_MODEL_ID="$MODEL_ID" \
+  SMOKE_PLAN_PROFILE="$PROFILE" \
+  SMOKE_PLAN_TIER="$TIER" \
+  SMOKE_PLAN_PRESET="$PRESET" \
+  SMOKE_PLAN_EDIT_CFG="$EDIT_CFG" \
+  SMOKE_PLAN_RUN_ROOT="$RUN_ROOT" \
+  SMOKE_PLAN_REPORT_ROOT="$REPORT_ROOT" \
+  "$PYTHON_BIN" - <<'PY'
+import json
+import os
+
+plan = {
+    "script": "run_cpu_telemetry",
+    "model_id": os.environ["SMOKE_PLAN_MODEL_ID"],
+    "profile": os.environ["SMOKE_PLAN_PROFILE"],
+    "tier": os.environ["SMOKE_PLAN_TIER"],
+    "preset": os.environ["SMOKE_PLAN_PRESET"],
+    "edit_config": os.environ["SMOKE_PLAN_EDIT_CFG"],
+    "run_root": os.environ["SMOKE_PLAN_RUN_ROOT"],
+    "report_root": os.environ["SMOKE_PLAN_REPORT_ROOT"],
+    "evaluate": {
+        "allow_network": True,
+        "assurance": "off",
+        "device": "cpu",
+        "baseline_adapter": "auto",
+        "subject_adapter": "auto",
+    },
+    "runtime_image": {"mode": "container", "device": "cpu"},
+    "post_checks": ["report validate"],
+}
+print(json.dumps(plan, sort_keys=True))
+PY
+  exit 0
+fi
+
 smoke_seed_local_runtime_image "cpu"
 smoke_ensure_current_runtime_image "container" "cpu"
 

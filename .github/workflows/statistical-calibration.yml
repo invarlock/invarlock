@@ -1,0 +1,44 @@
+name: Statistical Calibration
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 5 * * 1"
+
+concurrency:
+  group: statistical-calibration-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap-calibration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src
+      PYTHONWARNINGS: "default"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13"
+
+      - name: Cache pip
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        if: ${{ github.actor != 'nektos/act' }}
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-3.13-statistical-calibration-${{ hashFiles('requirements/workflows/assurance-ci-py313.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-3.13-statistical-calibration-
+
+      - name: Install dependencies
+        run: python -m pip install --require-hashes -r requirements/workflows/assurance-ci-py313.txt
+
+      - name: Run slow statistical calibration
+        run: make statistical-calibration-slow

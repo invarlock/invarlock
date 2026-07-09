@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from invarlock.core.run_orchestrator import RunCleanupStatusEvent
 from invarlock.core.run_orchestrator_execute import (
     _cleanup_snapshot_tmpdir,
     _coerce_float,
@@ -21,7 +22,10 @@ def test_run_orchestrator_execute_coercers_handle_invalid_and_nonfinite_values()
 
 
 def test_cleanup_snapshot_tmpdir_swallows_emit_failures() -> None:
-    def _emit(_event: object) -> None:
+    events: list[object] = []
+
+    def _emit(event: object) -> None:
+        events.append(event)
         raise TypeError("sink unavailable")
 
     result = _cleanup_snapshot_tmpdir(
@@ -30,3 +34,6 @@ def test_cleanup_snapshot_tmpdir_swallows_emit_failures() -> None:
         emit=_emit,
     )
     assert result is None
+    assert len(events) == 1
+    assert isinstance(events[0], RunCleanupStatusEvent)
+    assert events[0].removed is False

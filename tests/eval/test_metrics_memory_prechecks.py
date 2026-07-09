@@ -36,7 +36,7 @@ def test_measure_memory_raises_when_window_has_no_non_empty_samples():
     )
 
 
-def test_pre_eval_checks_dry_run_failure():
+def test_pre_eval_checks_dry_run_failure(caplog: pytest.LogCaptureFixture):
     class CrashOnForward(torch.nn.Module):
         def forward(self, *args, **kwargs):  # noqa: D401
             raise RuntimeError("dry run fails")
@@ -54,7 +54,11 @@ def test_pre_eval_checks_dry_run_failure():
                 "attention_mask": torch.ones(1, 6, dtype=torch.long),
             }
 
+    caplog.set_level("WARNING", logger="invarlock.eval.metrics_activation")
+
     result = _perform_pre_eval_checks(
         CrashOnForward(), Loader(), device=torch.device("cpu"), config=M.MetricsConfig()
     )
     assert result is None
+    assert "Input sequence length 6 exceeds model limit 4" in caplog.text
+    assert "Pre-evaluation dry run failed: dry run fails" in caplog.text

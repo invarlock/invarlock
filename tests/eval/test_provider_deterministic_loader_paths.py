@@ -18,10 +18,14 @@ def test_deterministic_worker_init_fn_handles_seed_errors(
 ) -> None:
     import random
 
-    def bad_seed(*args: Any, **kwargs: Any) -> None:
+    calls: dict[str, list[int]] = {"random": [], "numpy": []}
+
+    def bad_seed(value: int, *args: Any, **kwargs: Any) -> None:
+        calls["random"].append(value)
         raise RuntimeError("seed failure")
 
-    def bad_np_seed(*args: Any, **kwargs: Any) -> None:
+    def bad_np_seed(value: int, *args: Any, **kwargs: Any) -> None:
+        calls["numpy"].append(value)
         raise RuntimeError("numpy seed failure")
 
     monkeypatch.setattr(random, "seed", bad_seed, raising=False)
@@ -29,6 +33,7 @@ def test_deterministic_worker_init_fn_handles_seed_errors(
 
     result = deterministic_worker_init_fn(worker_id=1, base_seed=42)
     assert result is None
+    assert calls == {"random": [56], "numpy": [8]}
 
 
 def test_deterministic_worker_init_fn_uses_torch_when_available(
