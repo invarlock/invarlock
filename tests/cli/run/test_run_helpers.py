@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_common import assert_single_run_output_artifacts
 from invarlock.cli.run_execution import persist_ref_masks
 from invarlock.cli.run_overhead import plan_release_windows
 from rich.console import Console
@@ -457,7 +458,7 @@ def test_to_serialisable_dict_uses_dict_method(tmp_path: Path):
             )
         )
         run_command(config=str(cfg_path), device="cpu", out=str(tmp_path / "runs"))
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)
 
 
 # --------------------

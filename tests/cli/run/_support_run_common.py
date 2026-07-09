@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -205,3 +207,63 @@ def runner_success():
             status="success",
         )
     )
+
+
+def assert_single_run_report_artifact(
+    tmp_path: Path, *, profile: str | None = None
+) -> dict[str, object]:
+    runs_dir = tmp_path / "runs"
+    run_dirs = sorted(path for path in runs_dir.iterdir() if path.is_dir())
+    assert len(run_dirs) == 1
+
+    run_dir = run_dirs[0]
+    report_path = run_dir / "report.json"
+    manifest_path = run_dir / "runtime.manifest.json"
+    assert report_path.is_file()
+    assert manifest_path.is_file()
+
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert payload["meta"]["adapter"] == "hf_causal"
+    assert payload["metrics"]["primary_metric"]["kind"] == "ppl_causal"
+    if profile is not None:
+        assert payload["context"]["profile"] == profile
+    return payload
+
+
+def assert_single_run_output_artifacts(
+    tmp_path: Path, *, expected_count: int | None = 1
+) -> Path:
+    runs_dir = tmp_path / "runs"
+    run_dirs = sorted(path for path in runs_dir.iterdir() if path.is_dir())
+    if expected_count is None:
+        assert run_dirs
+    else:
+        assert len(run_dirs) == expected_count
+
+    for run_dir in run_dirs:
+        assert re.fullmatch(r"\d{8}_\d{6}", run_dir.name)
+
+        events_path = run_dir / "events.jsonl"
+        if events_path.is_file():
+            assert events_path.read_text(encoding="utf-8").strip()
+
+        report_path = run_dir / "report.json"
+        if report_path.is_file():
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            assert report["meta"]["adapter"] == "hf_causal"
+
+        manifest_path = run_dir / "runtime.manifest.json"
+        if manifest_path.is_file():
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            assert manifest
+            context = manifest.get("context")
+            if isinstance(context, dict) and "command" in context:
+                assert context["command"]
+            if "command" in manifest:
+                assert manifest["command"]
+            execution_mode = manifest.get("execution_mode")
+            if execution_mode is None and isinstance(manifest.get("environment"), dict):
+                execution_mode = manifest["environment"].get("execution_mode")
+            if execution_mode is not None:
+                assert execution_mode in {"container", "host-bypass"}
+    return run_dirs[-1]

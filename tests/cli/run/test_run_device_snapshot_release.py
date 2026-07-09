@@ -10,6 +10,7 @@ import pytest
 
 from invarlock.cli.commands.run import run_command
 from tests.cli.run._support_run_common import (
+    assert_single_run_output_artifacts,
     common_ce_patches,
 )
 from tests.cli.run._support_run_common import (
@@ -689,4 +690,4 @@ def test_tokenizer_hash_populated_from_context_when_missing(tmp_path: Path):
             out=str(tmp_path / "runs"),
             until_pass=False,
         )
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)

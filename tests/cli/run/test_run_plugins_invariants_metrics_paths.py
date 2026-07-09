@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from contextlib import ExitStack
 from pathlib import Path
 from types import SimpleNamespace
@@ -21,8 +22,19 @@ from tests.cli.run._support_run_plugins import (
 )
 
 
+def _capture_save_report(captured: dict[str, list[dict[str, object]]]):
+    captured["reports"] = []
+
+    def _save_report(report, run_dir, formats=None, filename_prefix=None):
+        captured["reports"].append(report)
+        return {"json": str(run_dir / (str(filename_prefix or "report") + ".json"))}
+
+    return _save_report
+
+
 def test_provider_non_evalwindow_mismatch_counts_no_exit(tmp_path: Path):
     cfg = _write_cfg(tmp_path, preview=2, final=1)
+    captured: dict[str, list[dict[str, object]]] = {}
 
     class Provider:
         def windows(self, **kwargs):
@@ -33,6 +45,12 @@ def test_provider_non_evalwindow_mismatch_counts_no_exit(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
+        stack.enter_context(
+            patch(
+                "invarlock.reporting.report_files.save_report",
+                _capture_save_report(captured),
+            )
+        )
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: Provider())
         )
@@ -57,11 +75,16 @@ def test_provider_non_evalwindow_mismatch_counts_no_exit(tmp_path: Path):
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
-    assert (tmp_path / "runs").is_dir()
+    assert len(captured["reports"]) == 1
+    report = captured["reports"][0]
+    windows = report["evaluation_windows"]
+    assert windows["preview"]["input_ids"] == [[1, 2]]
+    assert windows["final"]["input_ids"] == [[3, 4]]
 
 
 def test_provider_indices_not_iterable_fallback(tmp_path: Path):
     cfg = _write_cfg(tmp_path)
+    captured: dict[str, list[dict[str, object]]] = {}
 
     class Provider:
         def windows(self, **kwargs):
@@ -77,6 +100,12 @@ def test_provider_indices_not_iterable_fallback(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
+            patch(
+                "invarlock.reporting.report_files.save_report",
+                _capture_save_report(captured),
+            )
+        )
+        stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: Provider())
         )
         stack.enter_context(
@@ -100,7 +129,13 @@ def test_provider_indices_not_iterable_fallback(tmp_path: Path):
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
-    assert (tmp_path / "runs").is_dir()
+    assert len(captured["reports"]) == 1
+    report = captured["reports"][0]
+    windows = report["evaluation_windows"]
+    assert windows["preview"]["window_ids"] == [0]
+    assert windows["final"]["window_ids"] == [1]
+    assert windows["preview"]["input_ids"] == [[1, 2, 3]]
+    assert windows["final"]["input_ids"] == [[4, 5, 6]]
 
 
 def test_metrics_merges_masked_totals_from_context(tmp_path: Path):
@@ -242,6 +277,7 @@ def test_guard_overhead_fail_exits(tmp_path: Path):
 
 def test_drift_gate_fail_nonfatal(tmp_path: Path):
     cfg = _write_cfg(tmp_path)
+    captured: dict[str, list[dict[str, object]]] = {}
 
     class Runner:
         def execute(self, **kwargs):
@@ -256,6 +292,12 @@ def test_drift_gate_fail_nonfatal(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
+        stack.enter_context(
+            patch(
+                "invarlock.reporting.report_files.save_report",
+                _capture_save_report(captured),
+            )
+        )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider_min())
@@ -263,11 +305,19 @@ def test_drift_gate_fail_nonfatal(tmp_path: Path):
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
-    assert (tmp_path / "runs").is_dir()
+    assert len(captured["reports"]) == 1
+    report = captured["reports"][0]
+    primary_metric = report["metrics"]["primary_metric"]
+    assert primary_metric["kind"] == "ppl_causal"
+    assert math.isnan(primary_metric["preview"])
+    assert math.isnan(primary_metric["final"])
+    assert report["meta"]["adapter"] == "hf_causal"
+    assert report["metrics"]["loss_type"] == "ce"
 
 
 def test_retry_controller_until_pass_two_attempts(tmp_path: Path):
     cfg = _write_cfg(tmp_path)
+    captured: dict[str, list[dict[str, object]]] = {}
     baseline = tmp_path / "baseline.json"
     baseline.write_text(
         json.dumps(
@@ -333,7 +383,7 @@ def test_retry_controller_until_pass_two_attempts(tmp_path: Path):
             self.attempt_history = []
 
         def should_retry(self, passed):
-            return not passed and len(self.attempt_history) < 1
+            return not passed and len(self.attempt_history) < 2
 
         def record_attempt(self, attempt, result_summary, edit_config):
             self.attempt_history.append(result_summary)
@@ -344,10 +394,18 @@ def test_retry_controller_until_pass_two_attempts(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
+        stack.enter_context(
+            patch(
+                "invarlock.reporting.report_files.save_report",
+                _capture_save_report(captured),
+            )
+        )
         # first fail then pass
         results = [{"validation": {"gateA": False}}, {"validation": {"gateA": True}}]
+        cert_reports: list[dict[str, object]] = []
 
         def make_cert(report, baseline_report):
+            cert_reports.append(report)
             return results.pop(0)
 
         stack.enter_context(patch("invarlock.core.retry.RetryController", RC))
@@ -367,4 +425,9 @@ def test_retry_controller_until_pass_two_attempts(tmp_path: Path):
             until_pass=True,
             max_attempts=2,
         )
-    assert (tmp_path / "runs").is_dir()
+    assert len(captured["reports"]) == 2
+    assert len(cert_reports) == 2
+    assert results == []
+    assert cert_reports == captured["reports"]
+    assert cert_reports[0]["evaluation_windows"]["final"]["window_ids"] == [1]
+    assert cert_reports[1]["evaluation_windows"]["final"]["window_ids"] == [1]

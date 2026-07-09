@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_common import assert_single_run_output_artifacts
 from tests.cli.run._support_run_plugins import (
     plugin_provenance_cfg as _cfg,
 )
@@ -66,4 +67,4 @@ def test_provider_indices_various_types(tmp_path: Path, indices_type: str):
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)

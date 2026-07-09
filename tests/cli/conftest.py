@@ -56,6 +56,7 @@ def _default_cli_host_execution(
         yield
         return
 
+    monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", _VALID_TEST_IMAGE_DIGEST)
     monkeypatch.setattr(
         "invarlock.cli.config_execution.host_execution_allowed",
         lambda: True,

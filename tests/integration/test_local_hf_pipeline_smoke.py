@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 import json
 import os
 import subprocess
@@ -20,13 +21,50 @@ def _require_local_hf_runtime() -> tuple[object, object, object]:
         from tokenizers.pre_tokenizers import Whitespace
         from transformers import GPT2Config, GPT2LMHeadModel, PreTrainedTokenizerFast
     except Exception as exc:  # pragma: no cover - host dependency guard
-        pytest.skip(f"local HF runtime is unavailable: {exc}")
+        message = f"local HF runtime is unavailable: {exc}"
+        if os.environ.get("INVARLOCK_REQUIRE_LOCAL_HF") in {"1", "true", "yes", "on"}:
+            pytest.fail(message)
+        pytest.skip(message)
 
     return (
         GPT2Config,
         GPT2LMHeadModel,
         (Tokenizer, WordLevel, Whitespace, PreTrainedTokenizerFast),
     )
+
+
+def test_local_hf_runtime_requirement_fails_when_ci_requires_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_import = builtins.__import__
+
+    def blocked_import(name: str, *args: object, **kwargs: object) -> object:
+        if name == "tokenizers" or name.startswith(("tokenizers.", "transformers")):
+            raise ImportError("blocked local hf runtime")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setenv("INVARLOCK_REQUIRE_LOCAL_HF", "1")
+    monkeypatch.setattr(builtins, "__import__", blocked_import)
+
+    with pytest.raises(pytest.fail.Exception, match="blocked local hf runtime"):
+        _require_local_hf_runtime()
+
+
+def test_local_hf_runtime_requirement_can_skip_on_developer_hosts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_import = builtins.__import__
+
+    def blocked_import(name: str, *args: object, **kwargs: object) -> object:
+        if name == "tokenizers" or name.startswith(("tokenizers.", "transformers")):
+            raise ImportError("blocked local hf runtime")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.delenv("INVARLOCK_REQUIRE_LOCAL_HF", raising=False)
+    monkeypatch.setattr(builtins, "__import__", blocked_import)
+
+    with pytest.raises(pytest.skip.Exception, match="blocked local hf runtime"):
+        _require_local_hf_runtime()
 
 
 def _materialize_tiny_gpt2(model_dir: Path) -> None:

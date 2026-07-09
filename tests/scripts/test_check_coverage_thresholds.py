@@ -468,9 +468,7 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
 
     assert proc.returncode != 0
     for path in (
-        "src/invarlock/cli/commands/evaluate.py",
         "src/invarlock/cli/commands/evidence_pack.py",
-        "src/invarlock/cli/run_overhead.py",
         "src/invarlock/core/run_policy.py",
         "src/invarlock/core/api.py",
         "src/invarlock/core/config_loader.py",
@@ -479,7 +477,6 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
         "src/invarlock/core/evaluate_plan.py",
         "src/invarlock/core/registry.py",
         "src/invarlock/core/report_inputs.py",
-        "src/invarlock/core/run_orchestrator.py",
         "src/invarlock/eval/metrics_support.py",
         "src/invarlock/eval/data_local.py",
         "src/invarlock/eval/metrics_runtime_resources.py",
@@ -492,17 +489,11 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
         "src/invarlock/reporting/report_provenance.py",
         "src/invarlock/reporting/report_types.py",
         "src/invarlock/reporting/utils.py",
-        "src/invarlock/cli/commands/run.py",
         "src/invarlock/runtime_verify.py",
-        "src/invarlock/core/run_orchestrator_execute_helpers.py",
         "src/invarlock/evidence_pack_support.py",
-        "src/invarlock/adapters/hf_multimodal.py",
         "src/invarlock/runtime_security.py",
         "src/invarlock/core/bootstrap.py",
         "src/invarlock/core/config_runtime.py",
-        "src/invarlock/core/run_orchestrator_execute.py",
-        "src/invarlock/core/runner_eval_metrics_multimodal.py",
-        "src/invarlock/core/runner_eval_metrics_stats.py",
         "src/invarlock/core/runner_eval_phase.py",
         "src/invarlock/eval/bench_policy.py",
         "src/invarlock/eval/tail_stats.py",
@@ -510,11 +501,23 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
         "src/invarlock/guards/variance_ops.py",
         "src/invarlock/reporting/report_policy.py",
         "src/invarlock/reporting/report_make.py",
-        "src/invarlock/reporting/report_builder_support.py",
-        "src/invarlock/reporting/report_builder_telemetry.py",
         "src/invarlock/runtime_security_helpers.py",
     ):
         assert path in proc.stderr
+    for path in (
+        "src/invarlock/cli/commands/evaluate.py",
+        "src/invarlock/cli/run_overhead.py",
+        "src/invarlock/core/run_orchestrator.py",
+        "src/invarlock/cli/commands/run.py",
+        "src/invarlock/core/run_orchestrator_execute_helpers.py",
+        "src/invarlock/adapters/hf_multimodal.py",
+        "src/invarlock/core/run_orchestrator_execute.py",
+        "src/invarlock/core/runner_eval_metrics_multimodal.py",
+        "src/invarlock/core/runner_eval_metrics_stats.py",
+        "src/invarlock/reporting/report_builder_support.py",
+        "src/invarlock/reporting/report_builder_telemetry.py",
+    ):
+        assert path not in proc.stderr
 
 
 def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
@@ -561,7 +564,6 @@ def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
         "src/invarlock/cli/run_pairing.py",
         "src/invarlock/eval/metrics_runtime.py",
         "src/invarlock/eval/metrics_runtime_resources.py",
-        "src/invarlock/core/run_orchestrator_execute.py",
         "src/invarlock/evidence_pack_integrity.py",
         "src/invarlock/evidence_pack_support.py",
         "src/invarlock/reporting/verify_check_helpers_consistency.py",
@@ -578,6 +580,7 @@ def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
         "src/invarlock/reporting/run_metric_utils.py",
     ):
         assert path in proc.stderr
+    assert "src/invarlock/core/run_orchestrator_execute.py" not in proc.stderr
 
 
 def test_new_published_basis_core_thresholds_are_explicit(tmp_path: Path) -> None:

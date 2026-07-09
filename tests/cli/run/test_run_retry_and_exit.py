@@ -14,6 +14,7 @@ import pytest
 from typer.testing import CliRunner
 
 from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_common import assert_single_run_output_artifacts
 from tests.cli.run._internal_cli import internal_run_app as cli
 
 
@@ -346,7 +347,7 @@ output:
             max_attempts=2,
             out=str(tmp_path / "runs"),
         )
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)
 
 
 # --------------------
@@ -511,7 +512,7 @@ def test_until_pass_retry_summary_printed(tmp_path: Path):
             max_attempts=1,
             out=str(tmp_path / "runs"),
         )
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)
 
 
 # --------------------

@@ -162,6 +162,44 @@ THRESHOLDS = {
     "src/invarlock/evidence_pack_support.py": 1.00,
 }
 
+# Keep absolute 100% floors for compact contracts, security checks, guard math,
+# and schema/policy modules. Broad orchestration and third-party integration
+# glue keep high branch floors while mutation and black-box smoke tests carry
+# the stronger behavior-detection burden.
+BEHAVIORAL_RATCHET_THRESHOLDS = {
+    "scripts/evidence_workflows/workflow_runner.py": 0.95,
+    "src/invarlock/adapters/auto.py": 0.95,
+    "src/invarlock/adapters/hf_causal.py": 0.95,
+    "src/invarlock/adapters/hf_multimodal.py": 0.95,
+    "src/invarlock/cli/app.py": 0.95,
+    "src/invarlock/cli/commands/calibrate.py": 0.95,
+    "src/invarlock/cli/commands/evaluate.py": 0.95,
+    "src/invarlock/cli/commands/report_export.py": 0.95,
+    "src/invarlock/cli/commands/run.py": 0.95,
+    "src/invarlock/cli/commands/verify.py": 0.95,
+    "src/invarlock/cli/run_config.py": 0.95,
+    "src/invarlock/cli/run_execution_output.py": 0.95,
+    "src/invarlock/cli/run_overhead.py": 0.95,
+    "src/invarlock/cli/run_pairing.py": 0.95,
+    "src/invarlock/cli/run_pairing_baseline.py": 0.95,
+    "src/invarlock/core/backend_inventory.py": 0.95,
+    "src/invarlock/core/doctor_preflight.py": 0.95,
+    "src/invarlock/core/plugins_inventory.py": 0.95,
+    "src/invarlock/core/run_orchestrator.py": 0.95,
+    "src/invarlock/core/run_orchestrator_execute.py": 0.95,
+    "src/invarlock/core/run_orchestrator_execute_attempt_results.py": 0.95,
+    "src/invarlock/core/run_orchestrator_execute_attempts.py": 0.95,
+    "src/invarlock/core/run_orchestrator_execute_helpers.py": 0.95,
+    "src/invarlock/core/run_provider_dataset_materialization.py": 0.95,
+    "src/invarlock/core/run_provider_dataset_plan.py": 0.95,
+    "src/invarlock/core/runner_execution_plan.py": 0.95,
+    "src/invarlock/core/runner_eval_metrics_multimodal.py": 0.95,
+    "src/invarlock/core/runner_eval_metrics_stats.py": 0.95,
+    "src/invarlock/reporting/report_builder_support.py": 0.95,
+    "src/invarlock/reporting/report_builder_telemetry.py": 0.95,
+}
+THRESHOLDS.update(BEHAVIORAL_RATCHET_THRESHOLDS)
+
 CORE_FLOOR_DEFAULT = 0.90
 DEFAULT_FLOOR_DEFAULT = 0.90
 

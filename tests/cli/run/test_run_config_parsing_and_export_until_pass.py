@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_common import assert_single_run_output_artifacts
 from tests.cli.run._support_run_config_parsing import (
     ConfigParsingCfg as _Cfg,
 )
@@ -162,4 +163,4 @@ def test_run_command_until_pass_auto_tune_head_budget_paths(tmp_path: Path) -> N
                 until_pass=True,
                 max_attempts=1,
             )
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path, expected_count=None)

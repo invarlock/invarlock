@@ -10,6 +10,7 @@ import pytest
 
 from invarlock.cli.commands.run import run_command
 from tests.cli.run._support_run_common import (
+    assert_single_run_output_artifacts,
     common_ce_patches,
 )
 from tests.cli.run._support_run_common import (
@@ -108,7 +109,7 @@ def test_baseline_attention_masks_inferred_and_labels_sanitized(tmp_path: Path):
             out=str(tmp_path / "runs"),
             until_pass=False,
         )
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)
 
 
 def test_baseline_labels_longer_than_input_trimmed(tmp_path: Path):
@@ -169,7 +170,7 @@ def test_baseline_labels_longer_than_input_trimmed(tmp_path: Path):
             out=str(tmp_path / "runs"),
             until_pass=False,
         )
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)
 
 
 def test_provider_attention_mask_tolist_tuple_path(tmp_path: Path):
@@ -216,7 +217,7 @@ def test_provider_attention_mask_tolist_tuple_path(tmp_path: Path):
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)
 
 
 @pytest.mark.parametrize(

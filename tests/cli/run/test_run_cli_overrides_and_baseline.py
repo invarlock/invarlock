@@ -11,6 +11,7 @@ import pytest
 
 from invarlock.cli.commands.run import run_command
 from tests.cli.run._support_run_common import (
+    assert_single_run_output_artifacts,
     common_ce_patches,
 )
 from tests.cli.run._support_run_common import (
@@ -426,7 +427,7 @@ def test_fallback_to_dataset_when_baseline_no_eval_windows_in_ci(tmp_path: Path)
             out=str(tmp_path / "runs"),
             until_pass=False,
         )
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)
 
 
 def test_preview_and_final_hash_and_dataset_hash_present(tmp_path: Path):
@@ -675,4 +676,4 @@ def test_labels_numpy_arrays_in_baseline(tmp_path: Path):
             out=str(tmp_path / "runs"),
             until_pass=False,
         )
-    assert (tmp_path / "runs").is_dir()
+    assert_single_run_output_artifacts(tmp_path)

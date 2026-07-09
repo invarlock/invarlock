@@ -181,42 +181,81 @@ class TestEndToEndPipeline:
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_basic_pipeline_execution(self):
-        """Test basic pipeline execution with minimal configuration."""
-        # Create basic configuration
-        config = {
-            "model_path": "test_model",
-            "edit_type": "quantization",
-            "output_dir": self.temp_dir,
-            "edit_config": {"rank": 32},
-            "guard_config": {
-                "enabled": True,
-                "spectral": {
-                    "sigma_quantile": 0.95,
+        """Test real CoreRunner execution with lightweight fakes."""
+        from invarlock.core.api import RunConfig
+        from invarlock.core.runner import CoreRunner as RealCoreRunner
+
+        class _Adapter:
+            name = "fake_adapter"
+
+            def can_handle(self, model):
+                return model is self_model
+
+            def describe(self, model):
+                assert model is self_model
+                return {
+                    "n_layer": 2,
+                    "heads_per_layer": [8, 8],
+                    "mlp_dims": [128, 128],
+                    "tying": {},
+                }
+
+            def snapshot(self, model):
+                assert model is self_model
+                return b"snapshot"
+
+            def restore(self, model, blob):
+                assert model is self_model
+                assert blob == b"snapshot"
+
+        class _Edit:
+            name = "fake_edit"
+
+            def can_edit(self, model_desc):
+                return model_desc["n_layer"] == 2
+
+            def apply(self, model, adapter, plan=None, runtime=None):
+                assert model is self_model
+                assert adapter.name == "fake_adapter"
+                assert plan == {"rank": 32}
+                assert runtime.profile == "ci"
+                return {
+                    "name": self.name,
+                    "deltas": {"params_changed": 1000, "layers_modified": 1},
+                }
+
+        self_model = object()
+        runner = RealCoreRunner()
+        runner._compute_real_metrics = Mock(
+            return_value=(
+                {
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 1.0,
+                        "final": 1.0,
+                    }
                 },
-                "rmt": {"margin": 1.5},
-                "invariants": {"strict_mode": False},
-            },
-            "eval_config": {
-                "enabled": False  # Skip eval for basic test
-            },
-        }
+                {"preview": {"window_ids": [0]}, "final": {"window_ids": [1]}},
+            )
+        )
 
-        # Create and run pipeline
-        runner = CoreRunner()
+        result = runner.execute(
+            model=self_model,
+            adapter=_Adapter(),
+            edit=_Edit(),
+            guards=[],
+            config=RunConfig(context={"profile": "ci", "run_id": "unit-run"}),
+            calibration_data=[{"input_ids": [1, 2, 3]}],
+            edit_config={"rank": 32},
+        )
 
-        # Mock the actual run method to test configuration flow
-        with patch.object(runner, "run") as mock_run:
-            mock_run.return_value = {
-                "success": True,
-                "metrics": {"parameters_modified": 1000},
-                "edit_results": {"actual_sparsity": {"weight_sparsity": 0.1}},
-            }
-
-            result = runner.run(config)
-
-            assert isinstance(result, dict)
-            assert result.get("success")
-            mock_run.assert_called_once()
+        assert result.status == "success"
+        assert result.edit["deltas"]["params_changed"] == 1000
+        assert result.metrics["primary_metric"]["final"] == 1.0
+        assert result.evaluation_windows["final"]["window_ids"] == [1]
+        assert result.context["profile"] == "ci"
+        assert result.meta["run_id"] == "unit-run"
+        runner._compute_real_metrics.assert_called_once()
 
     # Plugin tests focus on quantization and core guards
 
@@ -304,21 +343,9 @@ class TestEndToEndPipeline:
 
     def test_model_loading_and_adapter_selection(self):
         """Test model loading and automatic adapter selection."""
-        # Mock runner components
-        runner = CoreRunner()
-
-        with patch.object(runner, "run") as mock_run:
-            mock_run.return_value = {
-                "success": True,
-                "model_loaded": True,
-                "adapter_selected": True,
-            }
-
-            # Test basic functionality
-            result = mock_run({"model_path": "test_model_path"})
-            assert result["success"]
-            assert result["model_loaded"]
-            assert result["adapter_selected"]
+        assert self.model.config.model_type == "gpt2"
+        assert self.model.config.n_layer == 2
+        assert self.adapter is not None
 
         # Test adapter compatibility
         if hasattr(self.adapter, "can_handle"):
@@ -376,14 +403,14 @@ class TestEndToEndPipeline:
 
     def test_error_handling_and_recovery(self):
         """Test error handling and recovery mechanisms."""
-        # Test model loading failure
-        runner = CoreRunner()
 
-        with patch.object(runner, "run") as mock_run:
-            mock_run.side_effect = FileNotFoundError("Model not found")
+        def _load_existing_model(path: str):
+            if not Path(path).exists():
+                raise FileNotFoundError("Model not found")
+            return object()
 
-            with pytest.raises(FileNotFoundError):
-                mock_run({"model_path": "nonexistent_model"})
+        with pytest.raises(FileNotFoundError):
+            _load_existing_model("nonexistent_model")
 
         # Edit failure and rollback path (quant-only dummy)
         class _FailingQuant:

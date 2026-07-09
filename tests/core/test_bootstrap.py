@@ -2,7 +2,7 @@ import math
 
 import numpy as np
 import pytest
-from hypothesis import given, settings
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from invarlock.core.bootstrap import (
@@ -206,8 +206,7 @@ def test_logloss_ci_empirical_coverage_smoke():
 @settings(max_examples=25, deadline=None)
 def test_paired_delta_log_ci_property_strict_identity(values, delta):
     final = [value + delta for value in values]
-    if min(final) <= 0:
-        pytest.skip("generated delta pushed log-loss below positive domain")
+    assume(min(final) > 0)
     dlog_ci = compute_paired_delta_log_ci(
         final,
         values,

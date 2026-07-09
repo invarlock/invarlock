@@ -5,6 +5,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE_DIR = REPO_ROOT / "examples" / "integrations" / "awq"
 README = EXAMPLE_DIR / "README.md"
@@ -138,12 +140,12 @@ def test_awq_helper_writes_local_jsonl_and_preset(tmp_path: Path) -> None:
     assert len(rows) == 6
     assert all(isinstance(row["text"], str) and row["text"] for row in rows)
 
-    preset = preset_path.read_text(encoding="utf-8")
-    assert 'kind: "local_jsonl"' in preset
-    assert f'file: "{data_path}"' in preset
-    assert "seq_len: 32" in preset
-    assert "preview_n: 3" in preset
-    assert "final_n: 3" in preset
+    preset = yaml.safe_load(preset_path.read_text(encoding="utf-8"))
+    assert preset["dataset"]["provider"]["kind"] == "local_jsonl"
+    assert preset["dataset"]["provider"]["file"] == str(data_path)
+    assert preset["dataset"]["seq_len"] == 32
+    assert preset["dataset"]["preview_n"] == 3
+    assert preset["dataset"]["final_n"] == 3
 
     persisted = json.loads(summary_path.read_text(encoding="utf-8"))
     assert persisted["format_version"] == "awq-fixture-v1"

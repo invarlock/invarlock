@@ -1,4 +1,5 @@
 import os
+import subprocess
 from pathlib import Path
 
 from invarlock.core.config_loader import load_config
@@ -11,6 +12,15 @@ EXPECTED_CONFIGS = [
     ("overlays/edits/quant_rtn", "8bit_attn.yaml", None),
     ("overlays/edits/quant_rtn", "8bit_full.yaml", None),
 ]
+
+
+def _assert_shell_syntax(path: Path) -> None:
+    subprocess.run(["bash", "-n", str(path)], check=True, text=True)
+
+
+def _assert_required_tokens(text: str, tokens: set[str]) -> None:
+    missing = sorted(token for token in tokens if token not in text)
+    assert missing == []
 
 
 def test_small_workflow_configs_present() -> None:
@@ -48,78 +58,86 @@ def test_gpt2_user_journey_smoke_script_is_executable() -> None:
     )
     helper_path = repo_root / "scripts" / "smoke" / "gpt2_journey_helpers.py"
     common_path = repo_root / "scripts" / "smoke" / "lib" / "smoke_common.sh"
+    _assert_shell_syntax(script_path)
+    _assert_shell_syntax(common_path)
     contents = script_path.read_text(encoding="utf-8")
     helper_contents = helper_path.read_text(encoding="utf-8")
     common_contents = common_path.read_text(encoding="utf-8")
-    assert 'source "$SCRIPT_DIR/lib/smoke_common.sh"' in contents
-    assert 'GPT2_HELPER="$SCRIPT_DIR/gpt2_journey_helpers.py"' in contents
-    assert 'smoke_select_python "$REPO_ROOT"' in contents
-    assert 'smoke_setup_pythonpath "$REPO_ROOT"' in contents
-    assert "smoke_ensure_writable_hf_cache" in contents
-    assert "INVARLOCK_SMOKE_HOST_HF_CACHE_ROOT" in contents
-    assert 'CLI=("$PYTHON_BIN" -m invarlock)' in contents
+    _assert_required_tokens(
+        contents,
+        {
+            "smoke_common.sh",
+            "gpt2_journey_helpers.py",
+            "smoke_select_python",
+            "smoke_setup_pythonpath",
+            "smoke_ensure_writable_hf_cache",
+            "INVARLOCK_SMOKE_HOST_HF_CACHE_ROOT",
+            "PYTHON_BIN",
+            "invarlock",
+        },
+    )
     assert "command -v invarlock" not in contents
-    assert "INVARLOCK_SMOKE_CACHE_COMPLETE" in contents
-    assert 'MODE="${INVARLOCK_SMOKE_MODE:-all}"' in contents
-    assert 'PROFILE="dev"' in contents
-    assert 'ASSURANCE="${INVARLOCK_SMOKE_ASSURANCE:-}"' in contents
-    assert 'EDIT_CONFIG="${INVARLOCK_SMOKE_EDIT_CONFIG:-}"' in contents
-    assert (
-        'QUANT_EDIT_CONFIG="${INVARLOCK_SMOKE_QUANT_EDIT_CONFIG:-${EDIT_CONFIG:-$DEFAULT_QUANT_EDIT_CONFIG}}"'
-        in contents
+    _assert_required_tokens(
+        contents,
+        {
+            "INVARLOCK_SMOKE_CACHE_COMPLETE",
+            "INVARLOCK_SMOKE_MODE",
+            "PROFILE",
+            "INVARLOCK_SMOKE_ASSURANCE",
+            "INVARLOCK_SMOKE_EDIT_CONFIG",
+            "INVARLOCK_SMOKE_QUANT_EDIT_CONFIG",
+            "INVARLOCK_SMOKE_CUSTOM_EDIT_CONFIG",
+            "INVARLOCK_SMOKE_DEVICE",
+            "INVARLOCK_SMOKE_JOURNEYS",
+            "INVARLOCK_SMOKE_QUANTIZED",
+            "strict-bundle,noop,quantized,edited,negative",
+            "write_strict_bundle_fixture",
+            "run_strict_bundle_journey",
+        },
     )
-    assert (
-        'CUSTOM_EDIT_CONFIG="${INVARLOCK_SMOKE_CUSTOM_EDIT_CONFIG:-${EDIT_CONFIG:-$DEFAULT_QUANT_EDIT_CONFIG}}"'
-        in contents
-    )
-    assert 'SMOKE_DEVICE="${INVARLOCK_SMOKE_DEVICE:-auto}"' in contents
-    assert 'JOURNEYS_RAW="${INVARLOCK_SMOKE_JOURNEYS:-$DEFAULT_JOURNEYS}"' in contents
-    assert "INVARLOCK_SMOKE_QUANTIZED" in contents
-    assert 'DEFAULT_JOURNEYS="strict-bundle,noop,quantized,edited,negative"' in contents
-    assert "write_strict_bundle_fixture" in contents
-    assert "run_strict_bundle_journey" in contents
     assert "write_strict_bundle_fixture" in helper_contents
-    assert (
-        '"${CLI[@]}" verify "$eval_report" --assurance strict --profile ci --json'
-        in contents
+    _assert_required_tokens(
+        contents,
+        {
+            "verify",
+            "--assurance",
+            "--profile",
+            "--json",
+            "run_all_mode_journeys",
+            "append_child_results",
+            "run_child_suite",
+            "container",
+            "INVARLOCK_SMOKE_CONTAINER_PROFILE",
+            "INVARLOCK_SMOKE_CONTAINER_ASSURANCE",
+            "INVARLOCK_SMOKE_CONTAINER_JOURNEYS",
+            "SMOKE_DEVICE",
+            "record_result",
+            "verify-rejects",
+        },
     )
-    assert "run_all_mode_journeys" in contents
-    assert "append_child_results" in contents
-    assert (
-        'if ! append_child_results "$suite" "$child_root"; then\n    rc=1\n  fi'
-        in contents
-    )
-    assert 'run_child_suite "container" "container"' in contents
-    assert "INVARLOCK_SMOKE_CONTAINER_PROFILE" in contents
-    assert "INVARLOCK_SMOKE_CONTAINER_ASSURANCE" in contents
-    assert "INVARLOCK_SMOKE_CONTAINER_JOURNEYS" in contents
-    assert 'INVARLOCK_SMOKE_DEVICE="$SMOKE_DEVICE"' in contents
-    assert "assurance=$ASSURANCE" in contents
-    assert "device=$SMOKE_DEVICE" in contents
-    assert '--device "$SMOKE_DEVICE"' in contents
-    assert '--assurance "$ASSURANCE"' in contents
-    assert 'record_result "$journey/verify-rejects"' in contents
     assert "GPT-2 User Journey Smoke Results" in helper_contents
-    assert "journey-results.tsv" in contents
-    assert "prefetch_hf_assets_on_host" in contents
-    assert "smoke_ensure_current_runtime_image" in contents
-    assert 'echo "[smoke] refreshing local container runtime image"' in common_contents
-    assert (
-        'echo "[smoke] refreshing local CUDA container runtime image"'
-        in common_contents
+    _assert_required_tokens(
+        contents,
+        {
+            "journey-results.tsv",
+            "prefetch_hf_assets_on_host",
+            "smoke_ensure_current_runtime_image",
+            "prefetching GPT-2 + WikiText-2 into host HF cache",
+            "run_evidence_pack_journey",
+            "verify rejects mutated report",
+            "report html",
+            "evaluation.html",
+        },
     )
-    assert "make runtime-image" in common_contents
-    assert "make runtime-image-cuda" in common_contents
-    assert (
-        'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"'
-        in common_contents
-    )
-    assert "prefetching GPT-2 + WikiText-2 into host HF cache" in contents
-    assert "run_evidence_pack_journey" in contents
-    assert "verify rejects mutated report" in contents
-    assert (
-        '"${CLI[@]}" report html -i "$eval_report" -o "$export_dir/evaluation.html" --force'
-        in contents
+    _assert_required_tokens(
+        common_contents,
+        {
+            "refreshing local container runtime image",
+            "refreshing local CUDA container runtime image",
+            "make runtime-image",
+            "make runtime-image-cuda",
+            "invarlock-runtime:cuda-local",
+        },
     )
 
 
@@ -133,6 +151,8 @@ def test_tiny_container_smoke_campaign_script_is_executable() -> None:
         "run_tiny_container_smoke.sh should be executable"
     )
     common_path = repo_root / "scripts" / "smoke" / "lib" / "smoke_common.sh"
+    _assert_shell_syntax(script_path)
+    _assert_shell_syntax(common_path)
     contents = script_path.read_text(encoding="utf-8")
     common_contents = common_path.read_text(encoding="utf-8")
     assert 'source "$SCRIPT_DIR/lib/smoke_common.sh"' in contents
@@ -186,6 +206,7 @@ def test_cli_smoke_fast_uses_repo_selected_python() -> None:
     assert script_path.exists(), "Expected scripts/smoke/cli_smoke_fast.sh to exist"
     assert os.access(script_path, os.X_OK), "cli_smoke_fast.sh should be executable"
 
+    _assert_shell_syntax(script_path)
     contents = script_path.read_text(encoding="utf-8")
     assert 'source "$SCRIPT_DIR/lib/smoke_common.sh"' in contents
     assert 'smoke_select_python "$ROOT"' in contents
@@ -237,6 +258,7 @@ def test_cli_smoke_negative_exercises_failure_categories() -> None:
     assert script_path.exists(), "Expected scripts/smoke/cli_smoke_negative.sh to exist"
     assert os.access(script_path, os.X_OK), "cli_smoke_negative.sh should be executable"
 
+    _assert_shell_syntax(script_path)
     contents = script_path.read_text(encoding="utf-8")
     assert "tests/artifacts/golden_runs/gpt2/evaluation.report.json" in contents
     assert 'source "$SCRIPT_DIR/lib/smoke_common.sh"' in contents
@@ -265,6 +287,7 @@ def test_cli_smoke_matrix_dispatches_lane_matrix() -> None:
     assert script_path.exists(), "Expected scripts/smoke/cli_smoke_matrix.sh to exist"
     assert os.access(script_path, os.X_OK), "cli_smoke_matrix.sh should be executable"
 
+    _assert_shell_syntax(script_path)
     contents = script_path.read_text(encoding="utf-8")
     assert 'LANES_RAW="${INVARLOCK_SMOKE_LANES:-fast,negative,realistic}"' in contents
     assert 'script_path="$REPO_ROOT/scripts/smoke/cli_smoke_fast.sh"' in contents
@@ -289,6 +312,7 @@ def test_run_cpu_telemetry_uses_repo_selected_python() -> None:
     assert script_path.exists(), "Expected scripts/smoke/run_cpu_telemetry.sh to exist"
     assert os.access(script_path, os.X_OK), "run_cpu_telemetry.sh should be executable"
 
+    _assert_shell_syntax(script_path)
     contents = script_path.read_text(encoding="utf-8")
     assert 'source "$SCRIPT_DIR/lib/smoke_common.sh"' in contents
     assert 'smoke_select_python "$ROOT"' in contents

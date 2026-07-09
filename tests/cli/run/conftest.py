@@ -6,6 +6,8 @@ import pytest
 
 from invarlock.runtime_security import RuntimeSecurityPolicy
 
+_VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
+
 
 class _DummyRunModel:
     def named_parameters(self):
@@ -51,6 +53,7 @@ def _default_run_registry(monkeypatch: pytest.MonkeyPatch):
 
 @pytest.fixture(autouse=True)
 def _default_run_host_execution(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", _VALID_TEST_IMAGE_DIGEST)
     monkeypatch.setattr(
         "invarlock.cli.config_execution.host_execution_allowed",
         lambda: True,
