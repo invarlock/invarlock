@@ -8,6 +8,10 @@ import pytest
 import yaml
 
 from invarlock.catalog_inputs import materialize_catalog_input, prepare_catalog_preset
+from invarlock.eval.vision_evidence import (
+    bind_loaded_record,
+    load_materialization_snapshot,
+)
 from invarlock.evidence_catalog import EvidenceCatalogError, input_digest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -157,6 +161,17 @@ def test_materialize_catalog_input_uses_a_pinned_vision_entry(tmp_path: Path) ->
     assert (output_dir / "materialization_summary.json").is_file()
     assert result["manifest"]["path"] == "manifest.jsonl"
 
+    snapshot = load_materialization_snapshot(output_dir / "manifest.jsonl")
+    record = snapshot.records[0]
+    bind_loaded_record(
+        record_id=str(record["id"]),
+        raw_record=record,
+        observed_image_sha256=str(record["source"]["image_sha256"]),
+        materialization_digest=snapshot.materialization_digest,
+        manifest_sha256=snapshot.manifest_sha256,
+        bindings=snapshot.bindings,
+    )
+
 
 def test_prepare_catalog_preset_requires_bound_materialization(tmp_path: Path) -> None:
     preset = tmp_path / "source-preset.yaml"
@@ -274,8 +289,11 @@ def test_prepare_catalog_preset_overlays_exact_text_model_and_dataset(
         "revision": "b" * 40,
     }
     assert prepared["dataset"]["provider"] == {
-        "kind": "wikitext2",
+        "kind": "hf_text",
         "dataset_name": "Salesforce/wikitext",
         "config_name": "wikitext-2-raw-v1",
+        "text_field": "text",
+        "max_samples": 10000,
         "revision": "c" * 40,
     }
+    assert prepared["dataset"]["split"] == "train"

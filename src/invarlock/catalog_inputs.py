@@ -305,6 +305,12 @@ def materialize_catalog_input(
                         "question": question,
                         "image_sha256": hashlib.sha256(image_bytes).hexdigest(),
                         "image_bytes": len(image_bytes),
+                        "prompt_sha256": hashlib.sha256(
+                            prompt.encode("utf-8")
+                        ).hexdigest(),
+                        "answer_sha256": hashlib.sha256(
+                            canonical_json_bytes(answers)
+                        ).hexdigest(),
                         "dataset_record_sha256": dataset_record_digest(
                             dataset=config.dataset,
                             revision=config.revision,

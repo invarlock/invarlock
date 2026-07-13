@@ -6,8 +6,13 @@ model:
   device: "auto"
 
 dataset:
-  provider: "wikitext2"
-  split: "validation"
+  provider:
+    kind: "hf_text"
+    dataset_name: "Salesforce/wikitext"
+    config_name: "wikitext-2-raw-v1"
+    text_field: "text"
+    max_samples: 10000
+  split: "train"
   seq_len: 128
   stride: 128
   preview_n: 64
@@ -23,6 +28,11 @@ eval:
     seed: 42
     random_token_prob: 0.10
     original_token_prob: 0.10
+
+primary_metric:
+  drift_band:
+    min: 0.90
+    max: 1.20
 
 edit:
   name: "noop"

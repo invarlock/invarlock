@@ -20,18 +20,25 @@ def _load_script_module() -> ModuleType:
 
 
 def _write_contracts(
-    tmp_path: Path, *, classification: dict, support: dict, catalog: dict
-) -> tuple[Path, Path, Path]:
+    tmp_path: Path,
+    *,
+    classification: dict,
+    support: dict,
+    catalog: dict,
+    evidence_catalog: dict,
+) -> tuple[Path, Path, Path, Path]:
     classification_path = tmp_path / "model_classification.json"
     support_path = tmp_path / "support_matrix.json"
     catalog_path = tmp_path / "model_family_catalog.json"
+    evidence_catalog_path = tmp_path / "evidence_catalog_v1.json"
     classification_path.write_text(json.dumps(classification), encoding="utf-8")
     support_path.write_text(json.dumps(support), encoding="utf-8")
     catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
-    return classification_path, support_path, catalog_path
+    evidence_catalog_path.write_text(json.dumps(evidence_catalog), encoding="utf-8")
+    return classification_path, support_path, catalog_path, evidence_catalog_path
 
 
-def _current_contracts() -> tuple[dict, dict, dict]:
+def _current_contracts() -> tuple[dict, dict, dict, dict]:
     classification = json.loads(
         Path("contracts/model_classification.json").read_text(encoding="utf-8")
     )
@@ -41,7 +48,10 @@ def _current_contracts() -> tuple[dict, dict, dict]:
     catalog = json.loads(
         Path("contracts/model_family_catalog.json").read_text(encoding="utf-8")
     )
-    return classification, support, catalog
+    evidence_catalog = json.loads(
+        Path("contracts/evidence_catalog_v1.json").read_text(encoding="utf-8")
+    )
+    return classification, support, catalog, evidence_catalog
 
 
 def _patch_contract_paths(
@@ -51,10 +61,12 @@ def _patch_contract_paths(
     classification_path: Path,
     support_path: Path,
     catalog_path: Path,
+    evidence_catalog_path: Path,
 ) -> None:
     monkeypatch.setattr(mod, "MODEL_CLASSIFICATION_PATH", classification_path)
     monkeypatch.setattr(mod, "SUPPORT_MATRIX_PATH", support_path)
     monkeypatch.setattr(mod, "MODEL_FAMILY_CATALOG_PATH", catalog_path)
+    monkeypatch.setattr(mod, "EVIDENCE_CATALOG_PATH", evidence_catalog_path)
 
 
 def test_model_classification_accepts_current_contracts() -> None:
@@ -76,13 +88,16 @@ def test_model_classification_catches_blocked_checkpoint_reintroduction(
     monkeypatch, tmp_path: Path
 ) -> None:
     mod = _load_script_module()
-    classification, support, catalog = _current_contracts()
+    classification, support, catalog, evidence_catalog = _current_contracts()
     support["lanes"][0]["representative_models"] = ["facebook/opt-1.3b"]
-    classification_path, support_path, catalog_path = _write_contracts(
-        tmp_path,
-        classification=classification,
-        support=support,
-        catalog=catalog,
+    classification_path, support_path, catalog_path, evidence_catalog_path = (
+        _write_contracts(
+            tmp_path,
+            classification=classification,
+            support=support,
+            catalog=catalog,
+            evidence_catalog=evidence_catalog,
+        )
     )
     _patch_contract_paths(
         monkeypatch,
@@ -90,6 +105,7 @@ def test_model_classification_catches_blocked_checkpoint_reintroduction(
         classification_path=classification_path,
         support_path=support_path,
         catalog_path=catalog_path,
+        evidence_catalog_path=evidence_catalog_path,
     )
 
     findings = mod.audit()
@@ -105,16 +121,19 @@ def test_model_classification_catches_published_basis_candidate_decision_drift(
     monkeypatch, tmp_path: Path
 ) -> None:
     mod = _load_script_module()
-    classification, support, catalog = _current_contracts()
+    classification, support, catalog, evidence_catalog = _current_contracts()
     for entry in classification["entries"]:
         if entry.get("candidate_id") == "broader-bert-like-mlms":
             entry["classification"] = "backlog"
             break
-    classification_path, support_path, catalog_path = _write_contracts(
-        tmp_path,
-        classification=classification,
-        support=support,
-        catalog=catalog,
+    classification_path, support_path, catalog_path, evidence_catalog_path = (
+        _write_contracts(
+            tmp_path,
+            classification=classification,
+            support=support,
+            catalog=catalog,
+            evidence_catalog=evidence_catalog,
+        )
     )
     _patch_contract_paths(
         monkeypatch,
@@ -122,6 +141,7 @@ def test_model_classification_catches_published_basis_candidate_decision_drift(
         classification_path=classification_path,
         support_path=support_path,
         catalog_path=catalog_path,
+        evidence_catalog_path=evidence_catalog_path,
     )
 
     findings = mod.audit()
@@ -133,20 +153,23 @@ def test_model_classification_catches_published_basis_candidate_decision_drift(
     )
 
 
-def test_model_classification_catches_suite_role_drift(
+def test_model_classification_catches_evidence_catalog_drift(
     monkeypatch, tmp_path: Path
 ) -> None:
     mod = _load_script_module()
-    classification, support, catalog = _current_contracts()
-    for entry in classification["entries"]:
-        if entry.get("id") == "mixtral-8x7b-moe-causal-hf":
-            entry["suite_roles"] = ["support-matrix-backlog-gpu"]
+    classification, support, catalog, evidence_catalog = _current_contracts()
+    for entry in evidence_catalog["entries"]:
+        if entry.get("lane_id") == "mixtral-8x7b-moe-causal-hf":
+            entry["model"]["adapter"] = "hf_mlm"
             break
-    classification_path, support_path, catalog_path = _write_contracts(
-        tmp_path,
-        classification=classification,
-        support=support,
-        catalog=catalog,
+    classification_path, support_path, catalog_path, evidence_catalog_path = (
+        _write_contracts(
+            tmp_path,
+            classification=classification,
+            support=support,
+            catalog=catalog,
+            evidence_catalog=evidence_catalog,
+        )
     )
     _patch_contract_paths(
         monkeypatch,
@@ -154,12 +177,13 @@ def test_model_classification_catches_suite_role_drift(
         classification_path=classification_path,
         support_path=support_path,
         catalog_path=catalog_path,
+        evidence_catalog_path=evidence_catalog_path,
     )
 
     findings = mod.audit()
 
     assert any(
-        finding.scope == "model_evidence:repo-mentioned-gpu:mixtral_8x7b_public"
-        and "does not list this suite role" in finding.message
+        finding.scope == "evidence_catalog:mixtral-8x7b-moe-causal-hf"
+        and "adapter disagrees with the support matrix" in finding.message
         for finding in findings
     )
