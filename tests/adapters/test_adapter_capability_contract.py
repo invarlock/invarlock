@@ -55,3 +55,14 @@ def test_support_matrix_adapters_have_capability_entries() -> None:
 
     assert support_adapters <= capabilities
     assert "hf_auto" in capabilities
+
+
+def test_compressed_tensors_capability_declares_its_strict_assurance_boundary() -> None:
+    capabilities = {
+        item["adapter"]: item for item in load_adapter_capabilities()["adapters"]
+    }
+
+    assert (
+        "strict_assurance_unavailable_pending_packed_storage_proof"
+        in capabilities["hf_ct"]["degraded_modes"]
+    )

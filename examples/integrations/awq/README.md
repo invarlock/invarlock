@@ -1,7 +1,7 @@
 # AWQ Integration Example
 
-Status: `runnable` on CUDA hosts; strict container evidence is verified on
-CUDA for this tiny AWQ example with the example-only GPTQModel/AWQ image.
+Status: `runnable` on CUDA hosts. A `cuda-container-strict` result requires
+independent acceptance inputs and the successful current run described below.
 
 This example shows how to attach InvarLock regression evidence to a checkpoint
 quantized with GPTQModel's AWQ flow. It creates a deterministic small
@@ -29,9 +29,9 @@ From a source checkout with `uv`:
 
 ```bash
 uv run --extra awq python - <<'PY'
-from invarlock.plugins import _patch_gptqmodel_transformers_hub_compat
-_patch_gptqmodel_transformers_hub_compat()
-import gptqmodel
+from invarlock.gptqmodel_runtime import require_gptqmodel_runtime
+
+require_gptqmodel_runtime()
 PY
 ```
 
@@ -46,7 +46,9 @@ PY
 
 Host lanes run prerequisite preflight before model materialization and
 evaluation. This AWQ example is CUDA-only because AWQ materialization requires
-CUDA regardless of the final evaluator device.
+CUDA regardless of the final evaluator device. The CUDA host preflight requires
+GPTQModel's JIT prerequisites: a C++ compiler, `ninja`, matching Python
+development headers, and a CUDA toolkit with `nvcc`.
 
 ### cuda-container-strict lane
 
@@ -57,7 +59,11 @@ CUDA host with that image configured:
 examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-gptqmodel
 examples/integrations/_runtime_images/smoke_example_runtime_image.sh cuda-gptqmodel
 
+TRUSTED_RUNTIME_IMAGE_DIGEST='sha256:REPLACE_WITH_REVIEWED_64_HEX_DIGEST'
+INVARLOCK_ACCEPTANCE_BASELINE_REPORT=/path/to/raw-baseline-report.json \
+INVARLOCK_ACCEPTANCE_POLICY_PACK=/path/to/acceptance-policy-pack.json \
 INVARLOCK_RUNTIME_IMAGE=invarlock-example-runtime:cuda-gptqmodel \
+INVARLOCK_EXPECTED_RUNTIME_IMAGE_DIGEST="$TRUSTED_RUNTIME_IMAGE_DIGEST" \
 uv run --extra awq \
   examples/integrations/awq/run_tiny_awq.sh \
   --allow-network \
@@ -65,8 +71,9 @@ uv run --extra awq \
   --lane cuda
 ```
 
-Use the digest-pinned image reference recorded in `runtime.manifest.json` when
-the artifact is being shared externally.
+Obtain the trusted digest independently from reviewed build/release policy.
+The matching digest in `runtime.manifest.json` is a manifest claim, not the source of
+the verifier pin.
 
 This strict lane is scoped to the configured tiny AWQ checkpoint and runtime
 image. Rerun the strict lane for the target runtime before using the result as
@@ -87,7 +94,8 @@ uv run --extra awq \
 
 The host path uses `--execution-mode host --assurance off` because the AWQ
 runtime depends on the selected CUDA host and installed GPTQModel wheel. To
-exercise a different AWQ backend, pass `--awq-backend VALUE`.
+exercise a different AWQ backend, pass `--awq-backend VALUE`. Its output is
+diagnostic only and cannot serve as strict or release evidence.
 
 ## Evidence Boundary
 
@@ -112,6 +120,7 @@ The default run writes generated artifacts under this directory:
 | `reports/tiny-awq/<artifact-lane>/verify.json` | Machine-readable verifier result. |
 | `reports/tiny-awq/<artifact-lane>/evaluation.html` | Human-readable report. |
 | `reports/tiny-awq/<artifact-lane>/backend_inventory.json` | GPTQModel backend version and AWQ module inventory when exposed. |
+| `reports/tiny-awq/<artifact-lane>/runtime_quantization_proof.json` | Strict-lane v1 process receipt listing recognized AWQ runtime types; wrapper-side schema checks are not an independent runtime observation or checkpoint-artifact proof. |
 | `reports/tiny-awq/<artifact-lane>/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
 | `reports/tiny-awq/<artifact-lane>/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
 | `reports/tiny-awq/<artifact-lane>/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
@@ -128,4 +137,9 @@ quantized checkpoint configuration, or if the subject cannot be loaded back
 through the Transformers AWQ loader with the selected backend.
 
 The shell runner relies on InvarLock report persistence to emit
-`backend_inventory.json` when adapter provenance is available.
+`backend_inventory.json` when adapter provenance is available and, for
+`cuda-container-strict`, requires `runtime_quantization_proof.json`. The shared
+wrapper validates the receipt's v1 schema, selected adapter/backend binding,
+allowed type-name surface, and matching backend inventory before `verify`.
+Those checks validate sidecars written by the evaluated process; they are not
+an independent runtime observation or checkpoint-artifact proof.

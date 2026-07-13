@@ -9,7 +9,7 @@ snapshot/restore behavior, and evaluation strategies.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -36,7 +36,8 @@ class QuantizationConfig:
 
     Attributes:
         method: The quantization method used.
-        bits: Bit-width of the quantization (e.g., 4, 8, 16).
+        bits: Bit-width of the quantization (e.g., 4, 8, 16), or ``None``
+            when a backend config does not declare one unambiguously.
         group_size: Group size for grouped quantization (AWQ/GPTQ).
         from_checkpoint: True if model was loaded from pre-quantized checkpoint.
         double_quant: Whether double quantization is enabled (BNB 4-bit).
@@ -44,7 +45,7 @@ class QuantizationConfig:
     """
 
     method: QuantizationMethod = QuantizationMethod.NONE
-    bits: int = 16
+    bits: int | None = 16
     group_size: int | None = None
     from_checkpoint: bool = False
     double_quant: bool = False
@@ -206,7 +207,8 @@ class ModelCapabilities:
     @classmethod
     def for_compressed_tensors(
         cls,
-        bits: int = 8,
+        bits: int | None = None,
+        group_size: int | None = None,
         from_checkpoint: bool = True,
     ) -> ModelCapabilities:
         """Create capabilities for a compressed-tensors checkpoint model."""
@@ -214,6 +216,7 @@ class ModelCapabilities:
             quantization=QuantizationConfig(
                 method=QuantizationMethod.COMPRESSED_TENSORS,
                 bits=bits,
+                group_size=group_size,
                 from_checkpoint=from_checkpoint,
             ),
             device_movable=False,
@@ -253,62 +256,128 @@ def _is_compressed_tensors_method(value: Any) -> bool:
     return "compressed_tensors" in normalized or "compressedtensors" in normalized
 
 
-def _compressed_tensors_bits_from_config(value: Any, *, default: int = 8) -> int:
-    if isinstance(value, dict):
-        direct_bits = value.get("bits", value.get("num_bits", value.get("nbits")))
-        bits = _coerce_positive_int(direct_bits, default=0)
-        if bits > 0:
-            return bits
+_MISSING = object()
 
-        groups = value.get("config_groups", {})
-        group_candidates: Iterable[Any]
-        if isinstance(groups, dict):
-            group_candidates = groups.values()
-        elif isinstance(groups, (list, tuple)):
-            group_candidates = groups
-        else:
-            group_candidates = ()
-        for group in group_candidates:
-            if not isinstance(group, dict):
-                continue
-            weights = group.get("weights", {})
-            if isinstance(weights, dict):
-                bits = _coerce_positive_int(weights.get("num_bits"), default=0)
-                if bits > 0:
-                    return bits
-        return default
 
-    direct_bits = getattr(
-        value,
-        "bits",
-        getattr(value, "num_bits", getattr(value, "nbits", None)),
-    )
-    bits = _coerce_positive_int(direct_bits, default=0)
-    if bits > 0:
-        return bits
+def _serialized_config_mapping(
+    value: Any,
+    *,
+    _seen: frozenset[int] = frozenset(),
+    _depth: int = 0,
+) -> Mapping[str, Any] | None:
+    """Return a serialized config mapping without guessing third-party fields."""
+    if _depth > 1 or id(value) in _seen:
+        return None
+    if isinstance(value, Mapping):
+        return value
 
-    groups = getattr(value, "config_groups", {})
-    object_group_candidates: Iterable[Any]
-    if isinstance(groups, dict):
-        object_group_candidates = groups.values()
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        try:
+            serialized = to_dict()
+        except Exception:  # Third-party optional config objects must fail closed.
+            serialized = None
+        if isinstance(serialized, Mapping):
+            return serialized
+
+    nested = getattr(value, "quantization_config", _MISSING)
+    if nested is not _MISSING and nested is not value:
+        return _serialized_config_mapping(
+            nested,
+            _seen=_seen | {id(value)},
+            _depth=_depth + 1,
+        )
+    return None
+
+
+def _config_field(value: Any, name: str) -> Any:
+    if isinstance(value, Mapping):
+        return value.get(name, _MISSING)
+    return getattr(value, name, _MISSING)
+
+
+def _declared_values(value: Any, names: tuple[str, ...]) -> list[Any]:
+    return [
+        candidate
+        for name in names
+        if (candidate := _config_field(value, name)) is not _MISSING
+    ]
+
+
+def _uniform_positive_int(values: list[Any]) -> int | None:
+    """Return one declared value only when every supplied value agrees."""
+    if not values:
+        return None
+    normalized = [_coerce_positive_int(value, default=0) for value in values]
+    if any(value <= 0 for value in normalized):
+        return None
+    unique = set(normalized)
+    return next(iter(unique)) if len(unique) == 1 else None
+
+
+def _compressed_tensors_group_values(
+    config: Mapping[str, Any],
+    *,
+    names: tuple[str, ...],
+) -> tuple[list[Any], bool]:
+    """Collect declared weight metadata and mark opaque group layouts ambiguous."""
+    groups = config.get("config_groups", _MISSING)
+    if groups is _MISSING or groups is None:
+        return [], False
+    if isinstance(groups, Mapping):
+        candidates = list(groups.values())
     elif isinstance(groups, (list, tuple)):
-        object_group_candidates = groups
+        candidates = list(groups)
     else:
-        object_group_candidates = ()
-    for group in object_group_candidates:
-        weights = (
-            group.get("weights", {})
-            if isinstance(group, dict)
-            else getattr(group, "weights", {})
+        return [], True
+
+    values: list[Any] = []
+    saw_weight_scheme = False
+    for group in candidates:
+        weights = _config_field(group, "weights")
+        if weights is _MISSING or weights is None:
+            continue
+        saw_weight_scheme = True
+        declared = _declared_values(weights, names)
+        values.extend(declared if declared else [_MISSING])
+    return values, saw_weight_scheme
+
+
+def _compressed_tensors_declared_metadata(
+    value: Any,
+) -> tuple[int | None, int | None]:
+    """Read globally uniform packed weight metadata from compressed-tensors.
+
+    Transformers' ``CompressedTensorsConfig`` keeps the actual scheme inside a
+    nested optional-package object and exposes the serialized structure through
+    ``to_dict()``. Precision and group size are global only when every declared
+    weight scheme agrees; mixed or opaque group layouts deliberately yield
+    ``None`` rather than an arbitrary first-group value.
+    """
+    config = _serialized_config_mapping(value)
+    if config is None:
+        return None, None
+
+    def resolve(names: tuple[str, ...]) -> int | None:
+        direct_values = _declared_values(config, names)
+        direct = _uniform_positive_int(direct_values)
+        group_values, saw_weight_scheme = _compressed_tensors_group_values(
+            config,
+            names=names,
         )
-        bits = (
-            _coerce_positive_int(weights.get("num_bits"), default=0)
-            if isinstance(weights, dict)
-            else _coerce_positive_int(getattr(weights, "num_bits", None), default=0)
-        )
-        if bits > 0:
-            return bits
-    return default
+        if not saw_weight_scheme:
+            return direct
+        grouped = _uniform_positive_int(group_values)
+        if grouped is None:
+            return None
+        if direct_values and direct != grouped:
+            return None
+        return grouped
+
+    return (
+        resolve(("bits", "num_bits", "nbits")),
+        resolve(("group_size",)),
+    )
 
 
 def detect_quantization_from_config(config: Any) -> QuantizationConfig:
@@ -388,9 +457,13 @@ def detect_quantization_from_config(config: Any) -> QuantizationConfig:
                 from_checkpoint=True,
             )
         elif _is_compressed_tensors_method(quant_method):
+            compressed_bits, compressed_group_size = (
+                _compressed_tensors_declared_metadata(quant_cfg)
+            )
             return QuantizationConfig(
                 method=QuantizationMethod.COMPRESSED_TENSORS,
-                bits=_compressed_tensors_bits_from_config(quant_cfg),
+                bits=compressed_bits,
+                group_size=compressed_group_size,
                 from_checkpoint=True,
             )
         elif load_in_8bit or (quant_method == "bitsandbytes" and bits == 8):
@@ -492,9 +565,13 @@ def detect_quantization_from_config(config: Any) -> QuantizationConfig:
         )
 
     if "CompressedTensors" in cfg_class or "Compressed" in cfg_class:
+        compressed_bits, compressed_group_size = _compressed_tensors_declared_metadata(
+            quant_cfg
+        )
         return QuantizationConfig(
             method=QuantizationMethod.COMPRESSED_TENSORS,
-            bits=_compressed_tensors_bits_from_config(quant_cfg),
+            bits=compressed_bits,
+            group_size=compressed_group_size,
             from_checkpoint=True,
         )
 
@@ -589,7 +666,7 @@ def detect_capabilities_from_model(model: Any) -> ModelCapabilities:
                     ):
                         quant_config = QuantizationConfig(
                             method=QuantizationMethod.COMPRESSED_TENSORS,
-                            bits=8,
+                            bits=None,
                             from_checkpoint=True,
                         )
                         break

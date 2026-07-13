@@ -12,6 +12,7 @@ import pytest
 from invarlock.cli.commands.run import run_command
 from tests.cli.run._support_run_common import (
     assert_single_run_output_artifacts,
+    canonical_ppl_metrics,
     common_ce_detect_ce_patches,
     offline_registry_patch,
     write_base_run_config,
@@ -131,11 +132,7 @@ def test_baseline_mlm_no_masked_tokens_exit(tmp_path: Path):
                 lambda: SimpleNamespace(
                     execute=lambda **k: SimpleNamespace(
                         edit={},
-                        metrics={
-                            "ppl_preview": 1.0,
-                            "ppl_final": 1.0,
-                            "ppl_ratio": 1.0,
-                        },
+                        metrics=canonical_ppl_metrics(),
                         guards={},
                         context={"dataset_meta": {}},
                         status="success",
@@ -220,11 +217,7 @@ def test_guard_order_permutations(tmp_path: Path, order):
                 lambda: SimpleNamespace(
                     execute=lambda **k: SimpleNamespace(
                         edit={},
-                        metrics={
-                            "ppl_preview": 1.0,
-                            "ppl_final": 1.0,
-                            "ppl_ratio": 1.0,
-                        },
+                        metrics=canonical_ppl_metrics(),
                         guards={},
                         context={"dataset_meta": {}},
                         status="success",

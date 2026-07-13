@@ -31,9 +31,6 @@ def test_command_wrappers_importable():
     from invarlock.cli.commands.doctor import doctor_command
     from invarlock.cli.commands.evaluate import evaluate_command
     from invarlock.cli.commands.evidence_pack import (
-        build_command as evidence_pack_build_command,
-    )
-    from invarlock.cli.commands.evidence_pack import (
         inspect_command as evidence_pack_inspect_command,
     )
     from invarlock.cli.commands.evidence_pack import (
@@ -55,7 +52,6 @@ def test_command_wrappers_importable():
         export_html_command,
         policy_build_command,
         policy_verify_command,
-        evidence_pack_build_command,
         evidence_pack_inspect_command,
         evidence_pack_verify_command,
         plugins_command,

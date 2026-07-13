@@ -2,8 +2,7 @@
 InvarLock Adapters Base
 ===================
 
-Base adapter interface and utilities for InvarLock adapters.
-Simplified implementation for production framework.
+Base adapter interface and shared utilities for InvarLock adapters.
 """
 
 import contextlib
@@ -373,14 +372,6 @@ class AdapterCache:
 
         return self._cache[key]
 
-    def save(self):
-        """Save cache to disk (stub)."""
-        pass
-
-    def load(self):
-        """Load cache from disk (stub)."""
-        pass
-
 
 class PerformanceTracker:
     """Performance tracking functionality."""
@@ -440,7 +431,7 @@ class PerformanceTracker:
     def export_metrics(self, path: Path):
         """Export metrics to file."""
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(self._metrics, f, indent=2)
+            json.dump(self._metrics, f, indent=2, allow_nan=False)
 
 
 class AdapterManager:
@@ -497,107 +488,3 @@ class AdapterManager:
         for name in self.adapters:
             adapters_health[name] = self.check_adapter_health(name)
         return {"adapters": adapters_health}
-
-
-class AdapterUtils:
-    """Adapter utility functions."""
-
-    @staticmethod
-    def _parse_version_tuple(value: str) -> tuple[int, ...]:
-        parts: list[int] = []
-        for raw_part in str(value).split("."):
-            digits = ""
-            for char in raw_part:
-                if char.isdigit():
-                    digits += char
-                else:
-                    break
-            if digits == "":
-                break
-            parts.append(int(digits))
-        return tuple(parts)
-
-    @staticmethod
-    def validate_config(config: dict[str, Any]) -> dict[str, Any]:
-        """Validate adapter configuration."""
-        valid = True
-        errors = []
-
-        if not config.get("name"):
-            valid = False
-            errors.append("name is required")
-
-        if not config.get("adapter_type"):
-            valid = False
-            errors.append("adapter_type is required")
-
-        return {"valid": valid, "errors": errors}
-
-    @staticmethod
-    def infer_adapter_type(model_id: str) -> str:
-        """Infer adapter type from model ID."""
-        if "gpt" in model_id.lower():
-            return "huggingface"
-        elif "davinci" in model_id.lower():
-            return "openai"
-        else:
-            return "generic"
-
-    @staticmethod
-    def select_optimal_device() -> str:
-        """Select optimal device."""
-        if torch.cuda.is_available():
-            return "cuda:0"
-        return "cpu"
-
-    @staticmethod
-    def estimate_memory_usage(model_params: dict[str, Any]) -> float:
-        """Estimate memory usage."""
-        num_params = model_params.get("num_parameters", 0)
-        precision = model_params.get("precision", "float32")
-
-        bytes_per_param = 4 if precision == "float32" else 2
-        base_memory = (num_params * bytes_per_param) / (1024**2)  # MB
-
-        # Add overhead
-        return float(base_memory * 1.2)
-
-    @staticmethod
-    def check_compatibility(
-        requirements: dict[str, str], system_info: dict[str, str]
-    ) -> dict[str, Any]:
-        """Check compatibility."""
-        compatible = True
-        issues = []
-
-        # Simple version checking (would need proper semver in production)
-        for requirement, _version in requirements.items():
-            if requirement in system_info:
-                system_version = system_info[requirement]
-                # Parse components so 3.10 is not treated as older than 3.8.
-                if "python" in requirement and AdapterUtils._parse_version_tuple(
-                    system_version
-                ) < (3, 8):
-                    compatible = False
-                    issues.append(f"Python version {system_version} < 3.8")
-
-        return {"compatible": compatible, "issues": issues}
-
-    @staticmethod
-    def migrate_config(
-        old_config: dict[str, Any], target_version: str
-    ) -> dict[str, Any]:
-        """Migrate configuration."""
-        new_config = old_config.copy()
-        new_config["version"] = target_version
-
-        # Migration logic would go here
-        if "model_path" in old_config:
-            new_config["model_id"] = old_config["model_path"]
-            del new_config["model_path"]
-
-        if "device_id" in old_config:
-            new_config["device"] = {"type": "cuda", "index": old_config["device_id"]}
-            del new_config["device_id"]
-
-        return new_config

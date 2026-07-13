@@ -33,7 +33,8 @@ def _is_bare_control(kwargs: dict[str, object]) -> bool:
         return False
     validation = context.get("validation")
     return (
-        isinstance(validation, dict) and validation.get("guard_overhead_mode") == "bare"
+        isinstance(validation, dict)
+        and validation.get("guard_metric_impact_mode") == "bare"
     )
 
 
@@ -240,7 +241,7 @@ def test_dataset_meta_stratification_scorer_profile(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: Provider())
@@ -302,7 +303,7 @@ def test_metrics_window_plan_stats_map(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         stack.enter_context(
             patch(
@@ -358,7 +359,7 @@ def test_metrics_window_plan_capacity_map(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         stack.enter_context(
             patch(
@@ -411,7 +412,7 @@ def test_persist_ref_masks_artifact(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         stack.enter_context(
             patch(
@@ -432,7 +433,7 @@ def test_persist_ref_masks_artifact(tmp_path: Path):
     assert path.exists() and path.name == "masks.json"
 
 
-def test_overhead_bare_warning_present(tmp_path: Path):
+def test_failed_bare_control_prevents_metric_impact_report(tmp_path: Path):
     cfg = _cfg(tmp_path, 1, 1)
     captured = {}
 
@@ -461,27 +462,8 @@ def test_overhead_bare_warning_present(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        # Validator passes but we expect bare warning to be captured
-        for target in (
-            "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
-            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
-        ):
-            stack.enter_context(
-                patch(
-                    target,
-                    lambda *a, **k: SimpleNamespace(
-                        passed=True,
-                        messages=[],
-                        warnings=[],
-                        errors=[],
-                        checks={},
-                        metrics={"overhead_ratio": 0.0, "overhead_percent": 0.0},
-                    ),
-                )
-            )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
@@ -489,20 +471,17 @@ def test_overhead_bare_warning_present(tmp_path: Path):
                 "invarlock.eval.data.get_provider", lambda *a, **k: _provider_simple()
             )
         )
-        run_command(
-            config=str(cfg),
-            device="cpu",
-            profile="ci",
-            out=str(tmp_path / "runs"),
-            until_pass=False,
-        )
+        with pytest.raises(click.exceptions.Exit) as exc_info:
+            run_command(
+                config=str(cfg),
+                device="cpu",
+                profile="ci",
+                out=str(tmp_path / "runs"),
+                until_pass=False,
+            )
 
-    gh = captured["r"].get("guard_overhead", {})
-    assert (
-        isinstance(gh, dict)
-        and gh.get("evaluated") is True
-        and gh.get("passed") is True
-    )
+    assert exc_info.value.exit_code == 3
+    assert captured == {}
 
 
 def test_dedupe_min_floor_error_path(tmp_path: Path):

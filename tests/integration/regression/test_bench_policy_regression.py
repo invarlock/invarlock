@@ -10,6 +10,10 @@ import pytest
 import invarlock.eval.bench_policy as bench
 from invarlock.eval.bench_runner import run_guard_effect_benchmark
 from invarlock.reporting.report_types import create_empty_report
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
 
 TESTS_ROOT = Path(__file__).resolve().parents[2]
 REPO_ROOT = TESTS_ROOT.parent
@@ -76,8 +80,14 @@ def test_bench_policy_regression_against_golden(tmp_path: Path, monkeypatch) -> 
                 "seed": scenario.seed,
                 "commit": "",
                 "ts": "2025-01-01T00:00:00",
+                "auto": {
+                    "tier": scenario.tier,
+                    "probes_used": scenario.probes,
+                    "target_pm_ratio": None,
+                },
             }
         )
+        report["context"] = {"profile": scenario.profile}
         report["data"].update(
             {
                 "dataset": "synthetic",
@@ -88,32 +98,37 @@ def test_bench_policy_regression_against_golden(tmp_path: Path, monkeypatch) -> 
                 "final_n": scenario.final_n,
             }
         )
-        report["edit"].update({"name": scenario.edit, "plan_digest": "pd"})
+        report["edit"].update(
+            {
+                "name": "noop" if run_type == "bare" else scenario.edit,
+                "plan_digest": "pd",
+            }
+        )
 
         if scenario.tier == "balanced":
-            guarded_ppl = 10.09
+            guarded_value = 10.09
             guarded_duration = 1.13
             guarded_mem = 1090.0
         elif scenario.tier == "conservative":
-            guarded_ppl = 10.08
+            guarded_value = 10.08
             guarded_duration = 1.14
             guarded_mem = 1095.0
         else:  # pragma: no cover
-            guarded_ppl = 10.10
+            guarded_value = 10.10
             guarded_duration = 1.10
             guarded_mem = 1080.0
 
-        bare_ppl = 10.0
+        bare_value = 10.0
         bare_duration = 1.0
         bare_mem = 1000.0
 
         if run_type == "bare":
-            pm_final = bare_ppl
+            pm_final = bare_value
             duration_s = bare_duration
             mem = bare_mem
             outliers = 2
         else:
-            pm_final = guarded_ppl
+            pm_final = guarded_value
             duration_s = guarded_duration
             mem = guarded_mem
             outliers = 3
@@ -136,12 +151,16 @@ def test_bench_policy_regression_against_golden(tmp_path: Path, monkeypatch) -> 
             report["guards"] = [
                 {
                     "name": "rmt",
+                    "passed": True,
+                    "decision": "allow",
                     "policy": {"deadband": 0.10, "margin": 1.5},
                     "metrics": {"outliers_total": outliers},
                     "violations": [],
                 },
                 {
                     "name": "invariants",
+                    "passed": True,
+                    "decision": "allow",
                     "policy": {},
                     "metrics": {"violations_found": 0},
                     "violations": [],
@@ -151,7 +170,16 @@ def test_bench_policy_regression_against_golden(tmp_path: Path, monkeypatch) -> 
             output_dir / f"{scenario.edit}-{scenario.tier}-{run_type}.report.json"
         )
         report["flags"].update({"guard_recovered": False, "rollback_reason": None})
-        return bench.RunResult(run_type=run_type, report=report, success=True)
+        canonical_report = (
+            canonical_baseline(report)
+            if run_type == "bare"
+            else canonical_run_report(report)
+        )
+        return bench.RunResult(
+            run_type=run_type,
+            report=canonical_report,
+            success=True,
+        )
 
     monkeypatch.setattr(
         "invarlock.eval.bench_runner.execute_single_run", stub_execute_single_run
@@ -183,13 +211,13 @@ def test_bench_policy_regression_against_golden(tmp_path: Path, monkeypatch) -> 
     float_keys = {
         "primary_metric_bare",
         "primary_metric_guarded",
-        "primary_metric_overhead",
+        "guard_primary_metric_impact",
         "latency_bare",
         "latency_guarded",
-        "guard_overhead_time",
+        "guard_runtime_overhead",
         "mem_bare",
         "mem_guarded",
-        "guard_overhead_mem",
+        "guard_memory_overhead",
         "epsilon",
     }
 

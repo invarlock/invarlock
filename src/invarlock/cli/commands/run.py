@@ -37,6 +37,7 @@ def run_command(
     allow_unverified_provenance: bool = False,
     prefer_local_files_only: bool = False,
     no_color: bool = False,
+    resolved_config_out: str | None = None,
 ):
     """Run a config-driven InvarLock pipeline and return the report path."""
     allow_network = bool(allow_network)
@@ -72,6 +73,7 @@ def run_command(
             allow_remote_code=allow_remote_code,
             allow_unverified_provenance=allow_unverified_provenance,
             prefer_local_files_only=prefer_local_files_only,
+            resolved_config_out=resolved_config_out,
         )
         return run_request(request, command_name="run")
     except RuntimeDelegationError as exc:

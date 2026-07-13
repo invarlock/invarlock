@@ -10,6 +10,7 @@ import click
 import pytest
 
 from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_common import configure_guard_metric_impact_skip
 
 
 def test_run_command_baseline_pairing_ce_without_attention_masks(tmp_path: Path):
@@ -45,12 +46,19 @@ output:
   dir: runs
         """
     )
+    configure_guard_metric_impact_skip(cfg)
 
     baseline = tmp_path / "baseline.json"
     baseline.write_text(
         json.dumps(
             {
                 "meta": {"tokenizer_hash": "tokhash123", "window_plan": {}},
+                "data": {
+                    "dataset": "synthetic",
+                    "split": "validation",
+                    "seq_len": 8,
+                    "stride": 4,
+                },
                 "evaluation_windows": {
                     "preview": {
                         "window_ids": [0, 1],
@@ -138,6 +146,12 @@ output:
             return prev, fin
 
     outdir = tmp_path / "runs"
+    captured: dict[str, object] = {}
+
+    def _capture_report(report, run_dir, formats, filename_prefix):
+        captured["report"] = report
+        return {"json": str(run_dir / (filename_prefix + ".json"))}
+
     with (
         patch("invarlock.core.registry.get_registry", lambda: DummyRegistry()),
         patch("invarlock.core.runner.CoreRunner", lambda: DummyRunner()),
@@ -166,18 +180,18 @@ output:
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report_files.save_report",
-            lambda report, run_dir, formats, filename_prefix: {
-                "json": str(run_dir / (filename_prefix + ".json"))
-            },
+            "invarlock.reporting.report_bundle.save_report",
+            _capture_report,
         ),
         patch(
-            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
             lambda *args, **kwargs: SimpleNamespace(
                 passed=True,
-                overhead_ratio=0.0,
-                overhead_percent=0.0,
+                degradation=1.0,
+                display_value=0.0,
                 threshold=0.01,
+                checks={"guard_metric_impact": True},
+                metrics={"degradation": 1.0, "display_value": 0.0},
                 errors=[],
             ),
         ),
@@ -185,7 +199,7 @@ output:
         run_command(
             config=str(cfg),
             device="cpu",
-            profile="release",
+            profile="ci",
             out=str(outdir),
             edit=None,
             tier=None,
@@ -194,6 +208,10 @@ output:
             baseline=str(baseline),
         )
     assert outdir.is_dir()
+    report = captured["report"]
+    assert isinstance(report, dict)
+    assert report["data"]["split"] == "validation"
+    assert report["provenance"]["dataset_split"] == "validation"
 
 
 def _write_cfg(tmp_path: Path) -> Path:
@@ -283,7 +301,7 @@ def _common_patches_for_baseline():
             ),
         ),
         patch(
-            "invarlock.reporting.report_files.save_report",
+            "invarlock.reporting.report_bundle.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (filename_prefix + ".json"))
             },

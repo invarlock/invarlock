@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typer.testing import CliRunner
 
 from tests.cli.run._internal_cli import internal_run_app as cli
+from tests.cli.run._support_run_common import canonical_ppl_metrics
 
 
 def _cfg(tmp_path: Path) -> str:
@@ -68,7 +69,10 @@ def _common_stubs(monkeypatch) -> None:
         lambda: SimpleNamespace(
             execute=lambda **k: SimpleNamespace(
                 edit={"deltas": {"params_changed": 0}},
-                metrics={"window_overlap_fraction": 0.0, "window_match_fraction": 1.0},
+                metrics=canonical_ppl_metrics(
+                    window_overlap_fraction=0.0,
+                    window_match_fraction=1.0,
+                ),
                 guards={},
                 context={"dataset_meta": {}},
                 evaluation_windows={},

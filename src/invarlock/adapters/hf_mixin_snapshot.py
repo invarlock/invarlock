@@ -13,9 +13,8 @@ from typing import Any
 
 import torch
 
-from invarlock.adapters.base import (
-    _record_snapshot_member_filename,
-    _resolve_snapshot_member_path,
+from invarlock.adapters.hf_mixin_snapshot_manifest import (
+    _preflight_chunked_manifest,
 )
 from invarlock.security import is_secure_path
 
@@ -51,6 +50,44 @@ def _resolve_named_parameter(
     return None
 
 
+def _set_named_parameter_alias(
+    module: torch.nn.Module,
+    tied_path: str,
+    source: torch.nn.Parameter,
+) -> None:
+    """Bind ``tied_path`` to the exact source ``Parameter`` object."""
+
+    parts = tied_path.split(".")
+    current: Any = module
+    for name in parts[:-1]:
+        current = getattr(current, name, None)
+        if current is None:
+            raise KeyError(f"Unable to resolve tied parameter parent: {tied_path}")
+    leaf = parts[-1]
+    if not isinstance(current, torch.nn.Module):
+        raise TypeError(f"Tied parameter parent is not a module: {tied_path}")
+    setattr(current, leaf, source)
+    rebound = getattr(current, leaf, None)
+    if rebound is not source:
+        raise RuntimeError(f"Failed to restore parameter alias: {tied_path}")
+
+
+def _require_exact_snapshot_members(
+    *,
+    snapshot_names: set[str],
+    target_names: set[str],
+    kind: str,
+    allowed_target_extras: set[str] | None = None,
+) -> None:
+    allowed_extras = allowed_target_extras or set()
+    missing = sorted((target_names - snapshot_names) - allowed_extras)
+    unexpected = sorted(snapshot_names - target_names)
+    if missing or unexpected:
+        raise KeyError(
+            f"Snapshot {kind} set mismatch: missing={missing} unexpected={unexpected}"
+        )
+
+
 def _require_safetensors_runtime() -> tuple[Any, Any, Any, Any]:
     try:
         from safetensors.torch import load as load_tensors
@@ -79,7 +116,9 @@ def _serialize_snapshot_blob(
         "metadata": metadata,
         "tensors_base64": base64.b64encode(tensor_blob).decode("ascii"),
     }
-    return json.dumps(envelope, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return json.dumps(
+        envelope, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
 
 
 def _deserialize_snapshot_blob(
@@ -147,28 +186,74 @@ def restore_model(adapter: Any, model: torch.nn.Module, blob: bytes) -> None:
     device_map = metadata.get("device_map", {})
     if not isinstance(device_map, dict):
         device_map = {}
+    original_tying = metadata.get("weight_tying", {})
+    if not isinstance(original_tying, dict):
+        original_tying = {}
 
-    for name, param in model.named_parameters():
+    param_map = dict(model.named_parameters())
+    buffer_map = dict(model.named_buffers())
+    snapshot_param_names = {
+        key.removeprefix("params.")
+        for key in state_dict
+        if str(key).startswith("params.")
+    }
+    snapshot_buffer_names = {
+        key.removeprefix("buffers.")
+        for key in state_dict
+        if str(key).startswith("buffers.")
+    }
+    _require_exact_snapshot_members(
+        snapshot_names=snapshot_param_names,
+        target_names=set(param_map),
+        kind="parameter",
+        allowed_target_extras={str(name) for name in original_tying},
+    )
+    _require_exact_snapshot_members(
+        snapshot_names=snapshot_buffer_names,
+        target_names=set(buffer_map),
+        kind="buffer",
+    )
+
+    # Validate the entire payload before mutating the target so a corrupt or
+    # incompatible late tensor cannot leave a partially restored model.
+    for name, param in param_map.items():
         state_key = f"params.{name}"
-        if state_key not in state_dict:
+        if state_key not in state_dict and name in original_tying:
+            continue
+        tensor = state_dict[state_key]
+        if tuple(tensor.shape) != tuple(param.shape):
+            raise ValueError(f"Snapshot tensor shape mismatch for param: {name}")
+        if tensor.dtype != param.dtype:
+            raise ValueError(f"Snapshot tensor dtype mismatch for param: {name}")
+    for name, buffer_param in buffer_map.items():
+        state_key = f"buffers.{name}"
+        tensor = state_dict[state_key]
+        if tuple(tensor.shape) != tuple(buffer_param.shape):
+            raise ValueError(f"Snapshot tensor shape mismatch for buffer: {name}")
+        if tensor.dtype != buffer_param.dtype:
+            raise ValueError(f"Snapshot tensor dtype mismatch for buffer: {name}")
+
+    for name, param in param_map.items():
+        state_key = f"params.{name}"
+        if state_key not in state_dict and name in original_tying:
+            # The tied alias was intentionally deduplicated in the snapshot.  It
+            # is rebound to its source after source tensors are restored.
             continue
         target_device = torch.device(device_map.get(state_key, "cpu"))
         with torch.no_grad():
             param.copy_(state_dict[state_key].to(target_device))
 
-    for name, buffer_param in model.named_buffers():
+    for name, buffer_param in buffer_map.items():
         state_key = f"buffers.{name}"
-        if state_key not in state_dict:
-            continue
         target_device = torch.device(device_map.get(state_key, "cpu"))
         buffer_param.copy_(state_dict[state_key].to(target_device))
 
-    original_tying = metadata.get("weight_tying", {})
-    if isinstance(original_tying, dict) and original_tying:
+    if original_tying:
         current_tying = adapter._extract_weight_tying_info(model)
         for tied_param, source_param in original_tying.items():
             if current_tying.get(tied_param) != source_param:
                 adapter._restore_weight_tying(model, tied_param, source_param)
+        adapter.validate_weight_tying(model, expected_tying=original_tying)
 
 
 def snapshot_model_chunked(
@@ -223,81 +308,10 @@ def snapshot_model_chunked(
         manifest["device_map"][f"buffer::{name}"] = str(buffer.device)
 
     manifest_path = snapshot_dir / "manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, allow_nan=False), encoding="utf-8"
+    )
     return str(snapshot_dir)
-
-
-def _preflight_chunked_manifest(
-    *,
-    snapshot_dir: Path,
-    params_manifest: dict[Any, Any],
-    buffers_manifest: dict[Any, Any],
-    params_meta: Any,
-    buffers_meta: Any,
-    param_map: dict[str, torch.nn.Parameter],
-    buffer_map: dict[str, torch.Tensor],
-) -> tuple[dict[str, Path], dict[str, Path]]:
-    seen_filenames: dict[str, str] = {}
-    param_paths: dict[str, Path] = {}
-    buffer_paths: dict[str, Path] = {}
-
-    for name, filename in params_manifest.items():
-        if name not in param_map:
-            raise KeyError(f"Snapshot parameter missing in target model: {name}")
-        file_path = _resolve_snapshot_member_path(
-            snapshot_dir, filename, entry_kind="param", entry_name=str(name)
-        )
-        _record_snapshot_member_filename(
-            seen_filenames,
-            filename,
-            entry_kind="param",
-            entry_name=str(name),
-        )
-        param_paths[str(name)] = file_path
-        if not file_path.exists():
-            raise FileNotFoundError(f"Missing snapshot tensor for param: {file_path}")
-        tensor = _load_chunked_tensor(file_path)
-        meta = params_meta.get(name) if isinstance(params_meta, dict) else None
-        _validate_tensor_manifest_meta(tensor, meta, kind="param", name=str(name))
-
-    for name, filename in buffers_manifest.items():
-        if name not in buffer_map:
-            raise KeyError(f"Snapshot buffer missing in target model: {name}")
-        file_path = _resolve_snapshot_member_path(
-            snapshot_dir, filename, entry_kind="buffer", entry_name=str(name)
-        )
-        _record_snapshot_member_filename(
-            seen_filenames,
-            filename,
-            entry_kind="buffer",
-            entry_name=str(name),
-        )
-        buffer_paths[str(name)] = file_path
-        if not file_path.exists():
-            raise FileNotFoundError(f"Missing snapshot tensor for buffer: {file_path}")
-        tensor = _load_chunked_tensor(file_path)
-        meta = buffers_meta.get(name) if isinstance(buffers_meta, dict) else None
-        _validate_tensor_manifest_meta(tensor, meta, kind="buffer", name=str(name))
-
-    return param_paths, buffer_paths
-
-
-def _validate_tensor_manifest_meta(
-    tensor: torch.Tensor,
-    meta: Any,
-    *,
-    kind: str,
-    name: str,
-) -> None:
-    if not isinstance(meta, dict):
-        return
-    expected_shape = meta.get("shape")
-    expected_dtype = meta.get("dtype")
-    if isinstance(expected_shape, list) and list(tensor.shape) != list(expected_shape):
-        raise ValueError(f"Snapshot tensor shape mismatch for {kind}: {name}")
-    if isinstance(expected_dtype, str) and expected_dtype:
-        if str(tensor.dtype) != expected_dtype:
-            raise ValueError(f"Snapshot tensor dtype mismatch for {kind}: {name}")
 
 
 def restore_model_chunked(
@@ -326,6 +340,20 @@ def restore_model_chunked(
     buffers_manifest = manifest.get("buffers", {})
     if not isinstance(buffers_manifest, dict):
         raise TypeError("Invalid snapshot manifest: buffers must be a mapping")
+    original_tying = manifest.get("weight_tying", {})
+    if not isinstance(original_tying, dict):
+        original_tying = {}
+    _require_exact_snapshot_members(
+        snapshot_names={str(name) for name in params_manifest},
+        target_names=set(param_map),
+        kind="parameter",
+        allowed_target_extras={str(name) for name in original_tying},
+    )
+    _require_exact_snapshot_members(
+        snapshot_names={str(name) for name in buffers_manifest},
+        target_names=set(buffer_map),
+        kind="buffer",
+    )
 
     param_paths, buffer_paths = _preflight_chunked_manifest(
         snapshot_dir=snapshot_dir,
@@ -335,6 +363,7 @@ def restore_model_chunked(
         buffers_meta=manifest.get("buffers_meta", {}),
         param_map=param_map,
         buffer_map=buffer_map,
+        load_tensor=_load_chunked_tensor,
     )
 
     for name in params_manifest:
@@ -351,9 +380,9 @@ def restore_model_chunked(
         tensor = _load_chunked_tensor(buffer_paths[str(name)])
         buffer_target.copy_(tensor.to(target_device))
 
-    original_tying = manifest.get("weight_tying", {})
-    if isinstance(original_tying, dict) and original_tying:
+    if original_tying:
         current_tying = adapter._extract_weight_tying_info(model)
         for tied_param, source_param in original_tying.items():
             if current_tying.get(tied_param) != source_param:
                 adapter._restore_weight_tying(model, tied_param, source_param)
+        adapter.validate_weight_tying(model, expected_tying=original_tying)

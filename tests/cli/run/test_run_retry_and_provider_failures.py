@@ -10,7 +10,11 @@ import click
 import pytest
 
 from invarlock.cli.commands.run import run_command
-from tests.cli.run._support_run_common import assert_single_run_output_artifacts
+from tests.cli.run._support_run_common import (
+    assert_single_run_output_artifacts,
+    configure_guard_metric_impact_skip,
+    measured_guard_metric_impact_result,
+)
 
 
 def _cfg(tmp_path: Path, preview=1, final=1) -> Path:
@@ -53,7 +57,11 @@ def _common_patches_detect_ce():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report_files.save_report",
+            "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
+            lambda *_args, **_kwargs: measured_guard_metric_impact_result(),
+        ),
+        patch(
+            "invarlock.reporting.report_bundle.save_report",
             lambda report, run_dir, formats, filename_prefix=None: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },
@@ -165,7 +173,7 @@ def test_dataset_meta_context_non_dict_path(tmp_path: Path):
     assert_single_run_output_artifacts(tmp_path)
 
 
-def test_guard_overhead_threshold_parse_fallback(tmp_path: Path):
+def test_guard_metric_degradation_limit_parse_fallback(tmp_path: Path):
     cfg = _cfg(tmp_path)
 
     class Runner:
@@ -208,7 +216,7 @@ def test_guard_overhead_threshold_parse_fallback(tmp_path: Path):
 
 
 def test_retry_summary_prints_and_snapshot_cleanup(tmp_path: Path, monkeypatch):
-    cfg = _cfg(tmp_path)
+    cfg = configure_guard_metric_impact_skip(_cfg(tmp_path))
     snapdir = tmp_path / "snapdir"
     restore_paths: list[str | None] = []
     attempt_summaries: list[dict[str, object]] = []

@@ -52,7 +52,8 @@ def is_device_available(device: str) -> bool:
 def validate_device_for_config(
     device: str, config_requirements: dict[str, Any] | None = None
 ) -> tuple[bool, str]:
-    # Simple validation stub; extend with model/profile specific checks as needed
+    # Validate syntax and explicit configuration-family requirements here;
+    # runtime availability is checked by resolve_device/is_device_available.
     normalized = (device or "cpu").lower()
     if normalized not in {"cpu", "mps"} and not _CUDA_DEVICE_RE.match(normalized):
         return False, f"Unsupported device '{device}'"

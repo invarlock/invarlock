@@ -12,6 +12,15 @@ Required:
 Options:
   --report-out DIR             Output directory for evaluation artifacts.
                                Default: reports/integration/<artifact-lane>
+  --baseline-revision VALUE    Immutable revision for a remote baseline.
+  --subject-revision VALUE     Immutable revision for a remote subject.
+  --baseline-report PATH       Independent raw baseline report. Required for
+                               strict evaluation reuse and verification. May
+                               also be set with the wrapper-only
+                               INVARLOCK_ACCEPTANCE_BASELINE_REPORT variable.
+  --policy-pack PATH           Independent policy pack required for strict
+                               verification. May also be set with the wrapper-only
+                               INVARLOCK_ACCEPTANCE_POLICY_PACK variable.
   --baseline-adapter NAME      Baseline adapter. Default: auto
   --subject-adapter NAME       Subject adapter. Default: auto
   --profile NAME               InvarLock profile. Default: ci
@@ -23,11 +32,18 @@ Options:
   --assurance MODE             strict or off. Default: strict
   --runtime-provenance MODE    container or host for verify. Defaults to
                                execution mode.
+  --expected-runtime-image-digest DIGEST
+                               Independent sha256 image pin required for strict
+                               verification. May also be set with the wrapper-only
+                               INVARLOCK_EXPECTED_RUNTIME_IMAGE_DIGEST variable.
   --device VALUE               Optional device override.
   --preset PATH                Optional InvarLock preset path.
   --edit-label VALUE           Optional edit label for BYOE subjects.
   --allow-network              Allow model/dataset downloads for evaluate.
   --require-backend-inventory  Fail if backend_inventory.json is missing.
+  --require-runtime-quantization-proof
+                               Require a valid v1 runtime proof cross-bound to
+                               backend_inventory.json for the subject adapter.
   --no-html                    Skip HTML rendering.
   -h, --help                   Show this help.
 
@@ -40,6 +56,10 @@ baseline=""
 subject=""
 report_out="reports/integration"
 report_out_was_default=1
+baseline_revision=""
+subject_revision=""
+baseline_report="${INVARLOCK_ACCEPTANCE_BASELINE_REPORT:-}"
+policy_pack="${INVARLOCK_ACCEPTANCE_POLICY_PACK:-}"
 baseline_adapter="auto"
 subject_adapter="auto"
 profile="ci"
@@ -48,12 +68,14 @@ lane=""
 execution_mode="container"
 assurance="strict"
 runtime_provenance=""
+expected_runtime_image_digest="${INVARLOCK_EXPECTED_RUNTIME_IMAGE_DIGEST:-}"
 device=""
 preset=""
 edit_label=""
 allow_network=0
 render_html=1
 require_backend_inventory=0
+require_runtime_quantization_proof=0
 original_args=("$@")
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../../.." && pwd)"
@@ -74,6 +96,22 @@ while [[ $# -gt 0 ]]; do
     --report-out)
       report_out="${2:-}"
       report_out_was_default=0
+      shift 2
+      ;;
+    --baseline-revision)
+      baseline_revision="${2:-}"
+      shift 2
+      ;;
+    --subject-revision)
+      subject_revision="${2:-}"
+      shift 2
+      ;;
+    --baseline-report)
+      baseline_report="${2:-}"
+      shift 2
+      ;;
+    --policy-pack)
+      policy_pack="${2:-}"
       shift 2
       ;;
     --baseline-adapter)
@@ -108,6 +146,10 @@ while [[ $# -gt 0 ]]; do
       runtime_provenance="${2:-}"
       shift 2
       ;;
+    --expected-runtime-image-digest)
+      expected_runtime_image_digest="${2:-}"
+      shift 2
+      ;;
     --device)
       device="${2:-}"
       shift 2
@@ -126,6 +168,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --require-backend-inventory)
       require_backend_inventory=1
+      shift
+      ;;
+    --require-runtime-quantization-proof)
+      require_runtime_quantization_proof=1
       shift
       ;;
     --no-html)
@@ -180,6 +226,12 @@ if [[ -z "$runtime_provenance" ]]; then
   runtime_provenance="$execution_mode"
 fi
 
+integration_require_strict_acceptance_inputs \
+  "$assurance" \
+  "$expected_runtime_image_digest" \
+  "$baseline_report" \
+  "$policy_pack" || exit $?
+
 device="$(integration_default_host_device "$execution_mode" "$device")"
 lane_artifact_label="$(
   integration_lane_artifact_label "$execution_mode" "$assurance" "$device"
@@ -192,6 +244,15 @@ integration_log_kv "lane" "$lane_artifact_label"
 integration_log_kv "execution_mode" "$execution_mode"
 integration_log_kv "assurance" "$assurance"
 integration_log_kv "runtime_provenance" "$runtime_provenance"
+if [[ -n "$expected_runtime_image_digest" ]]; then
+  integration_log_kv "expected_runtime_image_digest" "$expected_runtime_image_digest"
+fi
+if [[ -n "$baseline_report" ]]; then
+  integration_log_kv "acceptance_baseline_report" "$baseline_report"
+fi
+if [[ -n "$policy_pack" ]]; then
+  integration_log_kv "acceptance_policy_pack" "$policy_pack"
+fi
 integration_log_kv "device" "$device"
 integration_log_kv "report_out" "$report_out"
 
@@ -211,11 +272,13 @@ report_json="$report_out/evaluation.report.json"
 verify_json="$report_out/verify.json"
 html_out="$report_out/evaluation.html"
 backend_inventory_json="$report_out/backend_inventory.json"
+runtime_quantization_proof_json="$report_out/runtime_quantization_proof.json"
 lane_artifact_json="$report_out/lane_artifact.json"
 run_command_txt="$report_out/run_command.txt"
 run_summary_txt="$report_out/run_summary.txt"
 internal_runs_dir="$report_out/.invarlock-evaluation-runs"
 rm -f "$report_json" "$verify_json" "$backend_inventory_json"
+rm -f "$runtime_quantization_proof_json"
 rm -f "$lane_artifact_json" "$run_summary_txt"
 if [[ "$render_html" -eq 1 ]]; then
   rm -f "$html_out"
@@ -323,6 +386,7 @@ write_run_summary() {
     printf 'device: %s\n' "$device"
     printf 'report: %s\n' "$report_json"
     printf 'verify: %s\n' "$verify_json"
+    printf 'runtime_quantization_proof: %s\n' "$runtime_quantization_proof_json"
     emit_verify_summary_fields "file"
     if [[ "$render_html" -eq 1 ]]; then
       printf 'html: %s\n' "$html_out"
@@ -340,6 +404,7 @@ InvarLock integration run complete
   lane: $lane_artifact_label
   report: $report_json
   verify: $verify_json
+  runtime quantization proof: $runtime_quantization_proof_json
 MSG
   emit_verify_summary_fields "terminal"
   if [[ "$render_html" -eq 1 ]]; then
@@ -387,6 +452,15 @@ evaluate_cmd=(
 
 if [[ "$allow_network" -eq 1 ]]; then
   evaluate_cmd+=(--allow-network)
+fi
+if [[ -n "$baseline_revision" ]]; then
+  evaluate_cmd+=(--baseline-revision "$baseline_revision")
+fi
+if [[ -n "$subject_revision" ]]; then
+  evaluate_cmd+=(--subject-revision "$subject_revision")
+fi
+if [[ -n "$baseline_report" ]]; then
+  evaluate_cmd+=(--baseline-report "$baseline_report")
 fi
 if [[ -n "$device" ]]; then
   evaluate_cmd+=(--device "$device")
@@ -455,6 +529,45 @@ MSG
   exit 1
 fi
 
+if [[ "$require_runtime_quantization_proof" -eq 1 && ! -s "$runtime_quantization_proof_json" ]]; then
+  cat >&2 <<MSG
+Evaluate completed but did not write the required runtime quantization proof:
+  $runtime_quantization_proof_json
+
+This run requested --require-runtime-quantization-proof because the example
+documents a strict module-backed quantized lane. Check the selected subject
+adapter and report persistence output.
+MSG
+  exit 1
+fi
+
+if [[ "$require_runtime_quantization_proof" -eq 1 && ! -s "$backend_inventory_json" ]]; then
+  cat >&2 <<MSG
+Evaluate completed but did not write the backend inventory required to validate
+the runtime quantization proof:
+  $backend_inventory_json
+
+--require-runtime-quantization-proof requires a matching backend inventory,
+even when --require-backend-inventory was not supplied separately.
+MSG
+  exit 1
+fi
+
+if [[ "$require_runtime_quantization_proof" -eq 1 ]]; then
+  if ! "$PYTHON_BIN" -m invarlock.core.runtime_quantization_proof validate-sidecars \
+    --proof "$runtime_quantization_proof_json" \
+    --backend-inventory "$backend_inventory_json" \
+    --adapter "$subject_adapter"; then
+    cat >&2 <<MSG
+Evaluate wrote a runtime quantization proof that is not a valid strict v1
+receipt for subject adapter $subject_adapter. The wrapper will not continue to
+verification with a missing, forged, cross-adapter, or internally inconsistent
+runtime proof.
+MSG
+    exit 1
+  fi
+fi
+
 verify_cmd=(
   "${CLI[@]}" verify
   --json \
@@ -463,10 +576,24 @@ verify_cmd=(
   --runtime-provenance "$runtime_provenance" \
   "$report_json"
 )
+if [[ -n "$expected_runtime_image_digest" ]]; then
+  verify_cmd+=(
+    --expected-runtime-image-digest
+    "$expected_runtime_image_digest"
+  )
+fi
+if [[ -n "$baseline_report" ]]; then
+  verify_cmd+=(--baseline "$baseline_report")
+fi
+if [[ -n "$policy_pack" ]]; then
+  verify_cmd+=(--policy-pack "$policy_pack")
+fi
 
-printf 'verify: ' >> "$run_command_txt"
-printf '%q ' "${verify_cmd[@]}" >> "$run_command_txt"
-printf '> %q\n' "$verify_json" >> "$run_command_txt"
+{
+  printf 'verify: '
+  printf '%q ' "${verify_cmd[@]}"
+  printf '> %q\n' "$verify_json"
+} >> "$run_command_txt"
 
 integration_log_step "verify evaluation report"
 "${verify_cmd[@]}" > "$verify_json"
@@ -478,9 +605,11 @@ if [[ "$render_html" -eq 1 ]]; then
     -o "$html_out"
     --force
   )
-  printf 'html: ' >> "$run_command_txt"
-  printf '%q ' "${html_cmd[@]}" >> "$run_command_txt"
-  printf '\n' >> "$run_command_txt"
+  {
+    printf 'html: '
+    printf '%q ' "${html_cmd[@]}"
+    printf '\n'
+  } >> "$run_command_txt"
   integration_log_step "render HTML report"
   "${html_cmd[@]}"
 else

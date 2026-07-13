@@ -8,7 +8,7 @@ from invarlock.runtime_security import network_allowed
 
 from . import model_profile_selectors as _selectors
 from . import model_profile_tokenizers as _tokenizers
-from .model_profile_types import ModelProfile, TokenizerFactory
+from .adapters.model_profile_types import ModelProfile, TokenizerFactory
 
 _TRANSFORMERS_UNSET = _tokenizers._TRANSFORMERS_UNSET
 AutoTokenizer: Any = _tokenizers.AutoTokenizer
@@ -505,6 +505,9 @@ def detect_model_profile(
         ("mixtral", "mixtral"),
         ("gpt-oss", "gpt_oss"),
         ("gpt_oss", "gpt_oss"),
+        ("smollm3", "smollm3"),
+        ("granite", "granite"),
+        ("falcon", "falcon"),
         ("ministral", "mistral"),
         ("mistral", "mistral"),
         ("qwen", "qwen"),
@@ -522,11 +525,14 @@ def detect_model_profile(
             if keyword in adapter_lower or keyword in model_lower:
                 family = mapped_family
                 break
-        module_selectors = (
-            _selectors.gpt_oss_selectors()
-            if family == "gpt_oss"
-            else _selectors.rope_decoder_selectors()
-        )
+        if family == "gpt_oss":
+            module_selectors = _selectors.gpt_oss_selectors()
+        elif family == "falcon":
+            module_selectors = _selectors.falcon_selectors()
+        elif family in {"granite", "smollm3"}:
+            module_selectors = _selectors.dense_rope_decoder_selectors()
+        else:
+            module_selectors = _selectors.rope_decoder_selectors()
         return ModelProfile(
             family=family,
             default_loss="causal",

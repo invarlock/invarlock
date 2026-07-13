@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from invarlock.reporting.report_make import make_report
+from tests.cli._support_runtime_policy import bind_runtime_policy
 
 
 def test_choose_dataset_split_logic():
@@ -49,6 +50,15 @@ def test_evaluation_report_telemetry_includes_split(tmp_path: Path):
     # Minimal, valid-enough report/baseline pair
     report = {
         "meta": {"model_id": "m", "adapter": "hf_causal", "device": "cpu", "seed": 42},
+        "data": {
+            "dataset": "synthetic",
+            "split": "test",
+            "seq_len": 8,
+            "stride": 4,
+            "preview_n": 2,
+            "final_n": 2,
+        },
+        "edit": {"name": "noop", "plan_digest": "fixture", "deltas": {}},
         "metrics": {
             "primary_metric": {"kind": "ppl_causal", "preview": 10.0, "final": 10.0},
         },
@@ -65,10 +75,16 @@ def test_evaluation_report_telemetry_includes_split(tmp_path: Path):
             },
         },
         "guards": [],
-        "artifacts": {"events_path": "", "logs_path": ""},
+        "artifacts": {
+            "events_path": "",
+            "logs_path": "",
+            "checkpoint_path": None,
+        },
+        "flags": {"guard_recovered": False, "rollback_reason": None},
         "provenance": {"dataset_split": "test", "split_fallback": True},
     }
     baseline = {
+        "meta": {"auto": {"tier": "balanced"}},
         "run_id": "baseline",
         "model_id": "m",
         "evaluation_windows": {
@@ -84,14 +100,15 @@ def test_evaluation_report_telemetry_includes_split(tmp_path: Path):
             },
         },
     }
-    # Provide baseline primary metric final
-    baseline.setdefault("metrics", {})["primary_metric"] = {
+    baseline["ppl_final"] = 10.0
+    baseline["ppl_preview"] = 10.0
+    baseline["primary_metric"] = {
         "kind": "ppl_causal",
         "final": 10.0,
         "preview": 10.0,
     }
 
-    cert = make_report(report, baseline)
+    cert = make_report(bind_runtime_policy(report), baseline)
     summary = cert.get("telemetry", {}).get("summary_line", "")
     # Expect split=test*, where * denotes fallback
     assert "split=test*" in summary

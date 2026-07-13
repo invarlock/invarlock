@@ -5,8 +5,9 @@ baseline-vs-subject comparison. The subject may be a materialized checkpoint or
 the same checkpoint loaded through a runtime adapter.
 
 The evidence is strongest when the workflow runs in the default container-backed
-strict mode and the generated `evaluation.report.json` verifies with its sibling
-`runtime.manifest.json`.
+strict mode and the generated `evaluation.report.json` verifies against an
+independent raw baseline, acceptance policy pack, and runtime-image digest while
+binding its sibling `runtime.manifest.json`.
 
 ## Example Status Labels
 
@@ -40,31 +41,54 @@ Use scoped language:
 Keep public claims tied to the generated artifacts, the selected model family,
 the adapter, the dataset/window plan, and the verifier result.
 
-`source_matrix.json` is the source-controlled contract for README claims that
-use the phrase `strict container evidence is verified`. It records the target
-runner, strict lane, runtime image source, expected verifier and runtime
-provenance status, and required core and target-specific sidecars for a current
-run.
+`source_matrix.json` is the source-controlled contract for README strict-lane
+requirements. It records the target runner, strict lane, runtime image source,
+expected verifier and runtime provenance status, and required core and
+target-specific sidecars for a current run. Its v1 schema is closed:
+the top-level object, each target entry, and nested expectation objects accept
+only their documented fields. An unfiltered validation requires every canonical
+strict target exactly once; focused `--targets` validation still checks the full
+shape of every matrix entry before selecting a lane.
+
+The validator reads the matrix, report, runtime manifest, acceptance baseline,
+and acceptance policy as single regular-file snapshots. It rejects symlinks,
+duplicate keys, non-finite JSON values, and concurrent replacement or mutation.
+It replays strict verification from those exact bytes, checks the required
+sidecar set and closed runtime-observation schema, and requires the runtime
+quantization proof to match the backend inventory exactly. This establishes a
+live loaded-model type inventory for supported module-backed adapters; it does
+not establish packed checkpoint storage, kernel performance, or transformation
+history.
 
 ## Strict Evidence Checklist
 
 - `invarlock evaluate` ran with `--assurance strict` or the default strict mode.
 - The default container execution path produced `runtime.manifest.json`.
-- `invarlock verify --assurance strict` passed for `evaluation.report.json`.
+- `invarlock verify --profile ci|release --assurance strict --baseline <retained baseline report.json> --policy-pack <acceptance policy pack.json> --expected-runtime-image-digest ...`
+  passed for `evaluation.report.json`, using an image pin obtained independently
+  of the submitted runtime manifest.
 - `verify.json` was generated from the same report with `--json`.
 - `evaluation.html` was rendered from the same report.
-- `source_matrix.json` has an entry for any README that claims verified strict
-  container evidence.
-- `validate_source_matrix_artifacts.py` passes against the generated strict-lane
-  artifact directory before treating that run as current evidence.
+- `source_matrix.json` has an entry for every README that documents a strict
+  integration lane.
+- `validate_source_matrix_artifacts.py` replays strict verification with the
+  acceptance baseline, policy pack, and image digest before treating that run as
+  current evidence.
 - `lane_artifact.json` records `cuda-container-strict`.
 - `run_command.txt` records the wrapper, evaluate, verify, and render commands.
 - `run_summary.txt` records verifier and runtime-provenance status.
-- Target-specific provenance sidecars are copied into the lane output when they
+- Target-specific provenance sidecars are retained in the lane output when they
   apply: `checkpoint_refs.json`, `external_edit_summary.json`,
-  `adapter_runtime_summary.json`, and `fixture_summary.json`.
+  `adapter_runtime_summary.json`, `training_receipt.json`,
+  `training_binding.json`, `training_evidence_proof.json`,
+  `training_profile_snapshot.json`, and `fixture_summary.json`.
 - Quantized-adapter lanes include `backend_inventory.json` when adapter
   provenance is available.
-- Shared strict evidence records or references the runtime image digest.
+- Strict module-backed quantized lanes additionally include
+  `runtime_quantization_proof.json`. It records recognized live runtime types
+  for the selected adapter and backend; it is not evidence of packed storage
+  or another checkpoint transformation.
+- Shared strict evidence records the manifest-declared runtime image digest and
+  records verifier output showing a match to a separately supplied image pin.
 - Each integration example README records required or optional dependencies and
   backend limitations when they apply.

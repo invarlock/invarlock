@@ -8,7 +8,10 @@ import pytest
 
 from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 from tests.integration.packaging._support_installed_wheel import (
+    _VALID_TEST_IMAGE_DIGEST,
     InstalledWheelEnv,
+    _build_strict_baseline_report,
+    _build_strict_policy_pack,
     _build_strict_report,
     _ensure_hf_smoke_dependencies,
     _output_indicates_network_unavailable,
@@ -30,7 +33,11 @@ def test_wheel_install_verifies_strict_report_bundle_outside_repo_tree(
 ) -> None:
     report_dir = tmp_path / "strict-fixture"
     report_path = report_dir / "evaluation.report.json"
+    baseline_path = report_dir / "trusted-baseline.json"
+    policy_path = report_dir / "trusted-policy-pack.json"
     _write_json(report_path, _build_strict_report())
+    _write_json(baseline_path, _build_strict_baseline_report())
+    _write_json(policy_path, _build_strict_policy_pack())
     _write_runtime_manifest(report_path)
 
     verify = _run(
@@ -41,6 +48,12 @@ def test_wheel_install_verifies_strict_report_bundle_outside_repo_tree(
             "strict",
             "--profile",
             "ci",
+            "--baseline",
+            str(baseline_path),
+            "--policy-pack",
+            str(policy_path),
+            "--expected-runtime-image-digest",
+            _VALID_TEST_IMAGE_DIGEST,
             str(report_path),
         ],
         cwd=tmp_path,

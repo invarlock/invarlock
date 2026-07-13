@@ -7,8 +7,11 @@ from pathlib import Path
 import pytest
 
 from tests.integration.packaging._support_installed_wheel import (
+    _VALID_TEST_IMAGE_DIGEST,
     InstalledWheelEnv,
     _build_evidence_pack,
+    _build_strict_baseline_report,
+    _build_strict_policy_pack,
     _build_strict_report,
     _build_valid_report,
     _run,
@@ -39,6 +42,58 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
     import_path = Path(import_check.stdout.strip()).resolve()
     assert installed_wheel_env.env_dir.resolve() in import_path.parents
     assert installed_wheel_env.repo_root.resolve() not in import_path.parents
+
+    verifier_imports = _run(
+        installed_wheel_env.python_exe,
+        [
+            "-c",
+            (
+                "import json; "
+                "from importlib import metadata, resources; "
+                "import invarlock.evidence_pack_baselines as baselines; "
+                "import invarlock.evidence_pack_binding as binding; "
+                "import invarlock.evidence_pack_report_verification as report_verification; "
+                "import invarlock.reporting.verify_bootstrap as verify_bootstrap; "
+                "root = resources.files('invarlock'); "
+                "required = ["
+                "'adapters/hf_mixin_loading.py', "
+                "'adapters/hf_mixin_snapshot_manifest.py', "
+                "'core/runner_runtime/execution_phases.py', "
+                "'guards/invariant_checks.py', "
+                "'guards/policy_validation.py', "
+                "'_data/contracts/evidence_pack_manifest.schema.json', "
+                "'_data/contracts/runtime_manifest.schema.json', "
+                "'_data/contracts/verify_output.schema.json', "
+                "'_data/runtime/profiles/ci.yaml', "
+                "'_data/runtime/profiles/release.yaml', "
+                "'_data/runtime/tiers.yaml'"
+                "]; "
+                "print(json.dumps({"
+                "'imports': [baselines.__name__, binding.__name__, "
+                "report_verification.__name__, verify_bootstrap.__name__], "
+                "'missing': [path for path in required "
+                "if not root.joinpath(*path.split('/')).is_file()], "
+                "'requires': metadata.requires('invarlock') or []"
+                "}, sort_keys=True))"
+            ),
+        ],
+        cwd=tmp_path,
+    )
+    assert verifier_imports.returncode == 0, (
+        verifier_imports.stdout + verifier_imports.stderr
+    )
+    verifier_payload = json.loads(verifier_imports.stdout.strip())
+    assert verifier_payload["imports"] == [
+        "invarlock.evidence_pack_baselines",
+        "invarlock.evidence_pack_binding",
+        "invarlock.evidence_pack_report_verification",
+        "invarlock.reporting.verify_bootstrap",
+    ]
+    assert verifier_payload["missing"] == []
+    assert any(
+        requirement.lower().startswith("numpy>=1.24")
+        for requirement in verifier_payload["requires"]
+    )
 
     root_help = _run(
         installed_wheel_env.cli_exe,
@@ -72,7 +127,11 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
                 "import invarlock.public_contracts as public_contracts; "
                 "catalog = sorted(public_contracts.contract_catalog().keys()); "
                 "published_basis = {"
-                "lane['lane_id']: lane['evidence'] "
+                "lane['lane_id']: {"
+                "'status': lane['evidence_status'], "
+                "'label': lane['evidence_status_label'], "
+                "'has_evidence_paths': 'evidence' in lane"
+                "} "
                 "for lane in public_contracts.load_support_matrix()['lanes'] "
                 "if lane.get('support_tier') == 'published_basis'"
                 "}; "
@@ -91,14 +150,11 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
     assert "support_matrix" in exported_contracts["catalog"]
     assert exported_contracts["published_basis"]
     for evidence in exported_contracts["published_basis"].values():
-        assert evidence["evaluation_report_fixture"].startswith(
-            "public_evidence/published_basis/"
-        )
-        assert evidence["evidence_pack_recipe"].startswith(
-            "public_evidence/published_basis/"
-        )
-        assert "tests/fixtures/" not in evidence["evaluation_report_fixture"]
-        assert "tests/fixtures/" not in evidence["evidence_pack_recipe"]
+        assert evidence == {
+            "status": "not_created",
+            "label": "Evidence not yet created",
+            "has_evidence_paths": False,
+        }
 
     doctor = _run(
         installed_wheel_env.cli_exe,
@@ -137,12 +193,10 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
     index = public_evidence_payload["index"]
     assert index["format_version"] == "public-evidence-index-v1"
     assert index["carrier_policy"]["installed_wheel"] == "compact_index_only"
-    assert index["published_basis_count"] == len(index["entries"])
-    indexed_lanes = {
-        lane_id for entry in index["entries"] for lane_id in entry.get("lanes", [])
-    }
-    assert "gpt2-causal-hf" in indexed_lanes
-    assert "bert-mlm-hf" in indexed_lanes
+    assert index["status"] == "not_created"
+    assert index["status_label"] == "Evidence not yet created"
+    assert index["published_basis_count"] == 0
+    assert index["entries"] == []
     assert public_evidence_payload["legacy_tree_exists"] is False
 
 
@@ -177,7 +231,11 @@ def test_wheel_install_can_verify_report_runtime_and_evidence_pack_outside_repo_
 
     strict_report_dir = tmp_path / "strict-report"
     strict_report_path = strict_report_dir / "evaluation.report.json"
+    strict_baseline_path = strict_report_dir / "trusted-baseline.json"
+    strict_policy_path = strict_report_dir / "trusted-policy-pack.json"
     _write_json(strict_report_path, _build_strict_report())
+    _write_json(strict_baseline_path, _build_strict_baseline_report())
+    _write_json(strict_policy_path, _build_strict_policy_pack())
     _write_runtime_manifest(strict_report_path)
 
     verify_strict_report = _run(
@@ -188,6 +246,12 @@ def test_wheel_install_can_verify_report_runtime_and_evidence_pack_outside_repo_
             "strict",
             "--profile",
             "ci",
+            "--baseline",
+            str(strict_baseline_path),
+            "--policy-pack",
+            str(strict_policy_path),
+            "--expected-runtime-image-digest",
+            _VALID_TEST_IMAGE_DIGEST,
             "--json",
             str(strict_report_path),
         ],

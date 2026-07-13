@@ -48,7 +48,7 @@ def emit(payload: Any, exit_code: int) -> None:
     if isinstance(payload_obj, dict):
         payload_obj.setdefault("ts", _ts())
         payload_obj.setdefault("component", "cli")
-    typer.echo(json.dumps(payload_obj, sort_keys=True))
+    typer.echo(json.dumps(payload_obj, sort_keys=True, allow_nan=False))
     raise typer.Exit(exit_code)
 
 

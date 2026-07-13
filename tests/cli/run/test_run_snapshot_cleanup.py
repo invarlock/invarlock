@@ -4,16 +4,17 @@ from types import SimpleNamespace
 from typer.testing import CliRunner
 
 from tests.cli.run._internal_cli import internal_run_app as cli
+from tests.cli.run._support_run_common import canonical_ppl_metrics
 
 
-def _cfg(tmp_path: Path, *, skip_overhead: bool = False) -> str:
+def _cfg(tmp_path: Path, *, skip_guard_metric_impact: bool = False) -> str:
     p = tmp_path / "cfg.yaml"
     context_yaml = ""
-    if skip_overhead:
+    if skip_guard_metric_impact:
         context_yaml = """
 context:
   run:
-    skip_overhead_check: true
+    skip_guard_metric_impact_check: true
 """
     p.write_text(
         """
@@ -102,7 +103,10 @@ def _stub_env(
     def _exec(**kwargs):
         return SimpleNamespace(
             edit={"deltas": {"params_changed": 0}},
-            metrics={"window_overlap_fraction": 0.0, "window_match_fraction": 1.0},
+            metrics=canonical_ppl_metrics(
+                window_overlap_fraction=0.0,
+                window_match_fraction=1.0,
+            ),
             guards={},
             context={"dataset_meta": {}},
             evaluation_windows={},
@@ -178,11 +182,13 @@ def test_no_cleanup_flag_skips_deletion(tmp_path: Path, monkeypatch):
     assert "Cleanup: skipped" in s
 
 
-def test_ci_skip_overhead_reuses_loaded_model_without_snapshot(
+def test_ci_skip_guard_metric_impact_reuses_loaded_model_without_snapshot(
     tmp_path: Path, monkeypatch
 ):
     _stub_env(monkeypatch, tmp_path, with_snapshot=False)
-    monkeypatch.setattr("invarlock.cli.run_overhead.RELEASE_MIN_WINDOWS_PER_ARM", 1)
+    monkeypatch.setattr(
+        "invarlock.cli.run_metric_impact.RELEASE_MIN_WINDOWS_PER_ARM", 1
+    )
 
     loaded_model = SimpleNamespace(name="loaded-model")
     load_calls: list[dict[str, object] | None] = []
@@ -197,7 +203,10 @@ def test_ci_skip_overhead_reuses_loaded_model_without_snapshot(
         assert kwargs["model"] is loaded_model
         return SimpleNamespace(
             edit={"deltas": {"params_changed": 0}},
-            metrics={"window_overlap_fraction": 0.0, "window_match_fraction": 1.0},
+            metrics=canonical_ppl_metrics(
+                window_overlap_fraction=0.0,
+                window_match_fraction=1.0,
+            ),
             guards={},
             context={"dataset_meta": {}},
             evaluation_windows={},
@@ -211,7 +220,7 @@ def test_ci_skip_overhead_reuses_loaded_model_without_snapshot(
         "invarlock.core.runner.CoreRunner", lambda: SimpleNamespace(execute=_exec)
     )
 
-    cfg = _cfg(tmp_path, skip_overhead=True)
+    cfg = _cfg(tmp_path, skip_guard_metric_impact=True)
     result = CliRunner().invoke(cli, ["run", "-c", cfg, "--profile", "ci"])
 
     assert result.exit_code == 0, result.stdout
@@ -219,11 +228,13 @@ def test_ci_skip_overhead_reuses_loaded_model_without_snapshot(
     assert "Reusing initially loaded model for guarded execution." in result.stdout
 
 
-def test_ci_skip_overhead_reuses_loaded_model_before_snapshot_setup(
+def test_ci_skip_guard_metric_impact_reuses_loaded_model_before_snapshot_setup(
     tmp_path: Path, monkeypatch
 ):
     _stub_env(monkeypatch, tmp_path, with_snapshot=True, broken_snapshot=True)
-    monkeypatch.setattr("invarlock.cli.run_overhead.RELEASE_MIN_WINDOWS_PER_ARM", 1)
+    monkeypatch.setattr(
+        "invarlock.cli.run_metric_impact.RELEASE_MIN_WINDOWS_PER_ARM", 1
+    )
 
     loaded_model = SimpleNamespace(name="loaded-model")
     load_calls: list[dict[str, object] | None] = []
@@ -238,7 +249,10 @@ def test_ci_skip_overhead_reuses_loaded_model_before_snapshot_setup(
         assert kwargs["model"] is loaded_model
         return SimpleNamespace(
             edit={"deltas": {"params_changed": 0}},
-            metrics={"window_overlap_fraction": 0.0, "window_match_fraction": 1.0},
+            metrics=canonical_ppl_metrics(
+                window_overlap_fraction=0.0,
+                window_match_fraction=1.0,
+            ),
             guards={},
             context={"dataset_meta": {}},
             evaluation_windows={},
@@ -252,7 +266,7 @@ def test_ci_skip_overhead_reuses_loaded_model_before_snapshot_setup(
         "invarlock.core.runner.CoreRunner", lambda: SimpleNamespace(execute=_exec)
     )
 
-    cfg = _cfg(tmp_path, skip_overhead=True)
+    cfg = _cfg(tmp_path, skip_guard_metric_impact=True)
     result = CliRunner().invoke(cli, ["run", "-c", cfg, "--profile", "ci"])
 
     assert result.exit_code == 0, result.stdout

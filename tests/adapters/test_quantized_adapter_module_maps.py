@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from types import ModuleType, SimpleNamespace
 
 import pytest
@@ -74,6 +75,48 @@ class _NestedQuantizedWrapper(nn.Module):
         self.model = nn.Module()
         self.model.model = nn.Module()
         self.model.model.layers = nn.ModuleList([_DenseLayer()])
+
+
+_OBSERVED_PACKED_CT_CONFIG = {
+    "config_groups": {
+        "group_0": {
+            "targets": ["Linear"],
+            "weights": {
+                "num_bits": 4,
+                "type": "int",
+                "symmetric": True,
+                "group_size": 128,
+                "strategy": "group",
+                "dynamic": False,
+            },
+            "input_activations": None,
+            "output_activations": None,
+            "format": None,
+        }
+    },
+    "quant_method": "compressed-tensors",
+    "format": "pack-quantized",
+    "quantization_status": "compressed",
+    "ignore": ["lm_head"],
+}
+
+
+class _ObservedRuntimeCompressedTensorsConfig:
+    """Matches the relevant post-load Transformers config shape.
+
+    The real Transformers ``CompressedTensorsConfig`` stores its parsed scheme
+    under ``quantization_config`` and exposes packed metadata through
+    ``to_dict()``; it does not expose ``config_groups`` as a direct attribute.
+    """
+
+    def __init__(self, payload: dict[str, object]) -> None:
+        self.quantization_config = SimpleNamespace(parsed_scheme=True)
+        self.quant_method = SimpleNamespace(value="compressed-tensors")
+        self.run_compressed = True
+        self._payload = deepcopy(payload)
+
+    def to_dict(self) -> dict[str, object]:
+        return deepcopy(self._payload)
 
 
 @pytest.mark.parametrize(
@@ -348,6 +391,57 @@ def test_compressed_tensors_adapter_loads_prequantized_checkpoint(monkeypatch) -
     assert capabilities.device_movable is False
     assert capabilities.quantization.method == QuantizationMethod.COMPRESSED_TENSORS
     assert capabilities.quantization.bits == 4
+
+
+def test_compressed_tensors_adapter_preserves_observed_runtime_config_metadata() -> (
+    None
+):
+    """Nested runtime configs retain the packed checkpoint's declared metadata."""
+    model = _TinyCausalModel()
+    runtime_config = _ObservedRuntimeCompressedTensorsConfig(_OBSERVED_PACKED_CT_CONFIG)
+    assert not hasattr(runtime_config, "config_groups")
+    model.config.quantization_config = runtime_config
+
+    adapter = HF_CompressedTensors_Adapter()
+    from_model = adapter.get_capabilities(model)
+    from_config = adapter.get_capabilities_from_quantization_config(runtime_config)
+
+    for capabilities in (from_model, from_config):
+        assert capabilities.device_movable is False
+        assert capabilities.quantization.method == QuantizationMethod.COMPRESSED_TENSORS
+        assert capabilities.quantization.from_checkpoint is True
+        assert capabilities.quantization.bits == 4
+        assert capabilities.quantization.group_size == 128
+
+
+def test_compressed_tensors_adapter_fails_closed_for_mixed_packed_weight_groups() -> (
+    None
+):
+    """No single global value is claimed when packed group declarations conflict."""
+    payload = deepcopy(_OBSERVED_PACKED_CT_CONFIG)
+    config_groups = payload["config_groups"]
+    assert isinstance(config_groups, dict)
+    config_groups["group_1"] = {
+        "targets": ["Linear"],
+        "weights": {
+            "num_bits": 8,
+            "type": "int",
+            "symmetric": True,
+            "group_size": 64,
+            "strategy": "group",
+            "dynamic": False,
+        },
+    }
+    model = _TinyCausalModel()
+    model.config.quantization_config = _ObservedRuntimeCompressedTensorsConfig(payload)
+
+    capabilities = HF_CompressedTensors_Adapter().get_capabilities(model)
+
+    assert capabilities.device_movable is False
+    assert capabilities.quantization.method == QuantizationMethod.COMPRESSED_TENSORS
+    assert capabilities.quantization.from_checkpoint is True
+    assert capabilities.quantization.bits is None
+    assert capabilities.quantization.group_size is None
 
 
 def test_compressed_tensors_adapter_rejects_dense_checkpoint(monkeypatch) -> None:

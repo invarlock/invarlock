@@ -12,7 +12,7 @@ import json
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import torch.nn as nn
 
@@ -20,7 +20,6 @@ import torch.nn as nn
 from invarlock.adapters.base import (
     AdapterManager,
     AdapterState,
-    AdapterUtils,
     BaseAdapter,
     PerformanceTracker,
 )
@@ -487,91 +486,3 @@ class TestAdapterManager:
         overall_health = manager.check_overall_health()
         assert "adapters" in overall_health
         assert "healthy_adapter" in overall_health["adapters"]
-
-
-class TestAdapterUtils:
-    """Test adapter utilities."""
-
-    def test_validate_config(self):
-        """Test configuration validation."""
-        # Valid config
-        config = {"name": "test", "adapter_type": "transformer"}
-        result = AdapterUtils.validate_config(config)
-        assert result["valid"] is True
-        assert result["errors"] == []
-
-        # Invalid config - missing name
-        config = {"adapter_type": "transformer"}
-        result = AdapterUtils.validate_config(config)
-        assert result["valid"] is False
-        assert "name is required" in result["errors"]
-
-        # Invalid config - missing type
-        config = {"name": "test"}
-        result = AdapterUtils.validate_config(config)
-        assert result["valid"] is False
-        assert "adapter_type is required" in result["errors"]
-
-    def test_infer_adapter_type(self):
-        """Test adapter type inference."""
-        assert AdapterUtils.infer_adapter_type("gpt2-medium") == "huggingface"
-        assert AdapterUtils.infer_adapter_type("text-davinci-003") == "openai"
-        assert AdapterUtils.infer_adapter_type("custom-model") == "generic"
-
-    @patch("torch.cuda.is_available", return_value=True)
-    def test_select_optimal_device_cuda(self, mock_cuda):
-        """Test optimal device selection with CUDA."""
-        device = AdapterUtils.select_optimal_device()
-        assert device == "cuda:0"
-
-    @patch("torch.cuda.is_available", return_value=False)
-    def test_select_optimal_device_cpu(self, mock_cuda):
-        """Test optimal device selection without CUDA."""
-        device = AdapterUtils.select_optimal_device()
-        assert device == "cpu"
-
-    def test_estimate_memory_usage(self):
-        """Test memory usage estimation."""
-        # Test with float32
-        params = {"num_parameters": 1000000, "precision": "float32"}
-        memory = AdapterUtils.estimate_memory_usage(params)
-        expected = (1000000 * 4 / (1024**2)) * 1.2  # MB with 20% overhead
-        assert abs(memory - expected) < 0.01
-
-        # Test with float16
-        params = {"num_parameters": 1000000, "precision": "float16"}
-        memory = AdapterUtils.estimate_memory_usage(params)
-        expected = (1000000 * 2 / (1024**2)) * 1.2
-        assert abs(memory - expected) < 0.01
-
-    def test_check_compatibility(self):
-        """Test compatibility checking."""
-        requirements = {"python": "3.8", "torch": "1.10.0"}
-        system_info = {"python": "3.9.0", "torch": "1.11.0"}
-
-        result = AdapterUtils.check_compatibility(requirements, system_info)
-        assert result["compatible"] is True
-
-        # Numeric version parsing should treat Python 3.10 as newer than 3.8.
-        system_info = {"python": "3.10.0", "torch": "1.11.0"}
-        result = AdapterUtils.check_compatibility(requirements, system_info)
-        assert result["compatible"] is True
-
-        # Test incompatible
-        system_info = {"python": "3.7.0", "torch": "1.11.0"}
-        result = AdapterUtils.check_compatibility(requirements, system_info)
-        assert result["compatible"] is False
-        assert len(result["issues"]) > 0
-
-    def test_migrate_config(self):
-        """Test configuration migration."""
-        old_config = {"name": "test", "model_path": "/path/to/model", "device_id": 1}
-
-        new_config = AdapterUtils.migrate_config(old_config, "2.0.0")
-
-        assert new_config["version"] == "2.0.0"
-        assert new_config["model_id"] == "/path/to/model"
-        assert "model_path" not in new_config
-        assert new_config["device"]["type"] == "cuda"
-        assert new_config["device"]["index"] == 1
-        assert "device_id" not in new_config

@@ -3,9 +3,13 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_common import (
+    configure_guard_metric_impact_skip,
+    measured_guard_metric_impact_result,
+)
 
 
-def test_run_command_release_provider_without_capacity_estimator(tmp_path: Path):
+def test_run_command_ci_provider_without_capacity_estimator(tmp_path: Path):
     cfg = tmp_path / "config.yaml"
     cfg.write_text(
         """
@@ -37,6 +41,7 @@ output:
   dir: runs
         """
     )
+    configure_guard_metric_impact_skip(cfg)
 
     class DummyRegistry:
         def get_adapter(self, name):
@@ -77,6 +82,11 @@ output:
                     },
                 },
                 metrics={
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 10.0,
+                        "final": 10.0,
+                    },
                     "ppl_preview": 10.0,
                     "ppl_final": 10.0,
                     "ppl_ratio": 1.0,
@@ -123,7 +133,11 @@ output:
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report_files.save_report",
+            "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
+            lambda *_args, **_kwargs: measured_guard_metric_impact_result(),
+        ),
+        patch(
+            "invarlock.reporting.report_bundle.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (filename_prefix + ".json"))
             },
@@ -132,7 +146,7 @@ output:
         run_command(
             config=str(cfg),
             device="cpu",
-            profile="release",
+            profile="ci",
             out=str(outdir),
             edit=None,
             tier=None,

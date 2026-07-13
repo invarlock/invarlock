@@ -52,7 +52,8 @@ def _is_bare_control(kwargs: dict[str, object]) -> bool:
         return False
     validation = context.get("validation")
     return (
-        isinstance(validation, dict) and validation.get("guard_overhead_mode") == "bare"
+        isinstance(validation, dict)
+        and validation.get("guard_metric_impact_mode") == "bare"
     )
 
 
@@ -227,7 +228,7 @@ def test_provider_attention_mask_tolist_tuple_path(tmp_path: Path):
         "window_pairing_preview",
         "window_pairing_final",
         "paired_windows",
-        "paired_delta_summary",
+        "preview_final_slice_delta_summary",
     ],
 )
 def test_metrics_optional_pairing_fields_passthrough(tmp_path: Path, key: str):
@@ -248,7 +249,7 @@ def test_metrics_optional_pairing_fields_passthrough(tmp_path: Path, key: str):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         stack.enter_context(
             patch(
@@ -301,7 +302,7 @@ def test_edit_optional_fields_transfer(tmp_path: Path, opt_key: str):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         stack.enter_context(
             patch(

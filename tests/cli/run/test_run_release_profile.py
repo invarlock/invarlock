@@ -2,10 +2,16 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import click
+import pytest
+
 from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_common import configure_guard_metric_impact_skip
 
 
-def test_run_command_release_profile_with_capacity(tmp_path: Path):
+def test_run_command_release_profile_rejects_metric_impact_skip_before_execution(
+    tmp_path: Path,
+):
     # Minimal config YAML
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
@@ -38,6 +44,7 @@ output:
   dir: runs
         """
     )
+    configure_guard_metric_impact_skip(config_path)
 
     # Registry and runner stubs
     class DummyRegistry:
@@ -55,8 +62,11 @@ output:
         def get_plugin_metadata(self, name, plugin_type):
             return {"name": name, "module": f"{plugin_type}.{name}", "version": "test"}
 
+    execute_calls: list[dict[str, object]] = []
+
     class DummyRunner:
         def execute(self, **kwargs):
+            execute_calls.append(kwargs)
             return SimpleNamespace(
                 edit={
                     "plan_digest": "abcd",
@@ -142,30 +152,35 @@ output:
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report_files.save_report",
+            "invarlock.reporting.report_bundle.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (filename_prefix + ".json"))
             },
         ),
         patch(
-            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
             lambda *args, **kwargs: SimpleNamespace(
                 passed=True,
-                overhead_ratio=0.0,
-                overhead_percent=0.0,
+                degradation=1.0,
+                display_value=0.0,
                 threshold=0.01,
+                checks={"guard_metric_impact": True},
+                metrics={"degradation": 1.0, "display_value": 0.0},
                 errors=[],
             ),
         ),
     ):
-        run_command(
-            config=str(config_path),
-            device="cpu",
-            profile="release",
-            out=str(outdir),
-            edit=None,
-            tier=None,
-            probes=0,
-            until_pass=False,
-        )
-    assert outdir.is_dir()
+        with pytest.raises(click.exceptions.Exit) as exc_info:
+            run_command(
+                config=str(config_path),
+                device="cpu",
+                profile="release",
+                out=str(outdir),
+                edit=None,
+                tier=None,
+                probes=0,
+                until_pass=False,
+            )
+
+    assert exc_info.value.exit_code == 2
+    assert execute_calls == []

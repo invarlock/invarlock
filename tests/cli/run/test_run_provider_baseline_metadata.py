@@ -7,10 +7,13 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from invarlock.cli.commands.run import run_command
-from invarlock.cli.run_overhead import plan_release_windows
+from invarlock.cli.run_metric_impact import plan_release_windows
 from tests.cli.run._support_run_common import (
     assert_single_run_output_artifacts,
+    canonical_ppl_metrics,
     common_ce_patches,
+    configure_guard_metric_impact_skip,
+    measured_guard_metric_impact_result,
 )
 from tests.cli.run._support_run_common import (
     write_base_run_config as _base_cfg,
@@ -65,11 +68,7 @@ def test_evaluation_window_provider_success(tmp_path: Path):
                 lambda: SimpleNamespace(
                     execute=lambda **k: SimpleNamespace(
                         edit={},
-                        metrics={
-                            "ppl_preview": 1.0,
-                            "ppl_final": 1.0,
-                            "ppl_ratio": 1.0,
-                        },
+                        metrics=canonical_ppl_metrics(),
                         guards={},
                         context=getattr(k.get("config"), "context", {}),
                         status="success",
@@ -122,7 +121,7 @@ def test_report_flags_guard_recovered(tmp_path: Path):
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
@@ -177,7 +176,7 @@ def test_metrics_optional_keys_propagated(tmp_path: Path):
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
@@ -192,7 +191,7 @@ def test_metrics_optional_keys_propagated(tmp_path: Path):
     assert m.get("window_match_fraction") == 1.0
 
 
-def test_guard_overhead_payload_present_ci(tmp_path: Path):
+def test_guard_metric_impact_payload_present_ci(tmp_path: Path):
     cfg = _base_cfg(tmp_path, 1, 1)
     captured = {}
 
@@ -205,10 +204,21 @@ def test_guard_overhead_payload_present_ci(tmp_path: Path):
             # Return minimal valid reports for both bare and guarded runs
             return SimpleNamespace(
                 edit={},
-                metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+                metrics=canonical_ppl_metrics(),
                 guards={},
                 context={"dataset_meta": {}},
-                evaluation_windows={},
+                evaluation_windows={
+                    "preview": {
+                        "window_ids": [0],
+                        "logloss": [0.0],
+                        "token_counts": [1],
+                    },
+                    "final": {
+                        "window_ids": [1],
+                        "logloss": [0.0],
+                        "token_counts": [1],
+                    },
+                },
                 status="success",
             )
 
@@ -217,20 +227,13 @@ def test_guard_overhead_payload_present_ci(tmp_path: Path):
             stack.enter_context(ctx)
         # Patch the validator at both locations to guarantee the module ref is hit
         for target in (
-            "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+            "invarlock.reporting.validate.validate_guard_metric_impact",
+            "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
         ):
             stack.enter_context(
                 patch(
                     target,
-                    lambda *a, **k: SimpleNamespace(
-                        passed=True,
-                        messages=[],
-                        warnings=[],
-                        errors=[],
-                        checks={},
-                        metrics={"overhead_ratio": 0.0, "overhead_percent": 0.0},
-                    ),
+                    lambda *a, **k: measured_guard_metric_impact_result(),
                 )
             )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
@@ -246,7 +249,7 @@ def test_guard_overhead_payload_present_ci(tmp_path: Path):
             )
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
@@ -256,7 +259,7 @@ def test_guard_overhead_payload_present_ci(tmp_path: Path):
             until_pass=False,
         )
 
-    gh = captured["r"].get("guard_overhead", {})
+    gh = captured["r"].get("guard_metric_impact", {})
     assert isinstance(gh, dict) and gh.get("evaluated") is True
 
 
@@ -302,11 +305,7 @@ def test_tokenizer_digest_non_string_keys_in_vocab(tmp_path: Path):
                 lambda: SimpleNamespace(
                     execute=lambda **k: SimpleNamespace(
                         edit={},
-                        metrics={
-                            "ppl_preview": 1.0,
-                            "ppl_final": 1.0,
-                            "ppl_ratio": 1.0,
-                        },
+                        metrics=canonical_ppl_metrics(),
                         guards={},
                         context=getattr(k.get("config"), "context", {}),
                         status="success",
@@ -315,7 +314,7 @@ def test_tokenizer_digest_non_string_keys_in_vocab(tmp_path: Path):
             )
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
@@ -374,11 +373,7 @@ def test_tokenizer_digest_exception_unknown(tmp_path: Path):
                 lambda: SimpleNamespace(
                     execute=lambda **k: SimpleNamespace(
                         edit={},
-                        metrics={
-                            "ppl_preview": 1.0,
-                            "ppl_final": 1.0,
-                            "ppl_ratio": 1.0,
-                        },
+                        metrics=canonical_ppl_metrics(),
                         guards={},
                         context={"dataset_meta": {}},
                         status="success",
@@ -387,7 +382,7 @@ def test_tokenizer_digest_exception_unknown(tmp_path: Path):
             )
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
@@ -442,11 +437,7 @@ def test_tokenizer_digest_vocab_attribute_non_mapping(tmp_path: Path):
                 lambda: SimpleNamespace(
                     execute=lambda **k: SimpleNamespace(
                         edit={},
-                        metrics={
-                            "ppl_preview": 1.0,
-                            "ppl_final": 1.0,
-                            "ppl_ratio": 1.0,
-                        },
+                        metrics=canonical_ppl_metrics(),
                         guards={},
                         context={"dataset_meta": {}},
                         status="success",
@@ -491,11 +482,7 @@ def test_baseline_not_found_fallback_to_dataset(tmp_path: Path):
                 lambda: SimpleNamespace(
                     execute=lambda **k: SimpleNamespace(
                         edit={},
-                        metrics={
-                            "ppl_preview": 1.0,
-                            "ppl_final": 1.0,
-                            "ppl_ratio": 1.0,
-                        },
+                        metrics=canonical_ppl_metrics(),
                         guards={},
                         context={"dataset_meta": {}},
                         status="success",
@@ -515,7 +502,7 @@ def test_baseline_not_found_fallback_to_dataset(tmp_path: Path):
 
 
 def test_baseline_adjust_counts_success(tmp_path: Path):
-    cfg = _base_cfg(tmp_path, 2, 2)
+    cfg = configure_guard_metric_impact_skip(_base_cfg(tmp_path, 2, 2))
     baseline = tmp_path / "baseline.json"
     baseline.write_text(
         json.dumps(
@@ -533,16 +520,13 @@ def test_baseline_adjust_counts_success(tmp_path: Path):
         def execute(self, **kwargs):
             return SimpleNamespace(
                 edit={},
-                metrics={
-                    "ppl_preview": 1.0,
-                    "ppl_final": 1.0,
-                    "ppl_ratio": 1.0,
-                    "window_overlap_fraction": 0.0,
-                    "window_match_fraction": 1.0,
-                    "window_pairing_reason": None,
-                    "paired_windows": 1,
-                    "loss_type": "ce",
-                },
+                metrics=canonical_ppl_metrics(
+                    window_overlap_fraction=0.0,
+                    window_match_fraction=1.0,
+                    window_pairing_reason=None,
+                    paired_windows=1,
+                    loss_type="ce",
+                ),
                 guards={},
                 context={"dataset_meta": {}},
                 evaluation_windows={
@@ -578,7 +562,7 @@ def test_baseline_adjust_counts_success(tmp_path: Path):
         run_command(
             config=str(cfg),
             device="cpu",
-            profile="release",
+            profile="ci",
             out=str(tmp_path / "runs"),
             baseline=str(baseline),
             until_pass=False,

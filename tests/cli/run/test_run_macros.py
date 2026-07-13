@@ -109,7 +109,7 @@ def _patch_common(monkeypatch, run_mod, provider):
     import invarlock.core.registry as reg_mod
     import invarlock.core.runner as runner_mod
     import invarlock.eval.data as data_mod
-    import invarlock.reporting.report_files as report_files_mod
+    import invarlock.reporting.report_bundle as report_files_mod
 
     monkeypatch.setattr(reg_mod, "get_registry", lambda: _Registry())
     monkeypatch.setattr(data_mod, "get_provider", lambda *a, **k: provider)

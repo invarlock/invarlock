@@ -23,10 +23,10 @@ from invarlock.cli.output import (
     make_console,
     print_timing_summary,
 )
-from invarlock.cli.run_overhead import (
-    _extract_pm_snapshot_for_overhead,
+from invarlock.cli.run_metric_impact import (
+    _extract_pm_snapshot_for_metric_impact,
 )
-from invarlock.cli.run_overhead import (
+from invarlock.cli.run_metric_impact import (
     plan_release_windows as _plan_release_windows,
 )
 from invarlock.cli.run_pairing import (
@@ -35,6 +35,8 @@ from invarlock.cli.run_pairing import (
     _tensor_or_list_to_ints,
     _to_int_list,
 )
+from invarlock.cli.run_runtime_retry import init_retry_controller
+from invarlock.cli.run_runtime_snapshot import SnapshotRestoreFailed
 from invarlock.cli.run_shell_output import _event
 from invarlock.core import metric_provider_resolution as metric_provider_resolution_mod
 from invarlock.core import run_baseline_evidence as run_baseline_evidence_mod
@@ -82,8 +84,9 @@ from invarlock.core.run_snapshot_contract import (
 )
 from invarlock.eval import data as eval_data_mod
 from invarlock.eval import window_planning as window_planning_mod
+from invarlock.json_serialization import dumps_finite_json
 from invarlock.reporting import report_builder_support as telemetry_mod
-from invarlock.reporting import report_overhead as report_overhead_mod
+from invarlock.reporting import report_metric_impact as report_metric_impact_mod
 from invarlock.reporting import report_types as report_types_mod
 from invarlock.reporting import run_report_contract as run_report_contract_mod
 from invarlock.reporting import (
@@ -121,9 +124,10 @@ def persist_ref_masks(core_report: Any, run_dir: Path) -> Path | None:
     target_dir = run_dir / "artifacts" / "edit_masks"
     target_dir.mkdir(parents=True, exist_ok=True)
     mask_path = target_dir / "masks.json"
-    with mask_path.open("w", encoding="utf-8") as handle:
-        json.dump(payload_copy, handle, indent=2, sort_keys=True)
-        handle.write("\n")
+    mask_path.write_text(
+        dumps_finite_json(payload_copy, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     return mask_path
 
 
@@ -132,7 +136,7 @@ def emit_run_outputs(
 ) -> dict[str, str]:
     """Save run report and return emitted artifact paths."""
     report_files_mod = cast(
-        Any, importlib.import_module("invarlock.reporting.report_files")
+        Any, importlib.import_module("invarlock.reporting.report_bundle")
     )
     save_report = report_files_mod.save_report
     _event(console, "DATA", "Saving run report...", emoji="💾")
@@ -288,7 +292,9 @@ def _tokenizer_digest(tokenizer: Any) -> str:
                     for key, value in pairs
                     if isinstance(key, str | int)
                 ]
-                payload = json.dumps(sorted(pairs), separators=(",", ":")).encode()
+                payload = json.dumps(
+                    sorted(pairs), separators=(",", ":"), allow_nan=False
+                ).encode()
                 return hashlib.sha256(payload).hexdigest()
         except (AttributeError, RuntimeError, TypeError, ValueError):
             pass
@@ -298,6 +304,7 @@ def _tokenizer_digest(tokenizer: Any) -> str:
             payload = json.dumps(
                 [(str(key), int(value)) for key, value in vocab],
                 separators=(",", ":"),
+                allow_nan=False,
             ).encode()
             return hashlib.sha256(payload).hexdigest()
         except (TypeError, ValueError):
@@ -311,7 +318,9 @@ def _tokenizer_digest(tokenizer: Any) -> str:
         "pad": None if pad_token is None else str(pad_token),
         "size": _safe_int(getattr(tokenizer, "vocab_size", 0)),
     }
-    return hashlib.sha256(json.dumps(attrs, sort_keys=True).encode()).hexdigest()
+    return hashlib.sha256(
+        json.dumps(attrs, sort_keys=True, allow_nan=False).encode()
+    ).hexdigest()
 
 
 def execute_config_run_request(request: SupportsRunExecutionRequest) -> str | None:
@@ -321,7 +330,7 @@ def execute_config_run_request(request: SupportsRunExecutionRequest) -> str | No
 
 def _build_run_execution_services() -> RunExecutionServices:
     return RunExecutionServices(
-        SnapshotRestoreFailed=run_runtime_exec_mod.SnapshotRestoreFailed,
+        SnapshotRestoreFailed=SnapshotRestoreFailed,
         adjust_edit_params=_adjust_edit_params,
         assemble_run_report=_assemble_run_report_with_runtime_deps,
         build_snapshot_execution_plan=run_runtime_exec_mod.build_snapshot_execution_plan,
@@ -330,7 +339,7 @@ def _build_run_execution_services() -> RunExecutionServices:
         load_baseline_pairing_evidence=_load_baseline_pairing_evidence_with_runtime_deps,
         materialize_run_dataset=_materialize_run_dataset_with_runtime_deps,
         free_model_memory=run_runtime_exec_mod.free_model_memory,
-        init_retry_controller=run_runtime_exec_mod.init_retry_controller,
+        init_retry_controller=init_retry_controller,
         load_model_with_cfg=run_runtime_exec_mod.load_model_with_cfg,
         persist_run_report_outputs=_persist_run_report_outputs_with_runtime_deps,
         prepare_config_for_run=_prepare_config_for_run_with_runtime_deps,
@@ -432,8 +441,8 @@ def _assemble_run_report_with_runtime_deps(**kwargs: Any) -> Any:
             run_report_contract_mod.merge_core_timing_metrics
         ),
         build_metrics_payload_fn=run_report_contract_mod.build_metrics_payload,
-        prepare_guard_overhead_report_fn=(
-            _prepare_guard_overhead_report_with_runtime_deps
+        prepare_guard_metric_impact_report_fn=(
+            _prepare_guard_metric_impact_report_with_runtime_deps
         ),
         finalize_run_provenance_fn=(_finalize_run_provenance_with_runtime_deps),
         build_guard_entries_fn=run_report_contract_mod.build_guard_entries,
@@ -464,12 +473,16 @@ def _persist_run_report_outputs_with_runtime_deps(**kwargs: Any) -> Any:
     return persistence_result
 
 
-def _prepare_guard_overhead_report_with_runtime_deps(*args: Any, **kwargs: Any) -> Any:
-    return report_overhead_mod.prepare_guard_overhead_report(
+def _prepare_guard_metric_impact_report_with_runtime_deps(
+    *args: Any, **kwargs: Any
+) -> Any:
+    return report_metric_impact_mod.prepare_guard_metric_impact_report(
         *args,
         **kwargs,
-        extract_pm_snapshot_for_overhead_fn=_extract_pm_snapshot_for_overhead,
-        validate_guard_overhead_fn=run_runtime_exec_mod.validate_guard_overhead,
+        extract_pm_snapshot_for_metric_impact_fn=(
+            _extract_pm_snapshot_for_metric_impact
+        ),
+        validate_guard_metric_impact_fn=run_runtime_exec_mod.validate_guard_metric_impact,
     )
 
 

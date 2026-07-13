@@ -60,7 +60,7 @@ def test_output_dir_deleted_before_save_report(tmp_path: Path):
         for ctx in _common_ce_detect_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider_min())
@@ -72,12 +72,29 @@ def test_output_dir_deleted_before_save_report(tmp_path: Path):
                     execute=lambda **k: SimpleNamespace(
                         edit={},
                         metrics={
+                            "primary_metric": {
+                                "kind": "ppl_mlm",
+                                "preview": 1.0,
+                                "final": 1.0,
+                            },
                             "ppl_preview": 1.0,
                             "ppl_final": 1.0,
                             "ppl_ratio": 1.0,
                         },
                         guards={},
                         context={"dataset_meta": {}},
+                        evaluation_windows={
+                            "preview": {
+                                "window_ids": [0],
+                                "logloss": [0.0],
+                                "token_counts": [1],
+                            },
+                            "final": {
+                                "window_ids": [1],
+                                "logloss": [0.0],
+                                "token_counts": [1],
+                            },
+                        },
                         status="success",
                     )
                 ),
@@ -115,6 +132,18 @@ def test_permission_error_on_run_dir_creation(tmp_path: Path):
                         metrics={},
                         guards={},
                         context={"dataset_meta": {}},
+                        evaluation_windows={
+                            "preview": {
+                                "window_ids": [0],
+                                "logloss": [0.0],
+                                "token_counts": [1],
+                            },
+                            "final": {
+                                "window_ids": [1],
+                                "logloss": [0.0],
+                                "token_counts": [1],
+                            },
+                        },
                         status="success",
                     )
                 ),
@@ -210,6 +239,11 @@ def test_vars_failure_in_to_serialisable_dict(tmp_path: Path):
                     execute=lambda **k: SimpleNamespace(
                         edit={},
                         metrics={
+                            "primary_metric": {
+                                "kind": "ppl_mlm",
+                                "preview": 1.0,
+                                "final": 1.0,
+                            },
                             "ppl_preview": 1.0,
                             "ppl_final": 1.0,
                             "ppl_ratio": 1.0,
@@ -244,6 +278,11 @@ def test_invalid_file_encoding_baseline(tmp_path: Path):
                     execute=lambda **k: SimpleNamespace(
                         edit={},
                         metrics={
+                            "primary_metric": {
+                                "kind": "ppl_mlm",
+                                "preview": 1.0,
+                                "final": 1.0,
+                            },
                             "ppl_preview": 1.0,
                             "ppl_final": 1.0,
                             "ppl_ratio": 1.0,
@@ -410,6 +449,11 @@ def test_debug_trace_with_mlm_masks_prints(tmp_path: Path, monkeypatch):
                     execute=lambda **k: SimpleNamespace(
                         edit={},
                         metrics={
+                            "primary_metric": {
+                                "kind": "ppl_mlm",
+                                "preview": 1.0,
+                                "final": 1.0,
+                            },
                             "ppl_preview": 1.0,
                             "ppl_final": 1.0,
                             "ppl_ratio": 1.0,
@@ -560,6 +604,11 @@ def test_mlm_probability_inversion(tmp_path: Path):
                     execute=lambda **k: SimpleNamespace(
                         edit={},
                         metrics={
+                            "primary_metric": {
+                                "kind": "ppl_mlm",
+                                "preview": 1.0,
+                                "final": 1.0,
+                            },
                             "ppl_preview": 1.0,
                             "ppl_final": 1.0,
                             "ppl_ratio": 1.0,

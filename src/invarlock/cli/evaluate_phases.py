@@ -80,6 +80,7 @@ class SubjectEvaluationRequest:
     prefer_local_files_only: bool
     no_color: bool
     tmp_dir: Path
+    model_identity: dict[str, str] | None = None
 
 
 def _profile_effective_dataset_config(
@@ -124,6 +125,9 @@ def run_baseline_evaluation_phase(
             assurance_mode = (
                 assurance_cfg.get("mode") if isinstance(assurance_cfg, dict) else None
             )
+            expected_model_identity = (
+                model_cfg.get("model_identity") if isinstance(model_cfg, dict) else None
+            )
             dataset_cfg = _profile_effective_dataset_config(
                 request.baseline_cfg,
                 profile_name=request.profile_name,
@@ -136,6 +140,7 @@ def run_baseline_evaluation_phase(
                 expected_adapter=str(request.adapter),
                 expected_assurance_mode=str(assurance_mode or "off"),
                 expected_dataset=dataset_cfg,
+                expected_model_identity=expected_model_identity,
             )
             runtime.debug_fn(f"Baseline report: {baseline_report_path}")
             return baseline_report_path
@@ -211,7 +216,7 @@ def run_baseline_evaluation_phase(
 def run_subject_evaluation_phase(
     request: SubjectEvaluationRequest,
     runtime: EvaluatePhaseRuntime,
-) -> tuple[Path, dict[str, Any]]:
+) -> tuple[Path, dict[str, Any], Path]:
     from invarlock.core.evaluate_plan import (
         build_subject_edit_run_config,
         build_subject_noop_run_config,
@@ -219,6 +224,9 @@ def run_subject_evaluation_phase(
 
     runtime.phase_fn(2, 3, "SUBJECT EVALUATION")
     baseline_report_str = str(request.baseline_report_path)
+    resolved_config_path = request.tmp_dir / "subject-resolved.yaml"
+    if resolved_config_path.exists() or resolved_config_path.is_symlink():
+        runtime.fail_fn("Resolved subject config output already exists.", exit_code=1)
     if request.edit_config:
         edited_yaml = Path(request.edit_config)
         if not edited_yaml.exists():
@@ -250,6 +258,7 @@ def run_subject_evaluation_phase(
             cfg_loaded,
             subject_model_id=request.subject_model_id,
             adapter_name=str(request.adapter),
+            model_identity=request.model_identity,
             output_dir=str(Path(request.out) / "edited"),
             profile=request.profile_name,
             tier=request.tier_name,
@@ -296,6 +305,7 @@ def run_subject_evaluation_phase(
                         allow_unverified_provenance=request.allow_unverified_provenance,
                         prefer_local_files_only=request.prefer_local_files_only,
                         no_color=request.no_color,
+                        resolved_config_out=str(resolved_config_path),
                     )
             except typer.Exit:
                 if quiet_buffer is not None:
@@ -310,6 +320,7 @@ def run_subject_evaluation_phase(
             request.preset_data,
             model_id=request.subject_model_id,
             adapter_name=str(request.adapter),
+            model_identity=request.model_identity,
             output_dir=str(Path(request.out) / "edited"),
             profile=request.profile_name,
             tier=request.tier_name,
@@ -356,6 +367,7 @@ def run_subject_evaluation_phase(
                         allow_unverified_provenance=request.allow_unverified_provenance,
                         prefer_local_files_only=request.prefer_local_files_only,
                         no_color=request.no_color,
+                        resolved_config_out=str(resolved_config_path),
                     )
             except typer.Exit:
                 if quiet_buffer is not None:
@@ -377,8 +389,7 @@ def run_subject_evaluation_phase(
     runtime.debug_fn(f"Edited report: {edited_report}")
 
     try:
-        with Path(edited_report).open("r", encoding="utf-8") as fh:
-            edited_payload = runtime.json_load_fn(fh)
+        edited_payload = runtime.json_load_fn(Path(edited_report))
     except (json.JSONDecodeError, OSError, TypeError, ValueError) as exc:
         cli_output.print_event(
             runtime.console,
@@ -404,7 +415,11 @@ def run_subject_evaluation_phase(
             exit_code=1,
         )
 
-    return edited_report, edited_payload
+    if not resolved_config_path.is_file() or resolved_config_path.is_symlink():
+        runtime.fail_fn(
+            "Subject execution did not preserve its effective config.", exit_code=1
+        )
+    return edited_report, edited_payload, resolved_config_path
 
 
 __all__ = [

@@ -29,15 +29,33 @@ def gpt2_selectors() -> dict[str, list[str]]:
     }
 
 
-def rope_decoder_selectors() -> dict[str, list[str]]:
+def falcon_selectors() -> dict[str, list[str]]:
+    """Selectors for Transformers' Falcon decoder blocks.
+
+    Falcon fuses Q/K/V into ``query_key_value`` and uses two dense FFN
+    projections.  Those names are not compatible with either GPT-2's Conv1D
+    layout or the split projections used by the RoPE decoder families.
+    """
+
+    return {
+        "attention": [
+            "self_attention.query_key_value",
+            "self_attention.dense",
+        ],
+        "ffn": [
+            "mlp.dense_h_to_4h",
+            "mlp.dense_4h_to_h",
+        ],
+    }
+
+
+def dense_rope_decoder_selectors() -> dict[str, list[str]]:
     return {
         "attention": [
             "self_attn.q_proj",
             "self_attn.k_proj",
             "self_attn.v_proj",
             "self_attn.o_proj",
-            "linear_attn.in_proj_qkv",
-            "linear_attn.out_proj",
         ],
         "ffn": [
             "mlp.up_proj",
@@ -45,6 +63,17 @@ def rope_decoder_selectors() -> dict[str, list[str]]:
             "mlp.gate_proj",
         ],
     }
+
+
+def rope_decoder_selectors() -> dict[str, list[str]]:
+    selectors = dense_rope_decoder_selectors()
+    selectors["attention"].extend(
+        [
+            "linear_attn.in_proj_qkv",
+            "linear_attn.out_proj",
+        ]
+    )
+    return selectors
 
 
 def gpt_oss_selectors() -> dict[str, list[str]]:

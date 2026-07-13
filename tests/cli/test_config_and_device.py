@@ -87,6 +87,25 @@ dataset: !include inc.yaml
     assert "kind" not in cfg3.data["edit"]
 
 
+@pytest.mark.parametrize(
+    "legacy_field",
+    ["revision", "model_revision", "model_checkpoint_tree_sha256"],
+)
+@pytest.mark.parametrize("from_defaults", [False, True])
+def test_config_loader_rejects_legacy_model_identity_fields(
+    tmp_path, legacy_field: str, from_defaults: bool
+) -> None:
+    prefix = "defaults:\n  " if from_defaults else ""
+    config = tmp_path / "legacy-model-identity.yaml"
+    config.write_text(
+        f"{prefix}model:\n{'    ' if from_defaults else '  '}{legacy_field}: stale\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="legacy model identity field"):
+        load_config(config)
+
+
 def test_device_helpers(monkeypatch):
     # is_device_available without torch present should return False for cuda/mps
     assert is_device_available("cpu") is True

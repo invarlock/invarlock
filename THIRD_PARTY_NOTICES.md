@@ -25,6 +25,7 @@ redistributed artifact.
 | psutil | [giampaolo/psutil](https://github.com/giampaolo/psutil) | BSD-style | Process and system telemetry |
 | jsonschema | [python-jsonschema/jsonschema](https://github.com/python-jsonschema/jsonschema) | MIT | Report and manifest schema validation |
 | idna | [kjd/idna](https://github.com/kjd/idna) | BSD 3-Clause | Internationalized domain-name validation used by URL/security checks |
+| numpy | [numpy/numpy](https://github.com/numpy/numpy) | BSD 3-Clause | Numerical kernels used to replay strict paired-bootstrap verification |
 
 ## Optional Runtime Extras
 
@@ -41,7 +42,6 @@ release tooling.
 | safetensors | [huggingface/safetensors](https://github.com/huggingface/safetensors) | Apache License 2.0 | Tensor-only serialization used by secure snapshot flows |
 | datasets | [huggingface/datasets](https://github.com/huggingface/datasets) | Apache License 2.0 | Dataset ingestion and evaluation helpers |
 | requests | [psf/requests](https://github.com/psf/requests) | Apache License 2.0 | Optional HTTP client used by evaluation extras and observability exporters |
-| numpy | [numpy/numpy](https://github.com/numpy/numpy) | BSD 3-Clause | Numerical kernels and array helpers |
 | scikit-learn | [scikit-learn/scikit-learn](https://github.com/scikit-learn/scikit-learn) | BSD 3-Clause | Optional mutual-information/probe utilities |
 | huggingface_hub | [huggingface/huggingface_hub](https://github.com/huggingface/huggingface_hub) | Apache License 2.0 | Model and dataset registry access |
 | accelerate | [huggingface/accelerate](https://github.com/huggingface/accelerate) | Apache License 2.0 | Device placement and distributed helpers |

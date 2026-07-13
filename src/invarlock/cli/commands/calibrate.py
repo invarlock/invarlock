@@ -8,7 +8,6 @@ These commands run repeatable sweeps and emit stable artifacts for release notes
 
 from __future__ import annotations
 
-import csv
 import json
 import math
 from collections import defaultdict
@@ -21,7 +20,10 @@ import typer
 import yaml
 from rich.console import Console
 
+from invarlock.cli.calibration_artifacts import dump_csv, dump_json, dump_markdown
 from invarlock.cli.config_execution import RuntimeDelegationError, run_from_config
+from invarlock.evidence_pack_json import load_json_object
+from invarlock.strict_yaml import StrictYamlError, load_yaml_object
 
 console = Console()
 _NUMERIC_COERCION_ERRORS = (OverflowError, TypeError, ValueError)
@@ -41,35 +43,10 @@ class _SweepSpec:
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    if not isinstance(data, dict):
-        raise typer.BadParameter(f"Config must be a mapping: {path}")
-    return data
-
-
-def _dump_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-
-
-def _dump_markdown(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text.strip() + "\n", encoding="utf-8")
-
-
-def _dump_csv(path: Path, rows: list[dict[str, Any]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not rows:
-        path.write_text("", encoding="utf-8")
-        return
-    fields: list[str] = sorted({k for r in rows for k in r.keys()})
-    with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
-        writer.writeheader()
-        for row in rows:
-            writer.writerow(row)
+    try:
+        return load_yaml_object(path, label="Calibration config")
+    except StrictYamlError as exc:
+        raise typer.BadParameter(f"Config must be a mapping: {path} ({exc})") from exc
 
 
 def _mark_calibration_context(cfg: dict[str, Any]) -> None:
@@ -81,7 +58,7 @@ def _mark_calibration_context(cfg: dict[str, Any]) -> None:
     if not isinstance(run_context, dict):
         run_context = {}
         context["run"] = run_context
-    run_context["skip_overhead_check"] = True
+    run_context["skip_guard_metric_impact_check"] = True
 
 
 def _run_calibration_config(
@@ -269,7 +246,9 @@ def null_sweep(
     cfg_root.mkdir(parents=True, exist_ok=True)
 
     for spec in specs:
-        cfg = json.loads(json.dumps(base))  # safe deep copy without yaml anchors
+        cfg = json.loads(
+            json.dumps(base, allow_nan=False)
+        )  # safe deep copy without yaml anchors
         _mark_calibration_context(cfg)
         cfg.setdefault("dataset", {})["seed"] = int(spec.seed)
         cfg.setdefault("auto", {})["tier"] = spec.tier
@@ -292,7 +271,7 @@ def null_sweep(
             allow_third_party_plugins=allow_third_party_plugins,
             allow_remote_code=allow_remote_code,
         )
-        report = json.loads(Path(report_path).read_text(encoding="utf-8"))
+        report = load_json_object(Path(report_path), label="calibration report")
         reports_by_tier[spec.tier].append(report)
 
         spectral = None
@@ -392,8 +371,8 @@ def null_sweep(
         "summaries": summaries,
     }
 
-    _dump_json(out / "null_sweep_report.json", payload)
-    _dump_csv(out / "null_sweep_runs.csv", run_rows)
+    dump_json(out / "null_sweep_report.json", payload)
+    dump_csv(out / "null_sweep_runs.csv", run_rows)
     _write_tiers_recommendation(
         out / "tiers_patch_spectral_null.yaml", recommendations=tiers_patch
     )
@@ -419,7 +398,7 @@ def null_sweep(
         md_lines.append(
             f"| {tier_name} | {summary.get('n_runs', 0)} | {obs.get('any_warning_rate', 0.0):.3f} | {float(mt.get('alpha', 0.0)):.6f} |"
         )
-    _dump_markdown(out / "null_sweep_summary.md", "\n".join(md_lines))
+    dump_markdown(out / "null_sweep_summary.md", "\n".join(md_lines))
 
     console.print(f"[green]✅ Wrote null sweep artifacts under {out}[/green]")
 
@@ -530,7 +509,9 @@ def ve_sweep(
 
     for spec in specs:
         win = int(spec.windows or 0)
-        cfg = json.loads(json.dumps(base))  # safe deep copy without yaml anchors
+        cfg = json.loads(
+            json.dumps(base, allow_nan=False)
+        )  # safe deep copy without yaml anchors
         _mark_calibration_context(cfg)
         cfg.setdefault("dataset", {})["seed"] = int(spec.seed)
         cfg.setdefault("auto", {})["tier"] = spec.tier
@@ -569,7 +550,7 @@ def ve_sweep(
             allow_third_party_plugins=allow_third_party_plugins,
             allow_remote_code=allow_remote_code,
         )
-        report = json.loads(Path(report_path).read_text(encoding="utf-8"))
+        report = load_json_object(Path(report_path), label="calibration report")
         reports_by_tier[spec.tier].append(report)
         reports_by_tier_window[(spec.tier, win)].append(report)
 
@@ -679,9 +660,9 @@ def ve_sweep(
         "power_curve": power_curve,
     }
 
-    _dump_json(out / "ve_sweep_report.json", payload)
-    _dump_csv(out / "ve_sweep_runs.csv", run_rows)
-    _dump_csv(out / "ve_power_curve.csv", power_curve)
+    dump_json(out / "ve_sweep_report.json", payload)
+    dump_csv(out / "ve_sweep_runs.csv", run_rows)
+    dump_csv(out / "ve_power_curve.csv", power_curve)
     _write_tiers_recommendation(
         out / "tiers_patch_variance_ve.yaml", recommendations=tiers_patch
     )
@@ -705,7 +686,7 @@ def ve_sweep(
         md_lines.append(
             f"| {tier_name} | {summary.get('n_runs', 0)} | {float(rec.get('min_effect_lognll', 0.0)):.6f} | {float(rec.get('expected_enable_rate', 0.0)):.3f} |"
         )
-    _dump_markdown(out / "ve_sweep_summary.md", "\n".join(md_lines))
+    dump_markdown(out / "ve_sweep_summary.md", "\n".join(md_lines))
 
     console.print(f"[green]✅ Wrote VE sweep artifacts under {out}[/green]")
 

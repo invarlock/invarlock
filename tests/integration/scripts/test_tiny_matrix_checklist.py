@@ -30,7 +30,24 @@ def test_tiny_gpt2_matrix_dry_run(tmp_path: Path):
         and "--baseline-adapter hf_causal --subject-adapter hf_causal" in text
     )
     assert "INVARLOCK_ALLOW_NETWORK=1" not in text
+    assert "INVARLOCK_ALLOW_NETWORK=0" in text
     assert "HF_DATASETS_OFFLINE=1" in text
+
+
+def test_offline_matrix_overrides_inherited_network_allowance(tmp_path: Path) -> None:
+    env = os.environ.copy()
+    env["RUN"] = "0"
+    env["NET"] = "0"
+    env["INVARLOCK_ALLOW_NETWORK"] = "1"
+    env["TMP_DIR"] = str(tmp_path / "tmp")
+
+    subprocess.run(
+        ["bash", "scripts/smoke/run_tiny_all_matrix.sh"], env=env, check=True
+    )
+    text = (Path(env["TMP_DIR"]) / "checklist.md").read_text(encoding="utf-8")
+
+    assert "INVARLOCK_ALLOW_NETWORK=0" in text
+    assert "INVARLOCK_ALLOW_NETWORK=1" not in text
 
 
 def test_checklist_records_network_allowance_only_when_net_enabled(tmp_path: Path):
@@ -45,6 +62,50 @@ def test_checklist_records_network_allowance_only_when_net_enabled(tmp_path: Pat
 
     assert "INVARLOCK_ALLOW_NETWORK=1" in text
     assert "HF_DATASETS_OFFLINE=0" in text
+
+
+def test_networked_dry_run_never_bootstraps_python_dependencies(
+    tmp_path: Path,
+) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    log_path = tmp_path / "python_calls.log"
+    fake_python = bin_dir / "python"
+    fake_python.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env bash",
+                f'echo "$@" >> {log_path}',
+                'if [ "${1:-}" = "-c" ]; then exit 0; fi',
+                'if [ "${1:-}" = "-" ]; then exit 97; fi',
+                "exit 0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    fake_python.chmod(0o755)
+    env = os.environ.copy()
+    env.update(
+        {
+            "RUN": "0",
+            "NET": "1",
+            "PYTHON_BIN": str(fake_python),
+            "TMP_DIR": str(tmp_path / "tmp"),
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", "scripts/smoke/run_tiny_all_matrix.sh"],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert log_path.read_text(encoding="utf-8").splitlines() == [
+        "-c import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)"
+    ]
 
 
 def _read_profile_from_checklist(path: str) -> str:
@@ -165,6 +226,12 @@ def test_matrix_uses_repo_python_selector_and_py312_floor() -> None:
     assert 'smoke_setup_pythonpath "$REPO_ROOT"' in text
     assert "requires Python 3.12+" in text
     assert 'CLI=("$PYTHON_BIN" -m invarlock.cli)' in text
+
+
+def test_verify_exports_selected_python_to_nested_smokes() -> None:
+    makefile = Path("Makefile").read_text(encoding="utf-8")
+
+    assert "verify: export PYTHON_BIN := $(PYTHON)" in makefile
 
 
 def test_quant_demo_uses_dev_profile_by_default() -> None:

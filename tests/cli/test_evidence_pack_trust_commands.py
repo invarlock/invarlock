@@ -7,10 +7,10 @@ from typer.testing import CliRunner
 
 from invarlock.cli.app import app
 from tests.reporting._support_evidence_pack_paths import (
+    _build_pack,
     _build_report_payload,
+    _sign_pack,
     _successful_verify_result,
-    _write_json,
-    _write_runtime_manifest,
 )
 
 
@@ -18,14 +18,14 @@ def test_evidence_pack_verify_expected_fingerprint_json(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
-    final_verdict = tmp_path / "final_verdict.json"
-    report = tmp_path / "evaluation.report.json"
     out_dir = tmp_path / "evidence_pack_signed"
-    private_key = tmp_path / "evidence-pack-signing-key.pem"
 
-    _write_json(final_verdict, {"verdict": "PASS"})
-    _write_json(report, _build_report_payload())
-    _write_runtime_manifest(report)
+    _build_pack(
+        out_dir,
+        report_rel_path="reports/model/clean/noop/evaluation.report.json",
+        report_payload=_build_report_payload(),
+    )
+    fingerprint = _sign_pack(out_dir, tmp_path)
     monkeypatch.setattr(
         "invarlock.evidence_pack._run_verify_command",
         lambda reports, profile, report_assurance="report": _successful_verify_result(
@@ -33,37 +33,6 @@ def test_evidence_pack_verify_expected_fingerprint_json(
         ),
         raising=False,
     )
-
-    keygen = CliRunner().invoke(
-        app,
-        [
-            "advanced",
-            "evidence-pack",
-            "keygen",
-            str(private_key),
-            "--json",
-        ],
-    )
-    assert keygen.exit_code == 0, keygen.output
-    fingerprint = json.loads(keygen.stdout.strip())["signing_key_fingerprint"]
-
-    build = CliRunner().invoke(
-        app,
-        [
-            "advanced",
-            "evidence-pack",
-            "build",
-            str(out_dir),
-            "--final-verdict",
-            str(final_verdict),
-            "--report",
-            str(report),
-            "--signing-key",
-            str(private_key),
-            "--json",
-        ],
-    )
-    assert build.exit_code == 0, build.output
 
     pinned = CliRunner().invoke(
         app,

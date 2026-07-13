@@ -26,6 +26,9 @@ def test_runtime_verify_cli_json_success(
             errors=(),
             report=str(tmp_path / "evaluation.report.json"),
             manifest=str(tmp_path / "runtime.manifest.json"),
+            binding_verified=True,
+            expected_digest_matched=False,
+            trust_status="manifest_bound",
         ),
     )
     exit_code = runtime_verify.main(
@@ -46,6 +49,10 @@ def test_runtime_verify_cli_json_success(
         "errors": [],
         "report": str(tmp_path / "evaluation.report.json"),
         "manifest": str(tmp_path / "runtime.manifest.json"),
+        "binding_verified": True,
+        "expected_digest_matched": False,
+        "trust_status": "manifest_bound",
+        "declared_image_digest": None,
     }
 
 
@@ -62,6 +69,9 @@ def test_runtime_verify_cli_plain_failure(
             errors=("bad digest", "missing runtime"),
             report=str(tmp_path / "evaluation.report.json"),
             manifest=str(tmp_path / "runtime.manifest.json"),
+            binding_verified=False,
+            expected_digest_matched=False,
+            trust_status="failed",
         ),
     )
 
@@ -92,6 +102,9 @@ def test_runtime_verify_cli_plain_success(monkeypatch, tmp_path: Path, capsys) -
             errors=(),
             report=str(tmp_path / "evaluation.report.json"),
             manifest=str(tmp_path / "runtime.manifest.json"),
+            binding_verified=True,
+            expected_digest_matched=False,
+            trust_status="manifest_bound",
         ),
     )
 
@@ -105,7 +118,9 @@ def test_runtime_verify_cli_plain_success(monkeypatch, tmp_path: Path, capsys) -
     )
 
     assert exit_code == 0
-    assert "Runtime manifest verification passed" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "Runtime report/manifest binding passed" in output
+    assert "Runtime trust: manifest_bound" in output
 
 
 def test_runtime_verify_cli_help_surface() -> None:
@@ -115,6 +130,7 @@ def test_runtime_verify_cli_help_surface() -> None:
     assert "COMMAND [ARGS]..." not in out
     assert "--report" in out
     assert "--manifest" in out
+    assert "--expected-runtime-image-di" in out
     assert "--version" in out
 
 

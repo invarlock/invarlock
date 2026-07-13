@@ -27,11 +27,23 @@ import yaml
 from rich.console import Console
 
 from invarlock import __version__ as INVARLOCK_VERSION
+from invarlock.clean_pruning_selection_runtime import (
+    finalize_clean_pruning_selection_evaluation_report,
+    load_clean_pruning_selection_evaluation_context,
+)
+from invarlock.clean_selection_runtime import (
+    finalize_clean_selection_evaluation_report,
+    load_clean_selection_evaluation_context,
+)
 from invarlock.cli import output as cli_output
 from invarlock.core.exceptions import resolve_command_exit_code
+from invarlock.evidence_catalog_binding import evaluation_input_binding_errors
+from invarlock.evidence_pack_json import StrictJsonError, load_json_object
 from invarlock.runtime_security import (
     RuntimeManifestExecution,
+    current_runtime_security_policy,
 )
+from invarlock.strict_yaml import StrictYamlError, load_yaml_object
 
 from ...adapters.auto import resolve_auto_adapter
 from ...core.evaluate_contract import (
@@ -70,6 +82,12 @@ from ..evaluate_report_phase import (
     EvaluationReportRequest,
     EvaluationReportRuntime,
     emit_evaluation_report_phase,
+)
+from ..evaluate_selection_phase import (
+    EvaluateSelectionRequest,
+    EvaluateSelectionRuntime,
+    SelectionArtifactInputs,
+    load_evaluate_selection_contexts,
 )
 from ..security_helpers import (
     emit_runtime_manifest,
@@ -160,11 +178,10 @@ def _coerce_timing_seconds(value: Any) -> float | None:
 
 def _load_report_payload(path: Path) -> dict[str, Any] | None:
     try:
-        with path.open("r", encoding="utf-8") as handle:
-            payload = json.load(handle)
-    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        payload = load_json_object(path, label="run report")
+    except StrictJsonError:
         return None
-    return payload if isinstance(payload, dict) else None
+    return payload
 
 
 def _extract_run_timings_seconds(payload: dict[str, Any] | None) -> dict[str, float]:
@@ -243,7 +260,6 @@ def _print_quiet_summary(
         baseline=baseline,
         subject=subject,
         profile=profile,
-        json_load_fn=json.load,
     )
 
 
@@ -254,11 +270,14 @@ def _release_phase_memory() -> None:
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
-    with path.open("r", encoding="utf-8") as fh:
-        data = yaml.safe_load(fh) or {}
-    if not isinstance(data, dict):
-        raise ValueError("Preset must be a mapping")
-    return data
+    try:
+        return load_yaml_object(path, label="Preset")
+    except StrictYamlError as exc:
+        raise ValueError(str(exc)) from exc
+
+
+def _load_json_object_path(path: Path) -> dict[str, Any]:
+    return load_json_object(path, label="edited run report")
 
 
 def _dump_yaml(path: Path, data: dict[str, Any]) -> None:
@@ -294,7 +313,44 @@ def _build_evaluate_phase_runtime(
         load_yaml_fn=_load_yaml,
         dump_yaml_fn=_dump_yaml,
         run_command_fn=run_mod.run_command,
-        json_load_fn=json.load,
+        json_load_fn=_load_json_object_path,
+    )
+
+
+def _selection_contexts(
+    *,
+    baseline: str,
+    subject: str,
+    assurance: str,
+    allow_network: bool,
+    allow_remote_code: bool,
+    allow_third_party_plugins: bool,
+    execution_policy: Any,
+    clean_selection: SelectionArtifactInputs,
+    clean_pruning_selection: SelectionArtifactInputs,
+) -> tuple[Any, Any]:
+    """Load optional transformation-selection evidence at the CLI boundary."""
+
+    return load_evaluate_selection_contexts(
+        EvaluateSelectionRequest(
+            baseline=baseline,
+            subject=subject,
+            assurance=assurance,
+            allow_network=allow_network,
+            allow_remote_code=allow_remote_code,
+            allow_third_party_plugins=allow_third_party_plugins,
+            clean_selection=clean_selection,
+            clean_pruning_selection=clean_pruning_selection,
+        ),
+        EvaluateSelectionRuntime(
+            execution_policy=execution_policy,
+            current_security_policy_fn=current_runtime_security_policy,
+            delegate_model_command_fn=maybe_delegate_model_command,
+            load_clean_selection_fn=load_clean_selection_evaluation_context,
+            load_clean_pruning_selection_fn=(
+                load_clean_pruning_selection_evaluation_context
+            ),
+        ),
     )
 
 
@@ -309,6 +365,7 @@ def evaluate_command(
     profile: str = "ci",
     tier: str = "balanced",
     preset: str | None = None,
+    evaluation_input_binding: str | None = None,
     out: str = "runs",
     report_out: str = "reports/eval",
     edit_config: str | None = None,
@@ -328,6 +385,18 @@ def evaluate_command(
     assurance: str = "strict",
     defer_report_rendering: bool = False,
     no_color: bool = False,
+    baseline_revision: str | None = None,
+    subject_revision: str | None = None,
+    clean_selection_config: str | None = None,
+    clean_selection_execution_receipt: str | None = None,
+    clean_selection_replay: str | None = None,
+    clean_selection_runtime_proof: str | None = None,
+    clean_selection_repeat_index: int | None = None,
+    clean_pruning_selection_config: str | None = None,
+    clean_pruning_selection_execution_receipt: str | None = None,
+    clean_pruning_selection_replay: str | None = None,
+    clean_pruning_selection_runtime_proof: str | None = None,
+    clean_pruning_selection_repeat_index: int | None = None,
 ):
     """Evaluate two checkpoints (baseline vs subject) with pinned windows."""
     try:
@@ -343,7 +412,30 @@ def evaluate_command(
     allow_host_execution = execution_policy.allow_host_execution
     prefer_local_files_only = execution_policy.prefer_local_files_only
     allow_unverified_provenance = execution_policy.allow_unverified_provenance
-    maybe_delegate_model_command()
+
+    clean_selection_context, clean_pruning_selection_context = _selection_contexts(
+        baseline=baseline,
+        subject=subject,
+        assurance=assurance,
+        allow_network=allow_network,
+        allow_remote_code=allow_remote_code,
+        allow_third_party_plugins=allow_third_party_plugins,
+        execution_policy=execution_policy,
+        clean_selection=SelectionArtifactInputs(
+            config=clean_selection_config,
+            execution_receipt=clean_selection_execution_receipt,
+            replay=clean_selection_replay,
+            runtime_proof=clean_selection_runtime_proof,
+            repeat_index=clean_selection_repeat_index,
+        ),
+        clean_pruning_selection=SelectionArtifactInputs(
+            config=clean_pruning_selection_config,
+            execution_receipt=clean_pruning_selection_execution_receipt,
+            replay=clean_pruning_selection_replay,
+            runtime_proof=clean_pruning_selection_runtime_proof,
+            repeat_index=clean_pruning_selection_repeat_index,
+        ),
+    )
 
     verbosity = _resolve_verbosity(bool(quiet), bool(verbose))
 
@@ -385,6 +477,16 @@ def evaluate_command(
 
     src_id = str(baseline)
     edt_id = str(subject)
+    evaluation_binding_payload: dict[str, object] | None = None
+    if evaluation_input_binding is not None:
+        try:
+            loaded_binding = _load_json_object_path(Path(evaluation_input_binding))
+        except (OSError, StrictJsonError, TypeError, ValueError) as exc:
+            _fail(f"Evaluation input binding cannot be loaded: {exc}", exit_code=2)
+        binding_errors = evaluation_input_binding_errors(loaded_binding)
+        if binding_errors:
+            _fail("; ".join(binding_errors), exit_code=2)
+        evaluation_binding_payload = loaded_binding
     plan_start: float | None = (
         cli_output.perf_counter() if total_start is not None else None
     )
@@ -392,6 +494,8 @@ def evaluate_command(
         plan = build_evaluate_command_plan(
             baseline_model_id=src_id,
             subject_model_id=edt_id,
+            baseline_revision=baseline_revision,
+            subject_revision=subject_revision,
             baseline_adapter=baseline_adapter,
             subject_adapter=subject_adapter,
             profile=profile,
@@ -406,6 +510,7 @@ def evaluate_command(
             assurance_mode=assurance,
             execution_mode=execution_mode,
             allow_unverified_provenance=allow_unverified_provenance,
+            evaluation_input_binding=evaluation_binding_payload,
         )
     except FileNotFoundError as exc:
         _fail(f"Preset not found: {exc}", exit_code=2)
@@ -488,32 +593,35 @@ def evaluate_command(
     )
     _release_phase_memory()
 
-    edited_report, edited_payload = run_subject_evaluation_phase(
-        SubjectEvaluationRequest(
-            baseline_report_path=baseline_report_path,
-            preset_data=preset_data,
-            subject_model_id=norm_edt_id,
-            adapter=str(subject_eff_adapter),
-            out=out,
-            device=device,
-            profile_name=profile_name,
-            tier_name=tier_name,
-            guards_order=guards_order,
-            assurance_mode=assurance_mode,
-            subject_label=subject_label,
-            edit_config=edit_config,
-            edit_label=edit_label,
-            execution_mode=execution_mode,
-            allow_network=allow_network,
-            allow_host_execution=allow_host_execution,
-            allow_third_party_plugins=allow_third_party_plugins,
-            allow_remote_code=allow_remote_code,
-            allow_unverified_provenance=allow_unverified_provenance,
-            prefer_local_files_only=prefer_local_files_only,
-            no_color=no_color,
-            tmp_dir=tmp_dir,
-        ),
-        phase_runtime,
+    edited_report, edited_payload, resolved_subject_config = (
+        run_subject_evaluation_phase(
+            SubjectEvaluationRequest(
+                baseline_report_path=baseline_report_path,
+                preset_data=preset_data,
+                subject_model_id=norm_edt_id,
+                adapter=str(subject_eff_adapter),
+                out=out,
+                device=device,
+                profile_name=profile_name,
+                tier_name=tier_name,
+                guards_order=guards_order,
+                assurance_mode=assurance_mode,
+                subject_label=subject_label,
+                edit_config=edit_config,
+                edit_label=edit_label,
+                execution_mode=execution_mode,
+                allow_network=allow_network,
+                allow_host_execution=allow_host_execution,
+                allow_third_party_plugins=allow_third_party_plugins,
+                allow_remote_code=allow_remote_code,
+                allow_unverified_provenance=allow_unverified_provenance,
+                prefer_local_files_only=prefer_local_files_only,
+                no_color=no_color,
+                tmp_dir=tmp_dir,
+                model_identity=plan.subject_identity,
+            ),
+            phase_runtime,
+        )
     )
     _release_phase_memory()
 
@@ -542,6 +650,7 @@ def evaluate_command(
     emit_evaluation_report_phase(
         EvaluationReportRequest(
             edited_report=edited_report,
+            resolved_subject_config=resolved_subject_config,
             baseline_report_path=baseline_report_path,
             report_out=report_out,
             baseline=baseline,
@@ -560,6 +669,8 @@ def evaluate_command(
             execution_mode=execution_mode,
             assurance_mode=assurance_mode,
             defer_report_rendering=defer_report_rendering,
+            clean_selection_context=clean_selection_context,
+            clean_pruning_selection_context=clean_pruning_selection_context,
         ),
         EvaluationReportRuntime(
             console=console,
@@ -570,6 +681,10 @@ def evaluate_command(
             generate_reports_fn=generate_reports,
             emit_runtime_manifest_fn=emit_runtime_manifest,
             manifest_execution_fn=_evaluation_report_manifest_execution,
+            finalize_clean_selection_report_fn=finalize_clean_selection_evaluation_report,
+            finalize_clean_pruning_selection_report_fn=(
+                finalize_clean_pruning_selection_evaluation_report
+            ),
         ),
     )
     if total_start is not None:
@@ -619,7 +734,8 @@ def evaluate_command(
         timing_path = Path(timing_json)
         timing_path.parent.mkdir(parents=True, exist_ok=True)
         timing_path.write_text(
-            json.dumps(timing_payload, indent=2, sort_keys=True) + "\n",
+            json.dumps(timing_payload, indent=2, sort_keys=True, allow_nan=False)
+            + "\n",
             encoding="utf-8",
         )
     if verbosity == VERBOSITY_QUIET:

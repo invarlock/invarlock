@@ -1,17 +1,32 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 from invarlock.cli.commands.explain_gates import explain_gates_command
+from tests.cli._support_runtime_policy import bind_runtime_policy
 
 
 def _mk_pairable_reports(ratio: float = 1.101) -> tuple[dict, dict]:
     # Baseline with finite ppl_final
     base = {
         "meta": {"model_id": "m", "adapter": "hf_causal", "device": "cpu", "seed": 42},
+        "data": {
+            "dataset": "synthetic",
+            "split": "validation",
+            "seq_len": 8,
+            "stride": 4,
+            "preview_n": 2,
+            "final_n": 2,
+        },
+        "edit": {"name": "noop", "plan_digest": "fixture", "deltas": {}},
         "metrics": {
-            "primary_metric": {"kind": "ppl_causal", "final": 50.0},
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 50.0,
+                "final": 50.0,
+            },
             "bootstrap": {"replicates": 400, "alpha": 0.05},
         },
         "evaluation_windows": {
@@ -27,7 +42,12 @@ def _mk_pairable_reports(ratio: float = 1.101) -> tuple[dict, dict]:
             },
         },
         "guards": [],
-        "artifacts": {"events_path": "", "logs_path": ""},
+        "artifacts": {
+            "events_path": "",
+            "logs_path": "",
+            "checkpoint_path": None,
+        },
+        "flags": {"guard_recovered": False, "rollback_reason": None},
     }
     sub = {
         "meta": {
@@ -37,6 +57,15 @@ def _mk_pairable_reports(ratio: float = 1.101) -> tuple[dict, dict]:
             "seed": 42,
             "auto": {"tier": "balanced"},
         },
+        "data": {
+            "dataset": "synthetic",
+            "split": "validation",
+            "seq_len": 8,
+            "stride": 4,
+            "preview_n": 2,
+            "final_n": 2,
+        },
+        "edit": {"name": "quant_rtn", "plan_digest": "fixture", "deltas": {}},
         "metrics": {
             "primary_metric": {
                 "kind": "ppl_causal",
@@ -55,14 +84,19 @@ def _mk_pairable_reports(ratio: float = 1.101) -> tuple[dict, dict]:
             },
             "final": {
                 "window_ids": [3, 4],
-                "logloss": [1.0, 1.1],
+                "logloss": [1.0 + math.log(ratio), 1.1 + math.log(ratio)],
                 "token_counts": [100, 200],
             },
         },
         "guards": [],
-        "artifacts": {"events_path": "", "logs_path": ""},
+        "artifacts": {
+            "events_path": "",
+            "logs_path": "",
+            "checkpoint_path": None,
+        },
+        "flags": {"guard_recovered": False, "rollback_reason": None},
     }
-    return sub, base
+    return bind_runtime_policy(sub), bind_runtime_policy(base)
 
 
 def test_explain_gates_hysteresis(tmp_path: Path, capsys):

@@ -158,7 +158,7 @@ output:
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report_files.save_report",
+            "invarlock.reporting.report_bundle.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (filename_prefix + ".json"))
             },
@@ -185,12 +185,14 @@ output:
             ),
         ),
         patch(
-            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
             lambda *args, **kwargs: SimpleNamespace(
                 passed=True,
-                overhead_ratio=0.0,
-                overhead_percent=0.0,
+                degradation=1.0,
+                display_value=0.0,
                 threshold=0.01,
+                checks={"guard_metric_impact": True},
+                metrics={"degradation": 1.0, "display_value": 0.0},
                 errors=[],
             ),
         ),

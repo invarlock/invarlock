@@ -5,12 +5,12 @@ from pathlib import Path
 from typing import Any
 
 import typer
-import yaml
 
 from invarlock.cli import output as cli_output
 from invarlock.cli.constants import POLICY_PACK_VERIFY_FORMAT_VERSION
 from invarlock.policy_pack import (
     build_policy_pack,
+    load_policy_input,
     load_policy_pack,
     verify_policy_pack,
     write_policy_pack,
@@ -23,11 +23,7 @@ policy_app = typer.Typer(help="Build and verify policy-pack artifacts.")
 def _load_structured_input(path: str | None) -> Any:
     if not path:
         return None
-    file_path = Path(path)
-    raw = file_path.read_text(encoding="utf-8")
-    if file_path.suffix.lower() in {".yaml", ".yml"}:
-        return yaml.safe_load(raw)
-    return json.loads(raw)
+    return load_policy_input(Path(path))
 
 
 @policy_app.command(
@@ -61,12 +57,18 @@ def build_command(
     ),
 ) -> None:
     emit = cli_output.make_command_event_emitter(console)
-    resolved_payload = _load_structured_input(resolved_policy)
+    try:
+        resolved_payload = _load_structured_input(resolved_policy)
+        overrides_payload = _load_structured_input(overrides)
+        compatibility_payload = _load_structured_input(compatibility)
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
     if not isinstance(resolved_payload, dict):
         raise typer.BadParameter("--resolved-policy must decode to an object")
-
-    overrides_payload = _load_structured_input(overrides)
-    compatibility_payload = _load_structured_input(compatibility)
+    if compatibility_payload is not None and not isinstance(
+        compatibility_payload, dict
+    ):
+        raise typer.BadParameter("--compatibility must decode to an object")
     approval = {
         key: value
         for key, value in {
@@ -78,15 +80,16 @@ def build_command(
         }.items()
         if value
     }
-    pack = build_policy_pack(
-        tier=tier,
-        resolved_policy=resolved_payload,
-        overrides=overrides_payload if overrides_payload is not None else [],
-        compatibility=compatibility_payload
-        if isinstance(compatibility_payload, dict)
-        else None,
-        approval=approval,
-    )
+    try:
+        pack = build_policy_pack(
+            tier=tier,
+            resolved_policy=resolved_payload,
+            overrides=overrides_payload if overrides_payload is not None else [],
+            compatibility=compatibility_payload,
+            approval=approval,
+        )
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
     out_path = Path(out)
     write_policy_pack(out_path, pack)
     emit("PASS", "Wrote policy pack")
@@ -104,8 +107,12 @@ def verify_command(
     ),
 ) -> None:
     emit = cli_output.make_command_event_emitter(console)
-    payload = load_policy_pack(Path(pack))
-    errors = verify_policy_pack(payload)
+    try:
+        payload = load_policy_pack(Path(pack))
+    except (OSError, UnicodeError, ValueError) as exc:
+        errors = [f"policy pack is not valid JSON/YAML: {exc}"]
+    else:
+        errors = verify_policy_pack(payload)
     exit_code = 0 if not errors else 2
     if json_out:
         result = {
@@ -115,7 +122,7 @@ def verify_command(
             "errors": errors,
             "resolution": {"exit_code": exit_code},
         }
-        typer.echo(json.dumps(result))
+        typer.echo(json.dumps(result, allow_nan=False))
     else:
         if errors:
             emit("FAIL", "Policy pack verification failed")

@@ -29,7 +29,9 @@ def test_seq2seq_family_presets_load() -> None:
     )
     assert cfg.require_section("model")["id"] == "google/flan-t5-base"
     assert cfg.require_section("model")["adapter"] == "hf_seq2seq"
-    assert cfg.require_section("model")["revision"]
+    model_identity = cfg.require_section("model")["model_identity"]
+    assert model_identity["kind"] == "remote_revision"
+    assert model_identity["revision"]
     provider = cfg.require_section("dataset")["provider"]
     assert provider["kind"] == "hf_seq2seq"
     assert provider["dataset_name"] == "abisee/cnn_dailymail"

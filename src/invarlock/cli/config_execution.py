@@ -50,6 +50,7 @@ class ConfigExecutionRequest:
     allow_remote_code: bool = False
     allow_unverified_provenance: bool = False
     prefer_local_files_only: bool = False
+    resolved_config_out: str | None = None
 
     VALUE_ARG_SPECS: ClassVar[tuple[tuple[str, str], ...]] = (
         ("config", "--config"),
@@ -65,6 +66,7 @@ class ConfigExecutionRequest:
         ("timeout", "--timeout"),
         ("baseline", "--baseline"),
         ("style", "--style"),
+        ("resolved_config_out", "--resolved-config-out"),
     )
     VALUE_ARG_KWARGS: ClassVar[dict[str, dict[str, Any]]] = {
         "config": {"aliases": ("-c",), "required": True},

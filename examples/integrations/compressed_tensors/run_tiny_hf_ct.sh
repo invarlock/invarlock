@@ -21,8 +21,9 @@ Options:
   --profile NAME               InvarLock profile. Default: release
   --tier NAME                  InvarLock tier. Default: balanced
   --lane MODE                  Standard lane shortcut: host or cuda.
-  --execution-mode MODE        container or host. Default: container
-  --assurance MODE             strict or off. Default: strict
+  --execution-mode MODE        container or host. Default: host
+  --assurance MODE             strict or off. Default: off. Strict is rejected
+                               until packed-storage artifact proof exists.
   --runtime-provenance MODE    container or host for verify. Defaults to
                                execution mode.
   --device VALUE               Optional device override.
@@ -32,9 +33,9 @@ Options:
   --no-html                    Skip HTML rendering in the compare wrapper.
   -h, --help                   Show this help.
 
-The default compare path is strict/container-backed. Use --lane host --device
-cpu for cpu-host-off, --lane host --device cuda for cuda-host-off, and
---lane cuda for cuda-container-strict evidence.
+The default compare path is a diagnostic host/off run. Use --lane host --device
+cpu for cpu-host-off or --lane host --device cuda for cuda-host-off. --lane
+cuda is rejected because strict packed-storage assurance is not implemented.
 USAGE
 }
 
@@ -50,8 +51,8 @@ tokenizer_source="sshleifer/tiny-gpt2"
 profile="release"
 tier="balanced"
 lane=""
-execution_mode="container"
-assurance="strict"
+execution_mode="host"
+assurance="off"
 runtime_provenance=""
 device=""
 allow_network=0
@@ -157,6 +158,23 @@ fi
 source "$REPO_ROOT/examples/integrations/_shared/preflight.sh"
 effective_execution_mode="$(integration_effective_execution_mode "$lane" "$execution_mode")"
 effective_assurance="$(integration_effective_assurance "$lane" "$assurance")"
+if [[ "$effective_assurance" == "strict" ]]; then
+  cat >&2 <<'MSG'
+hf_ct is not eligible for strict assurance.
+
+InvarLock can load a genuine compressed-tensors packed checkpoint for a
+diagnostic comparison, but strict verification requires a dedicated
+packed-storage artifact proof that is not implemented yet. Use a host lane
+with assurance off for runtime compatibility work; do not treat its output as
+strict or release evidence.
+MSG
+  exit 2
+fi
+integration_require_strict_acceptance_inputs \
+  "$effective_assurance" \
+  "${INVARLOCK_EXPECTED_RUNTIME_IMAGE_DIGEST:-}" \
+  "${INVARLOCK_ACCEPTANCE_BASELINE_REPORT:-}" \
+  "${INVARLOCK_ACCEPTANCE_POLICY_PACK:-}" || exit $?
 device="$(integration_default_host_device "$effective_execution_mode" "$device")"
 effective_device="$(integration_effective_device "$lane" "$device")"
 lane_artifact_label="$(integration_lane_artifact_label "$effective_execution_mode" "$effective_assurance" "$effective_device")"

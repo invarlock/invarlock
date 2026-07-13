@@ -27,11 +27,14 @@ INVARLOCK_CORE_ABI = CORE_ABI
 
 _ALLOW_DIRECT_SUBMODULE = True
 _PROCESSOR_DIGEST_ERRORS = (DependencyError, ModelLoadError, RuntimeError)
+_PROCESSOR_LOAD_KWARGS = frozenset({"revision", "trust_remote_code"})
 
 
 def _hash_json(payload: dict[str, Any]) -> str:
     return hashlib.sha256(
-        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        json.dumps(
+            payload, sort_keys=True, separators=(",", ":"), allow_nan=False
+        ).encode("utf-8")
     ).hexdigest()
 
 
@@ -49,9 +52,82 @@ def _json_safe_processor_value(value: Any) -> Any:
             return _json_safe_processor_value(to_dict())
         except (TypeError, ValueError, RuntimeError):
             pass
-    if isinstance(value, (list, tuple, set)):
+    if isinstance(value, set):
+        return [
+            _json_safe_processor_value(item)
+            for item in sorted(value, key=lambda item: str(item))
+        ]
+    if isinstance(value, (list, tuple)):
         return [_json_safe_processor_value(item) for item in value]
     return str(value)
+
+
+def _strict_tokenizer_digest(tokenizer: Any) -> str | None:
+    get_vocab = getattr(tokenizer, "get_vocab", None)
+    if not callable(get_vocab):
+        return None
+    try:
+        vocab = get_vocab()
+    except (AttributeError, RuntimeError, TypeError, ValueError):
+        return None
+    if not isinstance(vocab, Mapping) or not vocab:
+        return None
+    normalized_vocab: dict[str, int] = {}
+    for token, token_id in vocab.items():
+        if isinstance(token_id, bool) or not isinstance(token_id, int):
+            return None
+        normalized_vocab[str(token)] = token_id
+    get_added_vocab = getattr(tokenizer, "get_added_vocab", None)
+    try:
+        added_vocab = get_added_vocab() if callable(get_added_vocab) else {}
+    except (AttributeError, RuntimeError, TypeError, ValueError):
+        return None
+    if not isinstance(added_vocab, Mapping):
+        return None
+    payload = {
+        "class": tokenizer.__class__.__name__,
+        "name": str(getattr(tokenizer, "name_or_path", "") or ""),
+        "vocab": normalized_vocab,
+        "added_vocab": _json_safe_processor_value(added_vocab),
+        "init_kwargs": _json_safe_processor_value(
+            getattr(tokenizer, "init_kwargs", {})
+        ),
+        "special_tokens": _json_safe_processor_value(
+            getattr(tokenizer, "special_tokens_map", {})
+        ),
+    }
+    return _hash_json(payload)
+
+
+def _strict_processor_digest(
+    processor: Any,
+    *,
+    tokenizer_sha256: str,
+    load_kwargs: Mapping[str, Any],
+) -> str | None:
+    processor_to_dict = getattr(processor, "to_dict", None)
+    try:
+        processor_config = processor_to_dict() if callable(processor_to_dict) else None
+    except (AttributeError, RuntimeError, TypeError, ValueError):
+        return None
+    if not isinstance(processor_config, Mapping):
+        image_processor = getattr(processor, "image_processor", None)
+        image_to_dict = getattr(image_processor, "to_dict", None)
+        try:
+            processor_config = image_to_dict() if callable(image_to_dict) else None
+        except (AttributeError, RuntimeError, TypeError, ValueError):
+            return None
+    if not isinstance(processor_config, Mapping) or not processor_config:
+        return None
+    return _hash_json(
+        {
+            "class": processor.__class__.__name__,
+            "name": str(getattr(processor, "name_or_path", "") or ""),
+            "config": _json_safe_processor_value(processor_config),
+            "load_kwargs": _json_safe_processor_value(load_kwargs),
+            "tokenizer_sha256": tokenizer_sha256,
+        }
+    )
 
 
 class HF_Multimodal_Adapter(HF_Causal_Adapter):
@@ -63,9 +139,12 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
         self._processor_digest: str | None = None
         self._last_model_id: str | None = None
         self._chat_template_kwargs: dict[str, Any] = {}
+        self._processor_load_kwargs: dict[str, Any] = {}
 
     def load_model(self, model_id: str, device: str = "auto", **kwargs: Any) -> Any:
         self._last_model_id = str(model_id)
+        self._processor = None
+        self._processor_digest = None
         chat_template_kwargs = kwargs.pop("chat_template_kwargs", None)
         if chat_template_kwargs is None:
             self._chat_template_kwargs = {}
@@ -73,7 +152,11 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
             self._chat_template_kwargs = dict(chat_template_kwargs)
         else:
             raise ValueError("model.chat_template_kwargs must be a mapping")
-        self._processor_digest = None
+        self._processor_load_kwargs = {
+            key: kwargs[key] for key in _PROCESSOR_LOAD_KWARGS if key in kwargs
+        }
+        if bool(kwargs.get("prefer_local_files_only", False)):
+            self._processor_load_kwargs["local_files_only"] = True
         try:
             with wrap_errors(
                 DependencyError,
@@ -160,7 +243,10 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
                 details={"dependency": "transformers"},
             ) from exc
 
-        self._processor = AutoProcessor.from_pretrained(self._last_model_id)
+        self._processor = AutoProcessor.from_pretrained(
+            self._last_model_id,
+            **self._processor_load_kwargs,
+        )
         self._processor_digest = self._compute_processor_digest(self._processor)
         return self._processor
 
@@ -208,6 +294,51 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
             except _PROCESSOR_DIGEST_ERRORS:
                 return None
         return self._processor_digest
+
+    @property
+    def processor_identity(self) -> dict[str, str] | None:
+        """Return the three independent identities required by strict vision evidence."""
+
+        try:
+            processor = self._require_processor()
+        except _PROCESSOR_DIGEST_ERRORS:
+            return None
+        tokenizer = getattr(processor, "tokenizer", None)
+        if tokenizer is None:
+            return None
+        tokenizer_digest = _strict_tokenizer_digest(tokenizer)
+        if tokenizer_digest is None:
+            return None
+        chat_template = getattr(tokenizer, "chat_template", None)
+        if not isinstance(chat_template, str) or not chat_template:
+            chat_template = getattr(processor, "chat_template", None)
+        if not isinstance(chat_template, str) or not chat_template:
+            return None
+        processor_digest = _strict_processor_digest(
+            processor,
+            tokenizer_sha256=tokenizer_digest,
+            load_kwargs=self._processor_load_kwargs,
+        )
+        if processor_digest is None:
+            return None
+        return {
+            "tokenizer_sha256": "sha256:" + tokenizer_digest,
+            "processor_sha256": "sha256:" + processor_digest,
+            "chat_template_sha256": "sha256:"
+            + hashlib.sha256(
+                json.dumps(
+                    {
+                        "chat_template": chat_template,
+                        "kwargs": _json_safe_processor_value(
+                            self._chat_template_kwargs
+                        ),
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                ).encode("utf-8")
+            ).hexdigest(),
+        }
 
     def _open_image(self, batch: dict[str, Any]) -> Any:
         from PIL import Image
@@ -360,6 +491,7 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
         prepared["_example_id"] = str(batch.get("id") or batch.get("example_id") or "")
         prepared["_reference_answers"] = answers
         prepared["_processor_sha256"] = self.processor_digest
+        prepared["_processor_identity"] = self.processor_identity
         prepared["_max_new_tokens"] = max(
             16,
             min(int(seq_len or 64), max((len(answer.split()) + 8), 16)),

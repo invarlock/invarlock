@@ -38,6 +38,10 @@ eval:
   loss:
     type: auto
 
+context:
+  run:
+    skip_guard_metric_impact_check: true
+
 output:
   dir: runs
         """,
@@ -91,8 +95,16 @@ def test_run_command_returns_report_path_and_emits_determinism_meta(
             guards={},
             context={"dataset_meta": {}},
             evaluation_windows={
-                "preview": {"logloss": [2.0], "token_counts": [8]},
-                "final": {"logloss": [2.0], "token_counts": [8]},
+                "preview": {
+                    "window_ids": [0],
+                    "logloss": [2.302585092994046],
+                    "token_counts": [8],
+                },
+                "final": {
+                    "window_ids": [1],
+                    "logloss": [2.302585092994046],
+                    "token_counts": [8],
+                },
             },
             status="success",
         )
@@ -174,7 +186,7 @@ def test_run_command_returns_report_path_and_emits_determinism_meta(
             )
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", _fake_save_report)
+            patch("invarlock.reporting.report_bundle.save_report", _fake_save_report)
         )
 
         report_path = run_command(
@@ -224,8 +236,16 @@ def test_run_command_persists_tiny_relax_context(tmp_path: Path, monkeypatch) ->
             guards={},
             context={"dataset_meta": {}},
             evaluation_windows={
-                "preview": {"logloss": [2.0], "token_counts": [8]},
-                "final": {"logloss": [2.0], "token_counts": [8]},
+                "preview": {
+                    "window_ids": [0],
+                    "logloss": [2.302585092994046],
+                    "token_counts": [8],
+                },
+                "final": {
+                    "window_ids": [1],
+                    "logloss": [2.302585092994046],
+                    "token_counts": [8],
+                },
             },
             status="success",
         )
@@ -307,7 +327,7 @@ def test_run_command_persists_tiny_relax_context(tmp_path: Path, monkeypatch) ->
             )
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", _fake_save_report)
+            patch("invarlock.reporting.report_bundle.save_report", _fake_save_report)
         )
 
         run_command(
@@ -357,8 +377,16 @@ def test_run_command_does_not_include_determinism_when_preset_empty(
             guards={},
             context={"dataset_meta": {}},
             evaluation_windows={
-                "preview": {"logloss": [2.0], "token_counts": [8]},
-                "final": {"logloss": [2.0], "token_counts": [8]},
+                "preview": {
+                    "window_ids": [0],
+                    "logloss": [2.302585092994046],
+                    "token_counts": [8],
+                },
+                "final": {
+                    "window_ids": [1],
+                    "logloss": [2.302585092994046],
+                    "token_counts": [8],
+                },
             },
             status="success",
         )
@@ -440,7 +468,7 @@ def test_run_command_does_not_include_determinism_when_preset_empty(
             )
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", _fake_save_report)
+            patch("invarlock.reporting.report_bundle.save_report", _fake_save_report)
         )
         stack.enter_context(
             patch(
@@ -464,20 +492,10 @@ def test_run_command_does_not_include_determinism_when_preset_empty(
     assert "determinism" not in meta
 
 
-def test_run_command_emits_overhead_skip_marker_in_release_when_configured(
+def test_run_command_emits_metric_impact_skip_marker_in_ci_when_configured(
     tmp_path: Path,
 ) -> None:
     cfg = _cfg(tmp_path)
-    cfg.write_text(
-        cfg.read_text(encoding="utf-8")
-        + """
-
-context:
-  run:
-    skip_overhead_check: true
-""",
-        encoding="utf-8",
-    )
     captured: dict[str, object] = {}
 
     class DummyRegistry:
@@ -505,8 +523,16 @@ context:
             guards={},
             context={"dataset_meta": {}},
             evaluation_windows={
-                "preview": {"logloss": [2.0], "token_counts": [8]},
-                "final": {"logloss": [2.0], "token_counts": [8]},
+                "preview": {
+                    "window_ids": [0],
+                    "logloss": [2.302585092994046],
+                    "token_counts": [8],
+                },
+                "final": {
+                    "window_ids": [1],
+                    "logloss": [2.302585092994046],
+                    "token_counts": [8],
+                },
             },
             status="success",
         )
@@ -588,7 +614,7 @@ context:
             )
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", _fake_save_report)
+            patch("invarlock.reporting.report_bundle.save_report", _fake_save_report)
         )
         stack.enter_context(
             patch(
@@ -600,16 +626,20 @@ context:
         report_path = run_command(
             config=str(cfg),
             device="cpu",
-            profile="release",
+            profile="ci",
             out=str(tmp_path / "runs"),
         )
 
     assert isinstance(report_path, Path) and report_path.suffix == ".json"
     report_obj = captured.get("report")
     assert isinstance(report_obj, dict)
-    overhead = report_obj.get("guard_overhead")
-    assert isinstance(overhead, dict)
-    assert overhead.get("skipped") is True
-    assert overhead.get("mode") == "skipped"
-    assert overhead.get("source") == "config:context.run.skip_overhead_check"
-    assert overhead.get("skip_reason") == "context.run.skip_overhead_check"
+    metric_impact = report_obj.get("guard_metric_impact")
+    assert isinstance(metric_impact, dict)
+    assert metric_impact.get("skipped") is True
+    assert metric_impact.get("mode") == "skipped"
+    assert metric_impact.get("source") == (
+        "config:context.run.skip_guard_metric_impact_check"
+    )
+    assert metric_impact.get("skip_reason") == (
+        "context.run.skip_guard_metric_impact_check"
+    )

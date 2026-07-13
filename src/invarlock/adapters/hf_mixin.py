@@ -16,12 +16,12 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import torch
 
+from .hf_mixin_loading import HFPretrainedLoadDiagnostic, _is_local_loader_cache_miss
 from .hf_mixin_snapshot import (
     _deserialize_snapshot_blob as _deserialize_snapshot_blob,
 )
@@ -44,6 +44,9 @@ from .hf_mixin_snapshot import (
     _serialize_snapshot_blob as _serialize_snapshot_blob,
 )
 from .hf_mixin_snapshot import (
+    _set_named_parameter_alias as _set_named_parameter_alias,
+)
+from .hf_mixin_snapshot import (
     restore_model,
     restore_model_chunked,
     snapshot_model,
@@ -55,33 +58,6 @@ if TYPE_CHECKING:
 
 SCALAR_TYPES = (int, float, str, bool)
 _BENIGN_HF_UNEXPECTED_KEY_RE = re.compile(r"(?:^|.*\.)attn\.(?:masked_)?bias$")
-
-
-@dataclass(frozen=True)
-class HFPretrainedLoadDiagnostic:
-    kind: str
-    entries: tuple[str, ...]
-
-
-def _is_local_loader_cache_miss(error: Exception) -> bool:
-    if isinstance(error, FileNotFoundError):
-        return True
-    if not isinstance(error, OSError):
-        return False
-    message = str(error).strip().lower()
-    return any(
-        snippet in message
-        for snippet in (
-            "no such file",
-            "not found",
-            "could not locate",
-            "does not appear to have a file named",
-            "missing cached",
-            "local files only",
-            "cannot find",
-            "can't load the model",
-        )
-    )
 
 
 def _iter_named_parameters_preserving_ties(
@@ -551,18 +527,20 @@ class HFAdapterMixin:
     def _restore_weight_tying(
         self, model: torch.nn.Module, tied_param: str, source_param: str
     ) -> None:
-        """Restore a weight-tying relationship (no-op by default)."""
-        model_params = dict(model.named_parameters())
-        tied = model_params.get(tied_param)
-        source = model_params.get(source_param)
-        if tied is None or source is None:
-            return
-        with torch.no_grad():
-            tied.copy_(source)
+        """Restore a weight-tying relationship by rebinding the parameter."""
+        source = _resolve_named_parameter(model, source_param)
+        if source is None:
+            raise KeyError(f"Missing source parameter for weight tying: {source_param}")
+        _set_named_parameter_alias(model, tied_param, source)
 
-    def validate_weight_tying(self, model: torch.nn.Module) -> None:
+    def validate_weight_tying(
+        self,
+        model: torch.nn.Module,
+        *,
+        expected_tying: Mapping[str, str] | None = None,
+    ) -> None:
         """Raise if a known weight-tying relationship has been broken."""
-        tying = self._extract_weight_tying_info(model)
+        tying = dict(expected_tying or self._extract_weight_tying_info(model))
         if not tying:
             return
 
@@ -585,12 +563,21 @@ class HFAdapterMixin:
                         "source_param": source_param,
                     },
                 )
-            if not torch.allclose(tied, source):
+            same_storage = tied is source
+            if not same_storage:
+                try:
+                    same_storage = int(tied.data_ptr()) == int(source.data_ptr())
+                except (RuntimeError, TypeError, ValueError):
+                    same_storage = False
+            if not same_storage:
                 from invarlock.core.exceptions import AdapterError
 
                 raise AdapterError(
                     code="E202",
-                    message="ADAPTER-STRUCTURE-INVALID: weight-tying invariant violated",
+                    message=(
+                        "ADAPTER-STRUCTURE-INVALID: weight-tying storage alias "
+                        "was not restored"
+                    ),
                     details={
                         "tied_param": tied_param,
                         "source_param": source_param,

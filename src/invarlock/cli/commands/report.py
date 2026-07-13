@@ -280,9 +280,16 @@ def _render_generation_result(
                 final = pm.get("final")
                 if final is not None:
                     pm_entries.append(("Final", _fmt_metric_value(final)))
-                ratio = pm.get("ratio_vs_baseline")
-                if ratio is not None:
-                    pm_entries.append(("Ratio", _fmt_metric_value(ratio)))
+                kind = str(pm.get("kind") or "").strip().lower()
+                comparison_field = (
+                    "delta_vs_baseline_pp"
+                    if kind == "accuracy"
+                    else "ratio_vs_baseline"
+                )
+                comparison = pm.get(comparison_field)
+                if comparison is not None:
+                    label = "Delta (pp)" if kind == "accuracy" else "Ratio"
+                    pm_entries.append((label, _fmt_metric_value(comparison)))
                 dci = pm.get("display_ci")
                 ci_95 = _fmt_ci_95(dci)
                 if ci_95 is not None:

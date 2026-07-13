@@ -10,9 +10,13 @@ from unittest.mock import patch
 import pytest
 
 from invarlock.cli.commands.run import run_command
-from tests.cli.run._support_run_common import assert_single_run_output_artifacts
+from tests.cli.run._support_run_common import (
+    assert_single_run_output_artifacts,
+    canonical_ppl_metrics,
+    configure_guard_metric_impact_skip,
+)
 from invarlock.cli.run_execution import persist_ref_masks
-from invarlock.cli.run_overhead import plan_release_windows
+from invarlock.cli.run_metric_impact import plan_release_windows
 from rich.console import Console
 
 
@@ -155,6 +159,7 @@ output:
   dir: runs
         """
     )
+    configure_guard_metric_impact_skip(cfg)
 
     baseline = tmp_path / "baseline.json"
     baseline.write_text(
@@ -296,18 +301,20 @@ output:
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report_files.save_report",
+            "invarlock.reporting.report_bundle.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (filename_prefix + ".json"))
             },
         ),
         patch(
-            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
             lambda *args, **kwargs: SimpleNamespace(
                 passed=True,
-                overhead_ratio=0.0,
-                overhead_percent=0.0,
+                degradation=1.0,
+                display_value=0.0,
                 threshold=0.01,
+                checks={"guard_metric_impact": True},
+                metrics={"degradation": 1.0, "display_value": 0.0},
                 errors=[],
             ),
         ),
@@ -316,7 +323,7 @@ output:
         run_command(
             config=str(cfg),
             device="cpu",
-            profile="release",
+            profile="ci",
             out=str(outdir),
             baseline=str(baseline),
             until_pass=False,
@@ -426,11 +433,7 @@ def test_to_serialisable_dict_uses_dict_method(tmp_path: Path):
                 lambda: SimpleNamespace(
                     execute=lambda **k: SimpleNamespace(
                         edit={},
-                        metrics={
-                            "ppl_preview": 1.0,
-                            "ppl_final": 1.0,
-                            "ppl_ratio": 1.0,
-                        },
+                        metrics=canonical_ppl_metrics(),
                         guards={},
                         context={"dataset_meta": {}},
                         status="success",

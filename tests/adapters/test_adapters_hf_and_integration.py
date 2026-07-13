@@ -176,6 +176,13 @@ class TestHFBERTAdapter:
         snapshot = adapter.snapshot(model)
         original = model.embeddings.word_embeddings.weight.detach().clone()
 
+        model.cls.predictions.decoder.weight = nn.Parameter(
+            model.cls.predictions.decoder.weight.detach().clone()
+        )
+        assert (
+            model.cls.predictions.decoder.weight
+            is not model.embeddings.word_embeddings.weight
+        )
         with torch.no_grad():
             model.embeddings.word_embeddings.weight.add_(1.0)
 
@@ -225,6 +232,8 @@ class TestHFCausalAdapterRopeDecoder:
         snapshot = adapter.snapshot(model)
         original = model.model.embed_tokens.weight.detach().clone()
 
+        model.lm_head.weight = nn.Parameter(model.lm_head.weight.detach().clone())
+        assert model.lm_head.weight is not model.model.embed_tokens.weight
         with torch.no_grad():
             model.model.embed_tokens.weight.mul_(0.5)
 

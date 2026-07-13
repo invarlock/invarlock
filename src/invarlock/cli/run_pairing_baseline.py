@@ -305,6 +305,10 @@ class _BaselineScheduleValidator:
                 "preview_hash",
                 "final_hash",
                 "provider_kind",
+                "provider",
+                "dataset_name",
+                "config_name",
+                "revision",
                 "provider_digest",
                 "processor_sha256",
             )
@@ -547,6 +551,10 @@ class _BaselineScheduleValidator:
         dataset_meta = {
             key: self.baseline_meta.get(key)
             for key in (
+                "provider",
+                "dataset_name",
+                "config_name",
+                "revision",
                 "tokenizer_hash",
                 "tokenizer_name",
                 "vocab_size",

@@ -83,9 +83,9 @@ def _write_smoke_edit(path: Path) -> None:
               plan:
                 bitwidth: 8
                 per_channel: true
-                clamp_ratio: 0.005
+                clamp_ratio: 0.0
                 scope: attn
-                max_modules: 12
+                max_modules: 1
                 seed: 42
             """
         ),
@@ -94,8 +94,9 @@ def _write_smoke_edit(path: Path) -> None:
 
 
 def _write_smoke_profile(config_root: Path) -> None:
-    (config_root / "runtime" / "profiles").mkdir(parents=True)
-    (config_root / "runtime" / "profiles" / "smoke_ext.yaml").write_text(
+    profiles = config_root / "runtime" / "profiles"
+    profiles.mkdir(parents=True)
+    (profiles / "dev.yaml").write_text(
         "model:\n  device: cpu\n",
         encoding="utf-8",
     )
@@ -153,7 +154,7 @@ def test_evaluate_container_default_smoke_with_external_runtime_inputs(
             "--edit-config",
             str(edit_path),
             "--profile",
-            "smoke_ext",
+            "dev",
             "--assurance",
             "off",
             "--allow-network",
@@ -215,7 +216,7 @@ def test_container_default_front_door_smoke_runs_evaluate_verify_and_report_html
             "--preset",
             str(preset_path),
             "--profile",
-            "smoke_ext",
+            "dev",
             "--assurance",
             "off",
             "--allow-network",

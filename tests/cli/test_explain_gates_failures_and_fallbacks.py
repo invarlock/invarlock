@@ -85,7 +85,7 @@ def test_explain_gates_handles_failures_and_threshold_edges(monkeypatch, tmp_pat
             "validation": {
                 "primary_metric_acceptable": False,
                 "preview_final_drift_acceptable": True,
-                "guard_overhead_acceptable": False,
+                "guard_metric_impact_acceptable": False,
             },
             "telemetry": FlakyTelemetry(),
             "primary_metric": {
@@ -94,10 +94,12 @@ def test_explain_gates_handles_failures_and_threshold_edges(monkeypatch, tmp_pat
                 "final": 0.97,
                 "ratio_vs_baseline": 1.2,
             },
-            "guard_overhead": {
-                "threshold_percent": "n/a",
-                "overhead_threshold": 0.05,
-                "overhead_percent": 2.5,
+            "guard_metric_impact": {
+                "evaluated": True,
+                "degradation_limit": 0.05,
+                "degradation": 0.025,
+                "display_value": 2.5,
+                "display_unit": "percent",
             },
         }
 
@@ -197,7 +199,33 @@ def test_explain_gates_missing_and_load_failures(tmp_path, monkeypatch) -> None:
     assert any("Failed to load inputs" in line for line in console.lines)
 
 
-def test_explain_gates_info_tail_and_ratio_only_overhead(tmp_path, monkeypatch) -> None:
+@pytest.mark.parametrize("summary_line", ["telemetry summary", ""])
+def test_explain_evaluation_report_telemetry_summary_is_optional(
+    monkeypatch: pytest.MonkeyPatch, summary_line: str
+) -> None:
+    from invarlock.cli.commands import explain_gates as mod
+
+    console = RecordingConsole()
+    monkeypatch.setattr(mod, "console", console)
+    monkeypatch.setattr(mod, "telemetry_output_enabled", lambda: True)
+    monkeypatch.setattr(mod, "telemetry_summary_line", lambda _report: summary_line)
+    monkeypatch.setattr(
+        mod,
+        "render_evaluation_report_explanation_lines",
+        lambda *_args, **_kwargs: ["gate explanation"],
+    )
+
+    mod.explain_evaluation_report({"validation": {}})
+
+    expected = ["gate explanation"]
+    if summary_line:
+        expected.insert(0, summary_line)
+    assert console.lines == expected
+
+
+def test_explain_gates_info_tail_and_percent_metric_impact(
+    tmp_path, monkeypatch
+) -> None:
     from invarlock.cli.commands import explain_gates as mod
 
     report = tmp_path / "report.json"
@@ -225,7 +253,7 @@ def test_explain_gates_info_tail_and_ratio_only_overhead(tmp_path, monkeypatch) 
             "validation": {
                 "primary_metric_acceptable": False,
                 "preview_final_drift_acceptable": True,
-                "guard_overhead_acceptable": True,
+                "guard_metric_impact_acceptable": True,
             },
             "resolved_policy": {"metrics": "ignore-me"},
             "telemetry": {"preview_total_tokens": 1, "final_total_tokens": 2},
@@ -235,7 +263,13 @@ def test_explain_gates_info_tail_and_ratio_only_overhead(tmp_path, monkeypatch) 
                 "policy": {"quantile": "oops"},
                 "stats": {"epsilon": 1e-6},
             },
-            "guard_overhead": {"overhead_threshold": 0.05, "overhead_ratio": 1.03},
+            "guard_metric_impact": {
+                "evaluated": True,
+                "degradation_limit": 0.05,
+                "degradation": 0.03,
+                "display_value": 3.0,
+                "display_unit": "percent",
+            },
         },
     )
 
@@ -249,7 +283,7 @@ def test_explain_gates_info_tail_and_ratio_only_overhead(tmp_path, monkeypatch) 
     assert "tiny relax enabled" in joined
     assert "status: INFO" in joined
     assert "Dataset split: validation (fallback)" in joined
-    assert "observed: 1.030x" in joined
+    assert "observed: +3.00%" in joined
     assert "threshold: ≤ +5.0%" in joined
 
 
@@ -285,7 +319,7 @@ def test_explain_gates_hysteresis_warn_tail_and_drift_defaults(
                 "primary_metric_acceptable": True,
                 "preview_final_drift_acceptable": False,
                 "hysteresis_applied": True,
-                "guard_overhead_acceptable": False,
+                "guard_metric_impact_acceptable": False,
             },
             "resolved_policy": {
                 "metrics": {
@@ -312,7 +346,7 @@ def test_explain_gates_hysteresis_warn_tail_and_drift_defaults(
                 "policy": {"quantile": 0.95, "quantile_max": 0.2, "mass_max": 0.1},
                 "stats": {"q95": 0.3, "tail_mass": 0.2},
             },
-            "guard_overhead": {"threshold_percent": "n/a"},
+            "guard_metric_impact": {"display_limit": "n/a"},
         },
     )
 

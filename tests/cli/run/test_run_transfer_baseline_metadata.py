@@ -16,7 +16,10 @@ from unittest.mock import patch
 import pytest
 
 from invarlock.cli.commands.run import run_command
-from tests.cli.run._support_run_common import assert_single_run_output_artifacts
+from tests.cli.run._support_run_common import (
+    assert_single_run_output_artifacts,
+    canonical_ppl_metrics,
+)
 
 
 def _cfg(tmp_path: Path, preview=1, final=1) -> Path:
@@ -59,7 +62,7 @@ def _common_patches_detect_ce():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report_files.save_report",
+            "invarlock.reporting.report_bundle.save_report",
             lambda report, run_dir, formats, filename_prefix=None: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },
@@ -148,7 +151,7 @@ def _common_device_and_save():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report_files.save_report",
+            "invarlock.reporting.report_bundle.save_report",
             lambda report, run_dir, formats, filename_prefix=None: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },
@@ -190,7 +193,7 @@ def _runner_min():
     return SimpleNamespace(
         execute=lambda **k: SimpleNamespace(
             edit={},
-            metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+            metrics=canonical_ppl_metrics(),
             guards={},
             context={"dataset_meta": {}},
             evaluation_windows={},
@@ -225,7 +228,7 @@ def _detect_loss(loss_type: str = "ce"):
 # ---- Selected general edge scenarios (from edges) ----
 
 
-def test_guard_overhead_ratio_display_path(monkeypatch, tmp_path):
+def test_guard_metric_degradation_display_path(monkeypatch, tmp_path):
     cfg = _cfg(tmp_path)
 
     class DummyRegistry:
@@ -250,35 +253,32 @@ def test_guard_overhead_ratio_display_path(monkeypatch, tmp_path):
         def execute(self, **kwargs):
             return SimpleNamespace(
                 edit={"plan_digest": "abcd", "deltas": {"params_changed": 0}},
-                metrics={
-                    "ppl_preview": 10.0,
-                    "ppl_final": 10.0,
-                    "ppl_ratio": 1.0,
-                    "window_overlap_fraction": 0.0,
-                    "window_match_fraction": 1.0,
-                    "loss_type": "ce",
-                },
+                metrics=canonical_ppl_metrics(
+                    preview=10.0,
+                    final=10.0,
+                    window_overlap_fraction=0.0,
+                    window_match_fraction=1.0,
+                    loss_type="ce",
+                ),
                 guards={},
                 context={"dataset_meta": {}},
-                evaluation_windows={},
+                evaluation_windows={
+                    "preview": {
+                        "window_ids": [0],
+                        "logloss": [2.302585092994046],
+                        "token_counts": [1],
+                    },
+                    "final": {
+                        "window_ids": [1],
+                        "logloss": [2.302585092994046],
+                        "token_counts": [1],
+                    },
+                },
                 status="success",
             )
 
-    class _OverheadRatio:
-        def __init__(self):
-            self.passed = True
-            self.messages = []
-            self.warnings = []
-            self.errors = []
-            self.checks = {}
-            self.metrics = {"overhead_ratio": 1.02, "overhead_percent": float("nan")}
-
     monkeypatch.setattr("invarlock.core.registry.get_registry", lambda: DummyRegistry())
     monkeypatch.setattr("invarlock.core.runner.CoreRunner", lambda: DummyRunner())
-    monkeypatch.setattr(
-        "invarlock.cli.run_runtime_exec.validate_guard_overhead",
-        lambda *a, **k: _OverheadRatio(),
-    )
     monkeypatch.setattr(
         "invarlock.eval.data.get_provider",
         lambda *a, **k: SimpleNamespace(
@@ -450,7 +450,7 @@ def test_baseline_missing_eval_windows_fallback(monkeypatch, tmp_path):
 
 
 def test_release_capacity_planner_path():
-    from invarlock.cli.run_overhead import plan_release_windows
+    from invarlock.cli.run_metric_impact import plan_release_windows
 
     capacity = {
         "available_unique": 1000,

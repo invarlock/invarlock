@@ -134,7 +134,7 @@ def test_dataset_dedupe_reduction_then_success(tmp_path: Path):
             )
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         for target in ("invarlock.cli.run_runtime_exec.resolve_tokenizer",):
             stack.enter_context(

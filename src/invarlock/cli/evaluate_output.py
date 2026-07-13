@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import io
-import json
 import math
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -16,6 +15,7 @@ from rich.panel import Panel
 from rich.text import Text
 
 from invarlock import __version__ as INVARLOCK_VERSION
+from invarlock.evidence_pack_json import StrictJsonError, load_json_object
 from invarlock.runtime_security import (
     RuntimeManifestExecution,
     resolve_runtime_image,
@@ -152,7 +152,6 @@ def _print_quiet_summary(
     baseline: str,
     subject: str,
     profile: str,
-    json_load_fn: Any = json.load,
 ) -> None:
     report_path = report_out / "evaluation.report.json"
     runtime_manifest_path = report_out / "runtime.manifest.json"
@@ -162,12 +161,8 @@ def _print_quiet_summary(
         console.print(f"Output: {report_out}", soft_wrap=True)
         return
     try:
-        with report_path.open("r", encoding="utf-8") as fh:
-            evaluation_report = json_load_fn(fh)
-    except (json.JSONDecodeError, OSError, TypeError, ValueError):
-        console.print(f"Output: {report_path}", soft_wrap=True)
-        return
-    if not isinstance(evaluation_report, dict):
+        evaluation_report = load_json_object(report_path, label="evaluation report")
+    except StrictJsonError:
         console.print(f"Output: {report_path}", soft_wrap=True)
         return
     try:
@@ -186,13 +181,18 @@ def _print_quiet_summary(
         total = 0
         passed = 0
         status = "UNKNOWN"
-    pm_ratio = _format_ratio(
-        (evaluation_report.get("primary_metric") or {}).get("ratio_vs_baseline")
+    primary_metric = evaluation_report.get("primary_metric") or {}
+    pm_kind = str(primary_metric.get("kind") or "").strip().lower()
+    pm_comparison = (
+        _format_ratio(primary_metric.get("delta_vs_baseline_pp"))
+        if pm_kind == "accuracy"
+        else _format_ratio(primary_metric.get("ratio_vs_baseline"))
     )
     gate_summary = f"{passed}/{total} passed" if total else "N/A"
     console.print(f"Status: {status} · Gates: {gate_summary}")
-    if pm_ratio != "N/A":
-        console.print(f"Primary metric ratio: {pm_ratio}")
+    if pm_comparison != "N/A":
+        label = "accuracy delta (pp)" if pm_kind == "accuracy" else "metric ratio"
+        console.print(f"Primary {label}: {pm_comparison}")
     console.print(f"Output: {report_path}", soft_wrap=True)
     if runtime_manifest_path.exists():
         console.print(f"Runtime provenance: {runtime_manifest_path}", soft_wrap=True)

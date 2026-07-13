@@ -15,7 +15,7 @@ _PATCH_TARGET_MODULES = (
     "invarlock.core.determinism_policy",
     "invarlock.core.metric_provider_resolution",
     "invarlock.core.registry",
-    "invarlock.core.run_orchestrator_execute",
+    "invarlock.core.orchestration.execute",
     "invarlock.core.runner",
     "invarlock.runtime_verify",
     "invarlock.eval.bench_runner",

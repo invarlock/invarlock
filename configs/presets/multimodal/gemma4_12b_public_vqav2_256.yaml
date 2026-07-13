@@ -20,8 +20,8 @@ dataset:
   split: "validation"
   seq_len: 256
   stride: 256
-  preview_n: 16
-  final_n: 16
+  preview_n: 400
+  final_n: 400
   seed: 42
 
 eval:
@@ -43,10 +43,6 @@ auto:
   enabled: true
   tier: "balanced"
   probes: 0
-
-context:
-  run:
-    skip_overhead_check: true
 
 guards:
   order: ["invariants", "spectral", "rmt", "variance", "invariants"]

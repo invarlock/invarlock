@@ -4,6 +4,7 @@ from __future__ import annotations
 # Consolidated retry, until-pass and exit-code behaviors
 
 import json
+import math
 import textwrap
 from contextlib import ExitStack
 from pathlib import Path
@@ -14,8 +15,67 @@ import pytest
 from typer.testing import CliRunner
 
 from invarlock.cli.commands.run import run_command
-from tests.cli.run._support_run_common import assert_single_run_output_artifacts
+from tests.cli.run._support_run_common import (
+    assert_single_run_output_artifacts,
+    canonical_ppl_metrics,
+    configure_guard_metric_impact_skip,
+    measured_guard_metric_impact_result,
+)
 from tests.cli.run._internal_cli import internal_run_app as cli
+from tests.cli._support_runtime_policy import bind_runtime_policy
+
+
+def _canonical_baseline_payload(*, preview: float, final: float) -> dict:
+    report = {
+        "meta": {
+            "model_id": "gpt2",
+            "adapter": "hf_causal",
+            "device": "cpu",
+            "seed": 42,
+            "tokenizer_hash": "tokhash123",
+        },
+        "data": {
+            "dataset": "synthetic",
+            "split": "validation",
+            "seq_len": 8,
+            "stride": 4,
+            "preview_n": 1,
+            "final_n": 1,
+            "tokenizer_hash": "tokhash123",
+        },
+        "edit": {"name": "noop", "plan_digest": "fixture", "deltas": {}},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": preview,
+                "final": final,
+            }
+        },
+        "evaluation_windows": {
+            "preview": {
+                "window_ids": [0],
+                "input_ids": [[1, 2]],
+                "attention_masks": [[1, 1]],
+                "logloss": [math.log(preview)],
+                "token_counts": [2],
+            },
+            "final": {
+                "window_ids": [1],
+                "input_ids": [[3, 4]],
+                "attention_masks": [[1, 1]],
+                "logloss": [math.log(final)],
+                "token_counts": [2],
+            },
+        },
+        "guards": [],
+        "artifacts": {
+            "events_path": "",
+            "logs_path": "",
+            "checkpoint_path": None,
+        },
+        "flags": {"guard_recovered": False, "rollback_reason": None},
+    }
+    return bind_runtime_policy(report)
 
 
 # --------------------
@@ -131,11 +191,7 @@ def stubbed_run_environment(monkeypatch, tmp_path):
                 attempts["guarded_runs"] += 1
             return SimpleNamespace(
                 edit={"deltas": {}},
-                metrics={
-                    "ppl_preview": 1.0,
-                    "ppl_final": 1.0,
-                    "ppl_ratio": 1.0,
-                },
+                metrics=canonical_ppl_metrics(),
                 guards={},
                 context={"dataset_meta": {}},
                 status="success",
@@ -167,6 +223,10 @@ def stubbed_run_environment(monkeypatch, tmp_path):
             "tokhash123",
         ),
     )
+    monkeypatch.setattr(
+        "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
+        lambda *_args, **_kwargs: measured_guard_metric_impact_result(),
+    )
 
     return attempts, adapter_calls
 
@@ -178,6 +238,7 @@ def test_run_command_retries_and_materializes_once(
     cfg = DummyConfig(tmp_path)
     cfg_path = tmp_path / "config.json"
     cfg_path.write_text(json.dumps(cfg.model_dump()))
+    configure_guard_metric_impact_skip(cfg_path)
     # Simulate PASS then materialize branch with until_pass
     run_command(
         config=str(cfg_path),
@@ -227,28 +288,11 @@ output:
   dir: runs
         """
     )
+    configure_guard_metric_impact_skip(cfg)
 
     baseline = tmp_path / "baseline.json"
     baseline.write_text(
-        json.dumps(
-            {
-                "meta": {"tokenizer_hash": "tokhash123"},
-                "metrics": {
-                    "ppl_preview": 10.0,
-                    "ppl_final": 10.0,
-                    "primary_metric": {
-                        "name": "ppl_causal",
-                        "preview": 10.0,
-                        "final": 10.0,
-                        "ratio_vs_baseline": 1.0,
-                    },
-                },
-                "evaluation_windows": {
-                    "preview": {"window_ids": [0], "input_ids": [[1, 2]]},
-                    "final": {"window_ids": [1], "input_ids": [[3, 4]]},
-                },
-            }
-        )
+        json.dumps(_canonical_baseline_payload(preview=10.0, final=10.0))
     )
 
     class DummyRegistry:
@@ -389,26 +433,9 @@ def test_until_pass_retry_summary_printed(tmp_path: Path):
             """
         )
     )
+    configure_guard_metric_impact_skip(cfg)
     baseline = tmp_path / "baseline.json"
-    baseline.write_text(
-        json.dumps(
-            {
-                "meta": {"tokenizer_hash": "tokhash123"},
-                "metrics": {
-                    "primary_metric": {
-                        "name": "ppl_causal",
-                        "preview": 1.0,
-                        "final": 1.0,
-                        "ratio_vs_baseline": 1.0,
-                    }
-                },
-                "evaluation_windows": {
-                    "preview": {"window_ids": [0], "input_ids": [[1, 2]]},
-                    "final": {"window_ids": [1], "input_ids": [[3, 4]]},
-                },
-            }
-        )
-    )
+    baseline.write_text(json.dumps(_canonical_baseline_payload(preview=1.0, final=1.0)))
 
     summary_called = {"ok": False}
 
@@ -460,11 +487,15 @@ def test_until_pass_retry_summary_printed(tmp_path: Path):
                         "window_ids": [0],
                         "input_ids": [[1, 2]],
                         "attention_masks": [[1, 1]],
+                        "logloss": [0.0],
+                        "token_counts": [2],
                     },
                     "final": {
                         "window_ids": [1],
                         "input_ids": [[3, 4]],
                         "attention_masks": [[1, 1]],
+                        "logloss": [0.0],
+                        "token_counts": [2],
                     },
                 },
                 status="success",
@@ -497,7 +528,7 @@ def test_until_pass_retry_summary_printed(tmp_path: Path):
         )
         stack.enter_context(
             patch(
-                "invarlock.reporting.report_files.save_report",
+                "invarlock.reporting.report_bundle.save_report",
                 lambda report, run_dir, formats, filename_prefix: {
                     "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
                 },

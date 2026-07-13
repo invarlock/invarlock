@@ -9,6 +9,23 @@ import invarlock.runtime_security as runtime_launch_plan
 import invarlock.runtime_security as runtime_security
 import invarlock.runtime_security_helpers as runtime_security_helpers
 
+_IMMUTABLE_IMAGE_ID = "sha256:" + "e" * 64
+
+
+@pytest.fixture(autouse=True)
+def _observe_immutable_runtime_image(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_resolve_observed_container_image",
+        lambda engine, image: runtime_security_helpers._ObservedContainerImage(
+            immutable_ref=_IMMUTABLE_IMAGE_ID,
+            image_digest=_IMMUTABLE_IMAGE_ID,
+            image_id=_IMMUTABLE_IMAGE_ID,
+            repo_digests=(),
+        ),
+        raising=True,
+    )
+
 
 def _env_value(command: list[str], key: str) -> str:
     needle = f"{key}="
@@ -47,9 +64,7 @@ def _path_is_mounted(command: list[str], path: str | Path) -> bool:
     return False
 
 
-def _delegated_argv(
-    command: list[str], image: str = "invarlock-runtime:local"
-) -> list[str]:
+def _delegated_argv(command: list[str], image: str = _IMMUTABLE_IMAGE_ID) -> list[str]:
     image_idx = command.index(image)
     return command[image_idx + 1 :]
 
@@ -84,6 +99,17 @@ def _stub_container_launch(monkeypatch: pytest.MonkeyPatch) -> None:
         runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:test",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_resolve_observed_container_image",
+        lambda engine, image: runtime_security_helpers._ObservedContainerImage(
+            immutable_ref=_IMMUTABLE_IMAGE_ID,
+            image_digest=_IMMUTABLE_IMAGE_ID,
+            image_id=_IMMUTABLE_IMAGE_ID,
+            repo_digests=(),
+        ),
         raising=True,
     )
 

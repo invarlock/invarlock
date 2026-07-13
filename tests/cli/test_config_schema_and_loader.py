@@ -227,7 +227,7 @@ def test_apply_profile_ci_and_release():
     assert ci.require_section("dataset")["preview_n"] == 240
     assert ci.require_section("dataset")["final_n"] == 240
     assert ci.require_section("eval")["bootstrap"]["replicates"] >= 1200
-    assert ci.require_section("primary_metric")["overhead_threshold"] == pytest.approx(
+    assert ci.require_section("primary_metric")["degradation_limit"] == pytest.approx(
         0.01
     )
     rel = apply_profile(cfg, "release")
@@ -255,7 +255,7 @@ def test_apply_profile_preserves_explicit_primary_metric_policy():
         "min": 0.92,
         "max": 1.18,
     }
-    assert ci.require_section("primary_metric")["overhead_threshold"] == pytest.approx(
+    assert ci.require_section("primary_metric")["degradation_limit"] == pytest.approx(
         0.01
     )
 

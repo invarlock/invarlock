@@ -6,7 +6,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from tests.cli.run._support_run_common import write_base_run_config
+from tests.cli.run._support_run_common import (
+    measured_guard_metric_impact_result,
+    write_base_run_config,
+)
 
 
 def baseline_pairing_write_base_cfg(
@@ -56,7 +59,11 @@ def baseline_pairing_common_patches_ce():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report_files.save_report",
+            "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
+            lambda *_args, **_kwargs: measured_guard_metric_impact_result(),
+        ),
+        patch(
+            "invarlock.reporting.report_bundle.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (filename_prefix + ".json"))
             },
@@ -82,7 +89,7 @@ def supplemental_common_patches_detect_ce():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report_files.save_report",
+            "invarlock.reporting.report_bundle.save_report",
             lambda report, run_dir, formats, filename_prefix=None: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },

@@ -12,7 +12,9 @@ import pytest
 from invarlock.cli.commands.run import run_command
 from tests.cli.run._support_run_common import (
     assert_single_run_report_artifact,
+    canonical_ppl_metrics,
     common_ce_patches,
+    configure_guard_metric_impact_skip,
 )
 from tests.cli.run._support_run_common import (
     write_base_run_config as _base_cfg,
@@ -74,11 +76,7 @@ def test_baseline_tokenizer_hash_mismatch_exit(tmp_path: Path):
                 lambda: SimpleNamespace(
                     execute=lambda **k: SimpleNamespace(
                         edit={},
-                        metrics={
-                            "ppl_preview": 1.0,
-                            "ppl_final": 1.0,
-                            "ppl_ratio": 1.0,
-                        },
+                        metrics=canonical_ppl_metrics(),
                         guards={},
                         context={"dataset_meta": {}},
                         status="success",
@@ -98,7 +96,7 @@ def test_baseline_tokenizer_hash_mismatch_exit(tmp_path: Path):
 
 
 def test_preview_final_tokens_computed_when_missing_in_baseline_meta(tmp_path: Path):
-    cfg = _base_cfg(tmp_path, 1, 1)
+    cfg = configure_guard_metric_impact_skip(_base_cfg(tmp_path, 1, 1))
     baseline = tmp_path / "baseline.json"
     baseline.write_text(
         json.dumps(
@@ -172,12 +170,12 @@ def test_preview_final_tokens_computed_when_missing_in_baseline_meta(tmp_path: P
 
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", runner_factory))
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
             device="cpu",
-            profile="release",
+            profile="ci",
             out=str(tmp_path / "runs"),
             baseline=str(baseline),
             until_pass=False,
@@ -214,11 +212,7 @@ def test_provider_indices_fallback_iteration(tmp_path: Path):
                 lambda: SimpleNamespace(
                     execute=lambda **k: SimpleNamespace(
                         edit={},
-                        metrics={
-                            "ppl_preview": 1.0,
-                            "ppl_final": 1.0,
-                            "ppl_ratio": 1.0,
-                        },
+                        metrics=canonical_ppl_metrics(),
                         guards={},
                         context={"dataset_meta": {}},
                         status="success",

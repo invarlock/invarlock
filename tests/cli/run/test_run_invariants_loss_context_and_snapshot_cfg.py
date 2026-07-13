@@ -13,6 +13,7 @@ from invarlock.cli.commands.run import run_command
 from tests.cli.run._support_run_common import (
     assert_single_run_output_artifacts,
     common_ce_patches,
+    configure_guard_metric_impact_skip,
     write_base_run_config,
 )
 from tests.cli.run._support_run_common import (
@@ -595,7 +596,7 @@ def test_loss_type_resolved_in_context(tmp_path: Path):
 
 
 def test_baseline_masked_counts_used_when_present(tmp_path: Path):
-    cfg = _base_cfg(tmp_path)
+    cfg = configure_guard_metric_impact_skip(_base_cfg(tmp_path))
     baseline = tmp_path / "baseline.json"
     baseline.write_text(
         json.dumps(
@@ -693,12 +694,12 @@ def test_baseline_masked_counts_used_when_present(tmp_path: Path):
             )
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
             device="cpu",
-            profile="release",
+            profile="ci",
             baseline=str(baseline),
             out=str(tmp_path / "runs"),
         )

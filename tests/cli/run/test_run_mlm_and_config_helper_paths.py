@@ -11,9 +11,9 @@ from invarlock.cli import run_pairing as pairing_mod
 from invarlock.cli import run_config as run_serial_mod
 from invarlock.core.exceptions import ConfigError
 from invarlock.core import run_policy as run_policy_mod
-from invarlock.core.run_policy import GUARD_OVERHEAD_THRESHOLD
+from invarlock.core.run_policy import GUARD_METRIC_DEGRADATION_LIMIT
 from invarlock.core.run_policy import choose_dataset_split
-from invarlock.core.run_policy import resolve_guard_overhead_threshold
+from invarlock.core.run_policy import resolve_guard_metric_degradation_limit
 from invarlock.core.run_policy import resolve_pm_acceptance_range
 
 
@@ -115,19 +115,21 @@ def test_resolve_pm_acceptance_range_covers_outer_exception(monkeypatch) -> None
         )
 
 
-def test_resolve_guard_overhead_threshold_from_config() -> None:
-    assert resolve_guard_overhead_threshold(None) == pytest.approx(
-        GUARD_OVERHEAD_THRESHOLD
+def test_resolve_guard_metric_degradation_limit_from_config() -> None:
+    assert resolve_guard_metric_degradation_limit(None) == pytest.approx(
+        GUARD_METRIC_DEGRADATION_LIMIT
     )
-    assert resolve_guard_overhead_threshold(
-        {"primary_metric": {"overhead_threshold": 0.025}}
+    assert resolve_guard_metric_degradation_limit(
+        {"primary_metric": {"degradation_limit": 0.025}}
     ) == pytest.approx(0.025)
-    with pytest.raises(ConfigError, match="overhead_threshold"):
-        resolve_guard_overhead_threshold(
-            {"primary_metric": {"overhead_threshold": "bad"}}
+    with pytest.raises(ConfigError, match="degradation_limit"):
+        resolve_guard_metric_degradation_limit(
+            {"primary_metric": {"degradation_limit": "bad"}}
         )
-    with pytest.raises(ConfigError, match="overhead_threshold"):
-        resolve_guard_overhead_threshold({"primary_metric": {"overhead_threshold": -1}})
+    with pytest.raises(ConfigError, match="degradation_limit"):
+        resolve_guard_metric_degradation_limit(
+            {"primary_metric": {"degradation_limit": -1}}
+        )
 
 
 def test_choose_dataset_split_covers_fallback_and_exception_path() -> None:

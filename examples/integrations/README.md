@@ -25,11 +25,12 @@ prerequisites, commands, and generated artifact list.
   labeling helpers.
 - `_shared/run_invarlock_compare.sh` is a reusable baseline-vs-subject wrapper
   for HF-loadable checkpoints and adapter-backed subject paths.
-- `public_e2e/` turns the shipped external-edit public evidence into verifier,
-  HTML, MLflow tag, model-card, release-review, and CI summary artifacts.
-- `ci_registry/` shows how to attach report verification, HTML, MLflow tags,
-  Hugging Face model-card evidence, and release-review packets to existing CI
-  and registry workflows.
+- `public_e2e/` demonstrates a handoff from caller-supplied current evidence to
+  verifier, HTML, MLflow tag, model-card, release-review, and CI summary
+  artifacts.
+- `ci_registry/` shows how to attach current report verification, HTML, MLflow
+  tags, Hugging Face model-card evidence, and release-review packets to
+  existing CI and registry workflows.
 - `_shared/validate_source_matrix_artifacts.py` checks generated strict-lane
   artifact directories against `source_matrix.json`.
 - `_runtime_images/` contains example-only CUDA image definitions for optional
@@ -50,17 +51,21 @@ prerequisites, commands, and generated artifact list.
    narrowest matching image under `_runtime_images/`; dense examples should use
    the standard InvarLock CUDA runtime.
 4. Run `invarlock evaluate` against the baseline and subject.
-5. Run `invarlock verify --json` and render `evaluation.html`.
-6. Validate generated strict-lane artifacts against `source_matrix.json` when
-   using verified strict-evidence README claims:
+5. Run `invarlock verify --json --baseline ... --policy-pack ...
+   --expected-runtime-image-digest ...` using independently reviewed inputs,
+   then render `evaluation.html`.
+6. Validate generated strict-lane artifacts against `source_matrix.json` before
+   presenting a new run as verified strict evidence:
 
    ```bash
    python3 examples/integrations/_shared/validate_source_matrix_artifacts.py \
-     --targets <target>
+     --targets <target> \
+     --baseline-report /path/to/raw-baseline-report.json \
+     --policy-pack /path/to/acceptance-policy-pack.json \
+     --expected-runtime-image-digest "$TRUSTED_RUNTIME_IMAGE_DIGEST"
    ```
 
-   Omit `--targets` only after every source-matrix entry has generated
-   strict-lane reports in the checkout.
+   Validate targets separately when their acceptance inputs differ.
 
 7. Record the output paths and any backend limitations in the example README.
 

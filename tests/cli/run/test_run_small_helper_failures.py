@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import builtins
+import math
 from types import SimpleNamespace
 
 import click
@@ -10,6 +11,7 @@ from invarlock.cli import run_config as run_config_mod
 from invarlock.cli import run_pairing as pairing_mod
 from invarlock.cli import run_pairing as run_pairing_mod
 from invarlock.cli import run_runtime_exec as run_runtime_exec_mod
+from invarlock.cli.run_runtime_snapshot import SnapshotRestoreFailed
 from invarlock.core.exceptions import InvarlockError
 
 
@@ -143,7 +145,7 @@ def test_run_bare_control_skip_model_load_requires_live_model(monkeypatch):
     )
 
     with pytest.raises(
-        run_runtime_exec_mod.SnapshotRestoreFailed,
+        SnapshotRestoreFailed,
         match="bare control without a live model instance",
     ):
         run_runtime_exec_mod.run_bare_control(
@@ -165,9 +167,150 @@ def test_run_bare_control_skip_model_load_requires_live_model(monkeypatch):
         )
 
 
+@pytest.mark.parametrize("metric_kind", ["ppl_causal", "accuracy"])
+def test_run_bare_control_retains_real_metric_specific_evidence(
+    monkeypatch, metric_kind: str
+) -> None:
+    if metric_kind == "accuracy":
+        metrics = {
+            "primary_metric": {"kind": "accuracy", "preview": 0.8, "final": 0.8},
+            "classification": {"final": {"correct_total": 8, "total": 10}},
+        }
+        windows = {"final": {"example_ids": list(range(10))}}
+        loss_type = "classification"
+    else:
+        metrics = {
+            "primary_metric": {"kind": "ppl_causal", "preview": 2.0, "final": 2.0},
+            "logloss_final": math.log(2.0),
+            "final_total_tokens": 2,
+        }
+        windows = {
+            "final": {
+                "window_ids": [1, 2],
+                "logloss": [math.log(2.0), math.log(2.0)],
+                "token_counts": [1, 1],
+            }
+        }
+        loss_type = "causal"
+    report = SimpleNamespace(
+        metrics=metrics,
+        evaluation_windows=windows,
+        status="success",
+    )
+    monkeypatch.setattr(
+        "invarlock.core.determinism_policy.set_seed", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "invarlock.core.runner.CoreRunner",
+        lambda: SimpleNamespace(execute=lambda **kwargs: report),
+    )
+    monkeypatch.setattr(
+        run_runtime_exec_mod, "_capture_backend_inventory", lambda **_: None
+    )
+    monkeypatch.setattr(run_runtime_exec_mod, "release_process_memory", lambda: None)
+
+    payload = run_runtime_exec_mod.run_bare_control(
+        adapter=SimpleNamespace(),
+        edit_op=None,
+        cfg=SimpleNamespace(model=SimpleNamespace(id="demo")),
+        model=object(),
+        run_config=SimpleNamespace(event_path=None, context={}),
+        calibration_data=[],
+        auto_config=None,
+        edit_config={},
+        preview_count=1,
+        final_count=1,
+        seed_bundle={"python": 1},
+        resolved_device="cpu",
+        restore_fn=lambda: None,
+        resolved_loss_type=loss_type,
+        profile_normalized="ci",
+    )
+
+    assert payload is not None
+    assert payload["bare_report"]["primary_metric"]["kind"] == metric_kind
+    assert payload["bare_report"]["status"] == "success"
+    assert payload["bare_facts"]["example_ids_digest"]
+
+
+def test_run_bare_control_rejects_non_success_status_before_report_assembly(
+    monkeypatch,
+) -> None:
+    report = SimpleNamespace(status="failed")
+    monkeypatch.setattr(
+        "invarlock.core.determinism_policy.set_seed", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "invarlock.core.runner.CoreRunner",
+        lambda: SimpleNamespace(execute=lambda **kwargs: report),
+    )
+    monkeypatch.setattr(
+        run_runtime_exec_mod, "_capture_backend_inventory", lambda **_: None
+    )
+    monkeypatch.setattr(run_runtime_exec_mod, "release_process_memory", lambda: None)
+
+    with pytest.raises(InvarlockError) as exc_info:
+        run_runtime_exec_mod.run_bare_control(
+            adapter=SimpleNamespace(),
+            edit_op=None,
+            cfg=SimpleNamespace(model=SimpleNamespace(id="demo")),
+            model=object(),
+            run_config=SimpleNamespace(event_path=None, context={}),
+            calibration_data=[],
+            auto_config=None,
+            edit_config={},
+            preview_count=1,
+            final_count=1,
+            seed_bundle={"python": 1},
+            resolved_device="cpu",
+            restore_fn=lambda: None,
+            resolved_loss_type="causal",
+            profile_normalized="ci",
+        )
+
+    assert exc_info.value.code == "E009"
+    assert "GUARD-METRIC-BARE-CONTROL-FAILED" in exc_info.value.message
+
+
+def test_run_bare_control_surfaces_the_underlying_runner_error(monkeypatch) -> None:
+    report = SimpleNamespace(
+        status="failed", error="vision_text batch is missing image_path"
+    )
+    monkeypatch.setattr(
+        "invarlock.core.determinism_policy.set_seed", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "invarlock.core.runner.CoreRunner",
+        lambda: SimpleNamespace(execute=lambda **kwargs: report),
+    )
+    monkeypatch.setattr(
+        run_runtime_exec_mod, "_capture_backend_inventory", lambda **_: None
+    )
+    monkeypatch.setattr(run_runtime_exec_mod, "release_process_memory", lambda: None)
+
+    with pytest.raises(InvarlockError, match="missing image_path"):
+        run_runtime_exec_mod.run_bare_control(
+            adapter=SimpleNamespace(),
+            edit_op=None,
+            cfg=SimpleNamespace(model=SimpleNamespace(id="demo")),
+            model=object(),
+            run_config=SimpleNamespace(event_path=None, context={}),
+            calibration_data=[],
+            auto_config=None,
+            edit_config={},
+            preview_count=1,
+            final_count=1,
+            seed_bundle={"python": 1},
+            resolved_device="cpu",
+            restore_fn=lambda: None,
+            resolved_loss_type="causal",
+            profile_normalized="ci",
+        )
+
+
 def test_execute_guarded_run_skip_model_load_requires_live_model():
     with pytest.raises(
-        run_runtime_exec_mod.SnapshotRestoreFailed,
+        SnapshotRestoreFailed,
         match="guarded execution without a live model instance",
     ):
         run_runtime_exec_mod.execute_guarded_run(

@@ -68,6 +68,19 @@ def test_restore_chunked_missing_parameter_key_raises_and_is_atomic(
     _assert_state_equal(_clone_state(target), modified)
 
 
+def test_restore_bytes_shape_mismatch_raises_before_mutation() -> None:
+    adapter = HFAdapterMixin()
+    source = torch.nn.Linear(4, 3, bias=True)
+    snapshot = adapter.snapshot(source)
+    target = torch.nn.Linear(5, 3, bias=True)
+    modified = _clone_state(target)
+
+    with pytest.raises(ValueError, match="shape mismatch"):
+        adapter.restore(target, snapshot)
+
+    _assert_state_equal(_clone_state(target), modified)
+
+
 def test_restore_chunked_rejects_manifest_path_traversal(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

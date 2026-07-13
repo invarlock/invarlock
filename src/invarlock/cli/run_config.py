@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -99,6 +100,20 @@ def _to_serialisable_dict(section: object) -> dict[str, Any]:
         return {}
 
 
+def _to_yaml_serialisable(value: Any) -> Any:
+    """Convert typed config values to the scalar containers emitted as YAML."""
+
+    if isinstance(value, Path):
+        return value.as_posix()
+    if isinstance(value, dict):
+        return {key: _to_yaml_serialisable(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_to_yaml_serialisable(item) for item in value]
+    if isinstance(value, tuple):
+        return [_to_yaml_serialisable(item) for item in value]
+    return value
+
+
 def _apply_requested_edit_override(
     cfg: Any, edit_name: str, *, config_cls: type
 ) -> Any:
@@ -118,6 +133,7 @@ def prepare_config_for_run(
     edit: str | None,
     tier: str | None,
     probes: int | None,
+    resolved_config_out: str | None = None,
     console: Console | None = None,
     event_fn: Any | None = None,
     invarlock_config_cls: type | None = None,
@@ -260,6 +276,24 @@ def prepare_config_for_run(
     if apply_auto_adapter_fn is not None:
         cfg = apply_auto_adapter_fn(cfg)
 
+    if resolved_config_out is not None:
+        resolved_path = Path(resolved_config_out)
+        resolved_path.parent.mkdir(parents=True, exist_ok=True)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(resolved_path, flags, 0o600)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                yaml.safe_dump(
+                    _to_yaml_serialisable(cfg.model_dump()),
+                    handle,
+                    sort_keys=False,
+                )
+                handle.flush()
+                os.fsync(handle.fileno())
+        except BaseException:
+            resolved_path.unlink(missing_ok=True)
+            raise
+
     return cfg
 
 
@@ -395,12 +429,29 @@ def extract_model_load_kwargs(
     if not isinstance(model, dict):
         return {}
 
+    from invarlock.core.checkpoint_identity import validated_model_identity
+
+    model_identity = validated_model_identity(model.get("model_identity"))
+
     extra = {
         key: value
         for key, value in model.items()
-        if key not in {"id", "adapter", "device", "baseline_id", "subject_id"}
+        if key
+        not in {
+            "id",
+            "adapter",
+            "device",
+            "baseline_id",
+            "subject_id",
+            "model_identity",
+            "model_revision",
+            "model_checkpoint_tree_sha256",
+            "revision",
+        }
         and value is not None
     }
+    if model_identity is not None and model_identity["kind"] == "remote_revision":
+        extra["revision"] = model_identity["revision"]
 
     trust_remote_code = extra.get("trust_remote_code")
     if (

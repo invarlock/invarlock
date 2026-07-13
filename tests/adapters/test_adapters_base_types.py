@@ -353,11 +353,3 @@ class TestAdapterCache:
         # Simulate time passing
         time.sleep(1.1)
         assert cache.get("key1") is None
-
-    def test_cache_save_load(self):
-        """Test cache save/load (stubs)."""
-        cache = AdapterCache({"enabled": True})
-
-        cache.save()
-        cache.load()
-        assert cache.get("missing") is None

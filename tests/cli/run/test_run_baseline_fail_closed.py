@@ -127,20 +127,20 @@ def _patch_minimal_run():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report_files.save_report",
+            "invarlock.reporting.report_bundle.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / f"{filename_prefix}.json")
             },
         ),
         patch(
-            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
             lambda *a, **k: SimpleNamespace(
                 passed=True,
                 messages=[],
                 warnings=[],
                 errors=[],
-                checks={},
-                metrics={"overhead_ratio": 1.0, "overhead_percent": 0.0},
+                checks={"guard_metric_impact": True},
+                metrics={"degradation": 1.0, "display_value": 0.0},
             ),
         ),
     )

@@ -7,8 +7,9 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _load_cert(cert_path: Path) -> dict:
-    if not cert_path.is_file():
-        pytest.skip(f"Evaluation Report fixture missing: {cert_path}")
+    assert cert_path.is_file(), (
+        f"required evaluation report fixture missing: {cert_path}"
+    )
     return json.loads(cert_path.read_text(encoding="utf-8"))
 
 

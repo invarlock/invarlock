@@ -6,13 +6,22 @@ import pytest
 import yaml
 
 from invarlock.cli.commands.evaluate import evaluate_command
+from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
+from tests.cli._support_effective_config import preserve_effective_config
 
 
 class _StubCLIExit(Exception):
     pass
 
 
-def _stub_run(out_dir: Path, baseline: Path | None = None) -> Path:
+def _stub_run(
+    out_dir: Path,
+    baseline: Path | None = None,
+    *,
+    run_kwargs: dict | None = None,
+) -> Path:
+    if run_kwargs is not None:
+        preserve_effective_config(run_kwargs)
     # Create a deterministic timestamp directory and write a minimal report.json
     ts_dir = out_dir / "20250101_000000"
     ts_dir.mkdir(parents=True, exist_ok=True)
@@ -34,6 +43,12 @@ def _stub_run(out_dir: Path, baseline: Path | None = None) -> Path:
     report_path = ts_dir / "report.json"
     report_path.write_text(json.dumps(report), encoding="utf-8")
     return report_path
+
+
+def _stub_report_generation(**kwargs) -> None:
+    output = Path(kwargs["output"])
+    output.mkdir(parents=True, exist_ok=True)
+    (output / "evaluation.report.json").write_bytes(Path(kwargs["run"]).read_bytes())
 
 
 def test_evaluate_orchestrates_runs_and_cert(monkeypatch, tmp_path):
@@ -58,10 +73,11 @@ def test_evaluate_orchestrates_runs_and_cert(monkeypatch, tmp_path):
         calls["runs"].append(
             {k: kwargs.get(k) for k in ["config", "profile", "out", "baseline"]}
         )
-        return str(_stub_run(out))
+        return str(_stub_run(out, run_kwargs=kwargs))
 
     def fake_report(**kwargs):
         calls["reports"].append(kwargs)
+        _stub_report_generation(**kwargs)
 
     # Patch in our fakes
     # Patch the lazily imported run command at its source module
@@ -119,7 +135,14 @@ def test_evaluate_reuses_baseline_report_skipping_baseline_run(monkeypatch, tmp_
     baseline_report.write_text(
         json.dumps(
             {
-                "meta": {"model_id": str(src), "adapter": "hf_causal"},
+                "meta": {
+                    "model_id": str(src),
+                    "adapter": "hf_causal",
+                    "model_identity": {
+                        "kind": "local_checkpoint_tree",
+                        "sha256": checkpoint_tree_sha256(src),
+                    },
+                },
                 "context": {
                     "profile": "ci",
                     "auto": {"tier": "balanced"},
@@ -159,10 +182,11 @@ def test_evaluate_reuses_baseline_report_skipping_baseline_run(monkeypatch, tmp_
         calls["runs"].append(
             {k: kwargs.get(k) for k in ["config", "profile", "out", "baseline"]}
         )
-        return str(_stub_run(out))
+        return str(_stub_run(out, run_kwargs=kwargs))
 
     def fake_report(**kwargs):  # noqa: ANN001
         calls["reports"].append(kwargs)
+        _stub_report_generation(**kwargs)
 
     import invarlock.cli.commands.run as run_mod
     from invarlock.cli.commands import evaluate as mod
@@ -209,10 +233,11 @@ def test_evaluate_can_defer_optional_rendering_and_write_timing_json(
     calls = {"reports": []}
 
     def fake_run(**kwargs):  # noqa: ANN001
-        return str(_stub_run(Path(kwargs.get("out"))))
+        return str(_stub_run(Path(kwargs.get("out")), run_kwargs=kwargs))
 
     def fake_report(**kwargs):  # noqa: ANN001
         calls["reports"].append(kwargs)
+        _stub_report_generation(**kwargs)
 
     import invarlock.cli.commands.run as run_mod
     from invarlock.cli.commands import evaluate as mod
@@ -276,6 +301,7 @@ def test_evaluate_timing_json_omits_empty_run_timings(monkeypatch, tmp_path: Pat
     )
 
     def fake_run(**kwargs):  # noqa: ANN001
+        preserve_effective_config(kwargs)
         out = Path(kwargs.get("out"))
         ts_dir = out / "20250101_000000"
         ts_dir.mkdir(parents=True, exist_ok=True)
@@ -287,7 +313,7 @@ def test_evaluate_timing_json_omits_empty_run_timings(monkeypatch, tmp_path: Pat
     from invarlock.cli.commands import evaluate as mod
 
     monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
-    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", _stub_report_generation, raising=False)
 
     timing_json = tmp_path / "timing" / "evaluate_timing.json"
     evaluate_command(
@@ -328,10 +354,10 @@ def test_evaluate_releases_phase_memory_between_runs(monkeypatch, tmp_path):
     monkeypatch.setattr(
         run_mod,
         "run_command",
-        lambda **kwargs: str(_stub_run(Path(kwargs["out"]))),
+        lambda **kwargs: str(_stub_run(Path(kwargs["out"]), run_kwargs=kwargs)),
         raising=False,
     )
-    monkeypatch.setattr(mod, "generate_reports", lambda **kwargs: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", _stub_report_generation, raising=False)
     monkeypatch.setattr(
         mod,
         "_release_phase_memory",
@@ -434,10 +460,10 @@ def test_evaluate_autogen_uses_device_auto(monkeypatch, tmp_path):
             {k: kwargs.get(k) for k in ("config", "profile", "out", "tier", "device")}
         )
         out = Path(kwargs.get("out"))
-        return str(_stub_run(out))
+        return str(_stub_run(out, run_kwargs=kwargs))
 
     def fake_report(**_kwargs):
-        return None
+        _stub_report_generation(**_kwargs)
 
     import invarlock.cli.commands.run as run_mod
     from invarlock.cli.commands import evaluate as mod
@@ -490,7 +516,7 @@ def test_evaluate_quiet_summary_emits_status(monkeypatch, tmp_path, capsys):
 
     def fake_run(**kwargs):
         out = Path(kwargs.get("out"))
-        return str(_stub_run(out))
+        return str(_stub_run(out, run_kwargs=kwargs))
 
     def fake_report(**kwargs):
         output_dir = Path(kwargs.get("output"))
@@ -552,7 +578,7 @@ def test_evaluate_container_bundle_manifest_inherits_container_execution(
 
     def fake_run(**kwargs):
         out = Path(kwargs.get("out"))
-        return str(_stub_run(out))
+        return str(_stub_run(out, run_kwargs=kwargs))
 
     def fake_report(**kwargs):
         output_dir = Path(kwargs.get("output"))
