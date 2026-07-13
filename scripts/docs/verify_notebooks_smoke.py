@@ -30,16 +30,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-DEMO_EVALUATION_REPORT_FIXTURE = (
-    ROOT
-    / "src"
-    / "invarlock"
-    / "_data"
-    / "public_evidence"
-    / "published_basis"
-    / "gpt2"
-    / "evaluation.report.json"
-)
 HOST_EXECUTION_ENV = "INVARLOCK_ALLOW_HOST_EXECUTION"
 SMOKE_MODEL_SCRIPT_REWRITES = (
     (re.compile(r"(?m)(--baseline\s+)distilgpt2\b"), r"\1sshleifer/tiny-gpt2"),
@@ -236,7 +226,11 @@ def _demo_verify_pass_report() -> dict:
         if src_path not in sys.path:
             sys.path.insert(0, src_path)
         try:
+            from invarlock.core.auto_tuning import resolve_tier_policies
             from invarlock.reporting.report_make import make_report
+            from invarlock.reporting.runtime_policy_receipt import (
+                build_runtime_policy_receipt,
+            )
 
             run_report = {
                 "meta": {
@@ -288,7 +282,20 @@ def _demo_verify_pass_report() -> dict:
                             "final": {"used": 2},
                         },
                     },
-                    "paired_delta_summary": {"mean": 0.0},
+                    "preview_final_slice_delta_summary": {
+                        "mean": 0.0,
+                        "ci": [-0.01, 0.01],
+                        "basis": "independent_disjoint_slices",
+                        "paired": False,
+                        "ci_method": "independent_percentile_delta_log",
+                        "ci_reason": None,
+                        "preview_windows": 2,
+                        "final_windows": 2,
+                        "degenerate": False,
+                        "degenerate_reason": None,
+                    },
+                    "window_match_fraction": 1.0,
+                    "window_overlap_fraction": 0.0,
                     "preview_total_tokens": 50000,
                     "final_total_tokens": 50000,
                     "logloss_delta": 0.0,
@@ -304,23 +311,38 @@ def _demo_verify_pass_report() -> dict:
                     "rollback_reason": None,
                 },
                 "evaluation_windows": {
+                    "preview": {
+                        "window_ids": [3, 4],
+                        "logloss": [2.30, 2.30],
+                        "token_counts": [100, 100],
+                    },
                     "final": {
                         "window_ids": [1, 2],
                         "logloss": [2.30, 2.30],
                         "token_counts": [100, 100],
-                    }
+                    },
                 },
             }
             baseline_report = {
                 "run_id": "docs-demo-base",
                 "model_id": "docs-demo-model",
-                "meta": {"seed": 0, "model_id": "docs-demo-model"},
+                "meta": {
+                    "seed": 0,
+                    "model_id": "docs-demo-model",
+                    "adapter": "hf_causal",
+                    "auto": {"tier": "balanced"},
+                },
                 "evaluation_windows": {
+                    "preview": {
+                        "window_ids": [3, 4],
+                        "logloss": [2.30, 2.30],
+                        "token_counts": [100, 100],
+                    },
                     "final": {
                         "window_ids": [1, 2],
                         "logloss": [2.30, 2.30],
                         "token_counts": [100, 100],
-                    }
+                    },
                 },
                 "data": {
                     "seq_len": 8,
@@ -341,7 +363,15 @@ def _demo_verify_pass_report() -> dict:
                     },
                 },
                 "guards": [],
-                "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
+                "metrics": {
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 10.0,
+                        "final": 10.0,
+                    },
+                    "window_match_fraction": 1.0,
+                    "window_overlap_fraction": 0.0,
+                },
                 "artifacts": {
                     "events_path": "",
                     "logs_path": "",
@@ -364,6 +394,7 @@ def _demo_verify_pass_report() -> dict:
                 )
                 run_report["metrics"]["primary_metric"]["preview"] = baseline_ppl
                 run_report["metrics"]["preview_total_tokens"] = baseline_tokens
+                baseline_report["metrics"]["primary_metric"]["preview"] = baseline_ppl
                 baseline_report["metrics"]["primary_metric"]["final"] = baseline_ppl
             else:
                 baseline_mean_logloss = None
@@ -377,94 +408,37 @@ def _demo_verify_pass_report() -> dict:
                 subject_mean_logloss = None
             if baseline_mean_logloss is not None and subject_mean_logloss is not None:
                 delta_mean_logloss = subject_mean_logloss - baseline_mean_logloss
-                run_report["metrics"]["paired_delta_summary"]["mean"] = (
+                run_report["metrics"]["preview_final_slice_delta_summary"]["mean"] = (
                     delta_mean_logloss
                 )
                 run_report["metrics"]["logloss_delta"] = delta_mean_logloss
+            for raw_report in (run_report, baseline_report):
+                meta = raw_report["meta"]
+                auto = meta.get("auto") if isinstance(meta, dict) else None
+                tier = str(auto.get("tier") if isinstance(auto, dict) else "balanced")
+                edit_name = str(raw_report["edit"]["name"])
+                policies = resolve_tier_policies(tier, edit_name, profile="dev")
+                resolved, receipt = build_runtime_policy_receipt(
+                    policies,
+                    raw_report["guards"],
+                    tier=tier,
+                    profile="dev",
+                    edit_name=edit_name,
+                )
+                raw_report["resolved_policy"] = resolved
+                raw_report["policy_resolution"] = receipt
             report = make_report(run_report, baseline_report)
-            validation = report.setdefault("validation", {})
-            if isinstance(validation, dict):
-                validation["primary_metric_acceptable"] = True
-            report["resolved_policy"] = {
-                "metrics": {
-                    "pm_ratio": {
-                        "ratio_limit_base": 1.1,
-                        "min_tokens": 1,
-                        "min_token_fraction": 0.0,
-                        "hysteresis_ratio": 0.0,
-                    }
-                }
-            }
-            report.setdefault(
-                "policy_digest",
-                {
-                    "policy_version": "policy-v1",
-                    "tier_policy_name": "balanced",
-                    "thresholds_hash": "docs-demo-policy",
-                    "changed": False,
-                },
+            report.setdefault("meta", {})["demo_input_mode"] = (
+                "canonical_generated_fixture"
             )
             report.setdefault("provenance", {}).setdefault(
                 "provider_digest", {"ids_sha256": "docs-demo-provider"}
             )
             return report
-        except Exception:
-            pass
-
-    if DEMO_EVALUATION_REPORT_FIXTURE.is_file():
-        report = json.loads(DEMO_EVALUATION_REPORT_FIXTURE.read_text(encoding="utf-8"))
-        report.setdefault("provenance", {}).setdefault(
-            "provider_digest", {"ids_sha256": "docs-demo-provider"}
-        )
-        return report
-
-    return {
-        "schema_version": "v1",
-        "run_id": "docs-demo",
-        "artifacts": {"generated_at": "2026-04-16T00:00:00+00:00"},
-        "plugins": {},
-        "meta": {"seed": 42},
-        "primary_metric": {
-            "kind": "ppl_causal",
-            "preview": math.exp(2.30),
-            "final": math.exp(2.30),
-            "ratio_vs_baseline": 1.0,
-            "display_ci": [1.0, 1.01],
-        },
-        "dataset": {
-            "provider": "unit",
-            "seq_len": 8,
-            "windows": {
-                "preview": 1,
-                "final": 1,
-                "stats": {
-                    "window_match_fraction": 1.0,
-                    "window_overlap_fraction": 0.0,
-                    "coverage": {"preview": {"used": 1}, "final": {"used": 1}},
-                    "paired_windows": 1,
-                },
-            },
-        },
-        "baseline_ref": {"primary_metric": {"final": math.exp(2.30)}},
-        "validation": {"primary_metric_acceptable": True},
-        "resolved_policy": {
-            "metrics": {
-                "pm_ratio": {
-                    "ratio_limit_base": 1.1,
-                    "min_tokens": 1,
-                    "min_token_fraction": 0.0,
-                    "hysteresis_ratio": 0.0,
-                }
-            }
-        },
-        "policy_digest": {
-            "policy_version": "policy-v1",
-            "tier_policy_name": "balanced",
-            "thresholds_hash": "docs-demo-policy",
-            "changed": False,
-        },
-        "provenance": {"provider_digest": {"ids_sha256": "docs-demo-provider"}},
-    }
+        except Exception as exc:
+            raise RuntimeError(
+                "Cannot build canonical notebook demo evidence."
+            ) from exc
 
 
 def _write_json(path: Path, payload: object) -> None:

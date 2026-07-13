@@ -29,7 +29,8 @@ def test_makefile_exposes_podman_runtime_targets() -> None:
     assert "runtime-smoke-cuda-quant" in text
     assert "runtime-smoke-cuda-quant-podman: CONTAINER_ENGINE=podman" in text
     assert "quant_runtime_image_smoke.py" in text
-    assert "Python.h missing" in quant_smoke_text
+    assert "require_gptqmodel_runtime" in quant_smoke_text
+    assert "require_jit_toolchain=True" in quant_smoke_text
     assert "container-default-smoke:" in text
     assert "container-default-smoke: runtime-image" in text
     assert "container-default-smoke-podman" in text
@@ -39,8 +40,10 @@ def test_makefile_exposes_podman_runtime_targets() -> None:
     assert "container-front-door-smoke: runtime-image" in text
     assert "container-front-door-smoke-podman" in text
     assert "container-front-door-smoke-podman: CONTAINER_ENGINE=podman" in text
-    assert (
-        "apt-get install -y --no-install-recommends build-essential jq"
-        in dockerfile_text
+    assert "apt_get install -y --no-install-recommends build-essential jq" in (
+        dockerfile_text
     )
     assert "shutil.which('jq')" in text
+    assert "RUNTIME_SOURCE_DATE_EPOCH ?=" in text
+    assert text.count("SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH)") >= 6
+    assert text.count("--build-arg SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH)") == 3

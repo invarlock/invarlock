@@ -6,30 +6,6 @@ from pathlib import Path
 
 REMOVED_README_GUARANTEE_LABEL = "Statistical " + "guarantees"
 REMOVED_REPORT_GUARANTEE_LABEL = "What the report " + "guarantees"
-PUBLISHED_BASIS_INTRO = "Published assurance basis covers GPT-2, BERT, Mistral 7B"
-PUBLISHED_BASIS_NAMES = [
-    "Ministral 3 3B",
-    "Ministral 3 8B",
-    "Ministral 3 14B",
-    "TinyLlama 1.1B",
-    "Gemma 4 E2B text-only",
-    "Gemma 4 E2B image-text",
-    "Gemma 4 E4B image-text",
-    "Granite 4.1 3B",
-    "Granite 4.1 8B",
-    "OLMo 2 7B",
-    "OLMo 2 13B",
-    "Qwen2 7B",
-    "Qwen2.5 7B",
-    "Qwen2.5 14B",
-    "Qwen3 8B",
-    "Qwen3.5 9B",
-    "DeepSeek-R1-Distill-Qwen 7B",
-    "DeepSeek-R1-0528-Qwen3 8B",
-    "DeepSeek-R1-Distill-Qwen 14B",
-    "Phi-4 text-only",
-]
-
 CLAIM_REQUIRED_BY_FILE = {
     "docs/user-guide/quickstart.md": [
         "machine-readable evaluation report",
@@ -53,10 +29,10 @@ CLAIM_REQUIRED_BY_FILE = {
     "docs/README.md": [
         "Assurance Case",
         "Evaluation Math Derivation",
-        PUBLISHED_BASIS_INTRO,
-        "Mistral 7B",
-        *PUBLISHED_BASIS_NAMES,
-        "pilot calibration configs",
+        "InvarLock maintains 39 evaluation lanes",
+        "Evidence not yet created",
+        "contracts/evidence_catalog_v1.json",
+        "contracts/support_matrix.json",
         "Model Family Catalog",
     ],
     "mkdocs.yml": [
@@ -69,11 +45,11 @@ CLAIM_REQUIRED_BY_FILE = {
     "docs/reference/index.md": ["Assurance rationale and derivations"],
     "docs/reference/contracts.md": ["Model family catalog"],
     "docs/reference/model-family-catalog.md": [
-        "support tier",
-        "coverage state",
-        "Declared Support",
-        "<=14B Text Candidate Inventory",
-        "Recommended Additions",
+        "Maintained evaluation lanes",
+        "Support tier and current evidence status",
+        "Implementation coverage",
+        "Coverage states include",
+        "Adding a maintained lane",
     ],
     "docs/assurance/00-assurance-case.md": [
         "assurance case",
@@ -81,25 +57,22 @@ CLAIM_REQUIRED_BY_FILE = {
         "published assurance tiers",
     ],
     "docs/assurance/04-guard-contracts.md": [
-        "published assurance basis",
         "contracts/support_matrix.json",
         "docs/README.md#support-matrix",
-        "not part of the published",
+        "evidence status",
     ],
     "docs/reference/calibration.md": [
-        "published assurance basis",
         "contracts/support_matrix.json",
         "docs/README.md#support-matrix",
+        "Evidence not yet created",
     ],
     "docs/reference/guards.md": [
         "contracts/support_matrix.json",
-        "docs/README.md#support-matrix",
-        "Mistral 7B",
-        "published assurance basis",
+        "maintained lanes",
+        "evidence status",
     ],
     "docs/reference/model-adapters.md": [
-        "Adapter availability is broader than the published evidence basis.",
-        "`published_basis` lanes span GPT-2/BERT fixtures",
+        "Maintained catalog lanes span GPT-2/BERT",
         "FLAN-T5 through `hf_seq2seq`",
         "Gemma 4 image-text through `hf_multimodal` plus `vision_text`",
         "lanes such as OLMoE, Mixtral, and Qwen3 30B-A3B",
@@ -110,14 +83,6 @@ CLAIM_REQUIRED_BY_FILE = {
         "signed manifest",
         "strict verification",
         "PASS final verdict",
-    ],
-    "scripts/evidence_packs/run_pack.sh": [
-        "signed manifest",
-        "strict verification",
-        "PASS final verdict",
-    ],
-    "scripts/evidence_packs/tests/test_run_pack_core.sh": [
-        "signed manifest, strict verification, and a PASS final verdict",
     ],
     "Makefile": ["eval-loop:"],
 }
@@ -155,7 +120,6 @@ CLAIM_BANNED_BY_FILE = {
         "safety tiers",
     ],
     "Makefile": ["cert-loop:"],
-    "scripts/evidence_packs/lib/tasks/task_functions.sh": ["Certif" + "ication for "],
 }
 
 

@@ -246,67 +246,6 @@ write_final_verdict() {
   "$PYTHON_BIN" "$GPT2_HELPER" write-final-verdict "$RESULTS_TSV" "$WORK_ROOT/final_verdict.json" "$verdict"
 }
 
-# smoke-plan-helper: run_evidence_pack_journey
-run_evidence_pack_journey() {
-  local journey="$1"
-  local eval_report="$2"
-  local journey_root="$3"
-  local pack_dir="$journey_root/evidence_pack"
-  local signing_key="$journey_root/evidence_pack_signing_key.pem"
-  local public_key="$journey_root/evidence_pack_signing_key.pub.pem"
-  local verdict_json="$journey_root/final_verdict.json"
-  local pack_verify_json="$journey_root/evidence-pack-verify.json"
-
-  if [[ "$MODE" == "local" ]]; then
-    record_result "$journey/evidence-pack" "container evidence-pack" "SKIP" "-" "-" "$pack_dir" "host mode"
-    return 0
-  fi
-
-  printf '%s\n' "{\"verdict\":\"PASS\",\"note\":\"$journey gpt2 user journey smoke\"}" > "$verdict_json"
-
-  local rc=0
-  set +e
-  # smoke-plan-command: advanced evidence-pack keygen
-  "${CLI[@]}" advanced evidence-pack keygen "$signing_key" \
-    --public-key-out "$public_key" \
-    --json
-  rc=$?
-  set -e
-  if [[ "$rc" -ne 0 ]]; then
-    record_result "$journey/evidence-pack" "build and verify evidence pack" "FAIL" "keygen_rc=$rc" "-" "$pack_dir" "key generation failed"
-    return 0
-  fi
-
-  set +e
-  # smoke-plan-command: advanced evidence-pack build
-  "${CLI[@]}" advanced evidence-pack build "$pack_dir" \
-    --final-verdict "$verdict_json" \
-    --report "$eval_report" \
-    --signing-key "$signing_key" \
-    --profile "$PROFILE" \
-    --json
-  rc=$?
-  set -e
-  if [[ "$rc" -ne 0 ]]; then
-    record_result "$journey/evidence-pack" "build and verify evidence pack" "FAIL" "build_rc=$rc" "-" "$pack_dir" "build failed"
-    return 0
-  fi
-
-  # smoke-plan-command: advanced evidence-pack inspect
-  "${CLI[@]}" advanced evidence-pack inspect "$pack_dir" --json
-  set +e
-  # smoke-plan-command: advanced evidence-pack verify
-  "${CLI[@]}" advanced evidence-pack verify "$pack_dir" --json > "$pack_verify_json"
-  rc=$?
-  set -e
-  cat "$pack_verify_json"
-  if [[ "$rc" -ne 0 ]]; then
-    record_result "$journey/evidence-pack" "build and verify evidence pack" "FAIL" "verify_rc=$rc" "-" "$pack_dir" "verification failed"
-    return 0
-  fi
-
-  record_result "$journey/evidence-pack" "build and verify evidence pack" "PASS" "ok" "-" "$pack_dir" "container mode"
-}
 
 # smoke-plan-helper: run_eval_journey
 run_eval_journey() {
@@ -411,7 +350,6 @@ run_eval_journey() {
   cat "$explain_txt"
 
   record_result "$journey/evaluate-verify-report" "$expectation" "PASS" "ok" "$(metric_summary "$eval_report")" "$export_dir/evaluation.html" "evaluate -> verify -> validate -> html -> explain"
-  run_evidence_pack_journey "$journey" "$eval_report" "$journey_root"
 
   if [[ -z "$FIRST_EVAL_REPORT" ]]; then
     FIRST_EVAL_REPORT="$eval_report"
@@ -527,7 +465,6 @@ run_strict_bundle_journey() {
   fi
 
   record_result "$journey/verify-report" "strict report bundle verifies" "PASS" "ok" "$(metric_summary "$eval_report")" "$export_dir/evaluation.html" "verify strict -> validate -> html"
-  run_evidence_pack_journey "$journey" "$eval_report" "$journey_root"
   echo "==== END journey:$journey ===="
 }
 

@@ -110,8 +110,6 @@ SKIP_TOKENS = (
     "make dev-install",
     "my_plugin",
     "my_config.yaml",
-    "run_pack.sh",
-    "run_suite.sh",
     "runs/latest",
     "/path/to/",
     "/absolute/path/to/",
@@ -152,6 +150,22 @@ def _should_skip_block(text: str) -> bool:
     if RUN_ID_PLACEHOLDER_PATTERN.search(stripped):
         return True
     return any(token in stripped for token in SKIP_TOKENS)
+
+
+def _expects_failure(text: str) -> bool:
+    return any(
+        line.strip().lower().startswith("# docs-live: expect-failure")
+        for line in text.splitlines()
+    )
+
+
+def _expected_failure_output(text: str) -> str | None:
+    prefix = "# docs-live: expect-failure:"
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.lower().startswith(prefix):
+            return stripped[len(prefix) :].strip() or None
+    return None
 
 
 def _contains_invarlock_command(text: str) -> bool:
@@ -368,6 +382,27 @@ def _default_env(workspace: Path) -> dict[str, str]:
     env.setdefault("INVARLOCK_DEDUP_TEXTS", "1")
     env.setdefault("TRANSFORMERS_NO_TORCHVISION", "1")
     env.setdefault("TOKENIZERS_PARALLELISM", "false")
+    fixture_manifest = (
+        workspace
+        / "tests"
+        / "fixtures"
+        / "runtime_provenance"
+        / "runtime.manifest.json"
+    )
+    try:
+        fixture_payload = json.loads(fixture_manifest.read_text(encoding="utf-8"))
+        runtime = fixture_payload.get("runtime")
+        image_digest = (
+            runtime.get("image_digest") if isinstance(runtime, dict) else None
+        )
+    except (OSError, json.JSONDecodeError):
+        image_digest = None
+    if isinstance(image_digest, str) and image_digest:
+        # Markdown replay uses a staged fixture report. Treat its fixture digest
+        # as the independently supplied test pin; never infer the pin from the
+        # report-side manifest generated during the replay itself.
+        env.setdefault("EXPECTED_RUNTIME_IMAGE_DIGEST", image_digest)
+        env.setdefault("TRUSTED_RUNTIME_IMAGE_DIGEST", image_digest)
     return env
 
 
@@ -421,25 +456,18 @@ def _run_logged_script(
 def _build_demo_evaluation_report(
     run_report: dict[str, object],
     baseline_report: dict[str, object],
-) -> dict[str, object] | None:
-    _sync_demo_input_paths()
-    return _demo_inputs._build_demo_evaluation_report(run_report, baseline_report)
-
-
-def _prepare_demo_evaluation_report_for_replay(
-    evaluation_report: dict[str, object],
 ) -> dict[str, object]:
     _sync_demo_input_paths()
-    return _demo_inputs._prepare_demo_evaluation_report_for_replay(evaluation_report)
+    return _demo_inputs._build_demo_evaluation_report(run_report, baseline_report)
 
 
 def _demo_window_summary(section: dict[str, object]) -> tuple[float, float, int] | None:
     return _demo_inputs._demo_window_summary(section)
 
 
-def _seed_demo_inputs(workspace: Path) -> None:
+def _seed_demo_inputs(workspace: Path, *, fixture_mode: bool = False) -> None:
     _sync_demo_input_paths()
-    _demo_inputs._seed_demo_inputs(workspace)
+    _demo_inputs._seed_demo_inputs(workspace, fixture_mode=fixture_mode)
 
 
 def run_blocks(
@@ -497,20 +525,38 @@ def run_blocks(
                     ),
                     encoding="utf-8",
                 )
+                expects_failure = _expects_failure(block.text)
+                expected_failure_output = _expected_failure_output(block.text)
                 returncode, output_tail = _run_logged_script(
-                    cmd=["bash", "-euo", "pipefail", str(script_path.name)],
+                    cmd=[
+                        "bash",
+                        "-uo" if expects_failure else "-euo",
+                        "pipefail",
+                        str(script_path.name),
+                    ],
                     cwd=workspace,
                     env=env,
                     log_path=log_path,
                     label=f"{block_id} {Path(block.file).name}:{block.line}",
+                )
+                passed = (
+                    returncode != 0
+                    and (
+                        expected_failure_output is None
+                        or expected_failure_output in output_tail
+                    )
+                    if expects_failure
+                    else returncode == 0
                 )
                 record = {
                     "id": block_id,
                     "file": block.file,
                     "line": block.line,
                     "execution_mode": execution_mode,
-                    "status": "ok" if returncode == 0 else "failed",
+                    "status": "ok" if passed else "failed",
                     "exit_code": int(returncode),
+                    "expected_failure": expects_failure,
+                    "expected_failure_output": expected_failure_output,
                     "log_path": str(log_path),
                     "stdout": output_tail,
                     "stderr": "",

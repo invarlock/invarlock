@@ -51,7 +51,6 @@
           "kind",
           "ok",
           "reason",
-          "ratio_vs_baseline",
           "ci"
         ],
         "properties": {
@@ -75,10 +74,10 @@
             ]
           },
           "ratio_vs_baseline": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": "number"
+          },
+          "delta_vs_baseline_pp": {
+            "type": "number"
           },
           "ci": {
             "oneOf": [
@@ -96,9 +95,118 @@
             ]
           },
           "recompute": {
-            "type": [
-              "object",
-              "null"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "family",
+                  "performed",
+                  "ok",
+                  "reason"
+                ],
+                "properties": {
+                  "family": {
+                    "enum": [
+                      "accuracy",
+                      "ppl"
+                    ]
+                  },
+                  "performed": {
+                    "type": "boolean"
+                  },
+                  "ok": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "reason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "performed": {
+                          "const": false
+                        }
+                      }
+                    },
+                    "then": {
+                      "properties": {
+                        "ok": {
+                          "type": "null"
+                        },
+                        "reason": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "performed": {
+                          "const": true
+                        }
+                      }
+                    },
+                    "then": {
+                      "properties": {
+                        "ok": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "performed": {
+                          "const": true
+                        },
+                        "ok": {
+                          "const": true
+                        }
+                      }
+                    },
+                    "then": {
+                      "properties": {
+                        "reason": {
+                          "type": "null"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "performed": {
+                          "const": true
+                        },
+                        "ok": {
+                          "const": false
+                        }
+                      }
+                    },
+                    "then": {
+                      "properties": {
+                        "reason": {
+                          "const": "mismatch"
+                        }
+                      }
+                    }
+                  }
+                ],
+                "additionalProperties": false
+              }
             ]
           },
           "guard_warnings_present": {
@@ -112,7 +220,51 @@
             "type": "object"
           }
         },
-        "additionalProperties": true
+        "additionalProperties": true,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "accuracy"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "delta_vs_baseline_pp"
+              ],
+              "not": {
+                "required": [
+                  "ratio_vs_baseline"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "ppl_causal",
+                    "ppl_mlm",
+                    "ppl_seq2seq"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "ratio_vs_baseline"
+              ],
+              "not": {
+                "required": [
+                  "delta_vs_baseline_pp"
+                ]
+              }
+            }
+          }
+        ]
       }
     },
     "error": {

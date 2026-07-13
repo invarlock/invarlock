@@ -1,7 +1,8 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
+.PHONY: release-preflight
 
-.PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration test-assurance lint typecheck mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-fast verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce mutation-smoke statistical-calibration-fast statistical-calibration-slow docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-dry contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync scripts-inventory-check scripts-audit architecture-fragmentation-check guard-fallback-audit model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda-quant runtime-image-cuda-quant-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-quant runtime-smoke-cuda-podman runtime-smoke-cuda-quant-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door local-hf-env-check local-hf-env-refresh local-hf-pipeline-smoke local-hf-pipeline-smoke-locked ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-evidence-check
+.PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration test-assurance lint typecheck mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-fast verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce coverage-enforce-parallel mutation-smoke statistical-calibration-fast statistical-calibration-slow docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-dry contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync scripts-inventory-check scripts-audit architecture-fragmentation-check guard-fallback-audit runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda-quant runtime-image-cuda-quant-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-quant runtime-smoke-cuda-podman runtime-smoke-cuda-quant-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door local-hf-env-check local-hf-env-refresh local-hf-pipeline-smoke local-hf-pipeline-smoke-locked ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-inventory-check
 
 PYTHON ?= $(shell bash scripts/select_workspace_python.sh)
 PIP := $(PYTHON) -m pip
@@ -13,8 +14,8 @@ MYPY := $(PYTHON) -m mypy
 COVERAGE := $(PYTHON) -m coverage
 MKDOCS := $(PYTHON) -m mkdocs
 PRE_COMMIT := $(PYTHON) -m pre_commit
-MODEL_EVIDENCE_ARGS ?=
-EMPIRICAL_GUARD_EVIDENCE_ROOT ?= artifacts/guard-validation/empirical
+EMPIRICAL_GUARD_INVENTORY_ROOT ?= artifacts/guard-validation/empirical
+RELEASE_PREFLIGHT_ARGS ?=
 CONTAINER_ENGINE ?= $(shell if command -v docker >/dev/null 2>&1; then echo docker; elif command -v podman >/dev/null 2>&1; then echo podman; fi)
 RUNTIME_IMAGE ?= invarlock-runtime:local
 RUNTIME_IMAGE_CUDA ?= invarlock-runtime:cuda-local
@@ -23,117 +24,17 @@ RUNTIME_IMAGE_CUDA_QUANT ?= invarlock-runtime:cuda-quant
 RUNTIME_IMAGE_CUDA_QUANT_BASE ?= nvidia/cuda:12.8.1-devel-ubuntu24.04@sha256:520292dbb4f755fd360766059e62956e9379485d9e073bbd2f6e3c20c270ed66
 RUNTIME_IMAGE_CUDA_QUANT_REQUIREMENTS ?= requirements/workflows/runtime-image-quant-py312-cu128.txt
 RUNTIME_IMAGE_CUDA_INDEX_URL ?= https://download.pytorch.org/whl/cu128
+RUNTIME_IMAGE_CUDA_APT_SNAPSHOT ?= 20260712T232152Z
+RUNTIME_SOURCE_DATE_EPOCH ?= $(shell git log -1 --pretty=%ct 2>/dev/null)
+RUNTIME_IMAGE_BUILD_COMMAND = $(if $(filter docker,$(CONTAINER_ENGINE)),$(CONTAINER_ENGINE) buildx build --load --provenance=false,$(CONTAINER_ENGINE) build)
 RUNTIME_IMAGE_DIGEST ?= sha256:local-runtime-image
 SECURITY_ARTIFACT_DIR ?= artifacts/supply-chain
 SECURITY_RUN ?= uv run --isolated --locked --extra security-ci
 DIST_RUN ?= uv run --isolated --locked --extra release-ci
 COVERAGE_POLICY := $(PYTHON) scripts/coverage/check_coverage_thresholds.py
 
-# Keep repo-wide coverage practical while still exercising the CLI command
-# surface that would otherwise pull the project floor below the real trust core.
-COVERAGE_TESTS_CORE := \
-	tests/core tests/guards tests/reporting tests/calibration tests/scripts tests/edits
-
-COVERAGE_TESTS_RUN := \
-	tests/cli/run
-
-COVERAGE_TESTS_VERIFY := \
-	tests/cli/test_verify*.py tests/cli/test_cli_command_help_smoke.py \
-	tests/cli/test_runtime_verify_cli.py \
-	tests/cli/test_policy_commands.py tests/cli/test_evidence_pack_commands.py \
-	tests/cli/test_evidence_pack_commands_release_review.py
-
-COVERAGE_TESTS_CONFIG := \
-	tests/cli/test_config_failfast.py tests/cli/test_error_codes.py \
-	tests/cli/test_config.py tests/cli/test_config_validation.py \
-	tests/cli/test_config_runtime_loader.py tests/cli/test_config_schema_and_loader.py \
-	tests/cli/test_device.py tests/cli/test_config_and_device.py
-
-COVERAGE_TESTS_EVAL := \
-	tests/eval/test_metrics*.py tests/eval/test_baseline_artifacts.py \
-	tests/eval/test_validate_module*.py tests/eval/test_bench*.py \
-	tests/eval/test_metric_gate_summary_inputs.py \
-	tests/eval/test_primary_metric*.py \
-	tests/eval/test_eval_import_safety.py \
-	tests/eval/test_determinism.py tests/eval/test_mask_parity_fail.py \
-	tests/eval/test_task_metrics.py tests/eval/test_eval_bootstrap_wrapper.py \
-	tests/eval/test_data*.py tests/eval/test_hf_text_provider*.py \
-	tests/eval/test_local_jsonl*.py tests/eval/test_synthetic_provider_paths.py \
-	tests/eval/test_wikitext2_fast_capacity.py \
-	tests/eval/test_provider_deterministic_loader_paths.py \
-	tests/eval/test_difficulty_scorer_modes.py \
-	tests/eval/providers
-
-COVERAGE_TESTS_EVAL_PROBES := \
-	tests/eval/test_fft.py tests/eval/test_fft_probe_paths.py \
-	tests/eval/test_mi*.py \
-	tests/eval/test_post_attention_probes.py tests/eval/test_post_attention_probe_paths.py
-
-COVERAGE_TESTS_CLI_COMMANDS := \
-	tests/cli/test_doctor*.py tests/cli/test_plugins*.py tests/cli/test_evaluate*.py \
-	tests/cli/test_export_html*.py tests/cli/test_app*.py \
-	tests/cli/test_core_command_surface.py tests/cli/test_execution_mode.py \
-	tests/cli/test_removed_command_migrations.py tests/cli/test_python_m_invarlock.py \
-	tests/cli/test_explain_gates*.py tests/cli/test_report*.py \
-	tests/cli/test_calibrate_harness_*.py tests/cli/test_determinism_preset.py
-
-COVERAGE_TESTS_CLI_HELPERS := \
-	tests/cli/test_adapter_auto*.py tests/cli/test_no_color.py \
-	tests/cli/test_config_execution_request_roundtrip.py \
-	tests/cli/test_config_execution_internal_entrypoint.py tests/cli/test_json_helpers.py \
-	tests/cli/test_runtime_launch_plan_contract.py \
-	tests/cli/test_overhead_extraction.py
-
-COVERAGE_TESTS_OBSERVABILITY := \
-	tests/observability
-
-COVERAGE_TESTS_EVIDENCE_PACKS := \
-	tests/evidence_packs/test_edit_metadata_contract.py \
-	tests/evidence_packs/test_generated_edit_lanes.py \
-	tests/evidence_packs/test_evidence_pack_preset_generator.py \
-	tests/evidence_packs/test_evidence_pack_scenarios_manifest.py \
-	tests/scripts/test_evidence_pack_tuned_edit_params.py \
-	tests/reporting/provenance/test_report_provenance_and_edit_summary_helpers.py
-
-COVERAGE_TESTS_ADAPTERS := \
-	tests/adapters/test_adapter_contracts.py \
-	tests/adapters/test_adapter_auto_runtime.py \
-	tests/adapters/test_hf_loading_helpers.py \
-	tests/adapters/test_hf_multimodal_adapter.py \
-	tests/adapters/test_hf_multimodal_chat_template_kwargs.py \
-	tests/adapters/test_adapter_errors.py \
-	tests/adapters/test_hf_causal_loader_fallback.py \
-	tests/adapters/test_hf_causal_variant_paths.py \
-	tests/adapters/test_hf_causal_phi_paths.py \
-	tests/adapters/test_hf_causal_gemma4_paths.py \
-	tests/adapters/test_hf_role_adapters.py \
-	tests/adapters/test_hf_causal_spec_contracts.py \
-	tests/adapters/test_hf_causal_qwen_linear_moe_spec.py \
-	tests/adapters/test_adapters_hf_and_integration.py
-
-COVERAGE_TESTS_RUNTIME := \
-	tests/cli/test_container_default_contract.py \
-	tests/cli/test_container_delegation.py \
-	tests/runtime/test_network_policy.py \
-	tests/runtime/test_runtime_image_contract.py \
-	tests/runtime/test_runtime_manifest_contract.py \
-	tests/runtime/test_runtime_security_container.py \
-	tests/runtime/test_runtime_security_core.py \
-	tests/runtime/test_runtime_security_facade.py \
-	tests/runtime/test_runtime_security_manifest.py \
-	tests/runtime/test_runtime_security_paths.py \
-	tests/runtime/test_runtime_security_decision_matrix.py
-
-COVERAGE_TESTS := \
-	$(COVERAGE_TESTS_CORE) \
-	$(COVERAGE_TESTS_RUN) \
-	$(COVERAGE_TESTS_VERIFY) \
-	$(COVERAGE_TESTS_CONFIG) \
-	$(COVERAGE_TESTS_EVAL) \
-	$(COVERAGE_TESTS_CLI_COMMANDS) \
-	$(COVERAGE_TESTS_CLI_HELPERS) \
-	$(COVERAGE_TESTS_OBSERVABILITY) \
-	$(COVERAGE_TESTS_EVIDENCE_PACKS)
+COVERAGE_TESTS := tests
+COVERAGE_MARKERS := not integration
 
 COVERAGE_MODULES := \
 	$(shell $(COVERAGE_POLICY) coverage-modules)
@@ -157,16 +58,23 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/core/metric_kind_contract.py \
 	src/invarlock/core/metric_provider_resolution.py \
 	src/invarlock/core/registry.py \
-	src/invarlock/core/runner_eval_metrics_stats.py \
-	src/invarlock/core/runner_eval_metrics_multimodal.py \
+	src/invarlock/core/runner_runtime/eval_metrics_stats.py \
+	src/invarlock/core/runner_runtime/eval_metrics_multimodal.py \
+	src/invarlock/clean_pruning_selection_artifacts.py \
+	src/invarlock/clean_pruning_selection_common.py \
+	src/invarlock/clean_pruning_selection_contract.py \
+	src/invarlock/clean_pruning_selection_contracts/snapshot.py \
+	src/invarlock/clean_pruning_selection_runtime.py \
+	src/invarlock/clean_selection/bundle.py \
+	src/invarlock/clean_selection_runtime.py \
 	src/invarlock/core/builtin_plugin_catalog.py \
 	src/invarlock/core/run_orchestrator.py \
-	src/invarlock/core/run_orchestrator_execute.py \
-	src/invarlock/core/run_orchestrator_execute_environment.py \
-	src/invarlock/core/run_orchestrator_execute_attempts.py \
-	src/invarlock/core/run_orchestrator_execute_attempt_results.py \
-	src/invarlock/core/run_orchestrator_execute_execution.py \
-	src/invarlock/core/run_orchestrator_execute_helpers.py \
+	src/invarlock/core/orchestration/execute.py \
+	src/invarlock/core/orchestration/environment.py \
+	src/invarlock/core/orchestration/attempts.py \
+	src/invarlock/core/orchestration/attempt_results.py \
+	src/invarlock/core/orchestration/execution.py \
+	src/invarlock/core/orchestration/helpers.py \
 	src/invarlock/cli/__init__.py \
 	src/invarlock/cli/__main__.py \
 	src/invarlock/cli/app.py \
@@ -187,8 +95,14 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/reporting/verify_check_helpers_consistency.py \
 	src/invarlock/reporting/verify_check_helpers_metrics.py \
 	src/invarlock/reporting/verify_contract.py \
+	src/invarlock/reporting/verify_strict_accuracy.py \
+	src/invarlock/reporting/verify_strict_ppl.py \
+	src/invarlock/reporting/verify_strict_schedule.py \
 	src/invarlock/runtime_security.py \
-	src/invarlock/runtime_security_helpers.py
+	src/invarlock/runtime_security_helpers.py \
+	src/invarlock/evidence_pack_json.py \
+	src/invarlock/evidence_pack_scenario_contract.py \
+	src/invarlock/training_evidence.py
 
 TEST_DIR_TARGETS := adapters calibration ci cli core docs edits eval guards integration lint observability plugins evidence_packs reporting runtime scripts
 GROUPED_TEST_DIR_TARGETS := $(filter-out integration,$(TEST_DIR_TARGETS))
@@ -226,7 +140,7 @@ test-fast:  ## Run the fast lane with marker selection
 	INVARLOCK_LIGHT_IMPORT=1 INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=0 \
 		PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q -m "not integration and not slow and not manual" tests
 
-test-parallel: PYTEST_WORKERS ?= auto
+test-parallel: PYTEST_WORKERS = auto
 test-parallel:  ## Run the fast non-integration lane with pytest-xdist workers
 	$(MAKE) test-fast PYTEST_WORKERS=$(PYTEST_WORKERS)
 
@@ -249,22 +163,21 @@ coverage:  ## Run tests with coverage and generate XML
 	$(MAKE) ensure-python
 	$(COVERAGE) erase
 	rm -f .coverage.*
-	PYTHONPATH=src $(PYTEST) -q $(COVERAGE_TESTS) \
+	PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
+		-m "$(COVERAGE_MARKERS)" $(COVERAGE_TESTS) \
 		$(COVERAGE_MODULES) \
 		--cov-branch \
-		--cov-report=term --cov-report=xml:reports/cov.xml --cov-fail-under=90
-	PYTHONPATH=src $(COVERAGE) run --branch --append -m pytest -q -p no:cov \
-		$(COVERAGE_TESTS_EVAL_PROBES)
-	PYTHONPATH=src $(COVERAGE) run --branch --append -m pytest -q -p no:cov \
-		$(COVERAGE_TESTS_RUNTIME)
-	PYTHONPATH=src $(COVERAGE) run --branch --append -m pytest -q -p no:cov \
-		$(COVERAGE_TESTS_ADAPTERS)
+		--cov-report=term
 	$(COVERAGE) report --include="$(COVERAGE_INCLUDE)" --fail-under=90
 	$(COVERAGE) xml --include="$(COVERAGE_INCLUDE)" -o reports/cov.xml
 
 coverage-enforce:  ## Run coverage and enforce per-file thresholds
 	$(MAKE) coverage
 	$(PYTHON) scripts/coverage/check_coverage_thresholds.py --coverage reports/cov.xml --json reports/thresholds.json
+
+coverage-enforce-parallel: PYTEST_WORKERS = auto
+coverage-enforce-parallel:  ## Run the main coverage lane with xdist, then enforce thresholds
+	$(MAKE) coverage-enforce PYTEST_WORKERS=$(PYTEST_WORKERS)
 
 mutation-smoke:  ## Run a scoped mutation smoke against trust-critical oracle tests
 	$(MAKE) ensure-python
@@ -321,21 +234,21 @@ $(addprefix test-,$(GROUPED_TEST_DIR_TARGETS)):
 test-assurance:  ## Run assurance-related tests only
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) -q \
-		tests/ci/test_golden_runs_offline.py \
-		tests/ci/test_public_evidence_handoffs.py \
+		tests/ci/test_public_evidence_audit.py \
 		tests/ci/test_support_matrix_consistency.py \
+		tests/core/test_public_evidence_catalog.py \
 		tests/adapters/test_adapter_capability_contract.py \
 		tests/core/test_bootstrap.py::test_compute_paired_delta_and_ratio_ci_consistency \
 		tests/core/test_bootstrap.py::test_paired_delta_log_ci_property_strict_identity \
 		tests/core/test_bootstrap.py::test_paired_delta_log_ci_property_rejects_mismatched_lengths \
 		tests/core/test_assurance_contract.py \
-		tests/core/test_runner_pairing.py::test_assess_bootstrap_coverage_paths \
+		tests/core/runner/test_runner_pairing.py::test_assess_bootstrap_coverage_paths \
 		tests/guards/invariants/test_invariants_guard.py::test_invariants_guard_detects_non_finite_weights \
 		tests/guards/contracts/test_unsupported_assurance_shape.py \
 		tests/eval/test_assurance_contracts.py \
-		tests/eval/test_metrics_masked_lm.py \
+		tests/eval/metrics/test_metrics_masked_lm.py \
 		tests/edits/test_quant_rtn.py \
-		tests/cli/test_verify.py::test_verify_command_passes \
+		tests/cli/verify/test_verify.py::test_verify_command_passes \
 		tests/docs/test_claim_surface_consistency.py \
 		tests/docs/test_assurance_xref_linter.py \
 		tests/reporting/policy/test_report_paired_ci_identity.py::test_paired_ci_identity_holds \
@@ -346,7 +259,7 @@ test-assurance:  ## Run assurance-related tests only
 		tests/reporting/evidence_pack/test_evidence_pack_contract.py \
 		tests/reporting/schema/test_policy_pack_contract.py \
 		tests/reporting/policy/test_policy_utils.py::test_compute_policy_digest_matches_assurance_spec \
-		tests/reporting/contracts/test_reporting_regression_matrix.py::test_validate_variance_enablement_rejects_missing_gate_provenance
+		tests/reporting/contracts/test_reporting_variance_enablement.py::test_validate_variance_enablement_rejects_missing_gate_provenance
 
 lint:  ## Run linting
 	$(MAKE) ensure-ruff
@@ -368,6 +281,7 @@ format:  ## Format code
 	$(RUFF) format src/ tests/ scripts/
 	$(RUFF) check --fix src/ tests/ scripts/
 
+verify: export PYTHON_BIN := $(PYTHON)
 verify:  ## Run verification (pytest -q, runtime verifier, lint, format, strict docs lint)
 	@echo "Running verification..."
 	$(MAKE) ensure-python
@@ -377,7 +291,7 @@ verify:  ## Run verification (pytest -q, runtime verifier, lint, format, strict 
 	$(MAKE) architecture-fragmentation-check
 	$(MAKE) guard-fallback-audit
 	PYTHONPATH=src $(PYTEST) -q
-	OMP_NUM_THREADS=1 PYTHONPATH=src $(PYTEST) -q tests/cli/test_cli_smoke.py tests/cli/test_app_version.py tests/cli/test_verify_json_shape.py
+	OMP_NUM_THREADS=1 PYTHONPATH=src $(PYTEST) -q tests/cli/test_cli_smoke.py tests/cli/test_app_version.py tests/cli/verify/test_verify_json_shape.py
 	OMP_NUM_THREADS=1 PYTHONPATH=src $(PYTEST) -q tests/reporting/policy/test_report_pm_only.py tests/core/test_default_providers.py
 	OMP_NUM_THREADS=1 PYTHONPATH=src $(PYTEST) -q tests/guards/property/test_variance_properties.py
 	OMP_NUM_THREADS=1 PYTHONPATH=src $(PYTEST) -q tests/integration/test_end_to_end_evaluate.py
@@ -398,8 +312,9 @@ verify-fast:  ## Run fast local verification without model downloads
 	$(MAKE) public-evidence-audit
 	PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q -m "not integration and not slow and not manual" \
 		tests/docs tests/reporting tests/evidence_packs \
-		tests/ci/test_public_evidence_handoffs.py::test_byoe_examples_verify_release_strict \
-		tests/ci/test_public_evidence_handoffs.py::test_lora_byoe_metadata_builds_and_verifies_signed_evidence_pack
+		tests/ci/test_public_evidence_audit.py \
+		tests/ci/test_support_matrix_consistency.py \
+		tests/core/test_public_evidence_catalog.py
 	$(MAKE) verify-ruff
 	$(MAKE) docs-lint-strict
 	@echo "Fast verification completed successfully"
@@ -475,26 +390,24 @@ packaging-smoke-front-door:  ## Smoke installed-wheel evaluate -> verify -> repo
 		tests/integration/packaging/test_wheel_front_door_contract.py::test_wheel_install_verifies_strict_report_bundle_outside_repo_tree \
 		tests/integration/packaging/test_wheel_front_door_contract.py::test_wheel_install_runs_front_door_evaluate_verify_report_html_outside_repo_tree
 
-model-evidence-list:  ## Print the maintained shipped-model evidence manifest
-	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTHON) scripts/model_evidence/model_evidence_sweep.py --list-json $(MODEL_EVIDENCE_ARGS)
-
-model-evidence-sweep:  ## Run the maintained shipped-model evidence sweep
-	$(MAKE) ensure-python
-	PYTHONPATH=src INVARLOCK_ALLOW_NETWORK=1 $(PYTHON) scripts/model_evidence/model_evidence_sweep.py $(MODEL_EVIDENCE_ARGS)
-
 runtime-image:  ## Build the local container runtime image used for default execution
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
+	@test -n "$(RUNTIME_SOURCE_DATE_EPOCH)" || { echo "❌ Unable to derive the source epoch; set RUNTIME_SOURCE_DATE_EPOCH explicitly for archive builds."; exit 1; }
 	@if $(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE) >/dev/null 2>&1; then $(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE) >/dev/null 2>&1 || true; fi
-	$(CONTAINER_ENGINE) build -f runtime/Dockerfile -t $(RUNTIME_IMAGE) .
+	SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH) $(RUNTIME_IMAGE_BUILD_COMMAND) \
+		--build-arg SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH) \
+		-f runtime/Dockerfile -t $(RUNTIME_IMAGE) .
 
 runtime-image-podman: CONTAINER_ENGINE=podman
 runtime-image-podman: runtime-image  ## Build the local container runtime image with Podman
 
 runtime-image-cuda:  ## Build the local CUDA container runtime image for GPU-backed default execution
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
+	@test -n "$(RUNTIME_SOURCE_DATE_EPOCH)" || { echo "❌ Unable to derive the source epoch; set RUNTIME_SOURCE_DATE_EPOCH explicitly for archive builds."; exit 1; }
 	@if $(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE_CUDA) >/dev/null 2>&1; then $(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE_CUDA) >/dev/null 2>&1 || true; fi
-	$(CONTAINER_ENGINE) build \
+	SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH) $(RUNTIME_IMAGE_BUILD_COMMAND) \
+		--build-arg SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH) \
+		--build-arg RUNTIME_APT_SNAPSHOT=$(RUNTIME_IMAGE_CUDA_APT_SNAPSHOT) \
 		--build-arg RUNTIME_REQUIREMENTS_AMD64=$(RUNTIME_IMAGE_CUDA_REQUIREMENTS) \
 		--build-arg RUNTIME_REQUIREMENTS_ARM64=requirements/workflows/runtime-image-py312-aarch64.txt \
 		--build-arg PYTORCH_EXTRA_INDEX_URL=$(RUNTIME_IMAGE_CUDA_INDEX_URL) \
@@ -506,8 +419,11 @@ runtime-image-cuda-podman: runtime-image-cuda  ## Build the local CUDA container
 
 runtime-image-cuda-quant:  ## Build the local CUDA runtime image with optional quant adapter backends
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
+	@test -n "$(RUNTIME_SOURCE_DATE_EPOCH)" || { echo "❌ Unable to derive the source epoch; set RUNTIME_SOURCE_DATE_EPOCH explicitly for archive builds."; exit 1; }
 	@if $(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE_CUDA_QUANT) >/dev/null 2>&1; then $(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE_CUDA_QUANT) >/dev/null 2>&1 || true; fi
-	$(CONTAINER_ENGINE) build \
+	SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH) $(RUNTIME_IMAGE_BUILD_COMMAND) \
+		--build-arg SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH) \
+		--build-arg RUNTIME_APT_SNAPSHOT=$(RUNTIME_IMAGE_CUDA_APT_SNAPSHOT) \
 		--build-arg RUNTIME_BASE_IMAGE=$(RUNTIME_IMAGE_CUDA_QUANT_BASE) \
 		--build-arg RUNTIME_REQUIREMENTS_AMD64=$(RUNTIME_IMAGE_CUDA_QUANT_REQUIREMENTS) \
 		--build-arg RUNTIME_REQUIREMENTS_ARM64=requirements/workflows/runtime-image-py312-aarch64.txt \
@@ -596,23 +512,28 @@ runtime-verify:  ## Smoke the Python runtime verifier on the fixture bundle
 dist-check:  ## Build wheel/sdist and validate distribution metadata
 	$(MAKE) ensure-python
 	rm -rf build/ dist/
-	$(DIST_RUN) python -m build
+	$(DIST_RUN) python -m build --no-isolation
 	$(DIST_RUN) python -m twine check dist/*
 
-release-evidence-check:  ## Validate required local release evidence artifacts
+release-evidence-check:  ## Validate non-authoritative local release artifact shape
 	$(MAKE) ensure-python
 	$(PYTHON) scripts/release/evidence_contracts.py release \
 		--root artifacts/release \
 		--dist dist \
 		--sbom $(SECURITY_ARTIFACT_DIR)/sbom.json
 
+release-preflight:  ## Run fail-closed release preflight (requires RELEASE_PREFLIGHT_ARGS)
+	$(MAKE) ensure-python
+	@test -n "$(RELEASE_PREFLIGHT_ARGS)" || { echo "RELEASE_PREFLIGHT_ARGS is required" >&2; exit 2; }
+	$(PYTHON) scripts/release/release_preflight.py $(RELEASE_PREFLIGHT_ARGS)
+
 guard-validation-smoke:  ## Run deterministic synthetic guard-validation smoke
 	$(MAKE) ensure-python
 	$(PYTHON) scripts/smoke/guard_validation_smoke.py --output-dir artifacts/guard-validation
 
-empirical-guard-evidence-check:  ## Validate non-synthetic guard-evidence artifacts when present for release review
+empirical-guard-inventory-check:  ## Validate a diagnostic guard-artifact inventory (never release authority)
 	$(MAKE) ensure-python
-	$(PYTHON) scripts/release/evidence_contracts.py empirical --root "$(EMPIRICAL_GUARD_EVIDENCE_ROOT)"
+	$(PYTHON) scripts/release/evidence_contracts.py empirical-inventory --root "$(EMPIRICAL_GUARD_INVENTORY_ROOT)"
 
 clean:  ## Clean build artifacts
 	rm -rf build/
@@ -718,9 +639,9 @@ scripts-audit:  ## Emit per-file scripts inventory with references/runtime/netwo
 	$(MAKE) ensure-python
 	$(PYTHON) scripts/check_scripts_inventory.py --json >/dev/null
 
-architecture-fragmentation-check:  ## Report source fragmentation metrics without forcing artificial splits
+architecture-fragmentation-check:  ## Enforce the repository-wide architecture policy
 	$(MAKE) ensure-python
-	$(PYTHON) scripts/checks/check_architecture_fragmentation.py --json >/dev/null
+	$(PYTHON) scripts/checks/check_architecture_fragmentation.py
 
 guard-fallback-audit:  ## Ensure guard numeric fallbacks are diagnostic or explicitly justified
 	$(MAKE) ensure-python

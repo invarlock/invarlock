@@ -73,6 +73,13 @@ jobs:
           INVARLOCK_REQUIRE_LOCAL_HF: "1"
         run: make local-hf-pipeline-smoke
 
+      - name: Run real tiny training profiles
+        env:
+          INVARLOCK_REQUIRE_REAL_TRAINING: "1"
+        run: >-
+          python -m pytest -q -m integration
+          tests/evidence_packs/test_training_runtime.py
+
       - name: Run mutation smoke
         run: make mutation-smoke
 

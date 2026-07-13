@@ -27,8 +27,11 @@ def test_runtime_image_target_replaces_existing_local_tag_before_build() -> None
     assert "$(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE)" in block
     assert "$(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE)" in block
     assert (
-        "$(CONTAINER_ENGINE) build -f runtime/Dockerfile -t $(RUNTIME_IMAGE) ." in block
+        "SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH) $(RUNTIME_IMAGE_BUILD_COMMAND)"
+        in block
     )
+    assert "--build-arg SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH)" in block
+    assert "-f runtime/Dockerfile -t $(RUNTIME_IMAGE) ." in block
 
 
 def test_runtime_image_cuda_target_builds_cuda_tag_with_cuda_requirements() -> None:
@@ -39,6 +42,14 @@ def test_runtime_image_cuda_target_builds_cuda_tag_with_cuda_requirements() -> N
     assert block is not None, "runtime-image-cuda target not found in Makefile"
     assert "$(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE_CUDA)" in block
     assert "$(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE_CUDA)" in block
+    assert (
+        "SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH) $(RUNTIME_IMAGE_BUILD_COMMAND)"
+        in block
+    )
+    assert "--build-arg SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH)" in block
+    assert (
+        "--build-arg RUNTIME_APT_SNAPSHOT=$(RUNTIME_IMAGE_CUDA_APT_SNAPSHOT)" in block
+    )
     assert (
         "--build-arg RUNTIME_REQUIREMENTS_AMD64=$(RUNTIME_IMAGE_CUDA_REQUIREMENTS)"
     ) in block
@@ -58,6 +69,14 @@ def test_runtime_image_cuda_quant_target_builds_quant_tag_with_quant_requirement
     assert block is not None, "runtime-image-cuda-quant target not found in Makefile"
     assert "$(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE_CUDA_QUANT)" in block
     assert "$(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE_CUDA_QUANT)" in block
+    assert (
+        "SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH) $(RUNTIME_IMAGE_BUILD_COMMAND)"
+        in block
+    )
+    assert "--build-arg SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH)" in block
+    assert (
+        "--build-arg RUNTIME_APT_SNAPSHOT=$(RUNTIME_IMAGE_CUDA_APT_SNAPSHOT)" in block
+    )
     assert "--build-arg RUNTIME_BASE_IMAGE=$(RUNTIME_IMAGE_CUDA_QUANT_BASE)" in block
     assert (
         "--build-arg RUNTIME_REQUIREMENTS_AMD64=$(RUNTIME_IMAGE_CUDA_QUANT_REQUIREMENTS)"
@@ -69,3 +88,22 @@ def test_runtime_image_cuda_quant_target_builds_quant_tag_with_quant_requirement
         "--build-arg PYTORCH_EXTRA_INDEX_URL=$(RUNTIME_IMAGE_CUDA_INDEX_URL)"
     ) in block
     assert "-t $(RUNTIME_IMAGE_CUDA_QUANT) ." in block
+
+
+def test_runtime_image_build_command_uses_reproducible_docker_buildx_path() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    data = makefile.read_text(encoding="utf-8")
+
+    assert "RUNTIME_IMAGE_BUILD_COMMAND" in data
+    assert "buildx build --load --provenance=false" in data
+    assert "$(CONTAINER_ENGINE) build)" in data
+
+
+def test_runtime_image_targets_fail_closed_without_a_source_epoch() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    data = makefile.read_text(encoding="utf-8")
+
+    assert "RUNTIME_SOURCE_DATE_EPOCH ?= $(shell git log -1 --pretty=%ct" in data
+    assert "$(or $(shell git log -1 --pretty=%ct" not in data
+    assert data.count('test -n "$(RUNTIME_SOURCE_DATE_EPOCH)"') == 3
+    assert "set RUNTIME_SOURCE_DATE_EPOCH explicitly for archive builds" in data

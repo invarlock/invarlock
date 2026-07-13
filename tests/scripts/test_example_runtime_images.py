@@ -105,6 +105,14 @@ def test_example_runtime_image_locks_are_hash_checked_and_split_by_family() -> N
             assert package not in text, f"{family} should not include {package}"
 
 
+def test_cuda_gptqmodel_example_runtime_pins_the_peft_compatible_release() -> None:
+    input_text = (REQ_DIR / "cuda-gptqmodel.in").read_text(encoding="utf-8")
+    lock_text = (REQ_DIR / "cuda-gptqmodel-py312-cu128.txt").read_text(encoding="utf-8")
+
+    assert "gptqmodel==6.0.3" in input_text
+    assert "gptqmodel==6.0.3" in lock_text
+
+
 def test_example_runtime_images_do_not_expand_root_runtime_build_surface() -> None:
     makefile_text = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
     dockerfile_text = (REPO_ROOT / "runtime" / "Dockerfile").read_text(encoding="utf-8")

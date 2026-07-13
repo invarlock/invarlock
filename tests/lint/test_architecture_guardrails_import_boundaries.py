@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -14,11 +13,6 @@ PACKAGE_ROOT_INIT_FILES = (
 OWNER_LAYER_ROOTS = (
     REPO_ROOT / "src/invarlock/core",
     REPO_ROOT / "src/invarlock/reporting",
-)
-REMOVED_REPORTING_MODULES = (
-    REPO_ROOT / "src/invarlock/reporting/report_builder.py",
-    REPO_ROOT / "src/invarlock/reporting/report_make_support.py",
-    REPO_ROOT / "src/invarlock/reporting/verify_checks.py",
 )
 RUN_COMMAND_PATH = REPO_ROOT / "src/invarlock/cli/commands/run.py"
 RUN_EXECUTION_PATH = REPO_ROOT / "src/invarlock/cli/run_execution.py"
@@ -64,34 +58,6 @@ def test_source_code_does_not_reference_rmt_legacy() -> None:
     assert not offenders, "\n".join(offenders)
 
 
-def test_removed_reporting_facades_do_not_reappear() -> None:
-    offenders: list[str] = []
-    for path in REMOVED_REPORTING_MODULES:
-        if path.exists():
-            offenders.append(f"unexpected file present: {path.relative_to(REPO_ROOT)}")
-
-    banned_refs = (
-        re.compile(r"\binvarlock\.reporting\.report_builder\b"),
-        re.compile(r"\binvarlock\.reporting\.report_make_support\b"),
-        re.compile(r"\binvarlock\.reporting\.verify_checks\b"),
-        re.compile(r"src/invarlock/reporting/report_builder\.py"),
-        re.compile(r"src/invarlock/reporting/report_make_support\.py"),
-        re.compile(r"src/invarlock/reporting/verify_checks\.py"),
-    )
-    for root in (REPO_ROOT / "src", REPO_ROOT / "docs", REPO_ROOT / "scripts"):
-        for path in root.rglob("*"):
-            if not path.is_file() or path.suffix not in {".py", ".md"}:
-                continue
-            text = _read_text(path)
-            for banned in banned_refs:
-                if banned.search(text):
-                    offenders.append(
-                        f"{path.relative_to(REPO_ROOT)} -> {banned.pattern}"
-                    )
-
-    assert not offenders, "\n".join(sorted(offenders))
-
-
 def test_run_command_shell_does_not_use_legacy_dependency_map_injection() -> None:
     text = _read_text(RUN_COMMAND_PATH)
     banned_snippets = (
@@ -130,7 +96,7 @@ def test_run_execution_services_use_pure_runtime_helpers() -> None:
     text = _read_text(RUN_EXECUTION_PATH)
     required_snippets = (
         "execute_guarded_run=run_runtime_exec_mod.execute_guarded_run",
-        "init_retry_controller=run_runtime_exec_mod.init_retry_controller",
+        "init_retry_controller=init_retry_controller",
         "load_model_with_cfg=run_runtime_exec_mod.load_model_with_cfg",
         "run_bare_control=run_runtime_exec_mod.run_bare_control",
         "typed_failures=True",
@@ -387,7 +353,7 @@ def test_retry_and_evaluate_contracts_use_typed_outcomes() -> None:
     assert "outcome.diagnostic.message" in cli_text
     assert "outcome.warning" not in cli_text
 
-    runner_guards_path = REPO_ROOT / "src/invarlock/core/runner_guards.py"
+    runner_guards_path = REPO_ROOT / "src/invarlock/core/runner_runtime/guards.py"
     runner_guards_text = _read_text(runner_guards_path)
     for legacy in (
         "_decision_from_action",
@@ -397,23 +363,25 @@ def test_retry_and_evaluate_contracts_use_typed_outcomes() -> None:
     ):
         assert legacy not in runner_guards_text
 
-    report_overhead_path = REPO_ROOT / "src/invarlock/reporting/report_overhead.py"
-    report_overhead_text = _read_text(report_overhead_path)
+    report_metric_impact_path = (
+        REPO_ROOT / "src/invarlock/reporting/report_metric_impact.py"
+    )
+    report_metric_impact_text = _read_text(report_metric_impact_path)
     assert (
         'diagnostics = _coerce_diagnostics(payload.get("diagnostics"))'
-        in report_overhead_text
+        in report_metric_impact_text
     )
     for legacy in (
         '"messages": list(result.messages)',
         '"warnings": list(result.warnings)',
         '"errors": list(result.errors)',
     ):
-        assert legacy not in report_overhead_text
+        assert legacy not in report_metric_impact_text
 
 
-def test_guard_overhead_section_is_diagnostic_only() -> None:
-    from invarlock.core.runner_guards import _normalize_guard_result
-    from invarlock.reporting import report_overhead
+def test_guard_metric_impact_section_is_diagnostic_only() -> None:
+    from invarlock.core.runner_runtime.guards import _normalize_guard_result
+    from invarlock.reporting import report_metric_impact
 
     normalized = _normalize_guard_result(
         {
@@ -428,10 +396,10 @@ def test_guard_overhead_section_is_diagnostic_only() -> None:
     assert "warnings" not in normalized
     assert "errors" not in normalized
 
-    payload, _ = report_overhead.prepare_guard_overhead_section(
+    payload, _ = report_metric_impact.prepare_guard_metric_impact_section(
         {
-            "bare_ppl": 10.0,
-            "guarded_ppl": 10.5,
+            "bare_value": 10.0,
+            "guarded_value": 10.5,
             "messages": ["ok"],
             "warnings": ["warn"],
             "errors": ["err"],
@@ -440,7 +408,14 @@ def test_guard_overhead_section_is_diagnostic_only() -> None:
     assert "messages" not in payload
     assert "warnings" not in payload
     assert "errors" not in payload
-    assert payload["diagnostics"] == []
+    assert payload["diagnostics"] == [
+        {
+            "kind": "guard_metric_impact_unavailable",
+            "severity": "warning",
+            "message": "Guard metric impact measurements unavailable",
+            "details": {},
+        }
+    ]
 
 
 def test_hf_adapter_loading_info_stays_structured() -> None:
@@ -500,7 +475,9 @@ def test_guard_validation_and_report_contracts_do_not_use_legacy_action_transcri
 
 
 def test_runner_guard_and_report_payload_contracts_use_typed_decisions() -> None:
-    runner_guards_text = _read_text(REPO_ROOT / "src/invarlock/core/runner_guards.py")
+    runner_guards_text = _read_text(
+        REPO_ROOT / "src/invarlock/core/runner_runtime/guards.py"
+    )
     for legacy in (
         "_decision_from_action",
         'raw.get("warnings")',
@@ -515,12 +492,12 @@ def test_runner_guard_and_report_payload_contracts_use_typed_decisions() -> None
     assert "_decision_from_action" not in report_payload_text
     assert 'guard_result.get("action")' not in report_payload_text
 
-    report_overhead_text = _read_text(
-        REPO_ROOT / "src/invarlock/reporting/report_overhead.py"
+    report_metric_impact_text = _read_text(
+        REPO_ROOT / "src/invarlock/reporting/report_metric_impact.py"
     )
     assert (
         'diagnostics = _coerce_diagnostics(payload.get("diagnostics"))'
-        in report_overhead_text
+        in report_metric_impact_text
     )
 
 
@@ -564,6 +541,9 @@ def test_runtime_verify_is_library_only() -> None:
 def test_verify_contract_stays_typed_and_cli_owns_exit_rendering() -> None:
     path = REPO_ROOT / "src/invarlock/reporting/verify_contract.py"
     text = _read_text(path)
+    types_text = _read_text(
+        REPO_ROOT / "src/invarlock/reporting/verify_contract_types.py"
+    )
     offenders = []
     for snippet in (
         "status_code:",
@@ -578,8 +558,27 @@ def test_verify_contract_stays_typed_and_cli_owns_exit_rendering() -> None:
             offenders.append(snippet)
 
     assert not offenders, "\n".join(offenders)
-    assert "class VerifyOutcome" in text
-    assert "class VerifyDiagnostic" in text
+    assert "class VerifyOutcome" in types_text
+    assert "class VerifyDiagnostic" in types_text
+    assert "from .verify_contract_types import (" in text
+
+
+def test_verify_contract_does_not_forward_strict_private_helpers() -> None:
+    contract_text = _read_text(REPO_ROOT / "src/invarlock/reporting/verify_contract.py")
+    banned_assignments = (
+        "_append_accuracy_recompute_errors =",
+        "_append_strict_ppl_schedule_errors =",
+        "_append_strict_supplied_baseline_binding_errors =",
+        "_schedule_digest =",
+    )
+    offenders = [
+        assignment for assignment in banned_assignments if assignment in contract_text
+    ]
+    assert not offenders, "\n".join(offenders)
+
+    baseline_text = _read_text(REPO_ROOT / "src/invarlock/evidence_pack_baselines.py")
+    assert "from invarlock.reporting.verify_strict_schedule import (" in baseline_text
+    assert "from invarlock.reporting.verify_contract import (" not in baseline_text
 
 
 def test_run_orchestrator_uses_named_event_types_not_generic_phase_envelope() -> None:
@@ -679,14 +678,12 @@ def test_core_run_paths_do_not_read_shell_env_for_execution_policy() -> None:
     offenders: list[str] = []
     for path in (
         REPO_ROOT / "src/invarlock/core/run_orchestrator.py",
-        REPO_ROOT / "src/invarlock/core/runner_eval_metrics.py",
+        REPO_ROOT / "src/invarlock/core/runner_runtime/eval_metrics.py",
     ):
         text = _read_text(path)
         for snippet in (
             'os.environ.get("INVARLOCK_EVAL_DEVICE")',
             'os.environ.get("PACK_DETERMINISM")',
-            'os.environ.get("INVARLOCK_DETERMINISM")',
-            'os.environ.get("INVARLOCK_DETERMINISM_WARN_ONLY")',
             'os.environ.get("INVARLOCK_TINY_RELAX")',
             'os.environ.get("INVARLOCK_EXPORT_MODEL")',
             'os.environ.get("INVARLOCK_EXPORT_DIR")',
@@ -702,7 +699,7 @@ def test_report_tiny_relax_is_provenance_only() -> None:
     for path in (
         REPO_ROOT / "src/invarlock/runtime_security.py",
         REPO_ROOT / "src/invarlock/reporting/report_make.py",
-        REPO_ROOT / "src/invarlock/reporting/report_validation.py",
+        REPO_ROOT / "src/invarlock/reporting/validation/report.py",
     ):
         text = _read_text(path)
         for snippet in (

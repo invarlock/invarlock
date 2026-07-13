@@ -128,7 +128,7 @@ MUTANTS = (
         original="if lower <= 0.0 <= upper:",
         mutated="if lower < 0.0 < upper:",
         killed_by=(
-            "tests/guards/variance/test_variance_predictive_gate_outcome.py::"
+            "tests/guards/variance/gating/test_variance_predictive_gate_outcome.py::"
             "test_predictive_gate_outcome_two_sided_zero_in_ci_fails",
         ),
     ),
@@ -138,7 +138,7 @@ MUTANTS = (
         original="if ab_gain < required_gain_with_deadband:",
         mutated="if ab_gain > required_gain_with_deadband:",
         killed_by=(
-            "tests/guards/variance/test_variance_results.py::"
+            "tests/guards/variance/gating/test_variance_results.py::"
             "test_evaluate_finalize_state_collects_errors_and_warnings",
         ),
     ),
@@ -173,7 +173,23 @@ def _run_pytest(
     )
 
 
+def _oracle_tests() -> tuple[str, ...]:
+    """Return the mutation-oracle tests once, preserving declaration order."""
+
+    return tuple(dict.fromkeys(test for mutant in MUTANTS for test in mutant.killed_by))
+
+
 def run_mutation_smoke(repo: Path) -> int:
+    baseline = _run_pytest(repo, repo, _oracle_tests())
+    if baseline.returncode != 0:
+        print(
+            "mutation smoke baseline oracle tests failed; mutants were not run",
+            file=sys.stderr,
+        )
+        print(baseline.stdout)
+        return 1
+    print(f"mutation smoke baseline: {len(_oracle_tests())} oracle tests passed")
+
     failures: list[str] = []
     for mutant in MUTANTS:
         with tempfile.TemporaryDirectory(prefix="invarlock-mutant-") as tmp:
@@ -183,6 +199,12 @@ def run_mutation_smoke(repo: Path) -> int:
             result = _run_pytest(repo, worktree, mutant.killed_by)
             if result.returncode == 0:
                 failures.append(f"{mutant.name}: survived")
+                print(result.stdout)
+            elif result.returncode != 1:
+                failures.append(
+                    f"{mutant.name}: pytest exited unexpectedly with "
+                    f"status {result.returncode}"
+                )
                 print(result.stdout)
             else:
                 print(f"{mutant.name}: killed")

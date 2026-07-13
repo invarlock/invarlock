@@ -1,6 +1,8 @@
 **
 !.dockerignore
 !README.md
+!LICENSE
+!MANIFEST.in
 !pyproject.toml
 !contracts/
 !contracts/**
@@ -10,7 +12,13 @@
 !requirements/workflows/runtime-image-py312-aarch64.txt
 !requirements/workflows/runtime-image-py312-cu128.txt
 !requirements/workflows/runtime-image-quant-py312-cu128.txt
+!requirements/workflows/runtime-wheel-build-py312.txt
 !runtime/
 !runtime/Dockerfile
 !src/
 !src/**
+src/**/__pycache__/
+src/**/*.py[co]
+src/*.egg-info/
+src/*.egg-info/**
+src/**/.DS_Store

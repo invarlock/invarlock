@@ -29,8 +29,10 @@ self-hosted-runner:
   `evaluation.report.json`, renders HTML, writes `invarlock-verify.json`,
   exports MLflow tags, exports a release-review Markdown packet, appends a PR
   summary, and uploads those files as an Actions artifact. The action exposes
-  `profile`, `assurance`, `runtime-provenance`, and `warning-policy` inputs so
-  workflows can keep verification policy explicit.
+  `baseline`, `policy-pack`, `profile`, `assurance`, `runtime-provenance`,
+  `expected-runtime-image-digest`, and `warning-policy` inputs so workflows can
+  keep verification policy explicit. Strict assurance requires the baseline,
+  policy pack, and expected digest to come from independent reviewed channels.
 
 ### Security Workflows
 
@@ -52,7 +54,7 @@ See also: [`SECURITY.md`](../SECURITY.md) for vulnerability reporting policy.
 
 ### Benchmark Workflows
 
-- **`guard-effect-benchmark.yml`** - Guard effect benchmarks (manual `workflow_dispatch`, not part of default CI)
+- **`guard-effect-benchmark.yml`** - Paired guard overhead and stability benchmark (manual `workflow_dispatch`, not part of default CI or a detection-efficacy study)
 
 ## Environment Variables
 

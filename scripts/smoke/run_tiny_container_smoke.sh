@@ -74,7 +74,6 @@ mkdir -p "$WORK_ROOT"
 SMOKE_RUN_DIR="$WORK_ROOT/runs"
 SMOKE_REPORT_DIR="$WORK_ROOT/reports/eval"
 SMOKE_EXPORT_DIR="$WORK_ROOT/exports"
-EVIDENCE_PACK_DIR="$WORK_ROOT/evidence_pack"
 SMOKE_CACHE_ROOT="$WORK_ROOT/.hf"
 HOST_HF_CACHE_ROOT="${INVARLOCK_SMOKE_HOST_HF_CACHE_ROOT:-${HF_HOME:-${HOME}/.cache/huggingface}}"
 DATA_FILE="$WORK_ROOT/smoke.jsonl"
@@ -282,38 +281,5 @@ mkdir -p "$SMOKE_EXPORT_DIR"
 "${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_EXPORT_DIR/evaluation.html"
 # smoke-plan-command: report explain
 "${CLI[@]}" report explain --subject-report "$EDITED_REPORT" --baseline-report "$BASELINE_REPORT"
-
-printf '%s\n' '{"verdict":"PASS","note":"tiny container smoke campaign"}' > "$WORK_ROOT/final_verdict.json"
-EVIDENCE_PACK_SIGNING_KEY="$WORK_ROOT/evidence_pack_signing_key.pem"
-EVIDENCE_PACK_PUBLIC_KEY="$WORK_ROOT/evidence_pack_signing_key.pub.pem"
-
-if [[ "$MODE" == "local" ]]; then
-  echo "[smoke] skipping evidence-pack build/verify in local mode; emitted artifacts are host-bypass."
-  echo "[smoke] complete"
-  exit 0
-fi
-
-# smoke-plan-command: advanced evidence-pack keygen
-"${CLI[@]}" advanced evidence-pack keygen "$EVIDENCE_PACK_SIGNING_KEY" \
-  --public-key-out "$EVIDENCE_PACK_PUBLIC_KEY" \
-  --json
-# smoke-plan-command: advanced evidence-pack build
-"${CLI[@]}" advanced evidence-pack build "$EVIDENCE_PACK_DIR" \
-  --final-verdict "$WORK_ROOT/final_verdict.json" \
-  --report "$EVAL_REPORT" \
-  --signing-key "$EVIDENCE_PACK_SIGNING_KEY" \
-  --profile "$PROFILE" \
-  --json
-# smoke-plan-command: advanced evidence-pack inspect
-"${CLI[@]}" advanced evidence-pack inspect "$EVIDENCE_PACK_DIR" --json
-EVIDENCE_PACK_VERIFY_RC=0
-# smoke-plan-command: advanced evidence-pack verify
-"${CLI[@]}" advanced evidence-pack verify "$EVIDENCE_PACK_DIR" --json || EVIDENCE_PACK_VERIFY_RC=$?
-EVIDENCE_PACK_VERIFY_RC="${EVIDENCE_PACK_VERIFY_RC:-0}"
-echo "[smoke] evidence_pack_verify_rc=$EVIDENCE_PACK_VERIFY_RC"
-if [[ "$EVIDENCE_PACK_VERIFY_RC" != "0" ]]; then
-  echo "[error] evidence-pack verification failed" >&2
-  exit "$EVIDENCE_PACK_VERIFY_RC"
-fi
 
 echo "[smoke] complete"

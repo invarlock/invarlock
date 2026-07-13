@@ -217,6 +217,29 @@ def test_seed_curated_demo_outputs_writes_expected_reports(tmp_path: Path) -> No
     assert python_api_report["primary_metric"]["ratio_vs_baseline"] == pytest.approx(
         1.0
     )
+    assert python_api_report["meta"]["demo_input_mode"] == (
+        "canonical_generated_fixture"
+    )
+
+
+def test_demo_report_build_failure_is_explicit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_script_module()
+    failing_builder = ModuleType("invarlock.reporting.report_make")
+
+    def _raise_builder_error(*_args: object, **_kwargs: object) -> object:
+        raise RuntimeError("builder failed")
+
+    failing_builder.make_report = _raise_builder_error  # type: ignore[attr-defined]
+    monkeypatch.setitem(
+        sys.modules,
+        "invarlock.reporting.report_make",
+        failing_builder,
+    )
+
+    with pytest.raises(RuntimeError, match="canonical notebook demo evidence"):
+        module._demo_verify_pass_report()
 
 
 def test_custom_datasets_notebook_uses_portable_python_shell_probe() -> None:

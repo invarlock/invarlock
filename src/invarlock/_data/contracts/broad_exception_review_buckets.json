@@ -13,18 +13,54 @@
   },
   "entries": [
     {
-            "path": "src/invarlock/cli/evaluate_phases.py",
-            "lines": [
-                145,
-                194,
-                206,
-                238,
-                304,
-                364,
-                374
-            ],
+      "path": "src/invarlock/cli/evaluate_phases.py",
+      "lines": [
+        150,
+        199,
+        211,
+        246,
+        314,
+        376,
+        386
+      ],
       "bucket": "acceptable",
       "rationale": "Phase-shell wrappers preserve buffered child output, normalize CLI exit codes, and isolate heterogeneous failures while orchestration and report-contract helpers still raise mixed exception types."
+    },
+    {
+      "path": "src/invarlock/cli/evaluate_report_phase.py",
+      "lines": [
+        169,
+        194
+      ],
+      "bucket": "acceptable",
+      "rationale": "Receipt-bound selection finalizers are extension boundaries with heterogeneous failures; both catches terminate report publication through the explicit fail callback."
+    },
+    {
+      "path": "src/invarlock/cli/run_runtime_evidence.py",
+      "lines": [
+        72
+      ],
+      "bucket": "acceptable",
+      "rationale": "Best-effort runtime quantization observation is non-authoritative for ordinary runs; strict evidence verification separately requires and validates the proof sidecar."
+    },
+    {
+      "path": "src/invarlock/core/runtime_observation.py",
+      "lines": [
+        32,
+        55,
+        67
+      ],
+      "bucket": "acceptable",
+      "rationale": "Optional third-party runtime introspection converts arbitrary proxy and module failures into an explicit unobserved result that downstream assurance checks reject."
+    },
+    {
+      "path": "src/invarlock/core/runtime_quantization_proof.py",
+      "lines": [
+        154,
+        176
+      ],
+      "bucket": "acceptable",
+      "rationale": "Optional backend configuration introspection resolves only ambiguous live wrapper families; any exception returns no family and therefore fails proof recognition closed."
     }
   ]
 }

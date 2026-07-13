@@ -1,19 +1,34 @@
 version = 1
 
 [[large_script_reviews]]
-path = "scripts/model_evidence/model_evidence_sweep.py"
-max_lines = 1400
-rationale = "Large model-evidence workflow entry point retained until sweep planning and execution surfaces are split safely."
-
-[[large_script_reviews]]
-path = "scripts/evidence_packs/python/editing/implementations.py"
-max_lines = 1200
-rationale = "Large evidence-pack edit implementation module retained until edit backends are split behind stable fixtures."
-
-[[large_script_reviews]]
 path = "scripts/evidence_packs/scenarios.json"
 max_lines = 1400
 rationale = "Large evidence-pack scenario catalog retained as reviewed maintainer workflow data until scenario families are split."
+
+[[large_script_reviews]]
+path = "scripts/evidence_packs/python/editing/streaming_transform.py"
+max_lines = 1500
+rationale = "Reviewed as the bounded raw-transformation materializer; its repaired v1 ABI is independently replayed by a separate package-owned verifier rather than importing this implementation."
+
+[[large_script_reviews]]
+path = "scripts/evidence_packs/python/editing/transformation_oracle.py"
+max_lines = 1500
+rationale = "Reviewed as the script-side v1 numerical and architecture oracle used for replay checks; it deliberately duplicates only public ABI semantics and imports neither the materializer nor its target resolver."
+
+[[large_script_reviews]]
+path = "scripts/evidence_packs/python/editing/training_runtime.py"
+max_lines = 1200
+rationale = "Reviewed as the shared training-profile runtime boundary for reload, inference, and receipt checks; keeping those coupled checks together prevents a receipt from outliving the artifact it proves."
+
+[[large_script_reviews]]
+path = "scripts/evidence_packs/python/editing/validate_artifact.py"
+max_lines = 3000
+rationale = "Reviewed as the compatibility front door for artifact validation while family-specific contracts remain delegated to dedicated modules and exercised by transformation and pruning regression tests."
+
+[[large_script_reviews]]
+path = "scripts/evidence_packs/python/verify_pack_checks.py"
+max_lines = 1200
+rationale = "Reviewed as the shared strict package-verification command surface; centralizing file, manifest, policy, and result checks avoids shell-specific verification drift."
 
 [[families]]
 name = "scripts-governance"
@@ -27,12 +42,50 @@ invoked_by = ["make verify", "make scripts-audit"]
 description = "Inventory and hygiene checks for the scripts tree itself."
 paths = [
   "scripts/README.md",
+  "scripts/checks/architecture_complexity.py",
+  "scripts/checks/architecture_dependency_analysis.py",
+  "scripts/checks/architecture_owner_analysis.py",
+  "scripts/checks/architecture_policy_contract.py",
   "scripts/checks/check_architecture_fragmentation.py",
   "scripts/checks/check_public_evidence.py",
   "scripts/checks/check_repo_cruft.py",
+  "scripts/checks/public_evidence_checks/__init__.py",
+  "scripts/checks/public_evidence_checks/artifacts.py",
+  "scripts/checks/public_evidence_checks/common.py",
+  "scripts/checks/public_evidence_checks/index.py",
+  "scripts/checks/public_evidence_checks/negative_fixtures.py",
+  "scripts/checks/public_evidence_checks/summaries.py",
   "scripts/check_scripts_inventory.py",
   "scripts/scripts_inventory.toml",
   "scripts/select_workspace_python.sh",
+]
+
+[[families]]
+name = "checkpoint-identity-benchmark"
+owner = "maintainers"
+stability = "repo-internal"
+audience = "maintainers"
+expected_runtime = "data-dependent"
+network = "never"
+gpu = "never"
+invoked_by = ["manual checkpoint-identity benchmarking"]
+description = "Manual local-checkpoint hashing benchmark; runtime and I/O scale with checkpoint size and storage throughput."
+paths = [
+  "scripts/checks/benchmark_checkpoint_identity.py",
+]
+
+[[families]]
+name = "command-hotpath-benchmark"
+owner = "maintainers"
+stability = "repo-internal"
+audience = "maintainers"
+expected_runtime = "fast"
+network = "never"
+gpu = "optional"
+invoked_by = ["manual optimization acceptance benchmarking"]
+description = "Local-only reproducible command-hotpath benchmark and fail-closed comparison against an explicitly supplied baseline."
+paths = [
+  "scripts/checks/benchmark_command_hotpaths.py",
 ]
 
 [[families]]
@@ -52,6 +105,7 @@ paths = [
   "scripts/checks/check_model_candidate_compatibility.py",
   "scripts/checks/sync_packaged_contracts.py",
   "scripts/checks/sync_packaged_public_evidence.py",
+  "scripts/evidence_catalog/build_public_catalog.py",
 ]
 
 [[families]]
@@ -100,7 +154,7 @@ audience = "ci-only"
 expected_runtime = "medium"
 network = "optional"
 gpu = "optional"
-invoked_by = ["make verify", "make smoke-fast", "make local-hf-env-check", "runtime smoke CI"]
+invoked_by = ["make verify", "make local-hf-env-check", "runtime smoke CI"]
 description = "Local smoke, runtime, tiny-model, and guard-validation entry points."
 paths = [
   "scripts/checks/check_local_hf_runtime.py",
@@ -114,28 +168,39 @@ paths = [
   "scripts/smoke/lib/smoke_common.sh",
   "scripts/smoke/run_cpu_telemetry.sh",
   "scripts/smoke/run_gpt2_user_journey_smoke.sh",
-  "scripts/smoke/run_training_evidence_campaign.py",
   "scripts/smoke/run_tiny_fine_tune_byoe_smoke.py",
   "scripts/smoke/run_tiny_all_matrix.sh",
   "scripts/smoke/run_tiny_container_smoke.sh",
 ]
 
 [[families]]
-name = "model-evidence"
+name = "catalog-lane-production"
 owner = "maintainers"
 stability = "maintainer-workflow"
 audience = "maintainer"
-expected_runtime = "long"
-network = "required"
-gpu = "optional"
-invoked_by = ["make model-evidence-list", "make model-evidence-sweep", "manual remote campaigns"]
-description = "Model-evidence sweep planning, remote launch, command generation, and outputs."
+expected_runtime = "data-dependent"
+network = "optional"
+gpu = "required"
+invoked_by = ["maintained evidence refresh"]
+description = "Catalog-derived evaluation, strict verification, and signed staging-pack production for one lane."
 paths = [
-  "scripts/evidence_workflows/**",
+  "scripts/model_evidence/catalog_lane_pack.py",
+  "scripts/model_evidence/run_catalog_lane.py",
+]
+
+[[families]]
+name = "model-evidence"
+owner = "maintainers"
+stability = "repo-internal"
+audience = "maintainer"
+expected_runtime = "data-dependent"
+network = "optional"
+gpu = "never"
+invoked_by = ["catalog validation", "fixture generation"]
+description = "Bounded public-input materialization and negative-fixture helpers."
+paths = [
   "scripts/model_evidence/materialize_vision_text_dataset.py",
-  "scripts/model_evidence/model_evidence_lanes.py",
-  "scripts/model_evidence/model_evidence_sweep.py",
-  "scripts/model_evidence/run_model_evidence_remote.py",
+  "scripts/model_evidence/negative_fixture_generation.py",
 ]
 
 [[families]]
@@ -143,11 +208,11 @@ name = "evidence-packs"
 owner = "maintainers"
 stability = "maintainer-workflow"
 audience = "maintainer"
-expected_runtime = "medium-to-long"
-network = "optional"
-gpu = "optional"
-invoked_by = ["scripts/evidence_packs/run_pack.sh", "scripts/evidence_packs/verify_pack.sh", "evidence-pack tests"]
-description = "Evidence-pack suite orchestration, helpers, fixtures, and shell tests."
+expected_runtime = "fast-to-medium"
+network = "never"
+gpu = "never"
+invoked_by = ["scripts/evidence_packs/verify_pack.sh", "evidence-pack tests"]
+description = "Evidence-pack verification, artifact validators, bounded fixtures, and tests."
 paths = [
   "scripts/evidence_packs/**",
 ]
@@ -160,8 +225,8 @@ audience = "release-only"
 expected_runtime = "medium"
 network = "optional"
 gpu = "never"
-invoked_by = ["make release-evidence-check", "make empirical-guard-evidence-check", "release checklist"]
-description = "Release evidence checks and offline-bundle helpers."
+invoked_by = ["make release-preflight", "make release-evidence-check", "make empirical-guard-inventory-check (standalone diagnostic)"]
+description = "Release checks, offline-bundle helpers, and a separate non-authoritative empirical-artifact inventory."
 paths = [
   "scripts/release/**",
 ]

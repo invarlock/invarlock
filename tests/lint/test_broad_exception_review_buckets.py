@@ -64,8 +64,8 @@ def test_former_trust_critical_paths_no_longer_use_broad_exception() -> None:
     actual = _scan_broad_exception_sites()
     must_be_absent = {
         "src/invarlock/core/determinism_policy.py",
-        "src/invarlock/core/runner_guards.py",
-        "src/invarlock/core/runner_pairing.py",
+        "src/invarlock/core/runner_runtime/guards.py",
+        "src/invarlock/core/runner_runtime/pairing.py",
         "src/invarlock/guards/_estimators.py",
         "src/invarlock/guards/invariants.py",
         "src/invarlock/guards/spectral_detection.py",

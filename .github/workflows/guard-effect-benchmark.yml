@@ -1,8 +1,9 @@
-name: Guard Effect Benchmark
+name: Guard Overhead and Stability Benchmark
 
 on:
-  # Cost optimization: benchmarks are expensive (60-120 min with matrix)
-  # Only run manually or on release tags to save compute
+  # This paired bare/guarded benchmark measures primary-metric impact, runtime,
+  # memory, and stability gates. It does not measure detection efficacy.
+  # It is expensive and runs only by explicit manual dispatch.
   workflow_dispatch:
     inputs:
       profile:
@@ -27,11 +28,11 @@ permissions:
 
 jobs:
   guard-effect-benchmark:
+    if: github.event.inputs.profile != 'release'
     runs-on: ubuntu-latest
-    timeout-minutes: 30  # Reduced from 60
+    timeout-minutes: 30
     permissions:
       contents: read
-      issues: write
 
     strategy:
       matrix:
@@ -62,25 +63,22 @@ jobs:
 
     - name: Verify installation
       run: |
-        python -c "import invarlock.eval.bench; print('Benchmark module imported successfully')"
-        python -m invarlock.eval.bench --help
+        python -c "import invarlock.cli.bench; print('Benchmark module imported successfully')"
+        python -m invarlock.cli.bench --help
 
-    - name: Run benchmark (CI profile)
+    - name: Run CI overhead and stability benchmark
       id: benchmark-ci
       run: |
-        # Determine edits and profile
-        PROFILE="${{ github.event.inputs.profile || 'ci' }}"
         EDITS="${{ github.event.inputs.edits || 'quant_rtn' }}"
 
-        echo "Running benchmark with profile=$PROFILE, edits=$EDITS"
+        echo "Running overhead and stability benchmark with profile=ci, edits=$EDITS"
 
-        # Run the benchmark
-        python -m invarlock.eval.bench \
+        python -m invarlock.cli.bench \
           --edits "$EDITS" \
-          --profile "$PROFILE" \
+          --profile ci \
           --dataset wikitext2 \
           --model-id gpt2 \
-          --adapter hf_gpt2 \
+          --adapter hf_causal \
           --device cpu \
           --seq-len 256 \
           --stride 64 \
@@ -92,64 +90,24 @@ jobs:
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       if: always()  # Upload even if benchmark fails
       with:
-        name: guard-effect-results-py${{ matrix.python-version }}
+        name: guard-overhead-stability-results-py${{ matrix.python-version }}
         path: |
           benchmarks/results/
           benchmarks/runs/*/events.jsonl
         retention-days: 30
 
-    - name: Comment PR with results
-      if: github.event_name == 'pull_request' && always()
-      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
-      with:
-        script: |
-          const fs = require('fs');
-          const path = require('path');
-
-          try {
-            // Read the markdown report
-            const reportPath = 'benchmarks/results/guard_effect.md';
-            if (fs.existsSync(reportPath)) {
-              const report = fs.readFileSync(reportPath, 'utf8');
-
-              // Create comment body
-              const body = `## 🛡️ Guard Effect Benchmark Results (Python ${{ matrix.python-version }})
-
-              <details>
-              <summary>Click to expand benchmark results</summary>
-
-              \`\`\`markdown
-              ${report}
-              \`\`\`
-              </details>
-
-              📊 Full results available in the [workflow artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}).
-              `;
-
-              // Post comment
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: body
-              });
-            }
-          } catch (error) {
-            console.log('Could not post benchmark results:', error.message);
-          }
-
-    - name: Fail if benchmark thresholds not met
-      if: steps.benchmark-ci.outcome == 'failure'
+    - name: Fail if overhead or stability thresholds are not met
+      if: always() && steps.benchmark-ci.outcome == 'failure'
       run: |
-        echo "❌ Guard effect benchmark failed - thresholds not met"
+        echo "Guard overhead and stability benchmark failed - thresholds not met"
         echo "Check the benchmark results for details on which thresholds failed"
         exit 1
 
-  # Separate job for release benchmark (manual only now)
+  # Separate release-profile job, also manual-only.
   guard-effect-benchmark-release:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.profile == 'release'
-    timeout-minutes: 60  # Reduced from 120
+    timeout-minutes: 60
     permissions:
       contents: read
 
@@ -165,14 +123,15 @@ jobs:
     - name: Install dependencies
       run: python -m pip install --require-hashes -r requirements/workflows/hf-py313.txt
 
-    - name: Run release benchmark
+    - name: Run release overhead and stability benchmark
       run: |
-        python -m invarlock.eval.bench \
-          --edits quant_rtn \
+        EDITS="${{ github.event.inputs.edits || 'quant_rtn' }}"
+        python -m invarlock.cli.bench \
+          --edits "$EDITS" \
           --profile release \
           --dataset wikitext2 \
           --model-id gpt2 \
-          --adapter hf_gpt2 \
+          --adapter hf_causal \
           --device cpu \
           --seq-len 512 \
           --stride 128 \
@@ -180,21 +139,22 @@ jobs:
           --out benchmarks/ \
           --verbose
 
-    - name: Upload release benchmark results
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-      if: always()
-      with:
-        name: guard-effect-results-release
-        path: benchmarks/results/
-        retention-days: 90  # Keep release results longer
-
-    - name: Create release benchmark report
+    - name: Prepare release benchmark report
       run: |
-        # Copy results to docs for inclusion in releases
         mkdir -p docs/benchmarks/
         cp benchmarks/results/guard_effect.md docs/benchmarks/guard_effect_latest.md
         cp benchmarks/results/guard_effect.json docs/benchmarks/guard_effect_latest.json
 
-        # Add timestamp and commit info
         echo "Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> docs/benchmarks/guard_effect_latest.md
         echo "Commit: ${{ github.sha }}" >> docs/benchmarks/guard_effect_latest.md
+
+    - name: Upload release benchmark results
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      if: always()
+      with:
+        name: guard-overhead-stability-results-release
+        path: |
+          benchmarks/results/
+          docs/benchmarks/guard_effect_latest.md
+          docs/benchmarks/guard_effect_latest.json
+        retention-days: 90

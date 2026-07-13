@@ -232,7 +232,12 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
 
     build_step = _find_step_by_name(steps, "Build release wheel")
     assert "rm -rf build dist" in build_step["run"]
-    assert "python -m build" in build_step["run"]
+    build_commands = [
+        line.strip()
+        for line in build_step["run"].splitlines()
+        if line.strip().startswith("python -m build")
+    ]
+    assert build_commands == ["python -m build --no-isolation"]
 
     venv_step = _find_step_by_name(steps, "Create install-surface venv")
     assert venv_step["id"] == "install_surface"
@@ -623,6 +628,14 @@ def test_release_workflow_builds_and_publishes_tag_only_artifacts():
         install_step["run"]
         == "python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt"
     )
+
+    build_step = _find_step_by_name(build_steps, "Build wheel/sdist")
+    build_commands = [
+        line.strip()
+        for line in build_step["run"].splitlines()
+        if line.strip().startswith("python -m build")
+    ]
+    assert build_commands == ["python -m build --no-isolation"]
 
     gitleaks_cache = _find_step_by_name(build_steps, "Cache gitleaks binary")
     assert gitleaks_cache["uses"] == ACTIONS_CACHE_PIN

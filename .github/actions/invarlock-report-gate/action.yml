@@ -5,6 +5,14 @@ inputs:
   report:
     description: Path to evaluation.report.json.
     required: true
+  baseline:
+    description: Independent raw baseline report required for strict paired-PPL verification.
+    required: false
+    default: ""
+  policy-pack:
+    description: Independently maintained policy pack required for strict assurance.
+    required: false
+    default: ""
   profile:
     description: Verification and policy profile label.
     required: false
@@ -41,6 +49,10 @@ inputs:
     description: Assurance verification mode passed to invarlock verify.
     required: false
     default: report
+  expected-runtime-image-digest:
+    description: Independent sha256 image pin required for strict assurance.
+    required: false
+    default: ""
   runtime-provenance:
     description: Runtime provenance mode passed to invarlock verify.
     required: false
@@ -63,7 +75,26 @@ runs:
 
     - name: Verify InvarLock report
       shell: bash
+      env:
+        INVARLOCK_EXPECTED_RUNTIME_IMAGE_DIGEST: ${{ inputs.expected-runtime-image-digest }}
+        INVARLOCK_BASELINE_REPORT: ${{ inputs.baseline }}
+        INVARLOCK_POLICY_PACK: ${{ inputs.policy-pack }}
       run: |
+        expected_digest_args=()
+        if [[ -n "$INVARLOCK_EXPECTED_RUNTIME_IMAGE_DIGEST" ]]; then
+          expected_digest_args=(
+            --expected-runtime-image-digest
+            "$INVARLOCK_EXPECTED_RUNTIME_IMAGE_DIGEST"
+          )
+        fi
+        baseline_args=()
+        if [[ -n "$INVARLOCK_BASELINE_REPORT" ]]; then
+          baseline_args=(--baseline "$INVARLOCK_BASELINE_REPORT")
+        fi
+        policy_args=()
+        if [[ -n "$INVARLOCK_POLICY_PACK" ]]; then
+          policy_args=(--policy-pack "$INVARLOCK_POLICY_PACK")
+        fi
         set +e
         "${{ inputs.python }}" -m invarlock verify \
           "${{ inputs.report }}" \
@@ -71,6 +102,9 @@ runs:
           --assurance "${{ inputs.assurance }}" \
           --runtime-provenance "${{ inputs.runtime-provenance }}" \
           --warning-policy "${{ inputs.warning-policy }}" \
+          "${baseline_args[@]}" \
+          "${policy_args[@]}" \
+          "${expected_digest_args[@]}" \
           --json > "${{ inputs.verify-output }}"
         status=$?
         cat "${{ inputs.verify-output }}"
@@ -122,6 +156,8 @@ runs:
         if-no-files-found: error
         path: |
           ${{ inputs.report }}
+          ${{ inputs.baseline }}
+          ${{ inputs.policy-pack }}
           ${{ inputs.verify-output }}
           ${{ inputs.html-output }}
           ${{ inputs.review-output }}

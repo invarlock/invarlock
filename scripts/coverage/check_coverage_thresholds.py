@@ -9,290 +9,142 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 import xml.etree.ElementTree as ET
 from collections.abc import Sequence
+from dataclasses import asdict, dataclass
+from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any
 
-THRESHOLDS = {
-    "scripts/release/evidence_contracts.py": 1.00,
-    "scripts/evidence_packs/python/workflow_frontdoor.py": 1.00,
-    "scripts/evidence_packs/python/create_edit_model.py": 0.30,
-    "scripts/evidence_packs/python/create_edits_batch.py": 0.25,
-    "scripts/evidence_packs/python/editing/implementations.py": 0.65,
-    "scripts/evidence_packs/python/editing/tensor_ops.py": 0.35,
-    "scripts/evidence_packs/python/preset_generator.py": 0.30,
-    "scripts/evidence_packs/python/task_tools_reports.py": 0.35,
-    "scripts/evidence_workflows/workflow_plan.py": 1.00,
-    "scripts/evidence_workflows/workflow_runner.py": 1.00,
-    "scripts/evidence_workflows/workflow_state.py": 1.00,
-    "src/invarlock/eval/data.py": 1.00,
-    "src/invarlock/eval/data_local.py": 1.00,
-    "src/invarlock/eval/probes/importance.py": 1.00,
-    "src/invarlock/eval/metrics.py": 1.00,
-    "src/invarlock/eval/metrics_activation.py": 1.00,
-    "src/invarlock/eval/metrics_runtime.py": 1.00,
-    "src/invarlock/eval/metrics_runtime_resources.py": 1.00,
-    "src/invarlock/eval/metrics_support.py": 1.00,
-    "src/invarlock/eval/bench_policy.py": 1.00,
-    "src/invarlock/eval/bench_runner.py": 1.00,
-    "src/invarlock/eval/primary_metric.py": 1.00,
-    "src/invarlock/eval/tail_stats.py": 1.00,
-    "src/invarlock/calibration.py": 1.00,
-    "src/invarlock/reporting/run_report_formatters.py": 1.00,
-    "src/invarlock/reporting/validate.py": 1.00,
-    "src/invarlock/reporting/report_types.py": 1.00,
-    "src/invarlock/reporting/dataset_hashing.py": 1.00,
-    "src/invarlock/reporting/guards_common.py": 1.00,
-    "src/invarlock/reporting/guards_rmt.py": 1.00,
-    "src/invarlock/reporting/guards_variance.py": 1.00,
-    "src/invarlock/reporting/report_build_context.py": 1.00,
-    "src/invarlock/reporting/report_build_evidence.py": 1.00,
-    "src/invarlock/reporting/report_make.py": 1.00,
-    "src/invarlock/reporting/report_primary_metric_policy.py": 1.00,
-    "src/invarlock/reporting/primary_metric_utils.py": 1.00,
-    "src/invarlock/reporting/utils.py": 1.00,
-    "src/invarlock/core/runner.py": 1.00,
-    "src/invarlock/guards/spectral.py": 1.00,
-    "src/invarlock/reporting/report_schema.py": 1.00,
-    "src/invarlock/public_contracts.py": 1.00,
-    "src/invarlock/policy_pack.py": 1.00,
-    "src/invarlock/evidence_pack.py": 1.00,
-    "src/invarlock/evidence_pack_edit_metadata.py": 1.00,
-    "src/invarlock/reporting/verify_output.py": 1.00,
-    "src/invarlock/reporting/oss_exports.py": 1.00,
-    "src/invarlock/cli/commands/policy.py": 1.00,
-    "src/invarlock/cli/commands/evidence_pack.py": 1.00,
-    "src/invarlock/cli/commands/report_export.py": 1.00,
-    "src/invarlock/core/runner_pairing.py": 1.00,
-    "src/invarlock/guards/variance_policy.py": 1.00,
-    "src/invarlock/guards/variance_results.py": 1.00,
-    "src/invarlock/guards/spectral_policy.py": 1.00,
-    "src/invarlock/guards/spectral_results.py": 1.00,
-    "src/invarlock/edits/quant_rtn.py": 1.00,
-    "src/invarlock/edits/quant_rtn_kernels.py": 1.00,
-    "src/invarlock/core/runner_eval_latency.py": 1.00,
-    "src/invarlock/core/runner_eval_phase.py": 1.00,
-    "src/invarlock/core/runner_eval_windows.py": 1.00,
-    "src/invarlock/guards/variance_batching.py": 1.00,
-    "src/invarlock/guards/variance_evaluation.py": 1.00,
-    "src/invarlock/guards/variance.py": 1.00,
-    "src/invarlock/guards/variance_ops.py": 1.00,
-    "src/invarlock/guards/variance_scaling.py": 1.00,
-    "src/invarlock/guards/invariants.py": 1.00,
-    "src/invarlock/guards/invariants_standard.py": 1.00,
-    "src/invarlock/guards/spectral_control.py": 1.00,
-    "src/invarlock/guards/spectral_measurement.py": 1.00,
-    "src/invarlock/guards/rmt.py": 1.00,
-    "src/invarlock/guards/rmt_runtime.py": 1.00,
-    "src/invarlock/guards/policies.py": 1.00,
-    "src/invarlock/core/registry.py": 1.00,
-    "src/invarlock/core/assurance_contract.py": 1.00,
-    "src/invarlock/core/bootstrap.py": 1.00,
-    "src/invarlock/core/auto_tuning.py": 1.00,
-    "src/invarlock/core/checkpoint.py": 1.00,
-    "src/invarlock/core/api.py": 1.00,
-    "src/invarlock/core/retry.py": 1.00,
-    "src/invarlock/core/types.py": 1.00,
-    "src/invarlock/core/doctor_findings.py": 1.00,
-    "src/invarlock/core/evaluate_plan.py": 1.00,
-    "src/invarlock/cli/app.py": 1.00,
-    "src/invarlock/core/config_runtime.py": 1.00,
-    "src/invarlock/core/metric_provider_resolution.py": 1.00,
-    "src/invarlock/cli/commands/evaluate.py": 1.00,
-    "src/invarlock/cli/commands/verify.py": 1.00,
-    "src/invarlock/cli/commands/run.py": 1.00,
-    "src/invarlock/reporting/report_contract.py": 1.00,
-    "src/invarlock/cli/commands/calibrate.py": 1.00,
-    "src/invarlock/reporting/report_bundle.py": 1.00,
-    "src/invarlock/reporting/report_explanation.py": 1.00,
-    "src/invarlock/reporting/verify_contract.py": 1.00,
-    "src/invarlock/runtime_verify.py": 1.00,
-    "src/invarlock/runtime_security.py": 1.00,
-    "src/invarlock/runtime_security_helpers.py": 1.00,
-    "src/invarlock/adapters/hf_causal.py": 1.00,
-    "src/invarlock/adapters/hf_causal_specs.py": 1.00,
-    "src/invarlock/adapters/hf_multimodal.py": 1.00,
-    "src/invarlock/evidence_pack_integrity.py": 1.00,
-    "src/invarlock/cli/run_config.py": 1.00,
-    "src/invarlock/cli/run_overhead.py": 1.00,
-    "src/invarlock/cli/run_pairing.py": 1.00,
-    "src/invarlock/core/run_policy.py": 1.00,
-    "src/invarlock/core/determinism_policy.py": 1.00,
-    "src/invarlock/core/events.py": 1.00,
-    "src/invarlock/core/runner_eval_metrics.py": 1.00,
-    "src/invarlock/core/runner_finalize.py": 1.00,
-    "src/invarlock/core/runner_guards.py": 1.00,
-    "src/invarlock/reporting/report_overhead.py": 1.00,
-    "src/invarlock/reporting/report_policy.py": 1.00,
-    "src/invarlock/reporting/report_provenance.py": 1.00,
-    "src/invarlock/reporting/report_validation.py": 1.00,
-    "src/invarlock/core/run_orchestrator_execute.py": 1.00,
-    "src/invarlock/reporting/verify_check_helpers_consistency.py": 1.00,
-    "src/invarlock/reporting/run_metric_utils.py": 1.00,
-    "src/invarlock/cli/run_execution_output.py": 1.0,
-    "src/invarlock/reporting/run_report_contract.py": 1.00,
-    "src/invarlock/reporting/report_builder_support.py": 1.00,
-    "src/invarlock/reporting/report_builder_telemetry.py": 1.00,
-    "src/invarlock/adapters/auto.py": 1.00,
-    "src/invarlock/core/backend_inventory.py": 1.00,
-    "src/invarlock/core/config_loader.py": 1.00,
-    "src/invarlock/core/error_utils.py": 1.00,
-    "src/invarlock/core/exceptions.py": 1.00,
-    "src/invarlock/core/report_inputs.py": 1.00,
-    "src/invarlock/core/run_orchestrator.py": 1.00,
-    "src/invarlock/core/run_orchestrator_execute_attempts.py": 1.00,
-    "src/invarlock/core/run_orchestrator_execute_attempt_results.py": 1.00,
-    "src/invarlock/core/run_orchestrator_execute_helpers.py": 1.00,
-    "src/invarlock/core/run_provider_dataset_materialization.py": 1.00,
-    "src/invarlock/core/run_provider_dataset_plan.py": 1.00,
-    "src/invarlock/core/run_snapshot_contract.py": 1.00,
-    "src/invarlock/core/runner_execution_plan.py": 1.00,
-    "src/invarlock/core/runner_eval_metrics_multimodal.py": 1.00,
-    "src/invarlock/core/runner_eval_metrics_stats.py": 1.00,
-    "src/invarlock/core/doctor_preflight.py": 1.00,
-    "src/invarlock/core/evaluate_contract.py": 1.00,
-    "src/invarlock/core/plugins_inventory.py": 1.00,
-    "src/invarlock/core/run_baseline_evidence.py": 1.00,
-    "src/invarlock/guards/rmt_analysis.py": 1.00,
-    "src/invarlock/guards/spectral_runtime.py": 1.00,
-    "src/invarlock/guards/tier_config.py": 1.00,
-    "src/invarlock/cli/run_pairing_baseline.py": 1.00,
-    "src/invarlock/evidence_pack_support.py": 1.00,
+
+@dataclass(frozen=True)
+class CoverageFloor:
+    line: float
+    branch: float
+
+
+@dataclass(frozen=True)
+class HardwareClosureRequirement:
+    accelerator: str
+    required_test_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class CoverageMeasurement:
+    line: float
+    branch: float
+
+
+REPOSITORY_FLOOR = CoverageFloor(line=0.90, branch=0.80)
+TIER_FLOORS = {
+    "compact_contract": CoverageFloor(line=1.00, branch=1.00),
+    "behavioral": CoverageFloor(line=0.95, branch=0.90),
+    "live_backend": CoverageFloor(line=0.85, branch=0.75),
 }
 
-# Keep absolute 100% floors for compact contracts, security checks, guard math,
-# and schema/policy modules. Broad orchestration and third-party integration
-# glue keep high branch floors while mutation and black-box smoke tests carry
-# the stronger behavior-detection burden.
-BEHAVIORAL_RATCHET_THRESHOLDS = {
-    "scripts/evidence_workflows/workflow_runner.py": 0.95,
-    "src/invarlock/adapters/auto.py": 0.95,
-    "src/invarlock/adapters/hf_causal.py": 0.95,
-    "src/invarlock/adapters/hf_multimodal.py": 0.95,
-    "src/invarlock/cli/app.py": 0.95,
-    "src/invarlock/cli/commands/calibrate.py": 0.95,
-    "src/invarlock/cli/commands/evaluate.py": 0.95,
-    "src/invarlock/cli/commands/report_export.py": 0.95,
-    "src/invarlock/cli/commands/run.py": 0.95,
-    "src/invarlock/cli/commands/verify.py": 0.95,
-    "src/invarlock/cli/run_config.py": 0.95,
-    "src/invarlock/cli/run_execution_output.py": 0.95,
-    "src/invarlock/cli/run_overhead.py": 0.95,
-    "src/invarlock/cli/run_pairing.py": 0.95,
-    "src/invarlock/cli/run_pairing_baseline.py": 0.95,
-    "src/invarlock/core/backend_inventory.py": 0.95,
-    "src/invarlock/core/doctor_preflight.py": 0.95,
-    "src/invarlock/core/plugins_inventory.py": 0.95,
-    "src/invarlock/core/run_orchestrator.py": 0.95,
-    "src/invarlock/core/run_orchestrator_execute.py": 0.95,
-    "src/invarlock/core/run_orchestrator_execute_attempt_results.py": 0.95,
-    "src/invarlock/core/run_orchestrator_execute_attempts.py": 0.95,
-    "src/invarlock/core/run_orchestrator_execute_helpers.py": 0.95,
-    "src/invarlock/core/run_provider_dataset_materialization.py": 0.95,
-    "src/invarlock/core/run_provider_dataset_plan.py": 0.95,
-    "src/invarlock/core/runner_execution_plan.py": 0.95,
-    "src/invarlock/core/runner_eval_metrics_multimodal.py": 0.95,
-    "src/invarlock/core/runner_eval_metrics_stats.py": 0.95,
-    "src/invarlock/reporting/report_builder_support.py": 0.95,
-    "src/invarlock/reporting/report_builder_telemetry.py": 0.95,
+# A ratchet may only raise a tier floor. Keep this empty until a measured,
+# reviewed baseline justifies an upward ratchet; never seed it with the current
+# result merely to make a run green.
+COVERAGE_RATCHETS: dict[str, CoverageFloor] = {}
+
+# Live-tier classification is intentionally explicit. Each entry names the
+# actual hardware tests whose exact-commit receipts must close the local-only
+# coverage gap in the release evidence. Mixed portable/live modules remain in
+# the behavioral tier until their hardware owner is separated.
+LIVE_HARDWARE_CLOSURE_REQUIREMENTS = {
+    "src/invarlock/guards/exact_svd.py": HardwareClosureRequirement(
+        accelerator="cuda",
+        required_test_ids=(
+            "tests/guards/test_exact_svd.py::"
+            "test_exact_svdvals_preserves_cuda_execution_and_values",
+            "tests/guards/test_exact_svd.py::"
+            "test_exact_svdvals_cuda_failure_retries_on_cpu",
+        ),
+    ),
 }
-THRESHOLDS.update(BEHAVIORAL_RATCHET_THRESHOLDS)
 
-CORE_FLOOR_DEFAULT = 0.90
-DEFAULT_FLOOR_DEFAULT = 0.90
-
-CORE_PREFIXES = (
-    "src/invarlock/core/",
-    "src/invarlock/guards/",
-    "src/invarlock/observability/",
+COMPACT_CONTRACT_MAX_SOURCE_LINES = 400
+COMPACT_CONTRACT_SUFFIXES = (
+    "_binding.py",
+    "_contract.py",
+    "_identity.py",
+    "_integrity.py",
+    "_json.py",
+    "_policy.py",
+    "_schema.py",
+    "_types.py",
+    "_validation.py",
 )
 
-CORE_FILES = (
-    "scripts/release/evidence_contracts.py",
-    "scripts/evidence_packs/python/workflow_frontdoor.py",
-    "scripts/evidence_packs/python/create_edit_model.py",
-    "scripts/evidence_packs/python/create_edits_batch.py",
-    "scripts/evidence_packs/python/editing/implementations.py",
-    "scripts/evidence_packs/python/editing/tensor_ops.py",
-    "scripts/evidence_packs/python/preset_generator.py",
-    "scripts/evidence_packs/python/task_tools_reports.py",
-    "scripts/evidence_workflows/workflow_plan.py",
-    "scripts/evidence_workflows/workflow_runner.py",
-    "scripts/evidence_workflows/workflow_state.py",
-    "src/invarlock/eval/data.py",
-    "src/invarlock/eval/data_local.py",
-    "src/invarlock/eval/probes/importance.py",
-    "src/invarlock/eval/metrics.py",
-    "src/invarlock/eval/metrics_activation.py",
-    "src/invarlock/eval/metrics_runtime.py",
-    "src/invarlock/eval/metrics_runtime_resources.py",
-    "src/invarlock/eval/metrics_support.py",
-    "src/invarlock/eval/bench_policy.py",
-    "src/invarlock/eval/bench_runner.py",
-    "src/invarlock/eval/primary_metric.py",
-    "src/invarlock/eval/tail_stats.py",
-    "src/invarlock/calibration.py",
-    "src/invarlock/reporting/run_report_formatters.py",
-    "src/invarlock/reporting/validate.py",
-    "src/invarlock/reporting/report_types.py",
-    "src/invarlock/reporting/dataset_hashing.py",
-    "src/invarlock/reporting/guards_common.py",
-    "src/invarlock/reporting/guards_rmt.py",
-    "src/invarlock/reporting/guards_variance.py",
-    "src/invarlock/reporting/report_schema.py",
-    "src/invarlock/reporting/report_explanation.py",
-    "src/invarlock/reporting/report_build_context.py",
-    "src/invarlock/reporting/report_build_evidence.py",
-    "src/invarlock/reporting/report_make.py",
-    "src/invarlock/reporting/report_primary_metric_policy.py",
-    "src/invarlock/reporting/primary_metric_utils.py",
-    "src/invarlock/reporting/utils.py",
-    "src/invarlock/reporting/run_metric_utils.py",
-    "src/invarlock/edits/quant_rtn.py",
-    "src/invarlock/edits/quant_rtn_kernels.py",
-    "src/invarlock/cli/commands/run.py",
-    "src/invarlock/cli/commands/evaluate.py",
-    "src/invarlock/reporting/report_contract.py",
-    "src/invarlock/cli/commands/calibrate.py",
-    "src/invarlock/cli/commands/policy.py",
-    "src/invarlock/reporting/verify_contract.py",
-    "src/invarlock/reporting/verify_output.py",
-    "src/invarlock/core/determinism_policy.py",
-    "src/invarlock/core/config_runtime.py",
-    "src/invarlock/cli/app.py",
-    "src/invarlock/core/doctor_findings.py",
-    "src/invarlock/core/evaluate_plan.py",
-    "src/invarlock/public_contracts.py",
-    "src/invarlock/policy_pack.py",
-    "src/invarlock/evidence_pack.py",
-    "src/invarlock/evidence_pack_edit_metadata.py",
-    "src/invarlock/runtime_verify.py",
-    "src/invarlock/cli/commands/evidence_pack.py",
-    "src/invarlock/core/runner_execution_plan.py",
-    "src/invarlock/runtime_security.py",
-    "src/invarlock/cli/run_config.py",
-    "src/invarlock/cli/run_pairing.py",
-    "src/invarlock/__init__.py",
-    "src/invarlock/adapters/auto.py",
+# Canonical production paths that are maintained outside the broad package
+# globs below. This list defines inclusion only; risk tiers and floors are
+# derived independently and cannot be lowered here.
+MAINTAINED_ASSURANCE_FILES = (
+    "scripts/evidence_packs/python/editing/edit_metadata_contract.py",
+    "scripts/evidence_packs/python/editing/streaming_pruning.py",
+    "scripts/evidence_packs/python/editing/training_artifact_verifier.py",
+    "scripts/evidence_packs/python/editing/training_contract.py",
+    "scripts/evidence_packs/python/editing/training_receipt.py",
+    "scripts/evidence_packs/python/editing/training_runtime.py",
+    "scripts/evidence_packs/python/editing/validate_artifact.py",
+    "src/invarlock/adapters/hf_mixin_loading.py",
+    "src/invarlock/adapters/hf_mixin_snapshot_manifest.py",
+    "src/invarlock/core/checkpoint_identity.py",
+    "src/invarlock/clean_pruning_selection_artifacts.py",
+    "src/invarlock/clean_pruning_selection_common.py",
+    "src/invarlock/clean_pruning_selection_contract.py",
+    "src/invarlock/clean_pruning_selection_contracts/snapshot.py",
+    "src/invarlock/clean_pruning_selection_runtime.py",
+    "src/invarlock/clean_selection/artifacts.py",
+    "src/invarlock/clean_selection/binding.py",
+    "src/invarlock/clean_selection/bundle.py",
+    "src/invarlock/clean_selection/candidate.py",
+    "src/invarlock/clean_selection/common.py",
+    "src/invarlock/clean_selection/snapshot.py",
+    "src/invarlock/clean_selection_runtime.py",
+    "src/invarlock/evidence_pack_baselines.py",
+    "src/invarlock/evidence_pack_binding.py",
+    "src/invarlock/evidence_pack_contracts/deployable_coverage.py",
+    "src/invarlock/evidence_pack_deployable_validation.py",
+    "src/invarlock/evidence_pack_edit_common.py",
+    "src/invarlock/evidence_pack_edit_validation.py",
+    "src/invarlock/evidence_pack_edit_verifier.py",
+    "src/invarlock/evidence_pack_json.py",
+    "src/invarlock/evidence_pack_policy.py",
+    "src/invarlock/evidence_pack_pruning_validation.py",
+    "src/invarlock/evidence_pack_report_verification.py",
+    "src/invarlock/evidence_pack_scenario_contract.py",
+    "src/invarlock/evidence_pack_training_validation.py",
+    "src/invarlock/evidence_pack_transformation_contract.py",
+    "src/invarlock/evidence_pack_transformation_replay.py",
+    "src/invarlock/evidence_pack_transformation_validation.py",
+    "src/invarlock/reporting/verify_baseline.py",
+    "src/invarlock/reporting/verify_bootstrap.py",
+    "src/invarlock/reporting/verify_dataset_identity.py",
+    "src/invarlock/training_evidence.py",
+    "src/invarlock/training_evidence_contracts/common.py",
+    "src/invarlock/training_evidence_contracts/receipt.py",
 )
 
 COVERAGE_MODULE_FLAGS = ("--cov",)
 
 COVERAGE_INCLUDE_PATTERNS = (
+    *MAINTAINED_ASSURANCE_FILES,
     "scripts/release/*.py",
-    "scripts/evidence_packs/python/workflow_frontdoor.py",
     "scripts/evidence_packs/python/create_edit_model.py",
     "scripts/evidence_packs/python/create_edits_batch.py",
     "scripts/evidence_packs/python/editing/implementations.py",
     "scripts/evidence_packs/python/editing/tensor_ops.py",
     "scripts/evidence_packs/python/preset_generator.py",
     "scripts/evidence_packs/python/task_tools_reports.py",
-    "scripts/evidence_workflows/*.py",
     "src/invarlock/eval/*",
     "src/invarlock/guards/*",
     "src/invarlock/calibration.py",
+    "src/invarlock/clean_pruning_selection_*.py",
+    "src/invarlock/clean_selection/*.py",
+    "src/invarlock/clean_selection_runtime.py",
     "src/invarlock/edits/quant_rtn.py",
     "src/invarlock/edits/quant_rtn_kernels.py",
     "src/invarlock/cli/*",
@@ -308,15 +160,20 @@ COVERAGE_INCLUDE_PATTERNS = (
     "src/invarlock/public_contracts.py",
     "src/invarlock/policy_pack.py",
     "src/invarlock/evidence_pack.py",
-    "src/invarlock/evidence_pack_edit_metadata.py",
     "src/invarlock/evidence_pack_integrity.py",
+    "src/invarlock/evidence_pack_json.py",
+    "src/invarlock/evidence_pack_scenario_contract.py",
     "src/invarlock/evidence_pack_support.py",
     "src/invarlock/runtime_security.py",
     "src/invarlock/runtime_security_helpers.py",
     "src/invarlock/runtime_verify.py",
+    "src/invarlock/training_evidence.py",
     "invarlock/eval/*",
     "invarlock/guards/*",
     "invarlock/calibration.py",
+    "invarlock/clean_pruning_selection_*.py",
+    "invarlock/clean_selection/*.py",
+    "invarlock/clean_selection_runtime.py",
     "invarlock/edits/quant_rtn.py",
     "invarlock/edits/quant_rtn_kernels.py",
     "invarlock/cli/*",
@@ -332,42 +189,54 @@ COVERAGE_INCLUDE_PATTERNS = (
     "invarlock/public_contracts.py",
     "invarlock/policy_pack.py",
     "invarlock/evidence_pack.py",
-    "invarlock/evidence_pack_edit_metadata.py",
     "invarlock/evidence_pack_integrity.py",
+    "invarlock/evidence_pack_json.py",
+    "invarlock/evidence_pack_scenario_contract.py",
     "invarlock/evidence_pack_support.py",
+    "invarlock/adapters/hf_mixin_loading.py",
+    "invarlock/adapters/hf_mixin_snapshot_manifest.py",
+    "invarlock/evidence_pack_baselines.py",
+    "invarlock/evidence_pack_binding.py",
+    "invarlock/evidence_pack_policy.py",
+    "invarlock/evidence_pack_report_verification.py",
+    "invarlock/reporting/verify_baseline.py",
+    "invarlock/reporting/verify_bootstrap.py",
     "invarlock/runtime_security.py",
     "invarlock/runtime_security_helpers.py",
     "invarlock/runtime_verify.py",
-    "evidence_packs/python/workflow_frontdoor.py",
+    "invarlock/training_evidence.py",
     "evidence_packs/python/create_edit_model.py",
     "evidence_packs/python/create_edits_batch.py",
+    "evidence_packs/python/editing/edit_metadata_contract.py",
     "evidence_packs/python/editing/implementations.py",
+    "evidence_packs/python/editing/streaming_pruning.py",
+    "evidence_packs/python/editing/training_artifact_verifier.py",
+    "evidence_packs/python/editing/training_contract.py",
+    "evidence_packs/python/editing/training_receipt.py",
+    "evidence_packs/python/editing/training_runtime.py",
     "evidence_packs/python/editing/tensor_ops.py",
+    "evidence_packs/python/editing/validate_artifact.py",
     "evidence_packs/python/preset_generator.py",
     "evidence_packs/python/task_tools_reports.py",
-    "evidence_workflows/*.py",
 )
 
 BARE_SCRIPT_MODULE_PATHS = {
-    "workflow_frontdoor.py": "scripts/evidence_packs/python/workflow_frontdoor.py",
     "create_edit_model.py": "scripts/evidence_packs/python/create_edit_model.py",
     "create_edits_batch.py": "scripts/evidence_packs/python/create_edits_batch.py",
+    "edit_metadata_contract.py": "scripts/evidence_packs/python/editing/edit_metadata_contract.py",
     "implementations.py": "scripts/evidence_packs/python/editing/implementations.py",
+    "streaming_pruning.py": "scripts/evidence_packs/python/editing/streaming_pruning.py",
+    "training_artifact_verifier.py": "scripts/evidence_packs/python/editing/training_artifact_verifier.py",
+    "training_contract.py": "scripts/evidence_packs/python/editing/training_contract.py",
+    "training_receipt.py": "scripts/evidence_packs/python/editing/training_receipt.py",
+    "training_runtime.py": "scripts/evidence_packs/python/editing/training_runtime.py",
     "tensor_ops.py": "scripts/evidence_packs/python/editing/tensor_ops.py",
+    "validate_artifact.py": "scripts/evidence_packs/python/editing/validate_artifact.py",
     "preset_generator.py": "scripts/evidence_packs/python/preset_generator.py",
     "task_tools_reports.py": "scripts/evidence_packs/python/task_tools_reports.py",
-    "workflow_plan.py": "scripts/evidence_workflows/workflow_plan.py",
-    "workflow_runner.py": "scripts/evidence_workflows/workflow_runner.py",
-    "workflow_state.py": "scripts/evidence_workflows/workflow_state.py",
 }
 
-_POLICY_ITEMS = (
-    "coverage-modules",
-    "coverage-include",
-    "threshold-count",
-    "core-prefixes",
-    "core-files",
-)
+_POLICY_ITEMS = ("coverage-modules", "coverage-include", "tier-policy")
 
 
 def coverage_modules() -> str:
@@ -383,21 +252,33 @@ def _print_policy_item(item: str) -> int:
         print(coverage_modules())
     elif item == "coverage-include":
         print(coverage_include())
-    elif item == "threshold-count":
-        print(len(THRESHOLDS))
-    elif item == "core-prefixes":
-        print(" ".join(CORE_PREFIXES))
-    elif item == "core-files":
-        print(" ".join(CORE_FILES))
+    elif item == "tier-policy":
+        print(
+            json.dumps(
+                {
+                    "repository_floor": asdict(REPOSITORY_FLOOR),
+                    "tiers": {
+                        name: asdict(floor) for name, floor in TIER_FLOORS.items()
+                    },
+                    "live_hardware_closure": {
+                        path: asdict(requirement)
+                        for path, requirement in (
+                            LIVE_HARDWARE_CLOSURE_REQUIREMENTS.items()
+                        )
+                    },
+                },
+                sort_keys=True,
+            )
+        )
     else:
         raise AssertionError(f"Unhandled policy item: {item}")
     return 0
 
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    core_floor_help = f"{CORE_FLOOR_DEFAULT:.0%}".replace("%", "%%")
-    default_floor_help = f"{DEFAULT_FLOOR_DEFAULT:.0%}".replace("%", "%%")
-    parser = argparse.ArgumentParser(description="Enforce per-file coverage floors")
+    parser = argparse.ArgumentParser(
+        description="Enforce risk-tiered per-file line and branch coverage floors"
+    )
     parser.add_argument(
         "--coverage",
         default="coverage.xml",
@@ -409,19 +290,11 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Optional path to write results as JSON",
     )
     parser.add_argument(
-        "--core-floor",
-        type=float,
-        default=CORE_FLOOR_DEFAULT,
-        help=f"Branch coverage floor for core modules (default: {core_floor_help})",
-    )
-    parser.add_argument(
-        "--default-floor",
-        type=float,
-        default=DEFAULT_FLOOR_DEFAULT,
+        "--allow-missing-threshold-files",
+        action="store_true",
         help=(
-            "Branch coverage floor for non-core modules "
-            f"(default: {default_floor_help}). "
-            "Note: non-core floors are only applied for files explicitly listed in THRESHOLDS."
+            "Diagnostic-only escape hatch: do not fail when maintained production "
+            "files are absent from the coverage report"
         ),
     )
     return parser.parse_args(argv)
@@ -433,109 +306,215 @@ def _load_coverage_xml(path: Path) -> ET.Element:
     return ET.parse(path).getroot()
 
 
-def _collect_branch_rates(root: ET.Element) -> dict[str, float]:
-    """Return mapping of normalized file path → branch rate (fallback to line rate).
+def _normalize_project_path(path: Path) -> str | None:
+    text = path.as_posix()
+    for anchor in ("src/", "scripts/"):
+        index = text.find(anchor)
+        if index != -1:
+            return text[index:]
+    if text.startswith("invarlock/"):
+        return f"src/{text}"
+    return None
 
-    Coverage.py emits class-level attributes like 'branch-rate' and 'line-rate'.
-    We prefer branch-rate to enforce branch coverage floors, and fall back to
-    line-rate if branch-rate is unavailable for a file.
-    """
 
-    # Order matters when coverage.xml reports ambiguous bare filenames (e.g.,
-    # "bootstrap.py"). Prefer core/reporting over eval so we map to the
-    # critical surfaces used in thresholds.
-    search_roots = [
-        Path("src/invarlock/observability"),
-        Path("src/invarlock/adapters"),
-        Path("src/invarlock"),
-        Path("src/invarlock/core"),
-        Path("src/invarlock/reporting"),
-        Path("src/invarlock/cli"),
-        Path("src/invarlock/calibration"),
-        Path("src/invarlock/guards"),
-        Path("src/invarlock/eval"),
-        Path("scripts/release"),
-        Path("scripts"),
-    ]
+def _resolve_coverage_path(filename: str, repo_root: Path) -> str | None:
+    normalized = filename.replace("\\", "/")
+    if normalized.startswith("invarlock/"):
+        return f"src/{normalized}"
+    if "/" not in normalized and normalized in BARE_SCRIPT_MODULE_PATHS:
+        return BARE_SCRIPT_MODULE_PATHS[normalized]
 
-    def _normalize_project_path(path: Path) -> str | None:
-        """Return project-relative path starting at src/ or scripts/.
+    candidate = Path(normalized)
+    if candidate.is_absolute():
+        return _normalize_project_path(candidate)
+    direct = repo_root / candidate
+    if direct.is_file():
+        return _normalize_project_path(candidate)
 
-        Coverage XML often emits absolute paths. We want stable keys like
-        "src/invarlock/core/runner.py" that match THRESHOLDS. This helper trims any
-        absolute prefix up to the first occurrence of "src/" or "scripts/".
-        """
-        try:
-            p = path.resolve()
-        except OSError:
-            p = path
+    matches = sorted(
+        path
+        for root_name in ("src", "scripts")
+        for path in (repo_root / root_name).rglob(normalized)
+        if path.is_file()
+    )
+    normalized_matches = {
+        value
+        for path in matches
+        if (value := _normalize_project_path(path.relative_to(repo_root))) is not None
+    }
+    if len(normalized_matches) == 1:
+        return normalized_matches.pop()
+    return None
 
-        # If the path already looks project-relative, keep it
-        text = p.as_posix()
-        for anchor in ("src/", "scripts/"):
-            idx = text.find(anchor)
-            if idx != -1:
-                return text[idx:]
-        # Handle coverage XML that emits package-relative paths like
-        # "invarlock/cli/commands/run.py" without the leading "src/" prefix.
-        # In that case, restore the expected project-relative prefix.
-        if text.startswith("invarlock/"):
-            return f"src/{text}"
-        # Fallback: if it exists under CWD, try to relativize
-        try:
-            rel = p.relative_to(Path.cwd())
-            return rel.as_posix()
-        except ValueError:
-            return None
 
-    def resolve_path(filename: str) -> str | None:
-        # Fast-path: coverage emits package-relative paths like "invarlock/..."
-        # Map these directly to project-relative under src/.
-        if filename.startswith("invarlock/"):
-            return f"src/{filename}"
-        if "/" not in filename and filename in BARE_SCRIPT_MODULE_PATHS:
-            return BARE_SCRIPT_MODULE_PATHS[filename]
-        # Coverage XML may emit bare basenames for multiple modules (e.g., older
-        # eval/core bootstrap layouts).
-        # In those cases, mapping is ambiguous and can mis-attribute rates.
-        if filename in {"bootstrap.py"} and "/" not in filename:
-            return None
-        candidate = Path(filename)
-        # Try normalizing absolute paths first
-        if candidate.exists():
-            norm = _normalize_project_path(candidate)
-            if norm:
-                return norm
-        # Try joining against known roots
-        for root_path in search_roots:
-            resolved = root_path / filename
-            if resolved.exists():
-                norm = _normalize_project_path(resolved)
-                if norm:
-                    return norm
+def _valid_rate(raw: str | None) -> float | None:
+    if raw is None:
         return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(value) or not 0.0 <= value <= 1.0:
+        return None
+    return value
 
-    rates: dict[str, float] = {}
+
+def _collect_coverage_measurements(
+    root: ET.Element,
+    repo_root: Path,
+) -> tuple[
+    dict[str, CoverageMeasurement],
+    list[str],
+    list[str],
+    list[str],
+    list[str],
+]:
+    measurements: dict[str, CoverageMeasurement] = {}
+    missing_line_data: set[str] = set()
+    missing_branch_data: set[str] = set()
+    duplicate_paths: set[str] = set()
+    unresolved_filenames: set[str] = set()
+    seen_paths: set[str] = set()
+
     for class_node in root.findall("./packages/package/classes/class"):
         filename = class_node.attrib.get("filename")
         if not filename:
+            unresolved_filenames.add("<missing filename>")
             continue
-        # Prefer branch-rate; fallback to line-rate
-        rate_str = class_node.attrib.get("branch-rate") or class_node.attrib.get(
-            "line-rate"
+        path = _resolve_coverage_path(filename, repo_root)
+        if path is None:
+            unresolved_filenames.add(filename.replace("\\", "/"))
+            continue
+        if path in seen_paths:
+            duplicate_paths.add(path)
+        seen_paths.add(path)
+        line_rate = _valid_rate(class_node.attrib.get("line-rate"))
+        branch_rate = _valid_rate(class_node.attrib.get("branch-rate"))
+        if line_rate is None:
+            missing_line_data.add(path)
+        if branch_rate is None:
+            missing_branch_data.add(path)
+        if line_rate is None or branch_rate is None:
+            continue
+        if path in measurements:
+            continue
+        measurements[path] = CoverageMeasurement(line=line_rate, branch=branch_rate)
+
+    return (
+        measurements,
+        sorted(missing_line_data),
+        sorted(missing_branch_data),
+        sorted(duplicate_paths),
+        sorted(unresolved_filenames),
+    )
+
+
+def _canonical_include_patterns() -> tuple[str, ...]:
+    return tuple(
+        dict.fromkeys(
+            pattern
+            for pattern in COVERAGE_INCLUDE_PATTERNS
+            if pattern.startswith(("src/", "scripts/"))
         )
-        try:
-            rate = float(rate_str or 0.0)
-        except (TypeError, ValueError):
-            rate = 0.0
-        # Normalize path; some coverage outputs are already project-relative
-        # (e.g., "invarlock/cli/commands/run.py")
-        norm = resolve_path(filename.replace("\\", "/"))
-        if not norm:
+    )
+
+
+def _coverage_omits(path: str) -> bool:
+    name = Path(path).name
+    return (
+        name == "__init__.py"
+        or path == "src/invarlock/__main__.py"
+        or "/tests/" in path
+        or name.startswith("test_")
+    )
+
+
+def maintained_coverage_files(repo_root: Path | None = None) -> set[str]:
+    root = Path.cwd() if repo_root is None else repo_root
+    patterns = _canonical_include_patterns()
+    files: set[str] = set()
+    for root_name in ("src", "scripts"):
+        source_root = root / root_name
+        if not source_root.is_dir():
             continue
-        # Keep the highest rate seen if tool emits duplicates per class
-        rates[norm] = max(rate, rates.get(norm, 0.0))
-    return rates
+        for path in source_root.rglob("*.py"):
+            relative = path.relative_to(root).as_posix()
+            if _coverage_omits(relative):
+                continue
+            if any(fnmatchcase(relative, pattern) for pattern in patterns):
+                files.add(relative)
+    return files
+
+
+def _is_compact_contract(path: str, repo_root: Path) -> bool:
+    file_path = repo_root / path
+    try:
+        source_lines = len(file_path.read_text(encoding="utf-8").splitlines())
+    except OSError:
+        return False
+    name = file_path.name
+    semantic_name = name in {
+        "binding.py",
+        "contract.py",
+        "identity.py",
+        "integrity.py",
+        "json.py",
+        "policy.py",
+        "schema.py",
+        "types.py",
+        "validation.py",
+    } or name.endswith(COMPACT_CONTRACT_SUFFIXES)
+    return semantic_name and source_lines <= COMPACT_CONTRACT_MAX_SOURCE_LINES
+
+
+def _classification_matches(path: str, repo_root: Path) -> tuple[str, ...]:
+    matches: list[str] = []
+    if path in LIVE_HARDWARE_CLOSURE_REQUIREMENTS:
+        matches.append("live_backend")
+    if _is_compact_contract(path, repo_root):
+        matches.append("compact_contract")
+    if not matches:
+        matches.append("behavioral")
+    return tuple(matches)
+
+
+def _effective_floor(path: str, tier: str) -> CoverageFloor:
+    tier_floor = TIER_FLOORS[tier]
+    repository_floor = (
+        CoverageFloor(line=0.0, branch=0.0)
+        if tier == "live_backend"
+        else REPOSITORY_FLOOR
+    )
+    ratchet = COVERAGE_RATCHETS.get(path, CoverageFloor(line=0.0, branch=0.0))
+    return CoverageFloor(
+        line=max(repository_floor.line, tier_floor.line, ratchet.line),
+        branch=max(repository_floor.branch, tier_floor.branch, ratchet.branch),
+    )
+
+
+def _hardware_metadata_failures(repo_root: Path) -> list[str]:
+    failures: list[str] = []
+    for path, requirement in sorted(LIVE_HARDWARE_CLOSURE_REQUIREMENTS.items()):
+        if not requirement.accelerator.strip():
+            failures.append(f"{path}: live tier has no accelerator closure metadata")
+        if not requirement.required_test_ids:
+            failures.append(f"{path}: live tier has no required hardware receipt tests")
+        for test_id in requirement.required_test_ids:
+            test_path, separator, test_name = test_id.partition("::")
+            if not separator or not test_name:
+                failures.append(f"{path}: invalid hardware receipt test id {test_id!r}")
+                continue
+            owner = repo_root / test_path
+            try:
+                source = owner.read_text(encoding="utf-8")
+            except OSError:
+                failures.append(
+                    f"{path}: hardware receipt test owner is missing: {test_path}"
+                )
+                continue
+            if f"def {test_name}(" not in source:
+                failures.append(f"{path}: hardware receipt test is missing: {test_id}")
+    return failures
 
 
 def _write_json(
@@ -543,18 +522,35 @@ def _write_json(
     records: list[dict[str, Any]],
     status: str,
     *,
-    configured_threshold_files: int,
+    maintained_files: int,
     evaluated_files: int,
-    missing_threshold_files: list[str],
-    measured_threshold_files: int,
+    missing_line_coverage_files: list[str],
+    missing_branch_coverage_files: list[str],
+    missing_coverage_files: list[str],
+    duplicate_coverage_files: list[str],
+    unclassified_coverage_files: list[str],
+    unresolved_coverage_filenames: list[str],
 ) -> None:
     payload = {
+        "schema": "invarlock/risk-tier-coverage-v1",
         "status": status,
         "files": records,
-        "configured_threshold_files": configured_threshold_files,
+        "policy": {
+            "repository_floor": asdict(REPOSITORY_FLOOR),
+            "tiers": {name: asdict(floor) for name, floor in TIER_FLOORS.items()},
+            "live_hardware_closure": {
+                path: asdict(requirement)
+                for path, requirement in LIVE_HARDWARE_CLOSURE_REQUIREMENTS.items()
+            },
+        },
+        "maintained_files": maintained_files,
         "evaluated_files": evaluated_files,
-        "measured_threshold_files": measured_threshold_files,
-        "missing_threshold_files": missing_threshold_files,
+        "missing_line_coverage_files": missing_line_coverage_files,
+        "missing_branch_coverage_files": missing_branch_coverage_files,
+        "missing_coverage_files": missing_coverage_files,
+        "duplicate_coverage_files": duplicate_coverage_files,
+        "unclassified_coverage_files": unclassified_coverage_files,
+        "unresolved_coverage_filenames": unresolved_coverage_filenames,
     }
     json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
@@ -571,49 +567,89 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _print_policy_item(raw_args[0])
 
     args = _parse_args(raw_args)
+    repo_root = Path.cwd()
     report_path = Path(args.coverage)
     root = _load_coverage_xml(report_path)
-    rates = _collect_branch_rates(root)
+    (
+        measurements,
+        missing_line_coverage_files,
+        missing_branch_coverage_files,
+        duplicate_coverage_files,
+        unresolved_coverage_filenames,
+    ) = _collect_coverage_measurements(root, repo_root)
+    maintained_files = maintained_coverage_files(repo_root)
 
-    failures: list[str] = []
+    failures = _hardware_metadata_failures(repo_root)
+    failures.extend(
+        f"{path}: no valid line coverage data present"
+        for path in missing_line_coverage_files
+    )
+    failures.extend(
+        f"{path}: no valid branch coverage data present"
+        for path in missing_branch_coverage_files
+    )
+    failures.extend(
+        f"{path}: duplicate normalized coverage entry"
+        for path in duplicate_coverage_files
+    )
+    failures.extend(
+        f"{filename}: coverage filename cannot be resolved uniquely"
+        for filename in unresolved_coverage_filenames
+    )
     records: list[dict[str, Any]] = []
 
-    def _is_core(path: str) -> bool:
-        return path in CORE_FILES or any(path.startswith(p) for p in CORE_PREFIXES)
+    invalid_measurement_paths = set(missing_line_coverage_files) | set(
+        missing_branch_coverage_files
+    )
+    missing_coverage_files = sorted(
+        maintained_files - set(measurements) - invalid_measurement_paths
+    )
+    if missing_coverage_files and not args.allow_missing_threshold_files:
+        failures.extend(
+            f"{path}: maintained production module has no coverage data"
+            for path in missing_coverage_files
+        )
 
-    # Build required floors for core classification only; non-core modules are
-    # not globally enforced to avoid over-scoping. Explicit overrides (below)
-    # extend this set.
-    required: dict[str, float] = {}
-    for rel_path in rates.keys():
-        if _is_core(rel_path):
-            required[rel_path] = args.core_floor
+    unclassified_coverage_files = sorted(set(measurements) - maintained_files)
+    failures.extend(
+        f"{path}: measured module is outside the maintained coverage surface"
+        for path in unclassified_coverage_files
+    )
 
-    # Apply explicit overrides (can be lower or higher than the base floor).
-    # Only enforce overrides for files that appear in the current report.
-    for rel_path, floor in THRESHOLDS.items():
-        if rel_path in rates:
-            required[rel_path] = floor
-
-    missing_threshold_files = sorted(set(THRESHOLDS) - set(rates))
-    measured_threshold_files = len(THRESHOLDS) - len(missing_threshold_files)
-
-    # Evaluate all known files with a required floor
-    for rel_path, floor in sorted(required.items()):
-        rate = rates.get(rel_path)
+    for path, measurement in sorted(measurements.items()):
+        if path not in maintained_files:
+            continue
+        matches = _classification_matches(path, repo_root)
+        if len(matches) != 1:
+            failures.append(
+                f"{path}: coverage classification must match exactly one tier; "
+                f"matched {', '.join(matches) or 'none'}"
+            )
+            continue
+        tier = matches[0]
+        floor = _effective_floor(path, tier)
+        hardware_requirement = LIVE_HARDWARE_CLOSURE_REQUIREMENTS.get(path)
         record = {
-            "path": rel_path,
-            "threshold": floor,
-            "coverage": rate,
-            "core": _is_core(rel_path),
+            "path": path,
+            "tier": tier,
+            "line_coverage": measurement.line,
+            "branch_coverage": measurement.branch,
+            "line_threshold": floor.line,
+            "branch_threshold": floor.branch,
+            "hardware_receipt_closure": (
+                asdict(hardware_requirement) if hardware_requirement else None
+            ),
         }
         records.append(record)
-        if rate is None:
-            failures.append(f"{rel_path}: no coverage data present")
-            continue
-        if rate + 1e-9 < floor:
+        if measurement.line + 1e-9 < floor.line:
             failures.append(
-                f"{rel_path}: coverage {rate:.3%} below required {floor:.0%}"
+                f"{path}: line coverage {measurement.line:.3%} below required "
+                f"{floor.line:.0%} for {tier} tier"
+            )
+        if measurement.branch + 1e-9 < floor.branch:
+            failures.append(
+                f"{path}: branch coverage {measurement.branch:.3%} below required "
+                f"{floor.branch:.0%} for {tier} tier"
             )
 
     if args.json_path:
@@ -621,10 +657,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             Path(args.json_path),
             records,
             "fail" if failures else "ok",
-            configured_threshold_files=len(THRESHOLDS),
+            maintained_files=len(maintained_files),
             evaluated_files=len(records),
-            missing_threshold_files=missing_threshold_files,
-            measured_threshold_files=measured_threshold_files,
+            missing_line_coverage_files=missing_line_coverage_files,
+            missing_branch_coverage_files=missing_branch_coverage_files,
+            missing_coverage_files=missing_coverage_files,
+            duplicate_coverage_files=duplicate_coverage_files,
+            unclassified_coverage_files=unclassified_coverage_files,
+            unresolved_coverage_filenames=unresolved_coverage_filenames,
         )
 
     if failures:
@@ -632,26 +672,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"Coverage threshold not met: {failure}", file=sys.stderr)
         return 1
 
-    for rel_path, threshold in THRESHOLDS.items():
-        rate = rates.get(rel_path)
-        if rate is not None:
-            print(f"{rel_path}: {rate:.2%} (branch threshold {threshold:.0%})")
-            if threshold < 0.85:
-                print(
-                    "  note: phased coverage floor – ratchet upward when touching this file"
-                )
-
-    summary = (
-        f"Coverage OK: {measured_threshold_files}/{len(THRESHOLDS)} threshold-listed files had coverage data "
-        "and met per-file thresholds. "
+    print(
+        f"Coverage OK: {len(records)}/{len(maintained_files)} maintained production "
+        "modules met their line and branch risk-tier floors."
     )
-    if missing_threshold_files:
-        summary += (
-            f"{len(missing_threshold_files)} threshold-listed files were absent from the "
-            "coverage report. "
-        )
-    summary += "Project floor enforced via pytest."
-    print(summary)
     return 0
 
 

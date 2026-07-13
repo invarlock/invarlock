@@ -116,7 +116,7 @@ jobs:
       - name: Build release wheel
         run: |
           rm -rf build dist
-          python -m build
+          python -m build --no-isolation
 
       - name: Create install-surface venv
         id: install_surface

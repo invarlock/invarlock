@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import importlib.util
 import json
 import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+
+from tests.scripts._support_evidence_contracts import load_evidence_contracts_module
 
 
 def _repo_root() -> Path:
@@ -13,19 +14,7 @@ def _repo_root() -> Path:
 
 
 def _checker_module():
-    module_path = _repo_root() / "scripts" / "release" / "evidence_contracts.py"
-    script_dir = str(module_path.parent)
-    if script_dir not in sys.path:
-        sys.path.insert(0, script_dir)
-    spec = importlib.util.spec_from_file_location(
-        "empirical_guard_evidence_contracts_under_test", module_path
-    )
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    return load_evidence_contracts_module()
 
 
 def _write_valid_bundle(root: Path) -> None:
@@ -33,7 +22,7 @@ def _write_valid_bundle(root: Path) -> None:
     for artifact in (
         "calibration/null_sweep_report.json",
         "calibration/ve_sweep_report.json",
-        "model-evidence/summary.json",
+        "catalog-evidence/summary.json",
         "families/gpt2.json",
     ):
         path = root / artifact
@@ -42,9 +31,10 @@ def _write_valid_bundle(root: Path) -> None:
     (root / "manifest.json").write_text(
         json.dumps(
             {
-                "schema": "invarlock/empirical-guard-evidence-v1",
+                "schema": "invarlock/empirical-guard-inventory-v1",
+                "authority": "diagnostic_inventory",
                 "source_commands": [
-                    "make model-evidence-sweep MODEL_EVIDENCE_ARGS='--slug tiny_gpt2_canary'",
+                    "invarlock evaluate --config resolved-config.yaml",
                     "invarlock advanced calibrate null-sweep --config configs/calibration/null_sweep_ci.yaml",
                     "invarlock advanced calibrate ve-sweep --config configs/calibration/rmt_ve_sweep_ci.yaml",
                 ],
@@ -52,21 +42,21 @@ def _write_valid_bundle(root: Path) -> None:
                     {
                         "guard": "spectral",
                         "evidence_kind": "calibration_null_sweep",
-                        "status": "empirical",
+                        "status": "indexed",
                         "model_family": "gpt2",
                         "artifact": "calibration/null_sweep_report.json",
                     },
                     {
                         "guard": "rmt",
-                        "evidence_kind": "model_evidence_sweep",
-                        "status": "empirical",
+                        "evidence_kind": "catalog_evaluation",
+                        "status": "indexed",
                         "model_family": "gpt2",
-                        "artifact": "model-evidence/summary.json",
+                        "artifact": "catalog-evidence/summary.json",
                     },
                     {
                         "guard": "variance",
                         "evidence_kind": "calibration_ve_sweep",
-                        "status": "empirical",
+                        "status": "indexed",
                         "model_family": "gpt2",
                         "artifact": "calibration/ve_sweep_report.json",
                     },
@@ -74,7 +64,7 @@ def _write_valid_bundle(root: Path) -> None:
                 "model_family_rows": [
                     {
                         "model_family": "gpt2",
-                        "status": "observed",
+                        "status": "indexed",
                         "artifact": "families/gpt2.json",
                     }
                 ],
@@ -88,7 +78,7 @@ def _checker_command(root: Path, *, json_output: bool = False) -> list[str]:
     command = [
         sys.executable,
         str(_repo_root() / "scripts" / "release" / "evidence_contracts.py"),
-        "empirical",
+        "empirical-inventory",
         "--root",
         str(root),
     ]
@@ -105,8 +95,8 @@ def test_empirical_guard_evidence_check_accepts_valid_bundle(
     module = _checker_module()
 
     assert module.check_empirical_guard_evidence(root=root) == []
-    assert module.main(["empirical", "--root", str(root)]) == 0
-    assert module.main(["empirical", "--root", str(root), "--json"]) == 0
+    assert module.main(["empirical-inventory", "--root", str(root)]) == 0
+    assert module.main(["empirical-inventory", "--root", str(root), "--json"]) == 0
 
     proc = subprocess.run(
         _checker_command(root, json_output=True),
@@ -117,6 +107,67 @@ def test_empirical_guard_evidence_check_accepts_valid_bundle(
 
     assert proc.returncode == 0, proc.stderr
     assert '"ok": true' in proc.stdout
+    payload = json.loads(proc.stdout)
+    assert payload["authoritative"] is False
+    assert payload["authority"] == "diagnostic_inventory"
+    assert payload["scope"] == "artifact_inventory_only"
+
+
+def test_empirical_guard_evidence_success_never_claims_authority(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "empirical"
+    _write_valid_bundle(root)
+
+    proc = subprocess.run(
+        _checker_command(root),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert "structurally valid" in proc.stdout
+    assert "diagnostic only" in proc.stdout
+    assert "cannot authorize release or calibration claims" in proc.stdout
+    assert "passed" not in proc.stdout.lower()
+
+
+def test_removed_empirical_command_has_no_compatibility_alias(tmp_path: Path) -> None:
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(_repo_root() / "scripts" / "release" / "evidence_contracts.py"),
+            "empirical",
+            "--root",
+            str(tmp_path),
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert proc.returncode == 2
+    assert "invalid choice: 'empirical'" in proc.stderr
+
+
+def test_empirical_guard_evidence_rejects_old_self_declared_authority(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "empirical"
+    _write_valid_bundle(root)
+    manifest_path = root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest.pop("authority")
+    for row in manifest["guard_rows"]:
+        row["status"] = "empirical"
+    manifest["model_family_rows"][0]["status"] = "observed"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    failures = _checker_module().check_empirical_guard_evidence(root=root)
+
+    assert any("authority must be diagnostic_inventory" in item for item in failures)
+    assert any("status must be indexed" in item for item in failures)
 
 
 def test_empirical_guard_evidence_check_reports_missing_manifest(
@@ -139,13 +190,14 @@ def test_empirical_guard_evidence_check_rejects_synthetic_and_missing_guards(
     (root / "manifest.json").write_text(
         json.dumps(
             {
-                "schema": "invarlock/empirical-guard-evidence-v1",
+                "schema": "invarlock/empirical-guard-inventory-v1",
+                "authority": "diagnostic_inventory",
                 "source_commands": ["make guard-validation-smoke"],
                 "guard_rows": [
                     {
                         "guard": "spectral",
-                        "evidence_kind": "model_evidence_sweep",
-                        "status": "empirical",
+                        "evidence_kind": "catalog_evaluation",
+                        "status": "indexed",
                         "synthetic": True,
                         "scope": "synthetic smoke",
                         "model_family": "gpt2",
@@ -187,21 +239,21 @@ def test_empirical_guard_evidence_check_rejects_artifact_path_edges(
         {
             "guard": "spectral",
             "evidence_kind": "calibration_null_sweep",
-            "status": "empirical",
+            "status": "indexed",
             "model_family": "gpt2",
             "artifact": str(outside),
         },
         {
             "guard": "rmt",
-            "evidence_kind": "model_evidence_sweep",
-            "status": "empirical",
+            "evidence_kind": "catalog_evaluation",
+            "status": "indexed",
             "model_family": "gpt2",
             "artifact": "../outside.json",
         },
         {
             "guard": "variance",
             "evidence_kind": "calibration_ve_sweep",
-            "status": "empirical",
+            "status": "indexed",
             "model_family": "gpt2",
             "artifact": "empty.json",
         },
@@ -209,15 +261,14 @@ def test_empirical_guard_evidence_check_rejects_artifact_path_edges(
     (root / "manifest.json").write_text(
         json.dumps(
             {
-                "schema": "invarlock/empirical-guard-evidence-v1",
-                "source_commands": [
-                    "scripts/model_evidence/model_evidence_sweep.py --dry-run"
-                ],
+                "schema": "invarlock/empirical-guard-inventory-v1",
+                "authority": "diagnostic_inventory",
+                "source_commands": ["invarlock evaluate --config resolved-config.yaml"],
                 "guard_rows": rows,
                 "model_family_rows": [
                     {
                         "model_family": "gpt2",
-                        "status": "observed",
+                        "status": "indexed",
                         "artifact": "",
                     }
                 ],
@@ -234,6 +285,20 @@ def test_empirical_guard_evidence_check_rejects_artifact_path_edges(
     assert any("artifact must not be empty" in failure for failure in failures)
     assert any(
         "artifact must be a non-empty relative path" in failure for failure in failures
+    )
+
+
+def test_empirical_guard_inventory_rejects_symlink_artifact(tmp_path: Path) -> None:
+    root = tmp_path / "empirical"
+    _write_valid_bundle(root)
+    target = root / "calibration" / "null_sweep_report.json"
+    target.unlink()
+    target.symlink_to(root / "calibration" / "ve_sweep_report.json")
+
+    failures = _checker_module().check_empirical_guard_evidence(root=root)
+
+    assert any(
+        "artifact must be a regular file, not a symlink" in item for item in failures
     )
 
 
@@ -275,7 +340,7 @@ def test_empirical_guard_evidence_check_rejects_shape_edges(
     failures = module.check_empirical_guard_evidence(root=root)
 
     assert any(
-        "schema must be invarlock/empirical-guard-evidence-v1" in item
+        "schema must be invarlock/empirical-guard-inventory-v1" in item
         for item in failures
     )
     assert any("source_commands[0] must be a string" in item for item in failures)
@@ -285,8 +350,7 @@ def test_empirical_guard_evidence_check_rejects_shape_edges(
     assert any("model_family_rows[0] must be an object" in item for item in failures)
     assert any("model_family_rows[1].model_family must be" in item for item in failures)
     assert any(
-        "model_family_rows[1].status must be observed or empirical" in item
-        for item in failures
+        "model_family_rows[1].status must be indexed" in item for item in failures
     )
 
 
@@ -300,7 +364,8 @@ def test_empirical_guard_evidence_check_rejects_required_field_edges(
     (root / "manifest.json").write_text(
         json.dumps(
             {
-                "schema": "invarlock/empirical-guard-evidence-v1",
+                "schema": "invarlock/empirical-guard-inventory-v1",
+                "authority": "diagnostic_inventory",
                 "source_commands": [],
                 "guard_rows": [
                     {
@@ -314,7 +379,7 @@ def test_empirical_guard_evidence_check_rejects_required_field_edges(
                 "model_family_rows": [
                     {
                         "model_family": "gpt2",
-                        "status": "observed",
+                        "status": "indexed",
                         "artifact": "family.json",
                     }
                 ],
@@ -328,7 +393,7 @@ def test_empirical_guard_evidence_check_rejects_required_field_edges(
 
     assert any("source_commands must be a non-empty list" in item for item in failures)
     assert any("evidence_kind must be one of" in item for item in failures)
-    assert any("status must be empirical" in item for item in failures)
+    assert any("status must be indexed" in item for item in failures)
     assert any("model_family must be a non-empty string" in item for item in failures)
     assert any("artifact missing" in item for item in failures)
 
@@ -338,11 +403,7 @@ def test_empirical_guard_evidence_check_rejects_required_field_edges(
 
     failures.clear()
     module._validate_source_commands(
-        {
-            "source_commands": [
-                "scripts/model_evidence/model_evidence_sweep.py --dry-run"
-            ]
-        },
+        {"source_commands": ["invarlock evaluate --config resolved-config.yaml"]},
         failures,
     )
     assert failures == []
@@ -373,7 +434,7 @@ def test_empirical_guard_evidence_contract_owner_paths(tmp_path: Path) -> None:
                 {
                     "guard": "spectral",
                     "evidence_kind": "calibration_null_sweep",
-                    "status": "empirical",
+                    "status": "indexed",
                     "model_family": "gpt2",
                     "artifact": "artifact.json",
                 },
@@ -392,21 +453,21 @@ def test_empirical_guard_evidence_contract_owner_paths(tmp_path: Path) -> None:
                 {
                     "guard": "spectral",
                     "evidence_kind": "calibration_null_sweep",
-                    "status": "empirical",
+                    "status": "indexed",
                     "model_family": "gpt2",
                     "artifact": "artifact.json",
                 },
                 {
                     "guard": "rmt",
-                    "evidence_kind": "model_evidence_sweep",
-                    "status": "empirical",
+                    "evidence_kind": "catalog_evaluation",
+                    "status": "indexed",
                     "model_family": "gpt2",
                     "artifact": "artifact.json",
                 },
                 {
                     "guard": "variance",
                     "evidence_kind": "calibration_ve_sweep",
-                    "status": "empirical",
+                    "status": "indexed",
                     "model_family": "gpt2",
                     "artifact": "artifact.json",
                 },
@@ -424,7 +485,7 @@ def test_empirical_guard_evidence_contract_owner_paths(tmp_path: Path) -> None:
                 None,
                 {
                     "model_family": "gpt2",
-                    "status": "observed",
+                    "status": "indexed",
                     "artifact": "artifact.json",
                 },
             ]
@@ -470,7 +531,7 @@ def test_empirical_guard_evidence_wrapper_counts_invalid_dict_rows(
         failures,
     )
 
-    assert any("guard_rows[0].status must be empirical" in item for item in failures)
+    assert any("guard_rows[0].status must be indexed" in item for item in failures)
     assert any("missing guard rows" in item for item in failures)
 
 
@@ -481,10 +542,11 @@ def test_empirical_guard_evidence_contract_empty_guard_rows(tmp_path: Path) -> N
     manifest = EmpiricalGuardEvidenceManifest(
         root=tmp_path,
         payload={
-            "schema": "invarlock/empirical-guard-evidence-v1",
-            "source_commands": ["scripts/model_evidence/model_evidence_sweep.py"],
+            "schema": "invarlock/empirical-guard-inventory-v1",
+            "authority": "diagnostic_inventory",
+            "source_commands": ["invarlock evaluate"],
             "guard_rows": [],
-            "model_family_rows": [{"model_family": "gpt2", "status": "observed"}],
+            "model_family_rows": [{"model_family": "gpt2", "status": "indexed"}],
         },
     )
 
@@ -559,7 +621,7 @@ def test_empirical_guard_evidence_check_rejects_malformed_manifest(
     manifest.write_text("{", encoding="utf-8")
     module = _checker_module()
 
-    assert module.main(["empirical", "--root", str(root)]) == 1
+    assert module.main(["empirical-inventory", "--root", str(root)]) == 1
     proc = subprocess.run(
         _checker_command(root),
         text=True,
@@ -569,3 +631,22 @@ def test_empirical_guard_evidence_check_rejects_malformed_manifest(
 
     assert proc.returncode == 1
     assert "not valid JSON" in proc.stderr
+
+
+def test_empirical_guard_inventory_rejects_duplicate_manifest_keys(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "empirical"
+    root.mkdir()
+    (root / "manifest.json").write_text(
+        '{"schema":"invarlock/empirical-guard-inventory-v1",'
+        '"authority":"diagnostic_inventory",'
+        '"authority":"release",'
+        '"source_commands":[],"guard_rows":[],"model_family_rows":[]}',
+        encoding="utf-8",
+    )
+
+    failures = _checker_module().check_empirical_guard_evidence(root=root)
+
+    assert any("ambiguous JSON" in item for item in failures)
+    assert any("duplicate JSON key 'authority'" in item for item in failures)

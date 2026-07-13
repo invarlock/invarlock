@@ -96,6 +96,7 @@ if [ "$NET" = "1" ]; then
   export INVARLOCK_CI_PREVIEW=${INVARLOCK_CI_PREVIEW:-64}
   export INVARLOCK_CI_FINAL=${INVARLOCK_CI_FINAL:-64}
 else
+  export INVARLOCK_ALLOW_NETWORK=0
   export HF_HUB_ENABLE_HF_TRANSFER=0
   export HF_DATASETS_OFFLINE=1
 fi
@@ -105,8 +106,9 @@ if [ "$RUN" = "1" ] && [ "$NET" = "1" ]; then
   smoke_ensure_current_runtime_image "container" "auto"
 fi
 
-# Ensure required Python deps are present when NET=1
-if [ "$NET" = "1" ]; then
+# Dependency bootstrap is an execution side effect, so checklist-only dry runs
+# never install packages even when they render network-enabled commands.
+if [ "$RUN" = "1" ] && [ "$NET" = "1" ]; then
   "$PYTHON_BIN" - << 'PY'
 try:
     import google.protobuf  # noqa: F401
@@ -135,10 +137,7 @@ PY
 fi
 
 echo "# Tiny Models Evaluation Matrix ($STAMP)" > "$TMP_DIR/checklist.md"
-CHECKLIST_ENV="Env: INVARLOCK_DEDUP_TEXTS=1, INVARLOCK_CAPACITY_FAST=1, HF_HUB_ENABLE_HF_TRANSFER=${HF_HUB_ENABLE_HF_TRANSFER:-0}"
-if [ "$NET" = "1" ]; then
-  CHECKLIST_ENV="${CHECKLIST_ENV}, INVARLOCK_ALLOW_NETWORK=1"
-fi
+CHECKLIST_ENV="Env: INVARLOCK_DEDUP_TEXTS=1, INVARLOCK_CAPACITY_FAST=1, INVARLOCK_ALLOW_NETWORK=${INVARLOCK_ALLOW_NETWORK}, HF_HUB_ENABLE_HF_TRANSFER=${HF_HUB_ENABLE_HF_TRANSFER:-0}"
 CHECKLIST_ENV="${CHECKLIST_ENV}, HF_DATASETS_OFFLINE=${HF_DATASETS_OFFLINE:-0}, HF_HOME=${HF_HOME}"
 echo "$CHECKLIST_ENV" >> "$TMP_DIR/checklist.md"
 echo >> "$TMP_DIR/checklist.md"

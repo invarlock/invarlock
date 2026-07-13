@@ -1,4 +1,4 @@
-"""Empirical guard-evidence contract helpers."""
+"""Non-authoritative empirical guard-artifact inventory helpers."""
 
 from __future__ import annotations
 
@@ -7,38 +7,51 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-EMPIRICAL_GUARD_EVIDENCE_SCHEMA = "invarlock/empirical-guard-evidence-v1"
-EMPIRICAL_GUARD_EVIDENCE_CHECK_SCHEMA = "invarlock/empirical-guard-evidence-check-v1"
+EMPIRICAL_GUARD_EVIDENCE_SCHEMA = "invarlock/empirical-guard-inventory-v1"
+EMPIRICAL_GUARD_EVIDENCE_CHECK_SCHEMA = "invarlock/empirical-guard-inventory-check-v1"
+EMPIRICAL_GUARD_EVIDENCE_AUTHORITY = "diagnostic_inventory"
 
 REQUIRED_GUARDS = frozenset({"spectral", "rmt", "variance"})
 ALLOWED_EVIDENCE_KINDS = frozenset(
     {
         "calibration_null_sweep",
         "calibration_ve_sweep",
+        "catalog_evaluation",
         "evidence_pack",
-        "model_evidence_sweep",
         "checkpoint_probe",
     }
 )
 REAL_PRODUCER_MARKERS = (
-    "model-evidence-sweep",
-    "model_evidence_sweep.py",
+    "invarlock evaluate",
+    "evidence-pack seal",
     "calibrate null-sweep",
     "calibrate ve-sweep",
-    "run_pack.sh",
-    "run_suite.sh",
-    "run_model_evidence_remote.py",
 )
 _MANIFEST_OBJECT_ERROR = "empirical guard evidence manifest must be a JSON object."
 
 
+def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in payload:
+            raise ValueError(f"duplicate JSON key {key!r}")
+        payload[key] = value
+    return payload
+
+
 def load_json(path: Path, label: str, failures: list[str]) -> object | None:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        payload: object = json.loads(
+            path.read_text(encoding="utf-8"),
+            object_pairs_hook=_reject_duplicate_keys,
+        )
+        return payload
     except FileNotFoundError:
         failures.append(f"{label} missing: {path}")
     except json.JSONDecodeError as exc:
         failures.append(f"{label} is not valid JSON: {path}: {exc}")
+    except ValueError as exc:
+        failures.append(f"{label} is ambiguous JSON: {path}: {exc}")
     return None
 
 
@@ -53,7 +66,11 @@ def resolve_artifact(
         failures.append(f"{label} artifact must be relative: {value}")
         return None
     root_resolved = root.resolve()
-    candidate = (root_resolved / raw).resolve()
+    unresolved_candidate = root_resolved / raw
+    if unresolved_candidate.is_symlink():
+        failures.append(f"{label} artifact must be a regular file, not a symlink.")
+        return None
+    candidate = unresolved_candidate.resolve()
     try:
         candidate.relative_to(root_resolved)
     except ValueError:
@@ -88,8 +105,8 @@ class GuardEvidenceRow:
                 + "."
             )
         status = self.payload.get("status")
-        if status != "empirical":
-            failures.append(f"{label}.status must be empirical.")
+        if status != "indexed":
+            failures.append(f"{label}.status must be indexed.")
         scope = str(self.payload.get("scope", "")).lower()
         if self.payload.get("synthetic") is True or "synthetic" in scope:
             failures.append(f"{label} must not be synthetic evidence.")
@@ -101,7 +118,7 @@ class GuardEvidenceRow:
         if (
             guard in REQUIRED_GUARDS
             and kind in ALLOWED_EVIDENCE_KINDS
-            and status == "empirical"
+            and status == "indexed"
             and self.payload.get("synthetic") is not True
             and "synthetic" not in scope
         ):
@@ -120,8 +137,8 @@ class ModelFamilyEvidenceRow:
             self.payload.get("model_family"), str
         ) or not self.payload.get("model_family"):
             failures.append(f"{label}.model_family must be a non-empty string.")
-        if self.payload.get("status") not in {"observed", "empirical"}:
-            failures.append(f"{label}.status must be observed or empirical.")
+        if self.payload.get("status") != "indexed":
+            failures.append(f"{label}.status must be indexed.")
         resolve_artifact(root, self.payload.get("artifact"), label, failures)
 
 
@@ -155,6 +172,11 @@ class EmpiricalGuardEvidenceManifest:
         if self.payload.get("schema") != EMPIRICAL_GUARD_EVIDENCE_SCHEMA:
             failures.append(
                 f"empirical guard evidence schema must be {EMPIRICAL_GUARD_EVIDENCE_SCHEMA}."
+            )
+        if self.payload.get("authority") != EMPIRICAL_GUARD_EVIDENCE_AUTHORITY:
+            failures.append(
+                "empirical guard evidence authority must be "
+                f"{EMPIRICAL_GUARD_EVIDENCE_AUTHORITY}."
             )
         self._validate_source_commands(failures)
         self._validate_guard_rows(failures)
@@ -235,6 +257,9 @@ class EmpiricalGuardEvidenceManifest:
             "schema": EMPIRICAL_GUARD_EVIDENCE_CHECK_SCHEMA,
             "root": str(self.root),
             "ok": not failures,
+            "authoritative": False,
+            "authority": EMPIRICAL_GUARD_EVIDENCE_AUTHORITY,
+            "scope": "artifact_inventory_only",
             "failures": failures,
         }
 
@@ -242,6 +267,7 @@ class EmpiricalGuardEvidenceManifest:
 __all__ = [
     "ALLOWED_EVIDENCE_KINDS",
     "EMPIRICAL_GUARD_EVIDENCE_CHECK_SCHEMA",
+    "EMPIRICAL_GUARD_EVIDENCE_AUTHORITY",
     "EMPIRICAL_GUARD_EVIDENCE_SCHEMA",
     "EmpiricalGuardEvidenceManifest",
     "GuardEvidenceRow",
