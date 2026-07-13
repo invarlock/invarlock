@@ -1,0 +1,574 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from invarlock.core.run_baseline_evidence import (
+    _apply_text_pairing_masks,
+    _finalize_text_pairing_dataset_meta,
+    _harvest_tokenizer_hash,
+    _materialize_multimodal_pairing_schedule,
+    load_baseline_pairing_evidence,
+    materialize_baseline_pairing_schedule,
+)
+
+
+def _extract_pairing_schedule(report: dict | None) -> dict | None:
+    if not isinstance(report, dict):
+        return None
+    return report.get("pairing_schedule")
+
+
+def test_load_baseline_pairing_evidence_missing_path(tmp_path: Path) -> None:
+    result = load_baseline_pairing_evidence(
+        baseline_path=tmp_path / "missing.json",
+        tokenizer_hash=None,
+        extract_pairing_schedule_fn=_extract_pairing_schedule,
+    )
+
+    assert result.status == "missing_path"
+    assert result.report_data is None
+    assert result.pairing_schedule is None
+    assert "PAIRING-EVIDENCE-MISSING" in str(result.message)
+
+
+def test_load_baseline_pairing_evidence_parse_failure(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text("{not-json", encoding="utf-8")
+
+    result = load_baseline_pairing_evidence(
+        baseline_path=baseline,
+        tokenizer_hash=None,
+        extract_pairing_schedule_fn=_extract_pairing_schedule,
+    )
+
+    assert result.status == "parse_failed"
+    assert result.report_data is None
+    assert result.pairing_schedule is None
+    assert "JSON parse failed" in str(result.message)
+
+
+def test_load_baseline_pairing_evidence_invalid_schedule(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(
+        json.dumps({"meta": {"tokenizer_hash": "tok"}}), encoding="utf-8"
+    )
+
+    result = load_baseline_pairing_evidence(
+        baseline_path=baseline,
+        tokenizer_hash=None,
+        extract_pairing_schedule_fn=_extract_pairing_schedule,
+    )
+
+    assert result.status == "missing_schedule"
+    assert result.report_data is None
+    assert result.pairing_schedule is None
+    assert "missing or invalid evaluation_windows" in str(result.message)
+
+
+def test_load_baseline_pairing_evidence_invalid_report_preserves_explicit_hash(
+    tmp_path: Path,
+) -> None:
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(json.dumps(["not-a-dict"]), encoding="utf-8")
+
+    result = load_baseline_pairing_evidence(
+        baseline_path=baseline,
+        tokenizer_hash="explicit-hash",
+        extract_pairing_schedule_fn=_extract_pairing_schedule,
+    )
+
+    assert result.status == "invalid_report"
+    assert result.tokenizer_hash == "explicit-hash"
+    assert result.report_data is None
+    assert result.pairing_schedule is None
+
+
+def test_load_baseline_pairing_evidence_merges_schedule_and_harvests_hash(
+    tmp_path: Path,
+) -> None:
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(
+        json.dumps(
+            {
+                "meta": {"tokenizer_hash": "tokhash123"},
+                "evaluation_windows": {
+                    "preview": {"logloss": [0.1]},
+                    "final": {"token_counts": [3]},
+                },
+                "pairing_schedule": {
+                    "preview": {"window_ids": [1], "input_ids": [[1, 2, 3]]},
+                    "final": {"window_ids": [2], "input_ids": [[4, 5, 6]]},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = load_baseline_pairing_evidence(
+        baseline_path=baseline,
+        tokenizer_hash=None,
+        extract_pairing_schedule_fn=_extract_pairing_schedule,
+    )
+
+    assert result.status == "loaded"
+    assert result.tokenizer_hash == "tokhash123"
+    assert result.pairing_schedule == {
+        "preview": {"window_ids": [1], "input_ids": [[1, 2, 3]]},
+        "final": {"window_ids": [2], "input_ids": [[4, 5, 6]]},
+    }
+    assert result.report_data is not None
+    assert result.report_data["evaluation_windows"]["preview"]["window_ids"] == [1]
+    assert result.report_data["evaluation_windows"]["preview"]["logloss"] == [0.1]
+    assert result.report_data["evaluation_windows"]["final"]["token_counts"] == [3]
+
+
+def test_load_baseline_pairing_evidence_builds_missing_windows_and_uses_data_hash(
+    tmp_path: Path,
+) -> None:
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(
+        json.dumps(
+            {
+                "data": {"tokenizer_hash": "tokhash-from-data"},
+                "pairing_schedule": {
+                    "preview": {"window_ids": [7], "input_ids": [[1, 2, 3]]},
+                    "final": "skip-me",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = load_baseline_pairing_evidence(
+        baseline_path=baseline,
+        tokenizer_hash=None,
+        extract_pairing_schedule_fn=_extract_pairing_schedule,
+    )
+
+    assert result.status == "loaded"
+    assert result.tokenizer_hash == "tokhash-from-data"
+    assert result.report_data is not None
+    assert result.report_data["evaluation_windows"] == {
+        "preview": {"window_ids": [7], "input_ids": [[1, 2, 3]]}
+    }
+
+
+def test_harvest_tokenizer_hash_prefers_explicit_override() -> None:
+    report = {
+        "meta": {"tokenizer_hash": "meta-hash"},
+        "data": {"tokenizer_hash": "data-hash"},
+    }
+
+    assert _harvest_tokenizer_hash(report, "explicit-hash") == "explicit-hash"
+
+
+def test_materialize_baseline_pairing_schedule_preserves_mask_counts_and_hashes() -> (
+    None
+):
+    result = materialize_baseline_pairing_schedule(
+        pairing_schedule={
+            "preview": {
+                "window_ids": [10],
+                "input_ids": [[1, 2]],
+                "attention_masks": [[1, 1]],
+                "labels": [[-100, 9]],
+                "masked_token_counts": [1],
+            },
+            "final": {
+                "window_ids": [20],
+                "input_ids": [[3, 4, 5]],
+                "attention_masks": [[1, 1, 1]],
+                "labels": [[8, -100, -100]],
+                "masked_token_counts": [1],
+            },
+        },
+        calibration_data=[],
+        dataset_meta={},
+        window_plan=None,
+        tokenizer=object(),
+        use_mlm=True,
+        mask_prob=0.15,
+        mask_seed=43,
+        random_token_prob=0.1,
+        original_token_prob=0.1,
+        resolved_tier="balanced",
+        profile="ci",
+        apply_mlm_masks_fn=lambda *args, **kwargs: (0, []),
+        resolve_pm_min_tokens_target_fn=lambda **kwargs: 4,
+        hash_sequences_fn=lambda seqs: f"hash-{len(list(seqs))}",
+        tensor_or_list_to_ints_fn=lambda values: list(values),
+    )
+
+    assert result.preview_count == 1
+    assert result.final_count == 1
+    assert result.calibration_data[0]["window_id"] == "preview::10"
+    assert result.calibration_data[1]["window_id"] == "final::20"
+    assert result.preview_mask_counts == [1]
+    assert result.final_mask_counts == [1]
+    assert result.dataset_meta["dataset_hash"] == "a538ec9757cc6936907c9089cfa0209a"
+    assert result.window_plan is not None
+    assert result.window_plan["tokens_floor_met"] is True
+    assert result.dataset_meta["masked_tokens_total"] == 2
+
+
+def test_materialize_baseline_pairing_schedule_preserves_seq2seq_labels_without_mlm_masks() -> (
+    None
+):
+    result = materialize_baseline_pairing_schedule(
+        pairing_schedule={
+            "preview": {
+                "window_ids": [10],
+                "input_ids": [[1, 2, 3]],
+                "attention_masks": [[1, 1, 1]],
+                "labels": [[101, 102, 1]],
+            },
+            "final": {
+                "window_ids": [20],
+                "input_ids": [[4, 5, 6, 7]],
+                "attention_masks": [[1, 1, 1, 1]],
+                "labels": [[201, 202, 203, 1]],
+            },
+        },
+        calibration_data=[],
+        dataset_meta={},
+        window_plan=None,
+        tokenizer=None,
+        use_mlm=False,
+        mask_prob=0.0,
+        mask_seed=43,
+        random_token_prob=0.0,
+        original_token_prob=0.0,
+        resolved_tier="balanced",
+        profile="release",
+        apply_mlm_masks_fn=lambda *args, **kwargs: (0, []),
+        resolve_pm_min_tokens_target_fn=lambda **kwargs: 4,
+        hash_sequences_fn=lambda seqs: f"hash-{len(list(seqs))}",
+        tensor_or_list_to_ints_fn=lambda values: list(values),
+    )
+
+    assert result.preview_records[0]["labels"] == [101, 102, 1]
+    assert result.final_records[0]["labels"] == [201, 202, 203, 1]
+    assert "mlm_masked" not in result.preview_records[0]
+    assert "mlm_masked" not in result.final_records[0]
+    assert "masked_tokens_total" not in result.dataset_meta
+
+
+def test_materialize_baseline_pairing_schedule_fails_when_masks_missing() -> None:
+    try:
+        materialize_baseline_pairing_schedule(
+            pairing_schedule={
+                "preview": {
+                    "input_ids": [[1, 2]],
+                    "attention_masks": [[1, 1]],
+                },
+                "final": {
+                    "input_ids": [[3, 4]],
+                    "attention_masks": [[1, 1]],
+                },
+            },
+            calibration_data=[],
+            dataset_meta={},
+            window_plan=None,
+            tokenizer=object(),
+            use_mlm=True,
+            mask_prob=0.15,
+            mask_seed=43,
+            random_token_prob=0.1,
+            original_token_prob=0.1,
+            resolved_tier="balanced",
+            profile="dev",
+            apply_mlm_masks_fn=lambda *args, **kwargs: (0, [0]),
+            resolve_pm_min_tokens_target_fn=lambda **kwargs: 4,
+            hash_sequences_fn=lambda seqs: "hash",
+            tensor_or_list_to_ints_fn=lambda values: list(values),
+        )
+    except ValueError as exc:
+        assert "provided no masked tokens for preview windows" in str(exc)
+    else:  # pragma: no cover - defensive
+        raise AssertionError("expected ValueError")
+
+
+def test_materialize_baseline_pairing_schedule_applies_missing_preview_masks_and_preserves_existing_meta() -> (
+    None
+):
+    applied_prefixes: list[str] = []
+    dataset_meta = {
+        "preview_hash": "existing-preview",
+        "final_hash": "existing-final",
+        "dataset_hash": "existing-dataset",
+        "preview_total_tokens": 11,
+        "final_total_tokens": 13,
+    }
+    window_plan = {"capacity": {"estimated": 4}}
+
+    result = materialize_baseline_pairing_schedule(
+        pairing_schedule={
+            "preview": {
+                "input_ids": [[1, 2]],
+                "attention_masks": [[0, 0]],
+                "labels": [[-100, -100]],
+                "masked_token_counts": ["bad-count"],
+            },
+            "final": {
+                "window_ids": [9],
+                "input_ids": [[3, 4]],
+                "attention_masks": [[1, 1]],
+                "labels": [[7, -100]],
+                "masked_token_counts": [1],
+            },
+        },
+        calibration_data=[],
+        dataset_meta=dataset_meta,
+        window_plan=window_plan,
+        tokenizer=object(),
+        use_mlm=True,
+        mask_prob=0.15,
+        mask_seed=43,
+        random_token_prob=0.1,
+        original_token_prob=0.1,
+        resolved_tier="balanced",
+        profile="release",
+        apply_mlm_masks_fn=lambda records, **kwargs: (
+            applied_prefixes.append(str(kwargs["prefix"])) or 2,
+            [2],
+        ),
+        resolve_pm_min_tokens_target_fn=lambda **kwargs: 10,
+        hash_sequences_fn=lambda seqs: f"hash-{len(list(seqs))}",
+        tensor_or_list_to_ints_fn=lambda values: list(values),
+    )
+
+    assert applied_prefixes == ["preview"]
+    assert result.preview_mask_counts == [2]
+    assert result.final_mask_counts == [1]
+    assert result.preview_mask_total == 2
+    assert result.final_mask_total == 1
+    assert result.calibration_data[1]["window_id"] == "final::9"
+    assert result.dataset_meta["preview_hash"] == "existing-preview"
+    assert result.dataset_meta["final_hash"] == "existing-final"
+    assert result.dataset_meta["dataset_hash"] == "existing-dataset"
+    assert result.dataset_meta["window_capacity"] == {"estimated": 4}
+    assert result.window_plan is window_plan
+    assert result.window_plan["preview_total_tokens"] == 11
+    assert result.window_plan["final_total_tokens"] == 2
+
+
+def test_materialize_baseline_pairing_schedule_fails_when_final_masks_missing() -> None:
+    try:
+        materialize_baseline_pairing_schedule(
+            pairing_schedule={
+                "preview": {
+                    "input_ids": [[1, 2]],
+                    "attention_masks": [[1, 1]],
+                    "labels": [[9, -100]],
+                    "masked_token_counts": [1],
+                },
+                "final": {
+                    "input_ids": [[3, 4]],
+                    "attention_masks": [[1, 1]],
+                },
+            },
+            calibration_data=[],
+            dataset_meta={},
+            window_plan=None,
+            tokenizer=object(),
+            use_mlm=True,
+            mask_prob=0.15,
+            mask_seed=43,
+            random_token_prob=0.1,
+            original_token_prob=0.1,
+            resolved_tier="balanced",
+            profile="dev",
+            apply_mlm_masks_fn=lambda *args, **kwargs: (0, [0]),
+            resolve_pm_min_tokens_target_fn=lambda **kwargs: 4,
+            hash_sequences_fn=lambda seqs: "hash",
+            tensor_or_list_to_ints_fn=lambda values: list(values),
+        )
+    except ValueError as exc:
+        assert "provided no masked tokens for final windows" in str(exc)
+    else:  # pragma: no cover - defensive
+        raise AssertionError("expected ValueError")
+
+
+def test_materialize_baseline_pairing_schedule_supports_multimodal_records() -> None:
+    result = materialize_baseline_pairing_schedule(
+        pairing_schedule={
+            "preview": {
+                "example_ids": ["ex-1"],
+                "records": [{"id": "ex-1", "prompt": "what is shown?"}],
+                "processor_sha256": "proc-123",
+            },
+            "final": {
+                "example_ids": ["ex-2"],
+                "records": [{"id": "ex-2", "prompt": "what changed?"}],
+            },
+        },
+        calibration_data=[],
+        dataset_meta={},
+        window_plan=None,
+        tokenizer=object(),
+        use_mlm=False,
+        mask_prob=0.15,
+        mask_seed=43,
+        random_token_prob=0.1,
+        original_token_prob=0.1,
+        resolved_tier="balanced",
+        profile="dev",
+        apply_mlm_masks_fn=lambda *args, **kwargs: (0, []),
+        resolve_pm_min_tokens_target_fn=lambda **kwargs: 4,
+        hash_sequences_fn=lambda seqs: "unused",
+        tensor_or_list_to_ints_fn=lambda values: list(values),
+    )
+
+    assert result.preview_count == 1
+    assert result.final_count == 1
+    assert result.calibration_data[0]["example_id"] == "ex-1"
+    assert result.calibration_data[1]["window_id"] == "final::0"
+    assert result.preview_records[0]["window_id"] == "preview::0"
+    assert result.final_records[0]["example_id"] == "ex-2"
+    assert result.dataset_meta["provider_kind"] == "vision_text"
+    assert result.dataset_meta["processor_sha256"] == "proc-123"
+    assert result.preview_mask_total == 0
+    assert result.final_mask_total == 0
+
+
+def test_materialize_multimodal_pairing_schedule_derives_ids_and_preserves_window_plan() -> (
+    None
+):
+    window_plan = {"source": "provided"}
+
+    result = _materialize_multimodal_pairing_schedule(
+        pairing_schedule={
+            "preview": {"records": [{"id": "preview-1", "prompt": "preview"}]},
+            "final": {"records": [{"example_id": "final-1", "prompt": "final"}]},
+        },
+        calibration_data=[],
+        dataset_meta={},
+        window_plan=window_plan,
+    )
+
+    assert result.preview_count == 1
+    assert result.final_count == 1
+    assert result.preview_records[0]["example_id"] == "preview-1"
+    assert result.final_records[0]["example_id"] == "final-1"
+    assert result.window_plan is window_plan
+    assert "processor_sha256" not in result.dataset_meta
+
+
+def test_materialize_multimodal_pairing_rehydrates_authenticated_runtime_paths() -> (
+    None
+):
+    binding = {
+        "image_ref": "images/demo.ppm",
+        "image_sha256": "a" * 64,
+        "prompt_sha256": "b" * 64,
+        "answer_sha256": "c" * 64,
+        "record_sha256": "d" * 64,
+    }
+    result = _materialize_multimodal_pairing_schedule(
+        pairing_schedule={
+            "preview": {
+                "example_ids": ["preview-1"],
+                "records": [{"id": "preview-1", "prompt": "what?", **binding}],
+            },
+            "final": {
+                "example_ids": ["final-1"],
+                "records": [{"id": "final-1", "prompt": "where?", **binding}],
+            },
+        },
+        calibration_data=[
+            {
+                "id": "preview-1",
+                "example_id": "preview-1",
+                "image_path": "/runtime/preview.ppm",
+                "source_file": "/runtime/manifest.jsonl",
+                **binding,
+            },
+            {
+                "id": "final-1",
+                "example_id": "final-1",
+                "image_path": "/runtime/final.ppm",
+                "source_file": "/runtime/manifest.jsonl",
+                **binding,
+            },
+        ],
+        dataset_meta={},
+        window_plan=None,
+    )
+
+    assert len(result.calibration_data) == 2
+    assert result.preview_records[0]["image_path"] == "/runtime/preview.ppm"
+    assert result.final_records[0]["image_path"] == "/runtime/final.ppm"
+    assert result.final_records[0]["window_id"] == "final::0"
+
+
+def test_materialize_multimodal_pairing_rejects_changed_runtime_binding() -> None:
+    with pytest.raises(ValueError, match="binding does not match"):
+        _materialize_multimodal_pairing_schedule(
+            pairing_schedule={
+                "preview": {
+                    "example_ids": ["ex-1"],
+                    "records": [{"id": "ex-1", "image_sha256": "a" * 64}],
+                },
+                "final": {"example_ids": [], "records": []},
+            },
+            calibration_data=[
+                {
+                    "id": "ex-1",
+                    "image_path": "/runtime/ex-1.ppm",
+                    "image_sha256": "b" * 64,
+                }
+            ],
+            dataset_meta={},
+            window_plan=None,
+        )
+
+
+def test_apply_text_pairing_masks_tolerates_empty_preview_and_final_sections() -> None:
+    preview_total, preview_counts, final_total, final_counts = (
+        _apply_text_pairing_masks(
+            materialized=[],
+            preview_count=0,
+            final_count=0,
+            tokenizer=object(),
+            mask_prob=0.15,
+            mask_seed=43,
+            random_token_prob=0.1,
+            original_token_prob=0.1,
+            apply_mlm_masks_fn=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                AssertionError("masking should not run")
+            ),
+        )
+    )
+
+    assert preview_total == 0
+    assert final_total == 0
+    assert preview_counts == []
+    assert final_counts == []
+
+
+def test_finalize_text_pairing_dataset_meta_skips_truthy_non_mapping_window_plan() -> (
+    None
+):
+    dataset_meta, window_plan = _finalize_text_pairing_dataset_meta(
+        pairing_schedule={
+            "preview": {"input_ids": [[1, 2]], "attention_masks": [[1, 1]]},
+            "final": {"input_ids": [[3, 4]], "attention_masks": [[1, 1]]},
+        },
+        dataset_meta={},
+        window_plan="external-plan",
+        resolved_tier="balanced",
+        profile="dev",
+        resolve_pm_min_tokens_target_fn=lambda **_kwargs: 10,
+        hash_sequences_fn=lambda seqs: f"hash-{len(list(seqs))}",
+        tensor_or_list_to_ints_fn=lambda values: list(values),
+    )
+
+    assert dataset_meta["preview_total_tokens"] == 2
+    assert dataset_meta["final_total_tokens"] == 2
+    assert dataset_meta["preview_hash"] == "hash-1"
+    assert dataset_meta["final_hash"] == "hash-1"
+    assert "min_tokens_target" not in dataset_meta
+    assert window_plan == "external-plan"

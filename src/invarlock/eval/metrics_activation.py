@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import Any, cast
 
 import torch
@@ -74,6 +75,7 @@ def _mi_gini_optimized_cpu_path(
     targ_cpu: torch.Tensor,
     max_per_layer: int,
     config: MetricsConfig,
+    mi_scores_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
 ) -> float:
     l_count, sample_count, _ = feats_cpu.shape
     if l_count <= 0:
@@ -83,11 +85,6 @@ def _mi_gini_optimized_cpu_path(
         feats_cpu = feats_cpu[:, sel, :]
         targ_cpu = targ_cpu[sel]
 
-    dep_manager = DependencyManager()
-    if not dep_manager.is_available("mi_scores"):
-        return float("nan")
-
-    mi_scores_fn = dep_manager.get_module("mi_scores")
     chunk_size = min(8, l_count)
     mi_scores_all: list[torch.Tensor] = []
 
@@ -226,7 +223,6 @@ def _collect_activations(
     hidden_states_list: list[torch.Tensor] = []
     fc1_activations_list: list[torch.Tensor] = []
     targets_list: list[torch.Tensor] = []
-    first_batch = None
 
     total_batches = (
         min(config.oracle_windows, len(dataloader))
@@ -239,12 +235,6 @@ def _collect_activations(
             break
 
         try:
-            if first_batch is None:
-                first_batch = {
-                    k: v.to(device) if isinstance(v, torch.Tensor) else v
-                    for k, v in batch.items()
-                }
-
             input_ids = batch["input_ids"].to(device)
             if input_ids.shape[1] > config.max_tokens:
                 input_ids = input_ids[:, : config.max_tokens]
@@ -277,7 +267,6 @@ def _collect_activations(
         "hidden_states": hidden_states_list,
         "fc1_activations": fc1_activations_list,
         "targets": targets_list,
-        "first_batch": first_batch,
     }
 
 
@@ -329,56 +318,43 @@ def _extract_fc1_activations(
 
 def _calculate_sigma_max(
     model: nn.Module,
-    first_batch: dict | None,
     dep_manager: DependencyManager,
     config: MetricsConfig,
-    device: torch.device,
 ) -> float:
     if not dep_manager.is_available("scan_model_gains"):
         logger.info("Skipping σ_max: scan_model_gains not available")
         return float("nan")
 
-    if first_batch is None:
-        logger.info("Skipping σ_max: no data batch available")
-        return float("nan")
-
     try:
         scan_model_gains = dep_manager.get_module("scan_model_gains")
-        gains_df = scan_model_gains(model, first_batch)
-        if gains_df is None:
-            logger.warning("scan_model_gains returned None")
+        scan = scan_model_gains(model)
+        if not isinstance(scan, dict):
+            logger.warning("scan_model_gains returned an invalid result")
             return float("nan")
 
-        if hasattr(gains_df, "columns") and "name" in gains_df.columns:
-            mask = ~gains_df["name"].str.contains(
-                "embed|lm_head", case=False, regex=True
-            )
-            filtered_gains = gains_df[mask]
-        else:
-            logger.info("Could not filter layers by name for σ_max")
-            filtered_gains = gains_df
-
-        if len(filtered_gains) == 0:
-            logger.warning("No valid layers found for σ_max computation")
+        spectral_norms = scan.get("spectral_norms")
+        if not isinstance(spectral_norms, list | tuple) or not spectral_norms:
+            logger.warning("No spectral norms found for σ_max computation")
             return float("nan")
 
-        gains_values = getattr(
-            filtered_gains, "gain", getattr(filtered_gains, "values", [])
-        )
-        gains_tensor = torch.as_tensor(gains_values, dtype=torch.float32, device=device)
+        # The canonical scanner returns host scalars after measuring weights on
+        # their native devices.  Keep the summary on CPU to avoid a pointless
+        # accelerator allocation and synchronization for a short vector.
+        gains_tensor = torch.as_tensor(spectral_norms, dtype=torch.float32)
         if gains_tensor.numel() == 0:
             logger.warning("No gain values found")
             return float("nan")
 
-        gains_tensor = validator.validate_tensor(
-            gains_tensor, "sigma_max_gains", config
-        )
         finite_mask = torch.isfinite(gains_tensor)
         if not finite_mask.any():
             logger.warning("All σ_max gains are NaN/Inf")
             return float("nan")
 
-        sigma_max = torch.max(gains_tensor[finite_mask]).item()
+        gains_tensor = validator.validate_tensor(
+            gains_tensor[finite_mask], "sigma_max_gains", config
+        )
+
+        sigma_max = torch.max(gains_tensor).item()
         logger.debug(f"Calculated σ_max: {sigma_max:.4f}")
         return sigma_max
     except _ACTIVATION_ERRORS as e:
@@ -421,7 +397,7 @@ def _calculate_mi_gini(
     config: MetricsConfig,
     device: torch.device,
 ) -> float:
-    del model
+    del model, device
     if not dep_manager.is_available("mi_scores"):
         logger.info("Skipping MI-Gini: mi_scores not available")
         return float("nan")
@@ -447,30 +423,18 @@ def _calculate_mi_gini(
         fc1_flat = InputValidator.validate_tensor(fc1_flat, "mi_gini_features", config)
         targ_flat = InputValidator.validate_tensor(targ_flat, "mi_gini_targets", config)
 
-        mi_scores_fn = dep_manager.get_module("mi_scores")
-
-        try:
-            logger.debug("Attempting MI-Gini calculation on GPU")
-            mi_scores_result = mi_scores_fn(fc1_flat, targ_flat)
-            mi_gini = _gini_vectorized(mi_scores_result)
-            logger.debug(f"Calculated MI-Gini (GPU): {mi_gini:.6f}")
-            return mi_gini
-        except RuntimeError as e:
-            if "out of memory" not in str(e).lower():
-                raise
-
-            logger.warning("GPU OOM for MI-Gini, falling back to CPU")
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-
-            mi_gini = _mi_gini_optimized_cpu_path(
-                fc1_flat.cpu().float(),
-                targ_flat.cpu(),
-                config.max_samples_per_layer,
-                config,
-            )
-            logger.debug(f"Calculated MI-Gini (CPU): {mi_gini:.6f}")
-            return mi_gini
+        # scikit-learn's mutual-information estimator is CPU-only and accepts
+        # one [samples, neurons] matrix at a time.  Score each layer explicitly
+        # instead of passing the former fictional 3-D lens contract through.
+        mi_gini = _mi_gini_optimized_cpu_path(
+            fc1_flat.cpu().float(),
+            targ_flat.cpu(),
+            config.max_samples_per_layer,
+            config,
+            dep_manager.get_module("mi_scores"),
+        )
+        logger.debug(f"Calculated MI-Gini (CPU): {mi_gini:.6f}")
+        return mi_gini
     except _ACTIVATION_ERRORS as e:
         logger.warning(f"MI-Gini calculation failed: {e}")
         return float("nan")

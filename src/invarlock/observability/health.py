@@ -604,7 +604,7 @@ def create_health_endpoint():
                     self.send_header("Content-type", "application/json")
                     self.end_headers()
 
-                    response = json.dumps(health_summary, indent=2)
+                    response = json.dumps(health_summary, indent=2, allow_nan=False)
                     self.wfile.write(response.encode())
                 else:
                     self.send_response(404)

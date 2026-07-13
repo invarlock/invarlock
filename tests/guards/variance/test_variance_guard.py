@@ -74,6 +74,12 @@ def _make_policy(**overrides):
     return base
 
 
+@pytest.mark.parametrize("mode", ["CI", "nonsense", " ci ", ""])
+def test_variance_guard_rejects_noncanonical_policy_mode(mode: str) -> None:
+    with pytest.raises(ValueError, match="mode must be exactly"):
+        VarianceGuard({"mode": mode})
+
+
 def test_equalise_residual_variance_allows_empty_dataloader() -> None:
     model = DummyModel()
     calibrations = []
@@ -166,7 +172,9 @@ def test_variance_guard_ci_gate_enables_on_small_gain() -> None:
     finalize = guard.finalize(model)
     assert finalize["passed"], finalize
     metrics = finalize["metrics"]
-    assert metrics["ve_enabled"] is True
+    assert metrics["ve_enabled_during_validation"] is True
+    assert metrics["ve_enabled"] is False
+    assert metrics["subject_restored_after_ab"] is True
     assert metrics["ratio_ci"] is not None
     assert metrics["ratio_ci"][1] <= 0.999
     assert "calibration" in metrics
@@ -316,6 +324,11 @@ def test_variance_guard_enables_when_log_effect_exceeds_threshold():
     guard._ppl_no_ve = 50.0
     guard._ppl_with_ve = 49.94  # ~0.0012 log improvement
     guard._ratio_ci = (0.90, 0.995)
+    guard._predictive_gate_state = {
+        "evaluated": True,
+        "passed": True,
+        "reason": "ci_gain_met",
+    }
 
     should_enable, reason = guard._evaluate_ab_gate()
     assert should_enable, reason

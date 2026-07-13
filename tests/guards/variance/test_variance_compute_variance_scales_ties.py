@@ -38,3 +38,25 @@ def test_compute_variance_scales_ties_and_trim_order(monkeypatch):
     # We expect both >=1.0 entries to be kept and the <1.0 entry dropped
     assert set(out.keys()).issubset({"block0.mlp", "block2.mlp"})
     assert "block1.attn" not in out
+
+
+def test_compute_variance_scales_uses_module_name_for_exact_ties(monkeypatch):
+    monkeypatch.setattr(
+        variance_scaling_mod,
+        "equalise_residual_variance",
+        lambda *_args, **_kwargs: {"z.module": 1.125, "a.module": 0.875},
+    )
+    guard = VarianceGuard(
+        policy={
+            "scope": "both",
+            "max_calib": 0,
+            "deadband": 0.0,
+            "min_abs_adjust": 0.2,
+            "max_scale_step": 0.02,
+            "topk_backstop": 1,
+        }
+    )
+
+    result = guard._compute_variance_scales(nn.Linear(2, 2, bias=False), [])
+
+    assert result == {"a.module": 0.98}

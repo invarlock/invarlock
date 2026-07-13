@@ -62,6 +62,7 @@ class PrimaryMetric(Protocol):
     kind: str
     unit: str
     direction: str  # "lower" | "higher"
+    guard_degradation_basis: str  # "relative_increase" | "absolute_drop"
     aggregation_scope: str  # "token" | "sequence" | "example"
     paired: bool
     gating_basis: str  # "point" | "upper" | "lower"
@@ -163,6 +164,7 @@ class _PPLCausal(PrimaryMetric):
     kind = "ppl_causal"
     unit = "ppl"
     direction = "lower"
+    guard_degradation_basis = "relative_increase"
     aggregation_scope = "token"
     paired = True
     gating_basis = "upper"  # typical gate on ratio upper-bound
@@ -372,6 +374,7 @@ class _Accuracy:
     kind = "accuracy"
     unit = "accuracy"
     direction = "higher"
+    guard_degradation_basis = "absolute_drop"
     aggregation_scope = "example"
     paired = True
     gating_basis = "lower"
@@ -564,8 +567,9 @@ def compute_primary_metric_from_report(
     """Compute a primary metric snapshot from a run report (Phase 1 helper).
 
     Returns a dict that can be attached to report["metrics"]["primary_metric"].
-    Includes preview/final points and (when baseline is present) a simple ratio
-    vs baseline based on baseline ppl_final.
+    Includes preview/final points and a kind-specific baseline comparison when
+    a compatible baseline is present: ``ratio_vs_baseline`` for perplexity and
+    ``delta_vs_baseline_pp`` for accuracy.
     """
     metric = get_metric(kind)
     windows = report.get("evaluation_windows") if isinstance(report, dict) else None
@@ -616,7 +620,7 @@ def compute_primary_metric_from_report(
 
     if not preview_win and not final_win:
         # Nothing to compute from
-        return {
+        payload = {
             "kind": metric.kind,
             "unit": metric.unit,
             "direction": metric.direction,
@@ -626,44 +630,16 @@ def compute_primary_metric_from_report(
             "supports_bootstrap": metric.supports_bootstrap,
             "preview": float("nan"),
             "final": float("nan"),
-            "ratio_vs_baseline": float("nan"),
             "invalid": True,
             "degraded": True,
             "degraded_reason": "non_finite_pm",
         }
-    # For accuracy kinds, derive counts from input_ids if aggregates are missing
-    if kind == "accuracy":
-
-        def _ensure_counts(win: dict[str, Any]) -> dict[str, Any]:
-            total = _coerce_float(win.get("total"))
-            has_counts = (
-                isinstance(win.get("correct_total"), int | float)
-                and total is not None
-                and total > 0
-            )
-            if has_counts:
-                return win
-            # Try to derive from input_ids deterministically
-            recs = []
-            seqs = (
-                win.get("input_ids") if isinstance(win.get("input_ids"), list) else []
-            )
-            if isinstance(seqs, list) and seqs:
-                for seq in seqs:
-                    if isinstance(seq, list):
-                        recs.append({"input_ids": seq})
-            if recs:
-                c, n = compute_accuracy_counts(recs)
-                return {"correct_total": int(c), "total": int(n)}
-            return win
-
-        preview_win = _ensure_counts(preview_win)
-        final_win = _ensure_counts(final_win)
-
+        return payload
     preview_point = metric.point_from_windows(windows=preview_win)
     final_point = metric.point_from_windows(windows=final_win)
 
     ratio_vs_baseline = float("nan")
+    delta_vs_baseline_pp = float("nan")
 
     def _is_finite(value: Any) -> bool:
         return isinstance(value, (int, float)) and math.isfinite(float(value))
@@ -692,7 +668,7 @@ def compute_primary_metric_from_report(
                 if is_ppl_like and base_value > 0:
                     ratio_vs_baseline = float(final_point) / base_value
                 elif str(kind).lower() == "accuracy" and 0 <= base_value <= 1:
-                    ratio_vs_baseline = float(final_point) - base_value
+                    delta_vs_baseline_pp = 100.0 * (float(final_point) - base_value)
 
     invalid = True
     invalid = not (_is_finite(preview_point) and _is_finite(final_point))
@@ -712,10 +688,13 @@ def compute_primary_metric_from_report(
         "supports_bootstrap": metric.supports_bootstrap,
         "preview": preview_point,
         "final": final_point,
-        "ratio_vs_baseline": ratio_vs_baseline,
         "invalid": invalid,
         "degraded": degraded,
     }
+    if kind == "accuracy" and _is_finite(delta_vs_baseline_pp):
+        payload["delta_vs_baseline_pp"] = delta_vs_baseline_pp
+    elif kind != "accuracy" and _is_finite(ratio_vs_baseline):
+        payload["ratio_vs_baseline"] = ratio_vs_baseline
     if degraded and degraded_reason:
         payload["degraded_reason"] = degraded_reason
     # Carry counts for accuracy to aid gating

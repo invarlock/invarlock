@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version as pkg_version
 from pathlib import Path
 from typing import Any
+
+from invarlock.core.installed_distribution import installed_distribution_version
+from invarlock.core.runtime_observation import observe_model_runtime
 
 BACKEND_INVENTORY_SCHEMA = "invarlock/backend-inventory-v1"
 BACKEND_INVENTORY_FILENAME = "backend_inventory.json"
@@ -23,7 +24,6 @@ _QUANTIZED_ADAPTER_BACKENDS = {
     "hf_ct": "compressed-tensors",
 }
 
-_VERSION_ERRORS = (PackageNotFoundError, OSError, RuntimeError, TypeError, ValueError)
 _ADAPTER_PROVENANCE_FAMILY_MAP: dict[str, tuple[str, str, list[str]]] = {
     "hf_gptq": ("gptq", "gptqmodel", []),
     "hf_awq": ("awq", "gptqmodel", []),
@@ -53,10 +53,7 @@ def quantized_adapter_backend(adapter_name: str | None) -> str | None:
 
 
 def _package_version(name: str) -> str | None:
-    try:
-        return pkg_version(name)
-    except _VERSION_ERRORS:
-        return None
+    return installed_distribution_version(name)
 
 
 def extract_adapter_provenance(adapter_name: str) -> AdapterProvenance:
@@ -66,14 +63,16 @@ def extract_adapter_provenance(adapter_name: str) -> AdapterProvenance:
     )
 
     try:
-        version = pkg_version(library)
+        version = installed_distribution_version(library)
+        if version is None:
+            raise RuntimeError(f"distribution metadata unavailable: {library}")
         supported = True if (not tested or version in tested) else False
         message = (
             None
             if supported
             else f"Use Compare & Evaluate (BYOE); {library} version unsupported (tested: {tested})"
         )
-    except _VERSION_ERRORS:
+    except (OSError, RuntimeError, TypeError, ValueError):
         version = None
         supported = False
         message = f"{library} not available; prefer Compare & Evaluate (BYOE) or install extras."
@@ -164,6 +163,7 @@ def build_backend_inventory_for_adapter(
         "quantization_config": dict(quantization_config or {}),
         "quantized_module_count": module_inventory["count"],
         "quantized_module_types": module_inventory["types"],
+        "quantized_observation_kinds": module_inventory["kinds"],
         "device_map": "unknown",
         "memory_footprint": memory_footprint,
         "load_smoke": bool(load_smoke),
@@ -177,48 +177,58 @@ def _quantized_module_inventory(
     adapter: str,
 ) -> dict[str, Any]:
     if model is None:
-        return {"count": 0, "types": []}
+        return {"count": 0, "types": [], "kinds": [], "modules": {}}
 
     adapter_key = str(adapter or "").strip().lower()
     type_names: set[str] = set()
+    kinds: set[str] = set()
+    module_types: dict[str, str] = {}
     count = 0
-    modules_fn = getattr(model, "modules", None)
-    if not callable(modules_fn):
-        return {"count": 0, "types": []}
+    observed, observations = observe_model_runtime(model)
+    if not observed:
+        return {"count": 0, "types": [], "kinds": [], "modules": {}}
 
-    for module in modules_fn():
-        module_type = type(module)
-        fqcn = f"{module_type.__module__}.{module_type.__name__}"
+    if adapter_key != "hf_ct":
+        # Imported lazily to avoid a module cycle while keeping both sidecar
+        # producers on the exact same family and live-class identity policy.
+        from invarlock.core.runtime_quantization_proof import (  # noqa: PLC0415
+            _MODULE_RECOGNIZERS,
+            _live_quantization_method,
+        )
+
+        recognizer = _MODULE_RECOGNIZERS.get(adapter_key)
+        quantization_method = _live_quantization_method(model)
+    else:
+        recognizer = None
+        quantization_method = None
+
+    for observation in observations:
+        fqcn = observation.fqcn
         normalized = fqcn.lower()
-        is_quantized = False
-        if adapter_key == "hf_bnb":
-            is_quantized = "bitsandbytes" in normalized
-        elif adapter_key == "hf_awq":
-            is_quantized = (
-                "awq" in normalized
-                or "gptqmodel" in normalized
-                or "qlinear" in normalized
-                or "wqlinear" in normalized
-            )
-        elif adapter_key == "hf_gptq":
-            is_quantized = "gptq" in normalized or "quantlinear" in normalized
-        elif adapter_key == "hf_torchao":
-            is_quantized = "torchao" in normalized or "affinequantized" in normalized
-        elif adapter_key == "hf_hqq":
-            is_quantized = "hqq" in normalized or "hqqlinear" in normalized
-        elif adapter_key == "hf_quanto":
-            is_quantized = "optimum.quanto" in normalized or ".quanto." in normalized
-        elif adapter_key == "hf_ct":
+        if adapter_key == "hf_ct":
             is_quantized = (
                 "compressed_tensors" in normalized
                 or "compressedtensors" in normalized
                 or "compressedlinear" in normalized
             )
+        else:
+            is_quantized = bool(
+                recognizer
+                and recognizer(observation.value, normalized, quantization_method)
+            )
         if not is_quantized:
             continue
         count += 1
         type_names.add(fqcn)
-    return {"count": count, "types": sorted(type_names)}
+        kinds.add(observation.kind)
+        if observation.kind == "module":
+            module_types[observation.path] = fqcn
+    return {
+        "count": count,
+        "types": sorted(type_names),
+        "kinds": sorted(kinds),
+        "modules": dict(sorted(module_types.items())),
+    }
 
 
 def _memory_footprint(model: Any | None) -> dict[str, Any]:
@@ -254,7 +264,8 @@ def write_backend_inventory_sidecar(
     output_path.mkdir(parents=True, exist_ok=True)
     sidecar_path = output_path / BACKEND_INVENTORY_FILENAME
     sidecar_path.write_text(
-        json.dumps(inventory_payload, indent=2, ensure_ascii=False) + "\n",
+        json.dumps(inventory_payload, indent=2, ensure_ascii=False, allow_nan=False)
+        + "\n",
         encoding="utf-8",
     )
     return sidecar_path

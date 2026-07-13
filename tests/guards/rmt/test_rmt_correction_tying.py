@@ -54,7 +54,7 @@ def test_apply_rmt_correction_conv1d_and_multi_param_loop_paths(caplog):
 
     layer = Conv1D(4, 4)
     with torch.no_grad():
-        layer.weight.mul_(50.0)
+        layer.weight.fill_(50.0)
 
     tied_param = torch.nn.Parameter(torch.ones_like(layer.weight))
 

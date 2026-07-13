@@ -20,7 +20,7 @@ class TinyModel(nn.Module):
         self.transformer.h = nn.ModuleList([TinyBlock(d)])
 
 
-def test_enable_partial_success_and_disable_inverse_revert():
+def test_enable_rejects_partial_target_coverage_without_mutation():
     model = TinyModel()
     g = VarianceGuard(policy={"scope": "both", "min_gain": 0.0, "max_calib": 0})
 
@@ -39,13 +39,10 @@ def test_enable_partial_success_and_disable_inverse_revert():
     for name, module in targets.items():
         before[name] = module.weight.detach().clone()
 
-    assert g.enable(model) is True
-    assert g._enabled is True
-
-    # Disable with empty checkpoint stack triggers inverse scaling path
-    assert g.disable(model) is True
+    assert g.enable(model) is False
     assert g._enabled is False
+    assert g.disable(model) is True
 
-    # Weights restored for the good_name module
+    # The valid target was never partially mutated.
     restored = targets[good_name].weight.detach()
-    assert torch.allclose(restored, before[good_name])
+    assert torch.equal(restored, before[good_name])

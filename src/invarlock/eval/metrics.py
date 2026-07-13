@@ -70,9 +70,18 @@ class MetricsEnvironmentReport:
 
 def get_metrics_info() -> dict[str, Any]:
     dep_manager = DependencyManager()
+    available_metrics = ["sigma_max", "head_energy"]
+    unavailable_metrics: dict[str, str] = {}
+    available_dependencies: list[str] = []
+    if dep_manager.is_available("mi_scores"):
+        available_metrics.append("mi_gini")
+        available_dependencies.append("scikit-learn")
+    else:
+        unavailable_metrics["mi_gini"] = "requires scikit-learn"
     return {
-        "available_metrics": ["sigma_max", "head_energy", "mi_gini"],
-        "available_dependencies": list(dep_manager.available_modules.keys()),
+        "available_metrics": available_metrics,
+        "unavailable_metrics": unavailable_metrics,
+        "available_dependencies": available_dependencies,
         "missing_dependencies": dep_manager.get_missing_dependencies(),
         "default_config": asdict(MetricsConfig(use_cache=False)),
     }
@@ -86,7 +95,10 @@ def validate_metrics_environment() -> MetricsEnvironmentReport:
 
         messages.append("Basic dependencies available")
         logger.info("Basic dependencies available")
-        available_count = len(dep_manager.available_modules)
+        available_dependencies = (
+            ("scikit-learn",) if dep_manager.is_available("mi_scores") else ()
+        )
+        available_count = len(available_dependencies)
         total_count = available_count + len(dep_manager.missing_modules)
         messages.append(
             f"{available_count}/{total_count} optional dependencies available"
@@ -109,7 +121,7 @@ def validate_metrics_environment() -> MetricsEnvironmentReport:
 
         return MetricsEnvironmentReport(
             ok=True,
-            available_dependencies=tuple(dep_manager.available_modules.keys()),
+            available_dependencies=available_dependencies,
             missing_dependencies=tuple(dep_manager.missing_modules),
             messages=tuple(messages),
         )
@@ -384,9 +396,7 @@ def calculate_lens_metrics_for_model(
                 results, skipped_metrics, cache, cache_key, start_time
             )
 
-        results["sigma_max"] = _calculate_sigma_max(
-            model, activation_data["first_batch"], dep_manager, config, device
-        )
+        results["sigma_max"] = _calculate_sigma_max(model, dep_manager, config)
         results["head_energy"] = _calculate_head_energy(
             activation_data["hidden_states"], config
         )

@@ -111,11 +111,26 @@ class TestVarianceGuardEdgeCases:
         # Test various A/B testing scenarios
         scenarios = [
             # Good improvement - should enable
-            {"ppl_no_ve": 3.5, "ppl_with_ve": 3.0, "expected_enable": True},
+            {
+                "ppl_no_ve": 3.5,
+                "ppl_with_ve": 3.0,
+                "ratio_ci": (0.80, 0.90),
+                "expected_enable": True,
+            },
             # Insufficient improvement - should not enable
-            {"ppl_no_ve": 3.5, "ppl_with_ve": 3.48, "expected_enable": False},
+            {
+                "ppl_no_ve": 3.5,
+                "ppl_with_ve": 3.48,
+                "ratio_ci": (0.98, 1.01),
+                "expected_enable": False,
+            },
             # Negative improvement - should not enable
-            {"ppl_no_ve": 3.0, "ppl_with_ve": 3.2, "expected_enable": False},
+            {
+                "ppl_no_ve": 3.0,
+                "ppl_with_ve": 3.2,
+                "ratio_ci": (1.02, 1.12),
+                "expected_enable": False,
+            },
         ]
 
         for scenario in scenarios:
@@ -126,18 +141,17 @@ class TestVarianceGuardEdgeCases:
                 scenario["ppl_with_ve"],
                 windows_used=50,
                 seed_used=123,
+                ratio_ci=scenario["ratio_ci"],
             )
 
             # Test A/B gate evaluation
             should_enable, reason = self.guard._evaluate_ab_gate()
 
-            # Verify gate logic - the A/B gate has strict thresholds
-            # Good improvement (0.5/3.5 = 14.3%) may still not meet the min_gain + deadband threshold
-            if scenario["expected_enable"]:
-                # Allow for strict A/B gate logic - improvement must be substantial
-                pass  # Don't assert enable, just test the logic works
+            assert should_enable is scenario["expected_enable"], reason
+            if should_enable:
+                assert reason.startswith("criteria_met")
             else:
-                assert not should_enable, f"Expected disable for scenario {scenario}"
+                assert not reason.startswith("criteria_met")
 
             # Test finalize with this state
             result = self.guard.finalize(self.model)

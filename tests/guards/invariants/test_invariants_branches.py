@@ -3,17 +3,21 @@ from types import SimpleNamespace
 import torch
 import torch.nn as nn
 
-from invarlock.guards.invariants import (
-    InvariantsGuard,
-    _coerce_vocab_counts,
-    _embedding_vocab_size_matches,
-    check_all_invariants,
+from invarlock.guards.invariant_embeddings import (
+    coerce_vocab_counts,
+    embedding_vocab_size_matches,
 )
+from invarlock.guards.invariants import InvariantsGuard, check_all_invariants
 
 
 class _BadInt:
     def __int__(self):
         raise ValueError("bad integer")
+
+
+class _KeyErrorInt:
+    def __int__(self):
+        raise KeyError("missing integer source")
 
 
 class TinyModel(nn.Module):
@@ -206,6 +210,13 @@ def test_invariants_profile_checks_respected():
     keys = guard.baseline_checks.keys()
     assert any(k.startswith("profile::") for k in keys)
 
+    outcome = guard.finalize(model)
+    assert any(
+        violation.get("type") == "profile_invariant_failed"
+        and violation.get("check") == "profile::unknown_check"
+        for violation in outcome.violations
+    )
+
 
 def test_invariants_validate_auto_prepares():
     model = TinyModel()
@@ -249,6 +260,124 @@ def test_profile_rotary_embedding_detected():
     assert guard.baseline_checks.get("profile::rotary_embedding") is True
 
 
+def test_profile_model_level_rotary_embedding_detected() -> None:
+    model = TinyModel()
+    model.model = SimpleNamespace(
+        rotary_emb=object(),
+        layers=[SimpleNamespace(self_attn=SimpleNamespace(rotary_emb=None))],
+    )
+
+    guard = InvariantsGuard()
+
+    assert guard._evaluate_profile_check(model, "rope_rotary_embedding") is True
+
+
+def test_profile_nested_language_model_rotary_embedding_detected() -> None:
+    model = TinyModel()
+    model.model = SimpleNamespace(
+        language_model=SimpleNamespace(
+            rotary_emb=object(),
+            layers=[SimpleNamespace(self_attn=SimpleNamespace(rotary_emb=None))],
+        )
+    )
+
+    guard = InvariantsGuard()
+
+    assert guard._evaluate_profile_check(model, "rope_rotary_embedding") is True
+
+
+def test_profile_nested_language_model_layer_rotary_embedding_detected() -> None:
+    model = TinyModel()
+    model.model = SimpleNamespace(
+        language_model=SimpleNamespace(
+            layers=[SimpleNamespace(self_attn=SimpleNamespace(rotary_emb=object()))]
+        )
+    )
+
+    guard = InvariantsGuard()
+
+    assert guard._evaluate_profile_check(model, "rope_rotary_embedding") is True
+
+
+def test_profile_falcon_transformer_rotary_embedding_detected() -> None:
+    model = TinyModel()
+    model.model = None
+    model.transformer = SimpleNamespace(
+        rotary_emb=object(),
+        h=[SimpleNamespace(self_attn=SimpleNamespace(rotary_emb=None))],
+    )
+
+    guard = InvariantsGuard()
+
+    assert guard._evaluate_profile_check(model, "rope_rotary_embedding") is True
+
+
+def test_profile_falcon_rotary_requires_h_decoder_layers() -> None:
+    model = TinyModel()
+    model.model = None
+    model.transformer = SimpleNamespace(
+        rotary_emb=object(),
+        layers=[SimpleNamespace(self_attn=SimpleNamespace(rotary_emb=object()))],
+    )
+
+    guard = InvariantsGuard()
+
+    assert guard._evaluate_profile_check(model, "rope_rotary_embedding") is False
+
+
+def test_profile_unrelated_falcon_lookalike_is_not_accepted() -> None:
+    model = TinyModel()
+    model.model = SimpleNamespace(
+        falcon=SimpleNamespace(
+            rotary_emb=object(),
+            h=[SimpleNamespace(self_attn=SimpleNamespace(rotary_emb=object()))],
+        )
+    )
+    model.transformer = SimpleNamespace(rotary_emb=object(), h=[])
+
+    guard = InvariantsGuard()
+
+    assert guard._evaluate_profile_check(model, "rope_rotary_embedding") is False
+
+
+def test_profile_unrelated_rotary_named_attribute_is_not_accepted() -> None:
+    model = TinyModel()
+    model.rotary_emb = object()
+    model.model = SimpleNamespace(
+        layers=[SimpleNamespace(self_attn=SimpleNamespace(rotary_emb=None))]
+    )
+
+    guard = InvariantsGuard()
+
+    assert guard._evaluate_profile_check(model, "rope_rotary_embedding") is False
+
+
+def test_profile_unrelated_nested_rotary_named_attribute_is_not_accepted() -> None:
+    model = TinyModel()
+    model.model = SimpleNamespace(
+        vision_tower=SimpleNamespace(
+            rotary_emb=object(),
+            layers=[SimpleNamespace(self_attn=SimpleNamespace(rotary_emb=object()))],
+        )
+    )
+
+    guard = InvariantsGuard()
+
+    assert guard._evaluate_profile_check(model, "rope_rotary_embedding") is False
+
+
+def test_profile_rotary_requires_decoder_layers() -> None:
+    model = TinyModel()
+    model.model = SimpleNamespace(
+        rotary_emb=object(),
+        language_model=SimpleNamespace(rotary_emb=object(), layers=[]),
+    )
+
+    guard = InvariantsGuard()
+
+    assert guard._evaluate_profile_check(model, "rope_rotary_embedding") is False
+
+
 def test_adapter_aware_standard_invariants_violation():
     class M(nn.Module):
         def __init__(self):
@@ -279,6 +408,76 @@ def test_capture_invariants_uses_embedding_weight_shape_fallback() -> None:
     checks = guard._capture_invariants(_Model(), adapter=None)
 
     assert checks["embedding_vocab_sizes"]["embed"] == 11
+
+
+def _wrapped_language_model(*, tied: bool = True) -> nn.Module:
+    model = nn.Module()
+    model.model = nn.Module()
+    model.model.language_model = nn.Module()
+    model.model.language_model.embed_tokens = nn.Embedding(17, 4)
+    model.model.vision_tower = nn.Module()
+    model.model.vision_tower.embed_tokens = nn.Embedding(17, 4)
+    model.lm_head = nn.Linear(4, 17, bias=False)
+    source = (
+        model.model.language_model.embed_tokens.weight
+        if tied
+        else model.model.vision_tower.embed_tokens.weight
+    )
+    model.lm_head.weight = source
+    return model
+
+
+def test_capture_invariants_detects_nested_language_model_weight_tying() -> None:
+    checks = InvariantsGuard()._capture_invariants(
+        _wrapped_language_model(tied=True), adapter=None
+    )
+
+    assert checks["weight_tying"] is True
+    assert checks["weight_tying_arches"]["language_model_embed_tokens"] is True
+
+
+def test_capture_invariants_rejects_tied_vision_embedding_as_language_tying() -> None:
+    checks = InvariantsGuard()._capture_invariants(
+        _wrapped_language_model(tied=False), adapter=None
+    )
+
+    assert checks["weight_tying"] is False
+    assert checks["weight_tying_arches"]["language_model_embed_tokens"] is False
+
+
+def test_capture_invariants_fails_closed_when_wrapped_embedding_is_missing() -> None:
+    model = _wrapped_language_model(tied=True)
+    del model.model.language_model.embed_tokens
+
+    checks = InvariantsGuard()._capture_invariants(model, adapter=None)
+
+    assert checks["weight_tying"] is None
+    assert {(gap["check"], gap["reason"]) for gap in checks["evidence_gaps"]} >= {
+        (
+            "weight_tying_language_model_embed_tokens",
+            "embedding_weight_missing",
+        )
+    }
+
+
+def test_strict_invariants_block_missing_wrapped_embedding_evidence() -> None:
+    model = _wrapped_language_model(tied=True)
+    guard = InvariantsGuard(strict_mode=True, on_fail="block")
+    guard.prepare(model, adapter=None, calib=None, policy={})
+    del model.model.language_model.embed_tokens
+
+    outcome = guard.finalize(model)
+
+    assert outcome.passed is False
+    assert outcome.decision == "block"
+    assert any(
+        violation.get("type") == "evidence_gap"
+        and any(
+            gap.get("check") == "weight_tying_language_model_embed_tokens"
+            for gap in violation.get("gaps", [])
+        )
+        for violation in outcome.violations
+    )
 
 
 def test_capture_invariants_records_multiple_evidence_gaps(
@@ -399,14 +598,33 @@ def test_detect_non_finite_ignores_bad_tensor_checks_and_iteration_failures() ->
     guard = InvariantsGuard()
 
     assert guard._detect_non_finite(_BrokenModel()) == []
+    assert {gap["check"] for gap in guard._non_finite_evidence_gaps} == {
+        "parameter_finiteness::bad_param",
+        "buffer_finiteness::bad_buffer",
+        "buffer_finiteness_iteration",
+    }
 
 
 def test_vocab_size_helpers_treat_uncoercible_values_as_mismatches() -> None:
-    counts = _coerce_vocab_counts({"good": "7", "bad": _BadInt()})
+    counts = coerce_vocab_counts({"good": "7", "bad": _BadInt()})
 
     assert counts[7] == 1
-    assert _embedding_vocab_size_matches({}, {}, "embed", _BadInt()) == (False, None)
-    assert _embedding_vocab_size_matches({}, {"embed": _BadInt()}, "embed", 7) == (
+    assert embedding_vocab_size_matches({}, {}, "embed", _BadInt()) == (False, None)
+    assert embedding_vocab_size_matches({}, {"embed": _BadInt()}, "embed", 7) == (
+        False,
+        None,
+    )
+
+
+def test_vocab_size_helpers_fail_closed_on_key_error_int_values() -> None:
+    counts = coerce_vocab_counts({"good": "7", "bad": _KeyErrorInt()})
+
+    assert counts[7] == 1
+    assert embedding_vocab_size_matches({}, {}, "embed", _KeyErrorInt()) == (
+        False,
+        None,
+    )
+    assert embedding_vocab_size_matches({}, {"embed": _KeyErrorInt()}, "embed", 7) == (
         False,
         None,
     )

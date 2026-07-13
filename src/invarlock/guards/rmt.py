@@ -54,6 +54,9 @@ from .rmt_runtime import (
     finalize_rmt_guard as _finalize_rmt_guard_impl,
 )
 from .rmt_runtime import (
+    load_external_baseline_evidence as _load_external_baseline_evidence_impl,
+)
+from .rmt_runtime import (
     prepare_rmt_guard as _prepare_rmt_guard_impl,
 )
 from .rmt_runtime import (
@@ -167,6 +170,10 @@ class RMTGuard(Guard):
         self.baseline_mp_stats: dict[str, dict[str, float]] = {}
         self.module_include_patterns: tuple[str, ...] = ()
         self.module_exclude_patterns: tuple[str, ...] = ()
+        self._external_baseline_required = False
+        self._external_baseline_ready = False
+        self._external_baseline_reason: str | None = None
+        self._external_baseline_evidence: dict[str, Any] | None = None
 
     def _log_event(
         self, operation: str, level: str = "INFO", message: str = "", **data
@@ -217,9 +224,22 @@ class RMTGuard(Guard):
             auto = ctx.get("auto")
             if isinstance(auto, dict):
                 tier = str(auto.get("tier", tier) or tier).strip().lower()
+            self._external_baseline_required = bool(
+                ctx.get("baseline_guard_evidence_required", False)
+            )
+            evidence = ctx.get("baseline_guard_evidence")
+            rmt = evidence.get("rmt") if isinstance(evidence, dict) else None
+            self._external_baseline_evidence = (
+                dict(rmt) if isinstance(rmt, dict) else None
+            )
         self._run_profile = profile or None
         self._run_tier = tier or None
         self._require_activation = bool(profile in {"ci", "release"})
+
+    def load_external_baseline_evidence(self) -> dict[str, Any]:
+        """Replace subject-local activation baselines with paired-run evidence."""
+
+        return _load_external_baseline_evidence_impl(self)
 
     def _set_epsilon_default(self, epsilon: Any) -> None:
         """Set the default ε used when a family value is missing."""

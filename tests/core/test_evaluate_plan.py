@@ -10,6 +10,7 @@ from invarlock.core.evaluate_plan import (
     build_baseline_run_config,
     build_evaluate_command_plan,
     build_subject_edit_run_config,
+    build_subject_noop_run_config,
     default_preset_data_for_adapter,
     determine_subject_label,
     normalize_model_id,
@@ -162,6 +163,48 @@ def test_build_baseline_run_config_injects_evaluate_context() -> None:
     assert cfg["assurance"] == {"mode": "off"}
 
 
+def test_build_baseline_run_config_uses_only_typed_model_identity() -> None:
+    identity = {"kind": "remote_revision", "revision": "0" * 40}
+    cfg = build_baseline_run_config(
+        {},
+        model_id="org/model",
+        adapter_name="hf_causal",
+        model_identity=identity,
+        output_dir="runs/source",
+        profile="ci",
+        tier="balanced",
+        guards_order=["invariants"],
+        assurance_mode="off",
+    )
+
+    assert cfg["model"] == {
+        "id": "org/model",
+        "adapter": "hf_causal",
+        "model_identity": identity,
+    }
+
+
+@pytest.mark.parametrize(
+    "legacy_field",
+    ["revision", "model_revision", "model_checkpoint_tree_sha256"],
+)
+def test_build_baseline_run_config_rejects_legacy_identity_fields(
+    legacy_field: str,
+) -> None:
+    with pytest.raises(ValueError, match="Preset config uses legacy model identity"):
+        build_baseline_run_config(
+            {"model": {legacy_field: "stale"}},
+            model_id="org/model",
+            adapter_name="hf_causal",
+            model_identity={"kind": "remote_revision", "revision": "a" * 40},
+            output_dir="runs/source",
+            profile="ci",
+            tier="balanced",
+            guards_order=DEFAULT_EVALUATE_GUARDS_ORDER,
+            assurance_mode="strict",
+        )
+
+
 def test_build_subject_edit_run_config_normalizes_placeholders_and_guards() -> None:
     cfg = build_subject_edit_run_config(
         {"dataset": {"provider": "wikitext2"}},
@@ -184,6 +227,175 @@ def test_build_subject_edit_run_config_normalizes_placeholders_and_guards() -> N
         "runtime": {"execution_mode": "unknown"},
     }
     assert cfg["guards"] == {"order": ["invariants", "variance"]}
+
+
+@pytest.mark.parametrize(
+    "legacy_field",
+    ["revision", "model_revision", "model_checkpoint_tree_sha256"],
+)
+def test_build_subject_edit_run_config_rejects_legacy_identity_fields(
+    legacy_field: str,
+) -> None:
+    with pytest.raises(ValueError, match="legacy model identity field"):
+        build_subject_edit_run_config(
+            {},
+            {
+                "model": {"id": "<MODEL_ID>", legacy_field: "stale"},
+                "edit": {"name": "noop"},
+            },
+            subject_model_id="org/model",
+            adapter_name="hf_causal",
+            model_identity={"kind": "remote_revision", "revision": "a" * 40},
+            output_dir="runs/edited",
+            profile="ci",
+            tier="balanced",
+            guards_order=DEFAULT_EVALUATE_GUARDS_ORDER,
+            assurance_mode="strict",
+        )
+
+
+@pytest.mark.parametrize(
+    "legacy_field",
+    ["revision", "model_revision", "model_checkpoint_tree_sha256"],
+)
+def test_build_subject_edit_run_config_rejects_legacy_preset_identity_fields(
+    legacy_field: str,
+) -> None:
+    with pytest.raises(ValueError, match="Preset config uses legacy model identity"):
+        build_subject_edit_run_config(
+            {"model": {legacy_field: "stale"}},
+            {"model": {"id": "<MODEL_ID>"}, "edit": {"name": "noop"}},
+            subject_model_id="org/model",
+            adapter_name="hf_causal",
+            model_identity={"kind": "remote_revision", "revision": "a" * 40},
+            output_dir="runs/edited",
+            profile="ci",
+            tier="balanced",
+            guards_order=DEFAULT_EVALUATE_GUARDS_ORDER,
+            assurance_mode="strict",
+        )
+
+
+def test_subject_configs_propagate_only_typed_model_identity() -> None:
+    revision = "a" * 40
+    digest = "sha256:" + "b" * 64
+    noop = build_subject_noop_run_config(
+        {},
+        model_id="org/model",
+        adapter_name="hf_causal",
+        model_identity={"kind": "remote_revision", "revision": revision},
+        output_dir="runs/edited",
+        profile="ci",
+        tier="balanced",
+        guards_order=DEFAULT_EVALUATE_GUARDS_ORDER,
+        assurance_mode="strict",
+    )
+    edited = build_subject_edit_run_config(
+        {},
+        {"model": {"id": "<MODEL_ID>"}, "edit": {"name": "quant_rtn"}},
+        subject_model_id="/models/local",
+        adapter_name="hf_causal",
+        model_identity={"kind": "local_checkpoint_tree", "sha256": digest},
+        output_dir="runs/edited",
+        profile="ci",
+        tier="balanced",
+        guards_order=DEFAULT_EVALUATE_GUARDS_ORDER,
+        assurance_mode="strict",
+    )
+    edited_remote = build_subject_edit_run_config(
+        {},
+        {"model": {"id": "<MODEL_ID>"}, "edit": {"name": "quant_rtn"}},
+        subject_model_id="org/model",
+        adapter_name="hf_causal",
+        model_identity={"kind": "remote_revision", "revision": revision},
+        output_dir="runs/edited-remote",
+        profile="ci",
+        tier="balanced",
+        guards_order=DEFAULT_EVALUATE_GUARDS_ORDER,
+        assurance_mode="strict",
+    )
+
+    assert noop["model"]["model_identity"]["revision"] == revision
+    assert "revision" not in noop["model"]
+    assert "model_checkpoint_tree_sha256" not in noop["model"]
+    assert edited["model"]["model_identity"]["sha256"] == digest
+    assert "model_checkpoint_tree_sha256" not in edited["model"]
+    assert "revision" not in edited["model"]
+    assert edited_remote["model"]["model_identity"]["revision"] == revision
+    assert "revision" not in edited_remote["model"]
+    assert "model_checkpoint_tree_sha256" not in edited_remote["model"]
+
+
+def test_strict_remote_evaluate_requires_canonical_revisions(tmp_path: Path) -> None:
+    common = {
+        "baseline_model_id": "org/source",
+        "subject_model_id": "org/subject",
+        "baseline_adapter": "hf_causal",
+        "subject_adapter": "hf_causal",
+        "profile": "ci",
+        "tier": "balanced",
+        "preset": None,
+        "out": "runs",
+        "edit_config": None,
+        "edit_label": None,
+        "resolve_auto_adapter_fn": lambda _model_id: "hf_causal",
+        "load_yaml_fn": lambda _path: {},
+        "tmp_dir_candidate": str(tmp_path / "scratch"),
+        "assurance_mode": "strict",
+    }
+    with pytest.raises(ValueError, match="baseline.*40-64 lowercase hexadecimal"):
+        build_evaluate_command_plan(**common)
+    with pytest.raises(ValueError, match="subject.*40-64 lowercase hexadecimal"):
+        build_evaluate_command_plan(**common, baseline_revision="a" * 40)
+
+    plan = build_evaluate_command_plan(
+        **common,
+        baseline_revision="a" * 40,
+        subject_revision="b" * 64,
+    )
+    assert plan.baseline_config["model"]["model_identity"] == {
+        "kind": "remote_revision",
+        "revision": "a" * 40,
+    }
+    assert "revision" not in plan.baseline_config["model"]
+    assert plan.subject_identity == {
+        "kind": "remote_revision",
+        "revision": "b" * 64,
+    }
+
+
+def test_strict_local_evaluate_hashes_checkpoint_trees(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline"
+    subject = tmp_path / "subject"
+    for root, weight in ((baseline, b"base"), (subject, b"subject")):
+        root.mkdir()
+        (root / "config.json").write_text("{}\n", encoding="utf-8")
+        (root / "model.safetensors").write_bytes(weight)
+
+    plan = build_evaluate_command_plan(
+        baseline_model_id=str(baseline),
+        subject_model_id=str(subject),
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
+        profile="ci",
+        tier="balanced",
+        preset=None,
+        out="runs",
+        edit_config=None,
+        edit_label=None,
+        resolve_auto_adapter_fn=lambda _model_id: "hf_causal",
+        load_yaml_fn=lambda _path: {},
+        tmp_dir_candidate=str(tmp_path / "scratch"),
+        assurance_mode="strict",
+    )
+
+    assert plan.baseline_config["model"]["model_identity"]["sha256"].startswith(
+        "sha256:"
+    )
+    assert plan.subject_identity is not None
+    assert plan.subject_identity["sha256"].startswith("sha256:")
+    assert "model_checkpoint_tree_sha256" not in plan.baseline_config["model"]
+    assert "revision" not in plan.baseline_config["model"]
 
 
 def test_build_subject_edit_run_config_strict_rejects_custom_preset_guard_order() -> (
@@ -240,6 +452,7 @@ def test_build_evaluate_command_plan_collects_core_execution_inputs(
     plan = build_evaluate_command_plan(
         baseline_model_id="hf:org/source",
         subject_model_id="hf:org/subject",
+        baseline_revision="0" * 40,
         profile="ci",
         tier="balanced",
         preset=str(preset_path),
@@ -261,6 +474,12 @@ def test_build_evaluate_command_plan_collects_core_execution_inputs(
     assert plan.source_model_id == "org/source"
     assert plan.subject_model_id == "org/subject"
     assert plan.baseline_config["output"] == {"dir": "runs/source"}
+    assert plan.baseline_config["model"]["model_identity"] == {
+        "kind": "remote_revision",
+        "revision": "0" * 40,
+    }
+    assert "revision" not in plan.baseline_config["model"]
+    assert "revision" not in plan.preset_data.get("model", {})
     assert plan.guards_order == ["shape_ok"]
     assert plan.assurance_mode == "off"
     assert plan.subject_label == "custom"

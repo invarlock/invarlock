@@ -203,6 +203,7 @@ def serialize_policy(guard: Any) -> dict[str, Any]:
         "estimator": guard.estimator,
         "degeneracy": guard.degeneracy,
         "correction_enabled": bool(guard.correction_enabled),
+        "correction_cap_ratio": float(guard.correction_cap_ratio),
         "ignore_preview_inflation": bool(guard.ignore_preview_inflation),
         "module_include_patterns": list(getattr(guard, "module_include_patterns", ())),
         "module_exclude_patterns": list(getattr(guard, "module_exclude_patterns", ())),
@@ -247,6 +248,18 @@ def apply_policy_overrides(guard: Any, policy: dict[str, Any]) -> None:
     if "correction_enabled" in policy:
         guard.correction_enabled = bool(policy["correction_enabled"])
         guard.config["correction_enabled"] = guard.correction_enabled
+
+    if "correction_cap_ratio" in policy:
+        guard.correction_cap_ratio = _require_policy_float(
+            "correction_cap_ratio", policy["correction_cap_ratio"], minimum=0.0
+        )
+        if guard.correction_cap_ratio <= 0.0:
+            raise _policy_invalid(
+                "correction_cap_ratio",
+                "must be > 0",
+                value=policy["correction_cap_ratio"],
+            )
+        guard.config["correction_cap_ratio"] = guard.correction_cap_ratio
 
     if "max_caps" in policy:
         guard.max_caps = _require_policy_int("max_caps", policy["max_caps"], minimum=0)

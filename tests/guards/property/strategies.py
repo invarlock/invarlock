@@ -17,7 +17,7 @@ def _coerce_float(value: object, default: float) -> float:
         return float(default)
 
 
-def bh_select(pvals: list[float], alpha: float) -> list[bool]:
+def bh_select(pvals: list[float], alpha: float, *, m: int | None = None) -> list[bool]:
     n = len(pvals)
     if n == 0:
         return []
@@ -25,6 +25,7 @@ def bh_select(pvals: list[float], alpha: float) -> list[bool]:
     if not (0.0 < alpha <= 1.0):
         return [False] * n
 
+    m_eff = max(m if isinstance(m, int) and m > 0 else n, n, 1)
     order = sorted(
         range(n), key=lambda i: float("inf") if not _finite01(pvals[i]) else pvals[i]
     )
@@ -34,12 +35,12 @@ def bh_select(pvals: list[float], alpha: float) -> list[bool]:
         p = pvals[idx]
         if not _finite01(p):
             continue
-        threshold = (alpha * rank) / n
+        threshold = (alpha * rank) / m_eff
         if p <= threshold:
             max_k = rank
 
     if max_k > 0:
-        cutoff = (alpha * max_k) / n
+        cutoff = (alpha * max_k) / m_eff
         for idx in order:
             p = pvals[idx]
             if _finite01(p) and p <= cutoff:
@@ -136,15 +137,21 @@ def spectral_family_decide(
     method = str(method_obj).lower()
     alpha_obj = (mtest or {}).get("alpha", 0.05)
     alpha = _coerce_float(alpha_obj, 0.05)
+    m_obj = (mtest or {}).get("m")
+    try:
+        m = int(m_obj) if m_obj is not None else len(families)
+    except (TypeError, ValueError, OverflowError):
+        m = len(families)
+    m_eff = max(m, len(families), 1)
     if method in {"bh", "benjamini-hochberg", "benjamini_hochberg"}:
-        rejects = bh_select(pvals, alpha)
+        rejects = bh_select(pvals, alpha, m=m_eff)
         applied_method = "bh"
     elif method in {"bonferroni", "bonf"}:
-        cutoff = alpha / max(1, len(pvals))
+        cutoff = alpha / m_eff
         rejects = [bool(p <= cutoff) if _finite01(p) else False for p in pvals]
         applied_method = "bonferroni"
     else:
-        cutoff = alpha / max(1, len(pvals))
+        cutoff = alpha / m_eff
         rejects = [bool(p <= cutoff) if _finite01(p) else False for p in pvals]
         applied_method = "bonferroni"
 
@@ -286,49 +293,140 @@ def families(min_families: int = 2, max_families: int = 5):
     return fams
 
 
-def spectral_inputs():
-    fams = families()
-    return st.builds(
-        _build_spectral,
-        fams,
-        st.integers(min_value=5, max_value=50),
-        st.floats(min_value=0.0, max_value=1.0),
-        st.floats(min_value=1.0, max_value=10.0),
-        st.floats(min_value=0.0, max_value=1.0),
+@st.composite
+def spectral_inputs(draw):
+    family_names = draw(families())
+    name_count = draw(st.integers(min_value=5, max_value=50))
+    names = [f"m{i}" for i in range(name_count)]
+    assignments = draw(
+        st.lists(
+            st.sampled_from(family_names),
+            min_size=name_count,
+            max_size=name_count,
+        )
+    )
+    sigma_values = draw(
+        st.lists(
+            st.floats(
+                min_value=1.0,
+                max_value=1.5,
+                allow_nan=False,
+                allow_infinity=False,
+            ),
+            min_size=name_count,
+            max_size=name_count,
+        )
+    )
+    deadband = draw(
+        st.floats(
+            min_value=0.0,
+            max_value=1.0,
+            allow_nan=False,
+            allow_infinity=False,
+        )
+    )
+    cap = draw(
+        st.floats(
+            min_value=1.0,
+            max_value=6.0,
+            allow_nan=False,
+            allow_infinity=False,
+        )
+    )
+    alpha = draw(
+        st.floats(
+            min_value=1e-6,
+            max_value=1.0,
+            allow_nan=False,
+            allow_infinity=False,
+        )
     )
 
-
-def _build_spectral(
-    families: list[str], n_names: int, deadband: float, kappa_hi: float, alpha: float
-):
-    import random
-
-    names = [f"m{i}" for i in range(n_names)]
-    family_of = {n: random.choice(families) for n in names}
-    sigma = {n: 1.0 + random.random() * 0.5 for n in names}
+    family_of = dict(zip(names, assignments, strict=True))
+    sigma = dict(zip(names, sigma_values, strict=True))
     denom = dict.fromkeys(names, 1.0)
-    caps = dict.fromkeys(families, 1.0 + kappa_hi / 2.0)
-    mtest = {"method": "bh", "alpha": float(alpha or 0.05)}
-    return sigma, denom, family_of, float(deadband), caps, mtest
+    caps = dict.fromkeys(family_names, cap)
+    mtest = {"method": "bh", "alpha": alpha}
+    return sigma, denom, family_of, deadband, caps, mtest
 
 
-def rmt_inputs():
-    fams = families()
-    return st.builds(
-        _build_rmt,
-        fams,
-        st.integers(min_value=0, max_value=100),
-        st.floats(min_value=0.0, max_value=0.5),
+@st.composite
+def spectral_family_inputs(draw):
+    family_names = draw(families(min_families=1, max_families=5))
+    name_count = draw(st.integers(min_value=1, max_value=30))
+    names = [f"module.{index}" for index in range(name_count)]
+    assignments = draw(
+        st.lists(
+            st.sampled_from(family_names),
+            min_size=name_count,
+            max_size=name_count,
+        )
+    )
+    z_values = draw(
+        st.lists(
+            st.floats(
+                min_value=-8.0,
+                max_value=8.0,
+                allow_nan=False,
+                allow_infinity=False,
+            ),
+            min_size=name_count,
+            max_size=name_count,
+        )
+    )
+    method = draw(st.sampled_from(["bh", "bonferroni"]))
+    alpha = draw(
+        st.floats(
+            min_value=1e-6,
+            max_value=1.0,
+            allow_nan=False,
+            allow_infinity=False,
+        )
+    )
+    return (
+        dict(zip(names, z_values, strict=True)),
+        dict(zip(names, assignments, strict=True)),
+        {"method": method, "alpha": alpha},
     )
 
 
-def _build_rmt(families: list[str], count_hi: int, eps_hi: float):
-    import random
-
-    bare = {f: random.randint(0, count_hi) for f in families}
-    guarded = {f: max(0, bare[f] + random.randint(-2, 3)) for f in families}
-    eps = dict.fromkeys(families, eps_hi)
-    return bare, guarded, eps
+@st.composite
+def rmt_inputs(draw):
+    family_names = draw(families())
+    family_count = len(family_names)
+    baseline_values = draw(
+        st.lists(
+            st.integers(min_value=0, max_value=100),
+            min_size=family_count,
+            max_size=family_count,
+        )
+    )
+    offsets = draw(
+        st.lists(
+            st.integers(min_value=-2, max_value=3),
+            min_size=family_count,
+            max_size=family_count,
+        )
+    )
+    epsilon_values = draw(
+        st.lists(
+            st.floats(
+                min_value=0.0,
+                max_value=0.5,
+                allow_nan=False,
+                allow_infinity=False,
+            ),
+            min_size=family_count,
+            max_size=family_count,
+        )
+    )
+    baseline = dict(zip(family_names, baseline_values, strict=True))
+    current = {
+        family: max(0, baseline[family] + offset)
+        for family, offset in zip(family_names, offsets, strict=True)
+    }
+    epsilon = dict(zip(family_names, epsilon_values, strict=True))
+    return baseline, current, epsilon
 
 
 def variance_inputs():

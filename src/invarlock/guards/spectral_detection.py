@@ -258,6 +258,17 @@ def should_check_module(guard: Any, name: str, module: Any) -> bool:
     return True
 
 
+def _resolve_kappa_cap(guard: Any, family: str, default_family_caps_fn: Any) -> float:
+    cap_config = guard.family_caps.get(family, {})
+    kappa_raw = cap_config.get("kappa") if isinstance(cap_config, dict) else None
+    if not (isinstance(kappa_raw, int | float) and math.isfinite(float(kappa_raw))):
+        other_cfg = guard.family_caps.get("other", {})
+        kappa_raw = other_cfg.get("kappa") if isinstance(other_cfg, dict) else None
+    if not (isinstance(kappa_raw, int | float) and math.isfinite(float(kappa_raw))):
+        kappa_raw = default_family_caps_fn().get("other", {}).get("kappa", 3.0)
+    return float(kappa_raw)
+
+
 def detect_spectral_violations(
     guard: Any,
     model: Any,
@@ -281,6 +292,7 @@ def detect_spectral_violations(
 
     violations: list[dict[str, Any]] = []
     latest_z: dict[str, float] = {}
+    latest_degeneracy: dict[str, dict[str, float]] = {}
 
     for name, module in guard._get_scoped_modules(model):
         try:
@@ -310,26 +322,7 @@ def detect_spectral_violations(
                     guard.module_family_map[name] = family
 
                 family_stats = guard.baseline_family_stats.get(family, {})
-                cap_config = guard.family_caps.get(family, {})
-                kappa_raw = (
-                    cap_config.get("kappa") if isinstance(cap_config, dict) else None
-                )
-                if not (
-                    isinstance(kappa_raw, int | float)
-                    and math.isfinite(float(kappa_raw))
-                ):
-                    other_cfg = guard.family_caps.get("other", {})
-                    kappa_raw = (
-                        other_cfg.get("kappa") if isinstance(other_cfg, dict) else None
-                    )
-                if not (
-                    isinstance(kappa_raw, int | float)
-                    and math.isfinite(float(kappa_raw))
-                ):
-                    kappa_raw = (
-                        default_family_caps_fn().get("other", {}).get("kappa", 3.0)
-                    )
-                kappa_cap = float(kappa_raw)
+                kappa_cap = _resolve_kappa_cap(guard, family, default_family_caps_fn)
 
                 z_score = compute_z_score_for_value_fn(
                     sigma_max,
@@ -379,6 +372,29 @@ def detect_spectral_violations(
                     base_sr = base.get("stable_rank")
                     base_nc = base.get("norm_collapse")
                     eps = 1e-12
+                    current_degeneracy: dict[str, float] = {}
+                    try:
+                        sr_cur = frobenius_norm_sq(module.weight) / max(
+                            float(sigma_max) ** 2, eps
+                        )
+                        if math.isfinite(float(sr_cur)):
+                            current_degeneracy["stable_rank"] = float(sr_cur)
+                    except _SPECTRAL_CHECK_ERRORS:
+                        pass
+                    try:
+                        norms = row_col_norm_extrema(module.weight, eps=eps)
+                        row_med = max(float(norms.get("row_median", 0.0)), eps)
+                        col_med = max(float(norms.get("col_median", 0.0)), eps)
+                        nc_cur = min(
+                            float(norms.get("row_min", 0.0)) / row_med,
+                            float(norms.get("col_min", 0.0)) / col_med,
+                        )
+                        if math.isfinite(float(nc_cur)):
+                            current_degeneracy["norm_collapse"] = float(nc_cur)
+                    except _SPECTRAL_CHECK_ERRORS:
+                        pass
+                    if current_degeneracy:
+                        latest_degeneracy[name] = current_degeneracy
                     try:
                         sr_cfg = (
                             (guard.degeneracy.get("stable_rank") or {})
@@ -401,11 +417,10 @@ def detect_spectral_violations(
                         isinstance(base_sr, int | float)
                         and math.isfinite(float(base_sr))
                         and float(base_sr) > 0
+                        and "stable_rank" in current_degeneracy
                     ):
                         try:
-                            sr_cur = frobenius_norm_sq(module.weight) / max(
-                                float(sigma_max) ** 2, eps
-                            )
+                            sr_cur = current_degeneracy["stable_rank"]
                             sr_ratio = float(sr_cur) / max(float(base_sr), eps)
                             if math.isfinite(sr_ratio) and sr_ratio < sr_warn:
                                 violations.append(
@@ -434,15 +449,10 @@ def detect_spectral_violations(
                         isinstance(base_nc, int | float)
                         and math.isfinite(float(base_nc))
                         and float(base_nc) > 0
+                        and "norm_collapse" in current_degeneracy
                     ):
                         try:
-                            norms = row_col_norm_extrema(module.weight, eps=eps)
-                            row_med = max(float(norms.get("row_median", 0.0)), eps)
-                            col_med = max(float(norms.get("col_median", 0.0)), eps)
-                            nc_cur = min(
-                                float(norms.get("row_min", 0.0)) / row_med,
-                                float(norms.get("col_min", 0.0)) / col_med,
-                            )
+                            nc_cur = current_degeneracy["norm_collapse"]
                             nc_ratio = float(nc_cur) / max(float(base_nc), eps)
                             if math.isfinite(nc_ratio) and nc_ratio < nc_warn:
                                 violations.append(
@@ -476,6 +486,7 @@ def detect_spectral_violations(
             )
 
     guard.latest_z_scores = latest_z
+    guard.latest_degeneracy = latest_degeneracy
     return violations
 
 

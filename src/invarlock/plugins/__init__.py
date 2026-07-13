@@ -12,17 +12,18 @@ from invarlock.adapters.capabilities import (
     detect_capabilities_from_model,
     detect_quantization_from_config,
 )
+from invarlock.adapters.gptq_checkpoint_validation import (
+    validate_gptq_checkpoint_bindings,
+)
+from invarlock.adapters.hf_causal import HF_Causal_Adapter
 from invarlock.adapters.hf_loading import resolve_trust_remote_code
 from invarlock.adapters.hf_mixin import HFAdapterMixin
-from invarlock.adapters.hf_quantized import (
-    describe_causal_quantized_model,
-    get_causal_quantized_layer_modules,
-)
 from invarlock.core import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import Guard, ModelAdapter
 from invarlock.core.error_utils import wrap_errors
 from invarlock.core.exceptions import AdapterError, DependencyError, ModelLoadError
 from invarlock.core.types import GuardValidationResult
+from invarlock.gptqmodel_runtime import import_gptqmodel
 
 INVARLOCK_CORE_ABI = CORE_ABI
 
@@ -36,31 +37,24 @@ _BNB_MODEL_LOAD_ERRORS = (
     TypeError,
     ValueError,
 )
+_HF_CAUSAL_INTROSPECTION = HF_Causal_Adapter()
 
 
-def _patch_gptqmodel_transformers_hub_compat() -> None:
-    """Bridge GPTQModel 7.0.0 hub imports on newer Transformers releases."""
+def _gptqmodel_jit_toolchain_required(device: str) -> bool:
+    """Require CUDA JIT prerequisites only when a load can use CUDA."""
+
+    normalized_device = device.strip().casefold()
+    if normalized_device.startswith("cuda"):
+        return True
+    if normalized_device != "auto":
+        return False
     try:
-        transformers = importlib.import_module("transformers")
-        huggingface_hub = importlib.import_module("huggingface_hub")
-    except ImportError:
-        return
-
-    transformers_utils = getattr(transformers, "utils", None)
-    transformers_hub = getattr(transformers_utils, "hub", None)
-    if transformers_hub is None:
-        return
-
-    if not hasattr(transformers_hub, "create_repo") and hasattr(
-        huggingface_hub, "create_repo"
-    ):
-        transformers_hub.create_repo = huggingface_hub.create_repo
-
-    if not hasattr(transformers_hub, "list_repo_tree") and hasattr(
-        huggingface_hub, "HfApi"
-    ):
-        api = huggingface_hub.HfApi()
-        transformers_hub.list_repo_tree = api.list_repo_tree
+        torch = importlib.import_module("torch")
+        cuda = getattr(torch, "cuda", None)
+        cuda_is_available = getattr(cuda, "is_available", None)
+        return bool(cuda_is_available()) if callable(cuda_is_available) else False
+    except (AttributeError, ImportError, OSError, RuntimeError):
+        return False
 
 
 def _fallback_causal_description(model: Any) -> dict[str, Any]:
@@ -79,12 +73,12 @@ def _fallback_causal_description(model: Any) -> dict[str, Any]:
 class _QuantizedCausalIntrospectionMixin:
     def describe(self, model: Any) -> dict[str, Any]:
         try:
-            return describe_causal_quantized_model(model)
+            return _HF_CAUSAL_INTROSPECTION.describe(model)
         except AdapterError:
             return _fallback_causal_description(model)
 
     def get_layer_modules(self, model: Any, layer_idx: int) -> dict[str, Any]:
-        return get_causal_quantized_layer_modules(model, layer_idx)
+        return _HF_CAUSAL_INTROSPECTION.get_layer_modules(model, layer_idx)
 
 
 def _is_local_path(model_id: str) -> bool:
@@ -172,8 +166,9 @@ class HF_AWQ_Adapter(_QuantizedCausalIntrospectionMixin, HFAdapterMixin, ModelAd
             "DEPENDENCY-MISSING: transformers/gptqmodel",
             lambda e: {"dependency": "transformers/gptqmodel"},
         ):
-            _patch_gptqmodel_transformers_hub_compat()
-            import gptqmodel  # noqa: F401
+            import_gptqmodel(
+                require_jit_toolchain=_gptqmodel_jit_toolchain_required(device)
+            )
             from transformers import AutoModelForCausalLM
 
         with wrap_errors(
@@ -225,8 +220,12 @@ class HF_GPTQ_Adapter(_QuantizedCausalIntrospectionMixin, HFAdapterMixin, ModelA
             "DEPENDENCY-MISSING: gptqmodel/transformers",
             lambda e: {"dependency": "gptqmodel"},
         ):
-            _patch_gptqmodel_transformers_hub_compat()
-            from gptqmodel import GPTQModel
+            gptqmodel = import_gptqmodel(
+                require_jit_toolchain=_gptqmodel_jit_toolchain_required(device)
+            )
+            # GPTQModel may expose its public class lazily; preserve the
+            # normal AttributeError path for a broken optional installation.
+            GPTQModel = getattr(gptqmodel, "GPTQModel")  # noqa: B009
 
         with wrap_errors(
             ModelLoadError,
@@ -239,6 +238,7 @@ class HF_GPTQ_Adapter(_QuantizedCausalIntrospectionMixin, HFAdapterMixin, ModelA
                 trust_remote_code=trust_remote_code,
                 **load_kwargs,
             )
+            validate_gptq_checkpoint_bindings(model)
 
         return self._safe_to_device(
             model, device, capabilities=ModelCapabilities.for_gptq()
@@ -321,13 +321,14 @@ class HF_BNB_Adapter(_QuantizedCausalIntrospectionMixin, HFAdapterMixin, ModelAd
                 "hf_bnb adapter: load_in_8bit/load_in_4bit are not supported. "
                 "Use model.quantization_config instead."
             )
+        device_map = load_kwargs.pop("device_map", "auto")
 
         if is_pre_quantized:
             try:
                 model = self._load_pretrained_model(
                     AutoModelForCausalLM,
                     model_id,
-                    device_map="auto",
+                    device_map=device_map,
                     trust_remote_code=trust_remote_code,
                     **load_kwargs,
                 )
@@ -358,7 +359,7 @@ class HF_BNB_Adapter(_QuantizedCausalIntrospectionMixin, HFAdapterMixin, ModelAd
                 model = self._load_pretrained_model(
                     AutoModelForCausalLM,
                     model_id,
-                    device_map="auto",
+                    device_map=device_map,
                     trust_remote_code=trust_remote_code,
                     quantization_config=quantization_config,
                     **load_kwargs,

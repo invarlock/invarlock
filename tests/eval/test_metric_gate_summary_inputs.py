@@ -77,11 +77,11 @@ def test_tail_summary_handles_invalid_inputs_and_empty_result() -> None:
 
     assert summary["n"] == 0
     assert summary["epsilon"] == 0.0
-    assert math.isnan(summary["max"])
+    assert summary["max"] is None
     assert summary["tail_mass"] == 0.0
-    assert math.isnan(summary["q25"])
-    assert math.isnan(summary["q100"])
-    assert math.isnan(summary["q0"])
+    assert summary["q25"] is None
+    assert summary["q100"] is None
+    assert summary["q0"] is None
     assert "tail_mass_weighted" not in summary
 
 

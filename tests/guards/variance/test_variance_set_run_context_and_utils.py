@@ -41,6 +41,35 @@ def test_set_run_context_pairing_and_monitor_only():
     assert "pairing_reference" not in g._stats
 
 
+def test_set_run_context_accepts_only_verified_explicit_noop_as_no_change():
+    verified = VarianceGuard()
+    verified.set_run_context(
+        SimpleNamespace(
+            meta={},
+            context={},
+            edit={"name": "noop", "deltas": {"params_changed": 0}},
+        )
+    )
+    assert verified._explicit_noop_no_change is True
+    assert verified._monitor_only is False
+    assert any(
+        event["kind"] == "no_adjustment_required"
+        for event in verified.diagnostic_records
+    )
+
+    rejected_edits = (
+        {"name": "structured", "deltas": {"params_changed": 0}},
+        {"name": "noop", "deltas": {"params_changed": False}},
+        {"name": "noop", "deltas": {"params_changed": 0.0}},
+        {"name": "noop", "deltas": {"params_changed": "0"}},
+        {"name": "noop", "deltas": {}},
+    )
+    for edit in rejected_edits:
+        guard = VarianceGuard()
+        guard.set_run_context(SimpleNamespace(meta={}, context={}, edit=edit))
+        assert guard._explicit_noop_no_change is False
+
+
 def test_tensorize_and_extract_window_ids():
     g = VarianceGuard()
     # Materialize nested structures

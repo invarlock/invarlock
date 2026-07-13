@@ -4,7 +4,6 @@ import invarlock.guards as guards_pkg
 import invarlock.guards.policies as guard_policies
 from invarlock.core.exceptions import GuardError, PolicyViolationError, ValidationError
 from invarlock.guards.policies import (
-    check_policy_drift,
     create_custom_rmt_policy,
     create_custom_spectral_policy,
     create_custom_variance_policy,
@@ -18,6 +17,12 @@ from invarlock.guards.policies import (
     get_variance_policy_for_model_size,
 )
 from invarlock.guards.rmt_policy import apply_rmt_policy_overrides
+from invarlock.guards.tier_config import (
+    TierConfigError,
+)
+from invarlock.guards.tier_config import (
+    get_tier_guard_config as get_packaged_tier_guard_config,
+)
 
 guards_pkg.policies = guard_policies
 
@@ -31,56 +36,55 @@ def _patch_tier_guard_config(monkeypatch: pytest.MonkeyPatch, replacement) -> No
     )
 
 
-def test_get_variance_policy_overlay_and_fallback(monkeypatch: pytest.MonkeyPatch):
-    """Ensure variance policy overlay from tiers.yaml and error fallback are exercised."""
+def test_get_variance_policy_overlay_and_load_failure(monkeypatch: pytest.MonkeyPatch):
+    """Ensure variance policy overlays and packaged-policy failures are explicit."""
 
     def _fake_variance_tier(name: str, guard: str):
         assert guard == "variance_guard"
         assert name == "balanced"
-        return {
-            "deadband": 0.07,
-            "min_effect_lognll": 0.002,
-            "min_abs_adjust": 0.03,
-            "max_scale_step": 0.02,
-            "topk_backstop": 3,
-            "predictive_one_sided": True,
-        }
+        config = get_packaged_tier_guard_config("balanced", "variance_guard")
+        config.update(
+            {
+                "deadband": 0.07,
+                "min_effect_lognll": 0.002,
+                "min_abs_adjust": 0.03,
+                "max_scale_step": 0.02,
+                "topk_backstop": 3,
+                "predictive_one_sided": True,
+            }
+        )
+        return config
 
     # Overlay branch
     _patch_tier_guard_config(monkeypatch, _fake_variance_tier)
-    overlaid = get_variance_policy("balanced", use_yaml=True)
+    overlaid = get_variance_policy("balanced")
     assert overlaid["deadband"] == 0.07
     assert overlaid["min_effect_lognll"] == 0.002
     assert overlaid["min_abs_adjust"] == 0.03
     assert overlaid["max_scale_step"] == 0.02
     assert overlaid["topk_backstop"] == 3
 
-    # Partial overlay to exercise false branches for some keys.
+    # Partial policy objects are rejected rather than filled from constants.
     def _partial_variance_tier(name: str, guard: str):
         assert guard == "variance_guard"
         assert name == "balanced"
         return {"deadband": 0.09}
 
     _patch_tier_guard_config(monkeypatch, _partial_variance_tier)
-    partial = get_variance_policy("balanced", use_yaml=True)
-    assert partial["deadband"] == 0.09
-
-    # Fallback branch on error
-    baseline = get_variance_policy("balanced", use_yaml=False)
+    with pytest.raises(TierConfigError, match="packaged variance policy"):
+        get_variance_policy("balanced")
 
     def _boom(*_args, **_kwargs):
         raise RuntimeError("tiers lookup failed")
 
     _patch_tier_guard_config(monkeypatch, _boom)
-    fallback = get_variance_policy("balanced", use_yaml=True)
-    assert fallback == baseline
+    with pytest.raises(TierConfigError, match="packaged variance policy"):
+        get_variance_policy("balanced")
 
 
-def test_get_variance_policy_preserves_default_deadband_when_overlay_omits_it(
+def test_get_variance_policy_rejects_incomplete_packaged_object(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    baseline = get_variance_policy("balanced", use_yaml=False)
-
     def _variance_without_deadband(name: str, guard: str):
         assert guard == "variance_guard"
         assert name == "balanced"
@@ -88,17 +92,13 @@ def test_get_variance_policy_preserves_default_deadband_when_overlay_omits_it(
 
     _patch_tier_guard_config(monkeypatch, _variance_without_deadband)
 
-    overlay = get_variance_policy("balanced", use_yaml=True)
-
-    assert overlay["deadband"] == baseline["deadband"]
-    assert overlay["min_effect_lognll"] == 0.004
+    with pytest.raises(TierConfigError, match="packaged variance policy"):
+        get_variance_policy("balanced")
 
 
 def test_get_variance_policy_ignores_bool_numeric_overlay_values(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    baseline = get_variance_policy("balanced", use_yaml=False)
-
     def _invalid_variance_tier(name: str, guard: str):
         assert guard == "variance_guard"
         assert name == "balanced"
@@ -113,13 +113,8 @@ def test_get_variance_policy_ignores_bool_numeric_overlay_values(
 
     _patch_tier_guard_config(monkeypatch, _invalid_variance_tier)
 
-    overlay = get_variance_policy("balanced", use_yaml=True)
-
-    assert overlay["deadband"] == baseline["deadband"]
-    assert overlay["min_effect_lognll"] == baseline["min_effect_lognll"]
-    assert overlay["min_abs_adjust"] == baseline["min_abs_adjust"]
-    assert overlay["max_scale_step"] == baseline["max_scale_step"]
-    assert overlay["topk_backstop"] == baseline["topk_backstop"]
+    with pytest.raises(TierConfigError, match="packaged variance policy"):
+        get_variance_policy("balanced")
 
 
 def test_get_spectral_policy_and_errors():
@@ -140,57 +135,60 @@ def test_get_spectral_policy_and_errors():
         create_custom_spectral_policy(scope="bad")
 
 
-def test_get_spectral_policy_overlays_and_fallback(monkeypatch: pytest.MonkeyPatch):
-    """Exercise spectral policy overlay from tiers.yaml and error fallback."""
+def test_get_spectral_policy_overlays_and_load_failure(monkeypatch: pytest.MonkeyPatch):
+    """Exercise spectral overlays and explicit packaged-policy failure."""
 
     def _fake_tier_config(name: str, guard: str):
         assert guard == "spectral_guard"
         assert name == "balanced"
-        return {
-            "sigma_quantile": 0.77,
-            "deadband": 0.09,
-            "scope": "all",
-            "max_caps": 9,
-            "family_caps": {"ffn": True, "attn": 3},
-            "multiple_testing": {"method": "bh", "alpha": 0.01, "m": 3},
-        }
+        config = get_packaged_tier_guard_config("balanced", "spectral_guard")
+        config.update(
+            {
+                "sigma_quantile": 0.77,
+                "deadband": 0.09,
+                "scope": "all",
+                "max_caps": 9,
+                "family_caps": {
+                    "ffn": 4.0,
+                    "attn": 3.0,
+                    "embed": 2.0,
+                    "other": 1.0,
+                },
+                "multiple_testing": {"method": "bh", "alpha": 0.01, "m": 3},
+            }
+        )
+        return config
 
     _patch_tier_guard_config(monkeypatch, _fake_tier_config)
-    overlay = get_spectral_policy("balanced", use_yaml=True)
+    overlay = get_spectral_policy("balanced")
     assert overlay["sigma_quantile"] == 0.77
     assert overlay["deadband"] == 0.09
     assert overlay["scope"] == "all"
     assert overlay["max_caps"] == 9
-    assert overlay["family_caps"] == {"attn": {"kappa": 3.0}}
+    assert overlay["family_caps"]["attn"] == {"kappa": 3.0}
     assert overlay["multiple_testing"]["alpha"] == 0.01
 
-    # Partial overlay to exercise false branches on some keys.
+    # Partial policy objects are rejected rather than filled from constants.
     def _partial_tier_config(name: str, guard: str):
         assert guard == "spectral_guard"
         assert name == "balanced"
         return {"deadband": 0.11}
 
     _patch_tier_guard_config(monkeypatch, _partial_tier_config)
-    partial = get_spectral_policy("balanced", use_yaml=True)
-    # Only deadband should change; other keys remain defaults.
-    assert partial["deadband"] == 0.11
-
-    # When tiers lookup fails, we fall back to the hardcoded defaults.
-    baseline = get_spectral_policy("balanced", use_yaml=False)
+    with pytest.raises(TierConfigError, match="packaged spectral policy"):
+        get_spectral_policy("balanced")
 
     def _boom(*_args, **_kwargs):
         raise RuntimeError("tiers lookup failed")
 
     _patch_tier_guard_config(monkeypatch, _boom)
-    fallback = get_spectral_policy("balanced", use_yaml=True)
-    assert fallback == baseline
+    with pytest.raises(TierConfigError, match="packaged spectral policy"):
+        get_spectral_policy("balanced")
 
 
 def test_get_spectral_policy_ignores_invalid_overlay_values(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    baseline = get_spectral_policy("balanced", use_yaml=False)
-
     def _invalid_tier_config(name: str, guard: str):
         assert guard == "spectral_guard"
         assert name == "balanced"
@@ -203,13 +201,8 @@ def test_get_spectral_policy_ignores_invalid_overlay_values(
 
     _patch_tier_guard_config(monkeypatch, _invalid_tier_config)
 
-    overlay = get_spectral_policy("balanced", use_yaml=True)
-
-    assert overlay["sigma_quantile"] == baseline["sigma_quantile"]
-    assert overlay["deadband"] == baseline["deadband"]
-    assert overlay["scope"] == "attn"
-    assert overlay["max_caps"] == baseline["max_caps"]
-    assert overlay["max_spectral_norm"] == 7.5
+    with pytest.raises(TierConfigError, match="packaged spectral policy"):
+        get_spectral_policy("balanced")
 
 
 def test_model_size_policy_selection():
@@ -352,49 +345,54 @@ def test_apply_rmt_policy_overrides_normalizes_module_patterns() -> None:
     assert guard.module_include_patterns == ()
 
 
-def test_get_rmt_policy_overlay_and_fallback(monkeypatch: pytest.MonkeyPatch):
-    """Exercise RMT policy overlay and fallback branches."""
+def test_get_rmt_policy_overlay_and_load_failure(monkeypatch: pytest.MonkeyPatch):
+    """Exercise RMT overlays and explicit packaged-policy failure."""
 
     def _fake_rmt_tier(name: str, guard: str):
         assert guard == "rmt_guard"
         assert name == "balanced"
-        return {
-            "deadband": 0.21,
-            "margin": 1.7,
-            "epsilon_by_family": {"ffn": True, "attn": 0.3},
-        }
+        config = get_packaged_tier_guard_config("balanced", "rmt_guard")
+        config.update(
+            {
+                "deadband": 0.21,
+                "margin": 1.7,
+                "epsilon_by_family": {
+                    "ffn": 0.2,
+                    "attn": 0.3,
+                    "embed": 0.4,
+                    "other": 0.5,
+                },
+            }
+        )
+        return config
 
     _patch_tier_guard_config(monkeypatch, _fake_rmt_tier)
-    overlaid = get_rmt_policy("balanced", use_yaml=True)
+    overlaid = get_rmt_policy("balanced")
     assert overlaid["deadband"] == 0.21
     assert overlaid["margin"] == 1.7
-    assert overlaid["epsilon_by_family"] == {"attn": 0.3}
+    assert overlaid["epsilon_by_family"]["attn"] == 0.3
 
-    # Partial overlay to exercise false branches on some keys.
+    # Partial policy objects are rejected rather than filled from constants.
     def _partial_rmt_tier(name: str, guard: str):
         assert guard == "rmt_guard"
         assert name == "balanced"
         return {"deadband": 0.19}
 
     _patch_tier_guard_config(monkeypatch, _partial_rmt_tier)
-    partial = get_rmt_policy("balanced", use_yaml=True)
-    assert partial["deadband"] == 0.19
-
-    baseline = get_rmt_policy("balanced", use_yaml=False)
+    with pytest.raises(TierConfigError, match="packaged RMT policy"):
+        get_rmt_policy("balanced")
 
     def _boom(*_args, **_kwargs):
         raise RuntimeError("tiers lookup failed")
 
     _patch_tier_guard_config(monkeypatch, _boom)
-    fallback = get_rmt_policy("balanced", use_yaml=True)
-    assert fallback == baseline
+    with pytest.raises(TierConfigError, match="packaged RMT policy"):
+        get_rmt_policy("balanced")
 
 
 def test_get_rmt_policy_ignores_invalid_overlay_values(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    baseline = get_rmt_policy("balanced", use_yaml=False)
-
     def _invalid_rmt_tier(name: str, guard: str):
         assert guard == "rmt_guard"
         assert name == "balanced"
@@ -406,19 +404,13 @@ def test_get_rmt_policy_ignores_invalid_overlay_values(
 
     _patch_tier_guard_config(monkeypatch, _invalid_rmt_tier)
 
-    overlay = get_rmt_policy("balanced", use_yaml=True)
-
-    assert overlay["deadband"] == baseline["deadband"]
-    assert overlay["margin"] == baseline["margin"]
-    assert overlay["epsilon_default"] == baseline["epsilon_default"]
-    assert overlay["epsilon_by_family"] == baseline["epsilon_by_family"]
+    with pytest.raises(TierConfigError, match="packaged RMT policy"):
+        get_rmt_policy("balanced")
 
 
 def test_get_rmt_policy_ignores_bool_deadband_and_margin_overlay_values(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    baseline = get_rmt_policy("balanced", use_yaml=False)
-
     def _invalid_rmt_tier(name: str, guard: str):
         assert guard == "rmt_guard"
         assert name == "balanced"
@@ -430,25 +422,18 @@ def test_get_rmt_policy_ignores_bool_deadband_and_margin_overlay_values(
 
     _patch_tier_guard_config(monkeypatch, _invalid_rmt_tier)
 
-    overlay = get_rmt_policy("balanced", use_yaml=True)
-
-    assert overlay["deadband"] == baseline["deadband"]
-    assert overlay["margin"] == baseline["margin"]
-    assert overlay["epsilon_default"] == 0.22
+    with pytest.raises(TierConfigError, match="packaged RMT policy"):
+        get_rmt_policy("balanced")
 
 
-def test_falsey_yaml_overlays_keep_default_policies(
+def test_empty_packaged_guard_objects_fail_instead_of_using_defaults(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    baseline_spectral = get_spectral_policy("balanced", use_yaml=False)
-    baseline_rmt = get_rmt_policy("balanced", use_yaml=False)
-    baseline_variance = get_variance_policy("balanced", use_yaml=False)
-
     _patch_tier_guard_config(monkeypatch, lambda *_a, **_k: {})
 
-    assert get_spectral_policy("balanced", use_yaml=True) == baseline_spectral
-    assert get_rmt_policy("balanced", use_yaml=True) == baseline_rmt
-    assert get_variance_policy("balanced", use_yaml=True) == baseline_variance
+    for resolver in (get_spectral_policy, get_rmt_policy, get_variance_policy):
+        with pytest.raises(TierConfigError, match="Failed to resolve packaged"):
+            resolver("balanced")
 
 
 def test_variance_policy_and_errors():
@@ -636,9 +621,3 @@ def test_enforce_validation_gate_ignores_bool_numeric_metrics() -> None:
     }
 
     assert enforce_validation_gate(metrics, gate) is None
-
-
-def test_check_policy_drift_returns_dict():
-    """check_policy_drift should always return a mapping, even when drift exists."""
-    drift = check_policy_drift(silent=True)
-    assert isinstance(drift, dict)

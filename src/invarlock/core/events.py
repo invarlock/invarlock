@@ -134,7 +134,9 @@ class EventLogger:
             event["data"] = self._sanitize_data(data)
 
         try:
-            json_line = json.dumps(event, default=self._json_serializer)
+            json_line = json.dumps(
+                event, default=self._json_serializer, allow_nan=False
+            )
             self._file.write(json_line + "\n")
 
             if self.auto_flush:

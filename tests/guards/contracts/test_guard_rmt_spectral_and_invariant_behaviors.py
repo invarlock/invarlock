@@ -2,6 +2,8 @@
 Guard invariant, RMT, and spectral behavior tests.
 """
 
+import math
+
 import pytest
 import torch
 import torch.nn as nn
@@ -106,14 +108,21 @@ class TestGuardUtilityBehaviors:
         result1 = apply_relative_spectral_cap(
             self.model, cap_ratio=2.0, baseline_sigmas=baselines
         )
-        assert isinstance(result1, dict)
-        assert not result1.get("applied")  # Placeholder returns False
+        assert result1 == {
+            "applied": False,
+            "cap_ratio": 2.0,
+            "capped_modules": [],
+            "failed_modules": [],
+            "message": "Applied spectral capping to 0 modules",
+        }
 
         result2 = apply_spectral_control(
             self.model, {"test": True, "baseline_sigmas": baselines}
         )
-        assert isinstance(result2, dict)
-        assert not result2.get("applied")  # Placeholder returns False
+        assert result2["applied"] is False
+        assert result2["capping_applied"] is False
+        assert result2["rescaling_applied"] is False
+        assert result2["corrections"] == []
 
         # Test compute_sigma_max with different inputs
         linear_layer = nn.Linear(20, 10)
@@ -128,14 +137,15 @@ class TestGuardUtilityBehaviors:
 
         # Test scan_model_gains
         gains = scan_model_gains(self.model)
-        assert isinstance(gains, dict)
-        if "total_layers" in gains:
-            assert gains["total_layers"] >= 0
+        assert gains["scanned_modules"] == 10
+        assert len(gains["spectral_norms"]) == 10
+        assert set(gains["weight_statistics"]) == set(baselines)
+        assert all(value > 0.0 for value in gains["spectral_norms"])
 
         # Test capture_baseline_sigmas
         baselines = capture_baseline_sigmas(self.model)
-        assert isinstance(baselines, dict)
-        # Placeholder implementation may return empty dict, which is fine
+        assert len(baselines) == 10
+        assert all(value > 0.0 for value in baselines.values())
 
     def test_rmt_functions_comprehensive(self):
         """Test RMT functions comprehensively."""
@@ -159,10 +169,12 @@ class TestGuardUtilityBehaviors:
 
         # Test analyze_weight_distribution
         dist_stats = analyze_weight_distribution(self.model)
-        assert isinstance(dist_stats, dict)
-        if dist_stats:  # May be empty for some models
-            assert "mean" in dist_stats
-            assert "std" in dist_stats
+        assert math.isfinite(dist_stats["mean"])
+        assert dist_stats["std"] > 0.0
+        assert len(dist_stats["histogram"]) == 50
+        assert len(dist_stats["bin_edges"]) == 51
+        assert dist_stats["singular_values"]["max"] > 0.0
+        assert dist_stats["mp_edges"]["max"] > dist_stats["mp_edges"]["min"]
 
         # Test clip_full_svd
         W = torch.randn(10, 8)
@@ -371,20 +383,13 @@ class TestRMTGuardBehaviors:
         from invarlock.guards.rmt_analysis import analyze_weight_distribution
 
         stats = analyze_weight_distribution(self.model, n_bins=20)
-        assert isinstance(stats, dict)
-
-        if stats:  # May be empty for some models
-            assert "mean" in stats
-            assert "std" in stats
-            assert "histogram" in stats
-            assert "bin_edges" in stats
-
-            if "singular_values" in stats:
-                assert "condition_number" in stats["singular_values"]
-
-            if "mp_edges" in stats:
-                assert "min" in stats["mp_edges"]
-                assert "max" in stats["mp_edges"]
+        assert math.isfinite(stats["mean"])
+        assert stats["std"] > 0.0
+        assert len(stats["histogram"]) == 20
+        assert len(stats["bin_edges"]) == 21
+        assert stats["singular_values"]["condition_number"] > 0.0
+        assert stats["mp_edges"]["min"] >= 0.0
+        assert stats["mp_edges"]["max"] > stats["mp_edges"]["min"]
 
     def test_guard_finalize_comprehensive(self):
         """Test RMT finalize ε-band evaluation."""
@@ -464,16 +469,18 @@ class TestSpectralGuardBehaviors:
                 "baseline_sigmas": baselines,
             },
         )
-        assert isinstance(result, dict)
-        assert not result.get("applied")  # Placeholder returns False
+        assert result["applied"] is False
+        assert result["capping_applied"] is False
+        assert result["corrections"] == []
 
         # Test with different policy
         result = apply_spectral_control(
             model=self.model,
             policy={"scope": "all", "verbose": False, "baseline_sigmas": baselines},
         )
-        assert isinstance(result, dict)
-        assert not result.get("applied")  # Placeholder returns False
+        assert result["applied"] is False
+        assert result["capping_applied"] is False
+        assert result["corrections"] == []
 
     def test_apply_relative_spectral_cap_comprehensive(self):
         """Test apply_relative_spectral_cap with various parameters."""
@@ -483,43 +490,48 @@ class TestSpectralGuardBehaviors:
         result = apply_relative_spectral_cap(
             model=self.model, cap_ratio=1.5, baseline_sigmas=baselines
         )
-        assert isinstance(result, dict)
-        assert not result.get("applied")  # Placeholder returns False
+        assert result["applied"] is False
+        assert result["capped_modules"] == []
+
+        target_name = next(iter(baselines))
+        target_module = dict(self.model.named_modules())[target_name]
+        with torch.no_grad():
+            target_module.weight.mul_(3.0)
 
         # Test with different cap ratio
         result = apply_relative_spectral_cap(
             model=self.model, cap_ratio=2.0, baseline_sigmas=baselines
         )
-        assert isinstance(result, dict)
-        assert not result.get("applied")  # Placeholder returns False
+        assert result["applied"] is True
+        assert [item["module"] for item in result["capped_modules"]] == [target_name]
+        assert result["failed_modules"] == []
+        capped_sigma = compute_sigma_max(target_module.weight)
+        assert capped_sigma == pytest.approx(2.0 * baselines[target_name], rel=1e-5)
 
     def test_scan_model_gains_basic(self):
         """Test scan_model_gains basic functionality."""
         # Test basic functionality (no scope parameter in minimal implementation)
         gains = scan_model_gains(self.model)
-
-        assert isinstance(gains, dict)
-        if "total_layers" in gains:
-            assert gains["total_layers"] >= 0
-        if "scanned_gains" in gains:
-            assert isinstance(gains["scanned_gains"], int)
+        assert gains["scanned_modules"] == 12
+        assert len(gains["spectral_norms"]) == 12
+        assert len(gains["weight_statistics"]) == 12
+        assert gains["max_spectral_norm"] >= gains["mean_spectral_norm"]
+        assert gains["mean_spectral_norm"] >= gains["min_spectral_norm"]
 
     def test_capture_baseline_sigmas_comprehensive(self):
         """Test capture_baseline_sigmas with different scenarios."""
-        # Test basic functionality (minimal implementation has simple signature)
         baselines = capture_baseline_sigmas(self.model)
-
-        assert isinstance(baselines, dict)
-        # Placeholder implementation may return empty dict or module->sigma mappings
+        assert len(baselines) == 12
+        assert all(value > 0.0 for value in baselines.values())
 
         # Test multiple calls to ensure consistency
         baselines2 = capture_baseline_sigmas(self.model)
-        assert isinstance(baselines2, dict)
+        assert baselines2 == pytest.approx(baselines, rel=0.0, abs=0.0)
 
         # Test with empty model
         empty_model = nn.Module()
         empty_baselines = capture_baseline_sigmas(empty_model)
-        assert isinstance(empty_baselines, dict)
+        assert empty_baselines == {}
 
     def test_spectral_functions_consistency(self):
         """Test consistency of spectral functions."""
@@ -531,13 +543,14 @@ class TestSpectralGuardBehaviors:
         assert isinstance(result1, dict)
         assert isinstance(result2, dict)
 
-        # Both should have "applied" field indicating placeholder status
-        assert "applied" in result1
-        assert "applied" in result2
+        assert result1["applied"] is False
+        assert result1["corrections"] == []
+        assert result2["applied"] is False
+        assert result2["capped_modules"] == []
 
         # Test that capture_baseline_sigmas works with the model
         baselines = capture_baseline_sigmas(self.model)
-        assert isinstance(baselines, dict)
+        assert len(baselines) == 12
 
         # Test compute_sigma_max with multiple layers
         for _name, module in self.model.named_modules():

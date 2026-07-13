@@ -54,9 +54,9 @@ def test_bench_policy_extract_and_markdown_cover_error_and_dash_paths() -> None:
                     probes=0,
                 ),
                 metrics={
-                    "primary_metric_overhead": 0.0,
-                    "guard_overhead_time": float("nan"),
-                    "guard_overhead_mem": 0.0,
+                    "guard_primary_metric_impact": 0.0,
+                    "guard_runtime_overhead": float("nan"),
+                    "guard_memory_overhead": 0.0,
                     "rmt_outliers_bare": 0,
                     "rmt_outliers_guarded": 0,
                 },
@@ -327,68 +327,24 @@ def test_metrics_runtime_invalid_label_branches_and_cuda_helpers(
         "empty_cache",
     ]
 
-    class _NameSeries:
-        def __init__(self, names: list[str]) -> None:
-            self._names = names
-
-        @property
-        def str(self) -> _NameSeries:
-            return self
-
-        def contains(self, pattern: str, case: bool = False, regex: bool = True):
-            del case, regex
-            return np.asarray(
-                [("embed" in name) or ("lm_head" in name) for name in self._names]
-            )
-
-    class _Frame:
-        def __init__(self, names: list[str]) -> None:
-            self._names = names
-            self.columns = ["name"]
-
-        def __getitem__(self, key):
-            if isinstance(key, str) and key == "name":
-                return _NameSeries(self._names)
-            return self.__class__(
-                [
-                    name
-                    for name, keep in zip(self._names, list(key), strict=False)
-                    if keep
-                ]
-            )
-
-        def __len__(self) -> int:
-            return len(self._names)
-
     dep_manager = SimpleNamespace(
         is_available=lambda _name: True,
-        get_module=lambda _name: lambda _model, _batch: _Frame(["embed", "lm_head"]),
+        get_module=lambda _name: lambda _model: {"spectral_norms": []},
     )
     sigma_max = metrics_activation_mod._calculate_sigma_max(  # noqa: SLF001
         nn.Linear(2, 2),
-        {"input_ids": torch.ones((1, 2), dtype=torch.long)},
         dep_manager,
         MetricsConfig(use_cache=False),
-        torch.device("cpu"),
     )
     assert np.isnan(sigma_max)
 
-    class _GainFrame(_Frame):
-        @property
-        def gain(self):
-            return [0.5 * (idx + 1) for idx, _ in enumerate(self._names)]
-
     sigma_max_nonempty = metrics_activation_mod._calculate_sigma_max(  # noqa: SLF001
         nn.Linear(2, 2),
-        {"input_ids": torch.ones((1, 2), dtype=torch.long)},
         SimpleNamespace(
             is_available=lambda _name: True,
-            get_module=lambda _name: (
-                lambda _model, _batch: _GainFrame(["embed", "block.0"])
-            ),
+            get_module=lambda _name: lambda _model: {"spectral_norms": [0.5]},
         ),
         MetricsConfig(use_cache=False),
-        torch.device("cpu"),
     )
     assert sigma_max_nonempty == pytest.approx(0.5)
 
@@ -398,6 +354,7 @@ def test_metrics_runtime_invalid_label_branches_and_cuda_helpers(
             torch.zeros(2, dtype=torch.float32),
             max_per_layer=2,
             config=MetricsConfig(use_cache=False),
+            mi_scores_fn=lambda x, _y: torch.zeros(x.shape[1]),
         )
     )
 

@@ -121,10 +121,25 @@ def iter_adapter_layer_modules(
         elif hasattr(modules, "items"):
             module_items = modules.items()
         else:
+            _log(
+                log_event,
+                "adapter_layer_modules_invalid",
+                level="WARN",
+                message="Adapter layer module discovery returned a non-mapping value",
+                layer=index,
+            )
             continue
         for key, module in module_items:
             if isinstance(key, str):
                 yield AdapterLayerModule(index, key, module)
+            else:
+                _log(
+                    log_event,
+                    "adapter_layer_module_key_invalid",
+                    level="WARN",
+                    message="Adapter layer module discovery returned a non-string key",
+                    layer=index,
+                )
 
 
 def iter_named_adapter_scoped_modules(
@@ -138,6 +153,14 @@ def iter_named_adapter_scoped_modules(
         name = f"adapter.layers.{item.layer_index}.{item.key}"
         if should_include(name, item.module):
             yield name, item.module
+        else:
+            _log(
+                log_event,
+                "adapter_layer_module_excluded",
+                level="INFO",
+                message="Adapter module was excluded by the spectral selector",
+                module=name,
+            )
 
 
 __all__ = [

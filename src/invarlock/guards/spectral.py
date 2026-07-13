@@ -266,8 +266,12 @@ class SpectralGuard(Guard):
         self.baseline_family_stats: dict[str, dict[str, float]] = {}
         self.module_family_map: dict[str, str] = {}
         self.latest_z_scores: dict[str, float] = {}
+        self.latest_degeneracy: dict[str, dict[str, float]] = {}
         self.pre_edit_z_scores: dict[str, float] = {}
         self.baseline_degeneracy: dict[str, dict[str, float]] = {}
+        self.measurement_inventory: dict[str, dict[str, Any]] = {}
+        self.correction_ledger: dict[str, Any] = {}
+        self._baseline_module_identities: dict[str, tuple[Any, Any]] = {}
         self._measurement_diagnostics: list[dict[str, Any]] = []
         self.module_include_patterns: tuple[str, ...] = ()
         self.module_exclude_patterns: tuple[str, ...] = ()
@@ -277,7 +281,19 @@ class SpectralGuard(Guard):
         self._scoped_modules_scope: str | None = None
         self._scoped_modules_adapter_id: int | None = None
         self._scoped_modules: tuple[tuple[str, Any], ...] = ()
+        self._module_aliases: dict[str, str] = {}
         self._adapter_ref: Any | None = None
+        self._external_baseline_required = False
+        self._external_baseline_ready = False
+        self._external_baseline_reason: str | None = None
+        self._external_baseline_evidence: dict[str, Any] | None = None
+        self.correction_cap_ratio = float(kwargs.get("correction_cap_ratio", 2.0))
+        if (
+            not math.isfinite(self.correction_cap_ratio)
+            or self.correction_cap_ratio <= 0
+        ):
+            raise ValueError("spectral.correction_cap_ratio must be finite and > 0")
+        self.config["correction_cap_ratio"] = self.correction_cap_ratio
 
     def _log_event(
         self, operation: str, level: str = "INFO", message: str = "", **data: Any
@@ -336,33 +352,54 @@ class SpectralGuard(Guard):
         profile = ""
         if isinstance(ctx, dict):
             profile = str(ctx.get("profile", "") or "").strip().lower()
+            self._external_baseline_required = bool(
+                ctx.get("baseline_guard_evidence_required", False)
+            )
+            evidence = ctx.get("baseline_guard_evidence")
+            spectral = evidence.get("spectral") if isinstance(evidence, dict) else None
+            self._external_baseline_evidence = (
+                dict(spectral) if isinstance(spectral, dict) else None
+            )
         self._run_profile = profile or None
+
+    def load_external_baseline_evidence(self) -> dict[str, Any]:
+        """Replace run-local prepare state with the paired baseline evidence."""
+
+        return _spectral_runtime.load_external_baseline_evidence(self)
 
     def _serialize_policy(self) -> dict[str, Any]:
         return _spectral_policy.serialize_policy(self)
 
     def _get_scoped_modules(self, model: Any) -> tuple[tuple[str, Any], ...]:
-        model_id = id(model)
         adapter = self._adapter_ref
-        adapter_id = id(adapter) if adapter is not None else None
-        if (
-            self._scoped_modules_model_id == model_id
-            and self._scoped_modules_scope == self.scope
-            and self._scoped_modules_adapter_id == adapter_id
-        ):
-            return self._scoped_modules
-
-        scoped_modules = tuple(
+        # Resolve live objects for every phase. Edits may replace a submodule
+        # without changing the parent model identity; caching object references
+        # would then measure the detached pre-edit module.
+        candidate_modules = tuple(
             (name, module)
             for name, module in model.named_modules()
             if self._should_check_module(name, module)
         )
-        if not scoped_modules:
-            scoped_modules = self._get_adapter_scoped_modules(model, adapter)
+        if not candidate_modules:
+            candidate_modules = self._get_adapter_scoped_modules(model, adapter)
+        scoped: list[tuple[str, Any]] = []
+        primary_by_weight: dict[int, str] = {}
+        aliases: dict[str, str] = {}
+        for name, module in candidate_modules:
+            weight = getattr(module, "weight", None)
+            weight_identity = id(weight)
+            primary = primary_by_weight.get(weight_identity)
+            if primary is not None:
+                aliases[str(name)] = primary
+                continue
+            primary_by_weight[weight_identity] = str(name)
+            scoped.append((str(name), module))
+        scoped_modules = tuple(scoped)
+        self._module_aliases = aliases
 
-        self._scoped_modules_model_id = model_id
+        self._scoped_modules_model_id = id(model)
         self._scoped_modules_scope = self.scope
-        self._scoped_modules_adapter_id = adapter_id
+        self._scoped_modules_adapter_id = id(adapter) if adapter is not None else None
         self._scoped_modules = scoped_modules
         return scoped_modules
 

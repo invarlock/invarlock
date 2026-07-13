@@ -49,7 +49,8 @@ def test_variance_enable_disable_applies_and_reverts_scales():
     assert g.disable(model) is True
     assert g._enabled is False
     after_disable = module.weight.detach().clone()
-    assert torch.allclose(original, after_disable)
+    assert torch.equal(original, after_disable)
+    assert g._last_restore_exact is True
 
 
 def test_variance_validate_payload_fields_present():

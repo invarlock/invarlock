@@ -5,7 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from invarlock.core.guard_evidence import GuardEvidence
+from invarlock.core.assurance_guard_validation import (
+    guard_evidence_policy_errors,
+    strict_guard_chain_errors,
+)
+from invarlock.core.assurance_plugin_validation import (
+    strict_plugin_provenance_errors,
+)
 
 CANONICAL_GUARD_CHAIN = (
     "invariants",
@@ -24,6 +30,48 @@ REPORT_BUILD_EVENT_CATEGORIES = (
     "repaired_fields",
     "fallback_fields",
 )
+
+
+def report_tiny_relax_enabled(report: dict[str, Any] | None) -> bool:
+    """Return whether a report declares the development-only tiny-relax mode."""
+
+    if not isinstance(report, dict):
+        return False
+
+    def _coerce(value: Any) -> bool | None:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, int):
+            return bool(value) if value in {0, 1} else None
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "on"}:
+                return True
+            if normalized in {"0", "false", "no", "off"}:
+                return False
+        return None
+
+    context = report.get("context")
+    if isinstance(context, dict):
+        for owner in ("run", "eval"):
+            owner_context = context.get(owner)
+            if isinstance(owner_context, dict):
+                resolved = _coerce(owner_context.get("tiny_relax"))
+                if resolved is not None:
+                    return resolved
+
+    auto = report.get("auto")
+    if isinstance(auto, dict):
+        resolved = _coerce(auto.get("tiny_relax"))
+        if resolved is not None:
+            return resolved
+
+    provenance = report.get("provenance")
+    if isinstance(provenance, dict):
+        flags = provenance.get("flags")
+        if isinstance(flags, list):
+            return "tiny_relax" in {str(flag).strip().lower() for flag in flags}
+    return False
 
 
 @dataclass(frozen=True)
@@ -106,7 +154,10 @@ def strict_evaluate_policy_errors(
     if not is_canonical_guard_chain(guards_order):
         errors.append("strict assurance requires the canonical guard chain.")
     if execution_name != "container" or allow_unverified_provenance:
-        errors.append("strict assurance requires verified container provenance.")
+        errors.append(
+            "strict assurance requires container execution mode and fail-closed "
+            "runtime provenance checks."
+        )
     return errors
 
 
@@ -218,13 +269,6 @@ def report_build_has_blocking_evidence_events(report: dict[str, Any]) -> bool:
     return False
 
 
-def _strict_guard_blocking_reasons(guard_name: str, block: Any) -> tuple[str, ...]:
-    evidence = GuardEvidence.from_report_block(guard_name, block)
-    if evidence is None:
-        return ()
-    return evidence.strict_blocking_reasons()
-
-
 def resolve_report_runtime_provenance_declared(
     report: dict[str, Any], *, default: str = "unknown"
 ) -> str:
@@ -293,11 +337,24 @@ def build_assurance_section(
         if fallback_fields_used:
             reasons.append("strict assurance forbids synthesized or repaired fields.")
         if provenance_status not in {"pending", "verified"}:
-            reasons.append("strict assurance requires verified runtime provenance.")
-        for guard_name in ("spectral", "rmt", "variance", "invariants"):
-            reasons.extend(
-                _strict_guard_blocking_reasons(guard_name, report.get(guard_name))
+            reasons.append(
+                "strict assurance requires report/manifest binding plus a "
+                "independently supplied runtime image digest."
             )
+        reasons.extend(
+            strict_guard_chain_errors(
+                report,
+                canonical_chain=CANONICAL_GUARD_CHAIN,
+                require_assurance=False,
+            )
+        )
+        reasons.extend(guard_evidence_policy_errors(report, require_complete=True))
+        reasons.extend(
+            strict_plugin_provenance_errors(
+                report,
+                canonical_guard_chain=CANONICAL_GUARD_CHAIN,
+            )
+        )
     report_local_verdict = "pass" if not reasons else "fail"
     if reasons:
         verdict = "fail"
@@ -330,10 +387,13 @@ def strict_report_policy_errors(
     require_strict: bool,
     fallback_fields_used: bool | None = None,
     runtime_provenance_verified: bool | None = None,
+    verifier_profile: str | None = None,
 ) -> list[str]:
     if not require_strict:
         return []
     errors: list[str] = []
+    if report_tiny_relax_enabled(report):
+        errors.append("strict assurance forbids development-only tiny_relax policy.")
     assurance = report.get("assurance")
     if not isinstance(assurance, dict):
         errors.append("strict assurance report missing assurance section.")
@@ -342,44 +402,106 @@ def strict_report_policy_errors(
             errors.append("strict assurance report has unknown claim_set.")
         if assurance.get("mode") != "strict":
             errors.append("strict assurance report mode must be strict.")
-        verdict = assurance.get("verdict")
-        if verdict not in {"pass", "pending_verifier"}:
-            errors.append("strict assurance verdict must be pass or pending_verifier.")
-        if (
-            verdict == "pending_verifier"
-            and runtime_provenance_verified is True
-            and assurance.get("report_local_verdict") not in {None, "pass"}
-        ):
-            errors.append("strict assurance report-local verdict must be pass.")
+        if assurance.get("verdict") != "pending_verifier":
+            errors.append(
+                "strict assurance.verdict must be pending_verifier in submitted evidence."
+            )
+        if assurance.get("report_local_verdict") != "pass":
+            errors.append("strict assurance.report_local_verdict must be pass.")
+        if assurance.get("verified_assurance_verdict") != "pending":
+            errors.append(
+                "strict assurance.verified_assurance_verdict must be pending."
+            )
         if assurance.get("canonical_guard_chain_enforced") is not True:
             errors.append(
                 "strict assurance requires canonical_guard_chain_enforced=true."
             )
-        if assurance.get("fallback_fields_used") is True:
-            errors.append("strict assurance forbids synthesized or repaired fields.")
+        if assurance.get("fallback_fields_used") is not False:
+            errors.append("strict assurance.fallback_fields_used must be false.")
+        if assurance.get("runtime_provenance_verified") is not False:
+            errors.append(
+                "strict assurance.runtime_provenance_verified must be false in "
+                "submitted evidence."
+            )
+        if assurance.get("runtime_provenance_declared") != "container":
+            errors.append(
+                "strict assurance.runtime_provenance_declared must be container."
+            )
+        if assurance.get("runtime_provenance_verification_status") != "pending":
+            errors.append(
+                "strict assurance.runtime_provenance_verification_status must be pending."
+            )
         blocking = assurance.get("blocking_reasons")
-        if isinstance(blocking, list) and blocking:
+        if not isinstance(blocking, list):
+            errors.append("strict assurance.blocking_reasons must be an array.")
+        elif blocking:
+            errors.append("strict assurance.blocking_reasons must be empty.")
             errors.extend(str(item) for item in blocking)
+        assurance_profile = assurance.get("profile")
+        if not isinstance(assurance_profile, str):
+            errors.append("strict assurance.profile must be a string.")
+        assurance_tier = assurance.get("tier")
+        if not isinstance(assurance_tier, str):
+            errors.append("strict assurance.tier must be a string.")
+        if verifier_profile is not None:
+            caller_profile = str(verifier_profile).strip().lower()
+            if caller_profile not in STRICT_ASSURANCE_PROFILES:
+                errors.append(
+                    "strict assurance verifier caller profile must be ci or release."
+                )
+            elif assurance_profile != caller_profile:
+                errors.append(
+                    "strict assurance verifier caller profile must exactly match "
+                    "assurance.profile."
+                )
     profile = _report_profile(report)
     tier = _report_tier(report)
     if profile not in STRICT_ASSURANCE_PROFILES:
         errors.append("strict assurance requires report profile ci or release.")
     if tier not in STRICT_ASSURANCE_TIERS:
         errors.append("strict assurance requires report tier balanced or conservative.")
-    if not is_canonical_guard_chain(observed_guard_chain_from_report(report)):
-        errors.append("strict assurance requires canonical guard chain evidence.")
+    policy_provenance = report.get("policy_provenance")
+    if not isinstance(policy_provenance, dict):
+        errors.append("strict assurance requires runtime-bound policy provenance.")
+    else:
+        if policy_provenance.get("source") != "runtime":
+            errors.append("strict assurance policy provenance source must be runtime.")
+    errors.extend(
+        strict_guard_chain_errors(report, canonical_chain=CANONICAL_GUARD_CHAIN)
+    )
+    context = report.get("context")
+    if isinstance(context, dict):
+        context_profile = context.get("profile")
+        if context_profile is not None and context_profile != profile:
+            errors.append(
+                "strict assurance.profile must match context.profile exactly."
+            )
+    meta = report.get("meta")
+    if isinstance(meta, dict):
+        meta_profile = meta.get("profile")
+        if meta_profile is not None and meta_profile != profile:
+            errors.append("strict assurance.profile must match meta.profile exactly.")
+    auto = report.get("auto")
+    if isinstance(auto, dict):
+        auto_tier = auto.get("tier")
+        if auto_tier is not None and auto_tier != tier:
+            errors.append("strict assurance.tier must match auto.tier exactly.")
     if fallback_fields_used is True:
         errors.append("strict assurance forbids synthesized or repaired fields.")
     if report_build_has_blocking_evidence_events(report):
         errors.append("strict assurance forbids synthesized or repaired fields.")
     if runtime_provenance_verified is False:
-        errors.append("strict assurance requires verified runtime provenance.")
-    for guard_name in ("spectral", "rmt", "variance", "invariants"):
-        block = report.get(guard_name)
-        if not isinstance(block, dict) or not block:
-            errors.append(f"strict assurance missing {guard_name} guard evidence.")
-            continue
-        errors.extend(_strict_guard_blocking_reasons(guard_name, block))
+        errors.append(
+            "strict assurance requires report/manifest binding plus a "
+            "independently supplied runtime image digest."
+        )
+    errors.extend(guard_evidence_policy_errors(report, require_complete=True))
+    errors.extend(
+        strict_plugin_provenance_errors(
+            report,
+            canonical_guard_chain=CANONICAL_GUARD_CHAIN,
+        )
+    )
     return _dedupe(errors)
 
 
@@ -408,6 +530,7 @@ __all__ = [
     "normalize_verify_assurance_mode",
     "observed_guard_chain_from_report",
     "report_build_has_blocking_evidence_events",
+    "report_tiny_relax_enabled",
     "resolve_report_assurance_mode",
     "resolve_report_runtime_provenance_declared",
     "strict_evaluate_policy_errors",

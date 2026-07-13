@@ -3,6 +3,7 @@ import types
 import torch
 import torch.nn as nn
 
+from invarlock.core.api import RunReport
 from invarlock.guards.invariants import InvariantsGuard
 
 
@@ -29,6 +30,22 @@ def test_invariants_guard_records_profile_checks():
     baseline_checks = guard.baseline_checks
     assert "profile::mlm_mask_alignment" in baseline_checks
     assert baseline_checks["profile::mlm_mask_alignment"] is True
+
+
+def test_strict_assurance_context_forces_invariants_to_fail_closed() -> None:
+    guard = InvariantsGuard(strict_mode=False, on_fail="monitor")
+    report = RunReport(context={"assurance": {"mode": "strict"}})
+
+    guard.set_run_context(report)
+    guard.prepare(
+        DummyBertModel(),
+        adapter=None,
+        calib=None,
+        policy={"strict_mode": False, "on_fail": "monitor"},
+    )
+
+    assert guard.strict_mode is True
+    assert guard.on_fail == "block"
 
 
 def test_invariants_guard_ignores_scalar_and_non_sequence_profile_checks() -> None:

@@ -79,3 +79,35 @@ def test_hf_bnb_surfaces_checkpoint_quantization_mismatch(
         "requested_quantization": "BitsAndBytesConfig",
         "recommended_adapter": "hf_causal",
     }
+
+
+def test_hf_bnb_prequantized_load_consumes_device_map_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, object]] = []
+    tr = types.ModuleType("transformers")
+
+    class _Auto:
+        @staticmethod
+        def from_pretrained(_model_id: str, **kwargs: object) -> object:
+            calls.append(dict(kwargs))
+            return object()
+
+    class _BitsAndBytesConfig:
+        pass
+
+    tr.AutoModelForCausalLM = _Auto
+    tr.BitsAndBytesConfig = _BitsAndBytesConfig
+    monkeypatch.setitem(sys.modules, "transformers", tr)
+
+    import invarlock.plugins as plugins
+
+    monkeypatch.setattr(
+        plugins, "_detect_pre_quantized_bnb", lambda _model_id: (True, 8)
+    )
+    adapter = plugins.HF_BNB_Adapter()
+    adapter.load_model("packed-checkpoint", device_map="cuda:0")
+
+    assert len(calls) == 1
+    assert calls[0]["device_map"] == "cuda:0"
+    assert calls[0]["trust_remote_code"] is False

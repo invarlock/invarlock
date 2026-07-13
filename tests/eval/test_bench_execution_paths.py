@@ -357,12 +357,12 @@ def test_execute_scenario_uses_explicit_epsilon_without_runtime_resolution(
             bare_result, guarded_result
         )
 
-        assert math.isnan(comparison["primary_metric_overhead"])
-        assert math.isnan(comparison["guard_overhead_time"])
-        assert math.isnan(comparison["guard_overhead_mem"])
+        assert math.isnan(comparison["guard_primary_metric_impact"])
+        assert math.isnan(comparison["guard_runtime_overhead"])
+        assert math.isnan(comparison["guard_memory_overhead"])
 
 
-def test_generate_step14_markdown_uses_dash_for_missing_time_overhead() -> None:
+def test_generate_step14_markdown_uses_dash_for_missing_runtime_overhead() -> None:
     summary = BenchmarkSummary(
         config=BenchmarkConfig(
             edits=["quant_rtn"],
@@ -378,9 +378,9 @@ def test_generate_step14_markdown_uses_dash_for_missing_time_overhead() -> None:
                     probes=0,
                 ),
                 metrics={
-                    "primary_metric_overhead": 0.0,
-                    "guard_overhead_time": float("nan"),
-                    "guard_overhead_mem": 0.0,
+                    "guard_primary_metric_impact": 0.0,
+                    "guard_runtime_overhead": float("nan"),
+                    "guard_memory_overhead": 0.0,
                     "rmt_outliers_bare": 0,
                     "rmt_outliers_guarded": 0,
                 },
@@ -421,6 +421,6 @@ def test_generate_step14_markdown_uses_dash_for_missing_time_overhead() -> None:
             bare_result, guarded_result
         )
 
-        assert math.isnan(comparison["primary_metric_overhead"])
-        assert math.isnan(comparison["guard_overhead_time"])
-        assert math.isnan(comparison["guard_overhead_mem"])
+        assert math.isnan(comparison["guard_primary_metric_impact"])
+        assert math.isnan(comparison["guard_runtime_overhead"])
+        assert math.isnan(comparison["guard_memory_overhead"])

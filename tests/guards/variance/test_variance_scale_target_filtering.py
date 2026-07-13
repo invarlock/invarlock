@@ -51,6 +51,7 @@ class TestScaleTargetFiltering:
                 "max_calib": 100,
                 "deadband": 0.0,
                 "min_abs_adjust": 0.0,
+                "max_adjusted_modules": 0,
                 "tap": "transformer.h.*.mlp.c_proj",
             }
         )
@@ -96,6 +97,7 @@ class TestScaleTargetFiltering:
                 "max_calib": 100,
                 "deadband": 0.0,
                 "min_abs_adjust": 0.0,
+                "max_adjusted_modules": 0,
                 "tap": "transformer.h.*.attn.c_proj",
             }
         )
@@ -141,6 +143,7 @@ class TestScaleTargetFiltering:
                 "max_calib": 100,
                 "deadband": 0.0,
                 "min_abs_adjust": 0.0,
+                "max_adjusted_modules": 0,
                 "tap": "transformer.h.*.*.*",  # Match all projections
             }
         )
@@ -198,6 +201,7 @@ class TestScaleTargetFiltering:
                 "max_calib": 100,
                 "deadband": 0.0,
                 "min_abs_adjust": 0.0,
+                "max_adjusted_modules": 0,
                 "tap": "transformer.h.*.mlp.c_proj",
             }
         )

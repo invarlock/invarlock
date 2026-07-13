@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gc
+import importlib
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -14,6 +15,8 @@ import torch
 import torch.nn as nn
 
 from invarlock.core.exceptions import MetricsError, ValidationError
+from invarlock.eval.probes.importance import mi_neuron_scores
+from invarlock.guards.spectral_measurement import scan_model_gains
 
 logger = logging.getLogger(__name__)
 
@@ -67,10 +70,6 @@ class MetricsConfig:
 
     strict_validation: bool = True
     allow_empty_data: bool = False
-
-    sigma_max_margin: float = 0.98
-    mi_gini_subsample_ratio: float = 0.05
-    head_energy_layers_filter: bool = True
 
     def __post_init__(self) -> None:
         if self.oracle_windows < 0:
@@ -175,28 +174,26 @@ class DependencyManager:
     """Manages optional dependencies with graceful degradation."""
 
     def __init__(self):
-        self.available_modules: dict[str, Any] = {}
+        self.available_modules: dict[str, Any] = {
+            "scan_model_gains": scan_model_gains,
+        }
         self.missing_modules: list[tuple[str, str]] = []
         self._check_dependencies()
 
     def _check_dependencies(self) -> None:
         try:
-            from .lens2_mi import mi_scores
+            feature_selection = importlib.import_module("sklearn.feature_selection")
+            mutual_info = feature_selection.mutual_info_regression
+            if not callable(mutual_info):
+                raise AttributeError(
+                    "sklearn.feature_selection.mutual_info_regression is not callable"
+                )
 
-            self.available_modules["mi_scores"] = mi_scores
-            logger.info("✓ lens2_mi module available")
-        except ImportError as e:
-            self.missing_modules.append(("lens2_mi", str(e)))
-            logger.warning("✗ lens2_mi module not available - MI-Gini will be NaN")
-
-        try:
-            from .lens3 import scan_model_gains
-
-            self.available_modules["scan_model_gains"] = scan_model_gains
-            logger.info("✓ lens3 module available")
-        except ImportError as e:
-            self.missing_modules.append(("lens3", str(e)))
-            logger.warning("✗ lens3 module not available - σ_max will be NaN")
+            self.available_modules["mi_scores"] = mi_neuron_scores
+            logger.info("Mutual-information scoring is available")
+        except (AttributeError, ImportError, OSError, RuntimeError, ValueError) as e:
+            self.missing_modules.append(("scikit-learn", str(e)))
+            logger.warning("scikit-learn is not available; MI-Gini will be unavailable")
 
     def get_module(self, name: str) -> Any:
         if name in self.available_modules:

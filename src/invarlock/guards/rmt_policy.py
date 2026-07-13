@@ -193,10 +193,11 @@ def compute_epsilon_violations(guard: Any) -> list[dict[str, Any]]:
 def get_rmt_policy(name: str = "balanced") -> RMTPolicyDict:
     """Return the in-module fallback policy set.
 
-    The calibrated source of truth used by the runtime is
-    `invarlock.guards.policies.get_rmt_policy(..., use_yaml=True)`,
-    which overlays values from `runtime/tiers.yaml`. These hardcoded values are
-    kept only as a defensive fallback for direct imports of this module.
+    The packaged policy source used by the runtime is
+    `invarlock.guards.policies.get_rmt_policy(...)`,
+    which overlays values from ``invarlock/_data/runtime/tiers.yaml``. These
+    hardcoded values mirror that resource for defensive direct imports of this
+    module; they do not constitute calibration evidence.
     """
 
     fallback_policies = {
@@ -205,24 +206,24 @@ def get_rmt_policy(name: str = "balanced") -> RMTPolicyDict:
             deadband=0.05,
             margin=1.3,
             correct=True,
-            epsilon_default=0.06,
-            epsilon_by_family={"ffn": 0.06, "attn": 0.05, "embed": 0.07, "other": 0.07},
+            epsilon_default=0.01,
+            epsilon_by_family={"ffn": 0.01, "attn": 0.01, "embed": 0.01, "other": 0.01},
         ),
         "balanced": RMTPolicyDict(
             q="auto",
             deadband=0.10,
             margin=1.5,
             correct=True,
-            epsilon_default=0.10,
-            epsilon_by_family={"ffn": 0.10, "attn": 0.08, "embed": 0.12, "other": 0.12},
+            epsilon_default=0.01,
+            epsilon_by_family={"ffn": 0.01, "attn": 0.01, "embed": 0.01, "other": 0.01},
         ),
         "aggressive": RMTPolicyDict(
             q="auto",
             deadband=0.15,
             margin=1.8,
             correct=True,
-            epsilon_default=0.15,
-            epsilon_by_family={"ffn": 0.15, "attn": 0.15, "embed": 0.15, "other": 0.15},
+            epsilon_default=0.01,
+            epsilon_by_family={"ffn": 0.01, "attn": 0.01, "embed": 0.01, "other": 0.01},
         ),
     }
 

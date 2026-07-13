@@ -160,12 +160,10 @@ def test_rmt_guard_covers_default_auto_context_and_none_epsilon() -> None:
     assert guard.epsilon_default == original
 
 
-def test_guard_policies_cover_overlay_passthrough(
+def test_guard_policies_reject_incomplete_spectral_policy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import invarlock.guards.policies as policies_mod
-
-    baseline = policies_mod.get_spectral_policy("balanced", use_yaml=False)
 
     def _overlay(_name: str, _guard: str) -> dict[str, object]:
         return {
@@ -179,17 +177,14 @@ def test_guard_policies_cover_overlay_passthrough(
         _overlay,
         raising=True,
     )
-    overlay = policies_mod.get_spectral_policy("balanced", use_yaml=True)
-    assert overlay["deadband"] == baseline["deadband"]
-    assert overlay["scope"] == "all"
+    with pytest.raises(policies_mod.TierConfigError, match="packaged spectral policy"):
+        policies_mod.get_spectral_policy("balanced")
 
 
-def test_guard_policies_ignore_non_mapping_rmt_epsilon_family_overlay(
+def test_guard_policies_reject_incomplete_rmt_policy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import invarlock.guards.policies as policies_mod
-
-    baseline = policies_mod.get_rmt_policy("balanced", use_yaml=False)
 
     monkeypatch.setattr(
         policies_mod,
@@ -198,6 +193,5 @@ def test_guard_policies_ignore_non_mapping_rmt_epsilon_family_overlay(
         raising=True,
     )
 
-    overlay = policies_mod.get_rmt_policy("balanced", use_yaml=True)
-
-    assert overlay["epsilon_by_family"] == baseline["epsilon_by_family"]
+    with pytest.raises(policies_mod.TierConfigError, match="packaged RMT policy"):
+        policies_mod.get_rmt_policy("balanced")

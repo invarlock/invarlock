@@ -234,7 +234,7 @@ def test_build_spectral_finalize_metrics_and_message_buckets() -> None:
         family_quantiles={"ffn": {"q95": 2.0}},
         top_z_scores={"ffn": [{"module": "m", "z": 2.0, "family": "ffn"}]},
     )
-    assert metrics["correction_applied"] is True
+    assert "correction_applied" not in metrics
     warnings, errors = categorize_spectral_messages(
         [
             {"message": "warn", "severity": "budgeted", "type": "family_z_cap"},

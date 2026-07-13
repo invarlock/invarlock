@@ -40,6 +40,11 @@ def _build_baseline_report(ppl_final: float) -> dict:
 
     report["metrics"].update(
         {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": ppl_final,
+                "final": ppl_final,
+            },
             "ppl_preview": ppl_final,
             "ppl_final": ppl_final,
             "ppl_ratio": 1.0 if ppl_final > 0 else 0.0,
@@ -51,7 +56,7 @@ def _build_baseline_report(ppl_final: float) -> dict:
 
     report["edit"].update(
         {
-            "name": "baseline",
+            "name": "noop",
             "plan_digest": "baseline_noop",
         }
     )
@@ -65,7 +70,7 @@ def test_normalize_baseline_raises_for_invalid_ppl():
     """Invalid baseline PPL values should fail closed."""
     baseline = _build_baseline_report(ppl_final=0.0)
 
-    with pytest.raises(ValueError, match="Invalid baseline"):
+    with pytest.raises(ValueError, match="Invalid canonical RunReport structure"):
         normalize_baseline(baseline)
 
 
@@ -81,20 +86,15 @@ def test_normalize_baseline_preserves_valid_values():
 
 
 def test_save_baseline_metrics_serializes_expected_schema(tmp_path: Path):
-    """Write a baseline-v1 payload and verify expected fields."""
+    """Write a canonical baseline RunReport and verify expected fields."""
     output_path = tmp_path / "baseline.json"
-
-    payload = {
-        "schema_version": "baseline-v1",
-        "metrics": {"ppl_final": 42.0, "ppl_ratio": 1.0},
-        "dataset": {"split": "validation"},
-    }
+    payload = _build_baseline_report(ppl_final=42.0)
     _save_baseline(payload, output_path)
 
     with output_path.open() as fp:
         out = json.load(fp)
 
-    assert out["schema_version"] == "baseline-v1"
+    assert out["edit"]["name"] == "noop"
     assert out["metrics"]["ppl_final"] == pytest.approx(42.0)
-    assert out["dataset"]["split"] == "validation"
+    assert out["data"]["split"] == "validation"
     assert out["metrics"]["ppl_ratio"] == 1.0

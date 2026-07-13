@@ -331,10 +331,11 @@ def test_hf_seq2seq_provider_supports_revision_prefix_and_nested_fields(monkeypa
     monkeypatch.setattr(
         data_support_mod, "load_dataset", fake_load_dataset, raising=False
     )
+    revision = "96df5e686bee6baa90b8bee7c28b81fa3fa6223d"
     provider = HFSeq2SeqProvider(
         "wmt14",
         config_name="de-en",
-        revision="abc123",
+        revision=revision,
         src_field="translation.en",
         tgt_field="translation.de",
         src_prefix="translate English to German: ",
@@ -353,7 +354,7 @@ def test_hf_seq2seq_provider_supports_revision_prefix_and_nested_fields(monkeypa
         "name": "de-en",
         "split": "validation",
         "cache_dir": None,
-        "kwargs": {"revision": "abc123"},
+        "kwargs": {"revision": revision},
     }
 
 

@@ -12,13 +12,17 @@ import torch
 # NOTE: import VarianceGuard only if it's part of the public surface;
 # otherwise, drive it via evaluation_report inputs in an integration test.
 from invarlock.core.auto_tuning import get_tier_policies
-from invarlock.core.runner_pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
+from invarlock.core.runner_runtime.pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
 from invarlock.guards.spectral import SpectralGuard
 from invarlock.guards.spectral_control import apply_relative_spectral_cap
 from invarlock.guards.variance import VarianceGuard
 from invarlock.reporting.guards_spectral import _extract_spectral_analysis
 from invarlock.reporting.report_make import _extract_rmt_analysis, make_report
 from invarlock.reporting.report_types import create_empty_report
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
 
 
 def _build_paired_run_and_baseline(
@@ -36,6 +40,15 @@ def _build_paired_run_and_baseline(
     ]
     weights = np.array(token_counts, dtype=float)
     wmean = float(np.average(deltas, weights=weights))
+    preview_ppl = math.exp(
+        float(np.average([math.log(x) for x in preview_values], weights=weights))
+    )
+    final_ppl = math.exp(
+        float(np.average([math.log(x) for x in final_values], weights=weights))
+    )
+    baseline_ppl = math.exp(
+        float(np.average([math.log(x) for x in baseline_final], weights=weights))
+    )
 
     report = {
         "meta": {
@@ -52,6 +65,7 @@ def _build_paired_run_and_baseline(
                 "target_pm_ratio": None,
             },
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "wikitext2",
             "split": "validation",
@@ -62,13 +76,25 @@ def _build_paired_run_and_baseline(
             "tokenizer_name": "gpt2",
         },
         "metrics": {
-            # No ppl_* keys; PM computed from windows. Keep analysis context only.
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": preview_ppl,
+                "final": final_ppl,
+                "ratio_vs_baseline": final_ppl / baseline_ppl,
+            },
             "logloss_delta": wmean,
             "logloss_delta_ci": (wmean - 0.01, wmean + 0.01),
-            "paired_delta_summary": {
+            "preview_final_slice_delta_summary": {
                 "mean": wmean,
-                "std": float(np.std(deltas, ddof=1)),
+                "ci": [wmean - 0.01, wmean + 0.01],
+                "basis": "independent_disjoint_slices",
+                "paired": False,
+                "ci_method": "independent_percentile_delta_log",
+                "ci_reason": None,
+                "preview_windows": len(preview_values),
+                "final_windows": len(final_values),
                 "degenerate": False,
+                "degenerate_reason": None,
             },
             "bootstrap": {
                 "method": "bca_paired_delta_log",
@@ -106,31 +132,54 @@ def _build_paired_run_and_baseline(
     }
 
     baseline = {
-        "run_id": "baseline-seed",
-        "model_id": "gpt2-small",
+        "meta": {
+            "model_id": "gpt2-small",
+            "adapter": "hf_causal",
+            "seed": 1337,
+            "auto": {"tier": "balanced"},
+        },
+        "context": {"profile": "dev"},
+        "data": {
+            "dataset": "wikitext2",
+            "split": "validation",
+            "seq_len": 768,
+            "stride": 768,
+            "preview_n": len(preview_values),
+            "final_n": len(final_values),
+        },
+        "edit": {"name": "noop"},
+        "guards": [],
         "metrics": {
             "primary_metric": {
                 "kind": "ppl_causal",
-                "final": math.exp(
-                    float(
-                        np.average(
-                            [math.log(x) for x in baseline_final],
-                            weights=weights,
-                        )
-                    )
-                ),
+                "preview": baseline_ppl,
+                "final": baseline_ppl,
             }
         },
         "evaluation_windows": {
+            "preview": {
+                "window_ids": [0, 1],
+                "logloss": [math.log(x) for x in baseline_final],
+                "token_counts": list(token_counts),
+            },
             "final": {
                 "window_ids": [0, 1],
                 "logloss": [math.log(x) for x in baseline_final],
                 "token_counts": list(token_counts),
-            }
+            },
         },
-        "rmt": {"outliers": 2},
+        "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
+        "flags": {"guard_recovered": False, "rollback_reason": None},
     }
     return report, baseline
+
+
+def _make_canonical_evaluation_report(
+    report: dict[str, Any], baseline: dict[str, Any]
+) -> dict[str, Any]:
+    """Build from current RunReport fixtures with an exact policy receipt."""
+
+    return make_report(canonical_run_report(report), canonical_baseline(baseline))
 
 
 def test_bootstrap_coverage_floors_match_assurance_docs():
@@ -146,8 +195,10 @@ def test_evaluation_report_enforces_paired_ratio_identity():
     with patch(
         "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
-        evaluation_report = make_report(deepcopy(report), deepcopy(baseline))
-    delta_mean = report["metrics"]["paired_delta_summary"]["mean"]
+        evaluation_report = _make_canonical_evaluation_report(
+            deepcopy(report), deepcopy(baseline)
+        )
+    delta_mean = report["metrics"]["preview_final_slice_delta_summary"]["mean"]
     expected_ratio = math.exp(delta_mean)
     pm = evaluation_report.get("primary_metric", {})
     assert math.isclose(
@@ -160,7 +211,9 @@ def test_evaluation_report_enforces_paired_ratio_identity():
 
 def test_evaluation_report_flags_inconsistent_ratio_gate_failure_in_dev_profile():
     report, baseline = _build_paired_run_and_baseline()
-    report["metrics"]["paired_delta_summary"]["mean"] += 0.1  # Break consistency
+    report["metrics"]["preview_final_slice_delta_summary"]["mean"] += (
+        0.1  # Break consistency
+    )
     with patch(
         "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
@@ -168,7 +221,7 @@ def test_evaluation_report_flags_inconsistent_ratio_gate_failure_in_dev_profile(
         report.setdefault("metrics", {}).setdefault("window_plan", {})["profile"] = (
             "dev"
         )
-        cert = make_report(report, baseline)
+        cert = _make_canonical_evaluation_report(report, baseline)
     assert isinstance(cert, dict)
     assert cert["validation"]["primary_metric_acceptable"] is False
     assert cert["validation"]["preview_final_drift_acceptable"] is False
@@ -196,6 +249,7 @@ def _make_ratio_report(
     report["data"].update(
         {"dataset": "wikitext2", "split": "validation", "seq_len": 128, "stride": 128}
     )
+    report["context"] = {"profile": "dev"}
     report["edit"].update({"name": "quant_rtn"})
     report["metrics"]["primary_metric"] = {
         "kind": "ppl_causal",
@@ -208,6 +262,23 @@ def _make_ratio_report(
 
 def test_ppl_ratio_gate_enforced():
     baseline = create_empty_report()
+    baseline["meta"].update(
+        {
+            "model_id": "gpt2",
+            "adapter": "hf_causal",
+            "auto": {"tier": "balanced"},
+        }
+    )
+    baseline["context"] = {"profile": "dev"}
+    baseline["data"].update(
+        {
+            "dataset": "wikitext2",
+            "split": "validation",
+            "seq_len": 128,
+            "stride": 128,
+        }
+    )
+    baseline["edit"]["name"] = "noop"
     baseline["metrics"]["primary_metric"] = {
         "kind": "ppl_causal",
         "preview": 40.0,
@@ -225,8 +296,12 @@ def test_ppl_ratio_gate_enforced():
     with patch(
         "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
-        passing_cert = make_report(deepcopy(passing_report), deepcopy(baseline))
-        failing_cert = make_report(deepcopy(failing_report), deepcopy(baseline))
+        passing_cert = _make_canonical_evaluation_report(
+            deepcopy(passing_report), deepcopy(baseline)
+        )
+        failing_cert = _make_canonical_evaluation_report(
+            deepcopy(failing_report), deepcopy(baseline)
+        )
 
     assert passing_cert["validation"]["primary_metric_acceptable"] is True
     assert failing_cert["validation"]["primary_metric_acceptable"] is False
@@ -237,7 +312,7 @@ def test_seed_bundle_contract():
     with patch(
         "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
-        evaluation_report = make_report(report, baseline)
+        evaluation_report = _make_canonical_evaluation_report(report, baseline)
     # Evaluation Report preserves the full seed bundle for auditability.
     assert evaluation_report["meta"]["seeds"] == {
         "python": 1337,
@@ -274,7 +349,7 @@ def test_evaluation_report_rejects_ci_runs_below_bootstrap_floor():
         "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
         with pytest.raises(ValueError):
-            make_report(deepcopy(report), deepcopy(baseline))
+            _make_canonical_evaluation_report(deepcopy(report), deepcopy(baseline))
 
 
 def _apply_ci_pairing_requirements(report: dict[str, Any]) -> None:
@@ -309,7 +384,7 @@ def test_evaluation_report_rejects_ci_overlap():
         "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
         with pytest.raises(ValueError):
-            make_report(deepcopy(report), deepcopy(baseline))
+            _make_canonical_evaluation_report(deepcopy(report), deepcopy(baseline))
 
 
 def test_evaluation_report_rejects_ci_pairing_mismatch():
@@ -320,7 +395,7 @@ def test_evaluation_report_rejects_ci_pairing_mismatch():
         "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
         with pytest.raises(ValueError):
-            make_report(deepcopy(report), deepcopy(baseline))
+            _make_canonical_evaluation_report(deepcopy(report), deepcopy(baseline))
 
 
 def test_spectral_cap_product_path_limits_weight_growth():
@@ -434,6 +509,7 @@ def test_spectral_fpr_matches_tail_probabilities():
 
 def test_rmt_epsilon_rule_acceptance_band():
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "guards": [
             {
                 "name": "rmt",
@@ -478,10 +554,13 @@ def _make_variance_policy(**overrides: Any) -> dict[str, Any]:
 def test_predictive_gate_respects_min_effect():
     # Two cases: below threshold (disable), above threshold (enable)
     guard = VarianceGuard(policy=_make_variance_policy(min_effect_lognll=0.002))
-    guard._ab_gain = 0.0005
-    guard._ppl_no_ve = 51.0
-    guard._ppl_with_ve = 50.8
-    guard._ratio_ci = (0.90, 0.998)
+    guard.set_ab_results(
+        ppl_no_ve=51.0,
+        ppl_with_ve=50.9745,
+        windows_used=8,
+        seed_used=123,
+        ratio_ci=(0.90, 0.998),
+    )
     should_enable, reason = guard._evaluate_ab_gate()
     assert not should_enable
     assert ("below_min_effect_lognll" in reason) or (
@@ -489,9 +568,12 @@ def test_predictive_gate_respects_min_effect():
     )
 
     guard = VarianceGuard(policy=_make_variance_policy(min_effect_lognll=0.0005))
-    guard._ab_gain = 0.0015
-    guard._ppl_no_ve = 51.0
-    guard._ppl_with_ve = 50.6
-    guard._ratio_ci = (0.90, 0.995)  # one-sided improvement
+    guard.set_ab_results(
+        ppl_no_ve=51.0,
+        ppl_with_ve=50.9235,
+        windows_used=8,
+        seed_used=123,
+        ratio_ci=(0.90, 0.995),
+    )
     should_enable, reason = guard._evaluate_ab_gate()
     assert should_enable, reason

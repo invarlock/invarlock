@@ -98,14 +98,14 @@ def compute_tail_summary(
         "epsilon": float(eps),
     }
     if n == 0:
-        summary.update({"max": float("nan"), "tail_mass": 0.0})
+        summary.update({"max": None, "tail_mass": 0.0})
         for q in quantiles:
             try:
                 qf = float(q)
             except _COERCE_ERRORS:
                 continue
             label = f"q{int(round(100.0 * max(0.0, min(1.0, qf))))}"
-            summary[label] = float("nan")
+            summary[label] = None
         return summary
 
     summary["max"] = float(values_sorted[-1])

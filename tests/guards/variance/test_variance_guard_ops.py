@@ -119,7 +119,7 @@ def test_enable_disable_checkpoint_restores_weights():
     assert not torch.allclose(mlp_proj.weight, orig)
     # Disable should restore exact weights
     assert guard.disable(model) is True
-    assert torch.allclose(mlp_proj.weight, orig)
+    assert torch.equal(mlp_proj.weight, orig)
 
 
 def test_enable_fails_on_quantized_weights_and_rolls_back():

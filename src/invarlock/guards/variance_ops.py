@@ -55,6 +55,14 @@ def _target_module_for_scale(guard: Any, scale_name: str) -> Any | None:
     return None
 
 
+def _module_weight_tensor(module: Any) -> torch.Tensor | None:
+    weight = getattr(module, "weight", None)
+    if isinstance(weight, torch.Tensor):
+        return weight
+    data = getattr(weight, "data", None)
+    return data if isinstance(data, torch.Tensor) else None
+
+
 def push_checkpoint(guard: Any, model: nn.Module) -> None:
     """Push current target-module weights to the checkpoint stack."""
     if not guard._target_modules:
@@ -63,11 +71,12 @@ def push_checkpoint(guard: Any, model: nn.Module) -> None:
     checkpoint: dict[str, torch.Tensor] = {}
     for name, module in guard._target_modules.items():
         weight = getattr(module, "weight", None)
-        if not isinstance(weight, torch.Tensor):
+        weight_tensor = _module_weight_tensor(module)
+        if weight_tensor is None:
             continue
         if is_quantized_weight(weight) or is_packed_quantized_module(module):
             continue
-        checkpoint[name] = weight.data.clone().detach()
+        checkpoint[name] = weight_tensor.detach().clone()
 
     guard._checkpoint_stack.append(checkpoint)
     guard._log_event(
@@ -88,14 +97,56 @@ def pop_checkpoint(guard: Any, model: nn.Module) -> bool:
         )
         return False
 
-    checkpoint = guard._checkpoint_stack.pop()
-    restored_count = 0
+    checkpoint = guard._checkpoint_stack[-1]
+    if not checkpoint:
+        guard._log_event(
+            "checkpoint_pop_failed",
+            level="ERROR",
+            message="Checkpoint is empty; exact restoration is unavailable",
+        )
+        return False
+
+    restore_targets: list[tuple[str, torch.Tensor, torch.Tensor]] = []
     for name, saved_weight in checkpoint.items():
-        if name in guard._target_modules:
-            module = guard._target_modules[name]
-            if hasattr(module, "weight"):
-                module.weight.data.copy_(saved_weight)
-                restored_count += 1
+        module = guard._target_modules.get(name)
+        weight = _module_weight_tensor(module)
+        if weight is None:
+            guard._log_event(
+                "checkpoint_pop_failed",
+                level="ERROR",
+                message=f"Checkpoint target {name} is unavailable",
+                module_name=name,
+            )
+            return False
+        if (
+            weight.shape != saved_weight.shape
+            or weight.dtype != saved_weight.dtype
+            or weight.device != saved_weight.device
+        ):
+            guard._log_event(
+                "checkpoint_pop_failed",
+                level="ERROR",
+                message=f"Checkpoint target {name} changed shape, dtype, or device",
+                module_name=name,
+            )
+            return False
+        restore_targets.append((name, weight, saved_weight))
+
+    try:
+        with torch.no_grad():
+            for _name, weight, saved_weight in restore_targets:
+                weight.copy_(saved_weight)
+    except _VARIANCE_OPERATION_ERRORS as error:
+        guard._log_event(
+            "checkpoint_pop_failed",
+            level="ERROR",
+            message=f"Checkpoint restoration failed: {error}",
+            error=str(error),
+        )
+        return False
+
+    guard._checkpoint_stack.pop()
+    restored_count = len(restore_targets)
 
     guard._log_event(
         "checkpoint_popped",
@@ -191,6 +242,29 @@ def enable_guard(guard: Any, model: nn.Module, adapter=None) -> bool:
         return False
 
     push_checkpoint(guard, model)
+    checkpoint = guard._checkpoint_stack[-1] if guard._checkpoint_stack else {}
+    snapshotted_modules = {
+        id(guard._target_modules[name])
+        for name in checkpoint
+        if name in guard._target_modules
+    }
+    unsnapshotted = [
+        scale_name
+        for scale_name in guard._scales
+        if id(_target_module_for_scale(guard, scale_name)) not in snapshotted_modules
+    ]
+    if unsnapshotted:
+        if guard._checkpoint_stack:
+            guard._checkpoint_stack.pop()
+        guard._log_event(
+            "enable_failed_snapshot_incomplete",
+            level="ERROR",
+            message="Cannot enable VE without an exact snapshot of every target",
+            failed_modules=unsnapshotted,
+        )
+        guard._enabled = False
+        guard._last_restore_exact = False
+        return False
     guard._log_event(
         "enable_start",
         message=f"Enabling VE with {len(guard._scales)} scale factors",
@@ -301,8 +375,8 @@ def enable_guard(guard: Any, model: nn.Module, adapter=None) -> bool:
                 failed_modules=failed_modules,
             )
 
-        commit_checkpoint(guard)
         guard._enabled = True
+        guard._last_restore_exact = False
         guard._log_event(
             "enable_complete",
             message=f"Enabled VE on {applied_count}/{len(guard._scales)} modules",
@@ -329,6 +403,7 @@ def disable_guard(guard: Any, model: nn.Module, adapter=None) -> bool:
     guard._disable_attempt_count += 1
 
     if not guard._enabled:
+        guard._last_restore_exact = True
         guard._log_event(
             "disable_idempotent",
             message="VE already disabled",
@@ -347,18 +422,22 @@ def disable_guard(guard: Any, model: nn.Module, adapter=None) -> bool:
             success = pop_checkpoint(guard, model)
             if success:
                 guard._enabled = False
+                guard._last_restore_exact = True
                 guard._log_event(
                     "disable_checkpoint_complete",
                     message="Disabled VE using checkpoint restoration",
                     attempt_count=guard._disable_attempt_count,
                 )
                 return True
+            guard._last_restore_exact = False
             guard._log_event(
                 "disable_checkpoint_failed",
-                level="WARN",
-                message="Checkpoint restoration failed, falling back to inverse scaling",
+                level="ERROR",
+                message="Exact checkpoint restoration failed",
             )
+            return False
 
+        guard._last_restore_exact = False
         reverted_count = 0
         failed_modules: list[str] = []
         for scale_name, scale_factor in guard._scales.items():

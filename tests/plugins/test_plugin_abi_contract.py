@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib
+import tomllib
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -157,3 +159,25 @@ def test_builtin_provider_modules_declare_core_abi() -> None:
             missing.append(module_name)
 
     assert not missing, "\n".join(missing)
+
+
+def test_declared_plugin_entry_points_are_loadable() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    project = tomllib.loads((repo_root / "pyproject.toml").read_text(encoding="utf-8"))[
+        "project"
+    ]
+    failures: list[str] = []
+
+    for group_name, entries in sorted(project["entry-points"].items()):
+        for entry_name, value in sorted(entries.items()):
+            module_name, separator, attribute_name = value.partition(":")
+            if not separator:
+                failures.append(f"{group_name}.{entry_name}: invalid target {value!r}")
+                continue
+            try:
+                module = importlib.import_module(module_name)
+                getattr(module, attribute_name)
+            except (AttributeError, ImportError) as exc:
+                failures.append(f"{group_name}.{entry_name}: {value}: {exc}")
+
+    assert failures == []

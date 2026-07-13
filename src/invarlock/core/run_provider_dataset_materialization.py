@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
+from .dataset_identity import dataset_identity_from_provider
 from .run_provider_dataset_plan import (
     ApplyMlmMasksFn,
     HashSequencesFn,
@@ -220,6 +221,7 @@ def _dataset_meta(
         "tokens_floor_met": bool(tokens_floor_met),
         "loss_type": resolved_loss_type,
     }
+    dataset_meta.update(dataset_identity_from_provider(data_provider))
     if include_window_plan:
         dataset_meta["window_plan"] = window_plan
         capacity_meta = window_plan.get("capacity")

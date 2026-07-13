@@ -258,9 +258,9 @@ class JSONExporter(MetricsExporter):
         try:
             with open(self.output_file, "w") as f:
                 if self.pretty_print:
-                    json.dump(json_metrics, f, indent=2, default=str)
+                    json.dump(json_metrics, f, indent=2, default=str, allow_nan=False)
                 else:
-                    json.dump(json_metrics, f, default=str)
+                    json.dump(json_metrics, f, default=str, allow_nan=False)
 
             self.export_count += 1
             self.last_export_time = time.time()

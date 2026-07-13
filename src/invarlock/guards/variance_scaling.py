@@ -102,6 +102,61 @@ def _t5_dense_relu_dense(block: nn.Module) -> nn.Module | None:
     return getattr(block, "DenseReluDense", None)
 
 
+def _run_variance_calibration_batches(
+    model: nn.Module,
+    batches: list[Any],
+    *,
+    device: torch.device | str,
+    progress_callback: ProgressCallback | None,
+) -> None:
+    total_batches = len(batches)
+    for idx, batch in enumerate(batches, start=1):
+        attention_mask = None
+        labels = None
+        if isinstance(batch, dict):
+            input_ids = batch.get("input_ids", batch.get("inputs", None))
+            attention_mask = batch.get("attention_mask")
+            labels = batch.get("labels")
+        elif isinstance(batch, tuple | list):
+            input_ids = batch[0] if len(batch) > 0 else None
+        else:
+            input_ids = batch
+
+        if input_ids is not None:
+            if not isinstance(input_ids, torch.Tensor):
+                input_ids = torch.as_tensor(input_ids)
+            if input_ids.dim() == 1:
+                input_ids = input_ids.unsqueeze(0)
+            input_ids = input_ids.to(device)
+            if attention_mask is not None:
+                if not isinstance(attention_mask, torch.Tensor):
+                    attention_mask = torch.as_tensor(attention_mask)
+                if attention_mask.dim() == 1:
+                    attention_mask = attention_mask.unsqueeze(0)
+                attention_mask = attention_mask.to(device)
+            if labels is not None:
+                if not isinstance(labels, torch.Tensor):
+                    labels = torch.as_tensor(labels)
+                if labels.dim() == 1:
+                    labels = labels.unsqueeze(0)
+                labels = labels.to(device)
+            with torch.no_grad():
+                try:
+                    if labels is not None:
+                        model(
+                            input_ids=input_ids,
+                            attention_mask=attention_mask,
+                            labels=labels,
+                        )
+                    elif attention_mask is not None:
+                        model(input_ids=input_ids, attention_mask=attention_mask)
+                    else:
+                        model(input_ids)
+                except TypeError:
+                    model(input_ids)
+        _emit_progress(progress_callback, completed=idx, total=total_batches)
+
+
 @torch.no_grad()
 def equalise_residual_variance(
     model: nn.Module,
@@ -268,52 +323,12 @@ def equalise_residual_variance(
     if not batches and not allow_empty:
         raise ValueError("Empty dataloader provided and allow_empty=False")
 
-    total_batches = len(batches)
-    for idx, batch in enumerate(batches, start=1):
-        attention_mask = None
-        labels = None
-        if isinstance(batch, dict):
-            input_ids = batch.get("input_ids", batch.get("inputs", None))
-            attention_mask = batch.get("attention_mask")
-            labels = batch.get("labels")
-        elif isinstance(batch, tuple | list):
-            input_ids = batch[0] if len(batch) > 0 else None
-        else:
-            input_ids = batch
-
-        if input_ids is not None:
-            if not isinstance(input_ids, torch.Tensor):
-                input_ids = torch.as_tensor(input_ids)
-            if input_ids.dim() == 1:
-                input_ids = input_ids.unsqueeze(0)
-            input_ids = input_ids.to(device)
-            if attention_mask is not None:
-                if not isinstance(attention_mask, torch.Tensor):
-                    attention_mask = torch.as_tensor(attention_mask)
-                if attention_mask.dim() == 1:
-                    attention_mask = attention_mask.unsqueeze(0)
-                attention_mask = attention_mask.to(device)
-            if labels is not None:
-                if not isinstance(labels, torch.Tensor):
-                    labels = torch.as_tensor(labels)
-                if labels.dim() == 1:
-                    labels = labels.unsqueeze(0)
-                labels = labels.to(device)
-            with torch.no_grad():
-                try:
-                    if labels is not None:
-                        model(
-                            input_ids=input_ids,
-                            attention_mask=attention_mask,
-                            labels=labels,
-                        )
-                    elif attention_mask is not None:
-                        model(input_ids=input_ids, attention_mask=attention_mask)
-                    else:
-                        model(input_ids)
-                except TypeError:
-                    model(input_ids)
-        _emit_progress(progress_callback, completed=idx, total=total_batches)
+    _run_variance_calibration_batches(
+        model,
+        batches,
+        device=device,
+        progress_callback=progress_callback,
+    )
 
     for hook in hooks.values():
         hook.remove()
@@ -470,7 +485,10 @@ def compute_variance_scales(
             continue
         raw_delta = abs(scale - 1.0)
         raw_delta_map[name] = raw_delta
-        if raw_delta > best_delta:
+        if raw_delta > best_delta or (
+            raw_delta == best_delta
+            and (best_candidate is None or name < best_candidate[0])
+        ):
             best_candidate = (name, scale)
             best_delta = raw_delta
         if raw_delta < min_abs:
@@ -501,12 +519,14 @@ def compute_variance_scales(
         sorted_candidates = sorted(
             filtered_scales.items(),
             key=lambda item: (
-                raw_delta_map.get(item[0], abs(item[1] - 1.0))
-                + (2.0 if item[1] >= 1.0 else 0.0),
-                raw_delta_map.get(item[0], abs(item[1] - 1.0)),
-                item[1],
+                -(
+                    raw_delta_map.get(item[0], abs(item[1] - 1.0))
+                    + (2.0 if item[1] >= 1.0 else 0.0)
+                ),
+                -raw_delta_map.get(item[0], abs(item[1] - 1.0)),
+                -item[1],
+                item[0],
             ),
-            reverse=True,
         )
         filtered_scales = dict(sorted_candidates[:max_adjusted])
         trimmed_to_limit = True

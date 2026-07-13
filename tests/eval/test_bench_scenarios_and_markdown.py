@@ -224,7 +224,10 @@ class TestRunGuardEffectBenchmark:
             "invarlock.eval.bench_runner.execute_scenario",
             lambda scenario, cfg, output_dir: ScenarioResult(
                 config=scenario,
-                metrics={"primary_metric_overhead": 0.0, "guard_overhead_time": 0.0},
+                metrics={
+                    "guard_primary_metric_impact": 0.0,
+                    "guard_runtime_overhead": 0.0,
+                },
                 gates={
                     "spike": True,
                     "tying": True,
@@ -257,7 +260,10 @@ class TestRunGuardEffectBenchmark:
             "invarlock.eval.bench_runner.execute_scenario",
             lambda scenario, cfg, output_dir: ScenarioResult(
                 config=scenario,
-                metrics={"primary_metric_overhead": 0.0, "guard_overhead_time": 0.0},
+                metrics={
+                    "guard_primary_metric_impact": 0.0,
+                    "guard_runtime_overhead": 0.0,
+                },
                 gates={
                     "spike": True,
                     "tying": True,
@@ -285,7 +291,7 @@ class TestRunGuardEffectBenchmark:
         scenario_cfg = ScenarioConfig(edit="quant_rtn", tier="balanced", probes=1)
         fail_result = ScenarioResult(
             config=scenario_cfg,
-            metrics={"primary_metric_overhead": 0.0, "guard_overhead_time": 0.0},
+            metrics={"guard_primary_metric_impact": 0.0, "guard_runtime_overhead": 0.0},
             gates={"quality": False, "spike": True, "rmt": True},
             skipped=False,
             probes_used=1,
@@ -321,9 +327,9 @@ class TestMarkdownGeneration:
         failing_result = ScenarioResult(
             config=scenario_config,
             metrics={
-                "primary_metric_overhead": float("nan"),
-                "guard_overhead_time": 0.20,
-                "guard_overhead_mem": 0.20,
+                "guard_primary_metric_impact": float("nan"),
+                "guard_runtime_overhead": 0.20,
+                "guard_memory_overhead": 0.20,
                 "rmt_outliers_bare": 3,
                 "rmt_outliers_guarded": 1,
             },

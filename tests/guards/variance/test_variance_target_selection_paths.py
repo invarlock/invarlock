@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import builtins
 
+import pytest
 import torch
 import torch.nn as nn
 
@@ -26,20 +27,9 @@ class _Guard:
         self.events.append((operation, level, {"message": message, **data}))
 
 
-class _BadTensor:
-    def detach(self):
-        return self
-
-    def cpu(self):
-        return self
-
-    def numpy(self):
-        raise RuntimeError("no numpy")
-
-
 class _BadStateModule:
     def state_dict(self):
-        return {"weight": _BadTensor()}
+        raise RuntimeError("state unavailable")
 
 
 def test_variance_target_utilities_cover_normalization_and_fingerprint_failure() -> (
@@ -55,7 +45,8 @@ def test_variance_target_utilities_cover_normalization_and_fingerprint_failure()
     assert vt.scale_matches_target("block1.foo", "transformer.h.1.attn.c_proj") is False
 
     guard._target_modules = {"bad": _BadStateModule()}
-    assert vt.fingerprint_targets(guard) is None
+    with pytest.raises(RuntimeError, match="fingerprinting failed"):
+        vt.fingerprint_targets(guard)
 
 
 def test_scale_matches_target_alias_and_split_error_paths() -> None:

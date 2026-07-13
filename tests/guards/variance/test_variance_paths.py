@@ -23,8 +23,8 @@ def test_variance_guard_handles_non_dict_base_calibration(monkeypatch):
 
     real = policies_mod.get_variance_policy
 
-    def fake(name: str = "balanced", *, use_yaml: bool = True):
-        policy = dict(real(name, use_yaml=use_yaml))
+    def fake(name: str = "balanced"):
+        policy = dict(real(name))
         policy["calibration"] = None
         return policy
 

@@ -8,6 +8,22 @@ import pytest
 import invarlock.runtime_security as runtime_security
 import invarlock.runtime_security_helpers as runtime_security_helpers
 
+_IMMUTABLE_IMAGE_ID = "sha256:" + "e" * 64
+
+
+def _stub_observed_image(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_resolve_observed_container_image",
+        lambda engine, image: runtime_security_helpers._ObservedContainerImage(
+            immutable_ref=_IMMUTABLE_IMAGE_ID,
+            image_digest=_IMMUTABLE_IMAGE_ID,
+            image_id=_IMMUTABLE_IMAGE_ID,
+            repo_digests=(),
+        ),
+        raising=True,
+    )
+
 
 def _plan(
     argv: list[str],
@@ -42,6 +58,11 @@ def test_runtime_provenance_image_ref_keeps_digest_and_allows_unverified_provena
         runtime_security_helpers._runtime_provenance_image_ref(digest_pinned, None)
         == digest_pinned
     )
+    image_id = "sha256:" + ("d" * 64)
+    assert (
+        runtime_security_helpers._runtime_provenance_image_ref(image_id, image_id)
+        == image_id
+    )
 
     with runtime_security.runtime_allowances_scope(allow_unverified_provenance=True):
         assert (
@@ -56,19 +77,24 @@ def test_runtime_provenance_image_ref_keeps_digest_and_allows_unverified_provena
 def test_inspect_container_image_parses_repo_digest_and_image_id(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    repo_digest = "sha256:" + "a" * 64
+    image_id = "sha256:" + "b" * 64
     monkeypatch.setattr(
         runtime_security_helpers.subprocess,
         "run",
         lambda *args, **kwargs: SimpleNamespace(
             returncode=0,
-            stdout='["ghcr.io/invarlock/invarlock-runtime:test@sha256:abc"]\nsha256:def\n',
+            stdout=(
+                '["ghcr.io/invarlock/invarlock-runtime:test@'
+                f'{repo_digest}"]\n{image_id}\n'
+            ),
         ),
         raising=True,
     )
 
     assert runtime_security_helpers._inspect_container_image("docker", "img") == (
         True,
-        "sha256:abc",
+        repo_digest,
     )
 
     monkeypatch.setattr(
@@ -76,14 +102,14 @@ def test_inspect_container_image_parses_repo_digest_and_image_id(
         "run",
         lambda *args, **kwargs: SimpleNamespace(
             returncode=0,
-            stdout="not-json\nsha256:def\n",
+            stdout=f"not-json\n{image_id}\n",
         ),
         raising=True,
     )
 
     assert runtime_security_helpers._inspect_container_image("docker", "img") == (
         True,
-        "sha256:def",
+        image_id,
     )
 
 
@@ -98,7 +124,7 @@ def test_inspect_container_image_handles_digestless_images(
     )
 
     assert runtime_security_helpers._inspect_container_image("docker", "img") == (
-        True,
+        False,
         None,
     )
 
@@ -114,7 +140,7 @@ def test_inspect_container_image_handles_empty_stdout(
     )
 
     assert runtime_security_helpers._inspect_container_image("docker", "img") == (
-        True,
+        False,
         None,
     )
 
@@ -133,7 +159,7 @@ def test_inspect_container_image_ignores_repo_digests_without_sha(
     )
 
     assert runtime_security_helpers._inspect_container_image("docker", "img") == (
-        True,
+        False,
         None,
     )
 
@@ -195,6 +221,7 @@ def test_build_container_python_command_adds_cwd_host_mirror(
         lambda: False,
         raising=True,
     )
+    _stub_observed_image(monkeypatch)
 
     command = runtime_security.build_container_python_command(
         script_path,
@@ -270,6 +297,7 @@ def test_build_container_command_skips_network_none_when_network_allowed(
         lambda *, cwd: ({}, []),
         raising=True,
     )
+    _stub_observed_image(monkeypatch)
 
     command = runtime_security.build_container_command(_plan(["evaluate", "--help"]))
 
@@ -284,14 +312,17 @@ def test_load_runtime_manifest_reports_read_failures(
     manifest_path = report_path.parent / runtime_security.RUNTIME_MANIFEST_FILENAME
     manifest_path.write_text('{"ok": true}\n', encoding="utf-8")
 
-    original_read_text = Path.read_text
+    def _read_failed(path: Path, *, label: str) -> bytes:
+        assert path == manifest_path
+        assert label == runtime_security.RUNTIME_MANIFEST_FILENAME
+        raise runtime_security_helpers.StrictJsonError("boom")
 
-    def _read_text(self: Path, *args, **kwargs) -> str:
-        if self == manifest_path:
-            raise OSError("boom")
-        return original_read_text(self, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "read_text", _read_text, raising=True)
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "read_regular_file_bytes",
+        _read_failed,
+        raising=True,
+    )
 
     result = runtime_security.load_runtime_manifest(report_path)
 

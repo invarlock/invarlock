@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import itertools
 import time
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
@@ -341,6 +342,8 @@ class VarianceGuard(Guard):
         if policy and "tie_breaker_deadband" not in policy:
             self._policy["tie_breaker_deadband"] = 0.005
         self._policy.setdefault("mode", "ci")
+        if self._policy["mode"] not in {"ci", "delta"}:
+            raise ValueError("variance policy mode must be exactly 'ci' or 'delta'")
         self._policy.setdefault("min_rel_gain", 0.001)
         self._policy.setdefault("alpha", 0.05)
         self._policy.setdefault("clamp", (0.5, 2.0))
@@ -377,6 +380,7 @@ class VarianceGuard(Guard):
         )
         self._monitor_only = bool(self._policy.get("monitor_only", False))
         self._params_changed: int | None = None
+        self._explicit_noop_no_change = False
         self._run_context: dict[str, Any] | None = None
         self._report_meta: dict[str, Any] | None = None
         self._dataset_meta: dict[str, Any] | None = None
@@ -411,12 +415,12 @@ class VarianceGuard(Guard):
         self._tap_patterns = _tap_patterns_from_policy(self._policy)
 
         self._checkpoint_stack: list[dict[str, Any]] = []
+        self._last_restore_exact = True
         self._enable_attempt_count = 0
         self._disable_attempt_count = 0
         self.TIE_BREAKER_DEADBAND = float(
             self._policy.get("tie_breaker_deadband", 0.005)
         )
-        self.ABSOLUTE_FLOOR = 0.05
         self._calibration_batches: list[Any] = []
         self._calibration_window_ids: list[str] = []
         self._calibration_context: dict[str, Any] = {}
@@ -485,8 +489,32 @@ class VarianceGuard(Guard):
         ]
 
     def set_run_context(self, report: Any) -> None:
-        self._report_meta = getattr(report, "meta", {}) or {}
+        raw_report_meta = getattr(report, "meta", {}) or {}
+        self._report_meta = (
+            dict(raw_report_meta) if isinstance(raw_report_meta, Mapping) else {}
+        )
         self._run_context = getattr(report, "context", {}) or {}
+        config = self._report_meta.get("config")
+        config_map = config if isinstance(config, Mapping) else {}
+        model_config = config_map.get("model")
+        model_map = model_config if isinstance(model_config, Mapping) else {}
+        context_map = (
+            self._run_context if isinstance(self._run_context, Mapping) else {}
+        )
+        seeds = context_map.get("seeds")
+        seed_map = seeds if isinstance(seeds, Mapping) else {}
+        model_id = (
+            self._report_meta.get("model_id")
+            or model_map.get("id")
+            or context_map.get("model_id")
+        )
+        run_seed = self._report_meta.get("seed")
+        if run_seed is None:
+            run_seed = seed_map.get("python")
+        if isinstance(model_id, str) and model_id:
+            self._report_meta["model_id"] = model_id
+        if isinstance(run_seed, int) and not isinstance(run_seed, bool):
+            self._report_meta["seed"] = run_seed
         if isinstance(self._run_context, dict):
             self._dataset_meta = self._run_context.get("dataset_meta")
         else:
@@ -532,21 +560,38 @@ class VarianceGuard(Guard):
 
         edit_info = getattr(report, "edit", {}) or {}
         params_changed = None
+        edit_name = None
         if isinstance(edit_info, dict):
+            edit_name = edit_info.get("name")
             deltas = edit_info.get("deltas") or {}
             if isinstance(deltas, dict):
                 params_changed = deltas.get("params_changed")
-        if params_changed is None:
-            if isinstance(edit_info, dict) and edit_info.get("name") in {"noop"}:
-                params_changed = 0
-            else:
-                params_changed = None
         self._params_changed = params_changed
-        if params_changed == 0:
+        verified_zero_change = (
+            isinstance(params_changed, int)
+            and not isinstance(params_changed, bool)
+            and params_changed == 0
+        )
+        self._explicit_noop_no_change = bool(
+            edit_name == "noop" and verified_zero_change
+        )
+        if self._explicit_noop_no_change:
+            self._monitor_only = bool(self._policy.get("monitor_only", False))
+            self._log_event(
+                "no_adjustment_required",
+                message="Variance adjustment is unnecessary for a verified no-op edit",
+            )
+            self._scales = {}
+        elif edit_name == "noop" or verified_zero_change:
             self._monitor_only = True
             self._log_event(
                 "monitor_only",
-                message="Variance guard forcing monitor-only mode (no parameters changed)",
+                message=(
+                    "Variance guard forcing monitor-only mode "
+                    "(no-op change evidence is incomplete)"
+                    if edit_name == "noop"
+                    else "Variance guard forcing monitor-only mode (no parameters changed)"
+                ),
             )
             self._scales = {}
 

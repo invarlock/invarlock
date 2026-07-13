@@ -17,9 +17,9 @@ import invarlock.core.metric_provider_resolution as metric_provider_mod
 import invarlock.core.run_policy as run_policy_mod
 import invarlock.core.run_snapshot_contract as run_snapshot_contract_mod
 import invarlock.core.runner as runner_context_mod
-import invarlock.core.runner_eval_metrics_stats as runner_eval_stats
+import invarlock.core.runner_runtime.eval_metrics_stats as runner_eval_stats
 import invarlock.core.types as core_types_mod
-import invarlock.reporting.report_overhead as run_guard_overhead_mod
+import invarlock.reporting.report_metric_impact as run_guard_metric_impact_mod
 import invarlock.reporting.run_report_contract as run_report_payload_mod
 import invarlock.runtime_verify as runtime_verify_mod
 from invarlock.core.api import RunConfig, RunReport
@@ -30,7 +30,7 @@ from invarlock.core.plugins_inventory import (
     gather_generic_inventory_rows,
 )
 from invarlock.core.runner import CoreRunner
-from invarlock.core.runner_guards import (
+from invarlock.core.runner_runtime.guards import (
     _coerce_diagnostics,
     _normalize_guard_result,
     resolve_guard_policies,
@@ -137,19 +137,20 @@ def test_compute_bootstrap_delta_stats_covers_truthy_empty_and_final_count_fallb
             preview_token_counts=[],
             final_token_counts=[],
         ),
-        compute_paired_delta_log_ci_fn=lambda *_args, **_kwargs: (0.0, 0.0),
+        compute_independent_delta_log_ci_fn=lambda *_args, **_kwargs: (0.0, 0.0),
         logspace_to_ratio_ci_fn=lambda _delta_ci: (1.0, 1.0),
     )
-    assert no_pairs.degenerate_reason == "no_pairs"
+    assert no_pairs.degenerate_reason == "missing_slice_losses"
 
     weighted = runner_eval_stats._compute_bootstrap_delta_stats(
         _FakeEvalRunner(),
         _runtime(),
         _slices(preview_token_counts=[], final_token_counts=[5, 7]),
-        compute_paired_delta_log_ci_fn=lambda *_args, **_kwargs: (0.0, 0.0),
+        compute_independent_delta_log_ci_fn=lambda *_args, **_kwargs: (0.0, 0.0),
         logspace_to_ratio_ci_fn=lambda _delta_ci: (1.0, 1.0),
     )
-    assert weighted.delta_weights == [5.0, 7.0]
+    assert weighted.delta_ci_method == "none"
+    assert weighted.delta_ci_reason == "bootstrap_disabled"
 
 
 def _patch_doctor_preflight_common(
@@ -380,11 +381,16 @@ def test_runner_guard_helpers_cover_skipped_items_and_meta_auto_resolution() -> 
     seen: dict[str, object] = {}
 
     def _resolver(
-        tier: str, edit_name: str | None, overrides: dict[str, object]
+        tier: str,
+        edit_name: str | None,
+        overrides: dict[str, object],
+        *,
+        profile: str | None,
     ) -> dict[str, dict[str, object]]:
         seen["tier"] = tier
         seen["edit_name"] = edit_name
         seen["overrides"] = dict(overrides)
+        seen["profile"] = profile
         return {"spectral": {"deadband": 0.1}}
 
     report = RunReport(meta={"config": {"auto": {"tier": "conservative"}}})
@@ -583,7 +589,7 @@ def test_run_payload_snapshot_and_runtime_helpers_cover_remaining_paths(
         model=object(),
         cfg_snapshot={"temp_dir": ""},
         direct_reuse_loaded_model=False,
-        skip_overhead_source=None,
+        skip_guard_metric_impact_source=None,
         choose_snapshot_mode_fn=_choose_snapshot_mode,
         estimate_model_bytes_fn=lambda _model: 1024,
         psutil_module=None,
@@ -629,18 +635,22 @@ def test_run_payload_snapshot_and_runtime_helpers_cover_remaining_paths(
 
 
 def test_finalize_related_types_and_decisions_cover_fallback_paths() -> None:
-    invalid_diags = run_guard_overhead_mod._coerce_guard_overhead_diagnostics(None)  # noqa: SLF001
+    invalid_diags = run_guard_metric_impact_mod._coerce_guard_metric_impact_diagnostics(
+        None
+    )  # noqa: SLF001
     assert invalid_diags == []
 
     class _BadPayload(dict):
         def get(self, key: object, default: object = None) -> object:  # type: ignore[override]
-            if key == "overhead_ratio":
+            if key == "degradation":
                 raise TypeError("boom")
             return super().get(key, default)
 
-    normalized = run_guard_overhead_mod.normalize_guard_overhead_result(_BadPayload())
+    normalized = run_guard_metric_impact_mod.normalize_guard_metric_impact_result(
+        _BadPayload()
+    )
     assert normalized["evaluated"] is False
-    assert normalized["passed"] is True
+    assert normalized["passed"] is False
 
     guard_result = core_types_mod.GuardValidationResult(passed=True, decision="allow")
     guard_result["diagnostics"] = "bad"

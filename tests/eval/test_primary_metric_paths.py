@@ -11,7 +11,7 @@ from invarlock.eval.primary_metric import (
 )
 
 
-def test_compute_primary_metric_accuracy_counts_source_and_ratio():
+def test_compute_primary_metric_accuracy_uses_only_percentage_point_delta():
     report = {
         "metrics": {
             "classification": {
@@ -30,9 +30,11 @@ def test_compute_primary_metric_accuracy_counts_source_and_ratio():
     assert payload["n_preview"] == 10 and payload["n_final"] == 20
     assert payload["counts_source"] == "measured"
     assert payload["estimated"] is False
-    assert payload["ratio_vs_baseline"] == pytest.approx(
+    expected_delta_pp = 100.0 * (
         payload["final"] - baseline["metrics"]["primary_metric"]["final"]
     )
+    assert payload["delta_vs_baseline_pp"] == pytest.approx(expected_delta_pp)
+    assert "ratio_vs_baseline" not in payload
 
 
 def test_compute_primary_metric_accuracy_ignores_bool_counts_and_baseline_final():
@@ -53,10 +55,11 @@ def test_compute_primary_metric_accuracy_ignores_bool_counts_and_baseline_final(
     )
     assert math.isnan(payload["preview"])
     assert payload["final"] == pytest.approx(0.9)
-    assert math.isnan(payload["ratio_vs_baseline"])
+    assert "delta_vs_baseline_pp" not in payload
+    assert "ratio_vs_baseline" not in payload
 
 
-def test_compute_primary_metric_accuracy_derives_counts_from_ids():
+def test_compute_primary_metric_accuracy_rejects_input_only_windows():
     report = {
         "evaluation_windows": {
             "preview": {"input_ids": [[1, 2, 3], [4, 5, 6]]},
@@ -64,8 +67,9 @@ def test_compute_primary_metric_accuracy_derives_counts_from_ids():
         }
     }
     payload = compute_primary_metric_from_report(report, kind="accuracy")
-    assert 0.0 <= payload["preview"] <= 1.0
-    assert 0.0 <= payload["final"] <= 1.0
+    assert math.isnan(payload["preview"])
+    assert math.isnan(payload["final"])
+    assert payload["invalid"] is True
 
 
 def test_compute_primary_metric_ppl_ratio_vs_baseline():
@@ -98,15 +102,20 @@ def test_compute_primary_metric_ppl_ignores_bool_baseline_final():
         report, kind="ppl_causal", baseline=baseline
     )
     assert payload["final"] == pytest.approx(math.exp(1.5))
-    assert math.isnan(payload["ratio_vs_baseline"])
+    assert "ratio_vs_baseline" not in payload
 
 
 def test_infer_binary_label_handles_bad_tokens():
     assert infer_binary_label_from_ids(["not-int"]) == 0
 
 
+@pytest.mark.parametrize("token", [True, float("inf"), float("-inf"), float("nan")])
+def test_infer_binary_label_rejects_non_integral_special_values(token):
+    assert infer_binary_label_from_ids([token]) == 0
+
+
 def test_compute_accuracy_counts_ignores_invalid_records():
     correct, total = compute_accuracy_counts(
         [{"input_ids": [1, 2]}, {"input_ids": []}, {"foo": "bar"}]
     )
-    assert (correct, total) == (1, 1)
+    assert (correct, total) == (0, 0)

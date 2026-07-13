@@ -170,7 +170,7 @@ class SnapshotExecutionPlan:
     skip_model_load: bool
     snapshot_tmpdir: str | None
     snapshot_provenance: dict[str, bool]
-    emitted_skip_overhead_warning: bool
+    emitted_skip_guard_metric_impact_warning: bool
     snapshot_enabled: bool | None
     diagnostics: tuple[SnapshotDiagnostic, ...]
 
@@ -181,7 +181,7 @@ def build_snapshot_execution_plan(
     model: Any,
     cfg_snapshot: dict[str, Any] | None,
     direct_reuse_loaded_model: bool,
-    skip_overhead_source: str | None,
+    skip_guard_metric_impact_source: str | None,
     choose_snapshot_mode_fn: Any,
     estimate_model_bytes_fn: Any,
     psutil_module: Any | None,
@@ -198,20 +198,24 @@ def build_snapshot_execution_plan(
         "reload_path_used": False,
     }
     if direct_reuse_loaded_model:
-        source_note = f" ({skip_overhead_source})" if skip_overhead_source else ""
+        source_note = (
+            f" ({skip_guard_metric_impact_source})"
+            if skip_guard_metric_impact_source
+            else ""
+        )
         return SnapshotExecutionPlan(
             model=model,
             restore_fn=None,
             skip_model_load=True,
             snapshot_tmpdir=None,
             snapshot_provenance=snapshot_provenance,
-            emitted_skip_overhead_warning=True,
+            emitted_skip_guard_metric_impact_warning=True,
             snapshot_enabled=None,
             diagnostics=(
                 SnapshotDiagnostic(
                     code="snapshot.overhead_check_skipped",
-                    summary=f"Overhead check skipped via config policy{source_note}",
-                    context={"source": skip_overhead_source},
+                    summary=f"Guard metric impact check skipped via config policy{source_note}",
+                    context={"source": skip_guard_metric_impact_source},
                 ),
                 SnapshotDiagnostic(
                     code="snapshot.loaded_model_reused",
@@ -275,7 +279,7 @@ def build_snapshot_execution_plan(
                 skip_model_load=False,
                 snapshot_tmpdir=snapshot_tmpdir,
                 snapshot_provenance=snapshot_provenance,
-                emitted_skip_overhead_warning=False,
+                emitted_skip_guard_metric_impact_warning=False,
                 snapshot_enabled=True,
                 diagnostics=(),
             )
@@ -296,7 +300,7 @@ def build_snapshot_execution_plan(
                     skip_model_load=False,
                     snapshot_tmpdir=snapshot_tmpdir,
                     snapshot_provenance=snapshot_provenance,
-                    emitted_skip_overhead_warning=False,
+                    emitted_skip_guard_metric_impact_warning=False,
                     snapshot_enabled=True,
                     diagnostics=(
                         SnapshotDiagnostic(
@@ -319,7 +323,7 @@ def build_snapshot_execution_plan(
                 skip_model_load=False,
                 snapshot_tmpdir=None,
                 snapshot_provenance=snapshot_provenance,
-                emitted_skip_overhead_warning=False,
+                emitted_skip_guard_metric_impact_warning=False,
                 snapshot_enabled=True,
                 diagnostics=(),
             )
@@ -331,7 +335,7 @@ def build_snapshot_execution_plan(
             skip_model_load=False,
             snapshot_tmpdir=None,
             snapshot_provenance=snapshot_provenance,
-            emitted_skip_overhead_warning=False,
+            emitted_skip_guard_metric_impact_warning=False,
             snapshot_enabled=False,
             diagnostics=(),
         )
@@ -343,7 +347,7 @@ def build_snapshot_execution_plan(
             skip_model_load=False,
             snapshot_tmpdir=None,
             snapshot_provenance=snapshot_provenance,
-            emitted_skip_overhead_warning=False,
+            emitted_skip_guard_metric_impact_warning=False,
             snapshot_enabled=False,
             diagnostics=(
                 SnapshotDiagnostic(
@@ -362,16 +366,16 @@ def build_snapshot_execution_plan(
 @dataclass(frozen=True)
 class SnapshotRetryTransition:
     skip_model_load: bool
-    emitted_skip_overhead_warning: bool
+    emitted_skip_guard_metric_impact_warning: bool
     diagnostics: tuple[SnapshotDiagnostic, ...]
 
 
 def resolve_snapshot_retry_transition(
     *,
-    skip_overhead: bool,
+    skip_guard_metric_impact: bool,
     profile_normalized: str | None,
-    emitted_skip_overhead_warning: bool,
-    skip_overhead_source: str | None,
+    emitted_skip_guard_metric_impact_warning: bool,
+    skip_guard_metric_impact_source: str | None,
     retry_controller: Any,
     model: Any,
     restore_fn: Any | None,
@@ -379,16 +383,20 @@ def resolve_snapshot_retry_transition(
 ) -> SnapshotRetryTransition:
     diagnostics: list[SnapshotDiagnostic] = []
     updated_skip_model_load = skip_model_load
-    warned = emitted_skip_overhead_warning
+    warned = emitted_skip_guard_metric_impact_warning
 
-    if skip_overhead and profile_normalized in {"ci", "release"}:
+    if skip_guard_metric_impact and profile_normalized in {"ci", "release"}:
         if not warned:
-            source_note = f" ({skip_overhead_source})" if skip_overhead_source else ""
+            source_note = (
+                f" ({skip_guard_metric_impact_source})"
+                if skip_guard_metric_impact_source
+                else ""
+            )
             diagnostics.append(
                 SnapshotDiagnostic(
                     code="snapshot.overhead_check_skipped",
-                    summary=f"Overhead check skipped via config policy{source_note}",
-                    context={"source": skip_overhead_source},
+                    summary=f"Guard metric impact check skipped via config policy{source_note}",
+                    context={"source": skip_guard_metric_impact_source},
                 )
             )
             warned = True
@@ -408,7 +416,7 @@ def resolve_snapshot_retry_transition(
 
     return SnapshotRetryTransition(
         skip_model_load=updated_skip_model_load,
-        emitted_skip_overhead_warning=warned,
+        emitted_skip_guard_metric_impact_warning=warned,
         diagnostics=tuple(diagnostics),
     )
 

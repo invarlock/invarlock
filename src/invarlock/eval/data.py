@@ -15,6 +15,8 @@ from typing import Any, cast
 
 from invarlock.core.exceptions import DataError as _DataErr
 from invarlock.core.exceptions import ValidationError as _ValErr
+from invarlock.evidence_pack_json import StrictJsonError, read_regular_file_bytes
+from invarlock.vision_dataset_evidence import canonical_json_bytes
 
 from .data_local import LocalJSONLPairsProvider, LocalJSONLProvider
 from .data_providers import (
@@ -339,6 +341,25 @@ def _resolve_image_path(image_path: str, *, base_dir: Path) -> Path:
     return candidate
 
 
+def _portable_path_reference(value: str, *, fallback: str) -> str:
+    """Return a report-safe reference without changing the runtime path."""
+
+    candidate = Path(value)
+    parts = candidate.parts
+    if (
+        value == value.strip()
+        and value
+        and not value.startswith("~")
+        and not candidate.is_absolute()
+        and "\\" not in value
+        and bool(parts)
+        and not parts[0].endswith(":")
+        and all(part not in {"", ".", ".."} for part in parts)
+    ):
+        return candidate.as_posix()
+    return fallback
+
+
 class VisionTextProvider(EvaluationProvider):
     name = "vision_text"
 
@@ -391,17 +412,24 @@ class VisionTextProvider(EvaluationProvider):
                     image_bytes = bytes(image_bytes)
                 if not isinstance(image_bytes, bytes):
                     image_bytes = b""
+                image_sha256 = _sha256_hex(image_bytes)
                 examples.append(
                     {
                         "id": rec_id,
                         "image_path": str(raw.get("image_path") or ""),
+                        "image_ref": _portable_path_reference(
+                            str(raw.get("image_path") or ""),
+                            fallback=f"sha256:{image_sha256}",
+                        ),
                         "prompt": prompt,
                         "answer": answers[0],
                         "answers": answers,
-                        "image_sha256": _sha256_hex(image_bytes),
+                        "image_sha256": image_sha256,
                         "prompt_sha256": _sha256_hex(prompt.encode("utf-8")),
                         "answer_sha256": _sha256_hex(
-                            json.dumps(answers, ensure_ascii=True).encode("utf-8")
+                            json.dumps(
+                                answers, ensure_ascii=True, allow_nan=False
+                            ).encode("utf-8")
                         ),
                     }
                 )
@@ -419,29 +447,16 @@ class VisionTextProvider(EvaluationProvider):
             )
 
         for file_path in files:
+            from invarlock.eval.vision_evidence import (
+                bind_loaded_record,
+                load_materialization_snapshot,
+            )
+
             try:
-                lines = file_path.read_text(encoding="utf-8").splitlines()
-            except (OSError, UnicodeDecodeError) as exc:
-                raise _DataErr(
-                    code="E306",
-                    message=f"NO-SAMPLES: failed to read vision_text manifest ({exc})",
-                ) from exc
-            for line_no, raw_line in enumerate(lines, start=1):
-                line = raw_line.strip()
-                if not line:
-                    continue
-                try:
-                    obj = json.loads(line)
-                except json.JSONDecodeError as exc:
-                    raise _DataErr(
-                        code="E306",
-                        message=(
-                            "NO-SAMPLES: failed to parse vision_text manifest "
-                            f"{file_path}:{line_no} ({exc})"
-                        ),
-                    ) from exc
-                if not isinstance(obj, dict):
-                    continue
+                materialization = load_materialization_snapshot(file_path)
+            except ValueError as exc:
+                raise _DataErr(code="E306", message=str(exc)) from exc
+            for line_no, obj in enumerate(materialization.records, start=1):
                 prompt = obj.get("prompt")
                 image_path = obj.get("image_path")
                 if not isinstance(prompt, str) or not prompt.strip():
@@ -465,24 +480,52 @@ class VisionTextProvider(EvaluationProvider):
                     image_path,
                     base_dir=file_path.parent,
                 )
-                image_bytes = resolved_image.read_bytes()
+                try:
+                    image_bytes = read_regular_file_bytes(
+                        resolved_image, label="vision_text image"
+                    )
+                except StrictJsonError as exc:
+                    raise _DataErr(
+                        code="E306",
+                        message=f"NO-SAMPLES: vision_text image is unsafe ({exc})",
+                    ) from exc
+                image_sha256 = _sha256_hex(image_bytes)
                 rec_id = str(
                     obj.get("id") or f"{file_path.name}:{line_no}:{resolved_image.name}"
                 )
+                try:
+                    evidence_binding = bind_loaded_record(
+                        record_id=rec_id,
+                        raw_record=obj,
+                        observed_image_sha256=image_sha256,
+                        materialization_digest=materialization.materialization_digest,
+                        manifest_sha256=materialization.manifest_sha256,
+                        bindings=materialization.bindings,
+                    )
+                except ValueError as exc:
+                    raise _DataErr(code="E306", message=str(exc)) from exc
                 examples.append(
                     {
                         "id": rec_id,
                         "image_path": str(resolved_image),
+                        "image_ref": _portable_path_reference(
+                            image_path,
+                            fallback=f"sha256:{image_sha256}",
+                        ),
                         "prompt": prompt.strip(),
                         "answer": answers[0],
                         "answers": answers,
-                        "image_sha256": _sha256_hex(image_bytes),
+                        "image_sha256": image_sha256,
                         "prompt_sha256": _sha256_hex(prompt.strip().encode("utf-8")),
                         "answer_sha256": _sha256_hex(
-                            json.dumps(answers, ensure_ascii=True).encode("utf-8")
+                            json.dumps(
+                                answers, ensure_ascii=True, allow_nan=False
+                            ).encode("utf-8")
                         ),
                         "source_file": str(file_path),
+                        "source_ref": file_path.name,
                         "source_line": line_no,
+                        **evidence_binding,
                     }
                 )
                 if self.max_samples > 0 and len(examples) >= self.max_samples:
@@ -513,7 +556,9 @@ class VisionTextProvider(EvaluationProvider):
     def digest(self) -> dict[str, Any]:
         examples = self._load_examples()
         by_id = sorted(examples, key=lambda item: str(item["id"]))
-        ids_sha256 = _sha256_hex("".join(item["id"] for item in by_id).encode("utf-8"))
+        ids_sha256 = _sha256_hex(
+            canonical_json_bytes([str(item["id"]) for item in by_id])
+        )
         images_sha256 = _sha256_hex(
             "".join(item["image_sha256"] for item in by_id).encode("utf-8")
         )
@@ -525,7 +570,7 @@ class VisionTextProvider(EvaluationProvider):
         )
         digest: dict[str, Any] = {
             "provider": "vision_text",
-            "version": 2,
+            "version": 1,
             "ids_sha256": ids_sha256,
             "images_sha256": images_sha256,
             "prompts_sha256": prompts_sha256,

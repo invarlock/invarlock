@@ -17,9 +17,148 @@ __all__ = [
     "build_after_edit_result",
     "build_prepare_result",
     "finalize_rmt_guard",
+    "load_external_baseline_evidence",
     "prepare_rmt_guard",
     "validate_rmt_guard",
 ]
+
+
+def _rmt_measurement_contract(guard: Any) -> dict[str, Any]:
+    return {
+        "kind": "activation_edge_risk",
+        "estimator": dict(guard.estimator),
+        "activation_sampling": dict(guard.activation_sampling),
+    }
+
+
+def load_external_baseline_evidence(guard: Any) -> dict[str, Any]:
+    """Load paired baseline activation-edge measurements for a subject run."""
+
+    guard._external_baseline_ready = False
+    guard._external_baseline_reason = None
+    if not guard._external_baseline_required:
+        return {"ready": False, "required": False, "reason": "not_required"}
+    evidence = guard._external_baseline_evidence
+    if not isinstance(evidence, dict):
+        guard._external_baseline_reason = "baseline_rmt_evidence_missing"
+        return {
+            "ready": False,
+            "required": True,
+            "reason": guard._external_baseline_reason,
+        }
+
+    metrics = evidence.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    contract = metrics.get("measurement_contract")
+    if contract != _rmt_measurement_contract(guard):
+        guard._external_baseline_reason = "baseline_rmt_measurement_contract_mismatch"
+        return {
+            "ready": False,
+            "required": True,
+            "reason": guard._external_baseline_reason,
+        }
+
+    raw_family = metrics.get("edge_risk_by_family")
+    raw_module = metrics.get("edge_risk_by_module")
+    if not isinstance(raw_family, dict) or not raw_family:
+        guard._external_baseline_reason = "baseline_rmt_family_measurements_missing"
+        return {
+            "ready": False,
+            "required": True,
+            "reason": guard._external_baseline_reason,
+        }
+    if not isinstance(raw_module, dict) or not raw_module:
+        guard._external_baseline_reason = "baseline_rmt_module_measurements_missing"
+        return {
+            "ready": False,
+            "required": True,
+            "reason": guard._external_baseline_reason,
+        }
+
+    def _finite_map(raw: Mapping[str, Any]) -> dict[str, float]:
+        out: dict[str, float] = {}
+        for key, value in raw.items():
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                continue
+            if numeric >= 0.0 and numeric < float("inf"):
+                out[str(key)] = numeric
+        return out
+
+    external_family = _finite_map(raw_family)
+    external_module = _finite_map(raw_module)
+    local_family = set(guard.baseline_edge_risk_by_family)
+    local_module = set(guard.baseline_edge_risk_by_module)
+    if not local_family or local_family != set(external_family):
+        guard._external_baseline_reason = "baseline_rmt_family_coverage_mismatch"
+        return {
+            "ready": False,
+            "required": True,
+            "reason": guard._external_baseline_reason,
+        }
+    if not local_module or local_module != set(external_module):
+        guard._external_baseline_reason = "baseline_rmt_module_coverage_mismatch"
+        return {
+            "ready": False,
+            "required": True,
+            "reason": guard._external_baseline_reason,
+        }
+
+    guard.baseline_edge_risk_by_family = external_family
+    guard.baseline_edge_risk_by_module = external_module
+    guard._external_baseline_ready = True
+    return {
+        "ready": True,
+        "required": True,
+        "families": len(external_family),
+        "modules": len(external_module),
+        "measurement_contract": _rmt_measurement_contract(guard),
+    }
+
+
+def _unsupported_rmt_outcome(
+    guard: Any,
+    *,
+    reason: str,
+    has_guard_outcome: bool,
+    guard_outcome_type: Any,
+    finalize_time: float,
+) -> Any:
+    message = f"RMT assurance unavailable: {reason}"
+    metrics = {
+        "prepared": bool(guard.prepared),
+        "stable": False,
+        "activation_required": bool(guard._require_activation),
+        "activation_ready": bool(guard._activation_ready),
+        "external_baseline_required": bool(guard._external_baseline_required),
+        "external_baseline_ready": bool(guard._external_baseline_ready),
+        "measurement_contract": _rmt_measurement_contract(guard),
+        "finalize_time": float(finalize_time),
+        "unsupported_reason": reason,
+    }
+    violation = {
+        "type": "rmt_unsupported",
+        "severity": "error",
+        "reason": reason,
+        "message": message,
+        "module_name": None,
+    }
+    if has_guard_outcome:
+        return guard_outcome_type(
+            name=guard.name,
+            passed=False,
+            decision="block",
+            violations=[violation],
+            metrics=metrics,
+        )
+    return {
+        "passed": False,
+        "decision": "block",
+        "metrics": metrics,
+        "violations": [violation],
+        "errors": [message],
+    }
 
 
 def build_prepare_result(
@@ -208,11 +347,8 @@ def prepare_rmt_guard(
             ready=True,
             baseline_metrics={
                 "edge_risk_by_family": dict(guard.baseline_edge_risk_by_family),
-                "measurement_contract": {
-                    "kind": "activation_edge_risk",
-                    "estimator": guard.estimator,
-                    "activation_sampling": guard.activation_sampling,
-                },
+                "edge_risk_by_module": dict(guard.baseline_edge_risk_by_module),
+                "measurement_contract": _rmt_measurement_contract(guard),
             },
             policy_applied=policy or {},
             preparation_time=time.time() - start_time,
@@ -291,6 +427,16 @@ def validate_rmt_guard(
 ) -> GuardValidationResult:
     _ = context
     result = guard.finalize(model, adapter)
+    policy_factory = getattr(guard, "policy", None)
+    policy = dict(policy_factory()) if callable(policy_factory) else {}
+    details = {
+        "baseline_edge_risk_by_family": dict(
+            getattr(guard, "baseline_edge_risk_by_family", {}) or {}
+        ),
+        "current_edge_risk_by_family": dict(
+            getattr(guard, "edge_risk_by_family", {}) or {}
+        ),
+    }
     if (
         hasattr(result, "passed")
         and hasattr(result, "decision")
@@ -304,14 +450,15 @@ def validate_rmt_guard(
             ]
         metrics = dict(result.metrics)
         extras: dict[str, Any] = {}
-        if metrics.get("activation_required") is True and not metrics.get(
-            "activation_ready",
-            False,
+        if metrics.get("unsupported_reason") or (
+            metrics.get("activation_required") is True
+            and not metrics.get("activation_ready", False)
         ):
             extras = {
                 "supported": False,
                 "reason": str(
-                    metrics.get("activation_reason")
+                    metrics.get("unsupported_reason")
+                    or metrics.get("activation_reason")
                     or "activation_edge_risk_unavailable"
                 ),
                 "assurance_blocking": True,
@@ -322,6 +469,8 @@ def validate_rmt_guard(
             decision=str(result.decision),
             metrics=metrics,
             diagnostics=_typed_diagnostics(violations_list),
+            policy=policy,
+            details=details,
             violations=tuple(violations_list),
             extras=extras,
         )
@@ -335,14 +484,16 @@ def validate_rmt_guard(
     ]
     metrics = dict(result.get("metrics", {}))
     extras: dict[str, Any] = {}
-    if metrics.get("activation_required") is True and not metrics.get(
-        "activation_ready",
-        False,
+    if metrics.get("unsupported_reason") or (
+        metrics.get("activation_required") is True
+        and not metrics.get("activation_ready", False)
     ):
         extras = {
             "supported": False,
             "reason": str(
-                metrics.get("activation_reason") or "activation_edge_risk_unavailable"
+                metrics.get("unsupported_reason")
+                or metrics.get("activation_reason")
+                or "activation_edge_risk_unavailable"
             ),
             "assurance_blocking": True,
             "status": "unsupported",
@@ -357,6 +508,8 @@ def validate_rmt_guard(
         ),
         metrics=metrics,
         diagnostics=_typed_diagnostics(violations),
+        policy=policy,
+        details=details,
         violations=tuple(violations),
         extras=extras,
     )
@@ -415,6 +568,17 @@ def finalize_rmt_guard(
             "errors": [error_message],
         }
 
+    if guard._external_baseline_required and not guard._external_baseline_ready:
+        return _unsupported_rmt_outcome(
+            guard,
+            reason=(
+                guard._external_baseline_reason or "baseline_rmt_evidence_unavailable"
+            ),
+            has_guard_outcome=has_guard_outcome,
+            guard_outcome_type=guard_outcome_type,
+            finalize_time=time.time() - start_time,
+        )
+
     if guard._require_activation and guard._activation_required_failed:
         reason = guard._activation_required_reason or "activation_required"
         finalize_time = time.time() - start_time
@@ -459,6 +623,33 @@ def finalize_rmt_guard(
             guard.edge_risk_by_module = dict(current.get("edge_risk_by_module") or {})
             guard._last_result = dict(current)
 
+    missing_required_measurements = (
+        guard._external_baseline_required
+        and (not guard.edge_risk_by_family or not guard.edge_risk_by_module)
+    ) or (guard._require_activation and not guard.edge_risk_by_family)
+    if missing_required_measurements:
+        return _unsupported_rmt_outcome(
+            guard,
+            reason="no_activation_edge_measurements",
+            has_guard_outcome=has_guard_outcome,
+            guard_outcome_type=guard_outcome_type,
+            finalize_time=time.time() - start_time,
+        )
+
+    if guard._external_baseline_required and (
+        set(guard.edge_risk_by_family) != set(guard.baseline_edge_risk_by_family)
+        or set(guard.edge_risk_by_module) != set(guard.baseline_edge_risk_by_module)
+    ):
+        guard._external_baseline_ready = False
+        guard._external_baseline_reason = "subject_rmt_measurement_coverage_mismatch"
+        return _unsupported_rmt_outcome(
+            guard,
+            reason=guard._external_baseline_reason,
+            has_guard_outcome=has_guard_outcome,
+            guard_outcome_type=guard_outcome_type,
+            finalize_time=time.time() - start_time,
+        )
+
     guard.epsilon_violations = compute_epsilon_violations(guard)
     from .policies import guard_assert
 
@@ -474,13 +665,22 @@ def finalize_rmt_guard(
         "stable": stable,
         "edge_risk_by_family_base": dict(guard.baseline_edge_risk_by_family),
         "edge_risk_by_family": dict(guard.edge_risk_by_family),
+        "edge_risk_by_module_base": dict(guard.baseline_edge_risk_by_module),
+        "edge_risk_by_module": dict(guard.edge_risk_by_module),
+        "module_family_map": {
+            name: guard._classify_family(name)
+            for name in sorted(
+                set(guard.baseline_edge_risk_by_module) | set(guard.edge_risk_by_module)
+            )
+        },
         "epsilon_by_family": dict(guard.epsilon_by_family),
         "epsilon_violations": list(guard.epsilon_violations),
-        "measurement_contract": {
-            "kind": "activation_edge_risk",
-            "estimator": guard.estimator,
-            "activation_sampling": guard.activation_sampling,
-        },
+        "measurement_contract": _rmt_measurement_contract(guard),
+        "baseline_source": (
+            "external_run" if guard._external_baseline_required else "run_local_prepare"
+        ),
+        "external_baseline_required": bool(guard._external_baseline_required),
+        "external_baseline_ready": bool(guard._external_baseline_ready),
         "finalize_time": finalize_time,
     }
 

@@ -49,7 +49,7 @@ def test_compute_paired_delta_log_ci_and_ratio():
     assert rlo <= rhi and rlo > 0
 
 
-def test_compute_paired_delta_log_ci_uses_weights_for_resampling():
+def test_compute_paired_delta_log_ci_resamples_windows_and_weights_statistic():
     final = [0.2, 0.4, 0.6]
     base = [0.1, 0.1, 0.1]
     weights = [1.0, 10.0, 1.0]
@@ -64,10 +64,12 @@ def test_compute_paired_delta_log_ci_uses_weights_for_resampling():
         seed=seed,
     )
     delta = np.array([f - b for f, b in zip(final, base, strict=False)], dtype=float)
-    prob = np.array(weights, dtype=float) / float(sum(weights))
+    sample_weights = np.array(weights, dtype=float)
     rng = np.random.default_rng(seed)
-    idx = rng.choice(len(delta), size=len(delta), replace=True, p=prob)
-    expected = float(np.mean(delta[idx]))
+    idx = rng.integers(0, len(delta), size=len(delta))
+    expected = float(
+        np.dot(delta[idx], sample_weights[idx]) / sample_weights[idx].sum()
+    )
     assert lo == pytest.approx(expected)
     assert hi == pytest.approx(expected)
 
@@ -181,3 +183,42 @@ def test_weighted_bootstrap_bca_handles_single_dominant_weight_and_short_weights
         strict_lengths=False,
     )
     assert lo2 <= hi2
+
+
+@pytest.mark.parametrize(
+    ("weights", "message"),
+    [
+        ([[1.0], [2.0]], "1-dimensional"),
+        ([1.0], "length must match"),
+        ([1.0, float("inf")], "finite"),
+        ([1.0, -1.0], "non-negative"),
+        ([0.0, 0.0], "positive sum"),
+    ],
+)
+def test_independent_delta_rejects_invalid_arm_weights(weights, message):
+    with pytest.raises(ValueError, match=message):
+        B.compute_independent_delta_log_ci(
+            [0.3, 0.4],
+            [0.1, 0.2],
+            final_weights=weights,
+            replicates=8,
+        )
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"method": "bca"}, "only the percentile method"),
+        ({"replicates": 0}, "replicates must be positive"),
+        ({"alpha": 1.0}, "alpha must be between"),
+    ],
+)
+def test_independent_delta_rejects_invalid_bootstrap_configuration(kwargs, message):
+    with pytest.raises(ValueError, match=message):
+        B.compute_independent_delta_log_ci([0.3], [0.1], **kwargs)
+
+
+def test_paired_delta_rejects_non_finite_subtraction_result():
+    with np.errstate(over="ignore"):
+        with pytest.raises(ValueError, match="deltas must be finite"):
+            B.compute_paired_delta_log_ci([1e308], [-1e308])

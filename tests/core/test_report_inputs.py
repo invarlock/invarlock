@@ -170,14 +170,14 @@ def test_load_report_input_json_rejects_unreadable_file(
 ) -> None:
     report = tmp_path / "report.json"
     report.write_text("{}", encoding="utf-8")
-    original_open = Path.open
+    original_open = os.open
 
-    def _bad_open(self: Path, *args: object, **kwargs: object):
-        if self == report:
+    def _bad_open(path: object, *args: object, **kwargs: object):
+        if Path(path) == report:
             raise OSError("io fail")
-        return original_open(self, *args, **kwargs)
+        return original_open(path, *args, **kwargs)
 
-    monkeypatch.setattr(Path, "open", _bad_open, raising=False)
+    monkeypatch.setattr(os, "open", _bad_open)
 
     with pytest.raises(ReportInputError, match="not readable"):
         load_report_input_json(report)

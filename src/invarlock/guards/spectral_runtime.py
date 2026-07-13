@@ -9,6 +9,7 @@ import torch
 
 from invarlock.core.types import GuardDiagnostic, GuardValidationResult
 
+from . import spectral_correction
 from ._estimators import frobenius_norm_sq, row_col_norm_extrema
 from .policies import guard_assert
 from .spectral_control import apply_spectral_control
@@ -54,6 +55,229 @@ def _raise_prepare_failure(message: str, *, error: Exception | None = None) -> N
     if error is None:
         raise RuntimeError(message)
     raise RuntimeError(message) from error
+
+
+def _spectral_measurement_contract(guard: Any) -> dict[str, Any]:
+    return {
+        "estimator": dict(guard.estimator),
+        "degeneracy": dict(guard.degeneracy),
+    }
+
+
+def _identity_changes(guard: Any) -> list[str]:
+    changed: set[str] = set()
+    for inventory in (getattr(guard, "measurement_inventory", {}) or {}).values():
+        if not isinstance(inventory, dict):
+            continue
+        raw = inventory.get("identity_changed_modules")
+        if isinstance(raw, list):
+            changed.update(str(name) for name in raw if isinstance(name, str))
+    return sorted(changed)
+
+
+def _measurement_exclusions(guard: Any) -> list[dict[str, str]]:
+    exclusions: dict[tuple[str, str], dict[str, str]] = {}
+    for phase, inventory in (getattr(guard, "measurement_inventory", {}) or {}).items():
+        if not isinstance(inventory, dict):
+            continue
+        raw_entries = inventory.get("excluded_modules")
+        if not isinstance(raw_entries, list):
+            continue
+        for raw in raw_entries:
+            if not isinstance(raw, dict) or raw.get("stage") != "measurement":
+                continue
+            module = str(raw.get("module") or "")
+            reason = str(raw.get("reason") or "measurement_unavailable")
+            exclusions[(str(phase), module)] = {
+                "phase": str(phase),
+                "module": module,
+                "reason": reason,
+            }
+    return [exclusions[key] for key in sorted(exclusions)]
+
+
+def _discovery_errors(guard: Any) -> list[dict[str, str]]:
+    errors: set[tuple[str, str]] = set()
+    for phase, inventory in (getattr(guard, "measurement_inventory", {}) or {}).items():
+        if not isinstance(inventory, dict):
+            continue
+        raw = inventory.get("discovery_errors")
+        if isinstance(raw, list):
+            errors.update(
+                (str(phase), reason) for reason in raw if isinstance(reason, str)
+            )
+    return [{"phase": phase, "reason": reason} for phase, reason in sorted(errors)]
+
+
+def _unsupported_spectral_result(
+    guard: Any,
+    *,
+    reason: str,
+    modules_checked: int,
+) -> GuardValidationResult:
+    message = f"Spectral assurance unavailable: {reason}"
+    return GuardValidationResult(
+        passed=False,
+        decision="block",
+        metrics={
+            "modules_checked": int(modules_checked),
+            "measurement_contract": _spectral_measurement_contract(guard),
+            "external_baseline_required": bool(guard._external_baseline_required),
+            "external_baseline_ready": bool(guard._external_baseline_ready),
+        },
+        diagnostics=(
+            GuardDiagnostic(
+                kind="spectral_unsupported",
+                severity="error",
+                message=message,
+                details={"reason": reason, "modules_checked": int(modules_checked)},
+            ),
+        ),
+        policy=guard._serialize_policy(),
+        violations=(
+            {
+                "type": "spectral_unsupported",
+                "severity": "error",
+                "reason": reason,
+                "message": message,
+            },
+        ),
+        extras={
+            "supported": False,
+            "reason": reason,
+            "assurance_blocking": True,
+            "status": "unsupported",
+            "measurement_inventory": {
+                phase: dict(inventory)
+                for phase, inventory in (
+                    getattr(guard, "measurement_inventory", {}) or {}
+                ).items()
+            },
+        },
+    )
+
+
+def load_external_baseline_evidence(guard: Any) -> dict[str, Any]:
+    """Load baseline-run measurements into a subject Spectral guard.
+
+    ``prepare`` still measures the subject so that module and measurement
+    coverage can be checked.  This function then replaces only the comparison
+    reference.  Invalid evidence is retained as an explicit blocking reason;
+    it never falls back to the subject-local reference.
+    """
+
+    guard._external_baseline_ready = False
+    guard._external_baseline_reason = None
+    if not guard._external_baseline_required:
+        return {"ready": False, "required": False, "reason": "not_required"}
+
+    evidence = guard._external_baseline_evidence
+    if not isinstance(evidence, dict):
+        guard._external_baseline_reason = "baseline_spectral_evidence_missing"
+        return {
+            "ready": False,
+            "required": True,
+            "reason": guard._external_baseline_reason,
+        }
+
+    metrics = evidence.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    baseline_metrics = evidence.get("baseline_metrics")
+    baseline_metrics = baseline_metrics if isinstance(baseline_metrics, dict) else {}
+    final_metrics = evidence.get("final_metrics")
+    final_metrics = final_metrics if isinstance(final_metrics, dict) else {}
+    raw_sigmas = baseline_metrics.get("module_sigmas") or final_metrics
+    if not isinstance(raw_sigmas, dict) or not raw_sigmas:
+        guard._external_baseline_reason = (
+            "baseline_spectral_module_measurements_missing"
+        )
+        return {
+            "ready": False,
+            "required": True,
+            "reason": guard._external_baseline_reason,
+        }
+
+    external_sigmas: dict[str, float] = {}
+    for name, value in raw_sigmas.items():
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(numeric) and numeric >= 0.0:
+            external_sigmas[str(name)] = numeric
+    local_names = set(guard.baseline_sigmas)
+    external_names = set(external_sigmas)
+    if not local_names or local_names != external_names:
+        guard._external_baseline_reason = "baseline_spectral_module_coverage_mismatch"
+        return {
+            "ready": False,
+            "required": True,
+            "reason": guard._external_baseline_reason,
+            "missing": sorted(local_names - external_names),
+            "unexpected": sorted(external_names - local_names),
+        }
+
+    external_contract = baseline_metrics.get("measurement_contract") or metrics.get(
+        "measurement_contract"
+    )
+    if external_contract != _spectral_measurement_contract(guard):
+        guard._external_baseline_reason = (
+            "baseline_spectral_measurement_contract_mismatch"
+        )
+        return {
+            "ready": False,
+            "required": True,
+            "reason": guard._external_baseline_reason,
+        }
+
+    raw_family_map = evidence.get("module_family_map")
+    if not isinstance(raw_family_map, dict):
+        guard._external_baseline_reason = "baseline_spectral_family_map_missing"
+        return {
+            "ready": False,
+            "required": True,
+            "reason": guard._external_baseline_reason,
+        }
+    external_family_map = {
+        str(name): str(family)
+        for name, family in raw_family_map.items()
+        if str(name) in external_names and isinstance(family, str) and family
+    }
+    if set(external_family_map) != external_names:
+        guard._external_baseline_reason = "baseline_spectral_family_coverage_mismatch"
+        return {
+            "ready": False,
+            "required": True,
+            "reason": guard._external_baseline_reason,
+        }
+
+    guard.baseline_sigmas = external_sigmas
+    guard.module_family_map = external_family_map
+    guard.baseline_family_stats = compute_family_stats(
+        guard.baseline_sigmas, guard.module_family_map
+    )
+    raw_degeneracy = baseline_metrics.get("baseline_degeneracy")
+    guard.baseline_degeneracy = (
+        {
+            str(name): dict(values)
+            for name, values in raw_degeneracy.items()
+            if isinstance(values, dict)
+        }
+        if isinstance(raw_degeneracy, dict)
+        else {}
+    )
+    guard.baseline_metrics = dict(baseline_metrics)
+    guard.baseline_metrics["module_sigmas"] = dict(external_sigmas)
+    guard.baseline_metrics["family_stats"] = {
+        family: dict(values) for family, values in guard.baseline_family_stats.items()
+    }
+    guard._external_baseline_ready = True
+    return {
+        "ready": True,
+        "required": True,
+        "modules": len(external_sigmas),
+        "measurement_contract": _spectral_measurement_contract(guard),
+    }
 
 
 def prepare_guard(
@@ -241,21 +465,34 @@ def after_edit_guard(
             model, guard.current_metrics, phase="after_edit"
         )
         guard.violations = violations
-        if violations and guard.correction_enabled:
-            control_result = apply_spectral_control_fn(
+        fatal_violations, budgeted_violations = partition_spectral_violations(
+            violations
+        )
+        selected_budgeted, mt_selection = guard._select_budgeted_violations(
+            budgeted_violations
+        )
+        selected_violations = [*fatal_violations, *selected_budgeted]
+        guard.current_metrics, correction_ledger = (
+            spectral_correction.run_correction_lifecycle(
+                guard,
                 model,
-                policy={
-                    "sigma_quantile": guard.sigma_quantile,
-                    "scope": guard.scope,
-                    "baseline_sigmas": guard.baseline_sigmas,
-                    "target_sigma": guard.target_sigma,
-                },
+                phase="after_edit",
+                pre_correction_metrics=guard.current_metrics,
+                selected_violations=selected_violations,
+                multiple_testing_selection=mt_selection,
+                apply_spectral_control_fn=apply_spectral_control_fn,
             )
+        )
+        guard.correction_ledger = correction_ledger
+        if selected_violations and guard.correction_enabled:
             guard._log_event(
-                "spectral_control_applied",
-                message=f"Applied spectral control, violations: {len(violations)}",
-                violations_count=len(violations),
-                control_result=control_result,
+                "spectral_control_attempted",
+                message=(
+                    "Spectral control lifecycle completed for "
+                    f"{len(selected_violations)} selected findings"
+                ),
+                selected_findings_count=len(selected_violations),
+                correction_ledger=correction_ledger,
             )
 
         guard._log_event(
@@ -281,6 +518,31 @@ def validate_guard(
         guard.prepare(model, adapter, None, {})
 
     current_metrics = guard._capture_sigmas(model, phase="validate")
+    if not current_metrics:
+        return _unsupported_spectral_result(
+            guard,
+            reason="no_eligible_modules_measured",
+            modules_checked=0,
+        )
+    if guard._external_baseline_required and not guard._external_baseline_ready:
+        return _unsupported_spectral_result(
+            guard,
+            reason=(
+                guard._external_baseline_reason
+                or "baseline_spectral_evidence_unavailable"
+            ),
+            modules_checked=len(current_metrics),
+        )
+    if guard._external_baseline_required and set(current_metrics) != set(
+        guard.baseline_sigmas
+    ):
+        guard._external_baseline_ready = False
+        guard._external_baseline_reason = "subject_spectral_module_coverage_mismatch"
+        return _unsupported_spectral_result(
+            guard,
+            reason=guard._external_baseline_reason,
+            modules_checked=len(current_metrics),
+        )
     violations = guard._detect_spectral_violations(
         model, current_metrics, phase="validate"
     )
@@ -288,6 +550,32 @@ def validate_guard(
     selected_budgeted, mt_selection = guard._select_budgeted_violations(
         budgeted_violations
     )
+    pre_correction_selected = [*fatal_violations, *selected_budgeted]
+    current_metrics, correction_ledger = spectral_correction.run_correction_lifecycle(
+        guard,
+        model,
+        phase="validate",
+        pre_correction_metrics=current_metrics,
+        selected_violations=pre_correction_selected,
+        multiple_testing_selection=mt_selection,
+    )
+    guard.correction_ledger = correction_ledger
+    if bool(correction_ledger.get("correction_enabled")) and pre_correction_selected:
+        if not current_metrics:
+            return _unsupported_spectral_result(
+                guard,
+                reason="post_correction_spectral_measurements_missing",
+                modules_checked=0,
+            )
+        violations = guard._detect_spectral_violations(
+            model, current_metrics, phase="validate_post_correction"
+        )
+        fatal_violations, budgeted_violations = partition_spectral_violations(
+            violations
+        )
+        selected_budgeted, mt_selection = guard._select_budgeted_violations(
+            budgeted_violations
+        )
     outcome = evaluate_spectral_outcome(
         fatal_violations=fatal_violations,
         budgeted_violations=budgeted_violations,
@@ -300,7 +588,18 @@ def validate_guard(
     caps_exceeded = bool(outcome["caps_exceeded"])
     passed = bool(outcome["passed"])
     decision = str(outcome["decision"])
-
+    if correction_ledger.get("policy_result") in {
+        "correction_failed",
+        "evidence_incomplete",
+    }:
+        passed = False
+        decision = "block"
+    identity_changes = _identity_changes(guard)
+    measurement_exclusions = _measurement_exclusions(guard)
+    discovery_errors = _discovery_errors(guard)
+    if identity_changes or measurement_exclusions or discovery_errors:
+        passed = False
+        decision = "block"
     family_summary = summarize_family_z_scores(
         guard.latest_z_scores, guard.module_family_map, guard.family_caps
     )
@@ -327,6 +626,16 @@ def validate_guard(
         family_quantiles=family_quantiles,
         top_z_scores=top_z_scores,
     )
+    metrics["baseline_source"] = (
+        "external_run" if guard._external_baseline_required else "run_local_prepare"
+    )
+    metrics["external_baseline_required"] = bool(guard._external_baseline_required)
+    metrics["external_baseline_ready"] = bool(guard._external_baseline_ready)
+    metrics["baseline_modules"] = len(guard.baseline_sigmas)
+    spectral_correction.attach_correction_metrics(metrics, correction_ledger)
+    metrics["identity_changed_modules"] = identity_changes
+    metrics["measurement_exclusions"] = measurement_exclusions
+    metrics["discovery_errors"] = discovery_errors
     _ = spectral_validation_message(
         passed=passed,
         fatal_violations=fatal_violations,
@@ -354,6 +663,21 @@ def validate_guard(
         extras={
             "final_z_scores": guard.latest_z_scores.copy(),
             "module_family_map": dict(guard.module_family_map),
+            "baseline_metrics": dict(guard.baseline_metrics),
+            "final_metrics": dict(current_metrics),
+            "final_degeneracy": {
+                name: dict(values)
+                for name, values in (
+                    getattr(guard, "latest_degeneracy", {}) or {}
+                ).items()
+            },
+            "measurement_inventory": {
+                phase: dict(inventory)
+                for phase, inventory in (
+                    getattr(guard, "measurement_inventory", {}) or {}
+                ).items()
+            },
+            "correction_ledger": dict(correction_ledger),
         },
     )
 
@@ -379,19 +703,38 @@ def finalize_guard(guard: Any, model: Any) -> dict[str, Any]:
     final_violations = guard._detect_spectral_violations(
         model, final_metrics, phase="finalize"
     )
+    fatal_violations, budgeted_violations = partition_spectral_violations(
+        final_violations
+    )
+    selected_budgeted, mt_selection = guard._select_budgeted_violations(
+        budgeted_violations
+    )
+    pre_correction_selected = [*fatal_violations, *selected_budgeted]
+    final_metrics, correction_ledger = spectral_correction.run_correction_lifecycle(
+        guard,
+        model,
+        phase="finalize",
+        pre_correction_metrics=final_metrics,
+        selected_violations=pre_correction_selected,
+        multiple_testing_selection=mt_selection,
+    )
+    guard.correction_ledger = correction_ledger
+    if bool(correction_ledger.get("correction_enabled")) and pre_correction_selected:
+        final_violations = guard._detect_spectral_violations(
+            model, final_metrics, phase="finalize_post_correction"
+        )
+        fatal_violations, budgeted_violations = partition_spectral_violations(
+            final_violations
+        )
+        selected_budgeted, mt_selection = guard._select_budgeted_violations(
+            budgeted_violations
+        )
     final_z_summary = summarize_family_z_scores(
         guard.latest_z_scores, guard.module_family_map, guard.family_caps
     )
     final_family_stats = compute_family_stats(final_metrics, guard.module_family_map)
     family_quantiles, top_z_scores = compute_family_observability(
         guard.latest_z_scores or {}, guard.module_family_map
-    )
-
-    fatal_violations, budgeted_violations = partition_spectral_violations(
-        final_violations
-    )
-    selected_budgeted, mt_selection = guard._select_budgeted_violations(
-        budgeted_violations
     )
     outcome = evaluate_spectral_outcome(
         fatal_violations=fatal_violations,
@@ -405,6 +748,18 @@ def finalize_guard(guard: Any, model: Any) -> dict[str, Any]:
     caps_exceeded = bool(outcome["caps_exceeded"])
     passed = bool(outcome["passed"])
     decision = str(outcome["decision"])
+    if correction_ledger.get("policy_result") in {
+        "correction_failed",
+        "evidence_incomplete",
+    }:
+        passed = False
+        decision = "block"
+    identity_changes = _identity_changes(guard)
+    measurement_exclusions = _measurement_exclusions(guard)
+    discovery_errors = _discovery_errors(guard)
+    if identity_changes or measurement_exclusions or discovery_errors:
+        passed = False
+        decision = "block"
 
     metrics = build_spectral_finalize_metrics(
         final_metrics=final_metrics,
@@ -414,7 +769,7 @@ def finalize_guard(guard: Any, model: Any) -> dict[str, Any]:
         candidate_budgeted=candidate_budgeted,
         caps_applied=caps_applied,
         caps_exceeded=caps_exceeded,
-        baseline_metrics=guard.baseline_metrics,
+        baseline_metrics=guard.baseline_sigmas,
         scope=guard.scope,
         correction_enabled=guard.correction_enabled,
         family_caps=guard.family_caps,
@@ -431,6 +786,10 @@ def finalize_guard(guard: Any, model: Any) -> dict[str, Any]:
         top_z_scores=top_z_scores,
     )
     metrics["target_sigma"] = guard.target_sigma
+    spectral_correction.attach_correction_metrics(metrics, correction_ledger)
+    metrics["identity_changed_modules"] = identity_changes
+    metrics["measurement_exclusions"] = measurement_exclusions
+    metrics["discovery_errors"] = discovery_errors
     warnings, errors = categorize_spectral_messages(selected_final_violations)
 
     result = {
@@ -447,6 +806,14 @@ def finalize_guard(guard: Any, model: Any) -> dict[str, Any]:
         "baseline_metrics": guard.baseline_metrics,
         "final_metrics": final_metrics,
         "final_z_scores": guard.latest_z_scores,
+        "final_degeneracy": {
+            name: dict(values) for name, values in guard.latest_degeneracy.items()
+        },
+        "measurement_inventory": {
+            phase: dict(inventory)
+            for phase, inventory in guard.measurement_inventory.items()
+        },
+        "correction_ledger": dict(correction_ledger),
         "module_family_map": dict(guard.module_family_map),
         "policy": guard._serialize_policy(),
     }
@@ -458,6 +825,7 @@ __all__ = [
     "after_edit_guard",
     "before_edit_guard",
     "finalize_guard",
+    "load_external_baseline_evidence",
     "prepare_guard",
     "validate_guard",
 ]
