@@ -1,116 +1,98 @@
-# RMT ε‑Band Acceptance (Edge Risk Score)
+# RMT Epsilon-Band Rule And Evidence Limits
 
-> **Plain language:** The RMT guard limits how much the activation **edge risk**
-> can grow beyond its baseline, ensuring structural shifts trigger a failure
-> while expected noise passes.
+> **Plain language:** The RMT guard implements a deterministic,
+> baseline-relative activation edge-risk comparison. The shipped one-percent
+> epsilon is an operational policy constant in this repository snapshot; the
+> public tree does not contain the null corpus needed to call it a demonstrated
+> q95-q97 calibration.
 
 ## Overview
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Define the RMT edge-risk acceptance band and the report fields needed to audit it. |
-| **Audience** | RMT guard maintainers, calibration auditors, and release approvers checking activation evidence. |
-| **Contract scope** | Baseline-relative activation edge-risk growth, per-family epsilon bands, and report-verifier behavior. |
-| **Source of truth** | `src/invarlock/guards/rmt*.py`, `runtime/tiers.yaml`, and RMT assurance tests. |
+| **Purpose** | Define the implemented activation edge-risk rule and its evidence boundary. |
+| **Audience** | RMT maintainers, reviewers, and operators selecting local policy. |
+| **Contract scope** | Global activation standardization, bounded power iteration, MP-edge normalization, and baseline-relative epsilon checks. |
+| **Source of truth** | `src/invarlock/guards/rmt_activation_runtime.py`, `src/invarlock/guards/rmt_policy.py`, and the packaged `runtime/tiers.yaml` policy resource. |
 
-## Claim
+## Implemented Rule
 
-The Random Matrix Theory (RMT) guard accepts an edit when the activation **edge
-risk score** stays within the calibrated ε‑band for each family.
-
-Let $r_f^{\text{base}}$ be the baseline edge risk score and
-$r_f^{\text{cur}}$ the current score for family $f$.
-The guard accepts if:
+For family `f`, the report compares baseline and current edge-risk values:
 
 $$
-r_f^{\text{cur}} \le (1+\epsilon_f)\, r_f^{\text{base}}
+r_f^{cur} \leq (1 + \epsilon_f) r_f^{base}.
 $$
 
-with $\epsilon_f$ calibrated from **null** runs (e.g., 95th–99th percentile of
-$r_f^{\text{cur}}/r_f^{\text{base}} - 1$).
+If the current value exceeds that bound, the family is listed in
+`rmt.epsilon_violations` and `validation.rmt_stable` becomes false.
 
-### What is the edge risk score?
+## Edge-Risk Computation
 
-For a (token×hidden) activation matrix, the guard forms a whitened centered and
-standardized matrix, estimates its top singular value via a deterministic
-matvec estimator, and normalizes by the Marchenko–Pastur edge for the same
-shape:
+For a token-by-hidden activation matrix, the implementation:
 
-$$
-r = \frac{\hat{\sigma}_{\max}(A')}{\sigma_{\mathrm{MP}}(m,n)}
-$$
+1. reshapes higher-rank activations to two dimensions;
+2. subtracts one global scalar mean and divides by one global scalar standard
+   deviation across all matrix entries;
+3. estimates the leading singular value with a deterministic bounded power
+   iteration (three iterations by default, initialized with all ones); and
+4. divides by the shape-dependent Marchenko-Pastur upper edge.
 
-The contract fixes the estimator budget and the activation sampling policy; those
-knobs are recorded in the report.
+The implementation performs global centering and scaling. It does **not**
+perform feature-covariance whitening, so documentation and evidence should not
+describe the matrix as whitened. The Marchenko-Pastur interpretation also relies
+on assumptions that are not established for arbitrary correlated transformer
+activations. Baseline-relative comparison may reduce some common bias, but does
+not prove the estimator detects every structural change.
 
-This note documents the runtime report contract for the activation edge-risk
-mode surfaced in reports; it does not catalog the full implementation surface
-inside `src/invarlock/guards/rmt.py`.
+## Shipped Policy
 
-## Derivation (sketch)
+Balanced and Conservative currently store
+`{ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01}` in the packaged tier
+resource (`runtime/tiers.yaml` as the logical package path).
+Those are enforced constants, not a public statistical guarantee. The checkout
+does not ship the raw null-run reports or a dedicated RMT epsilon summarizer
+that re-derives them.
 
-- Edge risk fluctuates under null due to finite‑sample deviations from the
-  Marchenko–Pastur edge and estimator noise.
-- The ε‑band permits expected null drift, flagging **structural** increases.
-- Large edge risk indicates concentration of activation energy along a small
-  number of directions beyond random‑matrix expectations.
+Use a local override when the target architecture, activation sampling plan,
+precision, or device differs. Record that override in `resolved_policy`.
 
-## Assumptions & Scope
+## Runtime Contract
 
-- Null calibration must cover each family `{ffn, attn, embed, other}`; default ε values are exposed whenever data is sparse.
-- Baseline and current scores use identical activation sampling and **token‑weighted aggregation**.
-- CI/release and activation-required evidence require activation-based scoring;
-  if activation batches are missing in those paths, the RMT guard fails closed.
+Reports record:
 
-## Calibration (pilot-derived)
+- `rmt.{mode,edge_risk_by_family_base,edge_risk_by_family}`
+- `rmt.{epsilon_default,epsilon_by_family,epsilon_violations,stable,status}`
+- `rmt.families.*.{edge_base,edge_cur,epsilon,allowed,ratio,delta}`
+- `rmt.measurement_contract` and its hash
+- the matching resolved policy under `resolved_policy.rmt`
 
-- Balanced tier uses $\epsilon_f = \{0.01, 0.01, 0.01, 0.01\}$ for
-  `{ffn, attn, embed, other}` respectively (q95–q97 of null deltas).
-- Conservative uses the same per-family ε defaults:
-  $\epsilon_f = \{0.01, 0.01, 0.01, 0.01\}$.
-  Values are recorded in the packaged `tiers.yaml`
-  (`runtime/tiers.yaml`) and surfaced in reports. Provide
-  overrides via `INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml` when needed.
+Verification checks presence, arithmetic consistency, policy matching, and the
+declared acceptance inequality. It does not replay model activations from the
+report alone.
 
-*Example:* with `r_base = 1.20` and ε = 0.01, the guard allows
-`r_cur ≤ (1+0.01) × 1.20 = 1.212`.
+The current runtime assigns a blocking decision to any epsilon violation, and
+strict verification requires `rmt.stable=true` with an empty violation list.
+There is no separate strict-mode organization-policy switch that accepts a
+complete RMT measurement as diagnostic-only evidence. The estimator's
+statistical interpretation remains experimental despite that blocking
+behavior.
 
-## Recalibration
+## Recalibration Procedure
 
-Calibration values are derived from null-sweep runs and stored in the packaged
-`runtime/tiers.yaml`. See the full calibration methodology in
-[09-tier-v1-calibration.md](09-tier-v1-calibration.md).
+For a local policy proposal:
 
-To recalibrate, run null baselines (no edit) and compute per-family deltas
-Δ(f) = r_cur(f)/r_base(f) − 1 (skip cases with missing or zero baseline). Set
-ε(f) to the q95–q99 quantile of Δ(f). For small families or tiny sample sizes,
-use a slightly larger ε to avoid spurious failures.
+1. specify model families, devices, precision, sampling, and null edits in advance;
+2. run independent baseline/no-op pairs;
+3. compute `delta(f) = r_cur(f) / r_base(f) - 1` when the baseline is positive;
+4. report the full distribution, sample count, quantiles, and uncertainty;
+5. validate the selected epsilon on held-out null and fault cases; and
+6. archive raw reports, code revision, configuration, and hashes.
 
-## Runtime Contract (report)
+A locally selected quantile is not a shipped calibration unless its corpus and
+derivation are attached and independently reviewable.
 
-- report records `rmt.{mode,edge_risk_by_family_base,edge_risk_by_family,epsilon_default,epsilon_by_family,epsilon_violations,stable,status}`.
-- Per-family details for rendering live under `rmt.families.*.{edge_base,edge_cur,epsilon,allowed,ratio,delta}`.
-- `rmt.measurement_contract.kind = "activation_edge_risk"` records which RMT
-  measurement path produced the evidence.
-- report lint verifies the inequality and marks violations; `validation.rmt_stable` reflects the ε‑band gate.
+## Related Documentation
 
-## Observability
-
-- `rmt.edge_risk_by_family_base.*` and `rmt.edge_risk_by_family.*`.
-- `rmt.epsilon_default` and `rmt.epsilon_by_family.*`.
-- `rmt.status` / `rmt.stable` and `rmt.epsilon_violations` for pass/fail context.
-- `resolved_policy.rmt.{margin,deadband,epsilon_by_family}` — resolved thresholds archived with the report bundle.
-
-## Edge cases
-
-- Small samples: estimator variance dominates; increase activation sample count or widen ε for tiny families.
-
-## Background reading
-
-- Marchenko, V. A., & Pastur, L. A. (1967). “Distribution of eigenvalues for
-  some sets of random matrices.” *Mathematics of the USSR-Sbornik*, 1(4),
-  457–483.
-- Bai, Z. D., & Silverstein, J. W. (2010). *Spectral Analysis of Large
-  Dimensional Random Matrices* (2nd ed.). Springer.
-- Pennington, J., & Worah, P. (2017). “Nonlinear Random Matrix Theory for Deep Learning.” *Advances in Neural Information Processing Systems (NeurIPS)*. <https://papers.nips.cc/paper/6857-nonlinear-random-matrix-theory-for-deep-learning>
-- Martin, C. H., & Mahoney, M. W. (2021). “Implicit Self-Regularization in Deep Neural Networks: Evidence from Random Matrix Theory and Implications for Learning.” *Journal of Machine Learning Research*, 22(165), 1–73. Preprint: <https://arxiv.org/abs/1810.01075>
+- [Guard Contracts](04-guard-contracts.md)
+- [Tier Policy Values And Recalibration](09-tier-v1-calibration.md)
+- [GPU/MPS-First Guard Measurement Contracts](13-gpu-mps-first-guards.md)

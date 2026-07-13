@@ -17,6 +17,9 @@ model:
   id: gpt2
   adapter: hf_causal
   device: auto
+  model_identity:
+    kind: remote_revision
+    revision: 607a30d783dfa663caf39e06633721c8d4cfcd7e
 
 dataset:
   provider: wikitext2
@@ -82,10 +85,10 @@ report shows `preview_n=240` because the CI profile overrides the YAML counts.
 
 | Config area | Report fields | report fields | Verify gates |
 | --- | --- | --- | --- |
-| `model.*` | `report.meta.{model_id,adapter,device}` | `report.meta.{model_id,adapter,device}` | Schema only. |
+| `model.*` | `report.meta.{model_id,adapter,device,model_identity}` | `report.meta.{model_id,adapter,device,model_identity}` | Strict identity and baseline-reference binding. |
 | `dataset.*` | `report.data.*`, `report.dataset.windows.stats`, `report.provenance.provider_digest` | `report.dataset.*`, `report.provenance.provider_digest` | Pairing + provider digest checks (CI/Release). |
 | `eval.*` | `report.metrics.primary_metric` | `report.primary_metric`, `validation.*`, `primary_metric_tail` | Ratio/counts + drift band (CI/Release). |
-| `guards.*` | `report.guards[]`, `report.guard_overhead` | `report.spectral/rmt/variance`, `resolved_policy.*`, `guard_overhead` | Measurement contracts + overhead (Release). |
+| `guards.*` | `report.guards[]`, `report.guard_metric_impact` | `report.spectral/rmt/variance`, `resolved_policy.*`, `guard_metric_impact` | Guard measurement contracts + paired metric-impact evidence (Release). |
 | `auto.*` / `--profile` | `report.meta.auto`, `report.context.profile` | `report.auto`, `report.meta.profile` | Schema only. |
 | `output.*` | `report.artifacts.*` | `report.artifacts.*` | Schema only. |
 
@@ -98,6 +101,9 @@ model:
   id: <hf_id_or_path>
   adapter: auto
   device: auto
+  model_identity:
+    kind: remote_revision
+    revision: <40-to-64-character-lowercase-hex-revision>
   # extra adapter kwargs (passed to load_model)
   dtype: float16
   low_cpu_mem_usage: true
@@ -108,6 +114,13 @@ model:
   #   quant_method: bitsandbytes
   #   bitwidth: 8
 ```
+
+`model_identity` is the only model identity field. Remote checkpoints use
+`kind: remote_revision` with an immutable revision. Local checkpoints use
+`kind: local_checkpoint_tree` with the `sha256:` tree digest produced by the
+evaluation planner. The runtime derives the adapter's remote `revision`
+argument from this object and compares a local tree directly with its bound
+digest before and after loading.
 
 For HF adapters, `memory_efficient_load` defaults to automatic behavior:
 accelerated loads receive a hardware-aware dtype when unset, HF loading uses
@@ -166,7 +179,7 @@ auto:
 primary_metric:
   acceptance_range: {min: 0.95, max: 1.10}
   drift_band: {min: 0.90, max: 1.20}
-  overhead_threshold: 0.01
+  degradation_limit: 0.01
 ```
 
 ### Guards
@@ -194,7 +207,7 @@ context:
   run:
     strict_guard_prepare: true
     strict_eval: true
-    skip_overhead_check: false   # release/ci explicit skip marker
+    skip_guard_metric_impact_check: false   # CI-only explicit skip; release rejects true
     tiny_relax: false            # dev/demo-only relaxed gating
   eval:
     strict_errors: true

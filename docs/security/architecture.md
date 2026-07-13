@@ -36,7 +36,7 @@ Overview of the core security-related components and defaults.
 ## report verification
 
 - `invarlock verify` re-checks schema, pairing math (Δlog → ratio),
-  drift/overhead gates, and runtime provenance via `runtime.manifest.json`.
+  drift/guard metric impact gates, and runtime provenance via `runtime.manifest.json`.
 - `invarlock advanced runtime-verify` is the low-level package-native CLI for direct
   report/manifest checks, and it uses the same Python verifier implementation
   as runtime provenance.

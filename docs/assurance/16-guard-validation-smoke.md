@@ -1,8 +1,9 @@
 # Guard Validation Smoke
 
 > **Plain language:** The smoke command checks the synthetic guard-validation
-> harness still runs and records deterministic guard behavior. Real model-family
-> evidence remains a separate release-evidence surface.
+> harness still runs and routes generated scores through production guard
+> primitives. Real model-family evidence remains a separate
+> release-evidence surface.
 
 ## Overview
 
@@ -27,45 +28,50 @@ The command writes:
 Release evidence validation requires both artifacts through
 `make release-evidence-check`.
 
-The smoke estimates synthetic type-I error and power for the spectral, RMT, and
-variance guard surfaces across several calibration-window counts. It is useful
-for checking that the release evidence path exists and stays deterministic.
+The smoke estimates synthetic null-trigger and shifted-trigger rates across
+several window counts. Each score is routed through a production primitive:
+spectral violation summary, RMT epsilon-violation detection, or the variance
+predictive gate outcome. The JSON records those import paths and roles. The
+generator distributions are deliberately synthetic; these rates are useful for
+implementation wiring and determinism checks, not threshold calibration.
+
+The release checker reads both artifacts as immutable regular-file snapshots.
+It rejects duplicate JSON keys, non-finite JSON values, symlinks, unexpected
+v1 fields, invalid seed/replicate bounds, and source-identity mismatches. It
+then independently regenerates every raw boolean outcome from the recorded
+seed and current policy thresholds, recomputes counts and rates, verifies the
+evidence digest, and requires the Markdown bytes to equal the canonical render.
+This replay strengthens the wiring claim only; it does not turn synthetic
+inputs into empirical guard evidence.
 
 ## Interpretation
 
-The generated rows provide a repeatable harness shape for synthetic validation
-and a release-evidence floor. Real checkpoint validation carries the
-model-family threshold evidence for GPT-2, LLaMA, Qwen, BERT, and other model
-families:
-
-- type-I error reporting
-- power reporting
-- calibration-window sensitivity
-- model-family placeholder rows
-- synthetic shifted-power rates
-
-Release approvers should treat the smoke as a floor. Empirical artifacts for
-real model families still belong in the release evidence bundle when a release
-claims new or expanded guard calibration.
+The generated rows show that the three named production primitives execute
+deterministically on declared synthetic inputs. They do not provide
+model-family evidence, real-world type-I error, detection power, or threshold
+calibration. Release approvers should treat the smoke as an implementation
+floor only. Independently reviewable empirical artifacts belong in the release
+evidence bundle whenever a release claims new or expanded guard or model-family
+calibration.
 
 ## Non-Synthetic Evidence Paths
 
-The repo also ships real-run evidence machinery that is separate from this
-synthetic smoke:
+Real-run evidence remains separate from this synthetic smoke:
 
-- `make model-evidence-sweep` runs maintained shipped-model lanes through
-  `scripts/model_evidence/model_evidence_sweep.py`.
-- `scripts/model_evidence/run_model_evidence_remote.py` launches the same sweep on remote GPU
-  hosts.
+- The public evidence catalog declares the exact supported evaluation lanes and
+  required artifacts.
+- `invarlock evaluate` runs one resolved lane, and strict evidence-pack
+  verification checks its catalog-bound artifacts.
 - `invarlock advanced calibrate null-sweep` and
   `invarlock advanced calibrate ve-sweep` emit empirical calibration artifacts.
-- `scripts/evidence_packs/run_pack.sh` and `run_suite.sh` package maintainer
-  evidence from real model/checkpoint runs.
 
-Use `make empirical-guard-evidence-check` to validate a portable empirical
-guard-evidence manifest when real evidence is attached for release review.
-That checker validates the separate non-synthetic artifact bundle; `make
-guard-validation-smoke` remains the deterministic smoke floor.
+Multi-host scheduling and host lifecycle are external to the public repository.
+
+Use `make empirical-guard-inventory-check` only to validate the shape of a
+portable diagnostic artifact inventory. That command does not inspect artifact
+contents and is not part of either release gate. Real empirical claims need a
+separate content-aware study contract and independent review;
+`make guard-validation-smoke` remains only the deterministic smoke floor.
 
 ## Related Documentation
 
@@ -73,4 +79,4 @@ guard-validation-smoke` remains the deterministic smoke floor.
 - [RMT Epsilon Rule](06-rmt-epsilon-rule.md)
 - [VE Predictive Gate](07-ve-gate-power.md)
 - [Guard Contracts and Primer](04-guard-contracts.md)
-- [Empirical Guard Evidence](17-empirical-guard-evidence.md)
+- [Diagnostic Empirical Guard Artifact Inventory](17-empirical-guard-evidence.md)

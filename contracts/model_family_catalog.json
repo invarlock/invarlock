@@ -1,6 +1,6 @@
 {
   "format_version": "model-family-catalog-v1",
-  "as_of": "2026-06-29",
+  "as_of": "2026-07-13",
   "declared_support": [
     {
       "family_id": "gpt2-causal-lm",

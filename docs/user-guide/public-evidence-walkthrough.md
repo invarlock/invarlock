@@ -1,300 +1,97 @@
-# Public Evidence Walkthrough
+# Evidence Catalog
 
 ## Purpose
 
-This walkthrough shows the shipped public evidence floor that readers can
-verify without downloading model weights. It is deliberately BYOE-oriented:
-InvarLock validates baseline/subject comparison artifacts for externally
-materialized subjects; deployable quantized checkpoint production is outside
-this public evidence floor.
+InvarLock's evidence catalog defines the maintained evaluation lanes used to
+exercise its public model, adapter, input, and verification surfaces. The
+catalog is useful before and after a run:
 
-`public_evidence/README.md` defines the evidence taxonomy. In short, fixture
-artifacts validate verifier contracts, while real-run artifacts are produced by
-`invarlock evaluate` against materialized baseline and subject checkpoints.
-Every public evidence artifact carries `evidence.meta.json` so readers can see
-whether they are looking at a fixture or a real run.
+- before a run, it fixes the model, adapter, preset, input materialization,
+  execution policy, and required artifact roles;
+- after a run, it provides the identity against which the resulting evidence
+  pack is verified.
 
-## Published-basis pass
+The machine-readable source is `contracts/evidence_catalog_v1.json`. The
+support table and current evidence state live in
+`contracts/support_matrix.json`.
 
-The repository ships a compact index for strict-pass public-basis examples,
-including GPT-2-style causal LM and BERT-style masked LM lanes. The full
-published-basis artifact tree is distributed as a GitHub Release asset recorded
-in `public_evidence/published_basis_index.json`. After verifying and unpacking
-that archive at the repository root, the logical paths in the index resolve for
-direct verifier use:
+## Current status
+
+The current index contains strictly verified evidence for 23 of the 39
+maintained lanes. Those rows are labeled **Available** and link to their
+evidence packs and verification receipts. The other 16 rows retain the label
+**Evidence not yet created** until current-contract evidence is published.
+
+Each available row has a corresponding entry in
+`public_evidence/published_basis_index.json`.
+
+## Creating and verifying current evidence
+
+Maintainers produce one lane at a time with the repository command:
 
 ```bash
-invarlock verify --profile release --assurance strict \
-  public_evidence/published_basis/gpt2/evidence_pack/reports/report-001/evaluation.report.json
-
-invarlock verify --profile release --assurance strict \
-  public_evidence/published_basis/bert/evaluation.report.json
+python scripts/model_evidence/run_catalog_lane.py --help
 ```
 
-Each indexed lane records:
+The command derives evaluation behavior from the catalog and independently
+resolved inputs, performs strict report and pack verification, and writes a
+signed pack to a caller-selected staging directory. It accepts the acceptance
+policy, runtime-image digest, source identity, and evidence signing key from the
+caller.
+The complete invocation and execution boundary are documented in
+`scripts/evidence_packs/README.md`.
 
-| File | Role |
+To add a completed result to the repository, place the verified pack under
+`public_evidence/` and change its lane from `not_created` to `available` in the
+index and support matrix.
+
+## What an available lane contains
+
+Each catalog entry declares the artifacts required for publication. The common
+set includes:
+
+| Artifact | Role |
 | --- | --- |
-| `evaluation.report.json` | Canonical verifier input with primary metric, guard evidence, policy digest, and assurance section. |
-| `runtime.manifest.json` | Container runtime provenance manifest bound to the report by SHA-256. |
-| `evidence_pack_recipe.json` | Recipe pointer for rebuilding a full validation evidence pack. |
-| `artifact_package/` | Checkpoint references, report/runtime paths, signed-pack path, and exact verifier commands. |
-| `evidence_pack/` | Signed, checksum-bound GPT-2 public evidence pack that verifies under strict release policy. |
+| `evaluation.report.json` | Canonical paired comparison and guard evidence. |
+| `runtime.manifest.json` | Runtime identity bound to the evaluation report. |
+| `final_verdict.json` | Verified lane outcome. |
+| `source_repo.json` | Source revision and source-bundle identity. |
+| `resolved-inputs.json` | Exact model and dataset inputs. |
+| `resolved-config.yaml` | Effective configuration used by evaluation. |
+| `preset.yaml` | Catalog-selected preset. |
+| `baseline.report.json` | Independent baseline used for recomputation. |
+| `policy-pack.json` | Independently maintained acceptance policy. |
 
-The support matrix records these paths under
-`contracts/support_matrix.json` as the `published_basis` evidence floor. The
-compact index records hashes, sizes, archive paths, and release-asset metadata
-for the full artifact tree.
+Vision-text lanes also bind the materialized record schedule used by the
+evaluation.
 
-The GPT-2 `artifact_package/` is a checkpoint-reference package. It names the
-baseline and subject checkpoint references, binds them to the report, runtime
-manifest, and signed pack, and keeps the exact verification commands in
-`artifact_package/artifact_package.json`. Large model weights remain external to
-the repository; the rebuild recipe is the source of truth for materializing a
-fresh BYOE evidence drop.
+## Review workflow
 
-The GPT-2 lane also includes a small signed pack in the published-basis archive
-so readers can exercise the full offline evidence-pack verifier without
-rebuilding the suite:
+Inspect the catalog and an available pack with the public CLI:
 
 ```bash
-FPR=$(python - <<'PY'
-import json
-from pathlib import Path
+invarlock advanced evidence-catalog validate \
+  contracts/evidence_catalog_v1.json --json
 
-manifest = json.loads(
-    Path("public_evidence/published_basis/gpt2/evidence_pack/manifest.json")
-    .read_text(encoding="utf-8")
-)
-print(manifest["signing_key_fingerprint"])
-PY
-)
-
-invarlock advanced evidence-pack verify \
-  public_evidence/published_basis/gpt2/evidence_pack \
-  --strict \
-  --profile release \
-  --report-assurance strict \
-  --expected-fingerprint "$FPR"
+invarlock advanced evidence-pack inspect PATH --json
+invarlock advanced evidence-pack verify PATH --strict --json
 ```
 
-The expected pack result is `ok=true` with `authenticity=pinned`. Without
-`--expected-fingerprint`, the signature still confirms integrity but not signer
-authenticity.
+For a complete published set, `verify-set` checks every retained pack against
+the catalog and independent source, image, and signer anchors.
 
-## Real model runs
+## Using the catalog for your own checkpoint
 
-The repository includes small real runs generated by the CLI on GPT-2-family
-checkpoints. They verify under the release/strict profile and ship signed
-evidence packs.
+The same workflow applies to a checkpoint produced by quantization, pruning,
+adapter merge, fine-tuning, or another editing system:
 
-The first run uses `sshleifer/tiny-gpt2` as the baseline and subject, then
-applies the built-in `quant_rtn` RTN dequantized weight-edit simulation:
+1. choose the closest maintained lane and preset;
+2. run `invarlock evaluate` with the baseline and edited subject;
+3. retain the raw baseline, resolved inputs, resolved configuration, and
+   runtime manifest;
+4. run `invarlock verify` with independently supplied policy and runtime inputs;
+5. render `evaluation.html` for human review.
 
-```bash
-uv run invarlock verify \
-  public_evidence/real_runs/tiny_gpt2_quant_rtn/evidence_pack/reports/report-001/evaluation.report.json \
-  --profile release \
-  --assurance strict
-
-uv run invarlock advanced evidence-pack verify \
-  public_evidence/real_runs/tiny_gpt2_quant_rtn/evidence_pack \
-  --strict \
-  --profile release \
-  --report-assurance strict \
-  --expected-fingerprint sha256:cc17b2af6579f5de01e74d91e93528b04670ff89f907ec3ba786a69065435605
-```
-
-The exact `invarlock evaluate` command is in
-`public_evidence/real_runs/tiny_gpt2_quant_rtn/run_command.txt`. The pack remains
-small enough for the repo because it references model checkpoints rather than
-vendoring weights. The built-in edit is a demo/smoke edit; deployable
-quantization backend evidence is covered by separate deployable-artifact lanes.
-
-The second run is a real external BYOE path. The subject checkpoint is
-materialized outside InvarLock by
-`public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/external_edit_recipe.py`,
-then consumed by `invarlock evaluate` with `--edit-label custom`:
-
-```bash
-uv run invarlock verify \
-  public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json \
-  --profile release \
-  --assurance strict
-
-uv run invarlock advanced evidence-pack verify \
-  public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack \
-  --strict \
-  --profile release \
-  --report-assurance strict \
-  --expected-fingerprint sha256:e01c40a94c89b22306a2670b032f623aa5428351d06e18f9b3e9e6a39b42c41b
-```
-
-That artifact is the concrete real-run evidence for BYOE/custom subjects:
-`checkpoint_refs.json` records the external edit type and file hashes for the
-external checkpoint weights, and the report records `edit_name = custom`.
-
-## Export Evidence
-
-Existing public reports can be converted into CI and registry handoff artifacts
-without adding generated files to `public_evidence/`:
-
-```bash
-mkdir -p reports/public-evidence-export
-
-invarlock verify --json \
-  public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json \
-  --profile release \
-  --assurance strict \
-  > reports/public-evidence-export/invarlock-verify.json
-
-invarlock report export \
-  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json \
-  --format mlflow-tags \
-  --policy-profile release \
-  --verify-result reports/public-evidence-export/invarlock-verify.json \
-  --output reports/public-evidence-export/mlflow-tags.json
-
-invarlock report export \
-  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json \
-  --format model-card-md \
-  --verify-result reports/public-evidence-export/invarlock-verify.json \
-  --output reports/public-evidence-export/model-card-invarlock.md
-
-invarlock report export \
-  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json \
-  --format release-review-md \
-  --policy-profile release \
-  --verify-result reports/public-evidence-export/invarlock-verify.json \
-  --output reports/public-evidence-export/release-review.md
-```
-
-These generated files are convenience outputs. The canonical evidence remains
-the checked-in `evaluation.report.json`, `runtime.manifest.json`, and evidence
-pack.
-
-## BYOE edit examples
-
-The repository also ships small strict-verifiable BYOE examples for multiple
-external edit workflows. These fixtures make the verifier boundary explicit:
-the subject checkpoint is an external reference, `plugins.edits` is empty, and
-the report is verified as a baseline-vs-subject comparison rather than as output
-from a built-in edit plugin.
-
-```bash
-invarlock verify --profile release --assurance strict \
-  public_evidence/byoe_examples/magnitude_prune_byoe/evaluation.report.json
-
-invarlock verify --profile release --assurance strict \
-  public_evidence/byoe_examples/lora_merge_byoe/evaluation.report.json
-
-invarlock verify --profile release --assurance strict \
-  public_evidence/byoe_examples/fine_tune_byoe/evaluation.report.json
-```
-
-Each example includes `checkpoint_refs.json` beside the report. The pruning
-fixture is a dense magnitude-pruned subject reference, and the LoRA fixture is a
-merged-adapter subject reference. The fine-tune fixture is a separate
-fine-tuned checkpoint subject reference. These fixtures cover
-validation-subject fixture semantics. Sparse runtime speedups, packed quantized
-storage, deployable optimized backend behavior, and training-method quality
-require separate evidence lanes.
-
-## Caught regressions
-
-The caught-regression fixtures keep the naive primary metric acceptable
-(`ratio_vs_baseline = 1.0`) while one guard fails. They cover the three
-non-primary guard families exposed in strict verification:
-
-```bash
-invarlock verify --profile release --assurance strict \
-  public_evidence/caught_regressions/spectral_guard_failure/evaluation.report.json
-
-invarlock verify --profile release --assurance strict \
-  public_evidence/caught_regressions/rmt_guard_failure/evaluation.report.json
-
-invarlock verify --profile release --assurance strict \
-  public_evidence/caught_regressions/variance_guard_failure/evaluation.report.json
-```
-
-Expected outcome: verification fails. The failing predicate is a guard/policy
-condition rather than perplexity. For the spectral case, the verifier reports:
-
-```text
-Release verification requires validation.spectral_stable == true
-spectral did not pass
-```
-
-That is the intended strict-verification behavior: guard stability is required even
-when the summary metric is clean.
-
-## Real guard-value demo
-
-The Mistral 7B published basis also ships a real scenario-pack artifact, separate
-from the fixture-only caught regressions:
-
-```bash
-invarlock verify --profile release --assurance report \
-  public_evidence/published_basis/mistral_7b/guard_value_demo/artifact_package/reports/errors/spectral_moderate_scale_mlp_l31_up_s112/evaluation.report.json
-```
-
-Expected outcome: verification passes for the selected report itself. The
-packaged `guard_value_summary.json` records the guard-value comparison:
-PM-only accepts `spectral_moderate_scale_mlp_l31_up_s112`
-(`ratio_vs_baseline = 1.0076338080085065`), while the evidence-pack PM+guards
-comparison finds one new spectral cap relative to the Mistral noop basis:
-`model.layers.31.mlp.up_proj`.
-
-The same artifact includes `spectral_moderate_scale_attn_l31_o_s105` as the
-selected attention negative control: a 1.05x scale on the closest non-baseline
-attention module passes PM, adds no new baseline-relative spectral cap, and
-keeps the edited target below the documented stock attention cap
-(`z = 2.7987064430328767`, stock cap `3.018`). The compact sweep summary
-records adjacent scale points showing that the attention target starts
-triggering at 1.18 and the FFN target remains PM-accepted through 1.20.
-
-This artifact is an evidence-pack guard-value demonstration:
-`validation.spectral_stable` remains true because the spectral cap budget is
-not exceeded. Baseline-only guard signals do not count as new guard catches, but
-a PM-passing run that adds a new capped module does.
-
-## Policy failures
-
-The policy-failure fixtures show non-guard and provenance predicates that can
-block a strict release:
-
-```bash
-invarlock verify --profile release --assurance strict \
-  public_evidence/policy_failures/invariants_failure/evaluation.report.json
-
-invarlock verify --profile release --assurance strict \
-  public_evidence/policy_failures/primary_metric_failure/evaluation.report.json
-
-invarlock verify --profile release --assurance strict \
-  public_evidence/policy_failures/runtime_provenance_failure/evaluation.report.json
-```
-
-Expected outcome: each verification fails for its named policy predicate:
-invariant evidence, primary-metric acceptance, or container runtime provenance.
-
-## Applying this to your checkpoint
-
-Use your own edited checkpoint from a quantization, pruning, distillation, or
-fine-tuning pipeline, then run `invarlock evaluate` or generate an
-`evaluation.report.json` from paired run reports:
-
-```bash
-invarlock report generate \
-  --run runs/subject/report.json \
-  --baseline-run-report runs/baseline/report.json \
-  --format report \
-  -o reports/eval
-
-invarlock verify --profile release --assurance strict \
-  reports/eval/evaluation.report.json
-```
-
-Keep `evaluation.report.json` and `runtime.manifest.json` together. Use
-`invarlock advanced runtime-verify` only when you specifically want to inspect
-the manifest/report binding; use `invarlock verify` for the full strict
-verification result.
+The resulting evidence is scoped to the chosen checkpoints, paired records,
+configuration, and policy, and records the inputs needed to reproduce and audit
+the verification decision.

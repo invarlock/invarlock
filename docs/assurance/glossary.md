@@ -25,7 +25,8 @@
 | --- | --- | --- |
 | Primary Metric | Canonical task metric for gating (ppl or accuracy) | `primary_metric.*` |
 | BCa Bootstrap | Bias-corrected accelerated bootstrap for CIs | `primary_metric.ci`, `primary_metric.reps` |
-| Ratio vs Baseline | PPL-like subject final ÷ baseline final (`>1` is worse); accuracy gates use baseline delta | `primary_metric.ratio_vs_baseline` |
+| Ratio vs Baseline | PPL-like subject final ÷ baseline final (`>1` is worse); not valid for accuracy | `primary_metric.ratio_vs_baseline` |
+| Accuracy Delta vs Baseline | Accuracy change in percentage points (`100 × (subject final - baseline final)`) | `primary_metric.delta_vs_baseline_pp` |
 | Primary Metric Tail | Tail regression gate (ΔlogNLL at q95) | `primary_metric_tail.*` |
 
 ### Guard Terms
@@ -35,8 +36,8 @@
 | Canonical Guard Chain | invariants (pre) → spectral → RMT → variance → invariants (post) | `assurance.{guard_chain_observed,canonical_guard_chain}`, `validation.{invariants_pass,spectral_stable,rmt_stable}` |
 | κ (kappa) Threshold | Per-family spectral cap for z-score outliers | `spectral.family_caps.*.kappa` |
 | ε (epsilon) Band | RMT acceptance threshold for edge-risk | `rmt.epsilon_by_family.*` |
-| Guard Overhead | Primary-metric impact of guarded evaluation vs a bare control run | `guard_overhead.*` |
-| Measurement Contract | Estimator + sampling policy recorded in reports | `spectral.measurement_contract_hash` |
+| Guard Metric Impact | Direction-aware primary-metric degradation of guarded evaluation vs a paired bare control; not a runtime/resource measurement | `guard_metric_impact.*` |
+| Measurement Contract | Declared estimator + sampling policy identity recorded in reports; not replay evidence | `spectral.measurement_contract_hash` |
 
 ### Data Terms
 
@@ -51,7 +52,7 @@
 | Term | Short Definition | Report Field |
 | --- | --- | --- |
 | Tier Policy | Guard threshold preset (conservative/balanced/aggressive) | `auto.tier` |
-| Policy Digest | Stable hash of resolved policy thresholds | `policy_digest.thresholds_hash` |
+| Policy Digest | Report-local hashes for threshold and resolved-policy change detection; not authorization | `policy_digest.thresholds_hash`, `policy_provenance.policy_digest` |
 
 ---
 
@@ -131,8 +132,8 @@ unmodified baseline.
 
 #### Evidence Pack / Evaluation Bundle
 
-Set of files produced for audit. An evidence pack is the portable signed/checksummed
-package shape; an evaluation bundle is the local output directory containing
+Set of files produced for audit. An evidence pack is the portable checksummed
+package shape and may also be signed; an evaluation bundle is the local output directory containing
 reports, runtime-provenance sidecars, events, or derived renderings.
 
 | Aspect | Details |
@@ -153,11 +154,12 @@ The default guard chain is `invariants` (pre) → `spectral` → `RMT` → `vari
 | --- | --- |
 | **Context** | Core guard checks in `evaluate` and internal config-runner flows |
 | **Canonical order** | `invariants` (pre), `spectral`, `rmt`, `variance`, `invariants` (post) |
-| **Related terms** | Guard Chain, Guard Overhead |
+| **Related terms** | Guard Chain, Guard Metric Impact |
 | **See also** | [Guards Reference](../reference/guards.md) |
 
-**Enforcement:** Guards execute in canonical order for reproducibility; strict
-reports can record `assurance.guard_chain_observed`,
+**Enforcement:** Strict evaluation requires the canonical order; exploratory
+configuration can use other orders but cannot claim strict assurance. Strict
+reports record `assurance.guard_chain_observed`,
 `assurance.canonical_guard_chain`, and
 `assurance.canonical_guard_chain_enforced`. Guard outcomes are also recorded in
 `validation.invariants_pass`, `validation.spectral_stable`, and
@@ -173,25 +175,28 @@ auditable outcomes.
 | Aspect | Details |
 | --- | --- |
 | **Context** | Canonical default enforced by strict assurance; config may request order, but strict reports must match the canonical chain |
-| **Related terms** | Guard Chain (Canonical Order), Guard Overhead |
+| **Related terms** | Guard Chain (Canonical Order), Guard Metric Impact |
 | **report fields** | `assurance.{canonical_guard_chain,guard_chain_observed,canonical_guard_chain_enforced}` |
 | **See also** | [Guards Reference](../reference/guards.md) |
 
 ---
 
-#### Guard Overhead
+#### Guard Metric Impact
 
 Primary-metric impact of guard checks vs a bare control run (no guards).
-This is not a wall-clock latency benchmark.
+This is not a wall-clock latency, memory, compute, or energy benchmark; runtime
+and memory measurements are reported separately.
 
 | Aspect | Details |
 | --- | --- |
-| **Context** | Measured in Release profile; gate requires ≤ +1.0% PM overhead |
+| **Context** | Measured in CI/Release profiles unless explicitly skipped; current strict assurance rejects a skip and uses the configured metric-specific degradation limit |
 | **Related terms** | Canonical Guard Chain, Timing Summary |
-| **report fields** | `guard_overhead.{bare_ppl,guarded_ppl,overhead_ratio,overhead_percent}` |
-| **See also** | [Guard Overhead Method](10-guard-overhead-method.md) |
+| **report fields** | `guard_metric_impact.{metric_kind,direction,degradation_basis,bare_value,guarded_value,bare_facts,guarded_facts,bare_report,degradation,degradation_limit,display_value,display_unit,schedule_digest}` |
+| **See also** | [Guard Metric Impact Method](10-guard-metric-impact-method.md) |
 
-**Example:** `overhead_percent: +0.12%` indicates guards add 0.12% to primary metric.
+**Examples:** PPL uses `relative_increase = guarded / bare - 1`; accuracy uses
+`absolute_drop = bare - guarded`. A negative degradation records an
+improvement. Neither value describes execution time or resource use.
 
 ---
 
@@ -208,7 +213,8 @@ Per-family spectral cap used to flag abnormally high z-scores.
 | **Related terms** | Spectral Cap, z-score, Spectral Guard |
 | **See also** | [Spectral FPR Derivation](05-spectral-fpr-derivation.md) |
 
-**Example:** `kappa=2.8` for attention family means z-scores > 2.8 are flagged.
+**Example:** `kappa=2.8` for an attention family means `abs(z) > 2.8` becomes a
+candidate before family selection.
 
 ---
 
@@ -219,12 +225,15 @@ Guard measurement procedure signature and digest recorded in reports.
 | Aspect | Details |
 | --- | --- |
 | **Context** | Spectral and RMT guards record estimator + sampling policy |
-| **Verified by** | `invarlock verify --profile ci\|release` (plus `runtime.manifest.json` runtime provenance for container-backed outputs) |
+| **Checked by** | `invarlock verify --profile ci\|release` recomputes the reported contract hash, compares the contract with `resolved_policy`, and requires the report-emitted match flag; it does not replay tensors or independently compare the supplied raw baseline's guard contract |
 | **report fields** | `spectral.{measurement_contract_hash,baseline_measurement_contract_hash,measurement_contract_match}`, `rmt.{measurement_contract_hash,baseline_measurement_contract_hash,measurement_contract_match}` |
 | **See also** | [Guard Contracts](04-guard-contracts.md) |
 
-**Enforcement:** CI/Release profiles require measurement contract match between
-baseline and subject.
+**Enforcement:** CI/Release profiles require a true report-local
+`measurement_contract_match`. The verifier does not independently derive that
+flag from independently supplied baseline guard measurements, so it remains an
+internal consistency property unless the evidence source and execution are separately
+trusted.
 
 ---
 
@@ -232,7 +241,8 @@ baseline and subject.
 
 #### Policy Digest
 
-Stable hash summarizing resolved policy thresholds for auditability.
+Stable, truncated hash summarizing resolved policy thresholds for internal
+change detection. It is not a signature or authorization anchor.
 
 | Aspect | Details |
 | --- | --- |
@@ -249,10 +259,10 @@ The canonical task metric used for gating (perplexity for LMs, accuracy for clas
 
 | Aspect | Details |
 | --- | --- |
-| **Supported kinds** | `accuracy`, `bleu`, `f1`, `ppl_causal`, `ppl_mlm`, `ppl_seq2seq`, `rouge` |
-| **Gating logic** | PPL-like kinds gate on ratio vs baseline; accuracy gates on percentage-point delta vs baseline |
+| **Recognized kinds** | `accuracy`, `bleu`, `f1`, `ppl_causal`, `ppl_mlm`, `ppl_seq2seq`, `rouge` |
+| **Assurance-case logic** | The derivations in this assurance case cover PPL-like ratio gates and accuracy percentage-point gates; recognition of another kind is not evidence that these derivations apply to it |
 | **Related terms** | Primary Metric Tail, BCa Bootstrap, Window Pairing |
-| **report fields** | `primary_metric.{kind,preview,final,ratio_vs_baseline,ci}` |
+| **report fields** | `primary_metric.{kind,preview,final,ratio_vs_baseline,delta_vs_baseline_pp,ci}` |
 | **See also** | [Reports Reference](../reference/reports.md) |
 
 **Example:** `primary_metric.kind: ppl_causal` with `ratio_vs_baseline: 1.003`
@@ -306,7 +316,7 @@ Random Matrix Theory epsilon band used for activation edge-risk stability checks
 | Aspect | Details |
 | --- | --- |
 | **Context** | `rmt.epsilon_default` and `rmt.epsilon_by_family.*` thresholds |
-| **Calibration** | Derived from null-sweep runs on target model families |
+| **Evidence status** | Operational tier default; no representative public corpus establishes a general false-alarm rate |
 | **Related terms** | RMT Guard, κ Threshold |
 | **report fields** | `rmt.{epsilon_default,epsilon_by_family,epsilon_violations,stable,status,max_edge_ratio,max_edge_delta}` |
 | **See also** | [RMT ε Rule](06-rmt-epsilon-rule.md) |
@@ -315,7 +325,9 @@ Random Matrix Theory epsilon band used for activation edge-risk stability checks
 
 #### RMT Guard
 
-Guard that checks eigenvalue statistics against Random Matrix Theory bounds.
+Guard that estimates a leading singular value of a globally standardized
+activation matrix, normalizes it by a shape-dependent Marchenko-Pastur edge,
+and compares baseline-relative edge-risk growth.
 
 | Aspect | Details |
 | --- | --- |
@@ -376,7 +388,7 @@ Performance and resource metrics emitted with reports.
 | Aspect | Details |
 | --- | --- |
 | **Context** | Optional fields for performance analysis |
-| **Related terms** | Timing Summary, Guard Overhead |
+| **Related terms** | Timing Summary, Guard Metric Impact |
 | **report fields** | `telemetry.*`, `metrics.memory_mb_peak` |
 | **See also** | [Observability](../reference/observability.md) |
 
@@ -388,7 +400,7 @@ Guard threshold preset selecting the tier profile for a run.
 
 | Aspect | Details |
 | --- | --- |
-| **Options** | `conservative` (strictest), `balanced` (default), `aggressive` (loosest) |
+| **Options** | `conservative` and `balanced` are assurance tiers with different operational policies; `aggressive` is research-oriented and is not a strict-assurance tier |
 | **Source** | Packaged `runtime/tiers.yaml`; overrides use `INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml` |
 | **Related terms** | Policy Digest, Policy Overrides |
 | **report fields** | `auto.tier`, `resolved_policy.*` |
@@ -404,7 +416,7 @@ Consolidated timing breakdown for an evaluation run.
 | --- | --- |
 | **Context** | CLI output via `print_timing_summary()` |
 | **Includes** | Model load, dataset load, evaluation, report generation |
-| **Related terms** | Guard Overhead, Telemetry |
+| **Related terms** | Guard Metric Impact, Telemetry |
 | **See also** | [Observability](../reference/observability.md) |
 
 ---
@@ -431,8 +443,8 @@ Guard that tracks variance change and applies equalization when beneficial.
 | Aspect | Details |
 | --- | --- |
 | **Context** | A/B test compares bare vs VE-enabled evaluation |
-| **Enabling condition** | Predictive CI upper bound ≤ -min_effect_lognll and mean Δ ≤ -min_effect_lognll; enabled VE also requires A/B provenance |
-| **Related terms** | Canonical Guard Chain, Guard Overhead, Predictive Gate |
+| **Enabling condition** | Predictive CI upper bound and mean Δ must both be negative and also ≤ -min_effect_lognll; enabled VE also requires A/B provenance |
+| **Related terms** | Canonical Guard Chain, Guard Metric Impact, Predictive Gate |
 | **report fields** | `variance.{enabled,gain,predictive_gate.delta_ci,predictive_gate.passed,ab_test}` |
 | **See also** | [VE Gate Power](07-ve-gate-power.md) |
 
@@ -444,7 +456,7 @@ Alignment of baseline and subject evaluation windows for paired statistical test
 
 | Aspect | Details |
 | --- | --- |
-| **Requirements** | Same window IDs, zero overlap, 100% match fraction |
+| **Requirements** | Same baseline/subject IDs within each arm, disjoint preview/final ID sets, zero token overlap, 100% match fraction |
 | **Violation** | `E001` pairing error in CI/Release profiles |
 | **Related terms** | BCa Bootstrap, Primary Metric, Provider Digest |
 | **report fields** | `dataset.windows.stats.{paired_windows,window_match_fraction,window_overlap_fraction}` |

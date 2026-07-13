@@ -81,16 +81,23 @@ The CLI exposes these contracts directly:
 - `invarlock advanced plugins adapters --json`
 - `invarlock doctor --json`
 - `invarlock advanced evidence-pack verify --json`
+- `invarlock advanced evidence-catalog validate --json`
 - `invarlock advanced policy build`
 - `invarlock advanced policy verify --json`
-- `scripts/evidence_packs/verify_pack.sh --pack <dir> --strict --report-assurance strict`
+- `scripts/evidence_packs/verify_pack.sh --pack <dir> --strict
+  --report-assurance strict --policy-pack <acceptance-policy-pack.json>
+  --expected-runtime-image-digest
+  "$EXPECTED_RUNTIME_IMAGE_DIGEST"`
 
-The first eight surfaces are available from installed packages. The low-level
+The first nine surfaces are available from installed packages. The low-level
 `invarlock advanced runtime-verify` command is the package-native
 runtime-manifest verifier used for direct report/manifest checks. The repo
 shell verifier remains available for evidence-pack workflow maintainers, and
 pure wheel installs can verify packs with `invarlock advanced evidence-pack
 verify`.
+Strict nested report verification requires a signed/checksummed baseline
+mapping inside the pack, a matching independently supplied policy pack, and an
+expected runtime-image digest from channels independent of the submitted pack.
 
 Third-party plugins are fail-closed on ABI declaration: adapters, edits, and
 guards must declare `INVARLOCK_CORE_ABI`, and the value must match the exact
@@ -108,6 +115,13 @@ The versioned JSON surfaces are intentionally explicit:
 
 - `invarlock doctor --json` emits `format_version: "doctor-v1"`
 - `invarlock verify --json` emits `format_version: "verify-v1"`
+  and each loaded result includes an additive unsigned
+  `verification.receipt` (format version **invarlock&#46;verify-receipt&#46;v1**) with the exact
+  subject/baseline SHA-256 values, provider digests, verifier version, and
+  normalized caller inputs. `signed=false` means the receipt is descriptive;
+  authenticate the containing evidence pack separately. `report export` checks
+  that receipt's subject digest against the exact bytes it exports, but labels
+  it `receipt_bound_untrusted` rather than treating it as a verified pass.
 - `invarlock advanced runtime-verify --json` emits
   `format_version: "runtime-verify-v1"`
 - `invarlock advanced plugins list --json` and
@@ -117,7 +131,12 @@ The versioned JSON surfaces are intentionally explicit:
   `format_version: "policy-pack-verify-v1"`
 - `invarlock advanced evidence-pack verify --json` emits
   `format_version: "evidence-pack-verify-v1"` and nests the bundled report
-  verification result under `verify.format_version: "verify-v1"`
+  verification result under `verify.format_version: "verify-v1"`. Its
+  diagnostic `--skip-verify` mode returns nonzero status `8`, `ok=false`,
+  `integrity_ok=true`, and `reports_verified=false`; it is not a report
+  verification result and is rejected in strict, CI, or release contexts.
+- `invarlock advanced evidence-catalog validate --json` emits
+  `format_version: "evidence-catalog-validate-v1"`.
 
 The CLI stability policy covers command names, documented options, exit-code
 meaning, and the required fields of the listed JSON envelopes. Commands under
@@ -133,12 +152,17 @@ describes the public support tier for a model/runtime/adapter lane.
 
 | Tier | Meaning |
 | --- | --- |
-| `published_basis` | Maintained public evidence floor with report, runtime-manifest, and evidence-pack provenance where available. |
-| `supported_experimental` | Repo ships preset/config/test/smoke paths, but no published-basis fixture set is claimed. |
-| `community_experimental` | Adapter/runtime path is usable for community experimentation without a maintained public evidence basis. |
+| `published_basis` | Maintained catalog evidence lane; availability is reported separately by `evidence_status`. |
+| `supported_experimental` | Maintained adapter, preset, configuration, test, and smoke path. |
+| `community_experimental` | Adapter and runtime path available for community evaluation. |
 
 Policy packs that declare `compatibility.support_tiers` must use one of those
 three tier values.
+
+`published_basis` is a stable compatibility identifier for lane eligibility;
+it does not mean that evidence already exists. For each lane,
+`evidence_status` and `evidence_status_label` state whether current evidence is
+available.
 
 ## Packaged public contract data
 
@@ -150,20 +174,11 @@ The maintained public contract data ships in two places:
 Repo tags and installed wheels are the only maintained public contract
 carriers.
 
-The support-matrix published-basis evidence paths remain logical
-`public_evidence/published_basis/...` references. Source repository tags carry
-the compact public-evidence index with those logical paths, per-artifact hashes,
-sizes, directory control-file hashes, and release-asset download metadata for
-the full published-basis archive.
-
-Installed wheels also intentionally avoid duplicating the full published-basis
-artifact tree. They ship the same compact generated index at
-`invarlock/_data/public_evidence/published_basis_index.json`. That index records
-the published-basis entries, logical source paths, lane IDs, file hashes, sizes,
-directory control-file hashes, external release-asset metadata, and the carrier
-policy. Users can inspect which public evidence exists from the source tree or
-wheel; verifying or rendering the full published-basis artifacts requires
-downloading and verifying the referenced release asset.
+Source tags and installed wheels ship the same compact current-evidence index
+at `invarlock/_data/public_evidence/published_basis_index.json`. An empty index
+uses `status=not_created` and the label **Evidence not yet created**. Completed
+lanes add hash-bound artifact entries as their current evidence becomes
+available.
 
 ## Policy packs
 
@@ -171,8 +186,9 @@ Policy packs are Git-native artifacts that bind:
 
 - `resolved_policy`
 - ordered `overrides`
-- a deterministic `policy_digest`
-- compatibility metadata
+- compatibility metadata, including the independently maintained dataset identity
+- a deterministic `policy_digest` covering the resolved policy, ordered
+  overrides, and compatibility metadata
 - optional approval metadata
 
 Build and verify them with:

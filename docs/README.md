@@ -1,56 +1,73 @@
 # InvarLock Documentation
 
-InvarLock provides auditable strict verification for edited model checkpoints. It
-centers on baseline-vs-subject comparisons for artifacts produced by your own
-edit workflow. A small built-in RTN dequantized weight-edit simulation
-(`quant_rtn`, 8-bit) exists for advanced smoke and demo workflows; production
-workflows are bring-your-own-edited-checkpoint (BYOE). See [Compare & evaluate
-(BYOE)](user-guide/compare-and-evaluate.md) and the [Public Evidence
-Walkthrough](user-guide/public-evidence-walkthrough.md).
+InvarLock is a standalone verification layer for baseline-versus-subject
+checkpoint comparisons. Production subjects come from your quantization, pruning, adapter,
+fine-tuning, or other external edit workflow; the main path is
+bring-your-own-edited-checkpoint (BYOE).
 
-Welcome to the documentation hub for InvarLock (auditable strict verification for
-edited model checkpoints).
-The material below is organized so new users can ramp quickly while practitioners
-find detailed reference, design rationales, and assurance notes.
-It is aimed at checkpoint editors, CI and assurance owners, and researchers
-running paired evaluation on text workflows plus the included image-text path.
+In these docs, a **strict pass** means the verifier received the complete raw
+baseline report, an independently maintained acceptance policy pack, and an
+independently pinned runtime-image digest, then accepted the report schema,
+pairing, recomputed
+metric, required guard evidence, and runtime-manifest binding. It is not
+execution attestation, artifact provenance, or a general model-safety
+certification. See the [Trust Model](assurance/14-trust-model.md).
+
+A generated strict report is not yet a strict pass: its report-local gates may
+show `PASS`, but `assurance.verdict` remains `pending_verifier` until
+`invarlock verify` exits `0` with those independent inputs. A policy pack or
+digest copied from the submitted bundle is not an independent trust anchor. See
+[policy-pack build and
+verification](reference/contracts.md#policy-packs) and the
+[runtime provenance guide](security/runtime-provenance-guide.md).
 
 ---
 
 ## Start Here
 
-1. **[Getting Started](user-guide/getting-started.md)** – environment setup and the first `evaluate` → `verify` → `report html` loop.
-2. **[Quickstart](user-guide/quickstart.md)** – CLI highlights for common workflows.
-3. **[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)** – baseline ↔ subject paired evaluation with the guard chain.
-4. **[Knowledge & self-edit workflows](user-guide/knowledge-and-self-edit-workflows.md)** – use upstream edit systems as BYOE subject generators.
-5. **[Primary Metric Smoke](user-guide/primary-metric-smoke.md)** – tiny examples for ppl/accuracy kinds.
+1. **[Getting Started](user-guide/getting-started.md)** – the first `evaluate → verify → report html` loop.
+2. **[Compare & Evaluate (BYOE)](user-guide/compare-and-evaluate.md)** – use a checkpoint produced by an external edit workflow.
+3. **[Reading a Report](user-guide/reading-report.md)** – interpret PASS/FAIL, evidence maturity, warnings, and provenance.
+4. **[Alternatives Comparison](reference/alternatives-comparison.md)** – decide when NeMo Evaluator, MLflow, lm-evaluation-harness, or another tool is the better fit.
 
 ### Choose Your Path
 
-- **Wheel user / report reader**: start with [Quickstart](user-guide/quickstart.md) if you already have an `evaluation.report.json` bundle and want to verify, explain, or render it.
-- **Evaluator**: start with [Getting Started](user-guide/getting-started.md) if you need to run `invarlock evaluate` and produce a fresh evaluation bundle.
-- **Repo maintainer**: use the same user guides first, then reach for repo-only smokes, `configs/`, and local runtime-image flows after the core path is green.
+- **Report reader**: start with [Reading a Report](user-guide/reading-report.md).
+- **Checkpoint evaluator**: start with [Getting Started](user-guide/getting-started.md).
+- **CI owner**: continue from [Quickstart](user-guide/quickstart.md) to the [CLI Reference](reference/cli.md).
+- **Toolchain designer**: use [Alternatives Comparison](reference/alternatives-comparison.md) before choosing workflow components.
 
 ### Quick Example
 
+Strict evaluation requires a running Docker or Podman engine. Confirm the
+engine separately (`docker info` or `podman info`) and run `invarlock doctor`
+for Python, dependency, and accelerator diagnostics.
+
 ```bash
 pip install "invarlock[hf]"
+invarlock doctor
 
-# Compare & evaluate (BYOE checkpoints)
+BASELINE_CHECKPOINT=/path/to/original-checkpoint
+EDITED_SUBJECT_CHECKPOINT=/path/to/checkpoint-produced-by-your-edit-pipeline
+
+# The subject must be the actual output of an external edit pipeline.
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
-  --baseline <BASELINE_MODEL> \
-  --subject  <SUBJECT_MODEL> \
+  --baseline "$BASELINE_CHECKPOINT" \
+  --subject "$EDITED_SUBJECT_CHECKPOINT" \
   --baseline-adapter auto \
   --subject-adapter  auto \
-  --profile  ci
+  --profile ci \
+  --assurance strict \
+  --verbose \
+  --report-out reports/eval
 ```
 
-Tip: enable Hub downloads per command when fetching models/datasets:
-`invarlock evaluate --allow-network ...`
-
-Security-default note: `evaluate` uses the runtime container by default. Use
-`--execution-mode host` only for host-side workflows that intentionally bypass that
-boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
+Continue with the strict verifier command in [Getting
+Started](user-guide/getting-started.md#verify-and-render). `evaluate` uses the
+runtime container by default; network access is explicit with `--allow-network`.
+`--verbose` prints the retained `Baseline report: ...` path, also recorded at
+`provenance.baseline.report_path`. The template above is not a claim that a
+strict black-box run has passed.
 
 ---
 
@@ -61,6 +78,10 @@ boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 - [Getting Started](user-guide/getting-started.md)
 - [Quickstart](user-guide/quickstart.md)
 - [Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)
+- [Reading a report](user-guide/reading-report.md) — PASS meaning, evidence maturity, warnings, and provenance
+- [Failure Examples](user-guide/failure-examples.md)
+- [Evidence Packs](user-guide/evidence-packs.md) — Portable validation bundles
+- [Troubleshooting](user-guide/troubleshooting.md) — Error codes and common fixes
 - [Knowledge & self-edit workflows](user-guide/knowledge-and-self-edit-workflows.md)
 - [Primary Metric Smoke](user-guide/primary-metric-smoke.md)
 - [Live Examples](user-guide/live-examples.md)
@@ -68,12 +89,8 @@ boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 - [Public Evidence Walkthrough](user-guide/public-evidence-walkthrough.md)
 - [Configuration Gallery](user-guide/config-gallery.md)
 - [Example Reports](user-guide/example-reports.md)
-- [Reading a report](user-guide/reading-report.md)
-- [Troubleshooting](user-guide/troubleshooting.md) — Error codes and common fixes
 - [Plugins](user-guide/plugins.md) — Extending adapters and guards
 - [Bring Your Own Data](user-guide/bring-your-own-data.md) — Custom datasets
-- [Evidence Packs](user-guide/evidence-packs.md) — Validation suite bundles
-- [Evidence Packs Internals](user-guide/evidence-packs-internals.md) — Suite architecture and preset derivation flow
 
 ### Reference
 
@@ -93,11 +110,7 @@ boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 - [API Guide](reference/api-guide.md)
 - [Programmatic Quickstart](reference/programmatic-quickstart.md)
 - [Environment Variables](reference/env-vars.md)
-
-Maintainer-only runbooks may exist locally and are intentionally omitted from
-this public docs index.
-
-<!-- Design docs intentionally omitted from this public docs index. -->
+- [Alternatives and Workflow Fit](reference/alternatives-comparison.md)
 
 ### Assurance
 
@@ -108,28 +121,26 @@ this public docs index.
 - [Coverage & Pairing Plan](assurance/02-coverage-and-pairing.md)
 - [BCa Bootstrap (Paired Δlog)](assurance/03-bca-bootstrap.md)
 - [Guard Contracts & Primer](assurance/04-guard-contracts.md)
-- [Spectral False-Positive Control](assurance/05-spectral-fpr-derivation.md)
+- [Spectral Selection Arithmetic and Assumptions](assurance/05-spectral-fpr-derivation.md)
 - [RMT ε-Rule](assurance/06-rmt-epsilon-rule.md)
 - [VE Predictive Gate](assurance/07-ve-gate-power.md)
 - [Determinism Contracts](assurance/08-determinism-contracts.md)
 - [Tier Policy v1 Calibration](assurance/09-tier-v1-calibration.md)
-- [Guard Overhead Method](assurance/10-guard-overhead-method.md)
+- [Guard Metric Impact Method](assurance/10-guard-metric-impact-method.md)
 - [Policy Provenance & Digest](assurance/11-policy-provenance.md)
 - [Device Drift Bands](assurance/12-device-drift-bands.md)
 - [GPU/MPS-First Guard Measurement Contracts](assurance/13-gpu-mps-first-guards.md)
 - [Guard Validation Smoke](assurance/16-guard-validation-smoke.md)
-- [Empirical Guard Evidence](assurance/17-empirical-guard-evidence.md)
+- [Diagnostic Empirical Guard Artifact Inventory](assurance/17-empirical-guard-evidence.md)
 
-Note: Every assurance claim is backed by automated tests and cross-referenced in
-the docs. See Guard Contracts → Coverage Reference
-(assurance/04-guard-contracts.md) for the test index.
+Automated tests cover the implementation contracts cross-referenced from the
+assurance notes. Empirical performance and calibration claims are backed by
+separately reviewed run artifacts and independently supplied trust anchors.
 
-Calibration CSVs and evidence reports referenced in these notes are produced by
-local or CI runs (typically under `runs/null_sweeps/**` and
-`reports/calibration/**`) and are not committed to the repository. Attach them
-to change proposals or releases when you update calibration.
-
-<!-- Developer docs intentionally omitted from this public docs index. See project root CHANGELOG.md. -->
+Calibration CSVs and evidence reports are produced by evaluation runs,
+typically under `runs/null_sweeps/**` and `reports/calibration/**`. Publish the
+supporting artifacts with any release that changes policy defaults. Current
+public artifacts are listed by `public_evidence/published_basis_index.json`.
 
 ### Security
 
@@ -152,15 +163,19 @@ to change proposals or releases when you update calibration.
 2. **Execute** – run `invarlock evaluate` under a CI or release profile;
    model-loading commands use the runtime container by default unless you pass
    `--execution-mode host`.
-3. **Validate** – run `invarlock verify` and render HTML via `invarlock report html`;
+3. **Validate** – run `invarlock verify` with the complete raw baseline, a
+   independently maintained policy pack, and an independently maintained
+   `--expected-runtime-image-digest` for strict assurance, then render HTML via
+   `invarlock report html`;
    container-backed outputs include `runtime.manifest.json` next to
    `evaluation.report.json`.
    Directory inputs to `invarlock report` are only accepted when they contain
    canonical `report.json` or `evaluation.report.json`.
 4. **Iterate** – compare runs, adjust edit plans, and reissue reports until gates pass.
 
-The guard suite (invariants, spectral, variance, and RMT) keeps edits inside
-configured acceptance envelopes even when aggressive compression is attempted.
+The guard suite (invariants, spectral, variance, and RMT) evaluates available
+evidence against configured acceptance envelopes. A pass is scoped to those
+measurements and policies; it is not a general safety or downstream-quality guarantee.
 
 ---
 
@@ -215,192 +230,53 @@ Notes
 
 ## Support Matrix
 
-### Baseline Fixture Evidence
+InvarLock maintains 39 evaluation lanes across causal, masked-language, seq2seq, and image-text workflows. Each lane has a checked adapter, preset, input definition, execution policy, and required artifact set.
 
-| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
-| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| GPT-2 causal LM | Yes | Yes | Yes | Yes |
-| BERT / RoBERTa MLM | Yes | Yes | Yes | Yes |
+The evidence column reports current artifacts only. A lane changes to **Available** after its current run and verification artifacts are published.
 
-### Published Small/Local Decoder Evidence
+| Surface | Lane ID | Adapter | Evidence |
+| --- | --- | --- | --- |
+| BERT / RoBERTa MLM | `bert-mlm-hf` | `hf_mlm` | **Evidence not yet created** |
+| DeepSeek-R1-0528-Qwen3 8B causal LM | `deepseek-r1-0528-qwen3-8b-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| DeepSeek-R1-Distill-Qwen 14B causal LM | `deepseek-r1-distill-qwen-14b-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| DeepSeek-R1-Distill-Qwen causal LM | `deepseek-r1-distill-qwen-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Falcon 7B causal LM | `falcon-7b-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| FLAN-T5 base seq2seq LM | `flan-t5-base-seq2seq-hf` | `hf_seq2seq` | **Evidence not yet created** |
+| Gemma 4 12B any-to-any LM | `gemma4-12b-any-to-any-hf` | `hf_multimodal` | **Evidence not yet created** |
+| Gemma 4 26B-A4B MoE image-text LM | `gemma4-26b-a4b-moe-image-text-hf` | `hf_multimodal` | **Evidence not yet created** |
+| Gemma 4 31B image-text LM | `gemma4-31b-image-text-hf` | `hf_multimodal` | **Evidence not yet created** |
+| Gemma 4 E2B image-text LM | `gemma4-e2b-image-text-hf` | `hf_multimodal` | **Evidence not yet created** |
+| Gemma 4 E2B causal LM (text-only eval) | `gemma4-e2b-text-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Gemma 4 E4B image-text LM | `gemma4-e4b-image-text-hf` | `hf_multimodal` | **Evidence not yet created** |
+| GPT-OSS 20B causal LM | `gpt-oss-20b-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| GPT-2 causal LM | `gpt2-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Granite 4.1 3B causal LM | `granite-4-1-3b-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Granite 4.1 8B causal LM | `granite-4-1-8b-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Ministral 3 14B causal LM (text-only eval) | `ministral-3-14b-text-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Ministral 3 3B causal LM (text-only eval) | `ministral-3-3b-text-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Ministral 3 8B causal LM (text-only eval) | `ministral-3-8b-text-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Mistral 7B causal LM | `mistral-7b-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Mixtral 8x7B MoE causal LM | `mixtral-8x7b-moe-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| OLMo 2 13B causal LM | `olmo-2-13b-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| OLMo 2 7B causal LM | `olmo-2-7b-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| OLMoE 1B-active/7B-total causal LM | `olmoe-1b-7b-0924-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| OpenLLaMA 7B causal LM | `open-llama-7b-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Phi-4 mini causal LM | `phi-4-mini-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Phi-4 causal LM (text-only eval) | `phi-4-text-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Qwen2.5 14B causal LM | `qwen2-5-14b-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Qwen2.5 7B causal LM | `qwen2-5-7b-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Qwen2 7B causal LM | `qwen2-7b-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Qwen3 30B-A3B MoE causal LM | `qwen3-30b-a3b-moe-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Qwen3.5 27B image-text LM (scoped) | `qwen3-5-27b-image-text-scoped-hf` | `hf_multimodal` | **Evidence not yet created** |
+| Qwen3.5 2B image-text LM | `qwen3-5-2b-image-text-hf` | `hf_multimodal` | **Evidence not yet created** |
+| Qwen3.5 4B image-text LM | `qwen3-5-4b-image-text-hf` | `hf_multimodal` | **Evidence not yet created** |
+| Qwen3.5 causal LM | `qwen3-5-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Qwen3.6 27B image-text LM (scoped) | `qwen3-6-27b-image-text-scoped-hf` | `hf_multimodal` | **Evidence not yet created** |
+| Qwen3 causal LM | `qwen3-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| SmolLM3 3B causal LM | `smollm3-3b-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| TinyLlama 1.1B causal LM | `tinyllama-1-1b-causal-hf` | `hf_causal` | **Evidence not yet created** |
 
-| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
-| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| TinyLlama 1.1B causal LM | Yes | Yes | Yes | Yes |
-| SmolLM3 3B causal LM | Yes | Yes | Yes | Yes |
-| Gemma 4 E2B causal LM (text-only eval) | Yes | Yes | Yes | Yes |
-| Ministral 3 3B causal LM (text-only eval) | Yes | Yes | Yes | Yes |
-| Phi-4 mini causal LM | Yes | Yes | Yes | Yes |
-| Granite 4.1 3B causal LM | Yes | Yes | Yes | Yes |
-
-### Published 7B-9B Decoder Evidence
-
-| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
-| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| Mistral 7B causal LM | Yes | Yes | Yes | Yes |
-| Ministral 3 8B causal LM (text-only eval) | Yes | Yes | Yes | Yes |
-| Qwen2 7B causal LM | Yes | Yes | Yes | Yes |
-| Qwen2.5 7B causal LM | Yes | Yes | Yes | Yes |
-| Qwen3 causal LM | Yes | Yes | Yes | Yes |
-| Qwen3.5 causal LM | Yes | Yes | Yes | Yes |
-| DeepSeek-R1-Distill-Qwen causal LM | Yes | Yes | Yes | Yes |
-| DeepSeek-R1-0528-Qwen3 8B causal LM | Yes | Yes | Yes | Yes |
-| OLMo 2 7B causal LM | Yes | Yes | Yes | Yes |
-| OpenLLaMA 7B causal LM | Yes | Yes | Yes | Yes |
-| Falcon 7B causal LM | Yes | Yes | Yes | Yes |
-| Granite 4.1 8B causal LM | Yes | Yes | Yes | Yes |
-
-### Published 13B-14B And Reasoning Decoder Evidence
-
-| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
-| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| Ministral 3 14B causal LM (text-only eval) | Yes | Yes | Yes | Yes |
-| OLMo 2 13B causal LM | Yes | Yes | Yes | Yes |
-| Qwen2.5 14B causal LM | Yes | Yes | Yes | Yes |
-| DeepSeek-R1-Distill-Qwen 14B causal LM | Yes | Yes | Yes | Yes |
-| Phi-4 causal LM (text-only eval) | Yes | Yes | Yes | Yes |
-
-### Multimodal Published Evidence
-
-| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
-| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| Qwen3.5 2B image-text LM | Yes | Yes | Yes | Yes |
-| Qwen3.5 4B image-text LM | Yes | Yes | Yes | Yes |
-| Qwen3.5 27B image-text LM (scoped) | Yes | Yes | Yes | Yes |
-| Qwen3.6 27B image-text LM (scoped) | Yes | Yes | Yes | Yes |
-| Gemma 4 E2B image-text LM | Yes | Yes | Yes | Yes |
-| Gemma 4 E4B image-text LM | Yes | Yes | Yes | Yes |
-| Gemma 4 12B any-to-any LM | Yes | Yes | Yes | Yes |
-| Gemma 4 26B-A4B MoE image-text LM | Yes | Yes | Yes | Yes |
-| Gemma 4 31B image-text LM | Yes | Yes | Yes | Yes |
-
-### Large/MoE Published Evidence
-
-| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
-| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| OLMoE 1B-active/7B-total causal LM | Yes | Yes | Yes | Yes |
-| Mixtral 8x7B MoE causal LM | Yes | Yes | Yes | Yes |
-| Qwen3 30B-A3B MoE causal LM | Yes | Yes | Yes | Yes |
-| GPT-OSS 20B causal LM | Yes | Yes | Yes | Yes |
-
-### Seq2Seq Published Evidence
-
-| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
-| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
-| FLAN-T5 base seq2seq LM | Yes | Yes | Yes | Yes |
-
-Published assurance basis covers GPT-2, BERT, Mistral 7B, Ministral 3 3B,
-Ministral 3 8B, Ministral 3 14B, TinyLlama 1.1B, Gemma 4 E2B text-only,
-Gemma 4 E2B image-text, Gemma 4 E4B image-text, Granite 4.1 3B,
-Granite 4.1 8B, OLMo 2 7B, OLMo 2 13B, Qwen2 7B, OpenLLaMA 7B,
-Falcon 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B,
-Qwen3.5 2B image-text, DeepSeek-R1-Distill-Qwen 7B,
-DeepSeek-R1-0528-Qwen3 8B,
-DeepSeek-R1-Distill-Qwen 14B, Phi-4 text-only, Qwen3.5 4B image-text,
-scoped Qwen3.5 27B image-text, scoped Qwen3.6 27B image-text,
-Gemma 4 12B image-text, Gemma 4 26B-A4B image-text MoE, Gemma 4 31B
-image-text, OLMoE 1B-active/7B-total MoE, Mixtral 8x7B MoE,
-Qwen3 30B-A3B MoE, GPT-OSS 20B, and FLAN-T5 base
-seq2seq profiles.
-Repo-included presets and pilot calibration configs for prepared practical-pick
-lanes do not become part of the published assurance basis until supporting
-artifacts are attached. OLMoE is the smaller MoE published-basis validation
-lane; Mixtral 8x7B and Qwen3 30B-A3B are larger no-op preservation
-bases. Gemma 4 26B-A4B is a multimodal MoE image-text preservation basis; it is
-scoped to pinned image-text evidence. Audio, exhaustive expert-bank, and MoE
-routing-quality evidence require separate artifacts. The Qwen3 30B-A3B fixture
-requires all-8 80GB-GPU sharding and uses scoped attention/router/shared-expert
-guard scans; exhaustive expert-bank and MoE routing-quality claims require
-separate evidence.
-The empirical guard manifest includes no-op published-basis summaries for the
-modern published-basis families. They are null-behavior evidence and calibration
-inputs, but they do not re-derive the packaged spectral/RMT/variance tier
-constants; transferred attention caps remain budgeted sentinels until a
-family-specific null sweep supports an FPR interpretation.
-Mistral 7B additionally ships the current real guard-value scenario package:
-`public_evidence/published_basis/mistral_7b/guard_value_demo/` records PM-pass,
-baseline-relative spectral, RMT, and variance/VE evidence from clean
-confirmation reruns.
-Practical-pick families without tuned edit params or public evidence fixtures
-are tracked as `community_experimental` rows, even when a repo pilot preset and
-calibration config are already present. Access-gated vendor checkpoints are not
-included as repo-shipped presets.
-The Phi-4 public fixture is text-only and skips guard-overhead measurement by
-preset policy; strict release verification accepts that declared skip.
-The FLAN-T5 base public fixture uses pinned CNN/DailyMail validation data via
-`hf_seq2seq`; strict release verification accepts one advisory guard warning
-while the hard policy gates pass.
-The Qwen3.5 4B image-text lane now includes a public VQAv2 preset, null-sweep
-config, strict public report, runtime manifest, and signed evidence pack after
-the structured JSON-answer prompt fix.
-The scoped Qwen3.5 27B and Qwen3.6 27B image-text lanes cover
-self-attention and MLP guard scans; linear-attention module coverage remains a
-separate strict spectral-cap finding.
-
-`published_basis` remains the narrow public evidence floor, while
-`supported_experimental` means the repo ships the preset, calibration config,
-targeted tests, smoke/evidence path, and tuned edit-param coverage for the lane
-without claiming a published-basis fixture set. `community_experimental` rows
-are candidate entries; some already have repo pilot presets and
-calibration configs, but still need the remaining published-basis artifacts before
-they become release-supported lanes.
-
-Image-text evaluation uses the built-in
-`hf_multimodal` adapter and the `vision_text` provider. Install
-`invarlock[multimodal]` for this path; Gemma 4 unified checkpoints require
-`transformers>=5.12.0` and `torchvision>=0.26.0`. Gemma 4 E2B has separate
-text-only and image-text public bases; Qwen3.5 2B, Qwen3.5 4B, Gemma 4 E4B,
-scoped Qwen3.5/Qwen3.6 27B, Gemma 4 12B, Gemma 4 26B-A4B, and Gemma 4 31B
-also have public image-text bases. Audio evaluation is deferred. Public
-image-text published-basis inclusion requires
-measured accuracy on a pinned public dataset above the repo floor; preservation
-passing alone is not sufficient.
-
-Machine-readable support metadata lives in `contracts/support_matrix.json`. It is
-the canonical source of truth for normalized support tiers
-(`published_basis`, `supported_experimental`, `community_experimental`) and for
-published-basis evidence references. Model lifecycle decisions live in
-`contracts/model_classification.json`: that file records whether a lane or
-family is published, backlog, blocked, smoke-only, usage-only, or out of scope.
-
-Model evidence automation lives in
-`scripts/model_evidence/model_evidence_sweep.py`, with tmux-based remote launch support in
-`scripts/model_evidence/run_model_evidence_remote.py` and a manual runner workflow in
-`.github/workflows/model-evidence-sweep.yml`.
-For large MoE lanes that do not fit comfortably on one GPU, the remote helper
-supports grouped CUDA visibility, for example
-`--gpu-group 0,1,2,3` to launch one sweep shard with all four GPUs exposed
-instead of one shard per GPU.
-Repo-prepared candidate lanes are tracked in
-`contracts/model_family_catalog.json`; published-basis eligibility and blockers are
-tracked in `contracts/model_classification.json`.
-For the Gemma 4 text lane, the repo-maintained local smoke is the included
-manifest dry-run (`scripts/model_evidence/model_evidence_sweep.py --suite repo-mentioned-gpu --slug gemma4_e2b_public --dry-run`).
-The image-text path also includes an offline demo preset at
-`configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml` and a Gemma
-4 12B pilot at `configs/presets/multimodal/gemma4_12b_vision_text_256.yaml` plus
-`tests/fixtures/vision_text/demo_manifest.jsonl` for provider/config validation.
-Gemma 4 E2B, Gemma 4 E4B, and Gemma 4 12B use
-`configs/presets/multimodal/gemma4_e2b_public_vqav2_256.yaml`,
-`configs/presets/multimodal/gemma4_e4b_public_vqav2_256.yaml`, and
-`configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml` and
-matching `configs/calibration/null_sweep_gemma4_*.yaml` files together with the
-model-evidence materializer for pinned public VQAv2 sample-validation data. Their
-public fixtures live under `public_evidence/published_basis/gemma4_e2b_image_text/`,
-`public_evidence/published_basis/gemma4_e4b/`, and
-`public_evidence/published_basis/gemma4_12b/`, and the local smoke manifest
-remains provider/config validation only. Gemma 4 26B-A4B uses the analogous
-`configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml` and
-`configs/calibration/null_sweep_gemma4_26b_a4b.yaml` path; its public fixture
-lives under `public_evidence/published_basis/gemma4_26b_a4b/`. The Qwen3.5 2B
-and Qwen3.5 4B public image-text bases use the same pinned VQAv2
-materialization pattern through
-`configs/presets/multimodal/*_public_vqav2_256.yaml` and matching
-`configs/calibration/null_sweep_*.yaml` files.
-
-For declared support, implemented-but-not-public coverage, usage-only checkpoint
-families, and recommended additions, see
-[Model Family Catalog](reference/model-family-catalog.md).
+Machine-readable definitions live in `contracts/evidence_catalog_v1.json` and `contracts/support_matrix.json`. Model and adapter implementation details live in the [Model Family Catalog](reference/model-family-catalog.md).
 
 ---
 
@@ -436,7 +312,13 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --baseline-adapter auto --subject-adapter auto \
   --profile release \
   --preset configs/presets/causal_lm/wikitext2_512.yaml
-invarlock verify reports/eval/evaluation.report.json
+invarlock verify \
+  --profile release \
+  --assurance strict \
+  --baseline /path/to/retained/baseline/report.json \
+  --policy-pack /path/to/acceptance/policy-pack.json \
+  --expected-runtime-image-digest "$EXPECTED_RUNTIME_IMAGE_DIGEST" \
+  reports/eval/evaluation.report.json
 # expects reports/eval/runtime.manifest.json next to the report
 ```
 
@@ -476,8 +358,6 @@ output:
 ```
 
 ---
-
-<!-- Quick CPU demos are intentionally omitted from this public docs index. -->
 
 ```bash
 bash scripts/smoke/run_tiny_all_matrix.sh

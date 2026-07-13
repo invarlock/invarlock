@@ -25,7 +25,14 @@ invarlock evaluate --allow-network \
   --assurance strict \
   --report-out reports/eval
 
-invarlock verify --assurance strict reports/eval/evaluation.report.json
+: "${TRUSTED_RUNTIME_IMAGE_DIGEST:?Set this from independently reviewed policy}"
+BASELINE_RUN_REPORT=/path/to/baseline/run/report.json
+ACCEPTANCE_POLICY_PACK=/path/to/acceptance/policy-pack.json
+invarlock verify --profile ci --assurance strict \
+  --baseline "$BASELINE_RUN_REPORT" \
+  --policy-pack "$ACCEPTANCE_POLICY_PACK" \
+  --expected-runtime-image-digest "$TRUSTED_RUNTIME_IMAGE_DIGEST" \
+  reports/eval/evaluation.report.json
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
@@ -33,6 +40,8 @@ Each stage emits artifacts the next stage consumes; readers can pause at any
 stage to inspect the surface in the table below. The `evaluate` command uses
 the runtime container by default for model-loading work; host execution must be
 an explicit non-assurance bypass.
+Obtain both the policy pack and trusted digest from reviewed policy channels
+independent of the report bundle and its runtime manifest.
 
 ## Stage Map
 
@@ -43,7 +52,7 @@ an explicit non-assurance bypass.
 | Config loading | `invarlock.core.config_loader` | normalized run config, `context.assurance` |
 | Component resolution | `invarlock.cli.run_execution`, guard/adapter/edit registries | resolved adapter, edit, and guard order |
 | Guard execution | `invarlock.core.runner`, `invarlock.guards.*` | guard evidence and statuses |
-| Metric computation | `invarlock.core.bootstrap`, runner metric helpers | paired delta log-loss, ratio, CI fields |
+| Metric computation | `invarlock.core.bootstrap`, runner metric helpers | independent preview/final slice drift plus paired baseline/subject final-window ratio and CI fields |
 | Report assembly | `invarlock.reporting.report_make` | `evaluation.report.json` |
 | Verification | `invarlock.reporting.verify_contract` | verifier pass/fail details |
 | Human report | `invarlock report html` | rendered HTML report |

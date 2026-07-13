@@ -148,13 +148,27 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
     exported_contracts = json.loads(cli_app_import.stdout.strip())
     assert "metric_kinds" in exported_contracts["catalog"]
     assert "support_matrix" in exported_contracts["catalog"]
-    assert exported_contracts["published_basis"]
-    for evidence in exported_contracts["published_basis"].values():
-        assert evidence == {
+    published_basis = exported_contracts["published_basis"]
+    assert len(published_basis) == 39
+    available_count = sum(
+        evidence
+        == {
+            "status": "available",
+            "label": "Available",
+            "has_evidence_paths": True,
+        }
+        for evidence in published_basis.values()
+    )
+    not_created_count = sum(
+        evidence
+        == {
             "status": "not_created",
             "label": "Evidence not yet created",
             "has_evidence_paths": False,
         }
+        for evidence in published_basis.values()
+    )
+    assert available_count + not_created_count == len(published_basis)
 
     doctor = _run(
         installed_wheel_env.cli_exe,
@@ -193,10 +207,14 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
     index = public_evidence_payload["index"]
     assert index["format_version"] == "public-evidence-index-v1"
     assert index["carrier_policy"]["installed_wheel"] == "compact_index_only"
-    assert index["status"] == "not_created"
-    assert index["status_label"] == "Evidence not yet created"
-    assert index["published_basis_count"] == 0
-    assert index["entries"] == []
+    assert index["published_basis_count"] == available_count
+    assert len(index["entries"]) == available_count
+    if index["entries"]:
+        assert "status" not in index
+        assert "status_label" not in index
+    else:
+        assert index["status"] == "not_created"
+        assert index["status_label"] == "Evidence not yet created"
     assert public_evidence_payload["legacy_tree_exists"] is False
 
 

@@ -7,7 +7,7 @@
 | **Purpose** | Understand and interpret InvarLock v1 reports. |
 | **Audience** | Readers validating evaluation evidence. |
 | **Key sections** | Decision, Primary Metric, Policy Gates, Guard Signals, Evidence And Provenance, Technical Appendix. |
-| **Validation** | Use `invarlock verify <evaluation.report.json>` to check schema, pairing, and required runtime provenance via `runtime.manifest.json`. |
+| **Validation** | Use `invarlock verify`; strict verification also requires the complete raw baseline, acceptance policy pack, and independent runtime-image digest. |
 | **Source of truth** | [reports](../reference/reports.md) for full schema. |
 
 This guide highlights the key sections of a v1 report and how to
@@ -26,9 +26,60 @@ Browser-first reading order for the HTML export:
 8. Technical Appendix
 ```
 
-The HTML export renders the shared report outline directly. The evidence still
-comes from `evaluation.report.json` and should be re-checked with
-`invarlock verify`.
+The HTML and Markdown exports render the shared report outline directly. Every
+render includes a `REPORT-LOCAL / UNVERIFIED RENDER` notice: its visible gate
+status comes from the submitted `evaluation.report.json`, not an independent
+check of report bytes, provenance, policy inputs, or report-authored assurance
+fields. Re-check the evidence with `invarlock verify`.
+
+## What PASS Means
+
+The HTML report and `evaluate` summary can show `PASS` when report-local policy
+gates pass. For a generated strict report, that is provisional:
+`assurance.report_local_verdict=pass` appears alongside
+`assurance.verdict=pending_verifier` and
+`assurance.verified_assurance_verdict=pending`.
+
+A strict verifier acceptance is different. It requires `invarlock verify
+--assurance strict ...` to exit `0` after checking the submitted report against
+the complete raw baseline, authorized policy pack, independently obtained image
+digest, and sibling runtime manifest. That result means the supplied evidence
+satisfies the current InvarLock contract for the identified baseline, subject,
+dataset, pairing plan, and acceptance inputs. It does not establish evidence-source
+honesty, actual container execution, checkpoint origin, representative
+sampling, downstream safety, or general model quality.
+
+For strict verification, confirm that the command supplied:
+
+- the exact raw baseline `report.json` retained from evaluation;
+- an independently maintained policy pack;
+- an expected runtime-image digest obtained independently of the report.
+
+The submitted report cannot create independence by building the policy pack
+itself or copying the digest out of `runtime.manifest.json`. The verifier caller
+or CI
+owner must control authorization and the digest source. `invarlock advanced
+policy build` serializes policy and optional approval metadata but does not
+confer approval. See [Policy-pack build and
+verification](../reference/contracts.md#policy-packs) and the
+[Runtime Provenance Guide](../security/runtime-provenance-guide.md).
+
+The adjacent runtime manifest binds declared runtime metadata to the report.
+Matching an expected digest checks the manifest's image claim, not whether that
+image actually executed.
+
+## Evidence Maturity
+
+| Surface | Empirical maturity | Current strict behavior | How to read it |
+| --- | --- | --- | --- |
+| Paired primary metric | **Implemented, recomputed gate** | Must satisfy the configured paired regression policy. | The main behavioral regression decision; field sensitivity depends on the selected data, metric, and thresholds. |
+| Invariants | **Stable blocking guard** | Structural and non-finite findings block. | Fail-closed integrity evidence. |
+| Spectral | **Operational diagnostic** | Selected external-baseline spectral violations block. | Investigate baseline-relative weight movement within calibrated policy scope. |
+| RMT | **Experimental diagnostic** | Epsilon violations block. | Treat activation edge-risk as scoped supporting evidence. |
+| Variance/VE | **Experimental intervention** | Predictive gate must be evaluated and pass. | Treat A/B-gated remediation evidence as workload-specific. |
+
+These labels describe interpretation maturity. They do not change current
+CI/release field requirements or create separate CLI modes.
 
 - Decision
   - First-screen summary of overall PASS/FAIL, evidence mode, subject model,
@@ -53,8 +104,8 @@ comes from `evaluation.report.json` and should be re-checked with
 - Guard Warnings (when present)
   - Shows baseline-relative guard-signal changes that are still inside the hard
     policy budget. These are warnings by default, not verification failures.
-  - Use `invarlock verify --fail-on-warnings <evaluation.report.json>` when your
-    workflow wants any guard warning to fail the verification step.
+  - Use `invarlock verify --warning-policy fail <evaluation.report.json>` when
+    your workflow wants any guard warning to fail the verification step.
 - pPL identity (ppl families)
   - Confirms `exp(mean Δlog)` ≈ `ratio_vs_baseline`; Δlog CI maps to ratio CI
     when reported.
@@ -84,8 +135,9 @@ adjacent `runtime.manifest.json`.
 
 `invarlock report explain --evaluation-report` reads `evaluation.report.json`
 directly. Public evidence fixtures may omit raw subject and baseline
-`report.json` files while still being valid for `verify`, `report html`,
-`report validate`, and `report explain`.
+`report.json` files while remaining useful for `report html`, schema validation,
+and `report explain`. They cannot satisfy the current strict verifier without
+the complete raw baseline and acceptance policy inputs.
 
 ### Decision Interpretation
 
@@ -95,7 +147,9 @@ directly. Public evidence fixtures may omit raw subject and baseline
 - **Guard Warnings** mean the edit moved a guard signal relative to the
   baseline while remaining within hard policy. They become failures only under
   strict warning mode.
-- **Overhead** appears only when guard overhead is evaluated; skipped in some profiles.
+- **Guard Metric Impact** appears only when the paired model-quality comparison
+  is evaluated; it is skipped in some profiles. It does not measure runtime or
+  resource cost.
 
 ## Related Documentation
 

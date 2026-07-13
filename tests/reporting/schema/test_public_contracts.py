@@ -144,7 +144,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
 
     family_catalog = contracts.load_model_family_catalog()
     assert family_catalog["format_version"] == "model-family-catalog-v1"
-    assert family_catalog["as_of"] == "2026-06-29"
+    assert family_catalog["as_of"] == "2026-07-13"
     assert family_catalog["declared_support"][0]["display_name"] == "GPT-2 causal LM"
     published_lane_families = {
         lane["family"] for lane in contracts.published_basis_lanes()
@@ -315,8 +315,9 @@ def test_public_contract_paths_are_repo_relative() -> None:
     ).as_posix() == ("contracts/support_matrix.json")
 
 
-def test_support_matrix_records_current_evidence_status_without_stale_paths() -> None:
+def test_support_matrix_records_current_evidence_status_and_paths() -> None:
     support_matrix = contracts.load_support_matrix()
+    public_index = contracts.load_public_evidence_index()
 
     published_basis = [
         lane
@@ -324,11 +325,25 @@ def test_support_matrix_records_current_evidence_status_without_stale_paths() ->
         if lane.get("support_tier") == "published_basis"
     ]
     assert published_basis
-
+    indexed = {
+        lane_id
+        for entry in public_index["entries"]
+        for lane_id in entry.get("lanes", [])
+    }
+    available = {
+        lane["lane_id"]
+        for lane in published_basis
+        if lane["evidence_status"] == "available"
+    }
+    assert available == indexed
     for lane in published_basis:
-        assert lane["evidence_status"] == "not_created"
-        assert lane["evidence_status_label"] == "Evidence not yet created"
-        assert "evidence" not in lane
+        if lane["lane_id"] in available:
+            assert lane["evidence_status_label"] == "Available"
+            assert set(lane["evidence"]) == {"evidence_pack", "verification_receipt"}
+        else:
+            assert lane["evidence_status"] == "not_created"
+            assert lane["evidence_status_label"] == "Evidence not yet created"
+            assert "evidence" not in lane
         assert "notes" not in lane
 
 
@@ -340,14 +355,18 @@ def test_readme_surfaces_public_contract_catalog_entries() -> None:
     assert "`model_classification`, `validation_keys`, `console_labels`, and" in readme
 
 
-def test_packaged_public_evidence_index_records_empty_current_state() -> None:
+def test_packaged_public_evidence_index_records_current_available_state() -> None:
     index = contracts.load_public_evidence_index()
     assert index["format_version"] == contracts.PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION
     assert index["carrier_policy"]["installed_wheel"] == "compact_index_only"
-    assert index["status"] == "not_created"
-    assert index["status_label"] == "Evidence not yet created"
-    assert index["published_basis_count"] == 0
-    assert index["entries"] == []
+    assert index["published_basis_count"] == len(index["entries"])
+    if index["entries"]:
+        assert "status" not in index
+        assert "status_label" not in index
+    else:
+        assert index["status"] == "not_created"
+        assert index["status_label"] == "Evidence not yet created"
+    assert all(entry["lanes"] for entry in index["entries"])
 
 
 def test_packaged_public_evidence_index_rejects_non_object(

@@ -1,7 +1,7 @@
 # Live Examples
 
-The curated live-example lane keeps the public front door honest while limiting
-CI to stable dependency surfaces.
+The curated live-example lane checks documented entry points while limiting CI
+to stable dependency surfaces.
 
 ## Curated CI-safe subset
 

@@ -1,8 +1,10 @@
-# Variance Guard Predictive Gate (power & sidedness)
+# Variance Guard Predictive Gate (decision rule and sidedness)
 
-> **Plain language:** VE only proposes scales when the predictive paired
-> ΔlogNLL shows a real improvement—Balanced needs a one-sided win, Conservative
-> needs a two-sided push—and the report explains why VE stayed on or off.
+> **Plain language:** VE only proposes scales when the reported predictive paired
+> ΔlogNLL estimate meets the configured improvement rule—Balanced uses a
+> one-sided interval and Conservative a two-sided interval—and the report
+> explains why VE stayed on or off. Meeting that rule is not by itself proof of
+> an out-of-sample improvement.
 
 ## Overview
 
@@ -11,22 +13,24 @@
 | **Purpose** | Define when the variance guard may enable scaling and how the predictive gate is audited. |
 | **Audience** | Variance guard maintainers, calibration auditors, and release approvers checking VE evidence. |
 | **Contract scope** | Predictive paired delta-log-loss gates, tier sidedness, minimum effect, and enablement provenance. |
-| **Source of truth** | `src/invarlock/guards/variance*.py`, `runtime/tiers.yaml`, and variance assurance tests. |
+| **Source of truth** | `src/invarlock/guards/variance*.py`, the packaged `runtime/tiers.yaml` policy resource, and variance assurance tests. |
 
 ## Claim
 
 VE proposes scales only when the **predictive** paired ΔlogNLL CI upper bound
-and mean effect both meet or beat −`min_effect_lognll` in the **improvement**
-direction (negative ΔlogNLL), using the tier's sidedness.
+and mean effect are both negative and also meet or beat
+−`min_effect_lognll`, using the tier's sidedness. With a zero min-effect,
+zero itself does not pass: the upper bound and mean must be strictly negative.
 
 - **Balanced**: **one‑sided improvement** test. VE enables only when the
-  predictive CI **upper bound** ≤ −`min_effect_lognll` and the mean Δ ≤
+  predictive CI **upper bound** and mean Δ are both `< 0` and both are ≤
   −`min_effect_lognll`.
 - **Conservative**: **two‑sided** CI with $z = z_{0.975}$ and
   **improvement‑only** gating.
-  VE enables only when the predictive CI **upper bound** ≤ −`min_effect_lognll`
-  and the mean Δ ≤ −`min_effect_lognll`. If the CI lies entirely above
-  +`min_effect_lognll`, VE stays off and the gate records a regression.
+  VE enables only when the predictive CI **upper bound** and mean Δ are both
+  negative and both are ≤ −`min_effect_lognll`. VE stays off for a positive
+  interval; the gate records `regression_detected` only when the CI lower bound
+  and mean are both at least +`min_effect_lognll`.
 
 Example (Balanced): with `min_effect_lognll = 0.0`, a predictive
 `mean_delta` of `-0.002` with CI `[-0.003, -0.001]` enables VE because both the
@@ -38,7 +42,7 @@ CI lies outside the interval `[-min_effect_lognll, +min_effect_lognll]`. A CI
 that touches or sits within this interval (e.g., `[-0.015, -0.002]`) does not
 enable VE.
 
-## Derivation (power target)
+## Planning approximation
 
 Let paired Δ values on calibration windows have standard deviation
 $\sigma_{\text{pred}}$ and count $n$. The CI half-width is approximately:
@@ -51,16 +55,16 @@ Use $z = z_{0.95}$ for one-sided gates or $z = z_{0.975}$ for two-sided gates.
 Choose `min_effect_lognll ≈ h` as an approximate sizing heuristic for boundary
 cases; raise for stricter tiers.
 
-## Tier knobs (pilot coverage)
+## Tier knobs
 
 | Tier          | deadband | min_abs_adjust | max_scale_step | min_effect_lognll | predictive\_one\_sided | max\_adjusted\_modules |
 |---------------|----------|----------------|----------------|-------------------|------------------------|------------------------|
 | balanced      | 0.02     | 0.012          | 0.03           | 0.0               | ✅ (one-sided)          | 1                      |
 | conservative  | 0.03     | 0.02           | 0.015          | 0.016             | ❌ (two-sided)          | 0                      |
 
-Values are stored in packaged `runtime/tiers.yaml` and
-maintain VE responsiveness without triggering false positives under the chosen
-window budgets.
+Values are stored in packaged `runtime/tiers.yaml`. They define behavior; the
+public repository does not contain a representative study establishing their
+false-enable rate or detection power under the chosen window budgets.
 
 > **Source of truth:** tier thresholds are drawn from packaged
 > `runtime/tiers.yaml`; overrides use
@@ -69,18 +73,29 @@ window budgets.
 > **Note:** `max_adjusted_modules = 0` means no module-count cap is enforced in
 > the current VE scaling policy, not "adjust zero modules."
 
-## Calibration
+## Strict-verifier constraint
 
-The `min_effect_lognll` values are derived from paired ΔlogNLL statistics on
-calibration windows using the half-width formula above with the appropriate
-z-quantile per tier. Calibrated values are stored in the packaged
-`runtime/tiers.yaml`. See the full calibration methodology in
-[09-tier-v1-calibration.md](09-tier-v1-calibration.md).
+The runtime can leave VE disabled after a complete no-benefit experiment and
+continue the edit. The current strict verifier is narrower: it requires
+`variance.predictive_gate.evaluated=true` and `passed=true` for strict
+acceptance, regardless of `variance.enabled`. Therefore a complete negative
+VE result is not currently acceptable as strict evidence. Treat this as a
+product-contract constraint, not as evidence that VE must improve every valid
+edit.
 
-To recalibrate, run null baselines (no edit) and compute the paired Δ standard
+## Evidence status and local recalibration
+
+The shipped `min_effect_lognll` values are operational policy defaults. The
+half-width expression is a normal-approximation sizing heuristic, not the
+implemented BCa interval and not evidence that the defaults achieve a stated
+power. See [Tier Policy Values](09-tier-v1-calibration.md).
+
+To propose a local replacement, run null baselines (no edit) and compute the paired Δ standard
 deviation $\hat{\sigma}$ across calibration windows. Use $z = z_{0.95}$ for
 one-sided gates (Balanced) or $z = z_{0.975}$ for two-sided gates
-(Conservative), then set `min_effect_lognll` from the half-width formula.
+(Conservative), then use the half-width formula as an initial candidate. Measure
+false enables and power on independent held-out null and edited runs before
+adopting or describing the value as calibrated.
 
 ## Provenance & tap
 
@@ -94,7 +109,16 @@ one-sided gates (Balanced) or $z = z_{0.975}$ for two-sided gates
 
 - report records `variance.predictive_gate` with `{evaluated,passed,reason,delta_ci,mean_delta}` and `variance.ab_test` with `{seed,windows_used,provenance}`; provenance states the window IDs for A/B.
 - Tier knobs for sidedness and min-effect are recorded under `resolved_policy.variance.{predictive_one_sided,min_effect_lognll}`.
-- Report verifier lints reject `variance.enabled = true` when the predictive gate did not pass, the predictive CI contains 0 or misses the `min_effect_lognll` threshold, the mean Δ misses the same threshold, or A/B seed/window provenance is missing.
+- Report verification rejects `variance.enabled = true` when the predictive
+  gate did not pass, the predictive CI includes zero or misses the
+  `min_effect_lognll` threshold, the mean Δ misses the same threshold, or A/B
+  seed/window provenance is missing. Strict assurance additionally requires
+  the predictive gate itself to be evaluated and passing even when VE is
+  disabled.
+
+These checks validate report consistency. The offline verifier does not replay
+the predictive A/B computation from model tensors and cannot establish that a
+the evaluation environment honestly generated or selected the recorded windows.
 
 ## Observability
 
@@ -109,8 +133,9 @@ one-sided gates (Balanced) or $z = z_{0.975}$ for two-sided gates
   and are token-weighted identically.
 - VE taps must target the edited modules (e.g., post `mlp.c_proj` for the
   edited projection); off-target taps invalidate the provenance check.
-- Calibration statistics come from pilot null runs with the same window counts;
-  different window budgets require recalibration of `min_effect_lognll`.
+- The shipped threshold has no public universal calibration claim. Different
+  model, edit, dataset, device, and window regimes require their own held-out
+  evaluation if a statistical operating characteristic is claimed.
 
 ## References
 

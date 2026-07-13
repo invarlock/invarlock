@@ -38,6 +38,9 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
     contract = load_support_matrix()
     lanes = contract["lanes"]
     docs_labels = _parse_docs_evidence_labels()
+    public_index = json.loads(
+        Path("public_evidence/published_basis_index.json").read_text(encoding="utf-8")
+    )
 
     runner = CliRunner()
     plugins = runner.invoke(app, ["advanced", "plugins", "adapters", "--json"])
@@ -63,11 +66,27 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
     assert len(lanes) == 39
     assert len({lane["family"] for lane in lanes}) == 39
     assert {lane["support_tier"] for lane in lanes} == {"published_basis"}
-    assert {lane["evidence_status"] for lane in lanes} == {"not_created"}
-    assert {lane["evidence_status_label"] for lane in lanes} == {
-        "Evidence not yet created"
+    available = {
+        lane["lane_id"] for lane in lanes if lane["evidence_status"] == "available"
     }
-    assert all("evidence" not in lane for lane in lanes)
+    not_created = {
+        lane["lane_id"] for lane in lanes if lane["evidence_status"] == "not_created"
+    }
+    indexed = {
+        lane_id
+        for entry in public_index["entries"]
+        for lane_id in entry.get("lanes", [])
+    }
+    assert available | not_created == {lane["lane_id"] for lane in lanes}
+    assert available.isdisjoint(not_created)
+    assert available == indexed
+    for lane in lanes:
+        if lane["lane_id"] in available:
+            assert lane["evidence_status_label"] == "Available"
+            assert set(lane["evidence"]) == {"evidence_pack", "verification_receipt"}
+        else:
+            assert lane["evidence_status_label"] == "Evidence not yet created"
+            assert "evidence" not in lane
     assert all(lane["support_groups"] for lane in lanes)
 
     expected_docs = {lane["lane_id"]: lane["evidence_status_label"] for lane in lanes}

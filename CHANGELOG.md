@@ -9,11 +9,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added immutable real-training profiles and fail-closed receipts for tiny
+  full-parameter fine-tuning and PEFT LoRA train/serialize/reload/merge flows.
+- Added complete raw-baseline, independently supplied policy-pack, and
+  runtime-image inputs to strict report and evidence-pack verification.
+- Added catalog-bound evidence verification with immutable catalog, source,
+  runtime-image, and signer anchors plus a repository-owned command for running
+  one evidence lane.
+- Added canonical report-contract, policy-provenance, dataset-identity,
+  checkpoint-identity, and guard-recomputation checks for release-grade
+  verification.
+- Added architecture, coverage-ratchet, mutation-smoke, documentation,
+  distribution, and release-preflight checks to the maintained validation
+  entrypoints.
+- Added catalog profiles, adapters, and deterministic dataset materialization
+  for current masked-language, sequence-to-sequence, causal-language, MoE, and
+  vision-language model families.
+
 ### Changed
 
-### Removed
+- Reclassified deterministic low-rank and dense perturbation generators as
+  synthetic edit fixtures. Real `lora_merge` and `fine_tune` labels now require
+  training provenance rather than generated look-alike edits.
+- Reworked guard reporting around measured primary-metric impact while keeping
+  runtime and memory overhead as separate system measurements.
+- Strengthened the report schema and renderer-independent outline so JSON,
+  console, Markdown, and HTML surfaces share the same decision, metric, policy,
+  guard, provenance, and appendix structure.
+- Clarified that runtime-manifest binding and image-digest matching establish
+  declared identity consistency, not execution attestation.
+- Consolidated catalog evidence execution around the repository-owned lane
+  command and retired overlapping sweep and campaign orchestration surfaces.
+- Aligned public evidence with the model catalog so every lane reports either a
+  strictly verified pack or `no evidence created yet`.
+- Updated integration examples to distinguish real training, serialization,
+  reload, merge, pruning, and quantization workflows from synthetic fixtures
+  and to validate their emitted artifacts fail closed.
+- Refocused the root and documentation landing pages on the evaluate, verify,
+  and report workflow, current contracts, supported model families, and public
+  evidence status.
 
 ### Fixed
+
+- Fixed strict evidence-pack verification to bind each subject report to signed,
+  checksummed raw baseline material and independently supplied policy inputs.
+- Fixed verifier recomputation and fail-closed handling for paired windows,
+  bootstrap statistics, primary-metric drift, guard evidence, policy digests,
+  runtime manifests, and signer authorization.
+- Fixed masked-language-model variance targeting and deterministic WikiText
+  calibration inputs used by the catalog profile.
+- Fixed vision-language materialization and paired bare-control replay so local
+  image paths are rehydrated only from authenticated current inputs while
+  prompt, answer, and image identity bindings remain verified.
+- Fixed modern dense and MoE adapter routing, quantized-wrapper compatibility,
+  snapshot restoration, and runtime dependency pins exercised by catalog lanes.
+- Fixed documentation and CLI examples so strict commands include every
+  independently supplied verifier input.
+- Fixed public-evidence, packaged-data, support-matrix, and model-catalog
+  consistency checks so superseded results cannot be presented as current.
 
 ## [0.12.1] - 2026-07-05
 
@@ -276,7 +329,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed remote model-evidence branch sync for `work/...` branches by fetching
   the current branch ref explicitly before fast-forwarding the remote checkout.
 - Fixed Mistral guard-demo manifests, run-log tracking, and public evidence
-  scope notes so the published demo no longer overclaims
+  scope notes so the published demo accurately identifies
   non-baseline-relative FP8 guard signals.
 - Fixed Gemma/Qwen multimodal evaluation gates by using classification-count
   accuracy intervals, delta semantics for accuracy drift, paired multimodal
@@ -330,8 +383,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runs, checkpoint-reference artifact packages, non-quant BYOE examples, and
   caught-regression fixtures for guard and policy failures.
 - Added `make public-evidence-audit` and CI coverage for classifying public
-  evidence fixtures, verifying signed pack metadata, and preventing overclaims
-  in packaged public evidence.
+  evidence fixtures, verifying signed pack metadata, and enforcing evidence
+  scope in packaged public evidence.
 - Added public evidence walkthrough documentation with pinned evidence-pack
   verification commands and explicit integrity-versus-authenticity guidance.
 - Added scripts inventory governance, architecture-fragmentation tracking, and
@@ -433,8 +486,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   forwarding, dev-profile rejection, strict PASS requirements, runtime sidecar
   requirements, signed-pack requirements, and deployable sidecar semantic
   validation failures.
-- Fixed evidence-pack verification and host evidence semantics for
-  expected-failure reports and host model evidence that should not claim strict
+- Fixed evidence-pack verification and host evidence semantics so
+  expected-failure reports and host model evidence are ineligible for strict
   assurance.
 - Fixed invariant-vocabulary guard compatibility for quantized wrapper models.
 - Fixed pseudo-accuracy handling so non-dev report generation fails unless
@@ -951,9 +1004,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refreshed docs to match the post-`v0.5.0` architecture and operations model,
   including the shell/core redesign, current evaluate contract, and updated
   report-artifact guidance.
-- Added remediation closeout records from the refactor program and updated the
-  maintainer smoke notes to distinguish the push-gated tiny container smoke from
-  the heavier GPT-2 canary workflow.
+- Updated maintainer smoke notes to distinguish the push-gated tiny container
+  smoke from the heavier GPT-2 canary workflow.
 - Documented the Python-only runtime-verifier contract and removed the obsolete
   external-verifier environment-variable guidance.
 - Updated the architecture/security references so runtime provenance
@@ -1392,8 +1444,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CI/Release reports require perfect pairing, non-overlapping windows, and coverage floors.
 - Determinism preset chooses `CUBLAS_WORKSPACE_CONFIG` based on GPU memory and disables
   `TOKENIZERS_PARALLELISM` under strict settings.
-- Guard overhead metric fields standardized to `bare_ppl`/`guarded_ppl`; primary metric `display_ci`
-  is aligned with log-space CI for ppl-like metrics.
+- Guard metric impact reporting introduced paired bare/guarded primary-metric
+  measurements; primary metric `display_ci` is aligned with log-space CI for
+  perplexity metrics.
 - B200 validation workflow upgraded to v2.1.0 with dynamic scheduling, GPU lock management,
   and expanded task orchestration scripts.
 
@@ -1411,7 +1464,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Calibration CLI (`invarlock calibrate`) and runtime modules for policy and guard tuning.
 - Determinism utilities and CLI flows to exercise repeatable runs and presets.
 - Bench policy regression harness and additional regression tests for guards and reports.
-- Benchmark policy regression golden `bench-golden-2025-12-13` (`2627b8872cd6bfc37bda31fbc11b78ed814751cbf2a9ad1396e173f1f4e5383a`) tracked to guard guard-effect CI against silent gate/output shifts.
+- Benchmark policy regression golden `bench-golden-2025-12-13` (`ae8094204c998fc51bf51052d7d1457d3cdc17bab9bc4785e88c4f07d0234ad3`) tracks guard-effect quality impact, runtime overhead, and memory overhead against silent gate/output shifts.
 
 ### Changed
 - Guard policies and tier runtime configuration updated to support calibration and determinism flows.
@@ -1425,7 +1478,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.1] - 2025-12-10
 
 ### Added
-- **INVARLOCK_SKIP_OVERHEAD_CHECK env var** - Skip guard overhead measurement even with ci/release profiles for large models.
+- **INVARLOCK_SKIP_GUARD_METRIC_IMPACT_CHECK env var** - Skip guard metric impact measurement even with ci/release profiles for large models.
 - **Configurable PM acceptance range** - Set via preset config or `INVARLOCK_PM_ACCEPTANCE_MIN/MAX` environment variables.
 - **Comprehensive evidence pack guide** - New documentation at `docs/user-guide/evidence-packs.md`.
 

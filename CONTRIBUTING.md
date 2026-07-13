@@ -86,7 +86,7 @@ Lane intent:
 
 - `cli_smoke_fast.sh` covers broad command-surface and positive-path tiny-model flows
 - `cli_smoke_negative.sh` covers malformed, policy-fail, and fail-closed categories
-- `INVARLOCK_SMOKE_LANES=realistic cli_smoke_matrix.sh` wraps the GPT-2-sized smoke campaign
+- `INVARLOCK_SMOKE_LANES=realistic cli_smoke_matrix.sh` wraps the GPT-2-sized smoke run
 
 Delegated config execution and calibration internals re-enter through the
 package-internal `python -m invarlock.cli.config_execution` module, not a
@@ -192,8 +192,9 @@ make test-integration
 ```
 
 For more curated examples (including the CI subset), see `tests/README.md`.
-Keep coverage runs serial unless the coverage target is explicitly updated to
-combine per-worker data; `make coverage-enforce` writes shared coverage reports.
+Use `make coverage-enforce` for the serial coverage gate or
+`make coverage-enforce-parallel` to run the same gate with pytest-xdist worker
+coverage combined into the canonical reports.
 
 ### 3.3 Coverage policy
 
@@ -211,12 +212,11 @@ Key points:
   make coverage
   ```
 
-- `make coverage` intentionally includes grouped test sets for the
-  core/guards/reporting/calibration suites, the split run/verify/config
-  surfaces, targeted CLI command suites, and a small helper-coverage set
-  (for example adapter auto-resolution, no-color console handling, and
-  guard-overhead extraction) so the project-wide floor reflects the real
-  command surface instead of only the split core paths.
+- `make coverage` collects coverage from the complete non-integration `tests/`
+  surface. Integration and packaging checks remain separate gates; no unit-test
+  packages or individual test files are allowlisted. Use
+  `make coverage-enforce-parallel` when local xdist workers should execute the
+  same surface.
 
 - The project-wide floor is enforced at **90%** via pytest-cov in `make coverage`.
 
@@ -227,68 +227,14 @@ Key points:
   # internally: python scripts/coverage/check_coverage_thresholds.py --coverage reports/cov.xml --json reports/thresholds.json
   ```
 
-- **Critical surface** includes (see `THRESHOLDS`, `CORE_PREFIXES`, and
-  `CORE_FILES` in `scripts/coverage/check_coverage_thresholds.py`):
-  - Core runtime: everything under `src/invarlock/core/`
-    (runner, registry, contracts, auto_tuning, events, types, checkpoint, api, retry)
-  - Guards: everything under `src/invarlock/guards/`
-    (invariants, spectral, spectral_analysis, rmt, variance, policies)
-  - Observability/runtime support: everything under `src/invarlock/observability/`
-    plus explicit runtime/config entry points such as
-    `src/invarlock/config.py` and `src/invarlock/adapters/auto.py`
-  - Evaluation/reporting entry points and contracts:
-    `src/invarlock/eval/metrics.py`,
-    `src/invarlock/reporting/report_contract.py`,
-    `src/invarlock/reporting/report_types.py`,
-    `src/invarlock/reporting/report_schema.py`,
-    `src/invarlock/reporting/validate.py`,
-    `src/invarlock/public_contracts.py`,
-    `src/invarlock/policy_pack.py`,
-  - CLI commands:
-    `src/invarlock/cli/commands/run.py`,
-    `src/invarlock/cli/commands/evaluate.py`,
-    `src/invarlock/cli/app.py`,
-    `src/invarlock/cli/commands/policy.py`,
-    `src/invarlock/runtime_verify.py`
+- The authoritative critical-surface membership and per-file ratchets live in
+  `scripts/coverage/check_coverage_thresholds.py`. Keep that executable policy
+  as the single source of truth instead of copying its file inventory into
+  documentation. To inspect the current measured module set, run:
 
-- Split-aware enforcement uses four levels:
-  - **100% branch** for lifecycle shells:
-    `src/invarlock/core/runner.py`,
-    `src/invarlock/guards/variance.py`,
-    `src/invarlock/guards/spectral.py`
-  - **100% branch** for pure contract / policy / result / selection helpers:
-    `src/invarlock/reporting/report_schema.py`,
-    `src/invarlock/public_contracts.py`,
-    `src/invarlock/policy_pack.py`,
-    `src/invarlock/cli/commands/policy.py`,
-    `src/invarlock/cli/verify_output.py`,
-    `src/invarlock/core/runner_lifecycle.py`,
-    `src/invarlock/core/runner_pairing.py`,
-    `src/invarlock/core/runner_services.py`,
-    `src/invarlock/guards/variance_policy.py`,
-    `src/invarlock/guards/variance_results.py`,
-    `src/invarlock/guards/spectral_analysis.py`,
-    `src/invarlock/guards/spectral_policy.py`,
-    `src/invarlock/guards/spectral_results.py`,
-    `src/invarlock/guards/spectral_selection.py`
-  - **≥95% branch** for numerical / mutation helpers and large validation helpers:
-    `src/invarlock/core/runner_context.py`,
-    `src/invarlock/core/runner_eval_phase.py`,
-    `src/invarlock/core/runner_latency.py`,
-    `src/invarlock/core/runner_eval_windows.py`,
-    `src/invarlock/cli/verify_checks.py`,
-    `src/invarlock/guards/variance_batching.py`,
-    `src/invarlock/guards/variance_evaluation.py`,
-    `src/invarlock/guards/variance_prepare.py`,
-    `src/invarlock/guards/variance_ops.py`,
-    `src/invarlock/guards/variance_scaling.py`,
-    `src/invarlock/guards/spectral_control.py`,
-    `src/invarlock/guards/spectral_measurement.py`
-  - **≥90% branch** for the rest of the critical surface until it is split further,
-    including orchestration helpers such as
-    `src/invarlock/core/runner_eval_metrics.py`,
-    `src/invarlock/core/runner_finalize.py`, and
-    `src/invarlock/core/runner_guards.py`
+  ```bash
+  python scripts/coverage/check_coverage_thresholds.py coverage-modules
+  ```
 
 When you modify a file covered by thresholds, please:
 
@@ -297,7 +243,8 @@ When you modify a file covered by thresholds, please:
   expand the critical surface or add new core modules
 
 If the checker reports **“no coverage data present”**, ensure the module is
-included in the `--cov=` targets and that a fresh XML report was generated.
+included in the configured coverage source and that a fresh XML report was
+generated.
 
 ---
 
@@ -380,8 +327,8 @@ We aim for test‑driven changes wherever practical:
 - Run focused invocations:
 
   ```bash
-  pytest -q tests/guards/test_spectral_guard.py::test_basic_spectral_gate
-  pytest -q tests/cli/test_doctor_json.py::test_doctor_json_round_trip
+  pytest -q tests/guards/spectral/test_spectral_smoke.py::test_spectral_finalize_passes_without_changes
+  pytest -q tests/cli/test_doctor_json.py::test_doctor_json_mode_outputs_findings_and_exitcode
   ```
 
 - For broader validation, run:
@@ -428,10 +375,10 @@ For broader functional validation, use:
 make verify
 ```
 
-This runs tests, a smoke regression (`scripts/smoke/run_smoke_regression.sh`),
-CLI command-surface smokes, ruff lint, ruff format (check mode), packaged
-contract sync checks, repository maintenance checks, public evidence audit, and
-strict docs linting.
+This runs the repository test suite, CLI command-surface smokes, runtime
+verification, Ruff lint and format checks, packaged contract sync checks,
+repository maintenance checks, the public-evidence audit, and strict docs
+linting.
 
 ### 5.4 Supply-chain and artifact checks
 

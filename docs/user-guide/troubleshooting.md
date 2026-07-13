@@ -16,7 +16,14 @@
 invarlock doctor --config <config.yaml> --profile ci
 
 # Validate a container-backed report bundle
-invarlock verify reports/eval/evaluation.report.json --profile ci
+TRUSTED_RUNTIME_IMAGE_DIGEST='sha256:REPLACE_WITH_REVIEWED_64_HEX_DIGEST'
+BASELINE_RUN_REPORT='/path/to/retained/baseline/report.json'
+ACCEPTANCE_POLICY_PACK='/path/to/acceptance/policy-pack.json'
+invarlock verify reports/eval/evaluation.report.json --profile ci \
+  --assurance strict \
+  --baseline "$BASELINE_RUN_REPORT" \
+  --policy-pack "$ACCEPTANCE_POLICY_PACK" \
+  --expected-runtime-image-digest "$TRUSTED_RUNTIME_IMAGE_DIGEST"
 
 # Enable debug output for detailed traces
 INVARLOCK_DEBUG_TRACE=1 \
@@ -24,7 +31,10 @@ INVARLOCK_DEBUG_TRACE=1 \
 ```
 
 For container-backed outputs, `verify` expects `runtime.manifest.json` next to
-the evaluation report. Host-mode outputs are an unverified provenance path; use
+the evaluation report. Strict reports also require
+the retained baseline run report, an independently maintained policy pack, and
+`TRUSTED_RUNTIME_IMAGE_DIGEST` from independently maintained policy channels.
+Host-mode outputs are an unverified provenance path; use
 `--runtime-provenance host --assurance off` only when that non-assurance mode is
 intentional.
 

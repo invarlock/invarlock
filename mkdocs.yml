@@ -9,8 +9,12 @@ nav:
   - User Guide:
       - Getting Started: user-guide/getting-started.md
       - Quickstart: user-guide/quickstart.md
-      - Primary Metric Smoke: user-guide/primary-metric-smoke.md
       - Compare & Evaluate (BYOE): user-guide/compare-and-evaluate.md
+      - Reading a Report: user-guide/reading-report.md
+      - Failure Examples: user-guide/failure-examples.md
+      - Evidence Packs: user-guide/evidence-packs.md
+      - Troubleshooting: user-guide/troubleshooting.md
+      - Primary Metric Smoke: user-guide/primary-metric-smoke.md
       - Knowledge & Self-Edit Workflows: user-guide/knowledge-and-self-edit-workflows.md
       - Live Examples: user-guide/live-examples.md
       - Integration Examples: user-guide/integrations.md
@@ -19,11 +23,6 @@ nav:
       - Plugin Workflow: user-guide/plugins.md
       - Configuration Gallery: user-guide/config-gallery.md
       - Example Reports: user-guide/example-reports.md
-      - Failure Examples: user-guide/failure-examples.md
-      - Reading a Report: user-guide/reading-report.md
-      - Evidence Packs: user-guide/evidence-packs.md
-      - Evidence Pack Internals: user-guide/evidence-packs-internals.md
-      - Troubleshooting: user-guide/troubleshooting.md
   - CLI Reference:
       - CLI Overview: reference/cli.md
   - Reference:
@@ -45,7 +44,7 @@ nav:
       - Artifact Layout: reference/artifacts.md
       - Observability: reference/observability.md
       - Calibration: reference/calibration.md
-      - Alternatives Comparison: reference/alternatives-comparison.md
+      - Alternatives and Workflow Fit: reference/alternatives-comparison.md
   - Assurance:
       - Assurance Case: assurance/00-assurance-case.md
       - Trust Model: assurance/14-trust-model.md
@@ -61,7 +60,7 @@ nav:
       - VE Predictive Gate: assurance/07-ve-gate-power.md
       - Determinism Contracts: assurance/08-determinism-contracts.md
       - Tier Policy v1 Calibration (Pilot): assurance/09-tier-v1-calibration.md
-      - Guard Overhead Method: assurance/10-guard-overhead-method.md
+      - Guard Metric Impact Method: assurance/10-guard-metric-impact-method.md
       - Policy Provenance & Digest: assurance/11-policy-provenance.md
       - Device Drift Bands: assurance/12-device-drift-bands.md
       - GPU/MPS-First Guard Measurement Contracts: assurance/13-gpu-mps-first-guards.md

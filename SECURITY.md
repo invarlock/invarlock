@@ -69,7 +69,8 @@ We will not pursue legal action against researchers who:
 When using InvarLock:
 
 1. **Keep dependencies updated**: Run `pip install --upgrade invarlock` regularly
-2. **Review evaluation reports**: Always verify evaluation report integrity before trusting results
+2. **Review evaluation reports**: Run `invarlock verify` with an independently
+   pinned expected runtime-image digest, then inspect the underlying evidence.
 3. **Isolate sensitive workloads**: Use virtual environments or containers
 4. **Network isolation**: Set `INVARLOCK_ALLOW_NETWORK=0` (default) except when needed
 5. **Audit configurations**: Review config files before running evaluation workflows
@@ -79,9 +80,18 @@ When using InvarLock:
 InvarLock includes several security features:
 
 - **Network disabled by default**: External network access requires explicit opt-in
-- **Supply chain verification**: SBOM generation and dependency auditing in CI
-- **Report integrity**: Cryptographic verification of evaluation results
-- **Minimal permissions**: Least-privilege design throughout the codebase
+- **Supply chain checks**: SBOM generation and dependency auditing in CI
+- **Evidence-pack signatures**: Ed25519 manifest signatures can authenticate a
+  pack when the verifier receives a trusted signer fingerprint or trust store.
+- **Report/manifest binding**: SHA-256 binding detects mismatches between a
+  report and its runtime manifest. An independently supplied expected image
+  digest additionally checks the manifest's image claim.
+
+These mechanisms do not attest actual container execution and cannot make
+evidence from a compromised evaluation environment trustworthy: the environment can fabricate a
+consistent report and manifest that name an expected digest. Use isolated
+evaluation infrastructure, protect signing keys, and obtain trust anchors
+through a separate release/deployment channel.
 
 ## Acknowledgments
 

@@ -234,9 +234,7 @@ calibration = [
 ### reports (canonical helpers)
 
 ```python
-from invarlock.reporting.render_markdown import render_report_markdown
-from invarlock.reporting.report_make import make_report
-from invarlock.reporting.report_schema import validate_report
+from invarlock.reporting import make_report, render_report_markdown, validate_report
 
 evaluation_report = make_report(report, baseline_report)
 validate_report(evaluation_report)

@@ -1,23 +1,17 @@
-# Tier Policy v1 Calibration (Pilot + Method)
+# Tier Policy v1 Values and Recalibration Method
 
 > **Plain language:** This appendix has two roles:
-> (1) the **pilot calibration lanes** that underpin the **Balanced** and
+> (1) document the shipped **operational defaults** for the **Balanced** and
 > **Conservative** tiers; and
-> (2) the **exact recipe** to recalibrate from scratch on your setup
+> (2) give a recipe for proposing replacements on your setup
 > (weight-based Spectral κ, activation-based RMT ε, VE min-effect, and window
 > sizing).
-> Every knob is surfaced in run reports and reports so readers can audit or recompute.
-> The public evidence floor is the source-tree `published_basis` fixture set.
-> That fixture set demonstrates the public report/evidence-pack contract; it is
-> not the entire calibration corpus used to justify every numeric tier constant:
-> `public_evidence/published_basis/gpt2/evidence_pack/reports/report-001/evaluation.report.json`,
-> `public_evidence/published_basis/gpt2/evidence_pack_recipe.json`,
-> `public_evidence/published_basis/gpt2/evidence_pack/`,
-> `public_evidence/published_basis/bert/evaluation.report.json`,
-> and `public_evidence/published_basis/bert/evidence_pack_recipe.json`.
-> Installed wheels carry a compact
-> `invarlock/_data/public_evidence/published_basis_index.json` summary of this
-> source-tree evidence rather than duplicating the full artifact corpus.
+> Every knob is surfaced in reports so readers can inspect the applied policy.
+> The repository does **not** contain an independent, representative calibration
+> corpus establishing false-positive, power, or confidence-interval coverage
+> guarantees for every shipped number. Public evidence bundles demonstrate
+> report and evidence-pack mechanics plus limited observed runs; they should not
+> be read as population calibration.
 >
 > For a key-by-key explanation of every value in the packaged tier file
 > (`runtime/tiers.yaml`; override path
@@ -28,20 +22,31 @@
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Summarize the pilot calibration basis and the recipe for recalibrating tier policy values. |
+| **Purpose** | State shipped policy values, their evidentiary limits, and a recipe for proposing locally evaluated replacements. |
 | **Audience** | Calibration owners, release approvers, and contributors updating tier thresholds. |
 | **Contract scope** | Balanced and Conservative tier values for Spectral kappa, RMT epsilon, VE min-effect, and window sizing. |
-| **Source of truth** | `runtime/tiers.yaml`, public evidence fixtures, and the Tier Policy Catalog. |
+| **Source of truth** | Packaged `runtime/tiers.yaml` for behavior; independently reviewed calibration artifacts are required to support statistical interpretations. |
 
 ## Spectral κ (z-caps) — Targets **and** Method
 
-### What the tier ships with (pilot)
+### What the tier ships with
 
 - **Balanced** per-family κ caps:
   `ffn: 3.849`, `attn: 3.018`, `embed: 1.05`, `other: 0.0`
-  with **Benjamini–Hochberg (BH)** FDR control (`α=0.05`, `m=4` families), **deadband** `δ=0.10`, **scope: all** 2-D weight matrices (LayerNorm excluded), **no absolute clamp**, and **per-run WARN budget** `max_caps = 5`.
-- **Conservative** tightens caps and budget:
-  `ffn: 3.849`, `attn: 2.6`, `embed: 2.8`, `other: 2.8`, **Bonferroni** (`α=0.000625`), and `max_caps = 3`.
+  with a **BH-named candidate selector** (`α=0.05`, `m=4` configured
+  families), **deadband** `δ=0.10`, **scope: all** 2-D weight matrices
+  (LayerNorm excluded), **no absolute clamp**, and exploratory cap budget
+  `max_caps = 5`.
+- **Conservative** uses a different family-cap profile and a lower cap budget:
+  `ffn: 3.849`, `attn: 2.6`, `embed: 2.8`, `other: 2.8`, a
+  **Bonferroni-named candidate selector** (`α=0.000625`), and `max_caps = 3`.
+
+The implementation combines that candidate selector with fixed per-family caps
+and a cap budget. In the current external-baseline strict path, any selected
+spectral violation blocks; `max_caps` governs exploratory local-baseline
+behavior. The selector has not been shown to satisfy formal FDR or family-wise
+error-rate control for the emitted decision. See
+[Spectral Threshold Semantics](05-spectral-fpr-derivation.md).
 
 **Runtime visibility.** reports record per-family WARNs and effective caps under
 `spectral.*` (summary, multiple_testing, families, family_caps) and the resolved
@@ -51,20 +56,19 @@ policy under `resolved_policy.spectral`.
 
 - The CI profile targets 240×240 non‑overlapping, paired windows with BCa
   replicates ≈ 1.2k. The Release profile targets 400×400 with ≈ 3.2k
-  replicates. Tier floors remain lower guard rails (Balanced 180×180,
+  replicates. Tier floors remain lower policy guard rails (Balanced 180×180,
   Conservative 220×220) so profiles can request stricter counts. These counts
-  follow a half‑width sizing rule on the paired Δlog‑loss CI (power ≈ 50% at the
-  boundary for the chosen `min_effect_lognll`), verified on pilot runs.
+  are engineering cost/evidence floors. The half-width expression below is a
+  planning heuristic, not public evidence of power or nominal BCa coverage.
 - CI/Release profiles request stricter counts than the base tier floors. The
   runtime/report gates enforce perfect pairing, zero overlap, and selected
   tier-floor minima; readers should compare requested profile counts to the
   recorded used counts when judging a release evidence package.
 
-**Spectral calibration provenance.** Aggregated null-run stats are derived from
-calibration runs. The tier constants are justified by the calibration artifacts
-under `artifacts/guard-validation/empirical/calibration/`; published-basis
-model reports under `public_evidence/published_basis/` add no-op null-behavior
-observations but do not re-derive `runtime/tiers.yaml`. Local tooling can parse
+**Spectral evidence status.** The repository may be reviewed with an external
+empirical-evidence bundle, but no in-tree corpus establishes the shipped caps as
+calibrated population thresholds. Public-basis reports provide observed examples
+and contract fixtures; they do not re-derive `runtime/tiers.yaml`. Local tooling can parse
 evaluation report JSON files (glob pattern `**/evaluation.report.json`) and run
 reports to extract spectral evidence, summarize per-family maximum z-scores,
 and recommend updated family caps and multiple-testing α. Persist results in
@@ -76,8 +80,8 @@ reports to change proposals.
 ### How to recalibrate κ on your machine (budget-aware)
 
 > **Key idea.** Keep the **budget** `max_caps` fixed (e.g., 5 for Balanced);
-> tune per-family κ so clean baselines stay inside that budget under the
-> published multiple-testing policy. **Do not** enable an absolute clamp in
+> tune per-family κ so the reviewed null sample stays inside that budget under
+> the configured candidate-selection policy. **Do not** enable an absolute clamp in
 > Balanced.
 
 1. **Gather spectral evidence.** From null/no-op runs, collect spectral guard
@@ -97,15 +101,16 @@ reports to change proposals.
 3. **Cap recommendation.** The current summarizer recommends
    $\kappa(f) = \max_z(f) \times (1+\eta)$, rounded for report stability, where
    $\eta$ is the configured safety margin (default 0.05). If the observed
-   any-warning rate is above target, it also recommends a lower
-   multiple-testing α on a bounded grid.
+   any-warning rate is above target, it may also report a lower
+   candidate-selection α from a bounded grid. Treat an α change as a separate
+   policy proposal; the worked cap-only procedure below keeps α fixed. Neither
+   recommendation proves FDR/FWER control.
 
 4. **Parametric cross-check.** With two-sided tail
    $\mathrm{pTail}(\kappa)=2\big(1-\Phi(\kappa)\big)$, compare the proposed caps
-   to modeled Gaussian tails for families covered by the null calibration basis.
-   Treat transferred attention caps in new published-basis no-op reports, and low
-   Balanced `embed`/`other` caps, as operational sentinels until a family-specific
-   null sweep supports an FPR interpretation.
+   to modeled Gaussian tails. This is only a diagnostic model check. Treat all
+   caps as operational thresholds unless a representative, held-out null study
+   supports a stated false-positive interpretation.
 
 5. **Keep these fixed (Balanced).** `multiple_testing: {method: bh, alpha: 0.05, m: 4}`, `deadband: 0.10`, `scope: all`, `max_caps: 5`, `max_spectral_norm: null`.
 
@@ -153,17 +158,13 @@ With 120 total modules distributed as: FFN=40, Attn=40, Embed=8, Other=32.
    - κ(other) = 1.1 × 1.05 = **1.155**
 
 3. **Review warning rate.** If observed any-warning rate exceeds the target,
-   lower the multiple-testing α according to the null-sweep recommendation.
+   revise the cap proposal or open a separate candidate-selector policy change.
+   Do not infer per-family budgets: the current runtime applies one global
+   `max_caps` count after family selection.
 
-4. **Record module distribution for audit.** With budget B=5 and M=120 total modules:
-   - B(ffn) = ⌊5 × 40/120 + 0.5⌋ = ⌊2.17⌋ = 2
-   - B(attn) = ⌊5 × 40/120 + 0.5⌋ = 2
-   - B(embed) = ⌊5 × 8/120 + 0.5⌋ = 1
-   - B(other) = ⌊5 × 32/120 + 0.5⌋ = 1
-
-5. **Write local override:** Start from
+4. **Write local override:** Start from
    `configs/overrides/spectral_balanced_local.example.yaml`, copy it for local
-   editing, and update the calibrated caps.
+   editing, and update the proposed caps.
 
    ```yaml
    # Based on configs/overrides/spectral_balanced_local.example.yaml
@@ -176,7 +177,7 @@ With 120 total modules distributed as: FFN=40, Attn=40, Embed=8, Other=32.
          other: {kappa: 1.2}
    ```
 
-6. **Re-run with override:** The command below uses the committed example path
+5. **Re-run with override:** The command below uses the committed example path
    for reproducibility; replace it with your edited local copy when trialing new
    caps.
 
@@ -193,15 +194,17 @@ With 120 total modules distributed as: FFN=40, Attn=40, Embed=8, Other=32.
      --tier balanced
    ```
 
-7. **Verify.** Check `spectral.caps_applied <= spectral.max_caps` and
-   `spectral.caps_exceeded == false` (or the same values mirrored under
-   `spectral.summary`) on clean baselines.
+6. **Review the result.** For exploratory local-baseline runs, check
+   `spectral.caps_applied <= spectral.max_caps` and
+   `spectral.caps_exceeded == false` (or their `spectral.summary` mirrors).
+   For the current external-baseline strict path, any selected violation is a
+   blocker even when it remains within `max_caps`.
 
 ---
 
 ## RMT ε (acceptance bands)
 
-### What the tier ships with (pilot)
+### What the tier ships with
 
 * **Balanced** ε per family: `{ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01}`
 * **Conservative**: `{ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01}`
@@ -215,8 +218,10 @@ $$
 
 **Runtime visibility.** report fields under `rmt.*` report baseline/current edge‑risk, ε (default and by family), status, and `validation.rmt_stable`.
 
-**RMT calibration provenance.** Aggregated null-run stats are derived from
-calibration reports. The current repo does not ship a dedicated RMT ε
+**RMT evidence status.** The shared `0.01` value is a policy default. The public
+repository does not contain a representative corpus demonstrating that it has a
+particular false-alarm rate across model families, layers, datasets, and devices.
+The current repo does not ship a dedicated RMT ε
 calibration CLI summarizer; recalibration is a manually audited procedure
 using report JSON fields such as `rmt.families.*.{edge_base,edge_cur,delta}`.
 Report quantile summaries of Δ(f) = r_cur(f)/r_base(f) − 1 and skip cases with
@@ -229,23 +234,28 @@ missing or zero baseline.
 1. Run **null** baselines (no edit) and compute per-family deltas
    $\Delta(f) = r_{\text{cur}}(f)/r_{\text{base}}(f) - 1$ (skip cases with
    $r_{\text{base}}(f)=0$).
-2. Set $\varepsilon(f) = \mathrm{Quantile}(\Delta(f); q)$ with
+2. On a training/calibration split, propose
+   $\varepsilon(f) = \mathrm{Quantile}(\Delta(f); q)$ with
    $q \in [0.95, 0.99]$.
-3. Use a slightly larger ε for tiny families (discreteness: $b(f)\in\{0,1\}$ matters).
+3. Report family sample counts and uncertainty; do not infer a special
+   small-family correction from the edge-risk value itself.
+4. Measure the selected threshold on independent held-out null and edited runs
+   before attaching a false-alarm or detection-power interpretation.
 
 ---
 
 ## Variance Equalization (VE) — minimum effect
 
-### What the tier ships with (pilot)
+### What the tier ships with
 
 * **Balanced (one-sided, improvement-only)**: `min_effect_lognll = 0.0`
 * **Conservative (two-sided, improvement-only)**: `min_effect_lognll = 0.016`
 
 **Runtime visibility.** Recorded in reports under `variance.predictive_gate` (CI, mean Δ, pass/fail reason) and under `resolved_policy.variance.{predictive_one_sided,min_effect_lognll}` (tier knobs).
 
-**VE calibration provenance.** Summary stats are derived from calibration
-reports. Local tooling can parse report JSON files to extract
+**VE evidence status.** These values are operational policy choices. The public
+repository does not contain a representative study establishing their power or
+false-enable rate. Local tooling can parse report JSON files to extract
 `variance.predictive_gate.{delta_ci,mean_delta}` and compute the paired Δ
 standard deviation across runs.
 
@@ -261,10 +271,14 @@ $$
 z \cdot \frac{\hat{\sigma}}{\sqrt{n}}
 $$
 
-Balanced uses one-sided $z = z_{0.95}$ and Conservative uses two-sided
-$z = z_{0.975}$. VE enables only if the predictive CI upper bound is at most
-`-min_effect_lognll` and the mean Δ is at most `-min_effect_lognll`; a CI
-entirely above `+min_effect_lognll` is treated as regression, so VE stays off.
+The $z$ expression is a planning approximation, not the implemented BCa
+coverage calculation. A proposal can use one-sided $z = z_{0.95}$ for Balanced
+and two-sided $z = z_{0.975}$ for Conservative as an initial sizing heuristic.
+VE enables only if the predictive CI upper bound and mean Δ are both negative
+and both are at most `-min_effect_lognll`. When the min-effect is zero, equality
+to zero does not pass. A positive interval keeps VE off; the implementation
+uses the `regression_detected` reason only when the interval lower bound and
+mean are both at least `+min_effect_lognll`.
 
 ---
 
@@ -276,7 +290,8 @@ $$
 \text{half-width} \approx z \cdot \frac{\hat{\sigma}}{\sqrt{n}}
 $$
 
-* **Balanced pilot target:** ±0.001 on GPT-2 release profile (CI profile uses fewer windows).
+* A local study may choose a target such as ±0.001, but the repository does not
+  establish this target or the shipped count as generally calibrated.
 * Sweep $n$ to find the “coverage vs cost” knee; enforce **non-overlap** (`stride = seq_len`) and reuse baseline window IDs for perfect pairing.
 
 **Window sizing provenance.** Window counts are controlled by the selected runtime
@@ -287,26 +302,31 @@ unprofiled runs.
 
 ---
 
-## “Fast path” recalibration (summary)
+## Recalibration proposal workflow
 
-1. **Baseline/null sweep (release, Balanced).** Collect guard-level
+1. **Baseline/null sweep.** Collect guard-level
    `final_z_scores` or evaluation-report spectral summaries.
-2. **Spectral κ.** Run the null-sweep summary, set κ from per-family max z plus
-   safety margin, optionally lower α if warning rate is high; **keep** BH,
-   deadband, scope, `max_caps`, and **no clamp** unless the change proposal says
-   otherwise.
-3. **RMT ε.** From null runs, set $\varepsilon(f)$ to the q95–q99 quantile of
-   $g(f)/b(f) - 1$ per family (adjust when `b(f)` is small).
-4. **VE min-effect.** Use $z\,\hat{\sigma}/\sqrt{n}$ with tier-appropriate sidedness.
-5. **Windows.** Size $n$ to hit the half-width target; enforce non-overlap and pairing.
-6. **Trial via override.** Write calibrated values to a local override YAML (e.g., `configs/overrides/spectral_balanced_local.example.yaml`, copied locally and edited) and merge it into a local run preset under `guards:` instead of editing the global tier. Re-run baseline + edits; pre-screen gates; then build reports.
+2. **Spectral κ candidate.** Run the null-sweep summary and set κ from
+   per-family max z plus a safety margin. Keep the selector method/α, deadband,
+   scope, `max_caps`, and no-clamp policy fixed unless the proposal explicitly
+   evaluates those changes too.
+3. **RMT ε candidate.** From a calibration split, set $\varepsilon(f)$ to a
+   quantile, declared in advance, of $r_f^{cur}/r_f^{base} - 1$ for families with a
+   positive baseline, then validate it on held-out runs.
+4. **VE min-effect candidate.** Use $z\,\hat{\sigma}/\sqrt{n}$ only as an initial sizing heuristic.
+5. **Windows.** Propose $n$ from the cost/half-width trade-off; enforce non-overlap and pairing.
+6. **Trial via override.** Write proposed values to a local override YAML (e.g., `configs/overrides/spectral_balanced_local.example.yaml`, copied locally and edited) and merge it into a local run preset under `guards:` instead of editing the global tier. Re-run baseline + edits; pre-screen gates; then build reports.
+7. **Hold out and document.** Evaluate false alarms and detection behavior on
+   runs not used to choose the thresholds, including the intended device/model
+   strata. Preserve the full run selection and failures to avoid cherry-picking.
 
 ---
 
-> **Note.** These pilot numbers are defaults. Teams are encouraged to re-run
-> calibration on their models/datasets/hardware and attach the resulting
-> reports and summary statistics to change proposals. The report
-> fields make such updates auditable end-to-end.
+> **Note.** These numbers are defaults, not universal calibrated constants.
+> Teams should evaluate them on their models, datasets, edits, and hardware and
+> attach the complete selected-run protocol, reports, failures, and summary
+> statistics to change proposals. Report fields improve auditability but do not
+> make the evaluation environment or its sampling choices independently trustworthy.
 
 ## See Also
 
@@ -316,7 +336,7 @@ unprofiled runs.
 - [Spectral False-Positive Control](05-spectral-fpr-derivation.md) — Multiple-testing and spectral cap rationale
 - [RMT Epsilon Rule](06-rmt-epsilon-rule.md) — Activation edge-risk rule
 - [VE Predictive Gate](07-ve-gate-power.md) — Variance-effect threshold sizing
-- [Empirical Guard Evidence](17-empirical-guard-evidence.md) — Release evidence manifest scope
+- [Diagnostic Empirical Guard Artifact Inventory](17-empirical-guard-evidence.md) — Non-authoritative inventory scope
 
 ## References
 

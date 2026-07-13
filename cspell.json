@@ -144,10 +144,14 @@
     "lockfiles",
     "dequantize",
     "dequantized",
+    "pretrained",
+    "quantizer",
+    "SLSA",
     "Arithmatex",
     "Sbornik",
     "Silverstein",
     "Smol",
-    "checksummed"
+    "checksummed",
+    "xdist"
   ]
 }

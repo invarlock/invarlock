@@ -50,15 +50,16 @@ security or alignment.
 │                               ▼                                         │
 │  ┌───────────────────────────────────────────────────────────────────┐  │
 │  │ VALIDATION LAYER                                                  │  │
-│  │ invarlock doctor -> invarlock evaluate -> invarlock verify        │  │
-│  │ env/config checks | pairing math | schema + contracts             │  │
+│  │ doctor preflight | evaluate | verify                              │  │
+│  │ strict verify also receives the raw baseline report, acceptance   │  │
+│  │ policy pack, and expected runtime-image digest                    │  │
 │  └───────────────────────────────────────────────────────────────────┘  │
 │                               │                                         │
 │                               ▼                                         │
 │  ┌───────────────────────────────────────────────────────────────────┐  │
 │  │ EVIDENCE LAYER                                                    │  │
-│  │ evaluation.report.json with seeds, hashes, policy digest, and     │  │
-│  │ guard measurement contracts plus runtime.manifest.json for audit. │  │
+│  │ evaluation.report.json + runtime.manifest.json                    │  │
+│  │ verifier result and exit status                                   │  │
 │  └───────────────────────────────────────────────────────────────────┘  │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -80,6 +81,10 @@ security or alignment.
   structural invariants while “appearing to run”.
 - Dependency vulnerabilities in the Python stack and transitive extras that
   could affect evaluation or guard logic.
+- A malicious or compromised evidence author that can author a mutually
+  consistent report, runtime manifest, policy digest, and signing key.
+- Post-hoc dataset/window selection that preserves pairing while biasing the
+  evaluated sample.
 
 ## Mitigations (built-in + process)
 
@@ -96,8 +101,10 @@ security or alignment.
 - Release automation only rebuilds and publishes from validated tags resolved
   to an immutable commit SHA.
 - Strict configuration and report validation (`invarlock doctor`,
-  `invarlock verify`) to detect misconfiguration, schema drift, and runtime
-  provenance mismatches.
+  `invarlock verify`) to detect misconfiguration, schema drift, report/manifest
+  mismatch, thresholds outside an independently maintained policy pack, raw-baseline
+  replay failures, and mismatch against an independently supplied runtime-image
+  digest.
 - report fields for seeds, windowing, dataset/tokenizer hashes, and guard
   telemetry so auditors can audit the assurance evidence.
 
@@ -143,11 +150,15 @@ in report. Manual review of `report.guards[]` evidence.
 **Threat:** Attacker modifies config to weaken guards (larger ε, disabled
 checks) hoping auditors do not notice.
 
-**Mitigation:** reports capture `resolved_policy.*` and `policy_digest`
-for audit. `invarlock verify` enforces schema compliance.
+**Mitigation:** reports capture `resolved_policy.*` and `policy_digest` for
+audit. Strict verification requires an independently maintained policy pack and
+checks the report against it. A report-local digest alone is only a
+self-consistency check.
 
-**Detection:** Policy changes appear in `policy_digest.changed = true`.
-Compare reports side-by-side for unexpected policy drift.
+**Detection:** Supply the separately controlled CI/release policy pack to
+`invarlock verify --policy-pack`. `policy_digest.changed` and side-by-side
+comparison remain useful signals, but an evidence author can recompute a
+report-local digest after changing policy.
 
 ### 5. Window Schedule Manipulation
 
@@ -155,9 +166,29 @@ Compare reports side-by-side for unexpected policy drift.
 performance (cherry-picked easy examples).
 
 **Mitigation:** Pairing enforcement requires `window_match_fraction = 1.0` and
-`window_overlap_fraction = 0.0`. CI/Release profiles fail on pairing violations.
+`window_overlap_fraction = 0.0`, which prevents baseline/subject schedule drift.
+It does not prevent cherry-picking. Representative dataset identity and a
+window plan must be independently fixed before results are observed.
 
-**Detection:** `[INVARLOCK:E001]` error on pairing schedule mismatch.
+**Detection:** `[INVARLOCK:E001]` detects pairing mismatch. Detecting biased
+selection requires an independently committed dataset/window-plan digest and
+review of the sampling protocol.
+
+### 6. Fabricated Evidence Bundle
+
+**Threat:** An evidence source fabricates a report and matching runtime
+manifest, or signs both with a key controlled only by that source.
+
+**Mitigation:** Strict report verification requires the exact raw baseline, a
+independently maintained policy pack, and an expected runtime image digest supplied
+independently of the submitted manifest. Evidence-pack review separately pins
+an accepted publisher key. High-assurance deployments should also use
+externally issued execution attestations or reproducible reruns.
+
+**Detection:** `manifest_bound` proves only report/manifest integrity.
+`expected_image_digest_matched` proves the declaration matches the digest the
+caller supplied, not that the image executed. A pinned evidence-pack signer
+authenticates the publisher, not the runtime execution.
 
 ## Out of scope (security non-goals)
 

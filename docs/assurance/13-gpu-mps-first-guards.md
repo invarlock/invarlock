@@ -2,7 +2,10 @@
 
 > **Plain language:** Accelerator-friendly guard measurements are acceptable
 > only when their estimator settings, sampling policy, and measurement-contract
-> hashes are recorded so later verification can replay the same contract.
+> hashes are recorded so later verification can check the declaration and its
+> report-local consistency. The offline verifier does not replay guard
+> measurements from tensors or independently compare those declarations with
+> the independently supplied raw baseline report.
 
 ## Overview
 
@@ -15,10 +18,16 @@
 
 ## Claim
 
-Spectral and RMT guard evidence must remain reproducible without requiring full
-matrix decompositions on large models. The runtime therefore records bounded
+Spectral and RMT guard evidence uses bounded estimators rather than full matrix
+decompositions on large models. The runtime records the
 iterative estimator settings, sampling policy, and measurement-contract hashes
-for the guard evidence that `invarlock verify` later checks.
+for the guard evidence that `invarlock verify` later checks for internal
+consistency.
+
+The recorded hash binds the report to a declared procedure. It does not prove
+that the procedure executed, that the sampled activations were genuine, or that
+the reported measurements were recomputed by the verifier. Those claims require
+an independent rerun, trusted execution evidence, or another external attestation.
 
 For operational guard usage, see [Guards](../reference/guards.md).
 
@@ -38,8 +47,9 @@ Guard reports must preserve enough information for later verification:
 - RMT evidence records activation edge-risk scoring, sampling policy, estimator
   budget, and measurement-contract hash.
 - CI/Release verification rejects missing measurement-contract hashes for
-  evaluated Spectral/RMT guard evidence and requires the resolved-policy
-  measurement contract to match the baseline evidence contract.
+  evaluated Spectral/RMT guard evidence, recomputes each hash from the reported
+  contract, compares the report block with `resolved_policy`, and requires the
+  report's `measurement_contract_match` flag to be true.
 
 ## Contract Details
 
@@ -47,8 +57,10 @@ Guard reports must preserve enough information for later verification:
 2. **Spectral contract**: track $\hat{\sigma}_{\max}$ and degeneracy proxies
    (stable-rank drift, row/col norm collapse).
 3. **RMT contract**: activation edge-risk score normalized by MP edge.
-4. **Verification gate**: reports must record the measurement contract, hash,
-   baseline hash, and match flag.
+4. **Verification gate**: evaluated reports must record the measurement
+   contract, its hash, and a true match flag. A baseline contract hash may also
+   be emitted. Verification checks report-local presence and consistency, not
+   numerical replay or an independent baseline-contract comparison.
 
 ## Non-goals
 
@@ -63,7 +75,7 @@ Guard reports must preserve enough information for later verification:
 
 - Contract hashes appear under `spectral.measurement_contract_hash` and
   `rmt.measurement_contract_hash` in reports.
-- Baseline comparison appears under
+- When emitted, evaluation-time baseline comparison appears under
   `spectral.baseline_measurement_contract_hash`,
   `rmt.baseline_measurement_contract_hash`, and
   `*.measurement_contract_match`.
