@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mock_report_with_seed_and_device() -> dict[str, Any]:
@@ -13,7 +15,9 @@ def _mock_report_with_seed_and_device() -> dict[str, Any]:
             "device": "cpu",
             "seed": 11,
             "seeds": {"python": 11},
+            "auto": {"tier": "balanced"},
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "dummy",
             "split": "validation",

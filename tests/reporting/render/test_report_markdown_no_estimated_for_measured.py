@@ -1,4 +1,4 @@
-from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.rendering.markdown import render_report_markdown
 from invarlock.reporting.report_make import REPORT_SCHEMA_VERSION
 
 
@@ -18,7 +18,7 @@ def test_markdown_excludes_estimated_suffix_for_measured_accuracy():
         "invariants": {"status": "pass"},
         "spectral": {"caps_applied": 0, "max_caps": 5},
         "rmt": {"stable": True},
-        "guard_overhead": {},
+        "guard_metric_impact": {},
         "structure": {"layers_modified": 0, "params_changed": 0},
         "variance": {"enabled": False},
         "validation": {
@@ -27,13 +27,13 @@ def test_markdown_excludes_estimated_suffix_for_measured_accuracy():
             "invariants_pass": True,
             "spectral_stable": True,
             "rmt_stable": True,
-            "guard_overhead_acceptable": True,
+            "guard_metric_impact_acceptable": True,
         },
         "primary_metric": {
             "kind": "accuracy",
             "preview": 0.8,
             "final": 0.9,
-            "ratio_vs_baseline": +0.1,
+            "delta_vs_baseline_pp": +10.0,
             "estimated": False,
             "counts_source": "measured",
         },
@@ -51,3 +51,5 @@ def test_markdown_excludes_estimated_suffix_for_measured_accuracy():
     assert "(estimated)" not in md
     assert "ESTIMATED / PSEUDO ACCURACY" not in md
     assert "NON-ASSURANCE REPORT" not in md
+    assert "REPORT-LOCAL / UNVERIFIED RENDER" in md
+    assert "strict pass" not in md.lower()

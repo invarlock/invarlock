@@ -49,7 +49,8 @@ class TestIntegrationAndEdgeCases:
         # Remove optional fields
         report["edit"]["deltas"].pop("sparsity", None)
         report["metrics"].pop("spectral", None)
-        report.pop("guards", None)
+        report["guards"] = []
+        report = refresh_runtime_policy_receipt(report)
 
         baseline = create_mock_baseline()
 
@@ -74,7 +75,7 @@ class TestDriftValidationGates:
         pm["final"] = 45.0
         pm["ratio_vs_baseline"] = 45.0 / 30.0
 
-        baseline = create_mock_baseline(ppl_final=30.0, schema_type="baseline-v1")
+        baseline = create_mock_baseline(ppl_final=30.0)
 
         with patch(
             "invarlock.reporting.report_normalization.validate_report",
@@ -94,7 +95,7 @@ class TestDriftValidationGates:
         pm["final"] = 30.6
         pm["ratio_vs_baseline"] = 30.6 / 30.0
 
-        baseline = create_mock_baseline(ppl_final=30.0, schema_type="baseline-v1")
+        baseline = create_mock_baseline(ppl_final=30.0)
 
         with patch(
             "invarlock.reporting.report_normalization.validate_report",
@@ -105,9 +106,7 @@ class TestDriftValidationGates:
         validation = evaluation_report["validation"]
         assert validation["preview_final_drift_acceptable"] is True
         assert validation["primary_metric_acceptable"] is True
-        from tests.reporting._support_primary_metric import pm as _pm
-
-        M = _pm(evaluation_report)
+        M = dict(evaluation_report["primary_metric"])
         assert (float(M["final"]) / float(M["preview"])) == pytest.approx(
             1.02, rel=1e-6
         )
@@ -119,7 +118,7 @@ class TestDriftValidationGates:
         report["metrics"]["ppl_final"] = float("inf")
         report["metrics"]["ppl_ratio"] = float("nan")
 
-        baseline = create_mock_baseline(ppl_final=30.0, schema_type="baseline-v1")
+        baseline = create_mock_baseline(ppl_final=30.0)
 
         with patch(
             "invarlock.reporting.report_normalization.validate_report",
@@ -137,7 +136,7 @@ class TestDriftValidationGates:
         report["metrics"]["ppl_ratio"] = 42.0 / 40.0
         report["metrics"]["ppl_ratio_ci"] = (1.01, 1.12)
 
-        baseline = create_mock_baseline(ppl_final=40.0, schema_type="baseline-v1")
+        baseline = create_mock_baseline(ppl_final=40.0)
 
         with patch(
             "invarlock.reporting.report_normalization.validate_report",

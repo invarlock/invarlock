@@ -46,7 +46,9 @@ def _compute_variance_policy_digest(policy: dict[str, Any]) -> str:
     }
     if not canonical_payload:
         return ""
-    serialized = json.dumps(canonical_payload, sort_keys=True, separators=(",", ":"))
+    serialized = json.dumps(
+        canonical_payload, sort_keys=True, separators=(",", ":"), allow_nan=False
+    )
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:16]
 
 
@@ -142,36 +144,21 @@ def _compute_thresholds_payload(
 
 
 def _compute_thresholds_hash(payload: dict[str, Any]) -> str:
-    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    canonical = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), allow_nan=False
+    )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
 
 
 def _resolve_policy_tier(report: RunReport) -> str:
-    """Resolve the policy tier from report metadata or context."""
-    tier: Any = None
-    try:
-        meta = report.get("meta", {}) if isinstance(report, dict) else {}
-        auto_cfg = (
-            meta.get("auto")
-            if isinstance(meta, dict) and isinstance(meta.get("auto"), dict)
-            else None
-        )
-        tier = (auto_cfg.get("tier") if auto_cfg else None) or (
-            meta.get("policy_tier") if isinstance(meta, dict) else None
-        )
-        if not tier:
-            context = report.get("context", {}) if isinstance(report, dict) else {}
-            if isinstance(context, dict):
-                tier = context.get("policy_tier") or (
-                    context.get("auto", {})
-                    if isinstance(context.get("auto"), dict)
-                    else {}
-                ).get("tier")
-        if not tier:
-            tier = "balanced"
-        return str(tier).lower()
-    except _NON_FATAL_EXCEPTIONS:
-        return "balanced"
+    """Resolve the policy tier from canonical RunReport metadata."""
+
+    meta = report.get("meta") if isinstance(report, dict) else None
+    auto_cfg = meta.get("auto") if isinstance(meta, dict) else None
+    tier = auto_cfg.get("tier") if isinstance(auto_cfg, dict) else None
+    if not isinstance(tier, str) or not tier.strip():
+        raise ValueError("Canonical RunReport requires non-empty meta.auto.tier.")
+    return tier.strip().lower()
 
 
 def _format_family_caps(caps: Any) -> dict[str, dict[str, float]]:
@@ -204,6 +191,29 @@ def _format_epsilon_map(epsilon_map: Any) -> dict[str, float]:
                 except _NON_FATAL_EXCEPTIONS:
                     pass
     return formatted
+
+
+def _resolved_confidence_policy(resolved: dict[str, Any]) -> dict[str, float] | None:
+    try:
+        metrics = resolved.get("metrics")
+        if not isinstance(metrics, dict):
+            return None
+        confidence = metrics.get("confidence")
+        if not isinstance(confidence, dict) or not confidence:
+            return None
+        output: dict[str, float] = {}
+        for field in ("ppl_ratio_width_max", "accuracy_delta_pp_width_max"):
+            if field not in confidence:
+                continue
+            try:
+                value = _float_or_none(confidence.get(field))
+            except _NON_FATAL_EXCEPTIONS:
+                continue
+            if value is not None:
+                output[field] = value
+        return output
+    except _NON_FATAL_EXCEPTIONS:
+        return None
 
 
 def _build_resolved_policies(
@@ -291,13 +301,9 @@ def _build_resolved_policies(
         spectral_resolved.get("correction_enabled", False),
     )
     spectral_resolved["correction_enabled"] = bool(correction_flag)
-    if tier_key == "balanced":
-        spectral_resolved["correction_enabled"] = False
-        spectral_resolved["max_spectral_norm"] = None
-    else:
-        spectral_resolved["max_spectral_norm"] = spectral.get("policy", {}).get(
-            "max_spectral_norm", spectral_resolved.get("max_spectral_norm")
-        )
+    spectral_resolved["max_spectral_norm"] = spectral.get("policy", {}).get(
+        "max_spectral_norm", spectral_resolved.get("max_spectral_norm")
+    )
     mc = spectral.get("measurement_contract")
     if isinstance(mc, dict) and mc:
         spectral_resolved["measurement_contract"] = copy.deepcopy(mc)
@@ -407,33 +413,9 @@ def _build_resolved_policies(
     except _NON_FATAL_EXCEPTIONS:
         pass
 
-    # Confidence thresholds (optional policy knobs)
-    try:
-        conf: dict[str, Any] | None = None
-        metrics_value = resolved.get("metrics")
-        metrics_config = metrics_value if isinstance(metrics_value, dict) else None
-        if isinstance(metrics_config, dict):
-            confidence_value = metrics_config.get("confidence")
-            conf = confidence_value if isinstance(confidence_value, dict) else None
-        if isinstance(conf, dict) and conf:
-            confidence_out: dict[str, float] = {}
-            if "ppl_ratio_width_max" in conf:
-                try:
-                    value = _float_or_none(conf.get("ppl_ratio_width_max"))
-                    if value is not None:
-                        confidence_out["ppl_ratio_width_max"] = value
-                except _NON_FATAL_EXCEPTIONS:
-                    pass
-            if "accuracy_delta_pp_width_max" in conf:
-                try:
-                    value = _float_or_none(conf.get("accuracy_delta_pp_width_max"))
-                    if value is not None:
-                        confidence_out["accuracy_delta_pp_width_max"] = value
-                except _NON_FATAL_EXCEPTIONS:
-                    pass
-            resolved["confidence"] = confidence_out
-    except _NON_FATAL_EXCEPTIONS:
-        pass
+    confidence = _resolved_confidence_policy(resolved)
+    if confidence is not None:
+        resolved["confidence"] = confidence
 
     return resolved
 
@@ -599,7 +581,7 @@ def _extract_policy_overrides(report: RunReport) -> list[str]:
 
 
 def _compute_policy_digest(policy: dict[str, Any]) -> str:
-    canonical = json.dumps(policy, sort_keys=True, default=str)
+    canonical = json.dumps(policy, sort_keys=True, default=str, allow_nan=False)
     return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
 

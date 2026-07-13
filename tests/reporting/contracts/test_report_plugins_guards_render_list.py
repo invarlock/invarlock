@@ -1,16 +1,22 @@
 from unittest.mock import patch
 
-from invarlock.reporting.render import (
+from invarlock.reporting.rendering.markdown import (
     render_report_markdown,
 )
 from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
 
 
 def test_plugins_guards_render_with_valid_entries():
     report = {
         "meta": {
             "model_id": "m",
+            "adapter": "hf_causal",
             "seed": 1,
+            "auto": {"tier": "balanced"},
             "plugins": {
                 "adapter": {"name": "hf", "module": "pkg.adapter"},
                 "edit": {"name": "structured", "module": "pkg.edits"},
@@ -20,7 +26,10 @@ def test_plugins_guards_render_with_valid_entries():
                 ],
             },
         },
-        "metrics": {"ppl_preview": 10.0, "ppl_final": 10.0},
+        "context": {"profile": "dev", "assurance": {"mode": "off"}},
+        "metrics": {
+            "primary_metric": {"kind": "ppl_causal", "preview": 10.0, "final": 10.0}
+        },
         "data": {
             "dataset": "d",
             "split": "val",
@@ -41,16 +50,11 @@ def test_plugins_guards_render_with_valid_entries():
         },
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    baseline = {
-        "run_id": "b",
-        "model_id": "m",
-        "ppl_final": 10.0,
-        "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
-    }
+    baseline = {**report, "edit": {"name": "noop"}}
     with patch(
         "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
-        cert = make_report(report, baseline)
+        cert = make_report(canonical_run_report(report), canonical_baseline(baseline))
     md = render_report_markdown(cert)
     # Plugin provenance may be omitted after normalization
     assert ("- Guards:" in md) or ("## Executive Summary" in md)

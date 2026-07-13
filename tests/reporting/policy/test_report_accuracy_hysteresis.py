@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_make import make_report
+from copy import deepcopy
+
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def test_accuracy_hysteresis_applied_and_pm_ok() -> None:
@@ -15,6 +19,7 @@ def test_accuracy_hysteresis_applied_and_pm_ok() -> None:
             "ts": "2024-01-01T00:00:00",
             "auto": {"tier": "balanced", "probes_used": 0, "target_pm_ratio": None},
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "ds",
             "split": "val",
@@ -37,18 +42,27 @@ def test_accuracy_hysteresis_applied_and_pm_ok() -> None:
         "metrics": {
             "primary_metric": {
                 "kind": "accuracy",
-                "final": 0.79,
-                "ratio_vs_baseline": -1.05,
+                "preview": 0.80,
+                "final": 0.7895,
+                "n_preview": 2000,
+                "n_final": 2000,
+                "delta_vs_baseline_pp": -1.05,
             },
             "classification": {
-                "final": {"correct_total": 210, "total": 210},
-                "preview": {"correct_total": 200, "total": 200},
+                "final": {"correct_total": 1579, "total": 2000},
+                "preview": {"correct_total": 1600, "total": 2000},
+                "counts_source": "measured",
             },
         },
         "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
         "flags": {"guard_recovered": False, "rollback_reason": None},
     }
-    base = {"metrics": {"primary_metric": {"kind": "accuracy", "final": 0.80}}}
+    base = deepcopy(rep)
+    base["metrics"]["primary_metric"] = {
+        "kind": "accuracy",
+        "preview": 0.80,
+        "final": 0.80,
+    }
     cert = make_report(rep, base)
     val = cert.get("validation", {})
     # Acceptable due to hysteresis with sufficient n_final and mark hysteresis applied

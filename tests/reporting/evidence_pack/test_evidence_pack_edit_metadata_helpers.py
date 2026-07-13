@@ -1,16 +1,56 @@
 from __future__ import annotations
 
-import invarlock.evidence_pack_edit_metadata as edit_metadata_mod
+import invarlock.evidence_pack_deployable_validation as deployable_mod
+import invarlock.evidence_pack_edit_validation as edit_validation_mod
+from invarlock.evidence_pack_contracts.deployable_coverage import (
+    canonical_names_sha256,
+)
 
 
-def test_deployable_artifact_validation_sidecar_accepts_passing_smokes() -> None:
+def _packed_runtime_facts() -> dict[str, object]:
+    module_names = ["model.fc1", "model.fc2"]
+    return {
+        "quantized_module_count": len(module_names),
+        "quantized_module_names": module_names,
+        "quantized_module_names_sha256": canonical_names_sha256(module_names),
+        "quantized_module_types": ["bitsandbytes.nn.Linear8bitLt"],
+        "packed_weight_storage_elements": 6,
+    }
+
+
+def _logical_coverage() -> dict[str, object]:
+    weight_names = ["model.fc1.weight", "model.fc2.weight"]
+    return {
+        "basis": "dense_baseline_unique_parameters",
+        "weight_tensor_names": weight_names,
+        "weight_tensor_names_sha256": canonical_names_sha256(weight_names),
+        "weight_tensor_count": len(weight_names),
+        "parameter_elements": 12,
+        "total_unique_parameter_elements": 16,
+    }
+
+
+def _positive_edit_coverage() -> dict[str, object]:
+    return {
+        "edited_tensors": 1,
+        "edited_params": 4,
+        "total_params": 8,
+        "coverage_ratio": 0.5,
+    }
+
+
+def test_deployable_artifact_validation_sidecar_requires_non_authoritative_scope() -> (
+    None
+):
     assert (
-        edit_metadata_mod._deployable_sidecar_consistency_errors(
+        deployable_mod._deployable_sidecar_consistency_errors(
             scenario_id="deploy",
             sidecar="deployable_artifact_validation.json",
             payload={
                 "schema": "invarlock/deployable-artifact-validation-v1",
                 "ok": True,
+                "validation_scope": "structural_only",
+                "runtime_proof_authoritative": False,
                 "load_smoke": True,
                 "inference_smoke": True,
             },
@@ -19,9 +59,40 @@ def test_deployable_artifact_validation_sidecar_accepts_passing_smokes() -> None
     )
 
 
-def test_backend_inventory_sidecar_accepts_passing_inventory() -> None:
+def test_runtime_deployability_sidecar_requires_authoritative_reproof() -> None:
+    valid_payload = {
+        "schema": "invarlock/deployable-artifact-validation-v1",
+        "ok": True,
+        "validation_scope": "runtime_reproof",
+        "runtime_proof_authoritative": True,
+        "runtime_proof": {"packed_module_reloaded": True},
+        "load_smoke": True,
+        "inference_smoke": True,
+    }
     assert (
-        edit_metadata_mod._deployable_sidecar_consistency_errors(
+        deployable_mod._deployable_sidecar_consistency_errors(
+            scenario_id="deploy",
+            sidecar="runtime_deployability_validation.json",
+            payload=valid_payload,
+        )
+        == []
+    )
+
+    invalid_payload = dict(valid_payload)
+    invalid_payload["runtime_proof_authoritative"] = False
+    errors = deployable_mod._deployable_sidecar_consistency_errors(
+        scenario_id="deploy",
+        sidecar="runtime_deployability_validation.json",
+        payload=invalid_payload,
+    )
+
+    assert any("runtime_proof_authoritative must be true" in error for error in errors)
+
+
+def test_backend_inventory_sidecar_accepts_passing_inventory() -> None:
+    runtime_facts = _packed_runtime_facts()
+    assert (
+        deployable_mod._deployable_sidecar_consistency_errors(
             scenario_id="deploy",
             sidecar="backend_inventory.json",
             payload={
@@ -29,8 +100,8 @@ def test_backend_inventory_sidecar_accepts_passing_inventory() -> None:
                 "ok": True,
                 "load_smoke": True,
                 "inference_smoke": True,
-                "quantized_module_count": 2,
-                "quantized_module_types": ["Linear8bitLt"],
+                **runtime_facts,
+                "logical_coverage": _logical_coverage(),
                 "memory_footprint": {
                     "reported_bytes": 1024,
                     "method": "get_memory_footprint",
@@ -42,7 +113,7 @@ def test_backend_inventory_sidecar_accepts_passing_inventory() -> None:
 
 
 def test_backend_inventory_sidecar_reports_failed_inventory_contract() -> None:
-    errors = edit_metadata_mod._deployable_sidecar_consistency_errors(
+    errors = deployable_mod._deployable_sidecar_consistency_errors(
         scenario_id="deploy",
         sidecar="backend_inventory.json",
         payload={
@@ -60,15 +131,99 @@ def test_backend_inventory_sidecar_reports_failed_inventory_contract() -> None:
     assert any("deployable sidecar did not pass" in error for error in errors)
     assert any("load_smoke must be true" in error for error in errors)
     assert any("inference_smoke must be true" in error for error in errors)
+    assert any("quantized module names are invalid" in error for error in errors)
     assert any(
-        "quantized_module_count must be non-negative int" in error for error in errors
+        "logical coverage has missing or unsupported fields" in error
+        for error in errors
     )
-    assert any("quantized_module_types must be a list" in error for error in errors)
     assert any("memory_footprint must be an object" in error for error in errors)
 
 
+def test_deployable_sidecar_valid_and_invalid_branch_matrix() -> None:
+    runtime_facts = _packed_runtime_facts()
+    logical_coverage = _logical_coverage()
+    assert (
+        deployable_mod._deployable_sidecar_consistency_errors(
+            scenario_id="deploy",
+            sidecar="future_sidecar.json",
+            payload={"ok": True},
+        )
+        == []
+    )
+    assert deployable_mod._deployable_sidecar_consistency_errors(
+        scenario_id="deploy",
+        sidecar="backend_inventory.json",
+        payload={
+            "schema": "invarlock/backend-inventory-v1",
+            "load_smoke": True,
+            "inference_smoke": True,
+            **runtime_facts,
+            "logical_coverage": logical_coverage,
+            "memory_footprint": {"reported_bytes": 0},
+        },
+    ) == [
+        "deploy: backend_inventory.json memory_footprint.reported_bytes must be positive"
+    ]
+    assert (
+        deployable_mod._deployable_sidecar_consistency_errors(
+            scenario_id="deploy",
+            sidecar="publication_commit.json",
+            payload={
+                "schema": "invarlock/deployable-publication-commit-v1",
+                "committed": True,
+            },
+        )
+        == []
+    )
+    assert (
+        deployable_mod._deployable_sidecar_consistency_errors(
+            scenario_id="deploy",
+            sidecar="memory_report.json",
+            payload={
+                "schema": "invarlock/deployable-memory-report-v1",
+                "ok": True,
+                "baseline_reported_bytes": 200,
+                "quantized_reported_bytes": 100,
+                "reduction_bytes": 100,
+                "reduction_ratio": 0.5,
+                "runtime_memory_reduction_observed": True,
+            },
+        )
+        == []
+    )
+    assert (
+        deployable_mod._deployable_sidecar_consistency_errors(
+            scenario_id="deploy",
+            sidecar="load_smoke.json",
+            payload={
+                "schema": "invarlock/deployable-load-smoke-v1",
+                "ok": True,
+                "loaded_from_saved_checkpoint": True,
+                "load_time_quantization_override": False,
+                **runtime_facts,
+                "logical_coverage": logical_coverage,
+            },
+        )
+        == []
+    )
+    assert (
+        deployable_mod._deployable_sidecar_consistency_errors(
+            scenario_id="deploy",
+            sidecar="inference_smoke.json",
+            payload={
+                "schema": "invarlock/deployable-inference-smoke-v1",
+                "ok": True,
+                "all_logits_finite": True,
+                "logits_sha256": "sha256:" + "a" * 64,
+                "logits_shape": [1, 2, 3],
+            },
+        )
+        == []
+    )
+
+
 def test_optional_edit_provenance_and_impact_metadata_accepts_valid_payload() -> None:
-    errors = edit_metadata_mod._metadata_consistency_errors(
+    errors = edit_validation_mod._metadata_consistency_errors(
         scenario_id="lora",
         spec={
             "artifact_class": "validation_subject_checkpoint",
@@ -80,6 +235,7 @@ def test_optional_edit_provenance_and_impact_metadata_accepts_valid_payload() ->
             "edit_type": "lora_merge",
             "optimized_deployment_backend": False,
             "packed_quantized_storage": False,
+            "coverage": _positive_edit_coverage(),
             "edit_provenance": {
                 "edit_family": "lora_merge",
                 "edit_method": "custom",
@@ -106,7 +262,7 @@ def test_optional_edit_provenance_and_impact_metadata_accepts_valid_payload() ->
 def test_optional_edit_provenance_and_impact_metadata_reports_malformed_payload() -> (
     None
 ):
-    errors = edit_metadata_mod._metadata_consistency_errors(
+    errors = edit_validation_mod._metadata_consistency_errors(
         scenario_id="knowledge",
         spec={
             "artifact_class": "validation_subject_checkpoint",
@@ -138,7 +294,7 @@ def test_optional_edit_provenance_and_impact_metadata_reports_malformed_payload(
 
 
 def test_optional_edit_metadata_reports_non_string_family_and_scenarios() -> None:
-    errors = edit_metadata_mod._metadata_consistency_errors(
+    errors = edit_validation_mod._metadata_consistency_errors(
         scenario_id="knowledge",
         spec={
             "artifact_class": "validation_subject_checkpoint",
@@ -160,7 +316,7 @@ def test_optional_edit_metadata_reports_non_string_family_and_scenarios() -> Non
 
 
 def test_optional_edit_metadata_reports_non_object_sections() -> None:
-    errors = edit_metadata_mod._metadata_consistency_errors(
+    errors = edit_validation_mod._metadata_consistency_errors(
         scenario_id="knowledge",
         spec={
             "artifact_class": "validation_subject_checkpoint",
@@ -182,7 +338,7 @@ def test_optional_edit_metadata_reports_non_object_sections() -> None:
 
 
 def test_optional_edit_metadata_reports_invalid_method_and_scenario_list() -> None:
-    errors = edit_metadata_mod._metadata_consistency_errors(
+    errors = edit_validation_mod._metadata_consistency_errors(
         scenario_id="knowledge",
         spec={
             "artifact_class": "validation_subject_checkpoint",
@@ -204,7 +360,7 @@ def test_optional_edit_metadata_reports_invalid_method_and_scenario_list() -> No
 
 
 def test_optional_edit_impact_accepts_missing_scenario_types() -> None:
-    errors = edit_metadata_mod._metadata_consistency_errors(
+    errors = edit_validation_mod._metadata_consistency_errors(
         scenario_id="knowledge",
         spec={
             "artifact_class": "validation_subject_checkpoint",
@@ -216,6 +372,7 @@ def test_optional_edit_impact_accepts_missing_scenario_types() -> None:
             "edit_type": "custom",
             "optimized_deployment_backend": False,
             "packed_quantized_storage": False,
+            "coverage": _positive_edit_coverage(),
             "edit_impact": {},
         },
     )
@@ -224,7 +381,7 @@ def test_optional_edit_impact_accepts_missing_scenario_types() -> None:
 
 
 def test_optional_edit_topology_and_delta_privacy_accepts_valid_payload() -> None:
-    errors = edit_metadata_mod._metadata_consistency_errors(
+    errors = edit_validation_mod._metadata_consistency_errors(
         scenario_id="dynamic",
         spec={
             "artifact_class": "validation_subject_checkpoint",
@@ -236,6 +393,7 @@ def test_optional_edit_topology_and_delta_privacy_accepts_valid_payload() -> Non
             "edit_type": "custom",
             "optimized_deployment_backend": False,
             "packed_quantized_storage": False,
+            "coverage": _positive_edit_coverage(),
             "edit_topology": {
                 "artifact_kind": "dynamic_weight_module",
                 "module_hashes": {"generator": "sha256:" + "a" * 64},
@@ -254,7 +412,7 @@ def test_optional_edit_topology_and_delta_privacy_accepts_valid_payload() -> Non
 
 
 def test_optional_edit_topology_and_delta_privacy_reports_malformed_payload() -> None:
-    errors = edit_metadata_mod._metadata_consistency_errors(
+    errors = edit_validation_mod._metadata_consistency_errors(
         scenario_id="dynamic",
         spec={
             "artifact_class": "validation_subject_checkpoint",
@@ -290,7 +448,7 @@ def test_optional_edit_topology_and_delta_privacy_reports_malformed_payload() ->
 
 
 def test_optional_edit_topology_accepts_empty_descriptive_payload() -> None:
-    errors = edit_metadata_mod._metadata_consistency_errors(
+    errors = edit_validation_mod._metadata_consistency_errors(
         scenario_id="dynamic",
         spec={
             "artifact_class": "validation_subject_checkpoint",
@@ -302,6 +460,7 @@ def test_optional_edit_topology_accepts_empty_descriptive_payload() -> None:
             "edit_type": "custom",
             "optimized_deployment_backend": False,
             "packed_quantized_storage": False,
+            "coverage": _positive_edit_coverage(),
             "edit_topology": {},
             "delta_privacy": {},
         },
@@ -311,7 +470,7 @@ def test_optional_edit_topology_accepts_empty_descriptive_payload() -> None:
 
 
 def test_optional_edit_topology_reports_non_object_shapes() -> None:
-    errors = edit_metadata_mod._metadata_consistency_errors(
+    errors = edit_validation_mod._metadata_consistency_errors(
         scenario_id="dynamic",
         spec={
             "artifact_class": "validation_subject_checkpoint",
@@ -333,7 +492,7 @@ def test_optional_edit_topology_reports_non_object_shapes() -> None:
 
 
 def test_optional_edit_topology_reports_bad_module_hash_container_and_key() -> None:
-    non_object_errors = edit_metadata_mod._metadata_consistency_errors(
+    non_object_errors = edit_validation_mod._metadata_consistency_errors(
         scenario_id="dynamic",
         spec={
             "artifact_class": "validation_subject_checkpoint",
@@ -348,7 +507,7 @@ def test_optional_edit_topology_reports_bad_module_hash_container_and_key() -> N
             "edit_topology": {"module_hashes": ["sha256:" + "a" * 64]},
         },
     )
-    bad_key_errors = edit_metadata_mod._metadata_consistency_errors(
+    bad_key_errors = edit_validation_mod._metadata_consistency_errors(
         scenario_id="dynamic",
         spec={
             "artifact_class": "validation_subject_checkpoint",

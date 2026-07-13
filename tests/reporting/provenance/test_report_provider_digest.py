@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_make import make_report
+import copy
+
+from invarlock.reporting.rendering.markdown import render_report_markdown
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def test_evaluation_report_includes_provider_digest_in_provenance():
@@ -11,8 +15,10 @@ def test_evaluation_report_includes_provider_digest_in_provenance():
             "adapter": "hf_causal",
             "device": "cpu",
             "seed": 42,
+            "auto": {"tier": "balanced"},
             "ts": "now",
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "dummy",
             "split": "validation",
@@ -62,11 +68,8 @@ def test_evaluation_report_includes_provider_digest_in_provenance():
             "final": {"window_ids": [2], "labels": [[-100]]},
         },
     }
-    baseline = {
-        "schema_version": "baseline-v1",
-        "meta": {},
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
-    }
+    baseline = copy.deepcopy(report)
+    baseline["edit"]["name"] = "noop"
 
     cert = make_report(report, baseline)
     # Provider digest may be omitted after normalization; rendering should still succeed

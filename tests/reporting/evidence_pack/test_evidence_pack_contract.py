@@ -1,19 +1,21 @@
 from __future__ import annotations
 
-import json
+import hashlib
+from copy import deepcopy
 from pathlib import Path
 
 import invarlock.evidence_pack as evidence_pack_mod
-import invarlock.evidence_pack_edit_metadata as edit_metadata_mod
+import invarlock.evidence_pack_deployable_validation as deployable_mod
 from invarlock.evidence_pack import (
     EvidencePackStatus,
     validate_manifest,
     verify_evidence_pack,
     verify_manifest_provenance,
 )
-from invarlock.reporting.verify_contract import VerifyExecutionResult, VerifyOutcome
+from invarlock.evidence_pack_contracts.deployable_coverage import (
+    canonical_names_sha256,
+)
 from tests.reporting._support_evidence_pack_paths import (
-    RUNTIME_MANIFEST_FILENAME,
     _build_pack,
     _write_json,
 )
@@ -70,7 +72,9 @@ def test_evidence_pack_verify_rejects_json_out_inside_pack(tmp_path: Path) -> No
     assert "--json-out must point outside the pack directory." in payload["errors"]
 
 
-def test_evidence_pack_verify_strict_rejects_extra_files(tmp_path: Path) -> None:
+def test_evidence_pack_verify_strict_rejects_extra_files_without_bypass(
+    tmp_path: Path,
+) -> None:
     pack_dir = _build_pack(
         tmp_path / "pack",
         report_rel_path="reports/model/clean/noop/evaluation.report.json",
@@ -80,7 +84,7 @@ def test_evidence_pack_verify_strict_rejects_extra_files(tmp_path: Path) -> None
     evidence_pack_mod._verify_signature = lambda pack_dir, strict: ([], [], None)
 
     try:
-        result = verify_evidence_pack(pack_dir, skip_verify=True, strict=True)
+        result = verify_evidence_pack(pack_dir, skip_verify=False, strict=True)
     finally:
         evidence_pack_mod._verify_signature = original_verify_signature
 
@@ -97,6 +101,7 @@ def test_evidence_pack_verify_requires_clean_reports(
     pack_dir = _build_pack(
         tmp_path / "pack",
         report_rel_path="reports/model/errors/noop/evaluation.report.json",
+        scenario_strictness="must_fail",
     )
     monkeypatch.setattr(
         evidence_pack_mod,
@@ -120,20 +125,13 @@ def test_evidence_pack_verify_requires_validation_edit_metadata(
     pack_dir = _build_pack(
         tmp_path / "pack",
         report_rel_path="reports/model/quant_4bit_clean/run_1/evaluation.report.json",
-    )
-    _write_json(
-        pack_dir / "metadata/scenarios.json",
-        {
-            "scenarios": [
-                {
-                    "id": "quant_4bit_clean",
-                    "artifact_class": "validation_subject_checkpoint",
-                    "generation": {
-                        "kind": "edit",
-                        "edit_spec": "quant_rtn:clean:ffn",
-                    },
-                }
-            ]
+        scenario_metadata={
+            "artifact_class": "validation_subject_checkpoint",
+            "generation": {
+                "kind": "edit",
+                "edit_spec": "quant_rtn:clean",
+                "version": "clean",
+            },
         },
     )
     _allow_unsigned_pack(monkeypatch)
@@ -151,31 +149,28 @@ def test_evidence_pack_verify_requires_deployable_sidecars(
     monkeypatch, tmp_path: Path
 ) -> None:
     report_rel = "reports/model/deploy_bnb_8bit_clean/run_1/evaluation.report.json"
-    pack_dir = _build_pack(tmp_path / "pack", report_rel_path=report_rel)
-    _write_json(
-        pack_dir / "metadata/scenarios.json",
-        {
-            "scenarios": [
-                {
-                    "id": "deploy_bnb_8bit_clean",
-                    "artifact_class": "deployable_optimized_subject",
-                    "generation": {
-                        "kind": "deployable_edit",
-                        "edit_spec": "bnb_8bit:clean:ffn",
-                    },
-                }
-            ]
-        },
-    )
-    _write_json(
-        pack_dir / Path(report_rel).parent / "edit_metadata.json",
-        {
-            "schema": "invarlock/evidence-pack-edit-metadata-v1",
+    pack_dir = _build_pack(
+        tmp_path / "pack",
+        report_rel_path=report_rel,
+        scenario_metadata={
             "artifact_class": "deployable_optimized_subject",
-            "edit_type": "bnb_8bit",
             "optimized_deployment_backend": True,
-            "packed_quantized_storage": True,
-            "coverage": {},
+            "generation": {
+                "kind": "deployable_edit",
+                "backend": "bitsandbytes",
+                "edit_spec": "bnb_8bit:8:all",
+                "version": "deployable",
+            },
+        },
+        report_sidecars={
+            "edit_metadata.json": {
+                "schema": "invarlock/evidence-pack-edit-metadata-v1",
+                "artifact_class": "deployable_optimized_subject",
+                "edit_type": "bnb_8bit",
+                "optimized_deployment_backend": True,
+                "packed_quantized_storage": True,
+                "coverage": {},
+            }
         },
     )
     _allow_unsigned_pack(monkeypatch)
@@ -189,461 +184,285 @@ def test_evidence_pack_verify_requires_deployable_sidecars(
     )
 
 
-def test_evidence_pack_metadata_helper_edges(tmp_path: Path) -> None:
-    assert (
-        edit_metadata_mod._infer_scenario_artifact_class(
-            {"artifact_class": "custom_class", "generation": {"kind": "error"}}
+def test_deployable_pack_binding_rejects_subject_backend_and_ledger_tampering(
+    tmp_path: Path,
+) -> None:
+    report_dir = tmp_path / "report"
+    report_dir.mkdir()
+    identity = {
+        "kind": "local_checkpoint_tree",
+        "sha256": "sha256:" + "a" * 64,
+    }
+    baseline_identity = {
+        "kind": "local_checkpoint_tree",
+        "sha256": "sha256:" + "b" * 64,
+    }
+    module_names = ["layer.0", "layer.1"]
+    weight_names = [f"{name}.weight" for name in module_names]
+    logical_coverage = {
+        "basis": "dense_baseline_unique_parameters",
+        "weight_tensor_names": weight_names,
+        "weight_tensor_names_sha256": canonical_names_sha256(weight_names),
+        "weight_tensor_count": 2,
+        "parameter_elements": 8,
+        "total_unique_parameter_elements": 10,
+    }
+    packed_facts = {
+        "quantized_module_count": 2,
+        "quantized_module_names": module_names,
+        "quantized_module_names_sha256": canonical_names_sha256(module_names),
+        "quantized_module_types": ["bitsandbytes.nn.Linear8bitLt"],
+        "packed_weight_storage_elements": 4,
+        "logical_coverage": logical_coverage,
+    }
+    sidecars: dict[str, dict[str, object]] = {}
+    for name in (
+        "backend_inventory.json",
+        "memory_report.json",
+        "load_smoke.json",
+        "inference_smoke.json",
+    ):
+        payload: dict[str, object] = {
+            "artifact_identity": identity,
+            "baseline_identity": baseline_identity,
+            "bits": 8,
+        }
+        if name == "backend_inventory.json":
+            payload["backend"] = "bitsandbytes"
+            payload["quantization_config"] = {
+                "load_in_8bit": True,
+                "load_in_4bit": False,
+            }
+            payload.update(packed_facts)
+        elif name == "load_smoke.json":
+            payload.update(packed_facts)
+        elif name == "inference_smoke.json":
+            payload["logits_sha256"] = "sha256:" + "c" * 64
+            payload["logits_shape"] = [1, 2, 3]
+            payload["all_logits_finite"] = True
+        elif name == "memory_report.json":
+            payload["baseline_reported_bytes"] = 200
+            payload["quantized_reported_bytes"] = 100
+            payload["reduction_bytes"] = 100
+            payload["reduction_ratio"] = 0.5
+            payload["runtime_memory_reduction_observed"] = True
+        _write_json(report_dir / name, payload)
+        sidecars[name] = payload
+    ledger = {
+        name: "sha256:" + hashlib.sha256((report_dir / name).read_bytes()).hexdigest()
+        for name in (
+            "backend_inventory.json",
+            "memory_report.json",
+            "load_smoke.json",
+            "inference_smoke.json",
         )
-        == "custom_class"
+    }
+    validation: dict[str, object] = {
+        "artifact_identity": identity,
+        "baseline_identity": baseline_identity,
+        "backend": "bitsandbytes",
+        "bits": 8,
+        "validation_scope": "structural_only",
+        "runtime_proof_authoritative": False,
+        "sidecar_digests": ledger,
+    }
+    runtime_validation = dict(validation)
+    runtime_validation["validation_scope"] = "runtime_reproof"
+    runtime_validation["runtime_proof_authoritative"] = True
+    runtime_validation["runtime_proof"] = {
+        "artifact_identity": identity,
+        "baseline_identity": baseline_identity,
+        **packed_facts,
+        "logits_sha256": "sha256:" + "c" * 64,
+        "logits_shape": [1, 2, 3],
+        "all_logits_finite": True,
+        "baseline_reported_bytes": 200,
+        "quantized_reported_bytes": 100,
+        "reduction_bytes": 100,
+        "reduction_ratio": 0.5,
+        "runtime_memory_reduction_observed": True,
+    }
+    _write_json(report_dir / "deployable_artifact_validation.json", validation)
+    publication: dict[str, object] = {
+        "artifact_identity": identity,
+        "baseline_identity": baseline_identity,
+        "bits": 8,
+        "validation_scope": "structural_only",
+        "runtime_proof_authoritative": False,
+        "sidecar_digests": ledger,
+        "proof_validation_sha256": "sha256:"
+        + hashlib.sha256(
+            (report_dir / "deployable_artifact_validation.json").read_bytes()
+        ).hexdigest(),
+    }
+    sidecars.update(
+        {
+            "deployable_artifact_validation.json": validation,
+            "runtime_deployability_validation.json": runtime_validation,
+            "publication_commit.json": publication,
+        }
     )
-    assert (
-        edit_metadata_mod._infer_scenario_artifact_class(
-            {"generation": {"kind": "error"}}
-        )
-        == "fault_injection_fixture"
-    )
-    assert (
-        edit_metadata_mod._infer_scenario_artifact_class(
-            {"generation": {"kind": "deployable_edit"}}
-        )
-        == "deployable_optimized_subject"
-    )
-    assert (
-        edit_metadata_mod._infer_scenario_artifact_class(
-            {"generation": {"kind": "edit"}}
-        )
-        == "validation_subject_checkpoint"
-    )
-    assert edit_metadata_mod._infer_scenario_artifact_class({}) == ""
-
-    invalid_pack = tmp_path / "invalid-pack"
-    (invalid_pack / "metadata").mkdir(parents=True)
-    (invalid_pack / "metadata" / "scenarios.json").write_text("{", encoding="utf-8")
-    assert edit_metadata_mod._scenario_index_from_pack(invalid_pack) == {}
-
-    non_list_pack = tmp_path / "non-list-pack"
-    _write_json(non_list_pack / "metadata" / "scenarios.json", {"scenarios": {}})
-    assert edit_metadata_mod._scenario_index_from_pack(non_list_pack) == {}
-
-    mixed_pack = tmp_path / "mixed-pack"
-    _write_json(
-        mixed_pack / "metadata" / "scenarios.json",
-        {"scenarios": ["bad", {"id": ""}, {"id": "ok"}]},
-    )
-    assert edit_metadata_mod._scenario_index_from_pack(mixed_pack) == {
-        "ok": {"id": "ok"}
+    spec = {
+        "generation": {
+            "kind": "deployable_edit",
+            "backend": "bitsandbytes",
+            "edit_spec": "bnb_8bit:8:all",
+        }
+    }
+    metadata = {
+        "backend": "bitsandbytes",
+        "edit_type": "bnb_8bit",
+        "logical_coverage": logical_coverage,
+        "coverage": {
+            "edited_tensors": 2,
+            "edited_params": 8,
+            "total_params": 10,
+            "coverage_ratio": 0.8,
+        },
+    }
+    report = {
+        "meta": {"model_identity": identity},
+        "baseline_ref": {"model_identity": baseline_identity},
     }
 
     assert (
-        edit_metadata_mod._report_scenario_id(
-            mixed_pack,
-            tmp_path / "outside" / "evaluation.report.json",
-        )
-        is None
-    )
-    assert (
-        edit_metadata_mod._report_scenario_id(
-            mixed_pack,
-            mixed_pack / "reports" / "evaluation.report.json",
-        )
-        is None
-    )
-    assert (
-        edit_metadata_mod._report_scenario_id(
-            mixed_pack,
-            mixed_pack
-            / "reports"
-            / "model"
-            / "errors"
-            / "bad"
-            / "evaluation.report.json",
-        )
-        == "bad"
-    )
-
-    assert (
-        edit_metadata_mod._load_json_sidecar(
-            invalid_pack / "metadata" / "scenarios.json"
-        )[0]
-        is None
-    )
-    sidecar = tmp_path / "sidecar.json"
-    sidecar.write_text("[]", encoding="utf-8")
-    assert edit_metadata_mod._load_json_sidecar(sidecar) == (
-        None,
-        "JSON sidecar must contain an object",
-    )
-
-    assert (
-        edit_metadata_mod._expected_edit_type(
-            {"failure_class": "deployable_edit.bnb_8bit"}
-        )
-        == "bnb_8bit"
-    )
-    assert edit_metadata_mod._expected_edit_type({}) == ""
-
-    deployable_errors = edit_metadata_mod._metadata_consistency_errors(
-        scenario_id="deploy",
-        spec={
-            "artifact_class": "deployable_optimized_subject",
-            "generation": {"edit_spec": "bnb_8bit:clean:ffn"},
-        },
-        metadata={
-            "schema": "wrong",
-            "artifact_class": "validation_subject_checkpoint",
-            "edit_type": "other",
-            "optimized_deployment_backend": False,
-            "packed_quantized_storage": False,
-        },
-    )
-    assert any("unrecognized schema" in error for error in deployable_errors)
-    assert any("artifact_class mismatch" in error for error in deployable_errors)
-    assert any("edit_type mismatch" in error for error in deployable_errors)
-    assert any(
-        "optimized_deployment_backend=true" in error for error in deployable_errors
-    )
-    assert any("packed_quantized_storage=true" in error for error in deployable_errors)
-
-    validation_errors = edit_metadata_mod._metadata_consistency_errors(
-        scenario_id="quant",
-        spec={
-            "artifact_class": "validation_subject_checkpoint",
-            "generation": {"edit_spec": "quant_rtn:clean:ffn"},
-        },
-        metadata={
-            "schema": "invarlock/evidence-pack-edit-metadata-v1",
-            "artifact_class": "validation_subject_checkpoint",
-            "edit_type": "quant_rtn",
-            "optimized_deployment_backend": True,
-            "packed_quantized_storage": True,
-        },
-    )
-    assert any(
-        "optimized_deployment_backend=false" in error for error in validation_errors
-    )
-    assert any("packed_quantized_storage=false" in error for error in validation_errors)
-
-    assert (
-        edit_metadata_mod._metadata_consistency_errors(
-            scenario_id="quant",
-            spec={
-                "artifact_class": "validation_subject_checkpoint",
-                "generation": {"edit_spec": "quant_rtn:clean:ffn"},
-            },
-            metadata={
-                "schema": "invarlock/evidence-pack-edit-metadata-v1",
-                "artifact_class": "validation_subject_checkpoint",
-                "edit_type": "quant_rtn",
-                "optimized_deployment_backend": False,
-                "packed_quantized_storage": False,
-            },
+        deployable_mod._deployable_binding_errors(
+            scenario_id="quant_8bit_deployable",
+            spec=spec,
+            report=report,
+            metadata=metadata,
+            report_dir=report_dir,
+            sidecars=sidecars,
         )
         == []
     )
 
-
-def test_evidence_pack_metadata_consistency_helper_edges(tmp_path: Path) -> None:
-    assert edit_metadata_mod._verify_edit_metadata_consistency(tmp_path / "empty") == []
-
-    pack_dir = tmp_path / "pack"
-    _write_json(
-        pack_dir / "metadata" / "scenarios.json",
-        {
-            "scenarios": [
-                {"id": "short", "artifact_class": "validation_subject_checkpoint"},
-                {"id": "fault", "artifact_class": "fault_injection_fixture"},
-                {
-                    "id": "badmeta",
-                    "artifact_class": "validation_subject_checkpoint",
-                    "generation": {"kind": "edit", "edit_spec": "quant_rtn:clean:ffn"},
-                },
-                {
-                    "id": "valid_validation",
-                    "artifact_class": "validation_subject_checkpoint",
-                    "generation": {"kind": "edit", "edit_spec": "quant_rtn:clean:ffn"},
-                },
-                {
-                    "id": "deploy_missing_report",
-                    "artifact_class": "deployable_optimized_subject",
-                    "generation": {
-                        "kind": "deployable_edit",
-                        "edit_spec": "bnb_8bit:clean:ffn",
-                    },
-                },
-                {
-                    "id": "deploy",
-                    "artifact_class": "deployable_optimized_subject",
-                    "generation": {
-                        "kind": "deployable_edit",
-                        "edit_spec": "bnb_8bit:clean:ffn",
-                    },
-                },
-            ]
-        },
-    )
-    (pack_dir / "reports").mkdir()
-    (pack_dir / "reports" / "evaluation.report.json").write_text(
-        "{}",
-        encoding="utf-8",
-    )
-    fault_report = pack_dir / "reports" / "model" / "fault" / "run_1"
-    fault_report.mkdir(parents=True)
-    (fault_report / "evaluation.report.json").write_text("{}", encoding="utf-8")
-
-    badmeta_report = pack_dir / "reports" / "model" / "badmeta" / "run_1"
-    badmeta_report.mkdir(parents=True)
-    (badmeta_report / "evaluation.report.json").write_text("{}", encoding="utf-8")
-    (badmeta_report / "edit_metadata.json").write_text("[", encoding="utf-8")
-
-    valid_report = pack_dir / "reports" / "model" / "valid_validation" / "run_1"
-    valid_report.mkdir(parents=True)
-    (valid_report / "evaluation.report.json").write_text("{}", encoding="utf-8")
-    _write_json(
-        valid_report / "edit_metadata.json",
-        {
-            "schema": "invarlock/evidence-pack-edit-metadata-v1",
-            "artifact_class": "validation_subject_checkpoint",
-            "edit_type": "quant_rtn",
-            "optimized_deployment_backend": False,
-            "packed_quantized_storage": False,
-        },
-    )
-
-    deploy_report = pack_dir / "reports" / "model" / "deploy" / "run_1"
-    deploy_report.mkdir(parents=True)
-    (deploy_report / "evaluation.report.json").write_text("{}", encoding="utf-8")
-    _write_json(
-        deploy_report / "edit_metadata.json",
-        {
-            "schema": "invarlock/evidence-pack-edit-metadata-v1",
-            "artifact_class": "deployable_optimized_subject",
-            "edit_type": "bnb_8bit",
-            "optimized_deployment_backend": True,
-            "packed_quantized_storage": True,
-        },
-    )
-    _write_json(deploy_report / "deployable_artifact_validation.json", {"ok": False})
-    (deploy_report / "backend_inventory.json").write_text("[]", encoding="utf-8")
-    _write_json(deploy_report / "memory_report.json", {"ok": False})
-    _write_json(
-        deploy_report / "load_smoke.json",
-        {"schema": "invarlock/deployable-load-smoke-v1", "ok": False},
-    )
-    _write_json(deploy_report / "inference_smoke.json", {"ok": True})
-
-    errors = edit_metadata_mod._verify_edit_metadata_consistency(pack_dir)
-
-    assert any("badmeta: edit_metadata.json invalid" in error for error in errors)
-    assert any(
-        "deployable sidecar invalid (backend_inventory.json)" in error
-        for error in errors
-    )
-    assert any(
-        "deployable sidecar did not pass: deployable_artifact_validation.json" in error
-        for error in errors
-    )
-    assert any(
-        "deployable sidecar did not pass: memory_report.json" in error
-        for error in errors
-    )
-    assert any(
-        "deployable sidecar schema mismatch (memory_report.json)" in error
-        for error in errors
-    )
-    assert any(
-        "deployable sidecar did not pass: load_smoke.json" in error for error in errors
-    )
-    assert any(
-        "deploy_missing_report: deployable scenario has no deployability report sidecars"
-        in error
-        for error in errors
-    )
-
-
-def test_evidence_pack_metadata_consistency_skips_non_mapping_specs(
-    monkeypatch, tmp_path: Path
-) -> None:
-    pack_dir = tmp_path / "pack"
-    report_dir = pack_dir / "reports" / "model" / "bad" / "run_1"
-    report_dir.mkdir(parents=True)
-    (report_dir / "evaluation.report.json").write_text("{}", encoding="utf-8")
-
-    monkeypatch.setattr(
-        edit_metadata_mod,
-        "_scenario_index_from_pack",
-        lambda _pack_dir: {"bad": "not-a-mapping"},
-        raising=True,
-    )
-
-    assert edit_metadata_mod._verify_edit_metadata_consistency(pack_dir) == []
-
-
-def test_verify_reports_runs_nested_verification_with_assurance_off(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    pack_dir = _build_pack(
-        tmp_path / "pack",
-        report_rel_path="reports/model/clean/noop/evaluation.report.json",
-    )
-    json_out = tmp_path / "verify.json"
-    seen: list[tuple[list[Path], str, str]] = []
-
-    def fake_run_verify_command(
-        reports: list[Path], *, profile: str, report_assurance: str = "report"
-    ) -> VerifyExecutionResult:
-        seen.append((reports, profile, report_assurance))
-        return VerifyExecutionResult(
-            outcome=VerifyOutcome.OK,
-            payload={
-                "ok": True,
-                "profile": profile,
-                "report_assurance": report_assurance,
-                "reports": len(reports),
-            },
-            diagnostics=(),
-        )
-
-    monkeypatch.setattr(
-        evidence_pack_mod,
-        "_run_verify_command",
-        fake_run_verify_command,
-        raising=True,
-    )
-
-    errors, payload = evidence_pack_mod._verify_reports(
-        pack_dir,
-        json_out_path=json_out,
-        profile="dev",
-        report_assurance="off",
-    )
-
-    assert errors == []
-    assert payload == {
-        "ok": True,
-        "profile": "dev",
-        "report_assurance": "off",
-        "reports": 1,
-    }
-    assert json.loads(json_out.read_text(encoding="utf-8")) == payload
-    assert seen[0][1:] == ("dev", "off")
-
-
-def test_evidence_pack_invalid_report_assurance_modes(tmp_path: Path) -> None:
-    final_verdict = tmp_path / "final.json"
-    report_path = tmp_path / "report.json"
-    _write_json(final_verdict, {"verdict": "PASS"})
-    _write_json(report_path, {"ok": True})
-
-    result = evidence_pack_mod.build_evidence_pack(
-        tmp_path / "out",
-        final_verdict_path=final_verdict,
-        report_paths=[report_path],
-        report_assurance="weak",
-    )
-    assert result.status == EvidencePackStatus.USAGE
-    assert any(
-        "Report assurance must be" in error for error in result.payload["errors"]
-    )
-
-    verify_result = verify_evidence_pack(
-        tmp_path / "missing",
-        report_assurance="weak",
-        skip_verify=True,
-    )
-    assert verify_result.status == EvidencePackStatus.USAGE
-    assert any(
-        "--report-assurance must be" in error
-        for error in verify_result.payload["errors"]
-    )
-
-
-def test_release_review_requires_explicit_profile_and_pass_verdict(
-    tmp_path: Path,
-) -> None:
-    final_verdict = tmp_path / "final.json"
-    report_path = tmp_path / "report.json"
-    runtime_manifest = tmp_path / RUNTIME_MANIFEST_FILENAME
-    _write_json(final_verdict, {"verdict": "WARN"})
-    _write_json(report_path, {"ok": True})
-    _write_json(runtime_manifest, {"ok": True})
-
-    result = evidence_pack_mod.build_evidence_pack(
-        tmp_path / "out-release-review",
-        final_verdict_path=final_verdict,
-        report_paths=[report_path],
-        profile="",
-        report_assurance="strict",
-        signing_key_path=tmp_path / "signing.key",
-        release_review=True,
-    )
-
-    assert result.status == EvidencePackStatus.USAGE
-    assert any("explicit profile" in error for error in result.payload["errors"])
-    assert any("final verdict PASS" in error for error in result.payload["errors"])
-
-
-def test_release_review_rejects_invalid_final_verdict_json(tmp_path: Path) -> None:
-    final_verdict = tmp_path / "final.json"
-    report_path = tmp_path / "report.json"
-    signing_key = tmp_path / "signing.key"
-    final_verdict.write_text("{", encoding="utf-8")
-    _write_json(report_path, {"ok": True})
-    evidence_pack_mod._generate_signing_keypair(
-        signing_key,
-        public_key_path=signing_key.with_suffix(".pub"),
-    )
-
-    result = evidence_pack_mod.build_evidence_pack(
-        tmp_path / "out-release-review-invalid-json",
-        final_verdict_path=final_verdict,
-        report_paths=[report_path],
-        profile="ci",
-        report_assurance="strict",
-        signing_key_path=signing_key,
-        release_review=True,
-    )
-
-    assert result.status == EvidencePackStatus.USAGE
-    assert any(
-        "Final verdict is not valid JSON" in error for error in result.payload["errors"]
-    )
-
-
-def test_release_review_build_passes_hardened_preflight(
-    monkeypatch, tmp_path: Path
-) -> None:
-    final_verdict = tmp_path / "final.json"
-    report_path = tmp_path / "report.json"
-    runtime_manifest = tmp_path / RUNTIME_MANIFEST_FILENAME
-    signing_key = tmp_path / "signing.key"
-    _write_json(final_verdict, {"verdict": "PASS"})
-    _write_json(report_path, {"ok": True})
-    _write_json(runtime_manifest, {"ok": True})
-    evidence_pack_mod._generate_signing_keypair(
-        signing_key,
-        public_key_path=signing_key.with_suffix(".pub"),
-    )
-    monkeypatch.setattr(
-        evidence_pack_mod,
-        "_run_verify_command",
-        lambda reports, profile, report_assurance="report": VerifyExecutionResult(
-            outcome=VerifyOutcome.OK,
-            payload={"ok": True},
-            diagnostics=(),
+    adversarial_cases = (
+        (
+            lambda s, _spec, _report, _metadata: s["publication_commit.json"].update(
+                artifact_identity={
+                    "kind": "local_checkpoint_tree",
+                    "sha256": "sha256:" + "0" * 64,
+                }
+            ),
+            "publication artifact identity mismatch",
         ),
-        raising=True,
+        (
+            lambda s, _spec, _report, _metadata: s[
+                "deployable_artifact_validation.json"
+            ].update(
+                artifact_identity={
+                    "kind": "local_checkpoint_tree",
+                    "sha256": "sha256:" + "0" * 64,
+                }
+            ),
+            "generated and runtime deployable artifact identities disagree",
+        ),
+        (
+            lambda _s, spec, _report, _metadata: spec.update(generation={}),
+            "scenario backend missing",
+        ),
+        (
+            lambda _s, _spec, _report, metadata: metadata.update(edit_type="bnb_4bit"),
+            "edit type does not match scenario",
+        ),
+        (
+            lambda _s, spec, _report, metadata: (
+                spec["generation"].update(edit_spec="unsupported"),
+                metadata.update(edit_type="unsupported"),
+            ),
+            "edit type has no supported bitwidth",
+        ),
+        (
+            lambda s, _spec, _report, _metadata: s[
+                "runtime_deployability_validation.json"
+            ]["runtime_proof"].update(quantized_module_types=["different"]),
+            "runtime module types disagree",
+        ),
+        (
+            lambda s, _spec, _report, _metadata: s[
+                "runtime_deployability_validation.json"
+            ]["runtime_proof"].update(quantized_module_count=1),
+            "quantized module count does not match module names",
+        ),
+        (
+            lambda s, _spec, _report, _metadata: s[
+                "runtime_deployability_validation.json"
+            ]["runtime_proof"].update(packed_weight_storage_elements=99),
+            "packed_weight_storage_elements disagrees",
+        ),
+        (
+            lambda s, _spec, _report, _metadata: s["backend_inventory.json"].update(
+                quantized_module_names_sha256="sha256:" + "0" * 64
+            ),
+            "quantized_module_names_sha256 disagrees",
+        ),
+        (
+            lambda _s, _spec, _report, metadata: metadata["coverage"].update(
+                total_params=11, coverage_ratio=8 / 11
+            ),
+            "metadata coverage is not canonical",
+        ),
+        (
+            lambda _s, _spec, _report, metadata: metadata["coverage"].update(
+                coverage_ratio=0.5
+            ),
+            "metadata coverage is not canonical",
+        ),
+        (
+            lambda s, _spec, _report, _metadata: s[
+                "runtime_deployability_validation.json"
+            ]["runtime_proof"].update(logits_sha256="sha256:" + "0" * 64),
+            "runtime inference disagrees on logits_sha256",
+        ),
+        (
+            lambda s, _spec, _report, _metadata: s[
+                "runtime_deployability_validation.json"
+            ]["runtime_proof"].update(reduction_ratio=0.25),
+            "runtime memory disagrees on reduction_ratio",
+        ),
     )
+    for mutate, fragment in adversarial_cases:
+        case_sidecars = deepcopy(sidecars)
+        case_spec = deepcopy(spec)
+        case_report = deepcopy(report)
+        case_metadata = deepcopy(metadata)
+        mutate(case_sidecars, case_spec, case_report, case_metadata)
+        case_errors = deployable_mod._deployable_binding_errors(
+            scenario_id="quant_8bit_deployable",
+            spec=case_spec,
+            report=case_report,
+            metadata=case_metadata,
+            report_dir=report_dir,
+            sidecars=case_sidecars,
+        )
+        assert any(fragment in error for error in case_errors), (fragment, case_errors)
 
-    result = evidence_pack_mod.build_evidence_pack(
-        tmp_path / "out-release-review-ok",
-        final_verdict_path=final_verdict,
-        report_paths=[report_path],
-        profile="ci",
-        report_assurance="strict",
-        signing_key_path=signing_key,
-        release_review=True,
+    report["meta"]["model_identity"] = {
+        **identity,
+        "sha256": "sha256:" + "c" * 64,
+    }
+    sidecars["backend_inventory.json"]["backend"] = "fabricated"
+    sidecars["inference_smoke.json"]["bits"] = 4
+    sidecars["runtime_deployability_validation.json"]["sidecar_digests"] = {}
+    sidecars["runtime_deployability_validation.json"]["runtime_proof"][
+        "quantized_module_count"
+    ] = 99
+    sidecars["memory_report.json"]["baseline_identity"] = {
+        **baseline_identity,
+        "sha256": "sha256:" + "d" * 64,
+    }
+    errors = deployable_mod._deployable_binding_errors(
+        scenario_id="quant_8bit_deployable",
+        spec=spec,
+        report=report,
+        metadata=metadata,
+        report_dir=report_dir,
+        sidecars=sidecars,
     )
-
-    assert result.status == EvidencePackStatus.OK
-    assert result.payload["release_review"] is True
+    assert any("evaluation subject identity" in error for error in errors)
+    assert any("inventory backend mismatch" in error for error in errors)
+    assert any("bitwidth mismatch" in error for error in errors)
+    assert any("runtime validation sidecar digest ledger" in error for error in errors)
+    assert any("runtime module count" in error for error in errors)
+    assert any("baseline identity mismatch" in error for error in errors)

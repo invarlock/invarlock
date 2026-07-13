@@ -82,88 +82,123 @@ class TestEvaluationReportHelpers:
         baseline_windows = {"window_ids": [2], "logloss": [0.3]}
         assert _pair_logloss_windows(run_windows, baseline_windows) is None
 
-    def test_prepare_guard_overhead_with_reports(self):
-        bare = {"metrics": {"primary_metric": {"kind": "ppl_causal", "final": 100.0}}}
+    def test_prepare_guard_metric_impact_with_reports(self):
+        bare = {
+            "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 100.0}},
+            "evaluation_windows": {
+                "final": {
+                    "window_ids": ["shared"],
+                    "logloss": [math.log(100.0)],
+                    "token_counts": [1],
+                }
+            },
+        }
         guarded = {
-            "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 101.0}}
+            "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 101.0}},
+            "evaluation_windows": {
+                "final": {
+                    "window_ids": ["shared"],
+                    "logloss": [math.log(101.0)],
+                    "token_counts": [1],
+                }
+            },
         }
         payload = {
             "bare_report": bare,
             "guarded_report": guarded,
-            "overhead_threshold": 0.05,
+            "degradation_limit": 0.05,
             "source": "regression",
         }
-        section, passed = _prepare_guard_overhead_section(payload)
+        section, passed = _prepare_guard_metric_impact_section(payload)
         assert passed is True
         assert section["evaluated"] is True
         assert section["source"] == "regression"
-        assert section["overhead_percent"] == pytest.approx(1.0)
+        assert section["display_value"] == pytest.approx(1.0)
 
-    def test_prepare_guard_overhead_ratio_fallback(self):
+    def test_prepare_guard_metric_degradation_without_contract_fails_closed(self):
         raw = {
-            "bare_ppl": 100,
-            "guarded_ppl": 103,
-            "overhead_threshold": 0.02,
+            "bare_value": 100,
+            "guarded_value": 103,
+            "degradation_limit": 0.02,
         }
-        section, passed = _prepare_guard_overhead_section(raw)
+        section, passed = _prepare_guard_metric_impact_section(raw)
         assert passed is False
-        assert section["overhead_ratio"] == pytest.approx(1.03)
-        assert section["threshold_percent"] == pytest.approx(2.0)
+        assert section["evaluated"] is False
+        assert "degradation" not in section
+        assert section["diagnostics"]
 
-    def test_prepare_guard_overhead_missing_ratio_records_error(self):
-        raw = {"bare_ppl": "nan", "guarded_ppl": None}
-        section, passed = _prepare_guard_overhead_section(raw)
-        # Missing/invalid inputs: mark not evaluated and soft-pass
-        assert passed is True
+    def test_prepare_guard_metric_impact_missing_degradation_records_error(self):
+        raw = {"bare_value": "nan", "guarded_value": None}
+        section, passed = _prepare_guard_metric_impact_section(raw)
+        # Missing/invalid inputs are not evaluated and fail closed.
+        assert passed is False
         assert section["diagnostics"]
         assert section["diagnostics"][0]["severity"] == "warning"
         assert section["evaluated"] is False
 
-    def test_prepare_guard_overhead_structured_reports(self):
+    def test_prepare_guard_metric_impact_structured_reports(self):
         bare_report = {
-            "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 98.0}}
+            "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 98.0}},
+            "evaluation_windows": {
+                "final": {
+                    "window_ids": ["shared"],
+                    "logloss": [math.log(98.0)],
+                    "token_counts": [1],
+                }
+            },
         }
         guarded_report = {
-            "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 99.0}}
+            "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 99.0}},
+            "evaluation_windows": {
+                "final": {
+                    "window_ids": ["shared"],
+                    "logloss": [math.log(99.0)],
+                    "token_counts": [1],
+                }
+            },
         }
 
         class FakeResult:
             def __init__(self):
                 self.metrics = {
-                    "overhead_ratio": 1.015,
-                    "overhead_percent": 1.5,
-                    "bare_ppl": 98.0,
-                    "guarded_ppl": 99.0,
+                    "metric_kind": "ppl_causal",
+                    "direction": "lower",
+                    "degradation_basis": "relative_increase",
+                    "degradation": (99.0 / 98.0) - 1.0,
+                    "display_value": ((99.0 / 98.0) - 1.0) * 100.0,
+                    "display_unit": "percent",
+                    "bare_value": 98.0,
+                    "guarded_value": 99.0,
                 }
                 self.diagnostics = [
                     {
-                        "kind": "guard_overhead_info",
+                        "kind": "guard_metric_impact_info",
                         "severity": "info",
                         "message": "ok",
                         "details": {},
                     }
                 ]
-                self.checks = {"ppl": True}
+                self.checks = {"guard_metric_impact": True}
                 self.passed = True
 
         with patch(
-            "invarlock.reporting.validate.validate_guard_overhead",
+            "invarlock.reporting.validate.validate_guard_metric_impact",
             return_value=FakeResult(),
         ):
-            section, passed = _prepare_guard_overhead_section(
+            section, passed = _prepare_guard_metric_impact_section(
                 {
                     "bare_report": bare_report,
                     "guarded_report": guarded_report,
-                    "overhead_threshold": 0.02,
+                    "degradation_limit": 0.02,
                     "source": "structured",
                 }
             )
 
         assert passed is True
         assert section["evaluated"] is True
-        assert section["overhead_ratio"] == pytest.approx(1.015)
+        assert section["degradation"] == pytest.approx((99.0 / 98.0) - 1.0)
         assert section["source"] == "structured"
-        assert section["checks"]["ppl"] is True
+        assert section["checks"]["guard_metric_impact"] is True
         assert section["diagnostics"][0]["message"] == "ok"
 
     def test_pair_logloss_windows_invalid_inputs(self):
@@ -231,30 +266,28 @@ class TestEvaluationReportHelpers:
         ]
 
     @pytest.mark.parametrize(
-        ("meta", "expected"),
+        "meta",
         [
-            ({"auto": {"tier": "balanced"}}, "balanced"),
-            ({"policy_tier": "aggressive"}, "aggressive"),
-            ({}, "balanced"),
+            {"policy_tier": "aggressive"},
+            {},
         ],
     )
-    def test_resolve_policy_tier_variants(self, meta, expected):
+    def test_resolve_policy_tier_rejects_noncanonical_metadata(self, meta):
         report = {"meta": meta}
-        assert _resolve_policy_tier(report) == expected
+        with pytest.raises(ValueError, match="meta.auto.tier"):
+            _resolve_policy_tier(report)
 
-    def test_resolve_policy_tier_from_context(self):
+    def test_resolve_policy_tier_rejects_context_fallback(self):
         report = {
             "meta": {},
             "context": {"auto": {"tier": "conservative"}},
         }
-        assert _resolve_policy_tier(report) == "conservative"
+        with pytest.raises(ValueError, match="meta.auto.tier"):
+            _resolve_policy_tier(report)
 
-    def test_normalize_baseline_handles_baseline_v1(self):
-        baseline = {
-            "schema_version": "baseline-v1",
-            "meta": {"model_id": "m", "commit_sha": "sha"},
-            "metrics": {"ppl_final": 11.0, "ppl_preview": 10.5},
-        }
+    def test_normalize_baseline_handles_canonical_run_report(self):
+        baseline = create_mock_baseline(model_id="m", ppl_final=11.0)
+        baseline["metrics"]["ppl_preview"] = 10.5
         normalized = _normalize_baseline(baseline)
         assert normalized["model_id"] == "m"
         assert normalized["ppl_final"] == 11.0

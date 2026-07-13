@@ -6,6 +6,10 @@ from invarlock.reporting.report_make import (
     REPORT_SCHEMA_VERSION,
     make_report,
 )
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
 
 
 def _mock_report_with_primary_metric() -> dict[str, Any]:
@@ -22,28 +26,42 @@ def _mock_report_with_primary_metric() -> dict[str, Any]:
         "token_counts": [100, 200],
     }
 
-    report = {
-        "meta": {
-            "model_id": "m",
-            "adapter": "hf_causal",
-            "device": "cpu",
-            "seed": 42,
-            "seeds": {"python": 42, "numpy": 42, "torch": 42},
-        },
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": math.exp((1.0 * 100 + 1.1 * 200) / 300),
-                "final": math.exp((1.05 * 100 + 1.15 * 200) / 300),
-                "ratio_vs_baseline": 1.0,
+    report = canonical_run_report(
+        {
+            "meta": {
+                "model_id": "m",
+                "adapter": "hf_causal",
+                "auto": {"tier": "balanced"},
+                "device": "cpu",
+                "seed": 42,
+                "seeds": {"python": 42, "numpy": 42, "torch": 42},
             },
-            "bootstrap": {"replicates": 150, "alpha": 0.05, "method": "percentile"},
-        },
-        "evaluation_windows": {"preview": preview, "final": final},
-        "edit": {"name": "structured"},
-        "artifacts": {"events_path": "", "logs_path": ""},
-        "guards": [],
-    }
+            "context": {"profile": "dev"},
+            "data": {
+                "dataset": "dummy",
+                "split": "validation",
+                "seq_len": 8,
+                "stride": 4,
+                "preview_n": 2,
+                "final_n": 2,
+            },
+            "metrics": {
+                "primary_metric": {
+                    "kind": "ppl_causal",
+                    "preview": math.exp((1.0 * 100 + 1.1 * 200) / 300),
+                    "final": math.exp((1.05 * 100 + 1.15 * 200) / 300),
+                    "ratio_vs_baseline": math.exp(
+                        ((1.05 * 100 + 1.15 * 200) - (1.0 * 100 + 1.1 * 200)) / 300
+                    ),
+                },
+                "bootstrap": {"replicates": 150, "alpha": 0.05, "method": "percentile"},
+            },
+            "evaluation_windows": {"preview": preview, "final": final},
+            "edit": {"name": "structured"},
+            "artifacts": {"events_path": "", "logs_path": ""},
+            "guards": [],
+        }
+    )
     return report
 
 
@@ -59,18 +77,37 @@ def _mock_baseline() -> dict[str, Any]:
         "logloss": [1.0, 1.1],
         "token_counts": [100, 200],
     }
-    return {
-        "run_id": "baseline123",
-        "model_id": "m",
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "final": math.exp((1.0 * 100 + 1.1 * 200) / 300),
+    return canonical_baseline(
+        {
+            "run_id": "baseline123",
+            "model_id": "m",
+            "meta": {
+                "model_id": "m",
+                "adapter": "hf_causal",
+                "auto": {"tier": "balanced"},
             },
-            "bootstrap": {"replicates": 150, "alpha": 0.05, "method": "percentile"},
-        },
-        "evaluation_windows": {"preview": preview, "final": final},
-    }
+            "context": {"profile": "dev"},
+            "data": {
+                "dataset": "dummy",
+                "split": "validation",
+                "seq_len": 8,
+                "stride": 4,
+                "preview_n": 2,
+                "final_n": 2,
+            },
+            "edit": {"name": "noop"},
+            "guards": [],
+            "metrics": {
+                "primary_metric": {
+                    "kind": "ppl_causal",
+                    "preview": math.exp((1.0 * 100 + 1.1 * 200) / 300),
+                    "final": math.exp((1.0 * 100 + 1.1 * 200) / 300),
+                },
+                "bootstrap": {"replicates": 150, "alpha": 0.05, "method": "percentile"},
+            },
+            "evaluation_windows": {"preview": preview, "final": final},
+        }
+    )
 
 
 def test_schema_version_bumped_and_ci_arrays_guarded():
@@ -97,13 +134,12 @@ def test_system_overhead_has_pattern_properties():
     assert any("latency_ms_" in p for p in pats)
     assert any("throughput_" in p for p in pats)
     for spec in pats.values():
-        # Support both historical numeric entries and structured overhead entries.
-        if spec.get("type") == "number":
-            continue
-        one_of = spec.get("oneOf")
-        assert isinstance(one_of, list)
-        assert any(isinstance(x, dict) and x.get("type") == "number" for x in one_of)
-        assert any(isinstance(x, dict) and x.get("type") == "object" for x in one_of)
+        assert spec.get("type") == "object"
+        assert spec.get("required") == ["edited"]
+        assert spec.get("additionalProperties") is False
+        assert {"edited", "baseline", "delta", "ratio"} == set(
+            spec.get("properties", {})
+        )
 
 
 def test_dataset_windows_seed_allows_null():

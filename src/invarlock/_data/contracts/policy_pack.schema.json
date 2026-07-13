@@ -15,8 +15,7 @@
       "const": "policy-pack-v1"
     },
     "tier": {
-      "type": "string",
-      "minLength": 1
+      "enum": ["aggressive", "balanced", "conservative"]
     },
     "resolved_policy": {
       "type": "object"
@@ -24,22 +23,30 @@
     "overrides": {
       "type": "array",
       "items": {
-        "type": "object"
+        "type": "object",
+        "required": ["path", "value"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$"
+          },
+          "value": {}
+        },
+        "additionalProperties": false
       }
     },
     "policy_digest": {
       "type": "string",
-      "minLength": 16,
-      "maxLength": 16
+      "pattern": "^sha256:[0-9a-f]{64}$"
     },
     "compatibility": {
       "type": "object",
-      "required": [
-        "support_tiers"
-      ],
+      "required": ["support_tiers"],
       "properties": {
         "support_tiers": {
           "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
           "items": {
             "enum": [
               "published_basis",
@@ -50,43 +57,52 @@
         },
         "adapter_families": {
           "type": "array",
-          "items": {
-            "type": "string"
-          }
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
         },
         "runtime_lanes": {
           "type": "array",
-          "items": {
-            "type": "string"
-          }
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "dataset_identity": {
+          "type": "object",
+          "required": [
+            "provider",
+            "dataset_name",
+            "config_name",
+            "revision",
+            "split"
+          ],
+          "properties": {
+            "provider": {"type": "string", "minLength": 1},
+            "dataset_name": {"type": ["string", "null"]},
+            "config_name": {"type": ["string", "null"]},
+            "revision": {"type": ["string", "null"]},
+            "split": {"type": "string", "minLength": 1}
+          },
+          "additionalProperties": false
         }
       },
-      "additionalProperties": true
+      "additionalProperties": false
     },
     "approval": {
       "type": "object",
+      "minProperties": 1,
       "properties": {
-        "owner": {
-          "type": "string"
-        },
-        "change_ticket": {
-          "type": "string"
-        },
-        "rationale": {
-          "type": "string"
-        },
-        "effective_date": {
-          "type": "string"
-        },
-        "signature": {
-          "type": "string"
-        }
+        "owner": {"type": "string", "minLength": 1},
+        "change_ticket": {"type": "string", "minLength": 1},
+        "rationale": {"type": "string", "minLength": 1},
+        "effective_date": {"type": "string", "minLength": 1},
+        "signature": {"type": "string", "minLength": 1}
       },
-      "additionalProperties": true
+      "additionalProperties": false
     },
     "metadata": {
       "type": "object"
     }
   },
-  "additionalProperties": true
+  "additionalProperties": false
 }

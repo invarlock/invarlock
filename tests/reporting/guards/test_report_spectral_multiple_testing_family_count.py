@@ -1,13 +1,27 @@
+from copy import deepcopy
 from unittest.mock import patch
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
-def test_spectral_multiple_testing_family_count_computed_when_missing_m():
-    # Minimal report with spectral guard policy providing family_caps and multiple_testing without m
+def test_spectral_multiple_testing_family_count_uses_applied_policy_inventory():
     report = {
-        "meta": {"model_id": "m", "seed": 1, "auto": {"tier": "balanced"}},
-        "metrics": {"ppl_preview": 10.0, "ppl_final": 10.0},
+        "meta": {
+            "model_id": "m",
+            "adapter": "hf_causal",
+            "seed": 1,
+            "auto": {"tier": "balanced"},
+        },
+        "context": {"profile": "dev"},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+            }
+        },
         "data": {
             "dataset": "d",
             "split": "val",
@@ -19,6 +33,7 @@ def test_spectral_multiple_testing_family_count_computed_when_missing_m():
         "guards": [
             {
                 "name": "spectral",
+                "passed": True,
                 "policy": {
                     "family_caps": {"ffn": {"kappa": 2.5}, "attn": {"kappa": 2.8}},
                     "multiple_testing": {"method": "bh", "alpha": 0.05},  # m omitted
@@ -38,11 +53,13 @@ def test_spectral_multiple_testing_family_count_computed_when_missing_m():
         },
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    baseline = {
-        "run_id": "b",
-        "model_id": "m",
-        "ppl_final": 10.0,
-        "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
+    baseline = deepcopy(report)
+    baseline["run_id"] = "b"
+    baseline["edit"]["name"] = "noop"
+    baseline["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": 10.0,
+        "final": 10.0,
     }
     with patch(
         "invarlock.reporting.report_normalization.validate_report", return_value=True
@@ -50,5 +67,5 @@ def test_spectral_multiple_testing_family_count_computed_when_missing_m():
         cert = make_report(report, baseline)
 
     spectral = cert.get("spectral", {})
-    # Expect the helper to compute m from families_present (from family_caps keys)
-    assert spectral.get("bh_family_count") == 2
+    # The exact runtime receipt expands the complete packaged family inventory.
+    assert spectral.get("bh_family_count") == 4

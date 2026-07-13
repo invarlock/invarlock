@@ -38,7 +38,7 @@ def _measurement_contract_digest(contract: Any) -> str | None:
     if not isinstance(contract, dict) or not contract:
         return None
     try:
-        canonical = json.dumps(contract, sort_keys=True, default=str)
+        canonical = json.dumps(contract, sort_keys=True, default=str, allow_nan=False)
     except _GUARD_COMMON_EXCEPTIONS:
         return None
     return hashlib.sha256(canonical.encode()).hexdigest()[:16]

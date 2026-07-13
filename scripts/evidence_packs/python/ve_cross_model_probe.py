@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import argparse
 import gc
+import hashlib
 import json
 import math
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +13,7 @@ import torch
 from transformers import AutoModelForCausalLM
 
 from invarlock.adapters.hf_causal import HF_Causal_Adapter
+from invarlock.evidence_pack_contracts.probes import build_probe_binding
 from invarlock.guards.variance import VarianceGuard
 
 try:
@@ -174,24 +175,14 @@ def _model_cleanup(model: Any) -> None:
         torch.cuda.empty_cache()
 
 
-def _top_scales(scales: dict[str, Any], *, limit: int = 6) -> list[dict[str, Any]]:
-    items: list[tuple[str, float]] = []
-    for name, value in scales.items():
-        vv = _safe_float(value)
-        if vv is None:
-            continue
-        items.append((str(name), vv))
-    items.sort(key=lambda item: abs(item[1] - 1.0), reverse=True)
-    return [{"module": name, "scale": scale} for name, scale in items[:limit]]
-
-
 def run_probe(args: argparse.Namespace) -> dict[str, Any]:
-    baseline_model_path = Path(args.baseline_model).resolve()
     subject_model_path = Path(args.subject_model).resolve()
     baseline_report_path = Path(args.baseline_report).resolve()
+    report_path = Path(args.report).resolve()
     output_path = Path(args.out).resolve()
 
     baseline_report = _load_json(baseline_report_path)
+    report = _load_json(report_path)
     batches = _extract_windows(
         baseline_report, max_windows=max(0, int(args.max_windows_per_split))
     )
@@ -207,28 +198,16 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     guard = VarianceGuard(policy)
     adapter = HF_Causal_Adapter()
 
-    prep_result: dict[str, Any] = {}
-    target_resolution: Any = None
-    target_module_names: Any = None
-
     subject_model = _load_model(
         subject_model_path, dtype=dtype, trust_remote_code=trust_remote_code
     )
     try:
-        prep_result = guard.prepare(
-            subject_model, adapter=adapter, calib=batches, policy=policy
-        )
-        target_resolution = guard._stats.get("target_resolution")  # noqa: SLF001
-        target_module_names = guard._stats.get("target_module_names")  # noqa: SLF001
-        proposed_scales_pre = guard._stats.get("proposed_scales_pre_edit", {})  # noqa: SLF001
+        guard.prepare(subject_model, adapter=adapter, calib=batches, policy=policy)
         proposed_scales = len(guard._scales)  # noqa: SLF001
         ppl_no_ve = guard._ppl_no_ve  # noqa: SLF001
         ppl_with_ve = guard._ppl_with_ve  # noqa: SLF001
         ab_gain = guard._ab_gain  # noqa: SLF001
         ratio_ci = guard._ratio_ci  # noqa: SLF001
-        predictive_gate = guard._predictive_gate_state  # noqa: SLF001
-        calibration = guard._calibration_stats  # noqa: SLF001
-
         would_enable = False
         try:
             would_enable, gate_reason = guard._evaluate_ab_gate()  # noqa: SLF001
@@ -264,34 +243,31 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     signal = not reasons
 
     payload: dict[str, Any] = {
+        "schema": "invarlock/ve-probe-v1",
         "probe": "ve_probe_v1",
-        "timestamp_utc": datetime.now(UTC).isoformat(),
-        "baseline_model": str(baseline_model_path),
-        "subject_model": str(subject_model_path),
-        "baseline_report": str(baseline_report_path),
-        "profile": str(args.profile),
-        "tier": str(args.tier),
-        "calibration_windows_loaded": len(batches),
-        "prepare": prep_result,
-        "target_resolution": target_resolution,
-        "target_module_names": target_module_names,
-        "policy": policy,
         "signal": signal,
         "signal_reasons": reasons,
         "would_enable": bool(would_enable),
         "gate_reason": str(gate_reason),
         "proposed_scales": int(proposed_scales),
-        "proposed_scales_pre_edit": proposed_scales_pre,
-        "top_scales_pre_edit": _top_scales(
-            proposed_scales_pre if isinstance(proposed_scales_pre, dict) else {}
-        ),
         "ppl_no_ve": ppl_no_ve_f,
         "ppl_with_ve": ppl_with_ve_f,
         "abs_improvement": abs_improvement,
         "ab_gain": ab_gain_f,
         "ratio_ci": ratio_ci,
-        "predictive_gate": predictive_gate,
-        "calibration": calibration,
+        "predictive_gate": {
+            "would_enable": bool(would_enable),
+            "reason": str(gate_reason),
+        },
+        "calibration": {
+            "windows": int(args.calibration_windows),
+            "min_coverage": int(args.min_coverage),
+            "tier": str(args.tier),
+            "profile": str(args.profile),
+        },
+        "binding": build_probe_binding(
+            report, "sha256:" + hashlib.sha256(report_path.read_bytes()).hexdigest()
+        ),
     }
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -314,6 +290,7 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Path to baseline report.json containing evaluation_windows",
     )
+    parser.add_argument("--report", required=True, help="Adjacent canonical report")
     parser.add_argument("--out", required=True, help="Output JSON path (ve_probe.json)")
     parser.add_argument("--tier", default="balanced")
     parser.add_argument("--profile", default="ci")

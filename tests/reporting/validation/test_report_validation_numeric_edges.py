@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_validation import compute_validation_flags
+from invarlock.reporting.validation.report import compute_validation_flags
 
 
 def test_compute_validation_flags_rejects_bool_ratio_for_ppl_metric() -> None:
@@ -21,7 +21,11 @@ def test_compute_validation_flags_rejects_bool_sample_size_for_accuracy() -> Non
         spectral={"caps_applied": 0, "max_caps": 5},
         rmt={"stable": True},
         invariants={"status": "pass"},
-        primary_metric={"kind": "accuracy", "ratio_vs_baseline": 0.0, "n_final": True},
+        primary_metric={
+            "kind": "accuracy",
+            "delta_vs_baseline_pp": 0.0,
+            "n_final": True,
+        },
         get_tier_policies_fn=lambda: {
             "balanced": {
                 "metrics": {"accuracy": {"delta_min_pp": -1.0, "min_examples": 1}}

@@ -1,7 +1,10 @@
+from copy import deepcopy
 from unittest.mock import patch
 
 from invarlock.reporting.policy_utils import _compute_variance_policy_digest
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def test_variance_policy_digest_fallback_merges_guard_policy_keys():
@@ -18,8 +21,20 @@ def test_variance_policy_digest_fallback_merges_guard_policy_keys():
         "max_adjusted_modules": 1,
     }
     report = {
-        "meta": {"model_id": "m", "seed": 7, "auto": {"tier": "balanced"}},
-        "metrics": {"ppl_preview": 10.0, "ppl_final": 10.0},
+        "meta": {
+            "model_id": "m",
+            "adapter": "hf_causal",
+            "seed": 7,
+            "auto": {"tier": "balanced"},
+        },
+        "context": {"profile": "dev"},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+            }
+        },
         "data": {
             "dataset": "dummy",
             "split": "val",
@@ -31,6 +46,7 @@ def test_variance_policy_digest_fallback_merges_guard_policy_keys():
         "guards": [
             {
                 "name": "variance",
+                "passed": True,
                 "policy": dict(variance_policy),
                 "metrics": {"ve_enabled": True},
             },
@@ -47,11 +63,13 @@ def test_variance_policy_digest_fallback_merges_guard_policy_keys():
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
         "plugins": {"adapter": {}, "edit": {}, "guards": []},
     }
-    baseline = {
-        "run_id": "b",
-        "model_id": "m",
-        "ppl_final": 10.0,
-        "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
+    baseline = deepcopy(report)
+    baseline["run_id"] = "b"
+    baseline["edit"]["name"] = "noop"
+    baseline["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": 10.0,
+        "final": 10.0,
     }
 
     with patch(

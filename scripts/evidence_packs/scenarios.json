@@ -15,50 +15,28 @@
   },
   "scenarios": [
     {
-      "id": "quant_4bit_clean",
+      "id": "quant_8bit_deployable",
       "suites": [
         "subset",
         "showcase",
         "workshop3",
         "full"
       ],
-      "category": "clean",
-      "failure_class": "common_edit.quant_rtn",
-      "strictness": "must_pass",
-      "intent": "clean_control",
+      "category": "deployable",
+      "failure_class": "common_edit.bitsandbytes_int8",
+      "strictness": "informational",
+      "intent": "production_artifact_assurance",
       "primary_guard": "primary_metric",
       "generation": {
-        "kind": "edit",
-        "edit_spec": "quant_rtn:clean:ffn",
-        "version": "clean"
+        "kind": "deployable_edit",
+        "backend": "bitsandbytes",
+        "edit_spec": "bnb_8bit:8:all",
+        "version": "deployable"
       },
-      "artifact_class": "validation_subject_checkpoint",
+      "runnable": true,
+      "artifact_class": "deployable_optimized_subject",
       "deployable_as_hf_checkpoint": true,
-      "optimized_deployment_backend": false,
-      "contains_model_weights_in_pack": false,
-      "run_directory_contains_edit_artifacts": true
-    },
-    {
-      "id": "fp8_e5m2_clean",
-      "suites": [
-        "subset",
-        "showcase",
-        "workshop3",
-        "full"
-      ],
-      "category": "clean",
-      "failure_class": "common_edit.fp8_quant",
-      "strictness": "must_pass",
-      "intent": "clean_control",
-      "primary_guard": "primary_metric",
-      "generation": {
-        "kind": "edit",
-        "edit_spec": "fp8_quant:clean:ffn",
-        "version": "clean"
-      },
-      "artifact_class": "validation_subject_checkpoint",
-      "deployable_as_hf_checkpoint": true,
-      "optimized_deployment_backend": false,
+      "optimized_deployment_backend": true,
       "contains_model_weights_in_pack": false,
       "run_directory_contains_edit_artifacts": true
     },
@@ -77,7 +55,7 @@
       "primary_guard": "primary_metric",
       "generation": {
         "kind": "edit",
-        "edit_spec": "magnitude_prune:clean:ffn",
+        "edit_spec": "magnitude_prune:clean",
         "version": "clean"
       },
       "artifact_class": "validation_subject_checkpoint",
@@ -87,7 +65,63 @@
       "run_directory_contains_edit_artifacts": true
     },
     {
-      "id": "svd_rank32_clean",
+      "id": "peft_lora",
+      "suites": [
+        "training"
+      ],
+      "category": "trained",
+      "failure_class": "trained_edit.lora_merge",
+      "strictness": "must_pass",
+      "intent": "production_artifact_assurance",
+      "primary_guard": "primary_metric",
+      "generation": {
+        "kind": "edit",
+        "edit_spec": "lora_merge:2:4:attn",
+        "version": "trained"
+      },
+      "training_profile": {
+        "profile_id": "tiny_gpt2_lora_cuda_v1",
+        "profile_sha256": "sha256:4550d5c25d5aa1d153159a7562db1cde66a704772bce9e67a15c280498564afe",
+        "snapshot_path": "metadata/training_profiles/tiny_gpt2_lora_cuda_v1.json",
+        "snapshot_sha256": "sha256:5c08aebdf96b55f023e01402587acec3da56d9481c23921204aa8ae2a66da70a"
+      },
+      "runnable": true,
+      "artifact_class": "validation_subject_checkpoint",
+      "deployable_as_hf_checkpoint": true,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
+    },
+    {
+      "id": "fine_tune",
+      "suites": [
+        "training"
+      ],
+      "category": "trained",
+      "failure_class": "trained_edit.full_fine_tune",
+      "strictness": "must_pass",
+      "intent": "production_artifact_assurance",
+      "primary_guard": "primary_metric",
+      "generation": {
+        "kind": "edit",
+        "edit_spec": "fine_tune:0.00001:2:all",
+        "version": "trained"
+      },
+      "training_profile": {
+        "profile_id": "tiny_gpt2_full_ft_cuda_v1",
+        "profile_sha256": "sha256:fc9c7c32ac8eb518d136773beb07d54aaa21fca385b950c5b21382e7b4140c2e",
+        "snapshot_path": "metadata/training_profiles/tiny_gpt2_full_ft_cuda_v1.json",
+        "snapshot_sha256": "sha256:1ba9a6f6d5a3eee6bb67461972937693b5ba07314db45bc09778ba780b8ca447"
+      },
+      "runnable": true,
+      "artifact_class": "validation_subject_checkpoint",
+      "deployable_as_hf_checkpoint": true,
+      "optimized_deployment_backend": false,
+      "contains_model_weights_in_pack": false,
+      "run_directory_contains_edit_artifacts": true
+    },
+    {
+      "id": "clean_synthetic_lowrank_delta",
       "suites": [
         "subset",
         "showcase",
@@ -95,13 +129,13 @@
         "full"
       ],
       "category": "clean",
-      "failure_class": "common_edit.lowrank_svd",
+      "failure_class": "common_edit.synthetic_lowrank_delta",
       "strictness": "must_pass",
       "intent": "clean_control",
       "primary_guard": "primary_metric",
       "generation": {
         "kind": "edit",
-        "edit_spec": "lowrank_svd:clean:ffn",
+        "edit_spec": "synthetic_lowrank_delta:clean",
         "version": "clean"
       },
       "artifact_class": "validation_subject_checkpoint",
@@ -111,7 +145,7 @@
       "run_directory_contains_edit_artifacts": true
     },
     {
-      "id": "lora_rank4_clean",
+      "id": "clean_synthetic_dense_update",
       "suites": [
         "subset",
         "showcase",
@@ -119,37 +153,13 @@
         "full"
       ],
       "category": "clean",
-      "failure_class": "common_edit.lora_merge",
+      "failure_class": "common_edit.synthetic_dense_update",
       "strictness": "must_pass",
       "intent": "clean_control",
       "primary_guard": "primary_metric",
       "generation": {
         "kind": "edit",
-        "edit_spec": "lora_merge:clean:attn",
-        "version": "clean"
-      },
-      "artifact_class": "validation_subject_checkpoint",
-      "deployable_as_hf_checkpoint": true,
-      "optimized_deployment_backend": false,
-      "contains_model_weights_in_pack": false,
-      "run_directory_contains_edit_artifacts": true
-    },
-    {
-      "id": "fine_tune_step1_clean",
-      "suites": [
-        "subset",
-        "showcase",
-        "workshop3",
-        "full"
-      ],
-      "category": "clean",
-      "failure_class": "common_edit.fine_tune",
-      "strictness": "must_pass",
-      "intent": "clean_control",
-      "primary_guard": "primary_metric",
-      "generation": {
-        "kind": "edit",
-        "edit_spec": "fine_tune:clean:ffn",
+        "edit_spec": "synthetic_dense_update:clean",
         "version": "clean"
       },
       "artifact_class": "validation_subject_checkpoint",
@@ -198,45 +208,6 @@
       "run_directory_contains_edit_artifacts": true
     },
     {
-      "id": "svd_rank32_stress",
-      "suites": [
-        "subset",
-        "showcase",
-        "workshop3",
-        "full"
-      ],
-      "category": "stress",
-      "failure_class": "catastrophic_edit.lowrank_svd",
-      "strictness": "must_fail",
-      "intent": "catastrophic_failure",
-      "primary_guard": "primary_metric",
-      "generation": {
-        "kind": "edit",
-        "edit_spec": "lowrank_svd:32:all",
-        "version": "stress"
-      },
-      "requirements": {
-        "catastrophic_required": true,
-        "detectors_any_of": [
-          {
-            "kind": "validation_flag",
-            "flag": "primary_metric_acceptable",
-            "expected": false
-          },
-          {
-            "kind": "primary_metric",
-            "field": "degraded",
-            "expected": true
-          }
-        ]
-      },
-      "artifact_class": "validation_subject_checkpoint",
-      "deployable_as_hf_checkpoint": true,
-      "optimized_deployment_backend": false,
-      "contains_model_weights_in_pack": false,
-      "run_directory_contains_edit_artifacts": true
-    },
-    {
       "id": "quant_4bit_stress",
       "suites": [
         "subset",
@@ -245,13 +216,14 @@
         "full"
       ],
       "category": "stress",
-      "failure_class": "stress_edit.quant_rtn",
+      "failure_class": "stress_edit.bitsandbytes_int4",
       "strictness": "informational",
       "intent": "subtle_detectable",
       "primary_guard": "primary_metric",
       "generation": {
-        "kind": "edit",
-        "edit_spec": "quant_rtn:4:32:all",
+        "kind": "deployable_edit",
+        "backend": "bitsandbytes",
+        "edit_spec": "bnb_4bit:4:all",
         "version": "stress"
       },
       "requirements": {
@@ -272,14 +244,15 @@
           }
         ]
       },
-      "artifact_class": "validation_subject_checkpoint",
+      "runnable": true,
+      "artifact_class": "deployable_optimized_subject",
       "deployable_as_hf_checkpoint": true,
-      "optimized_deployment_backend": false,
+      "optimized_deployment_backend": true,
       "contains_model_weights_in_pack": false,
       "run_directory_contains_edit_artifacts": true
     },
     {
-      "id": "lora_rank8_stress",
+      "id": "synthetic_lowrank_rank8_stress",
       "suites": [
         "subset",
         "showcase",
@@ -287,13 +260,13 @@
         "full"
       ],
       "category": "stress",
-      "failure_class": "stress_edit.lora_merge",
+      "failure_class": "stress_edit.synthetic_lowrank_delta",
       "strictness": "informational",
       "intent": "subtle_detectable",
       "primary_guard": "primary_metric",
       "generation": {
         "kind": "edit",
-        "edit_spec": "lora_merge:8:64:all",
+        "edit_spec": "synthetic_lowrank_delta:8:64:all",
         "version": "stress"
       },
       "requirements": {
@@ -321,7 +294,7 @@
       "run_directory_contains_edit_artifacts": true
     },
     {
-      "id": "fine_tune_step3_stress",
+      "id": "synthetic_dense_update_iter3_stress",
       "suites": [
         "subset",
         "showcase",
@@ -329,13 +302,13 @@
         "full"
       ],
       "category": "stress",
-      "failure_class": "stress_edit.fine_tune",
+      "failure_class": "stress_edit.synthetic_dense_update",
       "strictness": "informational",
       "intent": "subtle_detectable",
       "primary_guard": "primary_metric",
       "generation": {
         "kind": "edit",
-        "edit_spec": "fine_tune:0.0005:3:all",
+        "edit_spec": "synthetic_dense_update:0.0005:3:all",
         "version": "stress"
       },
       "requirements": {
@@ -355,33 +328,6 @@
             "min": 1
           }
         ]
-      },
-      "artifact_class": "validation_subject_checkpoint",
-      "deployable_as_hf_checkpoint": true,
-      "optimized_deployment_backend": false,
-      "contains_model_weights_in_pack": false,
-      "run_directory_contains_edit_artifacts": true
-    },
-    {
-      "id": "fp8_e5m2_stress",
-      "suites": [
-        "subset",
-        "showcase",
-        "workshop3",
-        "full"
-      ],
-      "category": "stress",
-      "failure_class": "stress_edit.fp8_quant",
-      "strictness": "informational",
-      "intent": "historical_sentinel",
-      "primary_guard": "spectral",
-      "generation": {
-        "kind": "edit",
-        "edit_spec": "fp8_quant:e5m2:all",
-        "version": "stress"
-      },
-      "requirements": {
-        "notes": "Historical FP8 report retained for baseline-contamination context; not a current guard-value gate."
       },
       "artifact_class": "validation_subject_checkpoint",
       "deployable_as_hf_checkpoint": true,

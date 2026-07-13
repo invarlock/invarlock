@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import math
+
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_schema import validate_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
 from tests.reporting._support_auto_config import make_auto_config
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
+from tests.reporting._support_primary_metric import independent_slice_summary
 
 
 def _mk_minimal_report() -> RunReport:
@@ -13,6 +20,8 @@ def _mk_minimal_report() -> RunReport:
     r["meta"]["adapter"] = "hf"
     r["meta"]["device"] = "cpu"
     r["meta"]["auto"] = make_auto_config()
+    r["context"] = {"profile": "dev"}
+    r["edit"]["name"] = "structured"
     r["data"]["dataset"] = "unit"
     r["data"]["split"] = "validation"
     r["data"]["seq_len"] = 8
@@ -34,8 +43,11 @@ def _mk_minimal_report() -> RunReport:
             "final": {"used": 2},
         },
     }
-    # Provide paired delta summary to be copied through
-    r["metrics"]["paired_delta_summary"] = {"mean": 0.0}
+    r["metrics"]["preview_final_slice_delta_summary"] = independent_slice_summary(
+        0.0,
+        preview_windows=2,
+        final_windows=2,
+    )
     # Provide tokens to consider token floor path
     r["metrics"]["preview_total_tokens"] = 50
     r["metrics"]["final_total_tokens"] = 50
@@ -46,49 +58,63 @@ def _mk_minimal_report() -> RunReport:
     r["evaluation_windows"] = {
         "final": {
             "window_ids": [1, 2],
-            "logloss": [2.30, 2.31],
+            "logloss": [math.log(10.0), math.log(10.0)],
             "token_counts": [100, 100],
         }
     }
-    return r
+    return canonical_run_report(r)
 
 
 def _mk_minimal_baseline() -> dict:
-    return {
-        "run_id": "base",
-        "model_id": "m",
-        "meta": {"seed": 0, "model_id": "m"},
-        "evaluation_windows": {
-            "final": {
-                "window_ids": [1, 2],
-                "logloss": [2.30, 2.30],
-                "token_counts": [100, 100],
-            }
-        },
-        # Allow make_report to compute baseline primary_metric from windows
-        "data": {
-            "seq_len": 8,
-            "preview_n": 2,
-            "final_n": 2,
-            "dataset": "unit",
-            "split": "validation",
-            "stride": 8,
-        },
-        "edit": {
-            "name": "none",
-            "plan_digest": "0",
-            "deltas": {
-                "params_changed": 0,
-                "layers_modified": 0,
-                "sparsity": None,
-                "bitwidth_map": None,
+    return canonical_baseline(
+        {
+            "run_id": "base",
+            "model_id": "m",
+            "meta": {
+                "seed": 0,
+                "model_id": "m",
+                "adapter": "hf",
+                "auto": make_auto_config(),
             },
-        },
-        "guards": [],
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
-        "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
-        "flags": {"guard_recovered": False, "rollback_reason": None},
-    }
+            "context": {"profile": "dev"},
+            "evaluation_windows": {
+                "final": {
+                    "window_ids": [1, 2],
+                    "logloss": [math.log(10.0), math.log(10.0)],
+                    "token_counts": [100, 100],
+                }
+            },
+            # Allow make_report to compute baseline primary_metric from windows
+            "data": {
+                "seq_len": 8,
+                "preview_n": 2,
+                "final_n": 2,
+                "dataset": "unit",
+                "split": "validation",
+                "stride": 8,
+            },
+            "edit": {
+                "name": "noop",
+                "plan_digest": "0",
+                "deltas": {
+                    "params_changed": 0,
+                    "layers_modified": 0,
+                    "sparsity": None,
+                    "bitwidth_map": None,
+                },
+            },
+            "guards": [],
+            "metrics": {
+                "primary_metric": {
+                    "kind": "ppl_causal",
+                    "preview": 10.0,
+                    "final": 10.0,
+                }
+            },
+            "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
+            "flags": {"guard_recovered": False, "rollback_reason": None},
+        }
+    )
 
 
 def test_make_evaluation_report_minimal_paths() -> None:
@@ -128,6 +154,8 @@ def test_make_evaluation_report_sets_measurement_contract_match_from_run_baselin
     report["guards"] = [
         {
             "name": "spectral",
+            "passed": True,
+            "policy": {"enabled": True},
             "metrics": {
                 "measurement_contract": spectral_contract,
                 "max_spectral_norm_final": 1.0,
@@ -137,6 +165,8 @@ def test_make_evaluation_report_sets_measurement_contract_match_from_run_baselin
         },
         {
             "name": "rmt",
+            "passed": True,
+            "policy": {"enabled": True},
             "metrics": {
                 "measurement_contract": rmt_contract,
                 "edge_risk_by_family_base": {"attn": 1.0},
@@ -150,6 +180,8 @@ def test_make_evaluation_report_sets_measurement_contract_match_from_run_baselin
     baseline["guards"] = [
         {
             "name": "spectral",
+            "passed": True,
+            "policy": {"enabled": True},
             "metrics": {
                 "measurement_contract": spectral_contract,
                 "max_spectral_norm_final": 1.0,
@@ -158,6 +190,8 @@ def test_make_evaluation_report_sets_measurement_contract_match_from_run_baselin
         },
         {
             "name": "rmt",
+            "passed": True,
+            "policy": {"enabled": True},
             "metrics": {
                 "measurement_contract": rmt_contract,
                 "edge_risk_by_family": {"attn": 1.0},
@@ -165,7 +199,7 @@ def test_make_evaluation_report_sets_measurement_contract_match_from_run_baselin
         },
     ]
 
-    cert = make_report(report, baseline)
+    cert = make_report(canonical_run_report(report), canonical_baseline(baseline))
 
     assert cert["spectral"]["measurement_contract_match"] is True
     assert cert["rmt"]["measurement_contract_match"] is True

@@ -1,0 +1,1142 @@
+{
+  "paths": {
+    "$": [
+      "artifacts",
+      "assurance",
+      "auto",
+      "baseline_ref",
+      "context",
+      "dataset",
+      "edit",
+      "evaluation_windows",
+      "guard_metric_impact",
+      "guards",
+      "invariants",
+      "meta",
+      "plugins",
+      "policy_provenance",
+      "policy_resolution",
+      "primary_metric",
+      "primary_metric_tail",
+      "provenance",
+      "resolved_policy",
+      "rmt",
+      "run_id",
+      "schema_version",
+      "spectral",
+      "structure",
+      "subject_ref",
+      "validation",
+      "variance"
+    ],
+    "$.artifacts": [
+      "generated_at"
+    ],
+    "$.assurance": [
+      "blocking_reasons",
+      "canonical_guard_chain",
+      "canonical_guard_chain_enforced",
+      "claim_set",
+      "fallback_fields_used",
+      "guard_chain_observed",
+      "mode",
+      "profile",
+      "report_local_verdict",
+      "runtime_provenance_declared",
+      "runtime_provenance_verification_status",
+      "runtime_provenance_verified",
+      "tier",
+      "verdict",
+      "verified_assurance_verdict"
+    ],
+    "$.auto": [
+      "tier"
+    ],
+    "$.baseline_ref": [
+      "adapter",
+      "model_id",
+      "model_identity",
+      "primary_metric",
+      "provider_digest",
+      "report_hash",
+      "run_id",
+      "tokenizer_hash"
+    ],
+    "$.baseline_ref.model_identity": [
+      "kind",
+      "revision"
+    ],
+    "$.baseline_ref.primary_metric": [
+      "final",
+      "kind"
+    ],
+    "$.baseline_ref.provider_digest": [
+      "ids_sha256",
+      "tokenizer_sha256"
+    ],
+    "$.context": [
+      "guard_chain_observed",
+      "profile",
+      "runtime"
+    ],
+    "$.context.runtime": [
+      "execution_mode"
+    ],
+    "$.dataset": [
+      "hash",
+      "provider",
+      "seq_len",
+      "split",
+      "tokenizer",
+      "windows"
+    ],
+    "$.dataset.hash": [
+      "dataset",
+      "final",
+      "preview"
+    ],
+    "$.dataset.tokenizer": [
+      "hash"
+    ],
+    "$.dataset.windows": [
+      "final",
+      "preview",
+      "stats"
+    ],
+    "$.dataset.windows.stats": [
+      "actual_final",
+      "actual_preview",
+      "bootstrap",
+      "coverage",
+      "paired_windows",
+      "preview_final_slice_delta_summary",
+      "window_match_fraction",
+      "window_overlap_fraction",
+      "window_pairing_reason"
+    ],
+    "$.dataset.windows.stats.bootstrap": [
+      "alpha",
+      "enabled",
+      "method",
+      "preview_final_delta_basis",
+      "preview_final_delta_method",
+      "preview_final_delta_seed",
+      "replicates",
+      "seed"
+    ],
+    "$.dataset.windows.stats.coverage": [
+      "final",
+      "preview",
+      "replicates",
+      "tier"
+    ],
+    "$.dataset.windows.stats.coverage.final": [
+      "ok",
+      "required",
+      "used"
+    ],
+    "$.dataset.windows.stats.coverage.preview": [
+      "ok",
+      "required",
+      "used"
+    ],
+    "$.dataset.windows.stats.coverage.replicates": [
+      "ok",
+      "required",
+      "used"
+    ],
+    "$.dataset.windows.stats.preview_final_slice_delta_summary": [
+      "basis",
+      "ci",
+      "ci_method",
+      "ci_reason",
+      "degenerate",
+      "degenerate_reason",
+      "final_windows",
+      "mean",
+      "paired",
+      "preview_windows"
+    ],
+    "$.edit": [
+      "name"
+    ],
+    "$.evaluation_windows": [
+      "final",
+      "preview"
+    ],
+    "$.evaluation_windows.final": [
+      "logloss",
+      "token_counts",
+      "window_ids"
+    ],
+    "$.evaluation_windows.preview": [
+      "logloss",
+      "token_counts",
+      "window_ids"
+    ],
+    "$.guard_metric_impact": [
+      "bare_facts",
+      "bare_report",
+      "bare_value",
+      "checks",
+      "degradation",
+      "degradation_basis",
+      "degradation_limit",
+      "diagnostics",
+      "direction",
+      "display_unit",
+      "display_value",
+      "evaluated",
+      "guarded_facts",
+      "guarded_value",
+      "metric_kind",
+      "passed",
+      "schedule_digest",
+      "source"
+    ],
+    "$.guard_metric_impact.bare_facts": [
+      "example_ids_digest",
+      "token_count",
+      "weighted_logloss_sum"
+    ],
+    "$.guard_metric_impact.bare_report": [
+      "final",
+      "primary_metric",
+      "status"
+    ],
+    "$.guard_metric_impact.bare_report.final": [
+      "logloss",
+      "token_counts",
+      "window_ids"
+    ],
+    "$.guard_metric_impact.bare_report.primary_metric": [
+      "final",
+      "kind"
+    ],
+    "$.guard_metric_impact.checks": [
+      "arm_facts_replay",
+      "guard_metric_impact",
+      "measurements_valid",
+      "metric_kind_matches"
+    ],
+    "$.guard_metric_impact.guarded_facts": [
+      "example_ids_digest",
+      "token_count",
+      "weighted_logloss_sum"
+    ],
+    "$.guards[]": [
+      "baseline_metrics",
+      "correction_ledger",
+      "decision",
+      "details",
+      "diagnostics",
+      "final_degeneracy",
+      "final_metrics",
+      "final_z_scores",
+      "measurement_inventory",
+      "metrics",
+      "module_family_map",
+      "name",
+      "passed",
+      "policy",
+      "stage",
+      "supported",
+      "violations"
+    ],
+    "$.guards[].baseline_metrics": [
+      "baseline_degeneracy",
+      "family_stats",
+      "measurement_contract",
+      "module_sigmas"
+    ],
+    "$.guards[].baseline_metrics.baseline_degeneracy": [],
+    "$.guards[].baseline_metrics.family_stats": [
+      "ffn"
+    ],
+    "$.guards[].baseline_metrics.family_stats.ffn": [
+      "count",
+      "max",
+      "mean",
+      "min",
+      "std"
+    ],
+    "$.guards[].baseline_metrics.measurement_contract": [
+      "kind",
+      "version"
+    ],
+    "$.guards[].baseline_metrics.module_sigmas": [
+      "layer.0",
+      "layer.1"
+    ],
+    "$.guards[].correction_ledger": [
+      "correction_cap_ratio",
+      "correction_enabled",
+      "corrections",
+      "multiple_testing_selection",
+      "phase",
+      "policy_result",
+      "post_correction_metrics",
+      "pre_correction_degeneracy",
+      "pre_correction_metrics",
+      "pre_correction_z_scores",
+      "schema_version",
+      "selected_findings"
+    ],
+    "$.guards[].correction_ledger.multiple_testing_selection": [
+      "alpha",
+      "default_selected_without_pvalue",
+      "families_selected",
+      "families_tested",
+      "family_max_abs_z",
+      "family_pvalues",
+      "family_violation_counts",
+      "m",
+      "method"
+    ],
+    "$.guards[].correction_ledger.multiple_testing_selection.family_max_abs_z": [],
+    "$.guards[].correction_ledger.multiple_testing_selection.family_pvalues": [],
+    "$.guards[].correction_ledger.multiple_testing_selection.family_violation_counts": [],
+    "$.guards[].correction_ledger.post_correction_metrics": [
+      "layer.0",
+      "layer.1"
+    ],
+    "$.guards[].correction_ledger.pre_correction_degeneracy": [],
+    "$.guards[].correction_ledger.pre_correction_metrics": [
+      "layer.0",
+      "layer.1"
+    ],
+    "$.guards[].correction_ledger.pre_correction_z_scores": [
+      "layer.0",
+      "layer.1"
+    ],
+    "$.guards[].details": [
+      "baseline_checks",
+      "baseline_edge_risk_by_family",
+      "current_checks",
+      "current_edge_risk_by_family",
+      "policy",
+      "stats",
+      "subject_restored_after_ab",
+      "ve_applied",
+      "ve_tested"
+    ],
+    "$.guards[].details.baseline_checks": [
+      "parameter_count",
+      "structure_hash"
+    ],
+    "$.guards[].details.baseline_edge_risk_by_family": [
+      "ffn"
+    ],
+    "$.guards[].details.current_checks": [
+      "parameter_count",
+      "structure_hash"
+    ],
+    "$.guards[].details.current_edge_risk_by_family": [
+      "ffn"
+    ],
+    "$.guards[].details.policy": [
+      "alpha",
+      "calibration",
+      "mode",
+      "predictive_gate",
+      "seed"
+    ],
+    "$.guards[].details.policy.calibration": [
+      "min_coverage",
+      "seed",
+      "windows"
+    ],
+    "$.guards[].details.stats": [
+      "ab_measurements",
+      "ab_point_estimates",
+      "ab_provenance",
+      "calibration",
+      "dataset_meta",
+      "pairing_reference",
+      "predictive_gate",
+      "target_fingerprint"
+    ],
+    "$.guards[].details.stats.ab_measurements": [
+      "condition_a",
+      "condition_b",
+      "delta_log_bootstrap",
+      "delta_log_ci",
+      "ratio_bootstrap",
+      "ratio_ci",
+      "window_ids"
+    ],
+    "$.guards[].details.stats.ab_measurements.condition_a": [
+      "log_loss",
+      "ppl",
+      "token_counts"
+    ],
+    "$.guards[].details.stats.ab_measurements.condition_b": [
+      "log_loss",
+      "ppl",
+      "token_counts"
+    ],
+    "$.guards[].details.stats.ab_measurements.delta_log_bootstrap": [
+      "alpha",
+      "method",
+      "replicates",
+      "seed",
+      "weights"
+    ],
+    "$.guards[].details.stats.ab_measurements.ratio_bootstrap": [
+      "alpha",
+      "method",
+      "replicates",
+      "seed"
+    ],
+    "$.guards[].details.stats.ab_point_estimates": [
+      "coverage",
+      "ppl_no_ve",
+      "ppl_with_ve",
+      "tag"
+    ],
+    "$.guards[].details.stats.ab_provenance": [
+      "condition_a",
+      "condition_b"
+    ],
+    "$.guards[].details.stats.ab_provenance.condition_a": [
+      "consumed_pairing_digest",
+      "dataset_hash",
+      "mode",
+      "model_id",
+      "pairing_digest",
+      "run_seed",
+      "status",
+      "tag",
+      "target_fingerprint",
+      "tokenizer_hash",
+      "window_count",
+      "window_ids"
+    ],
+    "$.guards[].details.stats.ab_provenance.condition_b": [
+      "consumed_pairing_digest",
+      "dataset_hash",
+      "mode",
+      "model_id",
+      "pairing_digest",
+      "run_seed",
+      "status",
+      "tag",
+      "target_fingerprint",
+      "tokenizer_hash",
+      "window_count",
+      "window_ids"
+    ],
+    "$.guards[].details.stats.calibration": [
+      "window_ids"
+    ],
+    "$.guards[].details.stats.dataset_meta": [
+      "dataset_hash",
+      "tokenizer_hash"
+    ],
+    "$.guards[].details.stats.pairing_reference": [
+      "digest"
+    ],
+    "$.guards[].details.stats.predictive_gate": [
+      "evaluated",
+      "passed",
+      "reason"
+    ],
+    "$.guards[].final_degeneracy": [],
+    "$.guards[].final_metrics": [
+      "layer.0",
+      "layer.1"
+    ],
+    "$.guards[].final_z_scores": [
+      "layer.0",
+      "layer.1"
+    ],
+    "$.guards[].measurement_inventory": [
+      "prepare",
+      "validate"
+    ],
+    "$.guards[].measurement_inventory.prepare": [
+      "discovery_error_count",
+      "discovery_errors",
+      "eligible_count",
+      "eligible_modules",
+      "enumerated_count",
+      "enumerated_modules",
+      "excluded_count",
+      "excluded_modules",
+      "identity_changed_count",
+      "identity_changed_modules",
+      "measured_count",
+      "measured_modules",
+      "phase",
+      "schema_version"
+    ],
+    "$.guards[].measurement_inventory.validate": [
+      "discovery_error_count",
+      "discovery_errors",
+      "eligible_count",
+      "eligible_modules",
+      "enumerated_count",
+      "enumerated_modules",
+      "excluded_count",
+      "excluded_modules",
+      "identity_changed_count",
+      "identity_changed_modules",
+      "measured_count",
+      "measured_modules",
+      "phase",
+      "schema_version"
+    ],
+    "$.guards[].metrics": [
+      "ab_gain",
+      "ab_measurements",
+      "ab_point_estimates",
+      "ab_provenance",
+      "ab_seed_used",
+      "ab_windows_used",
+      "baseline_modules",
+      "budgeted_violations",
+      "calibration",
+      "candidate_budgeted_violations",
+      "candidate_violations_detected",
+      "cap_budget_exceeded",
+      "caps_applied",
+      "caps_exceeded",
+      "checks_performed",
+      "correction_policy_result",
+      "corrections_applied",
+      "corrections_attempted",
+      "discovery_errors",
+      "edge_risk_by_family",
+      "edge_risk_by_family_base",
+      "edge_risk_by_module",
+      "edge_risk_by_module_base",
+      "epsilon_by_family",
+      "epsilon_violations",
+      "family_caps",
+      "fatal_violations",
+      "identity_changed_modules",
+      "max_caps",
+      "max_spectral_norm",
+      "mean_spectral_norm",
+      "measurement_contract",
+      "measurement_exclusions",
+      "met_threshold",
+      "mode",
+      "module_family_map",
+      "modules_analyzed",
+      "monitor_only",
+      "multiple_testing",
+      "multiple_testing_selection",
+      "ppl_no_ve",
+      "ppl_with_ve",
+      "predictive_gate",
+      "ratio_ci",
+      "selected_budgeted_findings",
+      "stable",
+      "subject_restored_after_ab",
+      "ve_enabled",
+      "ve_enabled_during_validation",
+      "violations_detected",
+      "violations_found",
+      "warning_violations"
+    ],
+    "$.guards[].metrics.ab_measurements": [
+      "condition_a",
+      "condition_b",
+      "delta_log_bootstrap",
+      "delta_log_ci",
+      "ratio_bootstrap",
+      "ratio_ci",
+      "window_ids"
+    ],
+    "$.guards[].metrics.ab_measurements.condition_a": [
+      "log_loss",
+      "ppl",
+      "token_counts"
+    ],
+    "$.guards[].metrics.ab_measurements.condition_b": [
+      "log_loss",
+      "ppl",
+      "token_counts"
+    ],
+    "$.guards[].metrics.ab_measurements.delta_log_bootstrap": [
+      "alpha",
+      "method",
+      "replicates",
+      "seed",
+      "weights"
+    ],
+    "$.guards[].metrics.ab_measurements.ratio_bootstrap": [
+      "alpha",
+      "method",
+      "replicates",
+      "seed"
+    ],
+    "$.guards[].metrics.ab_point_estimates": [
+      "coverage",
+      "ppl_no_ve",
+      "ppl_with_ve",
+      "tag"
+    ],
+    "$.guards[].metrics.ab_provenance": [
+      "condition_a",
+      "condition_b"
+    ],
+    "$.guards[].metrics.ab_provenance.condition_a": [
+      "consumed_pairing_digest",
+      "dataset_hash",
+      "mode",
+      "model_id",
+      "pairing_digest",
+      "run_seed",
+      "status",
+      "tag",
+      "target_fingerprint",
+      "tokenizer_hash",
+      "window_count",
+      "window_ids"
+    ],
+    "$.guards[].metrics.ab_provenance.condition_b": [
+      "consumed_pairing_digest",
+      "dataset_hash",
+      "mode",
+      "model_id",
+      "pairing_digest",
+      "run_seed",
+      "status",
+      "tag",
+      "target_fingerprint",
+      "tokenizer_hash",
+      "window_count",
+      "window_ids"
+    ],
+    "$.guards[].metrics.calibration": [
+      "coverage",
+      "min_coverage",
+      "requested",
+      "seed",
+      "status"
+    ],
+    "$.guards[].metrics.edge_risk_by_family": [
+      "ffn"
+    ],
+    "$.guards[].metrics.edge_risk_by_family_base": [
+      "ffn"
+    ],
+    "$.guards[].metrics.edge_risk_by_module": [
+      "layer.0.mlp"
+    ],
+    "$.guards[].metrics.edge_risk_by_module_base": [
+      "layer.0.mlp"
+    ],
+    "$.guards[].metrics.epsilon_by_family": [
+      "ffn"
+    ],
+    "$.guards[].metrics.family_caps": [
+      "ffn",
+      "other"
+    ],
+    "$.guards[].metrics.family_caps.ffn": [
+      "kappa"
+    ],
+    "$.guards[].metrics.family_caps.other": [
+      "kappa"
+    ],
+    "$.guards[].metrics.measurement_contract": [
+      "kind",
+      "version"
+    ],
+    "$.guards[].metrics.module_family_map": [
+      "layer.0.mlp"
+    ],
+    "$.guards[].metrics.multiple_testing": [
+      "alpha",
+      "m",
+      "method"
+    ],
+    "$.guards[].metrics.multiple_testing_selection": [
+      "alpha",
+      "default_selected_without_pvalue",
+      "families_selected",
+      "families_tested",
+      "family_max_abs_z",
+      "family_pvalues",
+      "family_violation_counts",
+      "m",
+      "method"
+    ],
+    "$.guards[].metrics.multiple_testing_selection.family_max_abs_z": [],
+    "$.guards[].metrics.multiple_testing_selection.family_pvalues": [],
+    "$.guards[].metrics.multiple_testing_selection.family_violation_counts": [],
+    "$.guards[].metrics.predictive_gate": [
+      "evaluated",
+      "passed",
+      "reason"
+    ],
+    "$.guards[].module_family_map": [
+      "layer.0",
+      "layer.1"
+    ],
+    "$.guards[].policy": [
+      "alpha",
+      "calibration",
+      "correction_cap_ratio",
+      "correction_enabled",
+      "deadband",
+      "degeneracy",
+      "epsilon_by_family",
+      "epsilon_default",
+      "family_caps",
+      "max_caps",
+      "max_spectral_norm",
+      "mode",
+      "multiple_testing",
+      "on_fail",
+      "predictive_gate",
+      "seed",
+      "strict_mode"
+    ],
+    "$.guards[].policy.calibration": [
+      "min_coverage",
+      "seed",
+      "windows"
+    ],
+    "$.guards[].policy.degeneracy": [
+      "enabled",
+      "norm_collapse",
+      "stable_rank"
+    ],
+    "$.guards[].policy.degeneracy.norm_collapse": [
+      "fatal_ratio",
+      "warn_ratio"
+    ],
+    "$.guards[].policy.degeneracy.stable_rank": [
+      "fatal_ratio",
+      "warn_ratio"
+    ],
+    "$.guards[].policy.epsilon_by_family": [
+      "ffn"
+    ],
+    "$.guards[].policy.family_caps": [
+      "ffn",
+      "other"
+    ],
+    "$.guards[].policy.family_caps.ffn": [
+      "kappa"
+    ],
+    "$.guards[].policy.family_caps.other": [
+      "kappa"
+    ],
+    "$.guards[].policy.multiple_testing": [
+      "alpha",
+      "m",
+      "method"
+    ],
+    "$.invariants": [
+      "decision",
+      "failures",
+      "passed",
+      "post",
+      "pre",
+      "status",
+      "summary",
+      "supported",
+      "violations"
+    ],
+    "$.invariants.summary": [
+      "checks_performed",
+      "fatal_violations",
+      "violations_found",
+      "warning_violations"
+    ],
+    "$.meta": [
+      "adapter",
+      "model_id",
+      "model_identity",
+      "profile",
+      "seed",
+      "tokenizer_hash"
+    ],
+    "$.meta.model_identity": [
+      "kind",
+      "sha256"
+    ],
+    "$.plugins": [
+      "adapter",
+      "edit",
+      "guards"
+    ],
+    "$.plugins.adapter": [
+      "available",
+      "module",
+      "name",
+      "package",
+      "strict_assurance_allowed",
+      "support_tier",
+      "type"
+    ],
+    "$.plugins.edit": [
+      "available",
+      "module",
+      "name",
+      "package",
+      "strict_assurance_allowed",
+      "support_tier",
+      "type"
+    ],
+    "$.plugins.guards[]": [
+      "available",
+      "module",
+      "name",
+      "package",
+      "strict_assurance_allowed",
+      "support_tier",
+      "type"
+    ],
+    "$.policy_provenance": [
+      "source"
+    ],
+    "$.policy_resolution": [
+      "edit_name",
+      "format_version",
+      "guard_policies",
+      "profile",
+      "resolved_policy_sha256",
+      "source",
+      "tier"
+    ],
+    "$.primary_metric": [
+      "analysis_basis",
+      "analysis_point_final",
+      "analysis_point_preview",
+      "ci",
+      "display_ci",
+      "final",
+      "kind",
+      "preview",
+      "ratio_vs_baseline"
+    ],
+    "$.primary_metric_tail": [
+      "evaluated",
+      "mode",
+      "passed",
+      "policy",
+      "stats",
+      "warned"
+    ],
+    "$.primary_metric_tail.policy": [
+      "quantile"
+    ],
+    "$.primary_metric_tail.stats": [
+      "q95"
+    ],
+    "$.provenance": [
+      "baseline",
+      "provider_digest",
+      "window_ids_digest",
+      "window_plan_digest"
+    ],
+    "$.provenance.baseline": [
+      "report_hash",
+      "run_id"
+    ],
+    "$.provenance.provider_digest": [
+      "ids_sha256",
+      "tokenizer_sha256"
+    ],
+    "$.resolved_policy": [
+      "metrics",
+      "rmt",
+      "spectral",
+      "variance"
+    ],
+    "$.resolved_policy.metrics": [
+      "accuracy"
+    ],
+    "$.resolved_policy.metrics.accuracy": [
+      "delta_min_pp",
+      "min_examples",
+      "min_examples_fraction"
+    ],
+    "$.resolved_policy.rmt": [
+      "epsilon_by_family",
+      "epsilon_default",
+      "measurement_contract"
+    ],
+    "$.resolved_policy.rmt.epsilon_by_family": [
+      "ffn"
+    ],
+    "$.resolved_policy.rmt.measurement_contract": [
+      "kind",
+      "version"
+    ],
+    "$.resolved_policy.spectral": [
+      "correction_cap_ratio",
+      "correction_enabled",
+      "deadband",
+      "degeneracy",
+      "family_caps",
+      "max_caps",
+      "max_spectral_norm",
+      "measurement_contract",
+      "multiple_testing"
+    ],
+    "$.resolved_policy.spectral.degeneracy": [
+      "enabled",
+      "norm_collapse",
+      "stable_rank"
+    ],
+    "$.resolved_policy.spectral.degeneracy.norm_collapse": [
+      "fatal_ratio",
+      "warn_ratio"
+    ],
+    "$.resolved_policy.spectral.degeneracy.stable_rank": [
+      "fatal_ratio",
+      "warn_ratio"
+    ],
+    "$.resolved_policy.spectral.family_caps": [
+      "ffn",
+      "other"
+    ],
+    "$.resolved_policy.spectral.family_caps.ffn": [
+      "kappa"
+    ],
+    "$.resolved_policy.spectral.family_caps.other": [
+      "kappa"
+    ],
+    "$.resolved_policy.spectral.measurement_contract": [
+      "kind",
+      "version"
+    ],
+    "$.resolved_policy.spectral.multiple_testing": [
+      "alpha",
+      "m",
+      "method"
+    ],
+    "$.resolved_policy.variance": [
+      "alpha",
+      "calibration",
+      "mode",
+      "predictive_gate",
+      "seed"
+    ],
+    "$.resolved_policy.variance.calibration": [
+      "min_coverage",
+      "seed",
+      "windows"
+    ],
+    "$.rmt": [
+      "decision",
+      "edge_risk_by_family",
+      "edge_risk_by_family_base",
+      "epsilon_by_family",
+      "epsilon_default",
+      "epsilon_violations",
+      "evaluated",
+      "families",
+      "measurement_contract",
+      "measurement_contract_hash",
+      "measurement_contract_match",
+      "passed",
+      "stable",
+      "status",
+      "supported",
+      "violations"
+    ],
+    "$.rmt.edge_risk_by_family": [
+      "ffn"
+    ],
+    "$.rmt.edge_risk_by_family_base": [
+      "ffn"
+    ],
+    "$.rmt.epsilon_by_family": [
+      "ffn"
+    ],
+    "$.rmt.families": [
+      "ffn"
+    ],
+    "$.rmt.families.ffn": [
+      "allowed",
+      "delta",
+      "edge_base",
+      "edge_cur",
+      "epsilon",
+      "ratio"
+    ],
+    "$.rmt.measurement_contract": [
+      "kind",
+      "version"
+    ],
+    "$.spectral": [
+      "caps_applied",
+      "caps_exceeded",
+      "decision",
+      "evaluated",
+      "max_caps",
+      "measurement_contract",
+      "measurement_contract_hash",
+      "measurement_contract_match",
+      "passed",
+      "status",
+      "summary",
+      "supported",
+      "violations"
+    ],
+    "$.spectral.measurement_contract": [
+      "kind",
+      "version"
+    ],
+    "$.spectral.summary": [
+      "caps_applied",
+      "caps_exceeded",
+      "max_caps",
+      "modules_checked",
+      "status"
+    ],
+    "$.structure": [
+      "layers_modified",
+      "params_changed"
+    ],
+    "$.subject_ref": [
+      "adapter",
+      "model_id",
+      "model_identity"
+    ],
+    "$.subject_ref.model_identity": [
+      "kind",
+      "sha256"
+    ],
+    "$.validation": [
+      "guard_metric_impact_acceptable",
+      "invariants_pass",
+      "preview_final_drift_acceptable",
+      "primary_metric_acceptable",
+      "primary_metric_tail_acceptable",
+      "rmt_stable",
+      "spectral_stable"
+    ],
+    "$.variance": [
+      "ab_test",
+      "calibration",
+      "decision",
+      "enabled",
+      "gain",
+      "met_threshold",
+      "monitor_only",
+      "passed",
+      "policy",
+      "ppl_no_ve",
+      "ppl_with_ve",
+      "predictive_gate",
+      "ratio_ci",
+      "status",
+      "subject_restored_after_ab",
+      "supported",
+      "ve_enabled_during_validation",
+      "violations"
+    ],
+    "$.variance.ab_test": [
+      "measurements",
+      "point_estimates",
+      "provenance",
+      "seed",
+      "windows_used"
+    ],
+    "$.variance.ab_test.measurements": [
+      "condition_a",
+      "condition_b",
+      "delta_log_bootstrap",
+      "delta_log_ci",
+      "ratio_bootstrap",
+      "ratio_ci",
+      "window_ids"
+    ],
+    "$.variance.ab_test.measurements.condition_a": [
+      "log_loss",
+      "ppl",
+      "token_counts"
+    ],
+    "$.variance.ab_test.measurements.condition_b": [
+      "log_loss",
+      "ppl",
+      "token_counts"
+    ],
+    "$.variance.ab_test.measurements.delta_log_bootstrap": [
+      "alpha",
+      "method",
+      "replicates",
+      "seed",
+      "weights"
+    ],
+    "$.variance.ab_test.measurements.ratio_bootstrap": [
+      "alpha",
+      "method",
+      "replicates",
+      "seed"
+    ],
+    "$.variance.ab_test.point_estimates": [
+      "coverage",
+      "ppl_no_ve",
+      "ppl_with_ve",
+      "tag"
+    ],
+    "$.variance.ab_test.provenance": [
+      "condition_a",
+      "condition_b",
+      "window_ids"
+    ],
+    "$.variance.ab_test.provenance.condition_a": [
+      "consumed_pairing_digest",
+      "dataset_hash",
+      "mode",
+      "model_id",
+      "pairing_digest",
+      "run_seed",
+      "status",
+      "tag",
+      "target_fingerprint",
+      "tokenizer_hash",
+      "window_count",
+      "window_ids"
+    ],
+    "$.variance.ab_test.provenance.condition_b": [
+      "consumed_pairing_digest",
+      "dataset_hash",
+      "mode",
+      "model_id",
+      "pairing_digest",
+      "run_seed",
+      "status",
+      "tag",
+      "target_fingerprint",
+      "tokenizer_hash",
+      "window_count",
+      "window_ids"
+    ],
+    "$.variance.calibration": [
+      "coverage",
+      "min_coverage",
+      "requested",
+      "seed",
+      "status"
+    ],
+    "$.variance.policy": [
+      "alpha",
+      "calibration",
+      "mode",
+      "predictive_gate",
+      "seed"
+    ],
+    "$.variance.policy.calibration": [
+      "min_coverage",
+      "seed",
+      "windows"
+    ],
+    "$.variance.predictive_gate": [
+      "evaluated",
+      "passed",
+      "reason"
+    ]
+  },
+  "schema": "invarlock.training_public_report_shape.v1"
+}

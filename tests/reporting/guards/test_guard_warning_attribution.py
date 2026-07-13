@@ -146,3 +146,84 @@ def test_spectral_new_capped_module_warns_without_policy_failure() -> None:
     assert warning["kind"] == "new_capped_module"
     assert warning["module"] == "layers.31.mlp.up_proj"
     assert warning["policy_gate"] == "pass"
+
+
+def test_invariant_warning_count_accepts_raw_and_assembled_shapes_once() -> None:
+    raw = {
+        "guards": [
+            {
+                "name": "invariants",
+                "metrics": {"warning_violations": 1},
+            }
+        ]
+    }
+    assembled = {
+        "invariants": {
+            "summary": {"warning_violations": 1},
+            "warning_violations": 1,
+        }
+    }
+
+    assert build_guard_warnings(
+        subject=assembled,
+        baseline=raw,
+        validation={"invariants_pass": True},
+    ) == {"present": False, "warning_count": 0, "warnings": []}
+
+
+def test_invariant_warning_delta_reads_raw_guard_metrics() -> None:
+    baseline = {
+        "guards": [{"name": "invariants", "metrics": {"warning_violations": 1}}]
+    }
+    subject = {"guards": [{"name": "invariants", "metrics": {"warning_violations": 2}}]}
+
+    warnings = build_guard_warnings(
+        subject=subject,
+        baseline=baseline,
+        validation={"invariants_pass": True},
+    )
+
+    assert warnings["warning_count"] == 1
+    assert warnings["warnings"][0]["baseline"] == {"warning_violations": 1}
+    assert warnings["warnings"][0]["subject"] == {"warning_violations": 2}
+
+
+def test_invariant_warning_delta_prefers_staged_post_without_double_count() -> None:
+    baseline = {
+        "guards": [
+            {
+                "name": "invariants",
+                "stage": "pre",
+                "metrics": {"warning_violations": 1},
+            },
+            {
+                "name": "invariants_post",
+                "stage": "post",
+                "metrics": {"warning_violations": 1},
+            },
+        ]
+    }
+    subject = {
+        "guards": [
+            {
+                "name": "invariants",
+                "stage": "pre",
+                "metrics": {"warning_violations": 1},
+            },
+            {
+                "name": "invariants_post",
+                "stage": "post",
+                "metrics": {"warning_violations": 3},
+            },
+        ]
+    }
+
+    warnings = build_guard_warnings(
+        subject=subject,
+        baseline=baseline,
+        validation={"invariants_pass": True},
+    )
+
+    assert warnings["warning_count"] == 1
+    assert warnings["warnings"][0]["baseline"] == {"warning_violations": 1}
+    assert warnings["warnings"][0]["subject"] == {"warning_violations": 3}

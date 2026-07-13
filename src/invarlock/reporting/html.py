@@ -69,9 +69,9 @@ def _render_summary_strip(outline: EvaluationReportOutline) -> str:
     warning_count = _fact_value(decision, "Guard Warnings", "0")
     cells = (
         (
-            "Verdict",
+            "Report-local gates",
             outline.overall_status,
-            "pass" if outline.overall_status == "PASS" else "fail",
+            "info",
         ),
         ("Subject", _fact_value(decision, "Model"), "info"),
         ("Baseline", _fact_value(decision, "Baseline"), "info"),
@@ -171,9 +171,9 @@ def _render_guard_warnings(evaluation_report: dict[str, Any]) -> str:
         baseline = warning.get("baseline", "N/A")
         subject = warning.get("subject", "N/A")
         if not isinstance(baseline, str):
-            baseline = json.dumps(baseline, sort_keys=True)
+            baseline = json.dumps(baseline, sort_keys=True, allow_nan=False)
         if not isinstance(subject, str):
-            subject = json.dumps(subject, sort_keys=True)
+            subject = json.dumps(subject, sort_keys=True, allow_nan=False)
         rows.append(
             "<tr>"
             f"<td>{escape(str(warning.get('guard') or 'unknown'))}</td>"
@@ -205,7 +205,7 @@ def _render_guard_warnings(evaluation_report: dict[str, Any]) -> str:
 
 
 def _preview_json(value: Any) -> str:
-    text = json.dumps(value, indent=2, sort_keys=True, default=str)
+    text = json.dumps(value, indent=2, sort_keys=True, default=str, allow_nan=False)
     if len(text) <= _APPENDIX_PREVIEW_LIMIT:
         return text
     return (
@@ -326,6 +326,8 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
         "color:var(--ink)}"
         ".brand-mark-svg{display:block;width:38px;height:38px}"
         ".brand-meta{margin-top:10px!important;font-size:0.9rem}"
+        ".render-notice{margin-top:12px!important;padding:9px 11px;border-left:3px solid var(--warn);"
+        "background:var(--panel);color:var(--warn)!important;font-size:0.88rem;font-weight:700}"
         ".theme-toggle{appearance:none;border:1px solid var(--border);background:transparent;"
         "color:var(--ink);padding:7px 10px;border-radius:2px;font:inherit;font-size:0.86rem;"
         "font-weight:700;line-height:1;cursor:pointer}"
@@ -383,7 +385,7 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
         ".summary-table td{padding:8px 0;border-left:0!important;border-top:1px solid var(--border)}"
         ".summary-table td::before{display:block;margin-bottom:2px;color:var(--muted);font-size:0.72rem;"
         "font-weight:700;letter-spacing:0.06em;text-transform:uppercase}"
-        ".summary-table td:nth-child(1)::before{content:'Verdict'}"
+        ".summary-table td:nth-child(1)::before{content:'Report-local gates'}"
         ".summary-table td:nth-child(2)::before{content:'Subject'}"
         ".summary-table td:nth-child(3)::before{content:'Baseline'}"
         ".summary-table td:nth-child(4)::before{content:'Metric'}"
@@ -402,6 +404,7 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
         f"<h1>{escape(outline.title)}</h1>"
         f"<p>{escape(BRAND_TAGLINE)}</p>"
         f'<p class="brand-meta">{escape(BRAND_NAME)} {escape(version_label())} · schema {escape(REPORT_SCHEMA_VERSION)} · renderer outline</p>'
+        '<p class="render-notice">REPORT-LOCAL / UNVERIFIED RENDER — this renderer does not independently verify report bytes, provenance, policy inputs, or declared assurance fields.</p>'
         "</header>"
         f"{summary_strip}"
         '<div class="report-grid">'

@@ -3,10 +3,14 @@ from __future__ import annotations
 import math
 from copy import deepcopy
 
+from tests.reporting._support_canonical_reports import canonical_run_report
+from tests.reporting._support_primary_metric import independent_slice_summary
+
 
 def _rich_run_report() -> tuple[dict, dict]:
-    window_ids = list(range(1, 181))
-    token_counts = [10] * len(window_ids)
+    preview_window_ids = list(range(1, 181))
+    final_window_ids = list(range(181, 361))
+    token_counts = [10] * len(preview_window_ids)
     report = {
         "meta": {
             "model_id": "demo-model",
@@ -21,6 +25,7 @@ def _rich_run_report() -> tuple[dict, dict]:
                 "target_pm_ratio": 1.1,
             },
         },
+        "context": {"profile": "ci"},
         "data": {
             "dataset": "demo-ds",
             "split": "eval",
@@ -63,14 +68,18 @@ def _rich_run_report() -> tuple[dict, dict]:
             "primary_metric": {
                 "kind": "ppl_causal",
                 "preview": 1.0,
-                "final": 1.05,
+                "final": 1.04,
                 "ratio_vs_baseline": 1.04,
                 "display_ci": (1.02, 1.06),
             },
             "logloss_preview": 0.0,
             "logloss_final": 0.05,
             "logloss_delta_ci": (-0.01, 0.02),
-            "paired_delta_summary": {"mean": math.log(1.04), "degenerate": False},
+            "preview_final_slice_delta_summary": independent_slice_summary(
+                math.log(1.04),
+                preview_windows=180,
+                final_windows=180,
+            ),
             "window_plan": {"profile": "ci", "preview_n": 180, "final_n": 180},
             "bootstrap": {
                 "replicates": 1200,
@@ -105,9 +114,28 @@ def _rich_run_report() -> tuple[dict, dict]:
             "generated_at": "2024-01-01T00:00:00Z",
         },
         "flags": {"guard_recovered": False, "rollback_reason": None},
-        "guard_overhead": {
-            "bare_report": {"metrics": {"primary_metric": {"final": 10.0}}},
-            "guarded_report": {"metrics": {"primary_metric": {"final": 10.1}}},
+        "guard_metric_impact": {
+            "degradation_limit": 0.02,
+            "bare_report": {
+                "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
+                "evaluation_windows": {
+                    "final": {
+                        "window_ids": final_window_ids,
+                        "logloss": [math.log(10.0)] * len(final_window_ids),
+                        "token_counts": token_counts,
+                    }
+                },
+            },
+            "guarded_report": {
+                "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.1}},
+                "evaluation_windows": {
+                    "final": {
+                        "window_ids": final_window_ids,
+                        "logloss": [math.log(10.1)] * len(final_window_ids),
+                        "token_counts": token_counts,
+                    }
+                },
+            },
         },
         "structure": {"parameters_total": 2000, "compression_diagnostics": {}},
         "provenance": {"edits": {"name": "quant_rtn"}},
@@ -115,24 +143,28 @@ def _rich_run_report() -> tuple[dict, dict]:
         "policy_provenance": {"source": "auto"},
         "evaluation_windows": {
             "preview": {
-                "window_ids": window_ids,
-                "logloss": [0.1] * len(window_ids),
+                "window_ids": preview_window_ids,
+                "logloss": [0.0] * len(preview_window_ids),
                 "token_counts": token_counts,
             },
             "final": {
-                "window_ids": window_ids,
-                "logloss": [0.2] * len(window_ids),
+                "window_ids": final_window_ids,
+                "logloss": [math.log(1.04)] * len(final_window_ids),
                 "token_counts": token_counts,
             },
         },
     }
+    report = canonical_run_report(report)
     baseline = deepcopy(report)
     baseline["metrics"]["primary_metric"]["final"] = 1.0
     baseline["metrics"]["primary_metric"]["ratio_vs_baseline"] = 1.0
-    baseline["metrics"]["paired_delta_summary"]["mean"] = 0.0
-    baseline["guard_overhead"]["guarded_report"]["metrics"]["primary_metric"][
+    baseline["metrics"]["preview_final_slice_delta_summary"]["mean"] = 0.0
+    baseline["guard_metric_impact"]["guarded_report"]["metrics"]["primary_metric"][
         "final"
     ] = 10.0
+    baseline["guard_metric_impact"]["guarded_report"]["evaluation_windows"]["final"][
+        "logloss"
+    ] = [math.log(10.0)] * len(final_window_ids)
     baseline["metrics"]["window_plan"]["profile"] = "dev"
-    baseline["evaluation_windows"]["final"]["logloss"] = [0.18, 0.2]
-    return report, baseline
+    baseline["evaluation_windows"]["final"]["logloss"] = [0.0] * len(final_window_ids)
+    return report, canonical_run_report(baseline)

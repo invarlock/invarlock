@@ -26,8 +26,8 @@ from . import report_builder_support as report_builder_support_mod
 from . import report_edit_summary as report_edit_summary_mod
 from . import report_enrichment as report_enrichment_mod
 from . import report_make_assembly as report_make_assembly_mod
+from . import report_metric_impact as report_metric_impact_mod
 from . import report_normalization as report_normalization_mod
-from . import report_overhead as report_overhead_mod
 from . import report_policy as report_policy_mod
 from . import report_primary_metric_analysis as report_primary_metric_analysis_mod
 from . import report_primary_metric_policy as report_primary_metric_policy_mod
@@ -111,9 +111,7 @@ def _normalize_make_report_inputs(
     dict[str, Any],
     RunReport | None,
 ]:
-    normalized_report = report_normalization_mod.normalize_and_validate_run_report(
-        report
-    )
+    normalized_report = report_normalization_mod.validated_run_report_view(report)
     report_map = cast(dict[str, Any], normalized_report)
 
     baseline_raw = baseline
@@ -139,8 +137,8 @@ def _normalize_make_report_inputs(
             and "metrics" in baseline_raw
             and "edit" in baseline_raw
         ):
-            baseline_report = (
-                report_normalization_mod.normalize_and_validate_run_report(baseline_raw)
+            baseline_report = report_normalization_mod.validated_run_report_view(
+                baseline_raw
             )
     except non_fatal_exceptions as exc:
         raise ValidationError(
@@ -341,19 +339,28 @@ def _build_evaluation_report(
     policies: dict[str, Any],
     resolved_policy: dict[str, Any],
     policy_provenance: dict[str, Any],
+    policy_resolution: dict[str, Any],
     provenance: dict[str, Any],
     plugin_provenance: dict[str, Any],
     edit_name: str | None,
     artifacts_payload: dict[str, Any],
     validation_filtered: dict[str, Any],
     guard_warning_summary: dict[str, Any] | None = None,
-    guard_overhead_section: dict[str, Any],
+    guard_metric_impact_section: dict[str, Any],
     pm_tail_result: dict[str, Any],
 ) -> dict[str, Any]:
+    subject_ref: dict[str, Any] = {
+        "model_id": meta.get("model_id"),
+        "adapter": meta.get("adapter"),
+    }
+    model_identity = meta.get("model_identity")
+    if model_identity is not None:
+        subject_ref["model_identity"] = copy.deepcopy(model_identity)
     evaluation_report = {
         "schema_version": report_schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": current_run_id,
         "meta": meta,
+        "subject_ref": subject_ref,
         "auto": auto,
         "dataset": dataset_info,
         "edit": edit_metadata,
@@ -367,6 +374,7 @@ def _build_evaluation_report(
         "policies": policies,
         "resolved_policy": resolved_policy,
         "policy_provenance": policy_provenance,
+        "policy_resolution": policy_resolution,
         "provenance": provenance,
         "plugins": plugin_provenance,
         "guards": (
@@ -378,7 +386,7 @@ def _build_evaluation_report(
         "validation": validation_filtered,
         "guard_warnings": guard_warning_summary
         or {"present": False, "warning_count": 0, "warnings": []},
-        "guard_overhead": guard_overhead_section,
+        "guard_metric_impact": guard_metric_impact_section,
         "primary_metric_tail": pm_tail_result,
         "context": (
             copy.deepcopy(report_map.get("context", {}))
@@ -395,6 +403,14 @@ def _build_evaluation_report(
         evaluation_report["evaluation_realism"] = copy.deepcopy(
             report_map["evaluation_realism"]
         )
+    provider_digest = provenance.get("provider_digest")
+    dataset_evidence = (
+        provider_digest.get("dataset_evidence")
+        if isinstance(provider_digest, dict)
+        else None
+    )
+    if isinstance(dataset_evidence, dict):
+        evaluation_report["dataset_evidence"] = copy.deepcopy(dataset_evidence)
     _attach_top_level_guard_outcomes(evaluation_report)
     if edit_name is not None:
         evaluation_report["edit_name"] = edit_name
@@ -440,11 +456,11 @@ def _finalize_evaluation_report(
                 message="Tiny-relax provenance could not be attached to the evaluation report.",
             )
 
-    report_enrichment_mod.attach_quality_overhead(
+    report_enrichment_mod.attach_guard_metric_impact(
         evaluation_report,
         raw_guard_ctx,
         report_map,
-        report_overhead_mod.compute_quality_overhead_from_guard,
+        report_metric_impact_mod.compute_guard_metric_impact_from_guard,
     )
 
     try:
@@ -567,7 +583,6 @@ def make_report(
             sections["policies"],
             sections["variance_policy_digest"],
             build_diagnostics,
-            record_blocking_diagnostic=record_blocking_diagnostic,
             non_fatal_exceptions=_MAKE_REPORT_NON_FATAL_EXCEPTIONS,
         )
     )
@@ -610,13 +625,14 @@ def make_report(
         policies=sections["policies"],
         resolved_policy=policy_context["resolved_policy"],
         policy_provenance=policy_context["policy_provenance"],
+        policy_resolution=policy_context["policy_resolution"],
         provenance=assembly_context["provenance"],
         plugin_provenance=policy_context["plugin_provenance"],
         edit_name=policy_context["edit_name"],
         artifacts_payload=assembly_context["artifacts_payload"],
         validation_filtered=assembly_context["validation_filtered"],
         guard_warning_summary=assembly_context["guard_warning_summary"],
-        guard_overhead_section=assembly_context["guard_overhead_section"],
+        guard_metric_impact_section=assembly_context["guard_metric_impact_section"],
         pm_tail_result=assembly_context["pm_tail_result"],
     )
     _finalize_evaluation_report(

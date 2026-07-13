@@ -3,6 +3,11 @@ from unittest.mock import patch
 
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import create_empty_report
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+    refresh_runtime_policy_receipt,
+)
 
 
 def _mk_reports_with_tail_policy(*, mode: str) -> tuple[dict, dict]:
@@ -13,9 +18,24 @@ def _mk_reports_with_tail_policy(*, mode: str) -> tuple[dict, dict]:
 
     base = create_empty_report()
     base["meta"].update(
-        {"model_id": "m", "adapter": "a", "commit": "cafebabe", "device": "cpu"}
+        {
+            "model_id": "m",
+            "adapter": "a",
+            "commit": "cafebabe",
+            "device": "cpu",
+            "auto": {"tier": "balanced"},
+        }
     )
-    base["metrics"]["primary_metric"] = {"kind": "ppl_causal", "final": math.exp(1.0)}
+    base["context"] = {"profile": "dev", "assurance": {"mode": "off"}}
+    base["data"].update(
+        {"dataset": "dummy", "split": "validation", "seq_len": 8, "stride": 8}
+    )
+    base["edit"]["name"] = "noop"
+    base["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": math.exp(1.0),
+        "final": math.exp(1.0),
+    }
     base["evaluation_windows"] = {
         "final": {
             "window_ids": window_ids,
@@ -56,6 +76,8 @@ def _mk_reports_with_tail_policy(*, mode: str) -> tuple[dict, dict]:
     subj["data"].update(
         {"dataset": "dummy", "split": "validation", "seq_len": 8, "stride": 8}
     )
+    subj["context"] = {"profile": "dev", "assurance": {"mode": "off"}}
+    subj["edit"]["name"] = "structured"
     ppl_sub = math.exp(sum(subject_ll) / len(subject_ll))
     subj["metrics"]["primary_metric"] = {
         "kind": "ppl_causal",
@@ -71,7 +93,13 @@ def _mk_reports_with_tail_policy(*, mode: str) -> tuple[dict, dict]:
             "token_counts": token_counts,
         }
     }
-    return subj, base
+    tail_policy = subj["meta"]["config"]["guards"]["metrics"]["pm_tail"]
+    canonical_subject = canonical_run_report(subj)
+    canonical_subject["resolved_policy"]["metrics"]["pm_tail"] = tail_policy
+    return (
+        refresh_runtime_policy_receipt(canonical_subject),
+        canonical_baseline(base),
+    )
 
 
 def test_tail_gate_warn_does_not_fail_validation():

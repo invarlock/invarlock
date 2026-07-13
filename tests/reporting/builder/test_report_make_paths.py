@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
+from tests.reporting._support_guard_metric_impact import ppl_guard_context
 
 
 def _mk_min_report_pm(kind: str = "ppl_causal") -> dict:
@@ -13,6 +18,7 @@ def _mk_min_report_pm(kind: str = "ppl_causal") -> dict:
             "ts": "2024-01-01T00:00:00",
             "auto": {"tier": "balanced", "probes_used": 0, "target_pm_ratio": None},
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "ds",
             "split": "val",
@@ -54,12 +60,9 @@ def test_make_evaluation_report_ratio_ci_from_run_metrics():
     rep = _mk_min_report_pm()
     # Provide a logloss_delta_ci to trigger run-metrics ratio_ci derivation path
     rep["metrics"]["logloss_delta_ci"] = (-0.02, 0.03)
-    baseline = {
-        "schema_version": "baseline-v1",
-        "meta": {},
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 4.0}},
-    }
-    cert = make_report(rep, baseline)
+    baseline = _mk_min_report_pm()
+    baseline["edit"]["name"] = "noop"
+    cert = make_report(canonical_run_report(rep), canonical_baseline(baseline))
     pm = cert.get("primary_metric", {})
     assert isinstance(pm, dict)
     dci = pm.get("display_ci")
@@ -77,12 +80,11 @@ def test_make_evaluation_report_pairing_and_dataset_stats_injection():
         "logloss": [4.0, 4.0],
         "token_counts": [100, 100],
     }
-    base = {
-        "meta": {},
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 4.0}},
-        "evaluation_windows": {"final": {"window_ids": [1, 2], "logloss": [4.0, 4.0]}},
+    base = _mk_min_report_pm()
+    base["evaluation_windows"] = {
+        "final": {"window_ids": [1, 2], "logloss": [4.0, 4.0]}
     }
-    cert = make_report(rep, base)
+    cert = make_report(canonical_run_report(rep), canonical_baseline(base))
     stats = cert.get("dataset", {}).get("windows", {}).get("stats", {})
     assert stats.get("pairing") == "paired_baseline"
     assert stats.get("paired_windows") == 2
@@ -90,26 +92,27 @@ def test_make_evaluation_report_pairing_and_dataset_stats_injection():
 
 def test_make_evaluation_report_policy_digest_changed_with_tier_difference():
     rep = _mk_min_report_pm()
-    base = {
-        "meta": {"auto": {"tier": "conservative"}},
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 4.0}},
+    base = _mk_min_report_pm()
+    base["meta"]["auto"] = {
+        "tier": "conservative",
+        "probes_used": 0,
+        "target_pm_ratio": None,
     }
-    cert = make_report(rep, base)
+    cert = make_report(canonical_run_report(rep), canonical_baseline(base))
     pd = cert.get("policy_digest", {})
     assert isinstance(pd, dict) and pd.get("changed") in {True, False}
 
 
-def test_make_evaluation_report_guard_overhead_integration():
+def test_make_evaluation_report_guard_metric_impact_integration():
     rep = _mk_min_report_pm()
     # Provide direct ratio path for overhead section
-    rep["guard_overhead"] = {
-        "bare_ppl": 100.0,
-        "guarded_ppl": 101.0,
-        "overhead_threshold": 0.02,
-    }
-    base = {"metrics": {"primary_metric": {"kind": "ppl_causal", "final": 4.0}}}
-    cert = make_report(rep, base)
-    go = cert.get("guard_overhead", {})
+    rep["guard_metric_impact"] = ppl_guard_context(100.0, 101.0, degradation_limit=0.02)
+    base = _mk_min_report_pm()
+    cert = make_report(canonical_run_report(rep), canonical_baseline(base))
+    go = cert.get("guard_metric_impact", {})
     assert go.get("evaluated") is True
     assert go.get("passed") is True
-    assert cert.get("validation", {}).get("guard_overhead_acceptable") in {True, False}
+    assert cert.get("validation", {}).get("guard_metric_impact_acceptable") in {
+        True,
+        False,
+    }

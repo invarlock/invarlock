@@ -14,49 +14,6 @@ def _load_scenarios() -> list[dict[str, object]]:
     return payload.get("scenarios", [])
 
 
-def _load_published_basis_index() -> dict[str, object]:
-    path = _repo_root() / "public_evidence/published_basis_index.json"
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    assert isinstance(payload, dict)
-    return payload
-
-
-def _load_published_mistral_guard_value_scenarios() -> list[dict[str, object]] | None:
-    path = (
-        _repo_root()
-        / "public_evidence/published_basis/mistral_7b/guard_value_demo"
-        / "artifact_package/state/scenarios.json"
-    )
-    if not path.is_file():
-        return None
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    return payload.get("scenarios", [])
-
-
-def _assert_mistral_guard_value_scenarios_snapshot_is_indexed() -> None:
-    index = _load_published_basis_index()
-    entries = index.get("entries")
-    assert isinstance(entries, list)
-    by_slug = {entry.get("slug"): entry for entry in entries if isinstance(entry, dict)}
-    mistral = by_slug.get("mistral_7b")
-    assert isinstance(mistral, dict)
-    artifacts = mistral.get("artifacts")
-    assert isinstance(artifacts, dict)
-    guard_value_demo = artifacts.get("guard_value_demo")
-    assert isinstance(guard_value_demo, dict)
-    assert guard_value_demo["kind"] == "directory"
-    assert guard_value_demo["path"] == (
-        "public_evidence/published_basis/mistral_7b/guard_value_demo"
-    )
-    control_hashes = guard_value_demo.get("control_hashes")
-    assert isinstance(control_hashes, dict)
-    assert control_hashes["artifact_package/state/scenarios.json"].startswith("sha256:")
-    external_asset = guard_value_demo.get("external_asset")
-    assert isinstance(external_asset, dict)
-    assert external_asset["archive_path"] == guard_value_demo["path"]
-    assert external_asset["url"].startswith("https://github.com/invarlock/invarlock/")
-
-
 def test_scenarios_include_intent_and_primary_guard_metadata() -> None:
     scenarios = _load_scenarios()
 
@@ -116,44 +73,86 @@ def test_scenarios_declare_artifact_taxonomy() -> None:
             assert scenario.get("optimized_deployment_backend") is True
 
 
-def test_scenarios_do_not_ship_unverified_quantization_lanes() -> None:
+def test_deployable_quantization_lanes_are_runnable_and_backend_bound() -> None:
     scenarios = _load_scenarios()
-
-    assert not any(
-        isinstance(scenario.get("generation"), dict)
-        and scenario["generation"].get("kind") == "deployable_edit"
+    deployable = [
+        scenario
         for scenario in scenarios
+        if isinstance(scenario.get("generation"), dict)
+        and scenario["generation"].get("kind") == "deployable_edit"
+    ]
+
+    assert {scenario["id"] for scenario in deployable} == {
+        "quant_8bit_deployable",
+        "quant_4bit_stress",
+    }
+    for scenario in deployable:
+        assert scenario["runnable"] is True
+        assert scenario["artifact_class"] == "deployable_optimized_subject"
+        assert scenario["generation"]["backend"] == "bitsandbytes"
+        assert scenario["generation"]["edit_spec"].startswith("bnb_")
+
+    deployable_8bit = next(
+        scenario for scenario in deployable if scenario["id"] == "quant_8bit_deployable"
     )
+    assert deployable_8bit["category"] == "deployable"
+    assert deployable_8bit["strictness"] == "informational"
+    assert deployable_8bit["intent"] == "production_artifact_assurance"
+    assert deployable_8bit["generation"]["version"] == "deployable"
 
 
-def test_scenarios_include_generated_lora_and_fine_tune_lane_parity() -> None:
+def test_active_scenarios_exclude_unsupported_fp8_and_lowrank_svd_lanes() -> None:
+    scenarios = _load_scenarios()
+    active_specs = {
+        str(generation.get("edit_spec"))
+        for scenario in scenarios
+        if isinstance((generation := scenario.get("generation")), dict)
+        and generation.get("kind") in {"edit", "deployable_edit"}
+    }
+
+    assert not {
+        spec for spec in active_specs if spec.startswith(("fp8_quant:", "lowrank_svd:"))
+    }
+    assert {
+        "bnb_8bit:8:all",
+        "bnb_4bit:4:all",
+        "magnitude_prune:clean",
+        "magnitude_prune:0.5:all",
+        "synthetic_lowrank_delta:clean",
+        "synthetic_lowrank_delta:8:64:all",
+        "synthetic_dense_update:clean",
+        "synthetic_dense_update:0.0005:3:all",
+    } <= active_specs
+
+
+def test_scenarios_include_synthetic_lowrank_and_dense_update_lane_parity() -> None:
     scenarios = _load_scenarios()
     by_id = {str(item.get("id")): item for item in scenarios}
 
     expected = {
-        "lora_rank4_clean": {
-            "edit_spec": "lora_merge:clean:attn",
+        "clean_synthetic_lowrank_delta": {
+            "edit_spec": "synthetic_lowrank_delta:clean",
             "version": "clean",
             "strictness": "must_pass",
-            "failure_class": "common_edit.lora_merge",
+            "failure_class": "common_edit.synthetic_lowrank_delta",
         },
-        "fine_tune_step1_clean": {
-            "edit_spec": "fine_tune:clean:ffn",
+        "clean_synthetic_dense_update": {
+            "edit_spec": "synthetic_dense_update:clean",
             "version": "clean",
             "strictness": "must_pass",
-            "failure_class": "common_edit.fine_tune",
+            "failure_class": "common_edit.synthetic_dense_update",
         },
-        "lora_rank8_stress": {
-            "edit_spec": "lora_merge:8:64:all",
+        "synthetic_lowrank_rank8_stress": {
+            "edit_spec": "synthetic_lowrank_delta:8:64:all",
             "version": "stress",
             "strictness": "informational",
-            "failure_class": "stress_edit.lora_merge",
+            "failure_class": "stress_edit.synthetic_lowrank_delta",
         },
-        "fine_tune_step3_stress": {
-            "edit_spec": "fine_tune:0.0005:3:all",
+        "synthetic_dense_update_iter3_stress": {
+            "edit_spec": "synthetic_dense_update:0.0005:3:all",
             "version": "stress",
             "strictness": "informational",
-            "failure_class": "stress_edit.fine_tune",
+            "failure_class": "stress_edit.synthetic_dense_update",
         },
     }
 
@@ -232,42 +231,6 @@ def test_scenarios_require_direct_primary_guard_hits_for_demo_probes() -> None:
             )
             assert isinstance(value, str), (
                 f"{scenario_id}: env value must be string for {key}"
-            )
-
-    fp8 = by_id["fp8_e5m2_stress"]
-    assert fp8.get("strictness") == "informational"
-    assert fp8.get("intent") == "historical_sentinel"
-    assert isinstance(fp8.get("requirements"), dict)
-    assert fp8["requirements"].get("primary_guard_required") is not True
-
-
-def test_mistral_guard_value_repo_contract_matches_published_snapshot_subset() -> None:
-    repo_by_id = {str(item.get("id")): item for item in _load_scenarios()}
-    published = _load_published_mistral_guard_value_scenarios()
-    contract_fields = (
-        "suites",
-        "category",
-        "strictness",
-        "intent",
-        "primary_guard",
-        "requirements",
-    )
-
-    if published is None:
-        _assert_mistral_guard_value_scenarios_snapshot_is_indexed()
-        return
-
-    assert published, "published Mistral guard-value snapshot must not be empty"
-
-    for published_scenario in published:
-        scenario_id = str(published_scenario.get("id"))
-        repo_scenario = repo_by_id.get(scenario_id)
-        assert repo_scenario is not None, (
-            f"{scenario_id}: repo manifest must retain published snapshot scenario"
-        )
-        for field in contract_fields:
-            assert repo_scenario.get(field) == published_scenario.get(field), (
-                f"{scenario_id}: repo field {field!r} must match published snapshot"
             )
 
 

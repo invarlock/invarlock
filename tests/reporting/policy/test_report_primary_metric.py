@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.rendering.markdown import render_report_markdown
 from invarlock.reporting.report_make import (
     REPORT_SCHEMA_VERSION,
 )
-from invarlock.reporting.report_validation import compute_validation_flags
+from invarlock.reporting.validation.report import compute_validation_flags
 
 
 def test_primary_metric_accuracy_gating_balanced_passes():
@@ -12,7 +12,12 @@ def test_primary_metric_accuracy_gating_balanced_passes():
     spectral = {"caps_applied": 0, "max_caps": 5}
     rmt = {"stable": True}
     invariants = {"status": "pass"}
-    pm = {"kind": "accuracy", "final": 0.90, "ratio_vs_baseline": -0.5, "n_final": 400}
+    pm = {
+        "kind": "accuracy",
+        "final": 0.90,
+        "delta_vs_baseline_pp": -0.5,
+        "n_final": 400,
+    }
 
     flags = compute_validation_flags(
         ppl,
@@ -22,7 +27,7 @@ def test_primary_metric_accuracy_gating_balanced_passes():
         tier="balanced",
         _ppl_metrics=None,
         target_ratio=None,
-        guard_overhead=None,
+        guard_metric_impact=None,
         primary_metric=pm,
     )
     assert flags["primary_metric_acceptable"] is True
@@ -68,15 +73,15 @@ def test_render_includes_primary_metric_section():
             "invariants_pass": True,
             "spectral_stable": True,
             "rmt_stable": True,
-            "guard_overhead_acceptable": True,
+            "guard_metric_impact_acceptable": True,
         },
-        "guard_overhead": {},
+        "guard_metric_impact": {},
         "auto": {"tier": "balanced", "probes_used": 0, "target_pm_ratio": None},
         "primary_metric": {
             "kind": "accuracy",
             "preview": 0.8,
             "final": 0.9,
-            "ratio_vs_baseline": +0.05,
+            "delta_vs_baseline_pp": +0.05,
         },
     }
     md = render_report_markdown(cert)

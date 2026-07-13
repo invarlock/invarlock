@@ -3,38 +3,7 @@
 coverage_owner_hint() {
     local rel="$1"
     case "${rel}" in
-        scripts/evidence_packs/lib/config/config_generator.sh) echo "scripts/evidence_packs/tests/test_config_generator.sh" ;;
-        scripts/evidence_packs/lib/config/dataset_provider_config.sh) echo "scripts/evidence_packs/tests/test_dataset_provider_config.sh" ;;
-        scripts/evidence_packs/lib/config/release_review_policy.sh) echo "scripts/evidence_packs/tests/test_run_pack_core.sh" ;;
-        scripts/evidence_packs/lib/tasks/task_serialization.sh) echo "scripts/evidence_packs/tests/test_task_serialization.sh" ;;
-        scripts/evidence_packs/lib/queue/queue_manager.sh) echo "scripts/evidence_packs/tests/test_queue_manager_core.sh" ;;
-        scripts/evidence_packs/lib/queue/queue_core.sh) echo "scripts/evidence_packs/tests/test_queue_manager_core.sh" ;;
-        scripts/evidence_packs/lib/queue/queue_lifecycle.sh) echo "scripts/evidence_packs/tests/test_queue_manager_generation.sh" ;;
-        scripts/evidence_packs/lib/queue/queue_dependencies.sh) echo "scripts/evidence_packs/tests/test_queue_manager_generation.sh" ;;
-        scripts/evidence_packs/lib/queue/queue_memory_plan.sh) echo "scripts/evidence_packs/tests/test_queue_manager_tasks.sh" ;;
-        scripts/evidence_packs/lib/queue/queue_generation.sh) echo "scripts/evidence_packs/tests/test_queue_manager_generation.sh" ;;
-        scripts/evidence_packs/lib/queue/scheduler.sh) echo "scripts/evidence_packs/tests/test_scheduler_core.sh" ;;
-        scripts/evidence_packs/lib/queue/scheduler_core.sh) echo "scripts/evidence_packs/tests/test_scheduler_selection.sh" ;;
-        scripts/evidence_packs/lib/queue/scheduler_gpu_runtime.sh) echo "scripts/evidence_packs/tests/test_scheduler_core.sh" ;;
-        scripts/evidence_packs/lib/queue/scheduler_reservations.sh) echo "scripts/evidence_packs/tests/test_scheduler_core.sh" ;;
-        scripts/evidence_packs/lib/queue/scheduler_selection.sh) echo "scripts/evidence_packs/tests/test_scheduler_selection.sh" ;;
-        scripts/evidence_packs/lib/queue/gpu_worker.sh) echo "scripts/evidence_packs/tests/test_gpu_worker.sh" ;;
-        scripts/evidence_packs/lib/core/fault_tolerance.sh) echo "scripts/evidence_packs/tests/test_fault_tolerance.sh" ;;
-        scripts/evidence_packs/lib/tasks/task_functions.sh) echo "scripts/evidence_packs/tests/test_task_functions_core.sh" ;;
-        scripts/evidence_packs/lib/tasks/task_common.sh) echo "scripts/evidence_packs/tests/test_task_functions_remaining.sh" ;;
-        scripts/evidence_packs/lib/tasks/task_baseline.sh) echo "scripts/evidence_packs/tests/test_task_functions_baseline.sh" ;;
-        scripts/evidence_packs/lib/tasks/task_edit_lifecycle.sh) echo "scripts/evidence_packs/tests/test_task_functions_remote.sh" ;;
-        scripts/evidence_packs/lib/tasks/task_error_lifecycle.sh) echo "scripts/evidence_packs/tests/test_task_functions_remote.sh" ;;
-        scripts/evidence_packs/lib/tasks/model_creation.sh) echo "scripts/evidence_packs/tests/test_model_creation.sh" ;;
         scripts/evidence_packs/lib/core/runtime.sh) echo "scripts/evidence_packs/tests/test_runtime.sh" ;;
-        scripts/evidence_packs/lib/validation/validation_suite.sh) echo "scripts/evidence_packs/tests/test_validation_suite_core.sh" ;;
-        scripts/evidence_packs/lib/validation/validation_preflight.sh) echo "scripts/evidence_packs/tests/test_validation_suite_preflight.sh" ;;
-        scripts/evidence_packs/lib/validation/validation_runtime.sh) echo "scripts/evidence_packs/tests/test_validation_suite_resume.sh" ;;
-        scripts/evidence_packs/lib/validation/validation_dynamic.sh) echo "scripts/evidence_packs/tests/test_validation_suite_dynamic.sh" ;;
-        scripts/evidence_packs/lib/core/setup_remote.sh) echo "scripts/evidence_packs/tests/test_setup_remote.sh" ;;
-        scripts/evidence_packs/run_suite.sh) echo "scripts/evidence_packs/tests/test_run_suite.sh" ;;
-        scripts/evidence_packs/run_mini_pack_gate.sh) echo "scripts/evidence_packs/tests/test_run_mini_pack_gate.sh" ;;
-        scripts/evidence_packs/run_pack.sh) echo "scripts/evidence_packs/tests/test_run_pack_core.sh" ;;
         scripts/evidence_packs/verify_pack.sh) echo "scripts/evidence_packs/tests/test_verify_pack_core.sh" ;;
         *) echo "scripts/evidence_packs/tests/<add_test>.sh" ;;
     esac

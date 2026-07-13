@@ -1,10 +1,13 @@
 import math
 from types import SimpleNamespace
 
+import pytest
+
 import invarlock.reporting.report_normalization as report_normalization
 from invarlock.reporting.dataset_hashing import _extract_dataset_info
 from invarlock.reporting.policy_utils import _resolve_policy_tier
 from invarlock.reporting.report_make import make_report
+from invarlock.reporting.report_types import create_empty_report
 from invarlock.reporting.utils import (
     _coerce_int,
     _get_mapping,
@@ -12,21 +15,36 @@ from invarlock.reporting.utils import (
     _iter_guard_entries,
     _sanitize_seed_bundle,
 )
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
+from tests.reporting._support_primary_metric import independent_slice_summary
 
 
 def _baseline_report(model_id: str, preview: float, final: float) -> dict[str, object]:
-    return {
-        "meta": {"model_id": model_id},
-        "metrics": {
-            "ppl_final": final,
-            "ppl_preview": preview,
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": preview,
-                "final": final,
+    baseline = create_empty_report()
+    baseline["meta"].update(
+        {
+            "model_id": model_id,
+            "adapter": "hf_causal",
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
             },
+        }
+    )
+    baseline["context"] = {"profile": "dev"}
+    baseline["edit"]["name"] = "noop"
+    baseline["metrics"] = {
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "preview": preview,
+            "final": final,
         },
     }
+    return canonical_baseline(baseline)
 
 
 def test_sanitize_seed_bundle_varied_inputs():
@@ -90,7 +108,8 @@ def test_resolve_policy_tier_exception_path():
             raise RuntimeError("boom")
 
     report = {"meta": {"auto": {"tier": BadStr()}}}
-    assert _resolve_policy_tier(report) == "balanced"
+    with pytest.raises(ValueError, match="meta.auto.tier"):
+        _resolve_policy_tier(report)
 
 
 def test_make_evaluation_report_raises_on_drift_vs_delta_mismatch(monkeypatch):
@@ -103,7 +122,11 @@ def test_make_evaluation_report_raises_on_drift_vs_delta_mismatch(monkeypatch):
             "ppl_preview": 10.0,
             "ppl_final": 11.0,
             # Inject a paired-delta summary mean inconsistent with preview→final drift
-            "paired_delta_summary": {"mean": math.log(1.22), "degenerate": False},
+            "preview_final_slice_delta_summary": independent_slice_summary(
+                math.log(1.22),
+                preview_windows=180,
+                final_windows=180,
+            ),
         },
         "data": {
             "dataset": "dummy",
@@ -129,21 +152,9 @@ def test_make_evaluation_report_raises_on_drift_vs_delta_mismatch(monkeypatch):
         },
         "plugins": {"adapter": {}, "edit": {}, "guards": []},
     }
-    baseline = {
-        "run_id": "r0",
-        "meta": {"model_id": "m"},
-        "metrics": {
-            "ppl_final": 9.5,
-            "ppl_preview": 9.4,
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 9.4,
-                "final": 9.5,
-            },
-        },
-        "evaluation_windows": {
-            "final": {"window_ids": window_ids, "logloss": logloss_vals}
-        },
+    baseline = _baseline_report("m", preview=9.4, final=9.5)
+    baseline["evaluation_windows"] = {
+        "final": {"window_ids": window_ids, "logloss": logloss_vals}
     }
     report["metrics"].update(
         {
@@ -185,23 +196,38 @@ def test_make_evaluation_report_raises_on_drift_vs_delta_mismatch(monkeypatch):
         lambda *_a, **_k: (-0.01, 0.01),
     )
 
-    # After normalization, this inconsistency no longer raises here; proceed and return a evaluation_report
+    # The canonical values are resolved before identity enforcement, so this
+    # inconsistent paired summary must fail closed.
     report.setdefault("metrics", {}).setdefault("window_plan", {}).update(
         {"profile": "ci", "preview_n": 180, "final_n": 180}
     )
-    cert = make_report(report, baseline)
-    assert isinstance(cert, dict)
+    with pytest.raises(ValueError, match="drift ratio"):
+        make_report(report, baseline)
 
 
 def test_make_evaluation_report_primary_seed_defaulted_when_missing(monkeypatch):
     report = {
         "meta": {
             "model_id": "m",
+            "adapter": "hf_causal",
             # Provide an explicit seed to satisfy strict validation
             "seed": 0,
             "seeds": {"python": None, "numpy": None, "torch": None},
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
         },
-        "metrics": {"ppl_preview": 10.0, "ppl_final": 10.1},
+        "context": {"profile": "dev"},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.1,
+                "ratio_vs_baseline": 1.0,
+            }
+        },
         "data": {
             "dataset": "dummy",
             "split": "val",
@@ -227,22 +253,32 @@ def test_make_evaluation_report_primary_seed_defaulted_when_missing(monkeypatch)
     baseline = _baseline_report("m", preview=10.1, final=10.2)
     monkeypatch.setattr(report_normalization, "validate_report", lambda _: True)
     # Ensure minimal acceptance criteria satisfied
-    report.setdefault("metrics", {})["ppl_ratio"] = 1.01
-    report["metrics"]["primary_metric"] = {
-        "kind": "ppl_causal",
-        "preview": 10.0,
-        "final": 10.1,
-        "ratio_vs_baseline": 1.0,
-    }
-    cert = make_report(report, baseline)
+    cert = make_report(canonical_run_report(report), baseline)
     # Seed=0 is a valid, preserved seed value.
     assert cert["meta"]["seed"] == 0
 
 
 def test_make_evaluation_report_uses_tokenizer_hash_from_data(monkeypatch):
     report = {
-        "meta": {"model_id": "m", "seed": 123},
-        "metrics": {"ppl_preview": 9.9, "ppl_final": 10.0},
+        "meta": {
+            "model_id": "m",
+            "adapter": "hf_causal",
+            "seed": 123,
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
+        },
+        "context": {"profile": "dev"},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 9.9,
+                "final": 10.0,
+                "ratio_vs_baseline": 1.0,
+            }
+        },
         "data": {
             "dataset": "dummy",
             "split": "val",
@@ -267,7 +303,7 @@ def test_make_evaluation_report_uses_tokenizer_hash_from_data(monkeypatch):
     }
     baseline = _baseline_report("m", preview=10.1, final=10.5)
     monkeypatch.setattr(report_normalization, "validate_report", lambda _: True)
-    cert = make_report(report, baseline)
+    cert = make_report(canonical_run_report(report), baseline)
     assert cert["meta"]["tokenizer_hash"] == "tok-abc"
 
 
@@ -275,11 +311,25 @@ def test_make_evaluation_report_includes_cuda_flags_and_model_profile(monkeypatc
     report = {
         "meta": {
             "model_id": "m",
+            "adapter": "hf_causal",
             "seed": 7,
             "cuda_flags": {"bf16": True},
             "model_profile": {"n_params": 1000},
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
         },
-        "metrics": {"ppl_preview": 9.9, "ppl_final": 10.0},
+        "context": {"profile": "dev"},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 9.9,
+                "final": 10.0,
+                "ratio_vs_baseline": 1.0,
+            }
+        },
         "data": {
             "dataset": "dummy",
             "split": "val",
@@ -303,18 +353,32 @@ def test_make_evaluation_report_includes_cuda_flags_and_model_profile(monkeypatc
     }
     baseline = _baseline_report("m", preview=10.1, final=10.5)
     monkeypatch.setattr(report_normalization, "validate_report", lambda _: True)
-    cert = make_report(report, baseline)
+    cert = make_report(canonical_run_report(report), baseline)
     # Extended meta fields may be omitted after normalization
     assert isinstance(cert.get("meta"), dict)
 
 
 def test_make_evaluation_report_carries_window_plan(monkeypatch):
     report = {
-        "meta": {"model_id": "m", "seed": 9},
+        "meta": {
+            "model_id": "m",
+            "adapter": "hf_causal",
+            "seed": 9,
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
+        },
+        "context": {"profile": "dev"},
         "metrics": {
-            "ppl_preview": 9.9,
-            "ppl_final": 10.0,
-            "window_plan": {"profile": "test", "preview_n": 10, "final_n": 12},
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 9.9,
+                "final": 10.0,
+                "ratio_vs_baseline": 1.0,
+            },
+            "window_plan": {"profile": "dev", "preview_n": 10, "final_n": 12},
         },
         "data": {
             "dataset": "dummy",
@@ -339,7 +403,7 @@ def test_make_evaluation_report_carries_window_plan(monkeypatch):
     }
     baseline = _baseline_report("m", preview=10.1, final=10.5)
     monkeypatch.setattr(report_normalization, "validate_report", lambda _: True)
-    cert = make_report(report, baseline)
+    cert = make_report(canonical_run_report(report), baseline)
     # Window plan may be omitted; ensure dataset pairing stats are present
     stats = cert.get("dataset", {}).get("windows", {}).get("stats", {})
     assert isinstance(stats, dict)

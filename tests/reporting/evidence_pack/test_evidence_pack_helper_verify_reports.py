@@ -11,6 +11,10 @@ import invarlock.evidence_pack as evidence_pack_mod
 import invarlock.evidence_pack_integrity as evidence_pack_integrity_mod
 from invarlock.reporting.verify_contract import VerifyExecutionResult, VerifyOutcome
 from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
+from tests._support_evidence_pack_signing import (
+    generate_signing_keypair,
+    sign_manifest,
+)
 
 
 def _write_json(path: Path, payload: object) -> None:
@@ -38,6 +42,29 @@ def _write_pack_scaffold(pack_dir: Path) -> tuple[Path, Path, Path]:
     environment = pack_dir / "metadata" / "environment.json"
     _write_json(final_verdict, {"verdict": "PASS"})
     _write_json(environment, {"platform": "test"})
+    _write_json(
+        pack_dir / "metadata/scenarios.json",
+        {
+            "scenarios": [
+                {
+                    "id": "clean",
+                    "strictness": "must_pass",
+                    "artifact_class": "evidence_only_pack",
+                    "generation": {"kind": "evidence_only"},
+                },
+                {
+                    "id": "noop",
+                    "strictness": "must_fail",
+                    "primary_guard": "primary_metric",
+                    "artifact_class": "fault_injection_fixture",
+                    "generation": {
+                        "kind": "error",
+                        "error_type": "nan_injection",
+                    },
+                },
+            ]
+        },
+    )
     return report_path, final_verdict, environment
 
 
@@ -56,12 +83,14 @@ def _write_manifest_and_checksums(
     ).replace("\\", "/")
     rel_verdict = str(final_verdict.relative_to(pack_dir)).replace("\\", "/")
     rel_environment = str(environment.relative_to(pack_dir)).replace("\\", "/")
+    scenarios = pack_dir / "metadata/scenarios.json"
     if checksum_lines is None:
         checksum_lines = [
             f"{_sha256_bytes(final_verdict.read_bytes())}  {rel_verdict}",
             f"{_sha256_bytes(environment.read_bytes())}  {rel_environment}",
             f"{_sha256_bytes(report_path.read_bytes())}  {rel_report}",
             f"{_sha256_bytes((report_path.parent / RUNTIME_MANIFEST_FILENAME).read_bytes())}  {rel_runtime}",
+            f"{_sha256_bytes(scenarios.read_bytes())}  metadata/scenarios.json",
         ]
     checksums_path = pack_dir / "checksums.sha256"
     checksums_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
@@ -97,7 +126,7 @@ def _sign_pack(
     )
     private_key = key_root
     public_key = key_root.with_name(f"{key_root.stem}.pub.pem")
-    fingerprint = evidence_pack_mod._generate_signing_keypair(
+    fingerprint = generate_signing_keypair(
         private_key,
         public_key_path=public_key,
     )
@@ -109,9 +138,7 @@ def _sign_pack(
             else manifest_fingerprint_override
         )
         _write_json(pack_dir / "manifest.json", manifest)
-    evidence_pack_mod._sign_manifest(
-        pack_dir / "manifest.json", signing_key_path=private_key
-    )
+    sign_manifest(pack_dir / "manifest.json", signing_key_path=private_key)
     return fingerprint
 
 
@@ -180,6 +207,23 @@ def test_verify_reports_and_inspect_cover_error_paths(
     )
     error_report.parent.mkdir(parents=True, exist_ok=True)
     error_report.write_text("{}", encoding="utf-8")
+    _write_json(
+        error_only_pack / "metadata/scenarios.json",
+        {
+            "scenarios": [
+                {
+                    "id": "noop",
+                    "strictness": "must_fail",
+                    "primary_guard": "primary_metric",
+                    "artifact_class": "fault_injection_fixture",
+                    "generation": {
+                        "kind": "error",
+                        "error_type": "nan_injection",
+                    },
+                }
+            ]
+        },
+    )
     errors, payload = evidence_pack_mod._verify_reports(
         error_only_pack,
         json_out_path=None,

@@ -25,7 +25,12 @@ def test_evaluation_report_schema_valid_and_fallback(monkeypatch):
             "seq_len": 4,
             "windows": {"preview": 1, "final": 1, "stats": {}},
         },
-        "primary_metric": {"kind": "ppl_causal", "final": 10.0},
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "preview": 10.0,
+            "final": 10.0,
+            "ratio_vs_baseline": 1.0,
+        },
         "validation": {},
     }
     assert validate_report(cert) is True

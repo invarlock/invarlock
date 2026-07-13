@@ -9,7 +9,7 @@ This is the single source of truth for all evaluation results.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, NotRequired, TypedDict
+from typing import Any, Literal, NotRequired, TypedDict, cast
 
 from invarlock.core.metric_kind_contract import (
     MetricKindContractError,
@@ -42,12 +42,17 @@ class MetaData(TypedDict):
     device: str  # Device used ("cpu", "cuda", "mps")
     ts: str  # ISO timestamp of evaluation
     auto: AutoConfig | None  # Auto-tuning configuration (if used)
+    model_identity: NotRequired[dict[str, str]]
 
 
 class DataConfig(TypedDict):
     """Configuration of evaluation dataset and windowing."""
 
     dataset: str  # Dataset name (e.g., "wikitext2")
+    provider: NotRequired[str]
+    dataset_name: NotRequired[str]
+    config_name: NotRequired[str]
+    revision: NotRequired[str]
     split: str  # Dataset split ("validation", "test")
     seq_len: int  # Sequence length for tokenization
     stride: int  # Stride for window generation
@@ -145,7 +150,8 @@ class EvalMetrics(TypedDict, total=False):
     window_pairing_preview: dict[str, Any]
     window_pairing_final: dict[str, Any]
     paired_windows: int
-    paired_delta_summary: dict[str, Any]
+    preview_final_slice_delta_summary: dict[str, Any]
+    # Bootstrap method, replicate count, seed, and measured coverage provenance.
     bootstrap: dict[str, Any]
     reduction: NotRequired[dict[str, Any]]
     moe: NotRequired[dict[str, Any]]
@@ -167,6 +173,87 @@ class Flags(TypedDict):
     rollback_reason: str | None  # Reason for rollback (if any)
 
 
+class GuardMetricImpactDiagnostic(TypedDict):
+    """One structured diagnostic emitted while evaluating metric degradation."""
+
+    kind: str
+    severity: str
+    message: str
+    details: dict[str, Any]
+
+
+class AccuracyMetricImpactFacts(TypedDict):
+    """Retained sufficient statistics for an accuracy measurement arm."""
+
+    correct: int
+    total: int
+    example_ids_digest: NotRequired[str]
+
+
+class PPLMetricImpactFacts(TypedDict):
+    """Retained sufficient statistics for a perplexity measurement arm."""
+
+    weighted_logloss_sum: float
+    token_count: int
+    example_ids_digest: NotRequired[str]
+
+
+GuardMetricImpactFacts = AccuracyMetricImpactFacts | PPLMetricImpactFacts
+
+
+class GuardMetricImpactBarePrimaryMetric(TypedDict):
+    kind: str
+    final: float
+
+
+class GuardMetricImpactBareReport(TypedDict):
+    """Closed retained evidence envelope for the independently run bare arm."""
+
+    primary_metric: GuardMetricImpactBarePrimaryMetric
+    final: dict[str, Any]
+
+
+class GuardMetricImpactEvaluated(TypedDict):
+    """Canonical measured guard-induced primary-metric degradation payload."""
+
+    metric_kind: str
+    direction: Literal["lower", "higher"]
+    degradation_basis: Literal["relative_increase", "absolute_drop"]
+    bare_value: float
+    guarded_value: float
+    bare_facts: GuardMetricImpactFacts
+    guarded_facts: GuardMetricImpactFacts
+    bare_report: GuardMetricImpactBareReport
+    degradation: float
+    degradation_limit: float
+    display_value: float
+    display_unit: Literal["percent", "percentage_points"]
+    evaluated: Literal[True]
+    passed: bool
+    checks: dict[str, bool]
+    diagnostics: list[GuardMetricImpactDiagnostic]
+    source: str
+    schedule_digest: str
+
+
+class GuardMetricImpactUnevaluated(TypedDict):
+    """Fail-closed skipped or otherwise unevaluated metric-impact payload."""
+
+    degradation_limit: float
+    evaluated: Literal[False]
+    passed: Literal[False]
+    checks: dict[str, bool]
+    diagnostics: list[GuardMetricImpactDiagnostic]
+    source: str
+    schedule_digest: NotRequired[str]
+    skipped: NotRequired[Literal[True]]
+    skip_reason: NotRequired[str]
+    mode: NotRequired[Literal["skipped", "unevaluated"]]
+
+
+GuardMetricImpact = GuardMetricImpactEvaluated | GuardMetricImpactUnevaluated
+
+
 class RunReport(TypedDict):
     """
     Canonical report structure for InvarLock evaluation results.
@@ -184,10 +271,12 @@ class RunReport(TypedDict):
     flags: Flags  # Status flags
     evaluation_windows: NotRequired[dict[str, Any]]
     # Optional extras kept for richer later processing
-    guard_overhead: NotRequired[dict[str, Any]]
+    guard_metric_impact: NotRequired[GuardMetricImpact]
     provenance: NotRequired[dict[str, Any]]
     context: NotRequired[dict[str, Any]]
     evaluation_realism: NotRequired[dict[str, Any]]
+    resolved_policy: NotRequired[dict[str, Any]]
+    policy_resolution: NotRequired[dict[str, Any]]
 
 
 # Utility functions for creating reports
@@ -258,6 +347,14 @@ def validate_report(report: object) -> bool:
     guards = report.get("guards")
     if not isinstance(guards, list):
         return False
+    for guard in guards:
+        if not isinstance(guard, dict):
+            return False
+        name = guard.get("name")
+        if not isinstance(name, str) or not name.strip():
+            return False
+        if not isinstance(guard.get("passed"), bool):
+            return False
 
     metrics = report.get("metrics")
     if not isinstance(metrics, dict):
@@ -274,7 +371,17 @@ def validate_report(report: object) -> bool:
     pm_final = pm.get("final")
     if not isinstance(pm_kind, str):
         return False
-    if pm_final is not None and not _is_non_bool_number(pm_final):
+    if pm_kind == "accuracy" and "ratio_vs_baseline" in pm:
+        return False
+    pm_preview = pm.get("preview")
+    if not _is_non_bool_number(pm_preview) or not _is_non_bool_number(pm_final):
+        return False
+    preview_value = float(cast(int | float, pm_preview))
+    final_value = float(cast(int | float, pm_final))
+    if pm_kind == "accuracy":
+        if not 0.0 <= preview_value <= 1.0 or not 0.0 <= final_value <= 1.0:
+            return False
+    elif preview_value < 1.0 or final_value < 1.0:
         return False
 
     meta = report.get("meta")

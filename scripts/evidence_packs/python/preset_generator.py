@@ -29,11 +29,9 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
 
 DEFAULT_PRESET_EDIT_TYPES = (
     "quant_rtn",
-    "fp8_quant",
     "magnitude_prune",
-    "lowrank_svd",
-    "lora_merge",
-    "fine_tune",
+    "synthetic_lowrank_delta",
+    "synthetic_dense_update",
 )
 
 
@@ -136,17 +134,23 @@ def _resolve_dataset_provider_spec(
         return provider
 
     if kind_norm == "hf_text":
-        dataset_name = os.environ.get("INVARLOCK_HF_DATASET_NAME") or os.environ.get(
-            "INVARLOCK_HF_DATASET"
-        )
+        if os.environ.get("INVARLOCK_HF_DATASET"):
+            raise SystemExit(
+                "INVARLOCK_HF_DATASET is unsupported; use INVARLOCK_HF_DATASET_NAME"
+            )
+        if os.environ.get("INVARLOCK_HF_DATASET_CONFIG_NAME"):
+            raise SystemExit(
+                "INVARLOCK_HF_DATASET_CONFIG_NAME is unsupported; "
+                "use INVARLOCK_HF_CONFIG_NAME"
+            )
+        dataset_name = os.environ.get("INVARLOCK_HF_DATASET_NAME")
         if not dataset_name:
             dataset_name = "allenai/c4"
-        # Migrate legacy "c4" to "allenai/c4" (script-based c4 deprecated in datasets 4.x)
         if str(dataset_name) == "c4":
-            dataset_name = "allenai/c4"
-        config_name = os.environ.get("INVARLOCK_HF_CONFIG_NAME") or os.environ.get(
-            "INVARLOCK_HF_DATASET_CONFIG_NAME"
-        )
+            raise SystemExit(
+                "dataset_name=c4 is unsupported; use allenai/c4 explicitly"
+            )
+        config_name = os.environ.get("INVARLOCK_HF_CONFIG_NAME")
         if not config_name and str(dataset_name) == "allenai/c4":
             config_name = "en"
         text_field = os.environ.get("INVARLOCK_HF_TEXT_FIELD") or "text"
@@ -177,6 +181,9 @@ def _resolve_dataset_provider_spec(
             "text_field": str(text_field),
             "max_samples": int(max_samples),
         }
+        revision = os.environ.get("INVARLOCK_HF_DATASET_REVISION")
+        if revision:
+            provider["revision"] = str(revision)
         if config_name:
             provider["config_name"] = str(config_name)
         if trust_remote_code is not None:
@@ -184,6 +191,11 @@ def _resolve_dataset_provider_spec(
         if cache_dir:
             provider["cache_dir"] = str(cache_dir)
         return provider
+
+    if kind_norm == "wikitext2":
+        revision = os.environ.get("INVARLOCK_HF_DATASET_REVISION")
+        if revision:
+            return {"kind": "wikitext2", "revision": str(revision)}
 
     if kind_norm == "local_jsonl":
         file = os.environ.get("INVARLOCK_LOCAL_JSONL_FILE")

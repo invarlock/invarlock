@@ -1,11 +1,29 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mk_report() -> tuple[dict, dict]:
     r = {
-        "meta": {"model_id": "m", "adapter": "hf_causal", "device": "cpu", "seed": 1},
+        "meta": {
+            "model_id": "m",
+            "adapter": "hf_causal",
+            "device": "cpu",
+            "seed": 1,
+            "auto": {"tier": "balanced"},
+        },
+        "context": {"profile": "dev"},
+        "data": {
+            "dataset": "dummy",
+            "split": "validation",
+            "seq_len": 8,
+            "stride": 4,
+            "preview_n": 2,
+            "final_n": 2,
+        },
+        "edit": {"name": "structured"},
         "metrics": {
             "primary_metric": {
                 "kind": "ppl_causal",
@@ -33,26 +51,17 @@ def _mk_report() -> tuple[dict, dict]:
         "artifacts": {"events_path": "", "logs_path": ""},
     }
     b = {
+        **r,
         "run_id": "baseline-1",
-        "model_id": "m",
+        "edit": {"name": "noop"},
         "metrics": {
-            "primary_metric": {"kind": "ppl_causal", "final": 50.0},
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 50.0,
+                "final": 50.0,
+            },
             "bootstrap": {"replicates": 200, "alpha": 0.05},
         },
-        "evaluation_windows": {
-            "preview": {
-                "window_ids": [1, 2],
-                "logloss": [1.0, 1.1],
-                "token_counts": [100, 200],
-            },
-            "final": {
-                "window_ids": [3, 4],
-                "logloss": [1.0, 1.1],
-                "token_counts": [100, 200],
-            },
-        },
-        "guards": [],
-        "artifacts": {"events_path": "", "logs_path": ""},
     }
     return r, b
 

@@ -2,6 +2,104 @@
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/pack_manifest_test_helpers.sh"
 
+test_verify_pack_baseline_material_helper_forwards_assurance() {
+    mock_reset
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local calls="${TEST_TMPDIR}/baseline-material.calls"
+    _cmd_python() {
+        printf '%s\n' "$*" > "${calls}"
+    }
+
+    run pack_verify_baseline_materials "${TEST_TMPDIR}/pack" strict
+
+    assert_rc "0" "${RUN_RC}" "baseline material helper succeeds"
+    assert_match "baseline-materials ${TEST_TMPDIR}/pack --report-assurance strict" "$(cat "${calls}")" "baseline assurance is forwarded"
+}
+
+test_verify_pack_strict_rejects_missing_signed_baseline_material() {
+    mock_reset
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}"
+    printf '%s\n' \
+        '{"format":"evidence-pack-v1","verification":{"report_assurance":"strict"}}' \
+        > "${pack_dir}/manifest.json"
+
+    run pack_verify_baseline_materials "${pack_dir}" strict
+
+    assert_rc "1" "${RUN_RC}" "strict baseline declaration is mandatory"
+    assert_match "requires signed verification_baselines" "${RUN_ERR}" "missing baseline declaration is explicit"
+}
+
+test_verify_pack_final_verdict_binding_matches_report() {
+    mock_reset
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    local report_rel="reports/report-001/evaluation.report.json"
+    mkdir -p "${pack_dir}/results" "${pack_dir}/reports/report-001"
+    printf '%s\n' '{"run_id":"run-1","ok":true}' > "${pack_dir}/${report_rel}"
+    local report_sha
+    report_sha="$(pack_file_sha256 "${pack_dir}" "${report_rel}")"
+    printf '%s\n' \
+        "{\"verdict\":\"PASS\",\"report_sha256\":\"${report_sha}\",\"run_id\":\"run-1\"}" \
+        > "${pack_dir}/results/final_verdict.json"
+
+    run pack_verify_final_verdict_binding "${pack_dir}" 1
+    assert_rc "0" "${RUN_RC}" "matching final-verdict report binding passes"
+}
+
+test_verify_pack_final_verdict_binding_rejects_stale_hash() {
+    mock_reset
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/results" "${pack_dir}/reports/report-001"
+    printf '%s\n' '{"run_id":"run-1","ok":true}' \
+        > "${pack_dir}/reports/report-001/evaluation.report.json"
+    printf '%s\n' \
+        "{\"verdict\":\"PASS\",\"report_sha256\":\"$(printf '0%.0s' {1..64})\",\"run_id\":\"run-1\"}" \
+        > "${pack_dir}/results/final_verdict.json"
+
+    run pack_verify_final_verdict_binding "${pack_dir}" 1
+    assert_rc "1" "${RUN_RC}" "stale final-verdict report hash fails"
+    assert_match "report_sha256 does not match" "${RUN_ERR}" "hash mismatch is explicit"
+}
+
+test_verify_pack_rejects_report_symlink_before_checksum_read() {
+    mock_reset
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    local outside_dir="${TEST_TMPDIR}/outside"
+    mkdir -p "${pack_dir}/results" "${pack_dir}/reports/report-001" "${outside_dir}"
+    printf '%s\n' '{"run_id":"outside","ok":true}' \
+        > "${outside_dir}/evaluation.report.json"
+    ln -s "${outside_dir}/evaluation.report.json" \
+        "${pack_dir}/reports/report-001/evaluation.report.json"
+    printf '%s\n' \
+        "{\"verdict\":\"PASS\",\"report_sha256\":\"$(printf '0%.0s' {1..64})\"}" \
+        > "${pack_dir}/results/final_verdict.json"
+    printf '%s\n' '{}' > "${pack_dir}/manifest.json"
+    : > "${pack_dir}/checksums.sha256"
+
+    pack_validate_manifest_schema() { return 0; }
+    pack_verify_signature() { return 0; }
+    pack_verify_manifest_binds_checksums() { return 0; }
+    pack_verify_checksums() {
+        touch "${TEST_TMPDIR}/checksum-called"
+        return 0
+    }
+
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify --strict
+    assert_rc "${PACK_VERIFY_INTEGRITY}" "${RUN_RC}" "report symlink is an integrity failure"
+    assert_match "must not contain symlinks" "${RUN_ERR}" "symlink rejection is explicit"
+    [[ ! -e "${TEST_TMPDIR}/checksum-called" ]] \
+        || t_fail "checksum verifier must not run before report symlink rejection"
+}
+
 test_verify_pack_strict_rejects_extra_files() {
     mock_reset
 
@@ -299,7 +397,7 @@ test_verify_pack_rejects_signature_when_manifest_records_mismatched_fingerprint(
 import sys
 from pathlib import Path
 
-from invarlock.evidence_pack_integrity import generate_signing_keypair, sign_manifest
+from tests._support_evidence_pack_signing import generate_signing_keypair, sign_manifest
 
 private_key = Path(sys.argv[1])
 public_key = Path(sys.argv[2])
@@ -313,13 +411,35 @@ PY
     assert_match "does not match signature key" "${RUN_ERR}" "fingerprint mismatch surfaced"
 }
 
-test_verify_pack_verify_reports_attempts_error_injection_reports_best_effort() {
+test_verify_pack_rejects_unsignaled_error_injection_failure() {
     mock_reset
 
     source ./scripts/evidence_packs/verify_pack.sh
 
     local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}/reports/modelA/edit/run_1" "${pack_dir}/reports/modelA/errors/nan_injection"
+    mkdir -p "${pack_dir}/metadata" "${pack_dir}/reports/modelA/edit/run_1" "${pack_dir}/reports/modelA/errors/nan_injection"
+    cat > "${pack_dir}/metadata/scenarios.json" <<'JSON'
+{
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "edit", "strictness": "must_pass"},
+    {
+      "id": "nan_injection",
+      "strictness": "must_fail",
+      "requirements": {
+        "detectors_any_of": [
+          {
+            "kind": "validation_flag",
+            "flag": "primary_metric_acceptable",
+            "expected": false
+          }
+        ]
+      }
+    }
+  ]
+}
+JSON
     echo "{}" > "${pack_dir}/reports/modelA/edit/run_1/evaluation.report.json"
     echo "{}" > "${pack_dir}/reports/modelA/errors/nan_injection/evaluation.report.json"
 
@@ -331,9 +451,11 @@ set -euo pipefail
 echo "$*" >> "${TEST_TMPDIR}/invarlock.calls"
 for arg in "$@"; do
     if [[ "${arg}" == */errors/*/evaluation.report.json ]]; then
+        echo '{"summary":{"ok":false,"reason":"policy_fail"},"results":[{"ok":false,"reason":"policy_fail","verification":{"runtime_provenance":{"binding_verified":true,"expected_digest_matched":false,"trust_status":"manifest_bound"}}}]}'
         exit 1
     fi
 done
+echo '{"summary":{"ok":true,"reason":"ok"},"results":[{"ok":true,"reason":"ok"}]}'
 exit 0
 EOF
     chmod +x "${bin_dir}/invarlock"
@@ -342,7 +464,8 @@ EOF
     PATH="${bin_dir}:${PATH}"
 
     run pack_verify_reports "${pack_dir}" ""
-    assert_rc "0" "${RUN_RC}" "verify succeeds when error-injection reports fail"
+    assert_rc "1" "${RUN_RC}" "unsignaled error-injection failure is rejected"
+    assert_match "lacks its intended report-local failure signal" "${RUN_ERR}" "missing report signal is explicit"
     assert_match "errors/nan_injection/evaluation\\.report\\.json" "$(cat "${TEST_TMPDIR}/invarlock.calls")" "attempts error-injection reports"
 
     PATH="${original_path}"
@@ -354,8 +477,30 @@ test_verify_pack_verify_reports_accepts_error_injection_report_failure_signal() 
     source ./scripts/evidence_packs/verify_pack.sh
 
     local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}/reports/modelA/edit/run_1" "${pack_dir}/reports/modelA/errors/scale_explosion"
-    echo '{"validation":{"primary_metric_acceptable":true,"preview_final_drift_acceptable":true,"invariants_pass":true,"spectral_stable":true,"rmt_stable":true,"guard_overhead_acceptable":true}}' > "${pack_dir}/reports/modelA/edit/run_1/evaluation.report.json"
+    mkdir -p "${pack_dir}/metadata" "${pack_dir}/reports/modelA/edit/run_1" "${pack_dir}/reports/modelA/errors/scale_explosion"
+    cat > "${pack_dir}/metadata/scenarios.json" <<'JSON'
+{
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "edit", "strictness": "must_pass"},
+    {
+      "id": "scale_explosion",
+      "strictness": "must_fail",
+      "requirements": {
+        "detectors_any_of": [
+          {
+            "kind": "validation_flag",
+            "flag": "primary_metric_acceptable",
+            "expected": false
+          }
+        ]
+      }
+    }
+  ]
+}
+JSON
+    echo '{"validation":{"primary_metric_acceptable":true,"preview_final_drift_acceptable":true,"invariants_pass":true,"spectral_stable":true,"rmt_stable":true,"guard_metric_impact_acceptable":true}}' > "${pack_dir}/reports/modelA/edit/run_1/evaluation.report.json"
     cat > "${pack_dir}/reports/modelA/errors/scale_explosion/evaluation.report.json" <<'JSON'
 {
   "validation": {
@@ -364,7 +509,7 @@ test_verify_pack_verify_reports_accepts_error_injection_report_failure_signal() 
     "invariants_pass": true,
     "spectral_stable": true,
     "rmt_stable": true,
-    "guard_overhead_acceptable": true
+    "guard_metric_impact_acceptable": true
   }
 }
 JSON
@@ -377,10 +522,11 @@ set -euo pipefail
 echo "$*" >> "${TEST_TMPDIR}/invarlock.calls"
 for arg in "$@"; do
     if [[ "${arg}" == */errors/*/evaluation.report.json ]]; then
+        echo '{"summary":{"ok":false,"reason":"policy_fail"},"results":[{"ok":false,"reason":"policy_fail","verification":{"runtime_provenance":{"binding_verified":true,"expected_digest_matched":false,"trust_status":"manifest_bound"}}}]}'
         exit 1
     fi
 done
-echo '{"ok": true}'
+echo '{"summary":{"ok":true,"reason":"ok"},"results":[{"ok":true,"reason":"ok"}]}'
 exit 0
 EOF
     chmod +x "${bin_dir}/invarlock"
@@ -411,12 +557,25 @@ test_verify_pack_verify_reports_accepts_scenario_expected_failures() {
   "schema_version": 1,
   "scenarios": [
     {"id": "quant_4bit_clean", "strictness": "must_pass"},
-    {"id": "prune_50pct_stress", "strictness": "must_fail"}
+    {
+      "id": "prune_50pct_stress",
+      "strictness": "must_fail",
+      "primary_guard": "primary_metric",
+      "requirements": {
+        "detectors_any_of": [
+          {
+            "kind": "validation_flag",
+            "flag": "primary_metric_acceptable",
+            "expected": false
+          }
+        ]
+      }
+    }
   ]
 }
 JSON
     echo "{}" > "${pack_dir}/reports/modelA/quant_4bit_clean/run_1/evaluation.report.json"
-    echo "{}" > "${pack_dir}/reports/modelA/prune_50pct_stress/run_1/evaluation.report.json"
+    echo '{"validation":{"primary_metric_acceptable":false}}' > "${pack_dir}/reports/modelA/prune_50pct_stress/run_1/evaluation.report.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -426,9 +585,11 @@ set -euo pipefail
 echo "$*" >> "${TEST_TMPDIR}/invarlock.calls"
 for arg in "$@"; do
     if [[ "${arg}" == */prune_50pct_stress/*/evaluation.report.json ]]; then
+        echo '{"summary":{"ok":false,"reason":"policy_fail"},"results":[{"ok":false,"reason":"policy_fail","verification":{"runtime_provenance":{"binding_verified":true,"expected_digest_matched":false,"trust_status":"manifest_bound"}}}]}'
         exit 1
     fi
 done
+echo '{"summary":{"ok":true,"reason":"ok"},"results":[{"ok":true,"reason":"ok"}]}'
 exit 0
 EOF
     chmod +x "${bin_dir}/invarlock"
@@ -475,6 +636,7 @@ JSON
 #!/usr/bin/env bash
 set -euo pipefail
 echo "$*" >> "${TEST_TMPDIR}/invarlock.calls"
+printf '%s\n' '{"summary":{"ok":true,"reason":"ok"},"results":[{"ok":true,"reason":"ok"}]}'
 exit 0
 EOF
     chmod +x "${bin_dir}/invarlock"
@@ -519,6 +681,7 @@ JSON
     cat > "${bin_dir}/invarlock" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+printf '%s\n' '{"summary":{"ok":true,"reason":"ok"},"results":[{"ok":true,"reason":"ok"}]}'
 exit 0
 EOF
     chmod +x "${bin_dir}/invarlock"
@@ -533,13 +696,112 @@ EOF
     PATH="${original_path}"
 }
 
+_write_expected_failure_contract_pack() {
+    local pack_dir="$1"
+    mkdir -p "${pack_dir}/metadata"
+    mkdir -p "${pack_dir}/reports/modelA/clean/run_1"
+    mkdir -p "${pack_dir}/reports/modelA/stress/run_1"
+    cat > "${pack_dir}/metadata/scenarios.json" <<'JSON'
+{
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "clean", "strictness": "must_pass"},
+    {
+      "id": "stress",
+      "strictness": "must_fail",
+      "primary_guard": "primary_metric",
+      "requirements": {
+        "detectors_any_of": [
+          {
+            "kind": "validation_flag",
+            "flag": "primary_metric_acceptable",
+            "expected": false
+          }
+        ]
+      }
+    }
+  ]
+}
+JSON
+    echo '{}' > "${pack_dir}/reports/modelA/clean/run_1/evaluation.report.json"
+    echo '{"validation":{"primary_metric_acceptable":false}}' > "${pack_dir}/reports/modelA/stress/run_1/evaluation.report.json"
+}
+
+test_verify_pack_rejects_malformed_result_as_expected_failure() {
+    mock_reset
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    _write_expected_failure_contract_pack "${pack_dir}"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+for arg in "$@"; do
+    if [[ "${arg}" == */stress/*/evaluation.report.json ]]; then
+        echo '{"summary":{"ok":false,"reason":"malformed"},"results":[{"ok":false,"reason":"malformed","verification":{"runtime_provenance":{"binding_verified":true,"expected_digest_matched":false,"trust_status":"manifest_bound"}}}]}'
+        exit 2
+    fi
+done
+echo '{"summary":{"ok":true,"reason":"ok"},"results":[{"ok":true,"reason":"ok"}]}'
+EOF
+    chmod +x "${bin_dir}/invarlock"
+
+    local original_path="${PATH}"
+    PATH="${bin_dir}:${PATH}"
+    run pack_verify_reports "${pack_dir}" ""
+    assert_rc "1" "${RUN_RC}" "malformed report cannot satisfy must_fail"
+    assert_match "must produce POLICY_FAIL, not malformed" "${RUN_ERR}" "malformed outcome is explicit"
+    PATH="${original_path}"
+}
+
+test_verify_pack_rejects_runtime_only_result_as_expected_failure() {
+    mock_reset
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    _write_expected_failure_contract_pack "${pack_dir}"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+for arg in "$@"; do
+    if [[ "${arg}" == */stress/*/evaluation.report.json ]]; then
+        echo '{"summary":{"ok":false,"reason":"policy_fail"},"results":[{"ok":false,"reason":"policy_fail","verification":{"runtime_provenance":{"binding_verified":false,"expected_digest_matched":false,"trust_status":"failed"}}}]}'
+        exit 1
+    fi
+done
+echo '{"summary":{"ok":true,"reason":"ok"},"results":[{"ok":true,"reason":"ok"}]}'
+EOF
+    chmod +x "${bin_dir}/invarlock"
+
+    local original_path="${PATH}"
+    PATH="${bin_dir}:${PATH}"
+    run pack_verify_reports "${pack_dir}" ""
+    assert_rc "1" "${RUN_RC}" "runtime-only failure cannot satisfy must_fail"
+    assert_match "lacks valid report/runtime binding" "${RUN_ERR}" "runtime binding failure is explicit"
+    PATH="${original_path}"
+}
+
 test_verify_pack_verify_reports_errors_when_only_error_injection_reports_present() {
     mock_reset
 
     source ./scripts/evidence_packs/verify_pack.sh
 
     local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}/reports/modelA/errors/nan_injection"
+    mkdir -p "${pack_dir}/metadata" "${pack_dir}/reports/modelA/errors/nan_injection"
+    cat > "${pack_dir}/metadata/scenarios.json" <<'JSON'
+{
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [{"id": "nan_injection", "strictness": "must_fail"}]
+}
+JSON
     echo "{}" > "${pack_dir}/reports/modelA/errors/nan_injection/evaluation.report.json"
 
     run pack_verify_reports "${pack_dir}" ""
@@ -586,6 +848,7 @@ test_verify_pack_returns_integrity_error_when_manifest_provenance_fails() {
     pack_validate_manifest_schema() { return 0; }
     pack_verify_signature() { return 0; }
     pack_verify_manifest_binds_checksums() { return 0; }
+    pack_verify_baseline_materials() { return 0; }
     pack_verify_checksums() { return 0; }
     pack_verify_manifest_provenance() { return 1; }
     pack_verify_no_extra_files() { return 0; }
@@ -601,19 +864,29 @@ test_verify_pack_exit_code_mappings_direct_branches() {
     source ./scripts/evidence_packs/verify_pack.sh
 
     local pack_dir="${TEST_TMPDIR}/pack"
+    local policy_pack="${TEST_TMPDIR}/acceptance-policy.json"
     mkdir -p "${pack_dir}"
     echo "{}" > "${pack_dir}/manifest.json"
     echo "hash payload" > "${pack_dir}/checksums.sha256"
+    echo "{}" > "${policy_pack}"
 
     pack_validate_manifest_schema() { return 0; }
     pack_verify_signature() { return 0; }
     pack_verify_manifest_binds_checksums() { return 0; }
+    pack_verify_baseline_materials() { return 0; }
+    pack_verify_policy_materials() { return 0; }
     pack_verify_checksums() { return 0; }
     pack_verify_manifest_provenance() { return 0; }
     pack_verify_no_extra_files() { return 0; }
     pack_verify_reports() { return 0; }
 
-    run pack_verify_pack --pack "${pack_dir}" --skip-verify --report-assurance strict
+    run pack_verify_pack \
+        --pack "${pack_dir}" \
+        --skip-verify \
+        --report-assurance strict \
+        --policy-pack "${policy_pack}" \
+        --expected-runtime-image-digest \
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     assert_rc "${PACK_VERIFY_OK}" "${RUN_RC}" "strict report assurance parses and succeeds"
 
     pack_verify_checksums() { return 1; }
@@ -634,4 +907,77 @@ test_verify_pack_exit_code_mappings_direct_branches() {
     pack_verify_reports() { return 1; }
     run pack_verify_pack --pack "${pack_dir}"
     assert_rc "${PACK_VERIFY_REPORTS}" "${RUN_RC}" "report verification failure maps to report exit code"
+}
+
+test_verify_pack_forwards_runtime_pin_to_all_nested_verify_calls() {
+    mock_reset
+
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/metadata"
+    mkdir -p "${pack_dir}/reports/modelA/clean/run_1"
+    mkdir -p "${pack_dir}/reports/modelA/stress/run_1"
+    cat > "${pack_dir}/metadata/scenarios.json" <<'JSON'
+{
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "clean", "strictness": "must_pass"},
+    {
+      "id": "stress",
+      "strictness": "must_fail",
+      "primary_guard": "primary_metric",
+      "requirements": {
+        "detectors_any_of": [
+          {
+            "kind": "validation_flag",
+            "flag": "primary_metric_acceptable",
+            "expected": false
+          }
+        ]
+      }
+    }
+  ]
+}
+JSON
+    echo "{}" > "${pack_dir}/reports/modelA/clean/run_1/evaluation.report.json"
+    echo '{"validation":{"primary_metric_acceptable":false}}' > "${pack_dir}/reports/modelA/stress/run_1/evaluation.report.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "$*" >> "${TEST_TMPDIR}/invarlock.calls"
+for arg in "$@"; do
+    if [[ "${arg}" == */stress/*/evaluation.report.json ]]; then
+        echo '{"summary":{"ok":false,"reason":"policy_fail"},"results":[{"ok":false,"reason":"policy_fail","verification":{"runtime_provenance":{"binding_verified":true,"expected_digest_matched":true,"trust_status":"expected_image_digest_matched"}}}]}'
+        exit 1
+    fi
+done
+echo '{"summary":{"ok":true,"reason":"ok"},"results":[{"ok":true,"reason":"ok"}]}'
+exit 0
+EOF
+    chmod +x "${bin_dir}/invarlock"
+
+    local original_path="${PATH}"
+    local expected_digest="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    PATH="${bin_dir}:${PATH}"
+    PACK_REPORT_ASSURANCE=report
+    PACK_EXPECTED_RUNTIME_IMAGE_DIGEST="${expected_digest}"
+    export PACK_REPORT_ASSURANCE PACK_EXPECTED_RUNTIME_IMAGE_DIGEST
+
+    run pack_verify_reports "${pack_dir}" ""
+    assert_rc "0" "${RUN_RC}" "verification preserves expected-failure handling"
+    local calls
+    calls="$(cat "${TEST_TMPDIR}/invarlock.calls")"
+    assert_match "clean/run_1/evaluation\\.report\\.json" "${calls}" "expected-pass report is verified"
+    assert_match "stress/run_1/evaluation\\.report\\.json" "${calls}" "expected-failure report is verified"
+    local digest_count
+    digest_count="$(grep -c -- "--expected-runtime-image-digest ${expected_digest}" "${TEST_TMPDIR}/invarlock.calls")"
+    assert_eq "2" "${digest_count}" "runtime image digest is forwarded to every nested verifier"
+
+    unset PACK_REPORT_ASSURANCE PACK_EXPECTED_RUNTIME_IMAGE_DIGEST
+    PATH="${original_path}"
 }

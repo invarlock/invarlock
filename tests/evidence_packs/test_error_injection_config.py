@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from scripts.evidence_packs.python.error_model.common import (
     fix_layer_drop_config,
-    fix_layer_drop_config_json,
 )
 
 
@@ -30,22 +29,3 @@ def test_fix_layer_drop_preserves_baseline_sliding_window() -> None:
         cfg, total_layers=48, kept_layers=47, baseline_config={"sliding_window": 131072}
     )
     assert cfg.sliding_window == 131072
-
-
-def test_fix_layer_drop_json_truncates_layer_lists_and_preserves_sliding_window() -> (
-    None
-):
-    cfg = {
-        "num_hidden_layers": 47,
-        "layer_types": ["full_attention"] * 48,
-        "sliding_window": None,
-    }
-    fix_layer_drop_config_json(
-        cfg,
-        total_layers=48,
-        kept_layers=47,
-        baseline_config={"sliding_window": 131072},
-    )
-    assert cfg["num_hidden_layers"] == 47
-    assert len(cfg["layer_types"]) == 47
-    assert cfg["sliding_window"] == 131072

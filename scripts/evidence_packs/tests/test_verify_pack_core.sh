@@ -8,14 +8,19 @@ test_verify_pack_validates_checksums_and_reports() {
     source ./scripts/evidence_packs/verify_pack.sh
 
     local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}/reports"
+    mkdir -p "${pack_dir}/reports" "${pack_dir}/results"
     echo "{}" > "${pack_dir}/reports/evaluation.report.json"
+    local report_digest
+    report_digest="$(pack_file_sha256 "${pack_dir}" "reports/evaluation.report.json")"
+    printf '%s\n' \
+        "{\"verdict\":\"PASS\",\"report_sha256\":\"${report_digest}\"}" \
+        > "${pack_dir}/results/final_verdict.json"
 
     local sha_cmd
     sha_cmd="$(pack_sha256_cmd)"
     (
         cd "${pack_dir}"
-        ${sha_cmd} reports/evaluation.report.json > checksums.sha256
+        ${sha_cmd} reports/evaluation.report.json results/final_verdict.json > checksums.sha256
     )
 
     local checksums_digest
@@ -47,14 +52,19 @@ test_verify_pack_report_assurance_off_still_invokes_report_verify() {
     source ./scripts/evidence_packs/verify_pack.sh
 
     local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}/reports"
+    mkdir -p "${pack_dir}/reports" "${pack_dir}/results"
     echo "{}" > "${pack_dir}/reports/evaluation.report.json"
+    local report_digest
+    report_digest="$(pack_file_sha256 "${pack_dir}" "reports/evaluation.report.json")"
+    printf '%s\n' \
+        "{\"verdict\":\"PASS\",\"report_sha256\":\"${report_digest}\"}" \
+        > "${pack_dir}/results/final_verdict.json"
 
     local sha_cmd
     sha_cmd="$(pack_sha256_cmd)"
     (
         cd "${pack_dir}"
-        ${sha_cmd} reports/evaluation.report.json > checksums.sha256
+        ${sha_cmd} reports/evaluation.report.json results/final_verdict.json > checksums.sha256
     )
 
     local checksums_digest
@@ -62,11 +72,22 @@ test_verify_pack_report_assurance_off_still_invokes_report_verify() {
     printf '%s\n' "{\"format\":\"evidence-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
 
     local verify_out="${TEST_TMPDIR}/verify-off.json"
+    local bin_dir
+    bin_dir="$(mock_install_bin_dir)"
+    rm -f "${bin_dir}/invarlock"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "invarlock $*" >> "${TEST_TMPDIR}/fixtures/invarlock.calls"
+printf '%s\n' '{"summary":{"ok":true,"reason":"ok"},"results":[{"ok":true,"reason":"ok"}]}'
+EOF
+    chmod +x "${bin_dir}/invarlock"
     run pack_verify_pack --pack "${pack_dir}" --report-assurance off --json-out "${verify_out}"
 
     assert_rc "0" "${RUN_RC}" "report-assurance off still verifies report files"
     assert_file_exists "${verify_out}" "verify output path is still used"
     assert_match "--assurance off" "$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")" "nested verify uses assurance off"
+
 }
 
 test_verify_pack_errors_on_missing_args() {
@@ -86,6 +107,14 @@ test_verify_pack_errors_on_missing_args() {
     run pack_verify_pack --pack "${TEST_TMPDIR}/pack" --expected-fingerprint
     assert_rc "2" "${RUN_RC}" "missing expected-fingerprint value"
 
+    run pack_verify_pack --pack "${TEST_TMPDIR}/pack" --expected-runtime-image-digest
+    assert_rc "2" "${RUN_RC}" "missing expected runtime image digest value"
+
+    run pack_verify_pack \
+        --pack "${TEST_TMPDIR}/pack" \
+        --expected-runtime-image-digest "sha256:not-a-digest"
+    assert_rc "2" "${RUN_RC}" "malformed expected runtime image digest is rejected"
+
     run pack_verify_pack --nope
     assert_rc "2" "${RUN_RC}" "unknown arg returns 2"
 
@@ -94,6 +123,9 @@ test_verify_pack_errors_on_missing_args() {
 
     run pack_verify_pack --pack "${TEST_TMPDIR}/pack" --report-assurance weak
     assert_rc "2" "${RUN_RC}" "invalid report-assurance value is rejected"
+
+    run pack_verify_pack --pack "${TEST_TMPDIR}/pack" --report-assurance strict
+    assert_rc "2" "${RUN_RC}" "strict report assurance requires an external runtime image digest"
 }
 
 test_verify_pack_source_selects_python_from_path_without_test_real_python() {
@@ -309,6 +341,13 @@ test_verify_pack_direct_helper_argument_branches() {
     run pack_verify_reports "${pack_dir}" "${TEST_TMPDIR}/verify.json"
     assert_rc "0" "${RUN_RC}" "verify reports accepts json_out"
     assert_match "verify-reports ${pack_dir} --profile dev --report-assurance report --require-clean --json-out ${TEST_TMPDIR}/verify\\.json" "$(cat "${calls}")" "verify reports forwards json_out"
+
+    PACK_EXPECTED_RUNTIME_IMAGE_DIGEST="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    export PACK_EXPECTED_RUNTIME_IMAGE_DIGEST
+    run pack_verify_reports "${pack_dir}" "${TEST_TMPDIR}/verify.json"
+    assert_rc "0" "${RUN_RC}" "verify reports accepts an expected runtime image digest"
+    assert_match "--expected-runtime-image-digest ${PACK_EXPECTED_RUNTIME_IMAGE_DIGEST}" "$(cat "${calls}")" "verify reports forwards expected runtime image digest"
+    unset PACK_EXPECTED_RUNTIME_IMAGE_DIGEST
 }
 
 test_verify_pack_manifest_field_reads_values() {

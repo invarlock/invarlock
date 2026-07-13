@@ -1,64 +1,80 @@
 from __future__ import annotations
 
-from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_make import make_report
+from invarlock.reporting.rendering.markdown import render_report_markdown
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mk_base_report(commit: str | None) -> dict:
-    meta = {"model_id": "m", "adapter": "hf", "device": "cpu", "seed": 1}
+    meta = {
+        "model_id": "m",
+        "adapter": "hf",
+        "device": "cpu",
+        "seed": 1,
+        "auto": {"tier": "balanced"},
+    }
     if commit is not None:
         meta["commit"] = commit
-    return {
-        "meta": meta,
-        "data": {
-            "dataset": "ds",
-            "split": "val",
-            "seq_len": 8,
-            "stride": 8,
-            "preview_n": 1,
-            "final_n": 1,
-        },
-        "edit": {
-            "name": "noop",
-            "plan_digest": "d",
-            "deltas": {"params_changed": 0, "layers_modified": 0},
-        },
-        "guards": [],
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 10.0,
-                "final": 10.0,
-                "ratio_vs_baseline": 1.0,
-                "display_ci": [1.0, 1.0],
+    return canonical_run_report(
+        {
+            "meta": meta,
+            "context": {"profile": "dev"},
+            "data": {
+                "dataset": "ds",
+                "split": "val",
+                "seq_len": 8,
+                "stride": 8,
+                "preview_n": 1,
+                "final_n": 1,
             },
-            # Secondary metrics without CI to trigger dash rendering
-            "secondary": [
-                {
-                    "kind": "latency_ms_p50",
-                    "preview": 1.2,
-                    "final": 1.1,
-                    "ratio_vs_baseline": 0.92,
-                }
-            ],
-        },
-        "evaluation_windows": {
-            "preview": {
-                "window_ids": [1],
-                "logloss": [2.302585093],
-                "token_counts": [1],
+            "edit": {
+                "name": "noop",
+                "plan_digest": "d",
+                "deltas": {"params_changed": 0, "layers_modified": 0},
             },
-            "final": {"window_ids": [2], "logloss": [2.302585093], "token_counts": [1]},
-        },
-        "artifacts": {"events_path": "", "logs_path": ""},
-    }
+            "guards": [],
+            "metrics": {
+                "primary_metric": {
+                    "kind": "ppl_causal",
+                    "preview": 10.0,
+                    "final": 10.0,
+                    "ratio_vs_baseline": 1.0,
+                    "display_ci": [1.0, 1.0],
+                },
+                # Secondary metrics without CI to trigger dash rendering
+                "secondary": [
+                    {
+                        "kind": "latency_ms_p50",
+                        "preview": 1.2,
+                        "final": 1.1,
+                        "ratio_vs_baseline": 0.92,
+                    }
+                ],
+            },
+            "evaluation_windows": {
+                "preview": {
+                    "window_ids": [1],
+                    "logloss": [2.302585093],
+                    "token_counts": [1],
+                },
+                "final": {
+                    "window_ids": [2],
+                    "logloss": [2.302585093],
+                    "token_counts": [1],
+                },
+            },
+            "artifacts": {"events_path": "", "logs_path": ""},
+        }
+    )
 
 
 def _mk_baseline() -> dict:
-    return {
-        "meta": {"auto": {"tier": "balanced"}},
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
-    }
+    return canonical_baseline(_mk_base_report(commit=None))
 
 
 def test_markdown_commit_present_and_absent() -> None:
@@ -94,7 +110,12 @@ def test_markdown_tokenizer_add_prefix_space_and_secondary_metrics_dash() -> Non
     )
     # Inject secondary_metrics in evaluation_report surface for markdown path
     cert["secondary_metrics"] = [
-        {"kind": "accuracy", "preview": 0.7, "final": 0.71, "ratio_vs_baseline": +0.01}
+        {
+            "kind": "accuracy",
+            "preview": 0.7,
+            "final": 0.71,
+            "delta_vs_baseline_pp": +1.0,
+        }
     ]  # no display_ci → dash branch
 
     md = render_report_markdown(cert)

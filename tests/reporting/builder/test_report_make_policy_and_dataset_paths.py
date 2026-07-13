@@ -26,6 +26,8 @@ from invarlock.reporting import (
 )
 from invarlock.reporting import utils as report_utils
 from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import refresh_runtime_policy_receipt
+from tests.reporting._support_guard_metric_impact import ppl_guard_context
 from tests.reporting.builder._support_report_make_policy import (
     base_baseline as _base_baseline,
 )
@@ -45,7 +47,7 @@ def test_make_report_wraps_baseline_normalization_errors(monkeypatch) -> None:
 
     monkeypatch.setattr(
         report_normalization,
-        "normalize_and_validate_run_report",
+        "validated_run_report_view",
         lambda _r: report,
         raising=False,
     )
@@ -68,7 +70,7 @@ def test_make_evaluation_report_raises_on_drift_identity(monkeypatch):
     report["metrics"]["primary_metric"].update(
         {"preview": 10.0, "final": 11.0, "ratio_vs_baseline": 1.1}
     )
-    report["metrics"]["paired_delta_summary"]["mean"] = math.log(1.6)
+    report["metrics"]["preview_final_slice_delta_summary"]["mean"] = math.log(1.6)
     report["metrics"]["window_plan"]["profile"] = "ci"
 
     _patch_common(monkeypatch, report, baseline)
@@ -84,7 +86,9 @@ def test_make_evaluation_report_raises_on_drift_identity(monkeypatch):
         pm_analysis_mod,
         "enforce_drift_ratio_identity",
         lambda *args, **kwargs: (_ for _ in ()).throw(
-            ValueError("Paired ΔlogNLL mean is inconsistent with reported drift ratio")
+            ValueError(
+                "Preview/final ΔlogNLL mean is inconsistent with reported drift ratio"
+            )
         ),
         raising=False,
     )
@@ -97,7 +101,7 @@ def test_make_evaluation_report_raises_on_ratio_ci_mismatch(monkeypatch):
     report = _base_report()
     baseline = _base_baseline()
     report["metrics"]["window_plan"]["profile"] = "ci"
-    report["metrics"]["paired_delta_summary"]["mean"] = 0.0
+    report["metrics"]["preview_final_slice_delta_summary"]["mean"] = 0.0
 
     _patch_common(monkeypatch, report, baseline)
 
@@ -119,17 +123,18 @@ def test_make_evaluation_report_raises_on_ratio_ci_mismatch(monkeypatch):
         make_report({}, {})
 
 
-def test_make_evaluation_report_uses_coverage_fallback(monkeypatch):
+def test_make_evaluation_report_does_not_treat_coverage_as_pairing(monkeypatch):
     report = _base_report()
     baseline = _base_baseline()
     report["metrics"]["bootstrap"]["coverage"] = {"preview": {"used": 5}}
+    report["metrics"]["paired_windows"] = 5
     report["evaluation_windows"] = {}
 
     _patch_common(monkeypatch, report, baseline)
 
     evaluation_report = make_report(report, baseline)
     stats = evaluation_report["dataset"]["windows"]["stats"]
-    assert stats["paired_windows"] == 5
+    assert stats["paired_windows"] == 0
 
 
 def test_make_report_surfaces_baseline_failures_explicitly(monkeypatch) -> None:
@@ -174,7 +179,7 @@ def test_make_report_surfaces_baseline_failures_explicitly(monkeypatch) -> None:
 
     monkeypatch.setattr(
         report_normalization,
-        "normalize_and_validate_run_report",
+        "validated_run_report_view",
         lambda payload: (
             (_ for _ in ()).throw(RuntimeError("baseline-bad"))
             if payload is baseline
@@ -203,7 +208,7 @@ def test_make_report_surfaces_baseline_failures_explicitly(monkeypatch) -> None:
 
     monkeypatch.setattr(
         report_normalization,
-        "normalize_and_validate_run_report",
+        "validated_run_report_view",
         lambda payload: report,
         raising=False,
     )
@@ -231,7 +236,7 @@ def test_make_evaluation_report_populates_optional_sections(monkeypatch):
             "kind": "accuracy",
             "preview": 0.8,
             "final": 0.82,
-            "ratio_vs_baseline": 0.02,
+            "delta_vs_baseline_pp": 2.0,
             "display_ci": [0.8, 0.85],
             "ci": [0.8, 0.86],
             "unit": "pp",
@@ -266,13 +271,7 @@ def test_make_evaluation_report_populates_optional_sections(monkeypatch):
     report["metrics"]["masked_tokens_total"] = 100
     report["metrics"]["masked_tokens_preview"] = 40
     report["metrics"]["masked_tokens_final"] = 60
-    report["guard_overhead"] = {
-        "bare_ppl": 10.0,
-        "guarded_ppl": 10.5,
-        "warnings": ["slow"],
-        "messages": ["note"],
-        "checks": {"ratio": True},
-    }
+    report["guard_metric_impact"] = ppl_guard_context(10.0, 10.5)
     report["provenance"] = {"dataset_split": "eval", "split_fallback": True}
     report["artifacts"]["masks_path"] = "/tmp/masks.bin"
     baseline["artifacts"]["report_path"] = "/tmp/base.json"
@@ -280,6 +279,7 @@ def test_make_evaluation_report_populates_optional_sections(monkeypatch):
     report["guards"] = [
         {"name": "variance", "policy": {"min_effect_lognll": 0.2, "topk_backstop": 3}}
     ]
+    report = refresh_runtime_policy_receipt(report)
 
     _patch_common(monkeypatch, report, baseline)
 
@@ -363,8 +363,8 @@ def test_make_evaluation_report_populates_optional_sections(monkeypatch):
     assert evaluation_report["secondary_metrics"][0]["kind"] == "accuracy"
     subgroup = evaluation_report["classification"]["subgroups"]["alpha"]
     assert subgroup["delta_pp"] == pytest.approx(10.0)
-    assert evaluation_report["guard_overhead"]["evaluated"] is True
-    assert evaluation_report["guard_overhead"]["passed"] is False
+    assert evaluation_report["guard_metric_impact"]["evaluated"] is True
+    assert evaluation_report["guard_metric_impact"]["passed"] is False
     assert evaluation_report["system_overhead"]["latency_ms_p50"][
         "ratio"
     ] == pytest.approx(0.8)
@@ -475,7 +475,7 @@ def test_make_evaluation_report_policy_digest_marks_tier_change(monkeypatch):
     assert evaluation_report["policy_digest"]["changed"] is True
 
 
-def test_make_evaluation_report_policy_digest_handles_missing_baseline_tier(
+def test_make_evaluation_report_policy_digest_rejects_missing_baseline_tier(
     monkeypatch,
 ):
     report = _base_report()
@@ -490,8 +490,8 @@ def test_make_evaluation_report_policy_digest_handles_missing_baseline_tier(
         resolved_policy={"spectral": {}, "variance": {}},
     )
 
-    evaluation_report = make_report(report, baseline)
-    assert evaluation_report["policy_digest"]["changed"] is False
+    with pytest.raises(ValueError, match="baseline.*meta.auto.tier"):
+        make_report(report, baseline)
 
 
 def test_make_evaluation_report_policy_digest_detects_threshold_hash_change(
@@ -533,6 +533,7 @@ def test_make_evaluation_report_variance_policy_digest_falls_back_to_guard_polic
     baseline = _base_baseline()
     guard_policy = {"min_effect_lognll": 0.2, "mode": "ab"}
     report["guards"] = [{"name": "variance", "policy": guard_policy}]
+    report = refresh_runtime_policy_receipt(report)
 
     _patch_common(monkeypatch, report, baseline)
     _stub_evaluation_report_extractors(
@@ -561,6 +562,7 @@ def test_make_evaluation_report_leaves_empty_variance_policy_digest_absent(
     report = _base_report()
     baseline = _base_baseline()
     report["guards"] = [{"name": "variance", "policy": {"mode": "ab"}}]
+    report = refresh_runtime_policy_receipt(report)
 
     _patch_common(monkeypatch, report, baseline)
     _stub_evaluation_report_extractors(
@@ -592,7 +594,7 @@ def test_make_evaluation_report_copies_meta_environment_flags(monkeypatch):
 
     monkeypatch.setattr(
         report_normalization,
-        "normalize_and_validate_run_report",
+        "validated_run_report_view",
         lambda value: value,
         raising=False,
     )
@@ -615,7 +617,7 @@ def test_make_evaluation_report_uses_meta_tokenizer_hash(monkeypatch):
 
     monkeypatch.setattr(
         report_normalization,
-        "normalize_and_validate_run_report",
+        "validated_run_report_view",
         lambda value: value,
         raising=False,
     )

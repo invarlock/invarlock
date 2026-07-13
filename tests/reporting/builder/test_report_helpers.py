@@ -1,13 +1,18 @@
 import math
+from copy import deepcopy
 
 from invarlock.reporting.policy_utils import _compute_variance_policy_digest
-from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.rendering.markdown import render_report_markdown
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_schema import validate_report
 from invarlock.reporting.utils import (
     _coerce_interval,
     _pair_logloss_windows,
     _sanitize_seed_bundle,
+)
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
 )
 
 
@@ -53,6 +58,7 @@ def test_make_evaluation_report_uses_paired_baseline_ratio_ci():
             "seed": 42,
             "auto": {"tier": "balanced", "probes": 0, "target_pm_ratio": None},
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "dummy",
             "split": "validation",
@@ -90,32 +96,19 @@ def test_make_evaluation_report_uses_paired_baseline_ratio_ci():
         },
     }
 
-    baseline = {
-        "run_id": "baseline-1",
-        "model_id": "gpt2",
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 10.0,
-                "final": 10.0,
-            }
-        },
-        "edit": {
-            "name": "structured",
-            "plan_digest": "baseline",
-            "deltas": {
-                "params_changed": 0,
-                "heads_pruned": 0,
-                "neurons_pruned": 0,
-                "layers_modified": 0,
-            },
-        },
-        "evaluation_windows": {
-            "final": {"window_ids": [2, 1], "logloss": [2.5, 0.7]},
-        },
+    baseline = deepcopy(report)
+    baseline["run_id"] = "baseline-1"
+    baseline["edit"]["name"] = "noop"
+    baseline["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": 10.0,
+        "final": 10.0,
+    }
+    baseline["evaluation_windows"] = {
+        "final": {"window_ids": [2, 1], "logloss": [2.5, 0.7]},
     }
 
-    cert = make_report(report, baseline)
+    cert = make_report(canonical_run_report(report), canonical_baseline(baseline))
     stats = cert.get("dataset", {}).get("windows", {}).get("stats", {})
     pm = cert.get("primary_metric", {})
     assert (

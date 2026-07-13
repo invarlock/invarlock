@@ -35,7 +35,7 @@ from invarlock.reporting.policy_utils import (
     _format_family_caps,
     _resolve_policy_tier,
 )
-from invarlock.reporting.render_markdown import (
+from invarlock.reporting.rendering.markdown import (
     _get_window_plan_summary,
     render_report_markdown,
 )
@@ -59,14 +59,14 @@ from invarlock.reporting.report_make import (
     _extract_variance_analysis,
     make_report,
 )
+from invarlock.reporting.report_metric_impact import (
+    prepare_guard_metric_impact_section as _prepare_guard_metric_impact_section,
+)
 from invarlock.reporting.report_normalization import (
     _generate_run_id,
 )
 from invarlock.reporting.report_normalization import (
     normalize_baseline as _normalize_baseline,
-)
-from invarlock.reporting.report_overhead import (
-    prepare_guard_overhead_section as _prepare_guard_overhead_section,
 )
 from invarlock.reporting.report_provenance import (
     compute_report_digest as _compute_report_digest,
@@ -74,9 +74,6 @@ from invarlock.reporting.report_provenance import (
 from invarlock.reporting.report_schema import REPORT_SCHEMA_VERSION, validate_report
 from invarlock.reporting.report_summary import (
     compute_report_hash as _compute_report_hash,
-)
-from invarlock.reporting.report_validation import (
-    compute_validation_flags as _compute_validation_flags,
 )
 from invarlock.reporting.utils import (
     _coerce_int,
@@ -86,6 +83,15 @@ from invarlock.reporting.utils import (
     _pair_logloss_windows,
     _sanitize_seed_bundle,
 )
+from invarlock.reporting.validation.report import (
+    compute_validation_flags as _compute_validation_flags,
+)
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+    refresh_runtime_policy_receipt,
+)
+from tests.reporting._support_primary_metric import independent_slice_summary
 
 __all__ = [
     "Any",
@@ -124,7 +130,7 @@ __all__ = [
     "_load_local_evaluation_report",
     "_normalize_baseline",
     "_pair_logloss_windows",
-    "_prepare_guard_overhead_section",
+    "_prepare_guard_metric_impact_section",
     "_resolve_policy_tier",
     "_sanitize_seed_bundle",
     "_extract_report_meta",
@@ -132,11 +138,13 @@ __all__ = [
     "copy",
     "create_mock_baseline",
     "create_mock_run_report",
+    "independent_slice_summary",
     "make_report",
     "math",
     "patch",
     "pytest",
     "render_report_markdown",
+    "refresh_runtime_policy_receipt",
     "validate_report",
 ]
 
@@ -218,7 +226,13 @@ def create_mock_run_report(
                     }
                 ],
             },
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "wikitext",
             "split": "test",
@@ -239,10 +253,11 @@ def create_mock_run_report(
                 math.log(ppl_final) - math.log(9.8) - 0.05,
                 math.log(ppl_final) - math.log(9.8) + 0.05,
             ),
-            "paired_delta_summary": {
-                "mean": math.log(ppl_final) - math.log(9.8),
-                "std": 0.01,
-            },
+            "preview_final_slice_delta_summary": independent_slice_summary(
+                math.log(ppl_final) - math.log(9.8),
+                preview_windows=10,
+                final_windows=50,
+            ),
             "invariants": {
                 "weight_norm": {"passed": True},
                 "activation_range": {"passed": True},
@@ -264,6 +279,7 @@ def create_mock_run_report(
             "events_path": "/path/to/events.jsonl",
             "logs_path": "/path/to/logs.txt",
         },
+        "guards": [],
     }
 
     if include_auto:
@@ -277,6 +293,7 @@ def create_mock_run_report(
         report["guards"] = [
             {
                 "name": "spectral",
+                "passed": True,
                 "policy": {
                     "sigma_quantile": 0.95,
                     "deadband": 0.1,
@@ -296,10 +313,16 @@ def create_mock_run_report(
             },
             {
                 "name": "rmt",
+                "passed": True,
                 "policy": {"threshold": 1.5, "deadband": 0.1},
                 "actions": [],
             },
-            {"name": "variance", "policy": {"gain": 2.0}, "metrics": {"gain": 1.8}},
+            {
+                "name": "variance",
+                "passed": True,
+                "policy": {"gain": 2.0},
+                "metrics": {"gain": 1.8},
+            },
         ]
 
     if include_evaluation_windows:
@@ -308,38 +331,29 @@ def create_mock_run_report(
             "final": {"input_ids": [[9, 10, 11, 12], [13, 14, 15, 16]]},
         }
 
-    return report
+    return canonical_run_report(report)
 
 
 def create_mock_baseline(
-    model_id: str = "test-model", ppl_final: float = 9.0, schema_type: str = "runreport"
+    model_id: str = "test-model", ppl_final: float = 9.0
 ) -> dict[str, Any]:
-    """Create a mock baseline for testing."""
-    if schema_type == "baseline-v1":
-        return {
-            "schema_version": "baseline-v1",
-            "meta": {"model_id": model_id, "commit_sha": "baseline123456789"},
-            "metrics": {
-                "ppl_final": ppl_final,
-                "primary_metric": {"kind": "ppl_causal", "final": ppl_final},
-            },
-            "spectral_base": {"sigma_ratios": [1.0, 1.0, 1.0]},
-            "rmt_base": {"outliers": 1},
-            "invariants": {"weight_norm": {"passed": True}},
-        }
-    elif schema_type == "runreport":
-        return create_mock_run_report(model_id=model_id, ppl_final=ppl_final)
-    else:
-        # Normalized format
-        return {
-            "run_id": "normalized123",
-            "model_id": model_id,
-            "ppl_final": ppl_final,
-            "metrics": {"primary_metric": {"kind": "ppl_causal", "final": ppl_final}},
-            "spectral": {"sigma_ratios": [1.0, 1.0]},
-            "rmt": {"outliers": 1},
-            "invariants": {"all_passed": True},
-        }
+    """Create a canonical no-op RunReport baseline for testing."""
+    baseline = create_mock_run_report(model_id=model_id, ppl_final=ppl_final)
+    baseline["edit"] = {
+        "name": "noop",
+        "plan_digest": "baseline-noop",
+        "deltas": {
+            "params_changed": 0,
+            "heads_pruned": 0,
+            "neurons_pruned": 0,
+            "layers_modified": 0,
+            "sparsity": 0.0,
+        },
+    }
+    baseline["metrics"]["primary_metric"].pop("ratio_vs_baseline", None)
+    baseline["artifacts"]["checkpoint_path"] = None
+    baseline["flags"] = {"guard_recovered": False, "rollback_reason": None}
+    return canonical_baseline(baseline)
 
 
 def _build_spectral_guard_with_z_scores() -> dict[str, Any]:

@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 
 from invarlock import __version__
-from invarlock.reporting import render_markdown as render_markdown_mod
 from invarlock.reporting import report_summary as report_summary_mod
-from invarlock.reporting.render import (
+from invarlock.reporting.rendering import markdown as render_markdown_mod
+from invarlock.reporting.rendering.markdown import (
     render_report_markdown,
 )
 from invarlock.reporting.report_schema import validate_report
@@ -26,6 +26,7 @@ def _mk_cert() -> dict:
         },
         "primary_metric": {
             "kind": "ppl_causal",
+            "preview": 10.0,
             "final": 10.0,
             "ratio_vs_baseline": 1.0,
             "display_ci": [1.0, 1.0],

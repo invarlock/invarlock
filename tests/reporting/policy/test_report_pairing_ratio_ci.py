@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_make import make_report
+from copy import deepcopy
+
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def test_make_evaluation_report_paired_baseline_ratio_ci():
@@ -14,6 +18,7 @@ def test_make_evaluation_report_paired_baseline_ratio_ci():
             "ts": "2024-01-01T00:00:00",
             "auto": {"tier": "balanced", "probes_used": 0, "target_pm_ratio": None},
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "ds",
             "split": "val",
@@ -56,10 +61,11 @@ def test_make_evaluation_report_paired_baseline_ratio_ci():
         "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
         "flags": {"guard_recovered": False, "rollback_reason": None},
     }
-    base = {
-        "meta": {"auto": {"tier": "balanced"}},
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 4.0}},
-        "evaluation_windows": {"final": {"window_ids": [1, 2], "logloss": [4.0, 4.0]}},
+    base = deepcopy(rep)
+    base["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": 4.0,
+        "final": 4.0,
     }
     cert = make_report(rep, base)
     pm = cert.get("primary_metric", {})

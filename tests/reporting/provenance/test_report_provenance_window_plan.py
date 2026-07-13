@@ -1,17 +1,28 @@
 from unittest.mock import patch
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def test_provenance_window_plan_propagates_from_metrics():
     report = {
-        "meta": {"model_id": "m", "seed": 1},
+        "meta": {
+            "adapter": "hf",
+            "model_id": "m",
+            "seed": 1,
+            "auto": {"tier": "balanced"},
+        },
         "metrics": {
-            "ppl_preview": 10.0,
-            "ppl_final": 10.0,
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+            },
             # Ensure ppl_analysis['window_plan'] is populated
             "window_plan": {"profile": "dev", "preview": 2, "final": 4},
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "d",
             "split": "val",
@@ -32,12 +43,7 @@ def test_provenance_window_plan_propagates_from_metrics():
         },
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    baseline = {
-        "run_id": "b",
-        "model_id": "m",
-        "ppl_final": 10.0,
-        "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
-    }
+    baseline = {**report, "run_id": "b", "edit": {"name": "noop"}}
     with patch(
         "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):

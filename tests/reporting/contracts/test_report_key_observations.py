@@ -15,6 +15,7 @@ def _mk(pm_ratio: float) -> dict:
     r["data"]["stride"] = 8
     r["metrics"]["primary_metric"] = {
         "kind": "ppl_causal",
+        "preview": 10.0,
         "final": 10.0,
         "ratio_vs_baseline": pm_ratio,
     }

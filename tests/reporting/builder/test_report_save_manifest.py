@@ -7,12 +7,19 @@ import pytest
 from invarlock.reporting.report_bundle import save_evaluation_bundle
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
+from tests.reporting._support_canonical_reports import canonical_run_report
 
 
 def _mk_simple_report() -> RunReport:
     r = create_empty_report()
     r["meta"]["model_id"] = "m"
     r["meta"]["adapter"] = "hf"
+    r["meta"]["auto"] = {
+        "tier": "balanced",
+        "probes_used": 0,
+        "target_pm_ratio": None,
+    }
+    r["context"] = {"profile": "dev"}
     r["data"]["dataset"] = "unit"
     r["data"]["split"] = "validation"
     r["data"]["seq_len"] = 8
@@ -27,13 +34,14 @@ def _mk_simple_report() -> RunReport:
     r["guards"] = [
         {
             "name": "variance",
+            "passed": True,
             "policy": {"deadband": 0.1},
             "metrics": {},
             "actions": [],
             "violations": [],
         }
     ]
-    return r
+    return canonical_run_report(r)
 
 
 def test_save_report_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

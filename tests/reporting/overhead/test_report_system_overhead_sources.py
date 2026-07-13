@@ -1,27 +1,18 @@
 from __future__ import annotations
 
-from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_make import make_report
+from invarlock.reporting.rendering.markdown import render_report_markdown
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
+from tests.reporting.overhead._support import (
+    overhead_baseline_report,
+    overhead_run_report,
+)
 
 
 def _mk_report_latency_fallback() -> dict:
-    return {
-        "meta": {"model_id": "m", "adapter": "hf", "device": "cpu", "seed": 1},
-        "data": {
-            "dataset": "ds",
-            "split": "val",
-            "seq_len": 8,
-            "stride": 8,
-            "preview_n": 1,
-            "final_n": 1,
-        },
-        "edit": {
-            "name": "noop",
-            "plan_digest": "d",
-            "deltas": {"params_changed": 0, "layers_modified": 0},
-        },
-        "guards": [],
-        "metrics": {
+    return overhead_run_report(
+        metrics={
             "primary_metric": {
                 "kind": "ppl_causal",
                 "preview": 10.0,
@@ -33,27 +24,26 @@ def _mk_report_latency_fallback() -> dict:
             "latency_ms_per_tok": 11.0,
             "throughput_tok_per_s": 100.0,
         },
-        "evaluation_windows": {
-            "preview": {
-                "window_ids": [1],
-                "logloss": [2.302585093],
-                "token_counts": [1],
-            },
-            "final": {"window_ids": [2], "logloss": [2.302585093], "token_counts": [1]},
-        },
-        "artifacts": {"events_path": "", "logs_path": ""},
-    }
+        edit_name="noop",
+        tier="balanced",
+        profile="dev",
+    )
 
 
 def _mk_baseline_explicit() -> dict:
-    return {
-        "meta": {"auto": {"tier": "balanced"}},
-        "metrics": {
-            "primary_metric": {"kind": "ppl_causal", "final": 10.0},
+    return overhead_baseline_report(
+        metrics={
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+            },
             "latency_ms_p50": 10.0,
             "throughput_sps": 120.0,
         },
-    }
+        tier="balanced",
+        profile="dev",
+    )
 
 
 def test_system_overhead_sources_mixed_and_markdown_na() -> None:
@@ -70,10 +60,17 @@ def test_system_overhead_sources_mixed_and_markdown_na() -> None:
 
 def test_system_overhead_does_not_reuse_edited_fallback_for_baseline() -> None:
     rep = _mk_report_latency_fallback()
-    base = {
-        "meta": {"auto": {"tier": "balanced"}},
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
-    }
+    base = overhead_baseline_report(
+        metrics={
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+            }
+        },
+        tier="balanced",
+        profile="dev",
+    )
 
     cert = make_report(rep, base)
 

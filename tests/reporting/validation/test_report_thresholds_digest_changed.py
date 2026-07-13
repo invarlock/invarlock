@@ -1,11 +1,20 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mk_pm_report(*, ratio: float = 1.0, pm_final: float = 10.0) -> dict:
     return {
-        "meta": {"model_id": "m", "adapter": "hf", "device": "cpu", "seed": 1},
+        "meta": {
+            "model_id": "m",
+            "adapter": "hf",
+            "device": "cpu",
+            "seed": 1,
+            "auto": {"tier": "balanced"},
+        },
+        "context": {"profile": "dev", "assurance": {"mode": "off"}},
         "data": {
             "dataset": "ds",
             "split": "val",
@@ -44,11 +53,8 @@ def _mk_pm_report(*, ratio: float = 1.0, pm_final: float = 10.0) -> dict:
 
 def test_policy_digest_changed_when_baseline_tier_differs() -> None:
     rep = _mk_pm_report(ratio=1.0)
-    # Subject implicit tier is balanced (default); baseline sets explicit conservative tier
-    base = {
-        "meta": {"auto": {"tier": "conservative"}},
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
-    }
+    base = _mk_pm_report(pm_final=10.0)
+    base["meta"]["auto"]["tier"] = "conservative"
     cert = make_report(rep, base)
     pd = cert.get("policy_digest", {})
     assert isinstance(pd, dict)

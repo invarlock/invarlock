@@ -1,0 +1,197 @@
+{
+  "schema": "invarlock/evidence-pack-training-profiles-v1",
+  "profiles": {
+    "tiny_gpt2_lora_v1": {
+      "profile_sha256": "sha256:53a1586a1c76c5f95a713298a2cf36d1853dd95a59350bd5341380e0862557fe",
+      "edit_type": "lora_merge",
+      "model_id": "sshleifer/tiny-gpt2",
+      "model_revision": "5f91d94bd9cd7190a9f3216ff93cd1dd95f2c7be",
+      "training_data": {
+        "path": "scripts/evidence_packs/fixtures/training/tiny_causal_lm.jsonl",
+        "sha256": "sha256:69c49d5d4be145bea5f0771dcc5c03e7728b27274a2b97bc3f5d7c822a452f15",
+        "rows": 8,
+        "text_field": "text"
+      },
+      "optimizer": {
+        "name": "adamw",
+        "learning_rate": 0.0005,
+        "betas": [
+          0.9,
+          0.999
+        ],
+        "eps": 1e-08,
+        "weight_decay": 0.0
+      },
+      "steps": 2,
+      "micro_batch_size": 2,
+      "gradient_accumulation_steps": 1,
+      "max_sequence_length": 32,
+      "seed": 43,
+      "deterministic_algorithms": true,
+      "device": "cpu",
+      "dtype": "float32",
+      "toolchain": {
+        "python": "3.12.13",
+        "torch": "2.11.0",
+        "transformers": "5.12.0",
+        "peft": "0.19.1"
+      },
+      "model_load": {
+        "loss_function": "ForCausalLM",
+        "expected_unexpected_keys": [
+          "transformer.h.0.attn.masked_bias",
+          "transformer.h.1.attn.masked_bias"
+        ]
+      },
+      "lora": {
+        "rank": 2,
+        "alpha": 4,
+        "dropout": 0.0,
+        "target_modules": [
+          "c_attn"
+        ],
+        "bias": "none",
+        "task_type": "CAUSAL_LM",
+        "fan_in_fan_out": true
+      }
+    },
+    "tiny_gpt2_full_ft_v1": {
+      "profile_sha256": "sha256:326909dc408130975e4e6e24ac055697311dff48990decf6ec24c278ca5ae276",
+      "edit_type": "fine_tune",
+      "model_id": "sshleifer/tiny-gpt2",
+      "model_revision": "5f91d94bd9cd7190a9f3216ff93cd1dd95f2c7be",
+      "training_data": {
+        "path": "scripts/evidence_packs/fixtures/training/tiny_causal_lm.jsonl",
+        "sha256": "sha256:69c49d5d4be145bea5f0771dcc5c03e7728b27274a2b97bc3f5d7c822a452f15",
+        "rows": 8,
+        "text_field": "text"
+      },
+      "optimizer": {
+        "name": "adamw",
+        "learning_rate": 1e-05,
+        "betas": [
+          0.9,
+          0.999
+        ],
+        "eps": 1e-08,
+        "weight_decay": 0.0
+      },
+      "steps": 2,
+      "micro_batch_size": 2,
+      "gradient_accumulation_steps": 1,
+      "max_sequence_length": 32,
+      "seed": 43,
+      "deterministic_algorithms": true,
+      "device": "cpu",
+      "dtype": "float32",
+      "toolchain": {
+        "python": "3.12.13",
+        "torch": "2.11.0",
+        "transformers": "5.12.0"
+      },
+      "model_load": {
+        "loss_function": "ForCausalLM",
+        "expected_unexpected_keys": [
+          "transformer.h.0.attn.masked_bias",
+          "transformer.h.1.attn.masked_bias"
+        ]
+      }
+    },
+    "tiny_gpt2_lora_cuda_v1": {
+      "profile_sha256": "sha256:4550d5c25d5aa1d153159a7562db1cde66a704772bce9e67a15c280498564afe",
+      "edit_type": "lora_merge",
+      "model_id": "sshleifer/tiny-gpt2",
+      "model_revision": "5f91d94bd9cd7190a9f3216ff93cd1dd95f2c7be",
+      "training_data": {
+        "path": "scripts/evidence_packs/fixtures/training/tiny_causal_lm.jsonl",
+        "sha256": "sha256:69c49d5d4be145bea5f0771dcc5c03e7728b27274a2b97bc3f5d7c822a452f15",
+        "rows": 8,
+        "text_field": "text"
+      },
+      "optimizer": {
+        "name": "adamw",
+        "learning_rate": 0.0005,
+        "betas": [
+          0.9,
+          0.999
+        ],
+        "eps": 1e-08,
+        "weight_decay": 0.0
+      },
+      "steps": 2,
+      "micro_batch_size": 2,
+      "gradient_accumulation_steps": 1,
+      "max_sequence_length": 32,
+      "seed": 43,
+      "deterministic_algorithms": true,
+      "device": "cuda",
+      "dtype": "float32",
+      "toolchain": {
+        "python": "3.12.3",
+        "torch": "2.11.0+cu128",
+        "transformers": "5.12.0",
+        "peft": "0.19.1"
+      },
+      "model_load": {
+        "loss_function": "ForCausalLM",
+        "expected_unexpected_keys": [
+          "transformer.h.0.attn.masked_bias",
+          "transformer.h.1.attn.masked_bias"
+        ]
+      },
+      "lora": {
+        "rank": 2,
+        "alpha": 4,
+        "dropout": 0.0,
+        "target_modules": [
+          "c_attn"
+        ],
+        "bias": "none",
+        "task_type": "CAUSAL_LM",
+        "fan_in_fan_out": true
+      }
+    },
+    "tiny_gpt2_full_ft_cuda_v1": {
+      "profile_sha256": "sha256:fc9c7c32ac8eb518d136773beb07d54aaa21fca385b950c5b21382e7b4140c2e",
+      "edit_type": "fine_tune",
+      "model_id": "sshleifer/tiny-gpt2",
+      "model_revision": "5f91d94bd9cd7190a9f3216ff93cd1dd95f2c7be",
+      "training_data": {
+        "path": "scripts/evidence_packs/fixtures/training/tiny_causal_lm.jsonl",
+        "sha256": "sha256:69c49d5d4be145bea5f0771dcc5c03e7728b27274a2b97bc3f5d7c822a452f15",
+        "rows": 8,
+        "text_field": "text"
+      },
+      "optimizer": {
+        "name": "adamw",
+        "learning_rate": 1e-05,
+        "betas": [
+          0.9,
+          0.999
+        ],
+        "eps": 1e-08,
+        "weight_decay": 0.0
+      },
+      "steps": 2,
+      "micro_batch_size": 2,
+      "gradient_accumulation_steps": 1,
+      "max_sequence_length": 32,
+      "seed": 43,
+      "deterministic_algorithms": true,
+      "device": "cuda",
+      "dtype": "float32",
+      "toolchain": {
+        "python": "3.12.3",
+        "torch": "2.11.0+cu128",
+        "transformers": "5.12.0"
+      },
+      "model_load": {
+        "loss_function": "ForCausalLM",
+        "expected_unexpected_keys": [
+          "transformer.h.0.attn.masked_bias",
+          "transformer.h.1.attn.masked_bias"
+        ]
+      }
+    }
+  }
+}

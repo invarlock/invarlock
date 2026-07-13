@@ -80,7 +80,10 @@ def test_verify_evidence_pack_reports_authenticity_with_pin_and_trust_store(
     fingerprint = _sign_pack(pack_dir, tmp_path)
 
     unpinned = evidence_pack_mod.verify_evidence_pack(pack_dir, skip_verify=True)
-    assert unpinned.status.value == 0
+    assert unpinned.status == evidence_pack_mod.EvidencePackStatus.INTEGRITY_ONLY
+    assert unpinned.payload["ok"] is False
+    assert unpinned.payload["integrity_ok"] is True
+    assert unpinned.payload["reports_verified"] is False
     assert unpinned.payload["authenticity"] == "unpinned"
     assert unpinned.payload["signer_fingerprint"] == fingerprint
 
@@ -89,7 +92,7 @@ def test_verify_evidence_pack_reports_authenticity_with_pin_and_trust_store(
         skip_verify=True,
         expected_fingerprint=fingerprint,
     )
-    assert pinned.status.value == 0
+    assert pinned.status == evidence_pack_mod.EvidencePackStatus.INTEGRITY_ONLY
     assert pinned.payload["authenticity"] == "pinned"
 
     trust_store = tmp_path / "trusted-signers.json"
@@ -99,7 +102,7 @@ def test_verify_evidence_pack_reports_authenticity_with_pin_and_trust_store(
         skip_verify=True,
         trust_store_path=trust_store,
     )
-    assert trusted.status.value == 0
+    assert trusted.status == evidence_pack_mod.EvidencePackStatus.INTEGRITY_ONLY
     assert trusted.payload["authenticity"] == "pinned"
     assert trusted.payload["trust_store"] == str(trust_store)
 

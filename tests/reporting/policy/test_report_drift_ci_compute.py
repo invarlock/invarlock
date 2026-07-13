@@ -1,11 +1,24 @@
+from copy import deepcopy
 from unittest.mock import patch
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def test_drift_ci_computed_from_preview_and_final_ci():
     report = {
-        "meta": {"model_id": "m", "seed": 1},
+        "meta": {
+            "model_id": "m",
+            "adapter": "hf",
+            "seed": 1,
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
+        },
+        "context": {"profile": "dev"},
         "metrics": {
             "primary_metric": {
                 "kind": "ppl_causal",
@@ -35,17 +48,12 @@ def test_drift_ci_computed_from_preview_and_final_ci():
         },
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    baseline = {
-        "run_id": "b",
-        "model_id": "m",
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 10.0,
-                "final": 10.0,
-            }
-        },
-        "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
+    baseline = deepcopy(report)
+    baseline["edit"]["name"] = "noop"
+    baseline["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": 10.0,
+        "final": 10.0,
     }
     with patch(
         "invarlock.reporting.report_normalization.validate_report", return_value=True

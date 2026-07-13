@@ -20,9 +20,8 @@ from .report_primary_metric_policy import (
     enforce_drift_ratio_identity,
     enforce_pairing_and_coverage,
     enforce_ratio_ci_alignment,
-    fallback_paired_windows,
 )
-from .utils import _coerce_int, _coerce_interval, _pair_logloss_windows
+from .utils import _coerce_interval, _pair_logloss_windows
 
 _NON_FATAL_EXCEPTIONS = (
     AttributeError,
@@ -86,6 +85,10 @@ def _resolve_ratio_ci_from_run_metrics(
     metrics: dict[str, Any],
 ) -> tuple[tuple[float, float] | None, str]:
     ratio_ci: tuple[float, float] | None = None
+    if isinstance(metrics.get("preview_final_slice_delta_summary"), dict):
+        # The runtime interval compares two disjoint subject slices. It is drift
+        # evidence and must not be promoted to a baseline ratio interval.
+        return None, "independent_preview_final"
     ratio_ci_source = "run_metrics"
     try:
         dlci = _coerce_interval(metrics.get("logloss_delta_ci"))
@@ -309,7 +312,7 @@ def _resolve_paired_window_analysis(
             method=ci_method,
             replicates=replicates,
             alpha=alpha,
-            seed=seed + 503,
+            seed=seed + bootstrap_mod.PAIRED_BASELINE_BOOTSTRAP_SEED_OFFSET,
         )
         if isinstance(delta_ci, tuple | list) and len(delta_ci) == 2:
             delta_ci = (float(delta_ci[0]), float(delta_ci[1]))
@@ -329,6 +332,69 @@ def _resolve_paired_window_analysis(
         ratio_ci,
         ratio_ci_source,
     )
+
+
+def _identical_final_id_pair_count(
+    report: dict[str, Any],
+    baseline_normalized: dict[str, Any],
+) -> int:
+    """Count exact baseline/subject final-ID pairs for non-logloss metrics."""
+
+    report_windows = report.get("evaluation_windows")
+    baseline_windows = baseline_normalized.get("evaluation_windows")
+    subject_final = (
+        report_windows.get("final") if isinstance(report_windows, dict) else None
+    )
+    baseline_final = (
+        baseline_windows.get("final") if isinstance(baseline_windows, dict) else None
+    )
+    if not isinstance(subject_final, dict) or not isinstance(baseline_final, dict):
+        return 0
+    for key in ("window_ids", "example_ids"):
+        subject_ids = subject_final.get(key)
+        baseline_ids = baseline_final.get(key)
+        if not (
+            isinstance(subject_ids, list)
+            and subject_ids
+            and isinstance(baseline_ids, list)
+            and len(subject_ids) == len(baseline_ids)
+        ):
+            continue
+        subject_keys = [str(value) for value in subject_ids]
+        baseline_keys = [str(value) for value in baseline_ids]
+        if (
+            len(set(subject_keys)) == len(subject_keys)
+            and len(set(baseline_keys)) == len(baseline_keys)
+            and subject_keys == baseline_keys
+        ):
+            return len(subject_keys)
+    return 0
+
+
+def _subject_slice_ids_are_disjoint(report: dict[str, Any]) -> bool:
+    windows = report.get("evaluation_windows")
+    preview = windows.get("preview") if isinstance(windows, dict) else None
+    final = windows.get("final") if isinstance(windows, dict) else None
+    if not isinstance(preview, dict) or not isinstance(final, dict):
+        return False
+    for key in ("window_ids", "example_ids"):
+        preview_ids = preview.get(key)
+        final_ids = final.get(key)
+        if not (
+            isinstance(preview_ids, list)
+            and preview_ids
+            and isinstance(final_ids, list)
+            and final_ids
+        ):
+            continue
+        preview_keys = [str(value) for value in preview_ids]
+        final_keys = [str(value) for value in final_ids]
+        return (
+            len(set(preview_keys)) == len(preview_keys)
+            and len(set(final_keys)) == len(final_keys)
+            and set(preview_keys).isdisjoint(final_keys)
+        )
+    return False
 
 
 def _coerce_bounds(bounds: Any) -> tuple[float, float] | None:
@@ -427,10 +493,6 @@ def build_primary_metric_analysis(
     baseline_ref: dict[str, Any],
     dataset_info: dict[str, Any],
 ) -> tuple[dict[str, Any], str | None]:
-    edited_preview = float("nan")
-    edited_final = float("nan")
-    ratio_vs_baseline = float("nan")
-
     (
         metrics,
         metrics_bootstrap,
@@ -438,6 +500,12 @@ def build_primary_metric_analysis(
         window_plan_ctx,
         window_plan_profile,
     ) = _collect_bootstrap_context(report)
+    (
+        edited_preview,
+        edited_final,
+        ratio_vs_baseline,
+        preview_final_ratio,
+    ) = _resolve_primary_metric_snapshot(report, baseline_ref)
     preview_ci = None
     final_ci = None
     ratio_ci: tuple[float, float] | None
@@ -455,10 +523,17 @@ def build_primary_metric_analysis(
     logloss_delta_ci: tuple[float, float] | None = _coerce_interval(
         metrics.get("logloss_delta_ci")
     )
-    raw_delta_summary = metrics.get("paired_delta_summary", {})
-    paired_delta_summary = (
-        dict(raw_delta_summary) if isinstance(raw_delta_summary, dict) else {}
-    )
+    raw_slice_summary = metrics.get("preview_final_slice_delta_summary")
+    if "paired_delta_summary" in metrics:
+        raise ValueError(
+            "metrics.paired_delta_summary is not supported; use "
+            "metrics.preview_final_slice_delta_summary for independent preview/final "
+            "slices."
+        )
+    if isinstance(raw_slice_summary, dict):
+        preview_final_slice_delta_summary = dict(raw_slice_summary)
+    else:
+        preview_final_slice_delta_summary = {}
 
     (
         paired_windows,
@@ -474,42 +549,39 @@ def build_primary_metric_analysis(
         ratio_ci,
         ratio_ci_source,
     )
+    identical_id_pairs = _identical_final_id_pair_count(report, baseline_normalized)
+    if paired_windows == 0:
+        paired_windows = identical_id_pairs
+    id_pairing_verified = identical_id_pairs > 0
+    slice_ids_disjoint = _subject_slice_ids_are_disjoint(report)
 
     drift_ci = _build_drift_ci(preview_ci, final_ci)
 
-    delta_mean = paired_delta_summary.get("mean")
-    degenerate_delta = paired_delta_summary.get("degenerate", False)
-    drift_ratio = (
-        edited_final / edited_preview
-        if _is_number(edited_final)
-        and _is_number(edited_preview)
-        and edited_preview > 0
-        else float("nan")
-    )
+    delta_mean = preview_final_slice_delta_summary.get("mean")
+    degenerate_delta = preview_final_slice_delta_summary.get("degenerate", False)
+    drift_ratio = preview_final_ratio
 
-    ratio_from_delta = None
     delta_mean_float = (
         float(delta_mean)
         if isinstance(delta_mean, int | float) and math.isfinite(float(delta_mean))
         else None
     )
     if delta_mean_float is not None and not degenerate_delta:
-        ratio_from_delta = enforce_drift_ratio_identity(
+        enforce_drift_ratio_identity(
             paired_windows,
             delta_mean_float,
             drift_ratio,
             window_plan_profile,
         )
 
-    if (
-        ratio_from_delta is not None
-        and _is_number(baseline_delta_mean)
-        and _is_number(ratio_vs_baseline)
-    ):
+    if _is_number(baseline_delta_mean) and _is_number(ratio_vs_baseline):
         expected_ratio_baseline = math.exp(float(baseline_delta_mean))
         tolerance = 5e-4 * max(1.0, abs(expected_ratio_baseline))
         if abs(expected_ratio_baseline - ratio_vs_baseline) > tolerance:
-            pass
+            raise ValueError(
+                "Primary metric ratio mismatch: ratio_vs_baseline does not match "
+                "the paired baseline log-loss delta."
+            )
 
     if not (
         isinstance(ratio_vs_baseline, int | float) and math.isfinite(ratio_vs_baseline)
@@ -528,35 +600,47 @@ def build_primary_metric_analysis(
 
     enforce_ratio_ci_alignment(ratio_ci_source, ratio_ci, logloss_delta_ci)
 
-    paired_windows = fallback_paired_windows(paired_windows, coverage_summary)
-    try:
-        paired_windows_signal = (
-            report.get("metrics", {}).get("paired_windows")
-            if isinstance(report.get("metrics"), dict)
-            else None
-        )
-    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        paired_windows_signal = None
-    paired_windows_signal_int = _coerce_int(paired_windows_signal)
-    paired_windows_explicit = False
-    if paired_windows_signal_int is not None and paired_windows_signal_int >= 0:
-        paired_windows = paired_windows_signal_int
-        paired_windows_explicit = True
+    paired_windows_explicit = paired_windows > 0
 
-    pm_prev, pm_fin, pm_ratio, pm_preview_final_ratio = (
-        _resolve_primary_metric_snapshot(
-            report,
-            baseline_ref,
+    stats_payload: dict[str, Any] = {
+        "metric_space": "log_nll",
+        "bootstrap": metrics_bootstrap,
+        "coverage": coverage_summary,
+        "pairing": ratio_ci_source,
+        "paired_windows": paired_windows,
+        "window_pairing_reason": metrics.get("window_pairing_reason", None),
+    }
+    overlap_fraction = metrics.get("window_overlap_fraction")
+    if (
+        not isinstance(overlap_fraction, bool)
+        and isinstance(overlap_fraction, int | float)
+        and math.isfinite(float(overlap_fraction))
+    ):
+        stats_payload["window_overlap_fraction"] = float(overlap_fraction)
+    elif id_pairing_verified and slice_ids_disjoint:
+        stats_payload["window_overlap_fraction"] = 0.0
+    match_fraction = metrics.get("window_match_fraction")
+    if (
+        not isinstance(match_fraction, bool)
+        and isinstance(match_fraction, int | float)
+        and math.isfinite(float(match_fraction))
+    ):
+        stats_payload["window_match_fraction"] = float(match_fraction)
+    elif id_pairing_verified:
+        stats_payload["window_match_fraction"] = 1.0
+    if isinstance(raw_slice_summary, dict):
+        stats_payload["preview_final_slice_delta_summary"] = (
+            preview_final_slice_delta_summary
         )
-    )
+
     ppl_analysis = {
-        "preview": pm_prev,
-        "final": pm_fin,
-        "ratio_vs_baseline": pm_ratio
-        if isinstance(pm_ratio, (int | float))
+        "preview": edited_preview,
+        "final": edited_final,
+        "ratio_vs_baseline": ratio_vs_baseline
+        if isinstance(ratio_vs_baseline, (int | float))
         else float("nan"),
-        "preview_final_ratio": pm_preview_final_ratio,
-        "drift": pm_preview_final_ratio,
+        "preview_final_ratio": preview_final_ratio,
+        "drift": preview_final_ratio,
         "preview_ci": None,
         "final_ci": None,
         "ratio_ci": ratio_ci,
@@ -575,19 +659,7 @@ def build_primary_metric_analysis(
         if _is_number(baseline_delta_mean)
         else None,
         "reduction": metrics.get("reduction"),
-        "stats": {
-            "metric_space": "log_nll",
-            "bootstrap": metrics_bootstrap,
-            "coverage": coverage_summary,
-            "pairing": ratio_ci_source,
-            "paired_windows": paired_windows,
-            "window_overlap_fraction": metrics.get(
-                "window_overlap_fraction", float("nan")
-            ),
-            "window_match_fraction": metrics.get("window_match_fraction", float("nan")),
-            "window_pairing_reason": metrics.get("window_pairing_reason", None),
-            "paired_delta_summary": paired_delta_summary,
-        },
+        "stats": stats_payload,
     }
 
     _merge_metrics_stats_source(report, ppl_analysis)

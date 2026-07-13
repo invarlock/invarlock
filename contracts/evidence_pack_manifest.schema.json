@@ -236,6 +236,65 @@
         "additionalProperties": true
       }
     },
+    "verification_baselines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "path",
+          "digest",
+          "report_paths"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^baselines/(?:[^./][^/]*/)+evaluation\\.report\\.json$"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "report_paths": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^reports/(?:[^./][^/]*/)+evaluation\\.report\\.json$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "verification_policy_pack": {
+      "type": "object",
+      "required": [
+        "path",
+        "digest",
+        "policy_digest"
+      ],
+      "properties": {
+        "path": {
+          "const": "policy/policy-pack.json"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "policy_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
     "checksums_sha256": {
       "const": "checksums.sha256"
     },

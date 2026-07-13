@@ -1,11 +1,20 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
+from invarlock.evidence_pack_contracts.probes import (
+    PROBE_FILENAMES,
+    ProbeValidationError,
+    load_probe_snapshot,
+)
+from invarlock.evidence_pack_json import StrictJsonError, read_json_object_snapshot
 
 try:
     from .report_branding import evidence_pack_text_header
@@ -88,6 +97,95 @@ def _display_manifest_path(manifest_path: Path) -> str:
     return manifest_path.name
 
 
+def _report_run_id(payload: dict[str, Any]) -> str | None:
+    run_id = payload.get("run_id")
+    if isinstance(run_id, str) and run_id.strip():
+        return run_id.strip()
+    meta = payload.get("meta")
+    if isinstance(meta, dict):
+        run_id = meta.get("run_id")
+        if isinstance(run_id, str) and run_id.strip():
+            return run_id.strip()
+    return None
+
+
+def _pack_report_path(report_path: Path, output_dir: Path) -> str | None:
+    try:
+        relative = report_path.relative_to(output_dir)
+    except ValueError:
+        return None
+    parts = relative.parts
+    if len(parts) < 4 or parts[1] != "reports":
+        return None
+    return Path("reports", parts[0], *parts[2:]).as_posix()
+
+
+def _report_bindings(
+    output_dir: Path,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    bindings: list[dict[str, Any]] = []
+    failures: list[dict[str, Any]] = []
+    for report_path in sorted(output_dir.glob("*/reports/**/evaluation.report.json")):
+        try:
+            relative = report_path.relative_to(output_dir)
+        except ValueError:
+            continue
+        if any(part.startswith(".") and ".tmp." in part for part in relative.parts):
+            continue
+        packed_path = _pack_report_path(report_path, output_dir)
+        if packed_path is None:
+            continue
+        try:
+            report_bytes, payload = read_json_object_snapshot(
+                report_path,
+                label=f"canonical report {packed_path}",
+            )
+        except (OSError, StrictJsonError) as exc:
+            failures.append(
+                {
+                    "requirement": "canonical_report_integrity",
+                    "message": "Canonical report must be unambiguous immutable JSON",
+                    "path": packed_path,
+                    "error": str(exc),
+                }
+            )
+            continue
+        binding: dict[str, Any] = {
+            "path": packed_path,
+            "report_sha256": hashlib.sha256(report_bytes).hexdigest(),
+        }
+        probe_bindings: list[dict[str, str]] = []
+        for filename in PROBE_FILENAMES:
+            probe_path = report_path.parent / filename
+            if not probe_path.exists():
+                continue
+            try:
+                probe_bytes, _payload = load_probe_snapshot(probe_path)
+            except (OSError, ProbeValidationError) as exc:
+                failures.append(
+                    {
+                        "requirement": "probe_evidence_valid",
+                        "message": "Verdict-driving probe must be strict canonical JSON",
+                        "path": f"{Path(packed_path).parent.as_posix()}/{filename}",
+                        "error": str(exc),
+                    }
+                )
+                continue
+            probe_bindings.append(
+                {
+                    "path": f"{Path(packed_path).parent.as_posix()}/{filename}",
+                    "sha256": hashlib.sha256(probe_bytes).hexdigest(),
+                }
+            )
+        if probe_bindings:
+            binding["probe_bindings"] = probe_bindings
+        run_id = _report_run_id(payload)
+        if run_id is not None:
+            binding["run_id"] = run_id
+        bindings.append(binding)
+    return bindings, failures
+
+
 def _evaluate_coverage_requirements(
     model_names: list[str],
     by_key: dict[tuple[str, str, str], dict[str, Any]],
@@ -111,9 +209,7 @@ def _evaluate_coverage_requirements(
 
     for model_name in model_names:
         missing_model: dict[str, list[str]] = {
-            "clean": [],
-            "stress": [],
-            "error_injection": [],
+            category: [] for category in SUMMARY_CATEGORIES
         }
         for category in SUMMARY_CATEGORIES:
             for scenario_id in sorted(expected_by_category.get(category, set())):
@@ -128,7 +224,8 @@ def _evaluate_coverage_requirements(
                         scenario_id
                     )
 
-        if any(missing_model.get(key) for key in SUMMARY_CATEGORIES):
+        gating_categories = {"clean", "trained", "stress", "error_injection"}
+        if any(missing_model.get(key) for key in gating_categories):
             missing["by_model"][model_name] = missing_model
             failed_requirements.append(
                 {
@@ -138,7 +235,7 @@ def _evaluate_coverage_requirements(
                     "missing": {
                         key: value
                         for key, value in missing_model.items()
-                        if key in {"clean", "stress", "error_injection"} and value
+                        if key in gating_categories and value
                     },
                 }
             )
@@ -168,6 +265,42 @@ def _evaluate_clean_gating(
                 {
                     "requirement": "clean_all_pass",
                     "message": "Clean scenarios must PASS",
+                    "scenario": scenario_id,
+                    "failures": [
+                        {
+                            "model": record["model"],
+                            "reasons": record["reasons"],
+                            "path": record["path"],
+                        }
+                        for record in failed_records
+                    ],
+                }
+            )
+    return failures
+
+
+def _evaluate_trained_gating(
+    model_names: list[str],
+    by_key: dict[tuple[str, str, str], dict[str, Any]],
+    scenario_ids: set[str],
+) -> list[dict[str, Any]]:
+    failures: list[dict[str, Any]] = []
+    for scenario_id in sorted(scenario_ids):
+        failed_records = [
+            record
+            for record in _scenario_records(
+                model_names,
+                by_key,
+                category="trained",
+                scenario_id=scenario_id,
+            )
+            if not bool(record["passed"])
+        ]
+        if failed_records:
+            failures.append(
+                {
+                    "requirement": "trained_all_pass",
+                    "message": "Genuine training scenarios must PASS",
                     "scenario": scenario_id,
                     "failures": [
                         {
@@ -427,6 +560,7 @@ def _build_counts(
     model_names: list[str],
     records: list[dict[str, Any]],
     clean: list[dict[str, Any]],
+    trained: list[dict[str, Any]],
     stress: list[dict[str, Any]],
     errors: list[dict[str, Any]],
     catastrophic_required: set[str],
@@ -451,6 +585,8 @@ def _build_counts(
         "records_total": len(records),
         "clean_total": len(clean),
         "clean_pass": sum(1 for record in clean if record["passed"]),
+        "trained_total": len(trained),
+        "trained_pass": sum(1 for record in trained if record["passed"]),
         "stress_total": len(stress),
         "stress_fail": sum(1 for record in stress if not record["passed"]),
         "catastrophic_required_total": len(catastrophic_required),
@@ -487,7 +623,10 @@ def generate_verdict(
         manifest_path = _manifest_root() / "scenarios.json"
     manifest = _load_scenarios_manifest(manifest_path)
     catalog = _build_scenario_catalog(manifest)
-    latest = _collect_latest_reports(output_dir)
+    latest = _collect_latest_reports(
+        output_dir,
+        scenario_index=catalog.scenario_index,
+    )
     baseline_reports = _collect_baseline_reports(output_dir)
     records, model_names = _collect_records(
         latest,
@@ -508,10 +647,28 @@ def generate_verdict(
         primary_guard_required_scenarios=catalog.primary_guard_required_scenarios,
     )
     failed_requirements.extend(
+        {
+            "requirement": "probe_evidence_valid",
+            "message": "Verdict-driving probe evidence must satisfy its exact contract",
+            "model": record["model"],
+            "scenario": record["name"],
+            "errors": record["probe_validation_errors"],
+        }
+        for record in records
+        if record.get("probe_validation_errors")
+    )
+    failed_requirements.extend(
         _evaluate_clean_gating(
             model_names,
             by_key,
             catalog.gating_by_category.get("clean", set()),
+        )
+    )
+    failed_requirements.extend(
+        _evaluate_trained_gating(
+            model_names,
+            by_key,
+            catalog.gating_by_category.get("trained", set()),
         )
     )
     failed_requirements.extend(
@@ -545,6 +702,7 @@ def generate_verdict(
     )
 
     clean = [record for record in records if record["category"] == "clean"]
+    trained = [record for record in records if record["category"] == "trained"]
     stress = [record for record in records if record["category"] == "stress"]
     errors = [record for record in records if record["category"] == "error_injection"]
     info_failures, info_total, info_fail, info_signaled = (
@@ -570,6 +728,8 @@ def generate_verdict(
         scenario_index=catalog.scenario_index,
     )
 
+    report_bindings, report_binding_failures = _report_bindings(output_dir)
+    failed_requirements.extend(report_binding_failures)
     verdict = "PASS" if not failed_requirements else "FAIL"
 
     return {
@@ -581,6 +741,7 @@ def generate_verdict(
         },
         "criteria": {
             "clean_all_pass": True,
+            "trained_all_pass": True,
             "stress_required_fail": True,
             "error_injection_detected": True,
             "informational_stress_min_signal_fraction": info_min_signal_fraction,
@@ -590,6 +751,7 @@ def generate_verdict(
             model_names=model_names,
             records=records,
             clean=clean,
+            trained=trained,
             stress=stress,
             errors=errors,
             catastrophic_required=catalog.catastrophic_required,
@@ -604,6 +766,7 @@ def generate_verdict(
         "guard_signal_summary": guard_signal_summary,
         "guard_intervention_summary": guard_intervention_summary,
         "scenario_signal_summary": scenario_signal_summary,
+        "report_bindings": report_bindings,
         "records": records,
         "missing": missing,
         "failed_requirements": failed_requirements,
@@ -628,6 +791,7 @@ def _render_text(payload: dict[str, Any]) -> str:
         "",
         "COUNTS:",
         f"  Clean: {counts.get('clean_pass')}/{counts.get('clean_total')} PASS",
+        f"  Trained: {counts.get('trained_pass')}/{counts.get('trained_total')} PASS",
         f"  Stress: {counts.get('stress_fail')}/{counts.get('stress_total')} FAIL (expected for stress probes)",
         (
             "  Catastrophic-required stress: "

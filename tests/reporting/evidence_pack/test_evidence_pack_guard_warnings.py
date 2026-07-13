@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from scripts.evidence_packs.python.verdict.records import _build_record
@@ -30,9 +31,12 @@ def test_evidence_pack_record_surfaces_guard_warnings(tmp_path: Path) -> None:
         },
     }
 
+    cert_path = tmp_path / "evaluation.report.json"
+    cert_path.write_text(json.dumps(cert), encoding="utf-8")
+
     record = _build_record(
         cert=cert,
-        cert_path=tmp_path / "evaluation.report.json",
+        cert_path=cert_path,
         model_name="model",
         category="stress",
         scenario_id="spectral_moderate_scale_stress",

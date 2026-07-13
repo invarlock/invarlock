@@ -8,18 +8,20 @@ import pytest
 from invarlock.reporting import (
     policy_utils,
     primary_metric_utils,
+    report_metric_impact,
     report_normalization,
-    report_overhead,
-    report_validation,
 )
 from invarlock.reporting import (
     report_primary_metric_policy as pm_policy,
 )
 from invarlock.reporting import report_schema as allowlist_mod
 from invarlock.reporting import utils as report_utils
-from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_schema import validate_report
 from invarlock.reporting.report_types import create_empty_report
+from invarlock.reporting.validation import report as report_validation
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mk_baseline() -> dict:
@@ -33,6 +35,7 @@ def _mk_baseline() -> dict:
             "auto": {"tier": "balanced", "probes_used": 0, "target_pm_ratio": None},
         }
     )
+    b["context"] = {"profile": "dev"}
     b["data"].update(
         {
             "dataset": "ds",
@@ -43,7 +46,7 @@ def _mk_baseline() -> dict:
             "final_n": 2,
         }
     )
-    b["edit"]["name"] = "baseline"
+    b["edit"]["name"] = "noop"
     b["edit"]["plan_digest"] = "baseline_noop"
     b["edit"]["deltas"]["params_changed"] = 0
     b["metrics"]["primary_metric"] = {
@@ -85,6 +88,7 @@ def test_make_evaluation_report_covers_baseline_ratio_identity_paths(
             "auto": {"tier": "balanced", "probes_used": 0, "target_pm_ratio": None},
         }
     )
+    report["context"] = {"profile": "dev"}
     report["data"].update(
         {
             "dataset": "ds",
@@ -106,26 +110,38 @@ def test_make_evaluation_report_covers_baseline_ratio_identity_paths(
         "seed": 0,
         "coverage": {"preview": {"used": 2}, "final": {"used": 2}},
     }
-    report["metrics"]["paired_delta_summary"] = {"mean": 0.0, "degenerate": False}
+    report["metrics"]["preview_final_slice_delta_summary"] = {
+        "mean": 0.0,
+        "ci": [-0.01, 0.01],
+        "basis": "independent_disjoint_slices",
+        "paired": False,
+        "ci_method": "independent_percentile_delta_log",
+        "ci_reason": None,
+        "preview_windows": 2,
+        "final_windows": 2,
+        "degenerate": False,
+        "degenerate_reason": None,
+    }
     report["metrics"]["window_plan"] = {"profile": "dev"}
     report["metrics"]["logloss_delta_ci"] = (-0.01, 0.01)
 
-    # Exercise both sides of the baseline-ratio identity check:
-    #  - ratio_vs_baseline == exp(baseline_delta_mean) (within tolerance)
-    #  - ratio_vs_baseline mismatches exp(baseline_delta_mean)
-    for ratio in (1.0, 1.2):
-        run = deepcopy(report)
-        run["metrics"]["primary_metric"] = {
-            "kind": "ppl_causal",
-            "preview": 10.0,
-            "final": 10.0,
-            "ratio_vs_baseline": ratio,
-        }
-        cert = make_report(run, baseline)
-        assert validate_report(cert)
+    run = deepcopy(report)
+    run["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": 10.0,
+        "final": 10.0,
+        "ratio_vs_baseline": 1.0,
+    }
+    cert = make_report(run, baseline)
+    assert validate_report(cert)
+
+    mismatched = deepcopy(run)
+    mismatched["metrics"]["primary_metric"]["ratio_vs_baseline"] = 1.2
+    with pytest.raises(ValueError, match="Primary metric ratio mismatch"):
+        make_report(mismatched, baseline)
 
 
-def test_make_evaluation_report_synthesizes_display_ci_from_ratio_or_defaults(
+def test_make_evaluation_report_synthesizes_display_ci_from_explicit_accuracy_delta(
     monkeypatch,
 ) -> None:
     baseline = _mk_baseline()
@@ -146,29 +162,33 @@ def test_make_evaluation_report_synthesizes_display_ci_from_ratio_or_defaults(
     # Ensure our test payload survives normalization and triggers the local fallback block.
     monkeypatch.setattr(
         report_normalization,
-        "normalize_and_validate_run_report",
+        "validated_run_report_view",
         lambda r: r,
         raising=False,
     )
     monkeypatch.setattr(primary_metric_utils, "attach_primary_metric", attach_stub)
 
     cases = [
-        # (primary_metric payload, report.config.guards, expected display_ci, expect ratio token)
+        # (primary_metric payload, report.config.guards, expected display_ci)
         (
-            {"kind": "accuracy", "ratio_vs_baseline": 1.25},
+            {
+                "kind": "accuracy",
+                "preview": 0.75,
+                "final": 0.75,
+                "delta_vs_baseline_pp": 1.25,
+            },
             {"variance": {"enabled": True}},
             [1.25, 1.25],
-            True,
-        ),
-        (
-            {"kind": "accuracy"},
-            "not-a-dict",
-            [1.0, 1.0],
-            False,
         ),
     ]
 
-    for pm, guards, expected_ci, expect_ratio in cases:
+    for pm, guards, expected_ci in cases:
+        case_baseline = deepcopy(baseline)
+        case_baseline["metrics"]["primary_metric"] = {
+            "kind": "accuracy",
+            "preview": 0.75,
+            "final": 0.75,
+        }
         report = create_empty_report()
         report["meta"].update(
             {
@@ -179,6 +199,7 @@ def test_make_evaluation_report_synthesizes_display_ci_from_ratio_or_defaults(
                 "auto": {"tier": "balanced", "probes_used": 0, "target_pm_ratio": None},
             }
         )
+        report["context"] = {"profile": "dev"}
         report["data"].update(
             {
                 "dataset": "ds",
@@ -197,7 +218,7 @@ def test_make_evaluation_report_synthesizes_display_ci_from_ratio_or_defaults(
         report["config"] = {"guards": guards}
         report["provenance"] = {"dataset_split": "validation", "split_fallback": False}
 
-        cert = make_report(report, baseline)
+        cert = make_report(report, case_baseline)
         assert validate_report(cert)
 
         pm_out = cert.get("primary_metric", {})
@@ -207,7 +228,7 @@ def test_make_evaluation_report_synthesizes_display_ci_from_ratio_or_defaults(
         summary = (cert.get("telemetry", {}) or {}).get("summary_line", "")
         assert isinstance(summary, str) and summary.startswith("INVARLOCK_TELEMETRY ")
         assert "ci=" in summary and "width=" in summary
-        assert ("ratio=" in summary) is expect_ratio
+        assert "ratio=" not in summary
 
         # Ensure JSON serialization remains stable for later reporters.
         json.dumps(cert, sort_keys=True, default=str)
@@ -360,27 +381,24 @@ def test_normalize_override_entry_variants() -> None:
 
 
 def test_normalize_baseline_derives_ppl_from_primary_metric() -> None:
-    baseline = {
-        "meta": {"model_id": "m"},
-        "metrics": {
-            "primary_metric": {"kind": "ppl_causal", "final": 10.0, "preview": 9.0}
-        },
-        "edit": {
-            "name": "baseline",
-            "plan_digest": "baseline_noop",
-            "deltas": {"params_changed": 0},
-        },
-        "evaluation_windows": {"final": {"window_ids": [1], "logloss": [1.0]}},
+    baseline = create_empty_report()
+    baseline["meta"].update({"model_id": "m", "adapter": "hf_causal"})
+    baseline["edit"]["name"] = "noop"
+    baseline["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "final": 10.0,
+        "preview": 9.0,
     }
+    baseline["evaluation_windows"] = {"final": {"window_ids": [1], "logloss": [1.0]}}
     out = report_normalization.normalize_baseline(baseline)
     assert out.get("ppl_final") == 10.0
     assert out.get("ppl_preview") == 9.0
 
 
-def test_prepare_guard_overhead_section_keeps_skip_reason() -> None:
-    payload = {"skipped": True, "skip_reason": " because ", "overhead_threshold": 0.01}
-    out, ok = report_overhead.prepare_guard_overhead_section(payload)
-    assert ok is True
+def test_prepare_guard_metric_impact_section_keeps_skip_reason() -> None:
+    payload = {"skipped": True, "skip_reason": " because ", "degradation_limit": 0.01}
+    out, ok = report_metric_impact.prepare_guard_metric_impact_section(payload)
+    assert ok is False
     assert out.get("skip_reason") == "because"
 
 
@@ -397,18 +415,18 @@ def test_compute_validation_flags_acceptance_bounds_and_accuracy_tiny_relax() ->
     )
     assert flags.get("primary_metric_acceptable") in {True, False}
 
-    # Tiny-relax accuracy branch: accept missing delta and small n.
+    # Missing accuracy delta evidence remains fail-closed even for tiny fixtures.
     flags2 = report_validation.compute_validation_flags(
         ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": 0.0},
         spectral={},
         rmt={},
         invariants={"status": "ok"},
         tier="balanced",
-        primary_metric={"kind": "accuracy", "ratio_vs_baseline": None, "n_final": 1},
+        primary_metric={"kind": "accuracy", "n_final": 1},
         dataset_capacity={"examples_available": 1},
         tiny_relax=True,
     )
-    assert flags2.get("primary_metric_acceptable") is True
+    assert flags2.get("primary_metric_acceptable") is False
 
 
 def test_validation_allowlist_schema_tightening_paths() -> None:
@@ -445,6 +463,7 @@ def test_make_evaluation_report_ratio_ci_fallback_skips_non_interval(
             "auto": {"tier": "balanced", "probes_used": 0, "target_pm_ratio": None},
         }
     )
+    report["context"] = {"profile": "dev"}
     report["data"].update(
         {
             "dataset": "ds",
@@ -466,7 +485,18 @@ def test_make_evaluation_report_ratio_ci_fallback_skips_non_interval(
         "seed": 0,
         "coverage": {"preview": {"used": 2}, "final": {"used": 2}},
     }
-    report["metrics"]["paired_delta_summary"] = {"mean": 0.0, "degenerate": False}
+    report["metrics"]["preview_final_slice_delta_summary"] = {
+        "mean": 0.0,
+        "ci": [-0.01, 0.01],
+        "basis": "independent_disjoint_slices",
+        "paired": False,
+        "ci_method": "independent_percentile_delta_log",
+        "ci_reason": None,
+        "preview_windows": 2,
+        "final_windows": 2,
+        "degenerate": False,
+        "degenerate_reason": None,
+    }
     report["metrics"]["window_plan"] = {"profile": "dev"}
     report["metrics"]["logloss_delta_ci"] = (-0.01, 0.01)
     report["metrics"]["primary_metric"] = {

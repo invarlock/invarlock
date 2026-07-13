@@ -2,14 +2,27 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_make import make_report
+from invarlock.reporting.rendering.markdown import render_report_markdown
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _make_cert(*, metrics: dict | None = None, edit_deltas: dict | None = None) -> dict:
+    primary_metric = metrics or {
+        "kind": "ppl_causal",
+        "preview": 10.0,
+        "final": 10.0,
+    }
     report = {
-        "meta": {"model_id": "m", "seed": 1},
-        "metrics": metrics or {"ppl_preview": 10.0, "ppl_final": 10.0},
+        "meta": {
+            "adapter": "hf",
+            "model_id": "m",
+            "seed": 1,
+            "auto": {"tier": "balanced"},
+        },
+        "metrics": {"primary_metric": primary_metric},
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "d",
             "split": "val",
@@ -31,12 +44,7 @@ def _make_cert(*, metrics: dict | None = None, edit_deltas: dict | None = None) 
         },
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    baseline = {
-        "run_id": "b",
-        "model_id": "m",
-        "ppl_final": 10.0,
-        "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
-    }
+    baseline = {**report, "run_id": "b", "edit": {"name": "noop"}}
     with patch(
         "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
@@ -51,9 +59,10 @@ def test_drift_basis_point_only_when_no_ci():
 def test_drift_basis_includes_ci_informational_when_ci_present():
     cert = _make_cert(
         metrics={
-            "ppl_preview": 10.0,
-            "ppl_final": 10.0,
-            "ppl_drift_ci": (0.98, 1.02),
+            "kind": "ppl_causal",
+            "preview": 10.0,
+            "final": 10.0,
+            "display_ci": (0.98, 1.02),
         }
     )
     md = render_report_markdown(cert)
@@ -62,7 +71,12 @@ def test_drift_basis_includes_ci_informational_when_ci_present():
 
 def test_render_markdown_uses_point_basis_when_no_ratio_ci():
     cert = _make_cert(
-        metrics={"ppl_preview": 10.0, "ppl_final": 10.0, "ppl_ratio": 1.0}
+        metrics={
+            "kind": "ppl_causal",
+            "preview": 10.0,
+            "final": 10.0,
+            "ratio_vs_baseline": 1.0,
+        }
     )
     cert.setdefault("auto", {})["tier"] = "balanced"
     cert["auto"]["target_pm_ratio"] = 1.0

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _rep_with_subgroups_and_sys() -> tuple[dict, dict]:
@@ -13,6 +15,7 @@ def _rep_with_subgroups_and_sys() -> tuple[dict, dict]:
             "ts": "2024-01-01T00:00:00",
             "auto": {"tier": "balanced", "probes_used": 0, "target_pm_ratio": None},
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "ds",
             "split": "val",
@@ -50,13 +53,8 @@ def _rep_with_subgroups_and_sys() -> tuple[dict, dict]:
         "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
         "flags": {"guard_recovered": False, "rollback_reason": None},
     }
-    base = {
-        "meta": {"auto": {"tier": "balanced"}},
-        "metrics": {
-            "primary_metric": {"kind": "ppl_causal", "final": 4.0},
-            "latency_ms_per_tok": 1.6,
-        },
-    }
+    base = {**rep, "edit": {"name": "noop"}}
+    base["metrics"] = {**rep["metrics"], "latency_ms_per_tok": 1.6}
     return rep, base
 
 

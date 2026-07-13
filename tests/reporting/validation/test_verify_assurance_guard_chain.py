@@ -3,110 +3,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import invarlock.reporting.verify_contract as verify_mod
 from invarlock.core.assurance_contract import (
-    ASSURANCE_CLAIM_SET,
     CANONICAL_GUARD_CHAIN,
 )
 from invarlock.reporting.verify_contract import VerifyOutcome, run_verify_reports
-from invarlock.runtime_provenance import RuntimeProvenanceResult
-
-
-def _report(guard_chain: list[str]) -> dict:
-    return {
-        "schema_version": "v1",
-        "run_id": "strict-test",
-        "artifacts": {},
-        "plugins": {"guards": guard_chain, "adapters": [], "edits": []},
-        "guards": [{"name": name} for name in guard_chain],
-        "spectral": {"supported": True, "status": "pass"},
-        "rmt": {"supported": True, "status": "pass"},
-        "variance": {"supported": True, "status": "pass"},
-        "invariants": {"supported": True, "status": "pass"},
-        "meta": {"profile": "ci"},
-        "context": {
-            "profile": "ci",
-            "runtime": {"execution_mode": "container"},
-        },
-        "auto": {"tier": "balanced"},
-        "provenance": {"provider_digest": {"ids_sha256": "subject-ids"}},
-        "dataset": {
-            "provider": "local_jsonl",
-            "seq_len": 8,
-            "windows": {
-                "preview": 2,
-                "final": 2,
-                "stats": {
-                    "paired_windows": 2,
-                    "window_match_fraction": 1.0,
-                    "window_overlap_fraction": 0.0,
-                    "window_pairing_reason": None,
-                    "coverage": {
-                        "preview": {"used": 2},
-                        "final": {"used": 2},
-                    },
-                },
-            },
-        },
-        "baseline_ref": {"primary_metric": {"final": 2.0}},
-        "primary_metric": {
-            "kind": "ppl_causal",
-            "preview": 2.0,
-            "final": 2.0,
-            "ratio_vs_baseline": 1.0,
-            "ci": [0.0, 0.0],
-            "display_ci": [1.0, 1.0],
-        },
-        "evaluation_windows": {
-            "final": {
-                "logloss": [0.6931471805599453, 0.6931471805599453],
-                "token_counts": [10, 10],
-            }
-        },
-        "validation": {},
-        "assurance": {
-            "mode": "strict",
-            "profile": "ci",
-            "tier": "balanced",
-            "claim_set": ASSURANCE_CLAIM_SET,
-            "canonical_guard_chain": list(CANONICAL_GUARD_CHAIN),
-            "guard_chain_observed": guard_chain,
-            "canonical_guard_chain_enforced": guard_chain
-            == list(CANONICAL_GUARD_CHAIN),
-            "fallback_fields_used": False,
-            "runtime_provenance_verified": False,
-            "runtime_provenance_declared": "container",
-            "runtime_provenance_verification_status": "pending",
-            "verdict": "pending_verifier",
-            "report_local_verdict": "pass",
-            "verified_assurance_verdict": "pending",
-            "blocking_reasons": [],
-        },
-    }
-
-
-def _write_report(path: Path, payload: dict) -> None:
-    path.write_text(json.dumps(payload), encoding="utf-8")
-
-
-def _verified_runtime(monkeypatch) -> None:
-    monkeypatch.setattr(
-        verify_mod,
-        "verify_runtime_provenance",
-        lambda *args, **kwargs: RuntimeProvenanceResult(
-            verified=True,
-            skipped=False,
-        ),
-        raising=True,
-    )
-
-
-def _run_strict(path: Path, *, profile: str = "dev"):
-    return run_verify_reports(
-        [path],
-        profile=profile,
-        assurance_mode="strict",
-    )
+from tests.reporting.validation._support_verify_assurance_guard_chain import (
+    _report,
+    _run_strict,
+    _verified_runtime,
+    _write_report,
+)
 
 
 def test_verify_assurance_strict_rejects_wrong_guard_order(
@@ -169,7 +75,7 @@ def test_verify_assurance_strict_rejects_unverified_override(
 
     assert result.outcome == VerifyOutcome.POLICY_FAIL
     diagnostics = "\n".join(item.message for item in result.diagnostics)
-    assert "verified runtime provenance" in diagnostics
+    assert "independently supplied runtime image digest" in diagnostics
 
 
 def test_verify_assurance_strict_rejects_manipulated_display_ci(
@@ -186,7 +92,7 @@ def test_verify_assurance_strict_rejects_manipulated_display_ci(
 
     assert result.outcome == VerifyOutcome.POLICY_FAIL
     diagnostics = "\n".join(item.message for item in result.diagnostics)
-    assert "display_ci mismatch" in diagnostics
+    assert "primary_metric.display_ci mismatch" in diagnostics
 
 
 def test_verify_assurance_strict_rejects_manipulated_ratio(
@@ -203,7 +109,10 @@ def test_verify_assurance_strict_rejects_manipulated_ratio(
 
     assert result.outcome == VerifyOutcome.POLICY_FAIL
     diagnostics = "\n".join(item.message for item in result.diagnostics)
-    assert "Primary metric ratio mismatch" in diagnostics
+    assert (
+        "Primary metric ratio mismatch against recomputed final and baseline"
+        in diagnostics
+    )
 
 
 def test_verify_assurance_strict_rejects_missing_final_windows(
@@ -220,7 +129,7 @@ def test_verify_assurance_strict_rejects_missing_final_windows(
 
     assert result.outcome == VerifyOutcome.POLICY_FAIL
     diagnostics = "\n".join(item.message for item in result.diagnostics)
-    assert "evaluation_windows.final missing" in diagnostics
+    assert "requires evaluation_windows.final" in diagnostics
 
 
 def test_verify_assurance_strict_rejects_mismatched_final_window_ids(
@@ -237,7 +146,7 @@ def test_verify_assurance_strict_rejects_mismatched_final_window_ids(
 
     assert result.outcome == VerifyOutcome.POLICY_FAIL
     diagnostics = "\n".join(item.message for item in result.diagnostics)
-    assert "window_ids length differs" in diagnostics
+    assert "schedule_digest" in diagnostics
 
 
 def test_verify_assurance_strict_rejects_duplicated_final_window_ids(
@@ -321,7 +230,7 @@ def test_verify_assurance_strict_rejects_spectral_without_pass_signal(
 
     assert result.outcome == VerifyOutcome.POLICY_FAIL
     diagnostics = "\n".join(item.message for item in result.diagnostics)
-    assert "spectral missing strict guard pass evidence." in diagnostics
+    assert "spectral.passed is required for strict assurance." in diagnostics
 
 
 def test_verify_assurance_strict_rejects_empty_invariants_guard_evidence(
@@ -409,7 +318,7 @@ def test_verify_assurance_strict_rejects_degraded_guard(
 
     assert result.outcome == VerifyOutcome.POLICY_FAIL
     diagnostics = "\n".join(item.message for item in result.diagnostics)
-    assert "rmt status degraded is not strict-assurance passing." in diagnostics
+    assert "rmt.status='degraded' is not passing." in diagnostics
 
 
 def test_verify_assurance_strict_rejects_tokenizer_mismatch(
@@ -427,7 +336,7 @@ def test_verify_assurance_strict_rejects_tokenizer_mismatch(
 
     assert result.outcome == VerifyOutcome.POLICY_FAIL
     diagnostics = "\n".join(item.message for item in result.diagnostics)
-    assert "Tokenizer hash mismatch" in diagnostics
+    assert "tokenizer hash mismatch" in diagnostics
 
 
 def test_verify_assurance_strict_rejects_provider_parity_mismatch(

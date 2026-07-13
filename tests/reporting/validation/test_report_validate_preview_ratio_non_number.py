@@ -1,16 +1,31 @@
 from unittest.mock import patch
 
-from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_make import make_report
+from invarlock.reporting.rendering.markdown import render_report_markdown
 from invarlock.reporting.report_schema import validate_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def test_schema_rejects_wrong_version_before_render():
     # Start from a valid evaluation report, then corrupt schema_version.
     # Rendering is intentionally formatting-only; schema rejection belongs to report_schema.
     report = {
-        "meta": {"model_id": "m", "seed": 1},
-        "metrics": {"ppl_preview": 10.0, "ppl_final": 10.0},
+        "meta": {
+            "model_id": "m",
+            "adapter": "hf_causal",
+            "seed": 1,
+            "auto": {"tier": "balanced"},
+        },
+        "context": {"profile": "dev", "assurance": {"mode": "off"}},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+                "ratio_vs_baseline": 1.0,
+            }
+        },
         "data": {
             "dataset": "d",
             "split": "val",
@@ -32,17 +47,33 @@ def test_schema_rejects_wrong_version_before_render():
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
     baseline = {
-        "run_id": "b",
-        "model_id": "m",
-        "ppl_final": 10.0,
+        "meta": {
+            "model_id": "m",
+            "adapter": "hf_causal",
+            "auto": {"tier": "balanced"},
+        },
+        "context": {"profile": "dev", "assurance": {"mode": "off"}},
+        "data": {
+            "dataset": "d",
+            "split": "val",
+            "seq_len": 8,
+            "stride": 1,
+            "preview_n": 1,
+            "final_n": 1,
+        },
+        "edit": {"name": "noop"},
+        "guards": [],
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+            }
+        },
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
+        "artifacts": {"events_path": "", "logs_path": ""},
+        "flags": {"guard_recovered": False, "rollback_reason": None},
     }
-    with patch(
-        "invarlock.reporting.report_normalization.validate_report", return_value=True
-    ):
-        cert = make_report(report, baseline)
-    # Seed primary_metric via ppl_ratio for PM-only validation path
-    report["metrics"]["ppl_ratio"] = 1.0
     with patch(
         "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):

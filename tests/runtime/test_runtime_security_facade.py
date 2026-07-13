@@ -35,6 +35,8 @@ def test_runtime_security_facade_exposes_only_public_surface() -> None:
         "RUNTIME_MANIFEST_FILENAME",
         "RUNTIME_MANIFEST_VERSION",
         "RUNTIME_VERIFIER_CONTRACT_VERSION",
+        "SOURCE_BUNDLE_DIGEST_ENV",
+        "SOURCE_BUNDLE_READ_ONLY_ENV",
         "RuntimeManifestExecution",
         "RuntimeManifestLoadIssueCode",
         "RuntimeManifestLoadResult",

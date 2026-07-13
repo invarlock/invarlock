@@ -2,14 +2,26 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mk_run_with_windows(final_vals: list[float], token_counts: list[int]) -> dict:
     assert len(final_vals) == len(token_counts) and len(final_vals) > 0
     # Use identical preview/final for simplicity; only final is used for baseline pairing
     return {
-        "meta": {"model_id": "model", "adapter": "hf_causal", "seed": 42},
+        "meta": {
+            "model_id": "model",
+            "adapter": "hf_causal",
+            "seed": 42,
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
+        },
+        "context": {"profile": "dev"},
         "metrics": {
             # Leave ppl_* absent to exercise pair-based recompute/identity
             "primary_metric": {
@@ -20,6 +32,7 @@ def _mk_run_with_windows(final_vals: list[float], token_counts: list[int]) -> di
                 "paired": True,
                 "gating_basis": "upper",
                 # do not set ratio_vs_baseline here
+                "preview": 123.0,
                 "final": 123.0,
             }
         },
@@ -31,11 +44,16 @@ def _mk_run_with_windows(final_vals: list[float], token_counts: list[int]) -> di
             }
         },
         "artifacts": {},
-        "dataset": {
-            "provider": "wikitext2",
+        "data": {
+            "dataset": "wikitext2",
+            "split": "validation",
             "seq_len": 128,
-            "windows": {"preview": 1, "final": 1},
+            "stride": 128,
+            "preview_n": 1,
+            "final_n": 1,
         },
+        "edit": {"name": "noop"},
+        "guards": [],
     }
 
 

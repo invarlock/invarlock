@@ -15,7 +15,7 @@ from invarlock.runtime_security import (
     reset_runtime_allowances,
     unverified_provenance_allowed,
 )
-from invarlock.runtime_verify import verify_runtime_manifest
+from invarlock.runtime_verify import verify_runtime_manifest_snapshot
 
 
 class RuntimeProvenanceIssueCode(StrEnum):
@@ -37,6 +37,10 @@ class RuntimeProvenanceResult:
     verified: bool
     skipped: bool
     issues: tuple[RuntimeProvenanceIssue, ...] = ()
+    binding_verified: bool = False
+    expected_digest_matched: bool = False
+    trust_status: str = "failed"
+    declared_image_digest: str | None = None
 
 
 @dataclass(frozen=True)
@@ -46,6 +50,10 @@ class RuntimeProvenanceVerdict:
     verified: bool
     skipped: bool
     issues: tuple[RuntimeProvenanceIssue, ...] = ()
+    binding_verified: bool = False
+    expected_digest_matched: bool = False
+    trust_status: str = "failed"
+    declared_image_digest: str | None = None
 
     @property
     def strict_blocking(self) -> bool:
@@ -58,8 +66,16 @@ class RuntimeProvenanceVerdict:
         *,
         declared_mode: str = "unknown",
     ) -> RuntimeProvenanceVerdict:
-        if result.verified:
-            status = "verified"
+        expected_digest_matched = bool(
+            result.expected_digest_matched or result.verified
+        )
+        trust_status = result.trust_status
+        if expected_digest_matched and trust_status == "failed":
+            trust_status = "expected_image_digest_matched"
+        if expected_digest_matched:
+            status = "expected_image_digest_matched"
+        elif result.binding_verified:
+            status = "manifest_bound"
         elif result.skipped:
             status = "skipped"
         else:
@@ -70,6 +86,10 @@ class RuntimeProvenanceVerdict:
             verified=result.verified,
             skipped=result.skipped,
             issues=result.issues,
+            binding_verified=result.binding_verified,
+            expected_digest_matched=expected_digest_matched,
+            trust_status=trust_status,
+            declared_image_digest=result.declared_image_digest,
         )
 
     def as_verification_payload(self) -> dict[str, object]:
@@ -88,6 +108,10 @@ class RuntimeProvenanceVerdict:
                 "declared_mode": self.declared_mode,
                 "status": self.status,
                 "verified": self.verified,
+                "binding_verified": self.binding_verified,
+                "expected_digest_matched": self.expected_digest_matched,
+                "trust_status": self.trust_status,
+                "declared_image_digest": self.declared_image_digest,
                 "skipped": self.skipped,
                 "strict_blocking": self.strict_blocking,
                 "issues": issues,
@@ -99,6 +123,8 @@ def _runtime_verifier_failed_result(
     report: Path,
     *,
     messages: tuple[str, ...],
+    binding_verified: bool = False,
+    declared_image_digest: str | None = None,
 ) -> RuntimeProvenanceResult:
     return RuntimeProvenanceResult(
         verified=False,
@@ -111,18 +137,60 @@ def _runtime_verifier_failed_result(
             )
             for message in messages
         ),
+        binding_verified=binding_verified,
+        expected_digest_matched=False,
+        trust_status="failed",
+        declared_image_digest=declared_image_digest,
     )
 
 
 def _verify_runtime_manifest(
     report: Path,
     manifest_path: Path,
+    *,
+    report_bytes: bytes,
+    manifest_payload: dict[str, object],
+    expected_image_digest: str | None = None,
+    require_strict_runtime: bool = False,
 ) -> RuntimeProvenanceResult:
-    result = verify_runtime_manifest(report, manifest_path)
+    result = verify_runtime_manifest_snapshot(
+        report_bytes,
+        manifest_payload,
+        report=report,
+        manifest=manifest_path,
+        expected_image_digest=expected_image_digest,
+        require_strict_runtime=require_strict_runtime,
+    )
+    binding_verified = bool(getattr(result, "binding_verified", result.ok))
+    expected_digest_matched = bool(getattr(result, "expected_digest_matched", False))
+    trust_status = str(
+        getattr(
+            result,
+            "trust_status",
+            (
+                "expected_image_digest_matched"
+                if expected_digest_matched
+                else "manifest_bound"
+            ),
+        )
+    )
+    declared_image_digest = getattr(result, "declared_image_digest", None)
     if result.ok:
-        return RuntimeProvenanceResult(verified=True, skipped=False)
+        return RuntimeProvenanceResult(
+            verified=expected_digest_matched,
+            skipped=False,
+            binding_verified=binding_verified,
+            expected_digest_matched=expected_digest_matched,
+            trust_status=trust_status,
+            declared_image_digest=declared_image_digest,
+        )
     messages = result.errors or (f"Runtime verifier failed for {report.name}.",)
-    return _runtime_verifier_failed_result(report, messages=messages)
+    return _runtime_verifier_failed_result(
+        report,
+        messages=messages,
+        binding_verified=binding_verified,
+        declared_image_digest=declared_image_digest,
+    )
 
 
 @contextmanager
@@ -152,9 +220,16 @@ def verify_runtime_provenance(
     report_path: str | Path,
     *,
     allow_unverified: bool = False,
+    expected_image_digest: str | None = None,
+    report_bytes: bytes | None = None,
+    require_strict_runtime: bool = False,
 ) -> RuntimeProvenanceResult:
     if allow_unverified or unverified_provenance_allowed():
-        return RuntimeProvenanceResult(verified=False, skipped=True)
+        return RuntimeProvenanceResult(
+            verified=False,
+            skipped=True,
+            trust_status="skipped",
+        )
 
     report = Path(report_path)
     load_result = load_runtime_manifest(report)
@@ -221,7 +296,23 @@ def verify_runtime_provenance(
             ),
         )
 
-    return _verify_runtime_manifest(report, manifest_path)
+    if report_bytes is None:
+        try:
+            report_bytes = report.read_bytes()
+        except OSError as exc:
+            return _runtime_verifier_failed_result(
+                report,
+                messages=(f"unable to read report: {exc}",),
+            )
+
+    return _verify_runtime_manifest(
+        report,
+        manifest_path,
+        report_bytes=report_bytes,
+        manifest_payload=manifest,
+        expected_image_digest=expected_image_digest,
+        require_strict_runtime=require_strict_runtime,
+    )
 
 
 __all__ = [

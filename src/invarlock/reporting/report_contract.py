@@ -10,11 +10,14 @@ from invarlock.core.report_inputs import load_report_input_json
 
 from .report_bundle import save_evaluation_bundle
 from .report_make import make_report
+from .report_normalization import validate_canonical_run_report
 from .report_schema import validate_report
 from .report_summary import compute_console_validation_block
 from .report_types import RunReport
 
-report_files = cast(Any, importlib.import_module("invarlock.reporting.report_files"))
+report_bundle_module = cast(
+    Any, importlib.import_module("invarlock.reporting.report_bundle")
+)
 
 
 @dataclass(frozen=True)
@@ -36,7 +39,7 @@ def save_report(
     compare: RunReport | None = None,
     filename_prefix: str = "report",
 ) -> dict[str, Path]:
-    saved = report_files.save_report(
+    saved = report_bundle_module.save_report(
         report,
         output_dir,
         formats=formats,
@@ -48,7 +51,9 @@ def save_report(
 
 def load_report_payload(path: str | Path) -> RunReport:
     _, payload = load_report_input_json(path)
-    return cast(RunReport, payload)
+    if not isinstance(payload, dict):
+        raise ValueError("Invalid RunReport structure")
+    return validate_canonical_run_report(payload)
 
 
 def _extract_saved_provenance_env_flags(
@@ -89,7 +94,7 @@ def _describe_run_report_health_error(
     status = report.get("status")
     if isinstance(status, str):
         normalized_status = status.strip().lower()
-        if normalized_status in {"failed", "error"}:
+        if normalized_status in {"failed", "error", "rollback", "cancelled"}:
             return (
                 f"Cannot generate evaluation report from {role} run report with "
                 f"status '{status}'."
@@ -113,13 +118,24 @@ def _describe_run_report_health_error(
             f"degraded primary metric{reason_suffix}."
         )
 
-    for field_name in ("preview", "final", "ratio_vs_baseline"):
+    kind = str(primary_metric.get("kind") or "").strip().lower()
+    if kind == "accuracy" and "ratio_vs_baseline" in primary_metric:
+        return (
+            f"Cannot generate evaluation report from {role} run report with "
+            "primary_metric.ratio_vs_baseline on an accuracy metric; use "
+            "delta_vs_baseline_pp."
+        )
+
+    for field_name in (
+        "preview",
+        "final",
+        "ratio_vs_baseline",
+        "delta_vs_baseline_pp",
+    ):
         if field_name not in primary_metric:
             continue
         field_value = primary_metric.get(field_name)
         if field_value is None:
-            continue
-        if field_name == "ratio_vs_baseline":
             continue
         if not _is_non_bool_finite_number(field_value):
             return (
@@ -164,7 +180,17 @@ def _assert_evaluation_report_is_finite(
             f"{reason_suffix}."
         )
 
-    for field_name in ("preview", "final", "ratio_vs_baseline"):
+    kind = str(primary_metric.get("kind") or "").strip().lower()
+    if kind == "accuracy" and "ratio_vs_baseline" in primary_metric:
+        raise ValueError(
+            "Generated accuracy report contains the PPL-only primary metric "
+            "field 'ratio_vs_baseline'."
+        )
+
+    comparison_field = (
+        "delta_vs_baseline_pp" if kind == "accuracy" else "ratio_vs_baseline"
+    )
+    for field_name in ("preview", "final", comparison_field):
         if field_name not in primary_metric:
             continue
         field_value = primary_metric.get(field_name)

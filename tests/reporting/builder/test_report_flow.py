@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from invarlock.core.exceptions import ValidationError
-from invarlock.reporting.report_files import save_report
+from invarlock.reporting.report_bundle import save_report
 from invarlock.reporting.report_make import make_report
 
 
@@ -89,6 +89,7 @@ def test_generate_comparison_markdown_with_guard_violations():
     rep1["guards"] = [
         {
             "name": "spectral",
+            "passed": False,
             "policy": {},
             "metrics": {},
             "actions": [],
@@ -98,6 +99,7 @@ def test_generate_comparison_markdown_with_guard_violations():
     rep2["guards"] = [
         {
             "name": "spectral",
+            "passed": False,
             "policy": {},
             "metrics": {},
             "actions": [],

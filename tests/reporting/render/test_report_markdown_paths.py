@@ -1,7 +1,9 @@
 from unittest.mock import patch
 
-from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_make import make_report
+from invarlock.reporting.rendering.markdown import render_report_markdown
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _base_report_and_baseline():
@@ -14,7 +16,9 @@ def _base_report_and_baseline():
             "ts": "2025-01-01T00:00:00",
             "commit": "dead",
             "seed": 1,
+            "auto": {"tier": "balanced"},
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "dummy",
             "split": "validation",
@@ -48,12 +52,7 @@ def _base_report_and_baseline():
         "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
         "flags": {"guard_recovered": False, "rollback_reason": None},
     }
-    baseline = {
-        "run_id": "b2",
-        "model_id": "m",
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
-        "evaluation_windows": {"final": {"window_ids": [1], "logloss": [1.0]}},
-    }
+    baseline = {**report, "run_id": "b2", "edit": {"name": "noop"}}
     return report, baseline
 
 
@@ -80,12 +79,12 @@ def test_render_markdown_plugins_overhead_and_rmt_variants():
     cert["plugins"] = {}
     _ = render_report_markdown(cert)
 
-    # Guard overhead present with percent
-    cert["guard_overhead"] = {"overhead_percent": 0.5, "threshold_percent": 1.0}
+    # Guard metric impact present with percent
+    cert["guard_metric_impact"] = {"display_value": 0.5, "display_limit": 1.0}
     _ = render_report_markdown(cert)
 
-    # Guard overhead absent path
-    cert.pop("guard_overhead")
+    # Guard metric impact absent path
+    cert.pop("guard_metric_impact")
     _ = render_report_markdown(cert)
 
     # RMT with nonzero baseline outliers

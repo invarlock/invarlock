@@ -5,42 +5,68 @@ import pytest
 import invarlock.core.bootstrap as bootstrap_mod
 import invarlock.reporting.report_normalization as report_normalization
 from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
+from tests.reporting._support_primary_metric import independent_slice_summary
 
 
 def _base_report():
-    return {
-        "meta": {"model_id": "m", "seed": 123},
-        "metrics": {"ppl_preview": 10.0, "ppl_final": 10.5},
-        "data": {
-            "dataset": "dummy",
-            "split": "val",
-            "seq_len": 8,
-            "stride": 1,
-            "preview_n": 2,
-            "final_n": 2,
-        },
-        "guards": [],
-        "edit": {
-            "name": "mock",
-            "deltas": {
-                "params_changed": 0,
-                "heads_pruned": 0,
-                "neurons_pruned": 0,
-                "layers_modified": 0,
+    return canonical_run_report(
+        {
+            "meta": {
+                "model_id": "m",
+                "adapter": "hf_causal",
+                "seed": 123,
+                "auto": {"tier": "balanced"},
             },
-        },
-        "evaluation_windows": {"final": {"window_ids": [1, 2], "logloss": [0.1, 0.2]}},
-        "plugins": {"adapter": {}, "edit": {}, "guards": []},
-    }
+            "context": {"profile": "dev", "assurance": {"mode": "off"}},
+            "metrics": {
+                "primary_metric": {"kind": "ppl_causal", "preview": 10.0, "final": 10.5}
+            },
+            "data": {
+                "dataset": "dummy",
+                "split": "val",
+                "seq_len": 8,
+                "stride": 1,
+                "preview_n": 2,
+                "final_n": 2,
+            },
+            "guards": [],
+            "edit": {
+                "name": "mock",
+                "deltas": {
+                    "params_changed": 0,
+                    "heads_pruned": 0,
+                    "neurons_pruned": 0,
+                    "layers_modified": 0,
+                },
+            },
+            "evaluation_windows": {
+                "final": {"window_ids": [1, 2], "logloss": [0.1, 0.2]}
+            },
+            "plugins": {"adapter": {}, "edit": {}, "guards": []},
+        }
+    )
 
 
 def _base_baseline():
-    return {
-        "run_id": "r0",
-        "meta": {"model_id": "m"},
-        "metrics": {"ppl_final": 9.8, "ppl_preview": 9.7},
-        "evaluation_windows": {"final": {"window_ids": [1, 2], "logloss": [0.1, 0.2]}},
-    }
+    report = _base_report()
+    return canonical_baseline(
+        {
+            **report,
+            "edit": {"name": "noop"},
+            "metrics": {
+                **report["metrics"],
+                "primary_metric": {
+                    "kind": "ppl_causal",
+                    "preview": 9.7,
+                    "final": 9.8,
+                },
+            },
+        }
+    )
 
 
 def test_evaluation_report_ratio_ci_mismatch_raises(monkeypatch):
@@ -51,14 +77,15 @@ def test_evaluation_report_ratio_ci_mismatch_raises(monkeypatch):
     # Align drift ratio with delta mean to bypass the earlier drift mismatch check
     delta_lo = delta_hi = math.log(1.11)
     # Adjust preview/final to match the delta mean ratio so only CI-mismatch branch triggers
-    report["metrics"]["ppl_preview"] = 10.0
-    report["metrics"]["ppl_final"] = 11.1
+    report["metrics"]["primary_metric"]["preview"] = 10.0
+    report["metrics"]["primary_metric"]["final"] = 11.1
     report["metrics"].update(
         {
-            "paired_delta_summary": {
-                "mean": (delta_lo + delta_hi) / 2.0,
-                "degenerate": False,
-            },
+            "preview_final_slice_delta_summary": independent_slice_summary(
+                (delta_lo + delta_hi) / 2.0,
+                preview_windows=2,
+                final_windows=2,
+            ),
             "logloss_delta_ci": (delta_lo, delta_hi),
             "ratio_ci": (1.05, 1.06),
         }

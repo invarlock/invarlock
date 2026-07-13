@@ -31,7 +31,8 @@ class TestRenderEvaluationReportMarkdown:
         assert "# InvarLock Evaluation Report" in markdown
         assert "test-model" in markdown
         assert "structured" in markdown
-        assert "Overall Status:" in markdown
+        assert "Report-local Gate Status:" in markdown
+        assert "REPORT-LOCAL / UNVERIFIED RENDER" in markdown
         # Plugin section is optional after normalization
         assert ("Plugin Provenance" in markdown) or ("Executive Summary" in markdown)
 
@@ -54,8 +55,8 @@ class TestRenderEvaluationReportMarkdown:
         # but should still include auto-tuning tier detail.
         assert "Auto-Tuning Configuration" in markdown
 
-    def test_markdown_without_auto_tuning(self):
-        """Test markdown rendering without auto-tuning."""
+    def test_markdown_with_default_runtime_policy(self):
+        """Test markdown rendering with the canonical balanced runtime policy."""
         report = create_mock_run_report(include_auto=False)
         baseline = create_mock_baseline()
 
@@ -67,7 +68,7 @@ class TestRenderEvaluationReportMarkdown:
 
         markdown = render_report_markdown(evaluation_report)
 
-        assert "Auto-Tuning Configuration" not in markdown
+        assert "Auto-Tuning Configuration" in markdown
 
     def test_markdown_validation_status(self):
         """Test validation status rendering in markdown."""
@@ -84,7 +85,7 @@ class TestRenderEvaluationReportMarkdown:
 
         # Quality gates table present; section titles may vary across releases
         assert "Quality Gates" in markdown
-        # Guard Overhead section may be omitted when not evaluated; ensure RMT section present
+        # Guard Metric Impact section may be omitted when not evaluated; ensure RMT section present
         assert "RMT" in markdown
 
     def test_invalid_evaluation_report_render_still_returns_markdown(self):
@@ -132,12 +133,12 @@ class TestRenderEvaluationReportMarkdown:
         assert "Quality Gates" in markdown
         assert "Policy Configuration" in markdown
 
-    def test_render_markdown_includes_guard_overhead_details(self):
+    def test_render_markdown_includes_guard_metric_impact_details(self):
         report = create_mock_run_report()
-        report["guard_overhead"] = {
-            "bare_ppl": 120.0,
-            "guarded_ppl": 121.2,
-            "overhead_threshold": 0.02,
+        report["guard_metric_impact"] = {
+            "bare_value": 120.0,
+            "guarded_value": 121.2,
+            "degradation_limit": 0.02,
             "source": "unit-test",
         }
         baseline = create_mock_baseline()
@@ -165,8 +166,8 @@ class TestRenderEvaluationReportMarkdown:
         )
 
         markdown = render_report_markdown(evaluation_report)
-        # Guard Overhead section may be omitted if normalization dropped the measure
-        assert ("Guard Overhead" in markdown) or ("Executive Summary" in markdown)
+        # Guard Metric Impact section may be omitted if normalization dropped the measure
+        assert ("Guard Metric Impact" in markdown) or ("Executive Summary" in markdown)
         assert "Inference Diagnostics" in markdown
 
     def test_render_markdown_includes_basis_and_spectral_tables(self):
@@ -281,14 +282,14 @@ class TestRenderEvaluationReportMarkdown:
             }
         )
 
-        cert_copy["guard_overhead"] = {
-            "bare_ppl": 118.0,
-            "guarded_ppl": 120.5,
-            "overhead_ratio": 1.021,
-            "overhead_percent": 2.1,
+        cert_copy["guard_metric_impact"] = {
+            "bare_value": 118.0,
+            "guarded_value": 120.5,
+            "degradation": 1.021,
+            "display_value": 2.1,
             "source": "regression",
         }
-        cert_copy["validation"]["guard_overhead_acceptable"] = False
+        cert_copy["validation"]["guard_metric_impact_acceptable"] = False
 
         cert_copy["edit_name"] = "quant_rtn"
         structure = cert_copy["structure"]
@@ -422,11 +423,11 @@ class TestRenderEvaluationReportMarkdown:
             "status": "stable",
             "stable": True,
         }
-        evaluation_report["guard_overhead"] = {
-            "bare_ppl": 118.0,
-            "guarded_ppl": 120.5,
-            "overhead_ratio": 1.021,
-            "overhead_percent": 2.1,
+        evaluation_report["guard_metric_impact"] = {
+            "bare_value": 118.0,
+            "guarded_value": 120.5,
+            "degradation": 1.021,
+            "display_value": 2.1,
             "source": "regression",
         }
         evaluation_report["variance"] = {

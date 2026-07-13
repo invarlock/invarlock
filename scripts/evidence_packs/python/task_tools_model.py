@@ -9,11 +9,9 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .error_model.common import fix_layer_drop_config_json
     from .runtime_tools import require_remote_code_opt_in
 except ImportError:  # pragma: no cover - direct script execution
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from error_model.common import fix_layer_drop_config_json
     from runtime_tools import require_remote_code_opt_in
 
 _BIN_IGNORE_PATTERNS = ["*.bin", "*.bin.index.json"]
@@ -27,14 +25,6 @@ def _get_config_value(cfg: dict[str, Any], key: str, *fallbacks: str) -> Any:
     for fallback in fallbacks:
         value = cfg.get(fallback)
         if value is not None:
-            return value
-    return None
-
-
-def _layer_count(cfg: dict[str, Any]) -> int | None:
-    for key in ("num_hidden_layers", "n_layer", "num_layers"):
-        value = cfg.get(key)
-        if isinstance(value, int) and value > 0:
             return value
     return None
 
@@ -406,36 +396,4 @@ def _write_model_profile(args: argparse.Namespace) -> int:
     }
 
     profile_path.write_text(json.dumps(profile, indent=2) + "\n")
-    return 0
-
-
-def _repair_missing_tensors_config(args: argparse.Namespace) -> int:
-    baseline_path = Path(args.baseline_config)
-    error_path = Path(args.error_config)
-
-    baseline_cfg = json.loads(baseline_path.read_text(encoding="utf-8"))
-    error_cfg = json.loads(error_path.read_text(encoding="utf-8"))
-    if not isinstance(baseline_cfg, dict) or not isinstance(error_cfg, dict):
-        return 2
-
-    total_layers = _layer_count(baseline_cfg)
-    kept_layers = _layer_count(error_cfg)
-    if total_layers is None or kept_layers is None:
-        return 0
-
-    before = json.dumps(error_cfg, sort_keys=True)
-    fix_layer_drop_config_json(
-        error_cfg,
-        total_layers=total_layers,
-        kept_layers=kept_layers,
-        baseline_config=baseline_cfg,
-    )
-    after = json.dumps(error_cfg, sort_keys=True)
-    if before != after:
-        error_path.write_text(json.dumps(error_cfg, indent=2) + "\n", encoding="utf-8")
-        print(
-            f"Repaired missing_tensors config: total_layers={total_layers} kept_layers={kept_layers}",
-            file=sys.stderr,
-        )
-
     return 0

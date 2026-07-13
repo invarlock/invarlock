@@ -1,106 +1,113 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from pathlib import Path
 
 import pytest
 
+from invarlock.core.runtime_quantization_proof import (
+    RUNTIME_QUANTIZATION_PROOF_FILENAME,
+    RUNTIME_QUANTIZATION_PROOF_SCHEMA,
+)
 from invarlock.reporting import report_bundle as report_bundle_mod
-from invarlock.reporting.report_bundle import save_evaluation_bundle
-from invarlock.reporting.report_files import save_report
+from invarlock.reporting.report_bundle import save_evaluation_bundle, save_report
 from invarlock.reporting.report_make import make_report
 from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
 
 
 def _minimal_run_report() -> dict:
-    return {
-        "meta": {
-            "model_id": "m",
-            "adapter": "hf",
-            "commit": "abc",
-            "seed": 1,
-            "device": "cpu",
-            "ts": "2024-01-01T00:00:00",
-            "auto": None,
-        },
-        "data": {
-            "dataset": "ds",
-            "split": "val",
-            "seq_len": 4,
-            "stride": 4,
-            "preview_n": 2,
-            "final_n": 2,
-        },
-        "edit": {
-            "name": "quant_rtn",
-            "plan_digest": "deadbeef",
-            "deltas": {
-                "params_changed": 0,
-                "sparsity": None,
-                "bitwidth_map": None,
-                "layers_modified": 0,
-            },
-        },
-        "guards": [
-            {
-                "name": "variance",
-                "policy": {
-                    "deadband": 0.02,
-                    "min_abs_adjust": 0.01,
-                    "max_scale_step": 0.03,
+    return canonical_run_report(
+        {
+            "meta": {
+                "model_id": "m",
+                "adapter": "hf",
+                "commit": "abc",
+                "seed": 1,
+                "device": "cpu",
+                "ts": "2024-01-01T00:00:00",
+                "auto": {
+                    "tier": "balanced",
+                    "probes_used": 0,
+                    "target_pm_ratio": None,
                 },
-                "metrics": {},
-                "actions": [],
-                "violations": [],
-            }
-        ],
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "final": 100.0,
-                "preview": 100.0,
-                "ratio_vs_baseline": 1.0,
             },
-            "latency_ms_per_tok": 1.0,
-            "memory_mb_peak": 256.0,
-            "bootstrap": {
-                "replicates": 10,
-                "alpha": 0.05,
-                "coverage": {"preview": {"used": 2}, "final": {"used": 2}},
+            "context": {"profile": "dev"},
+            "data": {
+                "dataset": "ds",
+                "split": "val",
+                "seq_len": 4,
+                "stride": 4,
+                "preview_n": 2,
+                "final_n": 2,
             },
-        },
-        "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
-        "flags": {"guard_recovered": False, "rollback_reason": None},
-        "evaluation_windows": {
-            "final": {
-                "window_ids": [1, 2],
-                "logloss": [4.0, 4.0],
-                "token_counts": [100, 100],
-            }
-        },
-    }
+            "edit": {
+                "name": "quant_rtn",
+                "plan_digest": "deadbeef",
+                "deltas": {
+                    "params_changed": 0,
+                    "sparsity": None,
+                    "bitwidth_map": None,
+                    "layers_modified": 0,
+                },
+            },
+            "guards": [
+                {
+                    "name": "variance",
+                    "passed": True,
+                    "policy": {
+                        "deadband": 0.02,
+                        "min_abs_adjust": 0.01,
+                        "max_scale_step": 0.03,
+                    },
+                    "metrics": {},
+                    "actions": [],
+                    "violations": [],
+                }
+            ],
+            "metrics": {
+                "primary_metric": {
+                    "kind": "ppl_causal",
+                    "final": 100.0,
+                    "preview": 100.0,
+                    "ratio_vs_baseline": 1.0,
+                },
+                "latency_ms_per_tok": 1.0,
+                "memory_mb_peak": 256.0,
+                "bootstrap": {
+                    "replicates": 10,
+                    "alpha": 0.05,
+                    "coverage": {"preview": {"used": 2}, "final": {"used": 2}},
+                },
+            },
+            "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
+            "flags": {"guard_recovered": False, "rollback_reason": None},
+            "evaluation_windows": {
+                "final": {
+                    "window_ids": [1, 2],
+                    "logloss": [4.0, 4.0],
+                    "token_counts": [100, 100],
+                }
+            },
+        }
+    )
 
 
-def _baseline_v1() -> dict:
-    # Minimal baseline-v1 that relies on evaluation_windows rather than explicit PM
-    return {
-        "schema_version": "baseline-v1",
-        "meta": {"model_id": "m"},
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 4.0}},
-        "evaluation_windows": {
-            "final": {
-                "window_ids": [1, 2],
-                "logloss": [4.0, 4.0],
-                "token_counts": [100, 100],
-            }
-        },
-    }
+def _canonical_baseline() -> dict:
+    baseline = copy.deepcopy(_minimal_run_report())
+    baseline["edit"]["name"] = "noop"
+    baseline["metrics"]["primary_metric"].pop("ratio_vs_baseline", None)
+    return canonical_baseline(baseline)
 
 
 def test_save_report_bundle_writes_manifest_and_evidence(tmp_path: Path, monkeypatch):
     rep = _minimal_run_report()
-    base = _baseline_v1()
+    base = _canonical_baseline()
     # Gate small debug evidence emission via env
     monkeypatch.setenv("INVARLOCK_EVIDENCE_DEBUG", "1")
     evaluation_report = make_report(rep, base)
@@ -124,7 +131,7 @@ def test_save_report_bundle_writes_manifest_and_evidence(tmp_path: Path, monkeyp
 
 def test_save_report_bundle_can_defer_optional_rendering(tmp_path: Path, monkeypatch):
     rep = _minimal_run_report()
-    base = _baseline_v1()
+    base = _canonical_baseline()
     monkeypatch.setenv("INVARLOCK_EVIDENCE_DEBUG", "1")
 
     out = save_evaluation_bundle(
@@ -151,6 +158,23 @@ def test_save_report_bundle_rejects_invalid_evaluation_report(tmp_path: Path):
         )
 
 
+def test_save_report_bundle_rejects_nonfinite_nested_authority_value(
+    tmp_path: Path,
+) -> None:
+    evaluation_report = make_report(_minimal_run_report(), _canonical_baseline())
+    evaluation_report.setdefault("provenance", {})["nonfinite_probe"] = float("inf")
+
+    with pytest.raises(
+        ValueError,
+        match=r"non-finite JSON number at \$\.provenance\.nonfinite_probe",
+    ):
+        save_evaluation_bundle(
+            run_report=_minimal_run_report(),
+            output_dir=tmp_path,
+            evaluation_report=evaluation_report,
+        )
+
+
 def test_save_report_bundle_copies_inventory_and_invalid_runtime_manifest(
     tmp_path: Path,
 ):
@@ -166,12 +190,54 @@ def test_save_report_bundle_copies_inventory_and_invalid_runtime_manifest(
     out = save_evaluation_bundle(
         run_report=_minimal_run_report(),
         output_dir=tmp_path / "out",
-        evaluation_report=make_report(_minimal_run_report(), _baseline_v1()),
+        evaluation_report=make_report(_minimal_run_report(), _canonical_baseline()),
         source_run_path=run_report_path,
     )
 
     assert out["backend_inventory"].read_text(encoding="utf-8") == '{"backend": "test"}'
     assert out["runtime_manifest"].read_text(encoding="utf-8") == "{not-json"
+
+
+def test_save_report_bundle_copies_runtime_quantization_proof(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    run_report_path = run_dir / "report.json"
+    run_report_path.write_text("{}", encoding="utf-8")
+    proof_payload = {
+        "schema": RUNTIME_QUANTIZATION_PROOF_SCHEMA,
+        "ok": False,
+        "status": "unverified",
+        "reason": "no_recognized_quantized_runtime_types",
+        "recognized_quantized_runtime_type_count": 0,
+        "recognized_quantized_runtime_types": [],
+    }
+    proof_path = run_dir / RUNTIME_QUANTIZATION_PROOF_FILENAME
+    proof_path.write_text(json.dumps(proof_payload), encoding="utf-8")
+
+    out = save_evaluation_bundle(
+        run_report=_minimal_run_report(),
+        output_dir=tmp_path / "out",
+        evaluation_report=make_report(_minimal_run_report(), _canonical_baseline()),
+        source_run_path=run_report_path,
+    )
+
+    assert out["runtime_quantization_proof"].read_text(encoding="utf-8") == json.dumps(
+        proof_payload
+    )
+
+
+def test_save_report_bundle_never_fabricates_runtime_quantization_proof(
+    tmp_path: Path,
+) -> None:
+    out = save_evaluation_bundle(
+        run_report=_minimal_run_report(),
+        output_dir=tmp_path / "out",
+        evaluation_report=make_report(_minimal_run_report(), _canonical_baseline()),
+        render_optional=False,
+    )
+
+    assert "runtime_quantization_proof" not in out
+    assert not (tmp_path / "out" / RUNTIME_QUANTIZATION_PROOF_FILENAME).exists()
 
 
 def test_save_report_bundle_keeps_same_directory_source_sidecars(tmp_path: Path):
@@ -185,7 +251,7 @@ def test_save_report_bundle_keeps_same_directory_source_sidecars(tmp_path: Path)
     out = save_evaluation_bundle(
         run_report=_minimal_run_report(),
         output_dir=tmp_path,
-        evaluation_report=make_report(_minimal_run_report(), _baseline_v1()),
+        evaluation_report=make_report(_minimal_run_report(), _canonical_baseline()),
         source_run_path=run_report_path,
         render_optional=False,
     )
@@ -200,7 +266,7 @@ def test_save_report_bundle_ignores_invalid_source_run_path(tmp_path: Path):
     out = save_evaluation_bundle(
         run_report=_minimal_run_report(),
         output_dir=tmp_path / "out",
-        evaluation_report=make_report(_minimal_run_report(), _baseline_v1()),
+        evaluation_report=make_report(_minimal_run_report(), _canonical_baseline()),
         source_run_path=tmp_path / "missing" / "report.json",
         render_optional=False,
     )
@@ -226,7 +292,7 @@ def test_save_report_bundle_records_generated_backend_inventory(
     out = save_evaluation_bundle(
         run_report=_minimal_run_report(),
         output_dir=tmp_path,
-        evaluation_report=make_report(_minimal_run_report(), _baseline_v1()),
+        evaluation_report=make_report(_minimal_run_report(), _canonical_baseline()),
         render_optional=False,
     )
 
@@ -291,7 +357,7 @@ def test_save_report_bundle_copies_runtime_manifest_when_source_run_path_provide
     )
 
     rep = _minimal_run_report()
-    base = _baseline_v1()
+    base = _canonical_baseline()
 
     out = save_evaluation_bundle(
         run_report=rep,
@@ -310,9 +376,7 @@ def test_save_report_bundle_copies_runtime_manifest_when_source_run_path_provide
         "image_digest": "sha256:test",
     }
     assert manifest_payload["report"]["filename"] == "evaluation.report.json"
-    assert manifest_payload["report"]["path"] == str(
-        tmp_path / "out" / "evaluation.report.json"
-    )
+    assert manifest_payload["report"]["path"] == "evaluation.report.json"
     assert (
         manifest_payload["report"]["sha256"]
         == hashlib.sha256(

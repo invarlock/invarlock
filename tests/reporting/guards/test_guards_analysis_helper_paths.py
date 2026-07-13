@@ -74,6 +74,8 @@ def test_extract_invariants_covers_fail_and_warn_paths() -> None:
         "guards": [
             {
                 "name": "invariants",
+                "passed": True,
+                "decision": "allow",
                 "metrics": {"fatal_violations": 0, "warning_violations": 1},
                 "violations": [
                     {"check": "x", "type": "violation", "severity": "warning"}
@@ -87,10 +89,13 @@ def test_extract_invariants_covers_fail_and_warn_paths() -> None:
 
 def test_extract_invariants_guard_entry_no_violations_keeps_pass() -> None:
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "metrics": {"invariants": {}},
         "guards": [
             {
                 "name": "invariants",
+                "passed": True,
+                "decision": "allow",
                 "metrics": {"fatal_violations": 0, "warning_violations": 0},
                 "violations": [],
             }
@@ -100,8 +105,30 @@ def test_extract_invariants_guard_entry_no_violations_keeps_pass() -> None:
     assert out["status"] == "pass"
 
 
+def test_extract_invariants_missing_or_malformed_evidence_never_passes() -> None:
+    missing = gi_mod._extract_invariants({"metrics": {}, "guards": []})
+    assert missing["status"] == "fail"
+    assert missing["passed"] is False
+    assert missing["decision"] == "block"
+
+    malformed = gi_mod._extract_invariants(
+        {"metrics": {"invariants": {"shape": {}}}, "guards": []}
+    )
+    assert malformed["status"] == "fail"
+    assert malformed["passed"] is False
+
+    missing_guard_verdict = gi_mod._extract_invariants(
+        {
+            "metrics": {"invariants": {}},
+            "guards": [{"name": "invariants", "metrics": {}, "violations": []}],
+        }
+    )
+    assert missing_guard_verdict["status"] == "fail"
+
+
 def test_extract_spectral_analysis_caps_applied_int_fallback() -> None:
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "guards": [
             {
                 "name": "spectral",
@@ -113,7 +140,7 @@ def test_extract_spectral_analysis_caps_applied_int_fallback() -> None:
                     "mean_spectral_norm_final": "bad",
                 },
             }
-        ]
+        ],
     }
     out = gs_mod._extract_spectral_analysis(report, baseline={})
     assert out["caps_applied"] == 0
@@ -121,7 +148,10 @@ def test_extract_spectral_analysis_caps_applied_int_fallback() -> None:
 
 
 def test_extract_spectral_analysis_defaults_without_guard() -> None:
-    out = gs_mod._extract_spectral_analysis({"guards": [], "meta": {}}, baseline={})
+    out = gs_mod._extract_spectral_analysis(
+        {"guards": [], "meta": {"auto": {"tier": "balanced"}}},
+        baseline={},
+    )
     assert out["caps_applied"] == 0
     assert out["summary"]["status"] in {"stable", "capped"}
     assert "family_caps" in out
@@ -132,9 +162,9 @@ def test_extract_spectral_analysis_with_empty_tier_defaults(monkeypatch) -> None
         gs_mod, "get_tier_policies", lambda *_a, **_k: {}, raising=False
     )
     report = {
+        "meta": {"model_id": "m", "auto": {"tier": "balanced"}},
         "metrics": {"spectral": {}},
         "guards": [],
-        "meta": {"model_id": "m"},
     }
     out = gs_mod._extract_spectral_analysis(report, baseline={"model_id": "m"})
     assert isinstance(out, dict) and out.get("caps_applied", 0) == 0
@@ -143,7 +173,10 @@ def test_extract_spectral_analysis_with_empty_tier_defaults(monkeypatch) -> None
 
 def test_extract_spectral_analysis_baseline_metrics_spectral_not_dict() -> None:
     baseline = {"metrics": {"spectral": ["bad"]}}
-    out = gs_mod._extract_spectral_analysis({"guards": []}, baseline=baseline)
+    out = gs_mod._extract_spectral_analysis(
+        {"guards": [], "meta": {"auto": {"tier": "balanced"}}},
+        baseline=baseline,
+    )
     assert out["evaluated"] is False
 
 
@@ -151,6 +184,7 @@ def test_extract_spectral_analysis_uses_guard_baseline_metrics_and_derives_quant
     None
 ):
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "guards": [
             {
                 "name": "spectral",
@@ -165,7 +199,7 @@ def test_extract_spectral_analysis_uses_guard_baseline_metrics_and_derives_quant
                 "final_z_scores": {"m1": 1.23},
                 "module_family_map": {"m1": "ffn"},
             }
-        ]
+        ],
     }
     out = gs_mod._extract_spectral_analysis(report, baseline={})
     assert out["evaluated"] is True
@@ -178,6 +212,7 @@ def test_extract_spectral_analysis_quantile_position_integer_path() -> None:
     final_z_scores = {f"m{i}": float(i) for i in range(21)}
     module_family_map = dict.fromkeys(final_z_scores, "ffn")
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "guards": [
             {
                 "name": "spectral",
@@ -185,7 +220,7 @@ def test_extract_spectral_analysis_quantile_position_integer_path() -> None:
                 "final_z_scores": final_z_scores,
                 "module_family_map": module_family_map,
             }
-        ]
+        ],
     }
     out = gs_mod._extract_spectral_analysis(report, baseline={})
     assert out["family_z_quantiles"]["ffn"]["q95"] == 19.0
@@ -195,6 +230,7 @@ def test_extract_spectral_analysis_summarize_returns_empty_when_family_map_empty
     None
 ):
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "guards": [
             {
                 "name": "spectral",
@@ -202,7 +238,7 @@ def test_extract_spectral_analysis_summarize_returns_empty_when_family_map_empty
                 "final_z_scores": {"m1": 1.0},
                 "module_family_map": {},
             }
-        ]
+        ],
     }
     out = gs_mod._extract_spectral_analysis(report, baseline={})
     assert out.get("family_z_quantiles", {}) == {}
@@ -210,6 +246,7 @@ def test_extract_spectral_analysis_summarize_returns_empty_when_family_map_empty
 
 def test_extract_spectral_analysis_summarize_skips_modules_without_family() -> None:
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "guards": [
             {
                 "name": "spectral",
@@ -217,7 +254,7 @@ def test_extract_spectral_analysis_summarize_skips_modules_without_family() -> N
                 "final_z_scores": {"m1": 1.0},
                 "module_family_map": {"other": "ffn"},
             }
-        ]
+        ],
     }
     out = gs_mod._extract_spectral_analysis(report, baseline={})
     assert out.get("family_z_quantiles", {}) == {}
@@ -227,6 +264,7 @@ def test_extract_spectral_analysis_skips_guard_metrics_block_when_metrics_falsy_
     None
 ):
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "guards": [
             {
                 "name": "spectral",
@@ -234,7 +272,7 @@ def test_extract_spectral_analysis_skips_guard_metrics_block_when_metrics_falsy_
                 "final_z_scores": {"m1": 1.0},
                 "module_family_map": {"m1": "ffn"},
             }
-        ]
+        ],
     }
     out = gs_mod._extract_spectral_analysis(report, baseline={})
     assert out["evaluated"] is True
@@ -244,6 +282,7 @@ def test_extract_spectral_analysis_bad_sigma_quantile_and_deadband_omits_summary
     None
 ):
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "guards": [
             {
                 "name": "spectral",
@@ -253,7 +292,7 @@ def test_extract_spectral_analysis_bad_sigma_quantile_and_deadband_omits_summary
                     "mean_spectral_norm_final": 1.0,
                 },
             }
-        ]
+        ],
     }
     out = gs_mod._extract_spectral_analysis(report, baseline={})
     assert "sigma_quantile" not in out["summary"]
@@ -269,6 +308,7 @@ def test_extract_rmt_analysis_edge_risk_paths_and_contract_hashes() -> None:
         }
     }
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "guards": [
             {
                 "name": "rmt",
@@ -286,7 +326,7 @@ def test_extract_rmt_analysis_edge_risk_paths_and_contract_hashes() -> None:
                     "measurement_contract": contract,
                 },
             }
-        ]
+        ],
     }
     out = report_make_mod._extract_rmt_analysis(report, baseline)
     assert out["evaluated"] is True
@@ -315,6 +355,7 @@ def test_extract_rmt_analysis_numeric_fallback_and_explicit_violations(
     )
 
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "guards": [
             {
                 "name": "rmt",
@@ -331,7 +372,7 @@ def test_extract_rmt_analysis_numeric_fallback_and_explicit_violations(
                     "measurement_contract": {"kind": "  "},
                 },
             }
-        ]
+        ],
     }
 
     out = report_make_mod._extract_rmt_analysis(report, {})
@@ -359,6 +400,7 @@ def test_extract_rmt_analysis_invalid_numeric_maps_and_contract_lookup_error(
             return super().get(key, default)
 
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "guards": [
             {
                 "name": "rmt",
@@ -370,7 +412,7 @@ def test_extract_rmt_analysis_invalid_numeric_maps_and_contract_lookup_error(
                     }
                 ),
             }
-        ]
+        ],
     }
 
     out = report_make_mod._extract_rmt_analysis(report, {})
@@ -388,6 +430,7 @@ def test_extract_rmt_analysis_ignores_non_mapping_metric_maps(monkeypatch) -> No
     )
 
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "guards": [
             {
                 "name": "rmt",
@@ -397,7 +440,7 @@ def test_extract_rmt_analysis_ignores_non_mapping_metric_maps(monkeypatch) -> No
                     "epsilon_by_family": ["bad"],
                 },
             }
-        ]
+        ],
     }
 
     out = report_make_mod._extract_rmt_analysis(report, {})
@@ -424,6 +467,7 @@ def test_extract_spectral_analysis_uses_run_report_baseline_contract() -> None:
         ]
     }
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "guards": [
             {
                 "name": "spectral",
@@ -434,7 +478,7 @@ def test_extract_spectral_analysis_uses_run_report_baseline_contract() -> None:
                     "caps_applied": 0,
                 },
             }
-        ]
+        ],
     }
 
     out = gs_mod._extract_spectral_analysis(report, baseline)
@@ -445,6 +489,7 @@ def test_extract_spectral_analysis_uses_run_report_baseline_contract() -> None:
 
 def test_extract_variance_analysis_provenance_window_ids_and_ratio_ci_fail() -> None:
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "guards": [
             {
                 "name": "variance",
@@ -484,13 +529,14 @@ def test_extract_variance_analysis_handles_non_dict_variance_metrics() -> None:
 
 def test_extract_variance_analysis_ignores_non_dict_calibration() -> None:
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "guards": [
             {
                 "name": "variance",
                 "metrics": {"calibration": ["bad"], "gain": 0.2},
                 "policy": {"mode": "ab"},
             }
-        ]
+        ],
     }
 
     out = report_make_mod._extract_variance_analysis(report)
@@ -501,12 +547,13 @@ def test_extract_variance_analysis_ignores_non_dict_calibration() -> None:
 
 def test_extract_variance_analysis_ignores_bad_ratio_ci_values() -> None:
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "guards": [
             {
                 "name": "variance",
                 "metrics": {"ratio_ci": (_BadFloat(1.0), 2.0), "gain": 0.2},
             }
-        ]
+        ],
     }
 
     out = report_make_mod._extract_variance_analysis(report)
@@ -517,12 +564,13 @@ def test_extract_variance_analysis_ignores_bad_ratio_ci_values() -> None:
 
 def test_extract_variance_analysis_keeps_existing_window_ids() -> None:
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "guards": [
             {
                 "name": "variance",
                 "metrics": {"ab_provenance": {"window_ids": [3, 1, 2]}},
             }
-        ]
+        ],
     }
     out = report_make_mod._extract_variance_analysis(report)
     assert out["ab_test"]["provenance"]["window_ids"] == [3, 1, 2]

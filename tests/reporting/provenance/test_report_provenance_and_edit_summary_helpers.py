@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from invarlock.reporting import report_edit_summary as report_edit_summary_mod
 from invarlock.reporting import report_provenance as provenance_mod
 from invarlock.reporting.report_enrichment import compute_confidence_label
@@ -155,12 +157,21 @@ def test_extract_edit_metadata_preserves_optional_edit_provenance_and_impact():
 
 
 def test_extract_edit_metadata_preserves_generated_edit_algorithms():
-    for algorithm in ("lora_merge", "fine_tune", "magnitude_prune", "lowrank_svd"):
+    for algorithm in ("lora_merge", "fine_tune", "magnitude_prune", "quant_rtn"):
         report = {"edit": {"name": algorithm, "algorithm": algorithm}}
 
         metadata = report_edit_summary_mod.extract_edit_metadata(report, {})
 
         assert metadata["algorithm"] == algorithm
+
+
+@pytest.mark.parametrize("algorithm", ("fp8_quant", "lowrank_svd"))
+def test_extract_edit_metadata_discards_retired_generated_algorithms(algorithm: str):
+    report = {"edit": {"name": algorithm, "algorithm": algorithm}}
+
+    metadata = report_edit_summary_mod.extract_edit_metadata(report, {})
+
+    assert metadata["algorithm"] == ""
 
 
 def test_compute_report_digest_returns_none_for_non_dict():

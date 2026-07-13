@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import re
 
-from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_make import make_report
+from invarlock.reporting.rendering.markdown import render_report_markdown
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mk_min_report(tier: str = "balanced") -> dict:
@@ -17,6 +19,7 @@ def _mk_min_report(tier: str = "balanced") -> dict:
             "ts": "2024-01-01T00:00:00",
             "auto": {"tier": tier, "probes_used": 0, "target_pm_ratio": None},
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "dummy",
             "split": "validation",
@@ -60,6 +63,7 @@ def _mk_min_report(tier: str = "balanced") -> dict:
 def test_evaluation_report_includes_policy_digest_fields():
     report = _mk_min_report(tier="balanced")
     baseline = _mk_min_report(tier="balanced")
+    baseline["edit"]["name"] = "noop"
     cert = make_report(report, baseline)
 
     assert "policy_digest" in cert, "evaluation_report should include policy_digest"
@@ -82,6 +86,7 @@ def test_policy_digest_changes_across_tiers_and_markdown_note():
     report_bal = _mk_min_report(tier="balanced")
     report_cons = _mk_min_report(tier="conservative")
     baseline = _mk_min_report(tier="balanced")
+    baseline["edit"]["name"] = "noop"
 
     cert_bal = make_report(report_bal, baseline)
     cert_cons = make_report(report_cons, baseline)

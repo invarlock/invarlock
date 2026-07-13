@@ -1,14 +1,26 @@
 from unittest.mock import patch
 
 from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
 
 
 def test_dataset_hash_uses_actual_evaluation_windows_ids():
     # Build report with explicit token IDs in evaluation windows so that
     # evaluation_report computes actual hashes (sha256) rather than config fallback.
     report = {
-        "meta": {"model_id": "m", "seed": 123},
-        "metrics": {"ppl_preview": 10.0, "ppl_final": 10.0},
+        "meta": {
+            "model_id": "m",
+            "adapter": "hf_causal",
+            "seed": 123,
+            "auto": {"tier": "balanced"},
+        },
+        "context": {"profile": "dev", "assurance": {"mode": "off"}},
+        "metrics": {
+            "primary_metric": {"kind": "ppl_causal", "preview": 10.0, "final": 10.0}
+        },
         "data": {
             "dataset": "d",
             "split": "val",
@@ -32,17 +44,12 @@ def test_dataset_hash_uses_actual_evaluation_windows_ids():
             "final": {"input_ids": [[5, 6], [7, 8, 9]]},
         },
     }
-    baseline = {
-        "run_id": "b",
-        "model_id": "m",
-        "ppl_final": 10.0,
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
-    }
+    baseline = {**report, "edit": {"name": "noop"}}
 
     with patch(
         "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
-        cert = make_report(report, baseline)
+        cert = make_report(canonical_run_report(report), canonical_baseline(baseline))
 
     dataset_hash = cert["dataset"]["hash"]
     assert dataset_hash["preview"].startswith("sha256:")

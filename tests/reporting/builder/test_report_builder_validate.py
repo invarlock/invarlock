@@ -41,7 +41,7 @@ class TestValidateEvaluationReport:
                 "invariants_pass": True,
                 "spectral_stable": True,
                 "rmt_stable": True,
-                "guard_overhead_acceptable": True,
+                "guard_metric_impact_acceptable": True,
             },
         }
 
@@ -125,7 +125,7 @@ class TestValidateEvaluationReport:
                 "invariants_pass": True,
                 "spectral_stable": True,
                 "rmt_stable": True,
-                "guard_overhead_acceptable": True,
+                "guard_metric_impact_acceptable": True,
             },
         }
 

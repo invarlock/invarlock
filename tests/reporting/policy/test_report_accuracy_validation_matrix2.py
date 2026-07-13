@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_validation import compute_validation_flags
+from invarlock.reporting.validation.report import compute_validation_flags
 
 
 def test_accuracy_hysteresis_applied_and_accepts_conservative() -> None:
@@ -14,13 +14,10 @@ def test_accuracy_hysteresis_applied_and_accepts_conservative() -> None:
         tier="conservative",
         _ppl_metrics={"preview_total_tokens": 60000, "final_total_tokens": 60000},
         target_ratio=None,
-        guard_overhead={},
+        guard_metric_impact={},
         primary_metric={
             "kind": "accuracy",
-            # ratio_vs_baseline used as Δ proportion for accuracy kinds
-            "ratio_vs_baseline": -0.55 / 100.0 * 100.0
-            if False
-            else -0.55,  # -0.55 pp interpreted as -0.55
+            "delta_vs_baseline_pp": -0.55,
             "n_final": 1000,
         },
         moe={},
@@ -41,7 +38,7 @@ def test_accuracy_min_examples_fraction_precedence_balanced() -> None:
         "tier": "balanced",
         "_ppl_metrics": {"preview_total_tokens": 60000, "final_total_tokens": 60000},
         "target_ratio": None,
-        "guard_overhead": {},
+        "guard_metric_impact": {},
         "moe": {},
         "dataset_capacity": {"examples_available": 50_000},
     }
@@ -49,13 +46,21 @@ def test_accuracy_min_examples_fraction_precedence_balanced() -> None:
     # Below floor
     flags_fail = compute_validation_flags(
         **common_kwargs,
-        primary_metric={"kind": "accuracy", "ratio_vs_baseline": 0.0, "n_final": 400},
+        primary_metric={
+            "kind": "accuracy",
+            "delta_vs_baseline_pp": 0.0,
+            "n_final": 400,
+        },
     )
     assert flags_fail["primary_metric_acceptable"] is False
 
     # Above floor
     flags_pass = compute_validation_flags(
         **common_kwargs,
-        primary_metric={"kind": "accuracy", "ratio_vs_baseline": 0.0, "n_final": 600},
+        primary_metric={
+            "kind": "accuracy",
+            "delta_vs_baseline_pp": 0.0,
+            "n_final": 600,
+        },
     )
     assert flags_pass["primary_metric_acceptable"] is True

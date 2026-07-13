@@ -6,7 +6,7 @@ import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, NoReturn
 
 from invarlock.reporting.report_summary import compute_console_validation_block
 
@@ -19,7 +19,7 @@ ReportExportFormat = Literal[
 _UNKNOWN = "unknown"
 _REPORT_LOCAL_GATE_KEYS = frozenset(
     {
-        "guard_overhead_acceptable",
+        "guard_metric_impact_acceptable",
         "guard_warning_policy_acceptable",
         "invariants_pass",
         "moe_identity_ok",
@@ -36,12 +36,24 @@ class VerifyResultMismatchError(ValueError):
     """Raised when a verifier JSON result is for a different report."""
 
 
+class VerifyResultValidationError(VerifyResultMismatchError):
+    """Raised when an external verifier result is malformed or unbound.
+
+    A standalone ``verify --json`` document is not a signature.  It can still
+    be useful handoff metadata, but only after its structure and the receipt
+    binding to the exact exported report bytes have been checked.
+    """
+
+
 @dataclass(frozen=True)
 class ReportExportContext:
     report_path: Path
     report_sha256: str
-    status: Literal["pass", "fail"]
-    verifier_status: Literal["pass", "fail", "not_provided"]
+    status: Literal["report_local_pass", "report_local_fail", "receipt_bound_untrusted"]
+    report_local_status: Literal["pass", "fail"]
+    verifier_status: Literal["not_provided", "receipt_bound_untrusted"]
+    verifier_outcome: Literal["pass", "fail", "not_provided"]
+    receipt_status: Literal["not_provided", "bound_unsigned"]
     verifier_reason: str
     runtime_provenance_status: str
     policy_profile: str
@@ -168,7 +180,12 @@ def _derive_primary_metric(report: Mapping[str, Any]) -> str:
     if not primary_metric:
         return _UNKNOWN
     parts = [_clean_text(primary_metric.get("kind"), default="primary")]
-    for key in ("preview", "final", "ratio_vs_baseline"):
+    for key in (
+        "preview",
+        "final",
+        "ratio_vs_baseline",
+        "delta_vs_baseline_pp",
+    ):
         value = primary_metric.get(key)
         if value is not None:
             parts.append(f"{key}={_format_scalar(value)}")
@@ -192,60 +209,239 @@ def _failed_gate_count(report: Mapping[str, Any]) -> int:
     )
 
 
-def _verify_result_item(
-    verify_result: Mapping[str, Any] | None,
+_VERIFY_RESULT_REASONS = frozenset({"ok", "policy_fail", "malformed"})
+_VERIFY_RESULT_FORMAT = "verify-v1"
+_VERIFY_RECEIPT_FORMAT = "invarlock.verify-receipt.v1"
+
+
+def _verify_result_error(message: str) -> NoReturn:
+    raise VerifyResultValidationError(message)
+
+
+def _require_json_boolean(value: Any, *, label: str) -> bool:
+    if isinstance(value, bool):
+        return value
+    _verify_result_error(f"{label} must be a JSON boolean.")
+
+
+def _require_json_string(
+    value: Any,
+    *,
+    label: str,
+    allow_empty: bool = False,
+) -> str:
+    if not isinstance(value, str):
+        _verify_result_error(f"{label} must be a JSON string.")
+    if not allow_empty and not value.strip():
+        _verify_result_error(f"{label} must not be empty.")
+    return value
+
+
+def _require_verify_reason(value: Any, *, label: str) -> str:
+    reason = _require_json_string(value, label=label)
+    if reason not in _VERIFY_RESULT_REASONS:
+        _verify_result_error(
+            f"{label} must be one of: {', '.join(sorted(_VERIFY_RESULT_REASONS))}."
+        )
+    return reason
+
+
+def _ensure_finite_json_value(value: Any, *, label: str) -> None:
+    """Reject values that cannot occur in a canonical finite JSON receipt."""
+
+    if value is None or isinstance(value, str | bool | int):
+        return
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            _verify_result_error(f"{label} contains a non-finite number.")
+        return
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            _ensure_finite_json_value(item, label=f"{label}[{index}]")
+        return
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                _verify_result_error(f"{label} contains a non-string object key.")
+            _ensure_finite_json_value(item, label=f"{label}.{key}")
+        return
+    _verify_result_error(f"{label} contains a non-JSON value.")
+
+
+def _validate_verify_result_item(item: Any, *, index: int) -> Mapping[str, Any]:
+    label = f"Verify result item {index}"
+    if not isinstance(item, Mapping):
+        _verify_result_error(f"{label} must be a JSON object with an id.")
+    item_id = _require_json_string(item.get("id"), label=f"{label}.id")
+    _ = item_id
+    schema_version = _require_json_string(
+        item.get("schema_version"), label=f"{label}.schema_version"
+    )
+    if schema_version != "v1":
+        _verify_result_error(f"{label}.schema_version must be 'v1'.")
+    _require_json_string(item.get("kind"), label=f"{label}.kind", allow_empty=True)
+    ok = _require_json_boolean(item.get("ok"), label=f"{label}.ok")
+    reason = _require_verify_reason(item.get("reason"), label=f"{label}.reason")
+    if (ok and reason != "ok") or (not ok and reason == "ok"):
+        _verify_result_error(f"{label}.ok and {label}.reason are inconsistent.")
+    if "ci" not in item:
+        _verify_result_error(f"{label}.ci is required.")
+    ci = item["ci"]
+    if ci is not None:
+        if not isinstance(ci, list) or len(ci) != 2:
+            _verify_result_error(f"{label}.ci must be null or a two-item JSON array.")
+        for ci_index, value in enumerate(ci):
+            if isinstance(value, bool) or not isinstance(value, int | float):
+                _verify_result_error(
+                    f"{label}.ci[{ci_index}] must be a finite JSON number."
+                )
+            if not math.isfinite(float(value)):
+                _verify_result_error(
+                    f"{label}.ci[{ci_index}] must be a finite JSON number."
+                )
+    return item
+
+
+def _validated_verify_result_item(
+    verify_result: object | None,
     report_path: Path,
 ) -> Mapping[str, Any] | None:
-    if not isinstance(verify_result, Mapping):
+    if verify_result is None:
         return None
+    if not isinstance(verify_result, Mapping):
+        _verify_result_error("Verify result must decode to a JSON object.")
+    _ensure_finite_json_value(verify_result, label="Verify result")
+    format_version = _require_json_string(
+        verify_result.get("format_version"), label="Verify result.format_version"
+    )
+    if format_version != _VERIFY_RESULT_FORMAT:
+        _verify_result_error(
+            f"Verify result.format_version must be '{_VERIFY_RESULT_FORMAT}'."
+        )
+    summary = verify_result.get("summary")
+    if not isinstance(summary, Mapping):
+        _verify_result_error("Verify result.summary must be a JSON object.")
+    _require_json_boolean(summary.get("ok"), label="Verify result.summary.ok")
+    _require_verify_reason(summary.get("reason"), label="Verify result.summary.reason")
     results = verify_result.get("results")
     if not isinstance(results, list) or not results:
         raise VerifyResultMismatchError(
             "Verify result must contain a non-empty results list for evaluation "
             f"report {report_path.resolve()}."
         )
+
     resolved = str(report_path.resolve())
+    matching_items: list[Mapping[str, Any]] = []
     mismatched_ids: list[str] = []
-    idless_count = 0
-    for item in results:
-        if not isinstance(item, Mapping):
-            idless_count += 1
-            continue
-        item_id = _clean_text(item.get("id"), default="")
-        if not item_id:
-            idless_count += 1
-            continue
-        if str(Path(item_id).expanduser().resolve()) == resolved:
-            return item
-        mismatched_ids.append(item_id)
-    if idless_count:
-        raise VerifyResultMismatchError(
-            "Verify result item(s) must include an id matching evaluation report "
-            f"{resolved}."
+    for index, raw_item in enumerate(results):
+        item = _validate_verify_result_item(raw_item, index=index)
+        item_id = str(item["id"])
+        try:
+            item_path = str(Path(item_id).expanduser().resolve())
+        except (OSError, RuntimeError) as exc:
+            _verify_result_error(
+                f"Verify result item {index}.id cannot be resolved: {exc}"
+            )
+        if item_path == resolved:
+            matching_items.append(item)
+        else:
+            mismatched_ids.append(item_id)
+    if len(matching_items) > 1:
+        _verify_result_error(
+            "Verify result must contain exactly one item for evaluation report "
+            f"{resolved}; found {len(matching_items)}."
         )
-    if mismatched_ids:
-        preview = ", ".join(mismatched_ids[:3])
-        suffix = "" if len(mismatched_ids) <= 3 else ", ..."
-        raise VerifyResultMismatchError(
-            "Verify result does not contain an item for evaluation report "
-            f"{resolved}. Found item id(s): {preview}{suffix}"
+    if matching_items:
+        return matching_items[0]
+    preview = ", ".join(mismatched_ids[:3])
+    suffix = "" if len(mismatched_ids) <= 3 else ", ..."
+    raise VerifyResultMismatchError(
+        "Verify result does not contain an item for evaluation report "
+        f"{resolved}. Found item id(s): {preview}{suffix}"
+    )
+
+
+def _validate_receipt_binding(
+    item: Mapping[str, Any],
+    *,
+    report_sha256: str,
+) -> tuple[Literal["pass", "fail"], str, str]:
+    verification = item.get("verification")
+    if not isinstance(verification, Mapping):
+        _verify_result_error("Matching verify result item must include verification.")
+    receipt = verification.get("receipt")
+    if not isinstance(receipt, Mapping):
+        _verify_result_error(
+            "Matching verify result item must include a verification.receipt."
         )
-    return None  # pragma: no cover - all result shapes exit via match/mismatch/idless paths.
+    receipt_format = _require_json_string(
+        receipt.get("format_version"), label="Verify receipt.format_version"
+    )
+    if receipt_format != _VERIFY_RECEIPT_FORMAT:
+        _verify_result_error(
+            f"Verify receipt.format_version must be '{_VERIFY_RECEIPT_FORMAT}'."
+        )
+    signed = _require_json_boolean(receipt.get("signed"), label="Verify receipt.signed")
+    if signed:
+        _verify_result_error(
+            "Verify receipt declares signed=true, but this export cannot authenticate "
+            "a standalone signature claim."
+        )
+    receipt_digest = _require_json_string(
+        receipt.get("subject_report_sha256"),
+        label="Verify receipt.subject_report_sha256",
+    )
+    if (
+        len(receipt_digest) != 64
+        or receipt_digest.lower() != receipt_digest
+        or any(character not in "0123456789abcdef" for character in receipt_digest)
+    ):
+        _verify_result_error(
+            "Verify receipt.subject_report_sha256 must be a lowercase SHA-256 hex digest."
+        )
+    if receipt_digest != report_sha256:
+        _verify_result_error(
+            "Verify receipt.subject_report_sha256 does not bind to the exact "
+            "evaluation report bytes being exported."
+        )
+    ok = _require_json_boolean(item.get("ok"), label="Matching verify result item.ok")
+    reason = _require_verify_reason(
+        item.get("reason"), label="Matching verify result item.reason"
+    )
+    runtime = verification.get("runtime_provenance")
+    if runtime is not None and not isinstance(runtime, Mapping):
+        _verify_result_error(
+            "Matching verify result item.verification.runtime_provenance must be an object."
+        )
+    runtime_status = _clean_text(
+        runtime.get("status") if isinstance(runtime, Mapping) else None
+    )
+    return ("pass" if ok else "fail"), reason, runtime_status
 
 
 def _verifier_fields(
     verify_result: Mapping[str, Any] | None,
     report_path: Path,
-) -> tuple[Literal["pass", "fail", "not_provided"], str, str]:
-    item = _verify_result_item(verify_result, report_path)
+    *,
+    report_sha256: str,
+) -> tuple[
+    Literal["not_provided", "receipt_bound_untrusted"],
+    Literal["pass", "fail", "not_provided"],
+    Literal["not_provided", "bound_unsigned"],
+    str,
+    str,
+]:
+    item = _validated_verify_result_item(verify_result, report_path)
     if item is None:
-        return "not_provided", _UNKNOWN, _UNKNOWN
-    ok = bool(item.get("ok"))
-    reason = _clean_text(item.get("reason"))
-    verification = _as_mapping(item.get("verification"))
-    runtime = _as_mapping(verification.get("runtime_provenance"))
-    runtime_status = _clean_text(runtime.get("status"))
-    return ("pass" if ok else "fail"), reason, runtime_status
+        return "not_provided", "not_provided", "not_provided", _UNKNOWN, _UNKNOWN
+    outcome, reason, runtime_status = _validate_receipt_binding(
+        item,
+        report_sha256=report_sha256,
+    )
+    # Current verify receipts explicitly set signed=false.  Binding proves only
+    # that this supplied JSON names these bytes; it does not authenticate who
+    # produced the JSON or independently prove the claimed verifier outcome.
+    return "receipt_bound_untrusted", outcome, "bound_unsigned", reason, runtime_status
 
 
 def build_report_export_context(
@@ -256,21 +452,43 @@ def build_report_export_context(
     report_url: str | None = None,
     evidence_url: str | None = None,
     verify_result: Mapping[str, Any] | None = None,
+    report_bytes: bytes | None = None,
 ) -> ReportExportContext:
     resolved = Path(report_path).resolve()
-    verifier_status, verifier_reason, runtime_status = _verifier_fields(
+    report_sha256 = (
+        hashlib.sha256(report_bytes).hexdigest()
+        if report_bytes is not None
+        else _sha256_file(resolved)
+    )
+    (
+        verifier_status,
+        verifier_outcome,
+        receipt_status,
+        verifier_reason,
+        runtime_status,
+    ) = _verifier_fields(
         verify_result,
         resolved,
+        report_sha256=report_sha256,
     )
     report_status = derive_report_status(report)
-    export_status = (
-        report_status if verifier_status == "not_provided" else verifier_status
-    )
+    export_status: Literal[
+        "report_local_pass", "report_local_fail", "receipt_bound_untrusted"
+    ]
+    if verifier_status == "not_provided":
+        export_status = (
+            "report_local_pass" if report_status == "pass" else "report_local_fail"
+        )
+    else:
+        export_status = "receipt_bound_untrusted"
     return ReportExportContext(
         report_path=resolved,
-        report_sha256=_sha256_file(resolved),
+        report_sha256=report_sha256,
         status=export_status,
+        report_local_status=report_status,
         verifier_status=verifier_status,
+        verifier_outcome=verifier_outcome,
+        receipt_status=receipt_status,
         verifier_reason=verifier_reason,
         runtime_provenance_status=runtime_status,
         policy_profile=_derive_policy_profile(report, policy_profile),
@@ -293,12 +511,15 @@ def build_report_export_context(
 def render_mlflow_tags_export(context: ReportExportContext) -> dict[str, Any]:
     tags = {
         "invarlock.status": context.status,
+        "invarlock.report_local_status": context.report_local_status,
         "invarlock.report_sha256": context.report_sha256,
         "invarlock.policy_profile": context.policy_profile,
         "invarlock.baseline": context.baseline,
         "invarlock.subject": context.subject,
         "invarlock.edit_name": context.edit_name,
         "invarlock.verifier_status": context.verifier_status,
+        "invarlock.verifier_outcome": context.verifier_outcome,
+        "invarlock.receipt_status": context.receipt_status,
         "invarlock.verifier_reason": context.verifier_reason,
         "invarlock.failed_gate_count": str(context.failed_gate_count),
         "invarlock.primary_metric_kind": context.primary_metric_kind,
@@ -354,7 +575,10 @@ def render_model_card_evidence_block(context: ReportExportContext) -> str:
     report_ref = context.report_url or context.report_path.name
     rows = [
         ("Status", status),
+        ("Report-local Gate Status", context.report_local_status.upper()),
         ("Verifier Status", _inline_code(context.verifier_status)),
+        ("Verifier Outcome", _inline_code(context.verifier_outcome)),
+        ("Verifier Receipt", _inline_code(context.receipt_status)),
         ("Verifier Reason", _inline_code(context.verifier_reason)),
         ("Runtime Provenance", _inline_code(context.runtime_provenance_status)),
         ("Report SHA-256", _inline_code(context.report_sha256)),
@@ -375,8 +599,9 @@ def render_model_card_evidence_block(context: ReportExportContext) -> str:
             _markdown_table(rows),
             "",
             (
-                "This block summarizes InvarLock regression evidence for the "
-                "referenced report. It is not deployment approval."
+                "This block summarizes report-local gates and any supplied "
+                "receipt-bound verifier outcome. An unsigned receipt is not "
+                "independent verification or deployment approval."
             ),
             "",
         ]
@@ -408,9 +633,12 @@ def render_release_review_packet(
         "## Decision Summary",
         "",
         f"- Status: **{context.status.upper()}**",
+        f"- Report-local gate status: `{context.report_local_status}`",
         f"- Run ID: `{context.run_id}`",
         f"- Policy profile: `{context.policy_profile}`",
         f"- Verifier status: `{context.verifier_status}`",
+        f"- Verifier outcome: `{context.verifier_outcome}`",
+        f"- Verifier receipt: `{context.receipt_status}`",
         f"- Verifier reason: `{context.verifier_reason}`",
         f"- Runtime provenance: `{context.runtime_provenance_status}`",
         f"- Report SHA-256: `{context.report_sha256}`",
@@ -465,13 +693,14 @@ def render_report_export(
 def serialize_report_export(exported: str | dict[str, Any]) -> str:
     if isinstance(exported, str):
         return exported if exported.endswith("\n") else exported + "\n"
-    return json.dumps(exported, indent=2, sort_keys=True) + "\n"
+    return json.dumps(exported, indent=2, sort_keys=True, allow_nan=False) + "\n"
 
 
 __all__ = [
     "ReportExportContext",
     "ReportExportFormat",
     "VerifyResultMismatchError",
+    "VerifyResultValidationError",
     "build_report_export_context",
     "derive_report_status",
     "render_mlflow_tags_export",

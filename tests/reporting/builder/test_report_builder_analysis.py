@@ -23,8 +23,8 @@ class TestExtractSpectralAnalysis:
         assert result["caps_applied_by_family"] == {"ffn": 2, "attn": 1}
         assert result["bh_family_count"] == 4
         assert result["multiple_testing"]["m"] == 4
-        assert result["policy"]["correction_enabled"] is False
-        assert result["policy"]["max_spectral_norm"] is None
+        assert "correction_enabled" not in result["policy"]
+        assert result["policy"]["max_spectral_norm"] == pytest.approx(9.9)
         assert result["family_z_quantiles"]["ffn"]["count"] == 4
         assert len(result["top_z_scores"]["attn"]) == 3
         assert {v["module"] for v in result["top_violations"]} == {
@@ -109,11 +109,12 @@ class TestExtractSpectralAnalysis:
 
     def test_extract_spectral_analysis_uses_metrics_fallback(self):
         report = {
+            "meta": {"auto": {"tier": "balanced"}},
             "metrics": {
                 "spectral": {
                     "sigma_ratios": [1.25, 0.95, 1.05],
                 }
-            }
+            },
         }
         baseline = {}
 

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from invarlock.reporting.report_enrichment import compute_confidence_label
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def test_confidence_label_variants():
@@ -57,6 +57,7 @@ def _simple_report_with_windows() -> dict:
             "ts": "2024-01-01T00:00:00",
             "auto": {"tier": "balanced", "probes_used": 0, "target_pm_ratio": None},
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "ds",
             "split": "val",
@@ -101,26 +102,17 @@ def _simple_report_with_windows() -> dict:
     }
 
 
-def _baseline_v1_windows_only() -> dict:
-    return {
-        "schema_version": "baseline-v1",
-        "meta": {"model_id": "m"},
-        "metrics": {},
-        "evaluation_windows": {
-            "final": {
-                "window_ids": [1, 2],
-                "logloss": [4.0, 4.0],
-                "token_counts": [100, 100],
-            }
-        },
-    }
+def _canonical_baseline_with_windows() -> dict:
+    baseline = _simple_report_with_windows()
+    baseline["metrics"]["primary_metric"].pop("ratio_vs_baseline")
+    return baseline
 
 
 def test_make_evaluation_report_uses_pairing_and_marks_unstable_with_low_replicates(
     monkeypatch,
 ):
     rep = _simple_report_with_windows()
-    base = _baseline_v1_windows_only()
+    base = _canonical_baseline_with_windows()
     # Ensure BCa not forced (and sample count remains small); environment flag off
     monkeypatch.delenv("INVARLOCK_BOOTSTRAP_BCA", raising=False)
     cert = make_report(rep, base)
@@ -130,9 +122,9 @@ def test_make_evaluation_report_uses_pairing_and_marks_unstable_with_low_replica
     assert pm.get("unstable") in {True, False}
 
 
-def test_normalize_baseline_v1_path_is_exercised(tmp_path: Path):
+def test_canonical_baseline_reference_contains_primary_metric():
     rep = _simple_report_with_windows()
-    base = _baseline_v1_windows_only()
+    base = _canonical_baseline_with_windows()
     cert = make_report(rep, base)
     # Baseline ref present with PM snapshot
     br = cert.get("baseline_ref", {})

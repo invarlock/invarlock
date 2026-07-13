@@ -5,15 +5,25 @@ import json
 import pytest
 
 from invarlock.core.exceptions import ValidationError
-from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.rendering.markdown import render_report_markdown
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
 
 
 def _mk_report() -> RunReport:
     r = create_empty_report()
     r["meta"]["model_id"] = "m"
     r["meta"]["adapter"] = "hf"
+    r["meta"]["auto"] = {
+        "tier": "balanced",
+        "probes_used": 0,
+        "target_pm_ratio": None,
+    }
+    r["context"] = {"profile": "dev"}
     r["data"]["dataset"] = "unit"
     r["data"]["split"] = "validation"
     r["data"]["seq_len"] = 8
@@ -30,7 +40,8 @@ def _mk_report() -> RunReport:
 def test_make_report_json_and_markdown() -> None:
     rp = _mk_report()
     base = _mk_report()
-    cert = make_report(rp, base)
+    base["edit"]["name"] = "noop"
+    cert = make_report(canonical_run_report(rp), canonical_baseline(base))
     js = json.dumps(cert, indent=2, ensure_ascii=False)
     assert "schema_version" in js
     md = render_report_markdown(cert)
@@ -45,4 +56,4 @@ def test_make_report_rejects_unsupported_baseline_schema() -> None:
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
     }
     with pytest.raises(ValidationError, match="Baseline normalization failed"):
-        make_report(rp, base)
+        make_report(canonical_run_report(rp), base)

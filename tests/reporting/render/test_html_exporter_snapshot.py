@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from invarlock import __version__
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _section_html(html: str, section_id: str) -> str:
@@ -22,6 +24,7 @@ def _mk_report() -> dict:
             "ts": "now",
             "auto": {"tier": "balanced"},
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "dummy",
             "split": "validation",
@@ -124,8 +127,29 @@ def test_html_summary_uses_computed_validation_status():
 
     html = render_report_html(cert)
 
-    assert '<td><strong class="tone-pass">PASS</strong></td>' in html
+    assert "<th>Report-local gates</th>" in html
+    assert '<td><strong class="tone-info">FAIL</strong></td>' in html
     assert '<td><strong class="tone-fail">FAIL</strong></td>' not in html
+
+
+def test_html_does_not_promote_self_authored_assurance_fields() -> None:
+    from invarlock.reporting.html import render_report_html
+
+    cert = make_report(_mk_report(), _mk_report())
+    cert["assurance"] = {
+        "mode": "strict",
+        "verdict": "pass",
+        "report_local_verdict": "pass",
+        "verified_assurance_verdict": "pass",
+        "runtime_provenance_verification_status": "verified",
+    }
+
+    html = render_report_html(cert)
+
+    assert "REPORT-LOCAL / UNVERIFIED RENDER" in html
+    assert "strict pass" not in html.lower()
+    assert "Independent Verification" in html
+    assert "NOT EMBEDDED" in html
 
 
 def test_html_exporter_renders_benchmark_comparison_section():
@@ -138,9 +162,9 @@ def test_html_exporter_renders_benchmark_comparison_section():
             {
                 "edit": "quant_rtn",
                 "skip": False,
-                "primary_metric_overhead": 0.009,
-                "guard_overhead_time": 0.13,
-                "guard_overhead_mem": 0.09,
+                "guard_primary_metric_impact": 0.009,
+                "guard_runtime_overhead": 0.13,
+                "guard_memory_overhead": 0.09,
                 "rmt_outliers_bare": 2,
                 "rmt_outliers_guarded": 3,
                 "pass": {"quality": True, "time": True, "mem": True},
@@ -166,7 +190,7 @@ def test_html_exporter_renders_accuracy_without_perplexity_language():
         "unit": "accuracy",
         "preview": 0.86,
         "final": 0.855,
-        "ratio_vs_baseline": 0.0,
+        "delta_vs_baseline_pp": 0.0,
         "display_ci": [-0.01, 0.01],
     }
 

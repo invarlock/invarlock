@@ -4,6 +4,7 @@ from pathlib import Path
 
 from invarlock.reporting.report_types import RunReport, create_empty_report
 from invarlock.reporting.run_report_formatters import to_html, to_markdown
+from tests.reporting._support_canonical_reports import canonical_run_report
 
 
 def _mk_report(pm_kind: str = "ppl_causal", pm_final: float = 10.0) -> RunReport:
@@ -11,19 +12,25 @@ def _mk_report(pm_kind: str = "ppl_causal", pm_final: float = 10.0) -> RunReport
     # Fill minimal required fields for PM
     r["meta"]["model_id"] = "m"
     r["meta"]["adapter"] = "hf"
+    r["meta"]["auto"] = {"tier": "balanced"}
+    r["context"] = {"profile": "dev"}
     r["edit"]["name"] = "quant_rtn"
     r["data"]["dataset"] = "unit"
     r["data"]["split"] = "validation"
     r["data"]["seq_len"] = 8
     r["data"]["stride"] = 8
+    r["data"]["preview_n"] = 1
+    r["data"]["final_n"] = 1
+    r["guards"] = []
     r["metrics"]["primary_metric"] = {
         "kind": pm_kind,
+        "preview": pm_final,
         "final": pm_final,
     }
     # Optional metrics for table rows
     r["metrics"]["latency_ms_per_tok"] = 1.23
     r["metrics"]["memory_mb_peak"] = 12.3
-    return r
+    return canonical_run_report(r)
 
 
 def test_to_html_markdown_single_and_css_toggle(tmp_path: Path) -> None:
@@ -61,6 +68,7 @@ def test_to_html_comparison_guards_violations_rows() -> None:
     rp1["guards"] = [
         {
             "name": "variance",
+            "passed": False,
             "policy": {},
             "metrics": {},
             "actions": [],
@@ -70,6 +78,7 @@ def test_to_html_comparison_guards_violations_rows() -> None:
     rp2["guards"] = [
         {
             "name": "variance",
+            "passed": False,
             "policy": {},
             "metrics": {},
             "actions": [],

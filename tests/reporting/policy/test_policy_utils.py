@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 
+import pytest
+
 import invarlock.reporting.policy_utils as policy_mod
 
 
@@ -35,13 +37,14 @@ def test_compute_thresholds_payload_uses_tier_defaults(monkeypatch):
     assert isinstance(payload["accuracy"]["min_examples"], int)
 
 
-def test_resolve_policy_tier_checks_multiple_sources():
+def test_resolve_policy_tier_uses_only_canonical_metadata():
     report = {
         "meta": {"auto": {"tier": "Aggressive"}},
         "context": {"policy_tier": "conservative"},
     }
     assert policy_mod._resolve_policy_tier(report) == "aggressive"
-    assert policy_mod._resolve_policy_tier({}) == "balanced"
+    with pytest.raises(ValueError, match="meta.auto.tier"):
+        policy_mod._resolve_policy_tier({})
 
 
 def test_format_helpers():
@@ -187,7 +190,10 @@ def test_extract_effective_policies_adds_default_status(monkeypatch):
     monkeypatch.setattr(
         policy_mod, "get_tier_policies", lambda *_a, **_k: {"balanced": {"misc": None}}
     )
-    report = {"metrics": {"spectral": {}, "rmt": {}}}
+    report = {
+        "meta": {"auto": {"tier": "balanced"}},
+        "metrics": {"spectral": {}, "rmt": {}},
+    }
     policies = policy_mod._extract_effective_policies(report)
     assert policies["spectral"]["status"] == "default_config"
     assert policies["rmt"]["status"] == "default_config"
@@ -218,3 +224,119 @@ def test_compute_policy_digest_matches_assurance_spec():
     canonical = json.dumps(policy, sort_keys=True, default=str)
     expected = hashlib.sha256(canonical.encode()).hexdigest()[:16]
     assert policy_mod._compute_policy_digest(policy) == expected
+
+
+@pytest.mark.parametrize(
+    "metrics",
+    [
+        "not-a-policy",
+        {"pm_ratio": "bad"},
+        {"pm_tail": "bad"},
+        {"accuracy": "bad"},
+    ],
+)
+def test_threshold_payload_rejects_non_mapping_policy_sections(metrics):
+    payload = policy_mod._compute_thresholds_payload("balanced", {"metrics": metrics})
+    assert payload["tier"] == "balanced"
+    assert payload["pm_ratio"]["ratio_limit_base"] > 0
+
+
+def test_threshold_payload_falls_back_from_uncoercible_optional_numbers():
+    payload = policy_mod._compute_thresholds_payload(
+        "balanced",
+        {
+            "metrics": {
+                "pm_ratio": {"ratio_limit_base": BadFloat()},
+                "pm_tail": {
+                    "quantile": BadFloat(),
+                    "epsilon": BadFloat(),
+                    "quantile_max": object(),
+                    "mass_max": object(),
+                },
+            }
+        },
+    )
+    assert payload["pm_tail"]["quantile"] == 0.95
+    assert payload["pm_tail"]["epsilon"] == 0.0
+    assert payload["pm_tail"]["quantile_max"] is None
+    assert payload["pm_tail"]["mass_max"] is None
+
+
+def test_build_resolved_policies_retains_observed_contracts(monkeypatch):
+    monkeypatch.setattr(
+        policy_mod,
+        "resolve_tier_policies",
+        lambda *_a, **_k: {"spectral": {}, "rmt": {}, "variance": {}},
+    )
+    resolved = policy_mod._build_resolved_policies(
+        "none",
+        {"measurement_contract": {"algorithm": "power"}},
+        {"measurement_contract": {"algorithm": "rmt"}},
+        {
+            "policy": {
+                "deadband": 0.2,
+                "min_abs_adjust": 0.01,
+                "max_scale_step": 0.3,
+                "min_effect_lognll": 0.04,
+                "predictive_one_sided": False,
+                "topk_backstop": 2,
+                "max_adjusted_modules": 4,
+            }
+        },
+    )
+    assert resolved["spectral"]["measurement_contract"]["algorithm"] == "power"
+    assert resolved["rmt"]["measurement_contract"]["algorithm"] == "rmt"
+    assert resolved["variance"]["deadband"] == 0.2
+    assert resolved["variance"]["max_adjusted_modules"] == 4
+
+
+def test_extract_effective_policies_sanitizes_all_guard_fallbacks(monkeypatch):
+    monkeypatch.setattr(
+        policy_mod,
+        "get_tier_policies",
+        lambda: {"balanced": {"spectral": {"deadband": 0.1}}},
+    )
+    report = {
+        "meta": {"auto": {"tier": "balanced"}},
+        "guards": [
+            {
+                "name": "spectral",
+                "policy": {"sigma_quantile": "invalid", "max_spectral_norm": 0},
+            },
+            {
+                "name": "variance",
+                "metrics": {
+                    "scope": "mlp",
+                    "min_gain_threshold": 0.5,
+                    "target_modules": 3,
+                    "ve_enabled": True,
+                },
+            },
+            {
+                "name": "invariants",
+                "metrics": {"checks_performed": 4, "violations_found": 1},
+            },
+        ],
+    }
+    policies = policy_mod._extract_effective_policies(report)
+    assert policies["spectral"]["sigma_quantile"] == "invalid"
+    assert policies["spectral"]["max_spectral_norm"] is None
+    assert policies["variance"]["target_modules"] == 3
+    assert policies["invariants"]["violations_found"] == 1
+
+
+def test_policy_override_extraction_accepts_all_metadata_locations():
+    report = {
+        "meta": {
+            "policy_overrides": ("one",),
+            "overrides": {"two", None},
+            "auto": {"overrides": "three"},
+        },
+        "config": {"overrides": "four"},
+    }
+    assert policy_mod._extract_policy_overrides(report) == [
+        "one",
+        "two",
+        "three",
+        "four",
+    ]

@@ -1,7 +1,11 @@
 import math
+from copy import deepcopy
 from unittest.mock import patch
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
+from tests.reporting._support_primary_metric import independent_slice_summary
 
 
 def test_evaluation_report_paired_ci_success_and_stats_passthrough():
@@ -18,7 +22,13 @@ def test_evaluation_report_paired_ci_success_and_stats_passthrough():
             "ts": "2025-01-01T00:00:00",
             "commit": "deadbeef",
             "seed": 7,
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
         },
+        "context": {"profile": "ci"},
         "data": {
             "dataset": "dummy",
             "split": "validation",
@@ -40,13 +50,6 @@ def test_evaluation_report_paired_ci_success_and_stats_passthrough():
         },
         "guards": [],
         "metrics": {
-            # Choose preview/final so drift ≈ exp(-0.07)
-            "ppl_preview": 10.0,
-            "ppl_final": 10.0 * math.exp(-0.07),
-            "ppl_ratio": math.exp(-0.07),
-            "ppl_preview_ci": (9.5, 10.5),
-            "ppl_final_ci": (9.5, 10.5),
-            "ppl_ratio_ci": ratio_ci,
             "primary_metric": {
                 "kind": "ppl_causal",
                 "preview": 10.0,
@@ -55,8 +58,11 @@ def test_evaluation_report_paired_ci_success_and_stats_passthrough():
                 "ci": (-0.08, -0.06),
                 "display_ci": ratio_ci,
             },
-            # Provide paired delta summary mean consistent with drift
-            "paired_delta_summary": {"mean": -0.07, "degenerate": False},
+            "preview_final_slice_delta_summary": independent_slice_summary(
+                -0.07,
+                preview_windows=180,
+                final_windows=180,
+            ),
             # Include stats passthrough keys
             "stats": {
                 "requested_preview": 180,
@@ -88,13 +94,13 @@ def test_evaluation_report_paired_ci_success_and_stats_passthrough():
         "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
         "flags": {"guard_recovered": False, "rollback_reason": None},
     }
-    baseline = {
-        "run_id": "b",
-        "model_id": "m",
-        "ppl_final": 10.0,
-        "evaluation_windows": {
-            "final": {"window_ids": window_ids, "logloss": logloss_vals}
-        },
+    baseline = deepcopy(report)
+    baseline["run_id"] = "b"
+    baseline["edit"]["name"] = "noop"
+    baseline["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": 10.0,
+        "final": 10.0,
     }
 
     # Return a tight ΔlogNLL CI around the mean so ratio_ci == exp(bounds)

@@ -1,4 +1,4 @@
-from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.rendering.markdown import render_report_markdown
 from invarlock.reporting.report_make import REPORT_SCHEMA_VERSION
 
 
@@ -18,7 +18,7 @@ def test_markdown_includes_estimated_suffix_and_note_for_accuracy():
         "invariants": {"status": "pass"},
         "spectral": {"caps_applied": 0, "max_caps": 5},
         "rmt": {"stable": True},
-        "guard_overhead": {},
+        "guard_metric_impact": {},
         "structure": {"layers_modified": 0, "params_changed": 0},
         "variance": {"enabled": False},
         "validation": {
@@ -27,13 +27,13 @@ def test_markdown_includes_estimated_suffix_and_note_for_accuracy():
             "invariants_pass": True,
             "spectral_stable": True,
             "rmt_stable": True,
-            "guard_overhead_acceptable": True,
+            "guard_metric_impact_acceptable": True,
         },
         "primary_metric": {
             "kind": "accuracy",
             "preview": 1.0,
             "final": 1.0,
-            "ratio_vs_baseline": 0.0,
+            "delta_vs_baseline_pp": 0.0,
             "estimated": True,
         },
         "auto": {"tier": "balanced", "probes_used": 0, "target_ppl_ratio": None},

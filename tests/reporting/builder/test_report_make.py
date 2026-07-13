@@ -1,6 +1,10 @@
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_schema import validate_report
 from invarlock.reporting.report_types import create_empty_report
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
 
 
 def test_make_evaluation_report_with_secondary_and_subgroups():
@@ -17,8 +21,14 @@ def test_make_evaluation_report_with_secondary_and_subgroups():
             "model_profile": {"family": "gpt2"},
             "tokenizer_hash": "hash",
             "env_flags": {"foo": "bar"},
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
         }
     )
+    report["context"] = {"profile": "dev"}
     report["data"].update(
         {
             "dataset": "wikitext2",
@@ -49,7 +59,7 @@ def test_make_evaluation_report_with_secondary_and_subgroups():
             },
             "paired_windows": 2,
             "logloss_delta_ci": (-0.1, 0.0),
-            "window_plan": {"profile": "ci", "preview_n": 180, "final_n": 180},
+            "window_plan": {"profile": "dev", "preview_n": 180, "final_n": 180},
             "preview_total_tokens": 10,
             "final_total_tokens": 10,
             "window_match_fraction": 1.0,
@@ -59,7 +69,7 @@ def test_make_evaluation_report_with_secondary_and_subgroups():
                     "kind": "accuracy",
                     "preview": 0.9,
                     "final": 0.91,
-                    "ratio_vs_baseline": 1.0,
+                    "delta_vs_baseline_pp": 0.0,
                     "unit": "acc",
                     "display_ci": (0.8, 1.0),
                     "ci": (0.8, 1.0),
@@ -79,7 +89,8 @@ def test_make_evaluation_report_with_secondary_and_subgroups():
     report["guards"] = [
         {
             "name": "variance",
-            "policy": {},
+            "passed": True,
+            "policy": {"enabled": False},
             "metrics": {},
             "actions": [],
             "violations": [],
@@ -102,8 +113,16 @@ def test_make_evaluation_report_with_secondary_and_subgroups():
             "ts": "now",
             "seed": 1,
             "seeds": {"python": 1, "numpy": 1, "torch": 1},
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
         }
     )
+    baseline["context"] = {"profile": "dev"}
+    baseline["data"].update(report["data"])
+    baseline["edit"]["name"] = "noop"
     baseline["metrics"]["primary_metric"] = {
         "kind": "ppl_causal",
         "preview": 1.0,
@@ -119,11 +138,16 @@ def test_make_evaluation_report_with_secondary_and_subgroups():
         "checkpoint_path": None,
     }
 
-    evaluation_report = make_report(report, baseline)
+    evaluation_report = make_report(
+        canonical_run_report(report), canonical_baseline(baseline)
+    )
 
     assert evaluation_report["primary_metric"]["ratio_vs_baseline"] is not None
     assert evaluation_report["policy_digest"]["policy_version"] == "policy-v1"
-    assert evaluation_report["validation"]["guard_overhead_acceptable"] in {True, False}
+    assert evaluation_report["validation"]["guard_metric_impact_acceptable"] in {
+        True,
+        False,
+    }
     assert evaluation_report["validation"]["primary_metric_acceptable"] in {True, False}
 
     # Evaluation Report should validate against schema/allowlist

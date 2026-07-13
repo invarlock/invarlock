@@ -14,26 +14,26 @@ def test_compute_console_validation_block_guard_omitted_and_included():
             "spectral_stable": True,
             "rmt_stable": True,
         },
-        "guard_overhead": {"evaluated": False},
+        "guard_metric_impact": {"evaluated": False},
     }
     blk = compute_console_validation_block(cert)
     labels = blk["labels"]
-    assert all("Guard Overhead" not in lab for lab in labels)
+    assert all("Guard Metric Impact" not in lab for lab in labels)
     assert blk["overall_pass"] is True
 
     # Guard evaluated and passing → row included
     cert2 = {
-        "validation": {**cert["validation"], "guard_overhead_acceptable": True},
-        "guard_overhead": {"evaluated": True},
+        "validation": {**cert["validation"], "guard_metric_impact_acceptable": True},
+        "guard_metric_impact": {"evaluated": True},
     }
     blk2 = compute_console_validation_block(cert2)
-    assert any("Guard Overhead" in lab for lab in blk2["labels"])
+    assert any("Guard Metric Impact" in lab for lab in blk2["labels"])
     assert blk2["overall_pass"] is True
 
     # Guard evaluated and failing → overall fail
     cert3 = {
-        "validation": {**cert["validation"], "guard_overhead_acceptable": False},
-        "guard_overhead": {"evaluated": True},
+        "validation": {**cert["validation"], "guard_metric_impact_acceptable": False},
+        "guard_metric_impact": {"evaluated": True},
     }
     blk3 = compute_console_validation_block(cert3)
     assert blk3["overall_pass"] is False

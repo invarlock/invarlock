@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 from collections.abc import Callable
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,10 @@ from invarlock.core.metric_kind_contract import (
     MetricKindContractError,
     is_ppl_metric_kind,
     normalize_metric_kind,
+)
+from invarlock.primary_metric_tail import (
+    PrimaryMetricTailContractError,
+    require_primary_metric_tail,
 )
 from invarlock.reporting import report_schema as _report_schema
 from invarlock.reporting.report_policy import (
@@ -22,7 +27,8 @@ from invarlock.reporting.report_schema import (
     REPORT_SCHEMA_VERSION,
     validate_report,
 )
-from invarlock.reporting.report_validation import compute_validation_flags
+from invarlock.reporting.validation.report import compute_validation_flags
+from invarlock.reporting.verify_system_overhead import validate_system_overhead
 
 _VERIFY_PARSE_EXCEPTIONS = (
     AttributeError,
@@ -33,6 +39,12 @@ _VERIFY_PARSE_EXCEPTIONS = (
     TypeError,
     ValueError,
 )
+
+
+@lru_cache(maxsize=1)
+def _compiled_canonical_report_validator(schema_runtime_id: int) -> Any | None:
+    del schema_runtime_id
+    return _report_schema._compile_jsonschema_validator(REPORT_JSON_SCHEMA)
 
 
 def _coerce_float(value: Any) -> float | None:
@@ -92,7 +104,15 @@ def _validate_report_schema_strict(
     ) + schema_failures
 
     try:
-        schema_lib.validate(instance=report, schema=report_json_schema)
+        validator = (
+            _compiled_canonical_report_validator(id(schema_lib))
+            if report_json_schema is REPORT_JSON_SCHEMA
+            else None
+        )
+        if validator is not None:
+            validator.validate(report)
+        else:
+            schema_lib.validate(instance=report, schema=report_json_schema)
     except schema_validation_exceptions:
         return False
     return True
@@ -173,8 +193,23 @@ def _validate_logspace_ci_identity(
     if ci_bounds is None or display_bounds is None:
         return errors
 
-    expected = (math.exp(ci_bounds[0]), math.exp(ci_bounds[1]))
+    try:
+        expected = (math.exp(ci_bounds[0]), math.exp(ci_bounds[1]))
+    except OverflowError:
+        errors.append(
+            "primary_metric.ci exponentiation overflows finite display range."
+        )
+        return errors
+    if any(not math.isfinite(value) or value <= 0.0 for value in expected):
+        errors.append(
+            "primary_metric.ci exponentiation is outside the finite positive "
+            "display range."
+        )
+        return errors
     observed = display_bounds
+    if any(value <= 0.0 for value in observed):
+        errors.append("primary_metric.display_ci bounds must be positive for PPL.")
+        return errors
     for obs, exp_val in zip(observed, expected, strict=False):
         tolerance = 5e-4 * max(1.0, abs(exp_val))
         if abs(obs - exp_val) > tolerance:
@@ -185,8 +220,130 @@ def _validate_logspace_ci_identity(
     return errors
 
 
+def _validate_ppl_metric(
+    report: dict[str, Any], pm: dict[str, Any], kind: str
+) -> list[str]:
+    errors: list[str] = []
+    preview_value = _coerce_float(pm.get("preview"))
+    ratio_value = _coerce_float(pm.get("ratio_vs_baseline"))
+    baseline_ref = report.get("baseline_ref", {}) or {}
+    baseline_pm = (
+        baseline_ref.get("primary_metric") if isinstance(baseline_ref, dict) else None
+    )
+    try:
+        baseline_kind = normalize_metric_kind(
+            baseline_pm.get("kind") if isinstance(baseline_pm, dict) else None
+        )
+    except (MetricKindContractError, ValueError):
+        baseline_kind = None
+    if baseline_kind != kind:
+        errors.append("PPL verification requires a same-kind baseline primary metric.")
+    baseline_final = (
+        _coerce_float(baseline_pm.get("final"))
+        if isinstance(baseline_pm, dict)
+        else None
+    )
+    final_value = _coerce_float(pm.get("final"))
+    if preview_value is None or preview_value < 1.0:
+        errors.append("PPL primary_metric.preview must be finite and at least 1.0.")
+    if final_value is None or final_value < 1.0:
+        errors.append("PPL primary_metric.final must be finite and at least 1.0.")
+    if baseline_final is None:
+        errors.append("PPL verification requires a finite baseline final value.")
+    elif baseline_final < 1.0:
+        errors.append(
+            f"PPL baseline final must be at least 1.0 (found {baseline_final})."
+        )
+    if ratio_value is None or ratio_value <= 0.0:
+        errors.append(
+            "report is missing a finite positive primary_metric.ratio_vs_baseline value."
+        )
+    if (
+        final_value is not None
+        and final_value >= 1.0
+        and baseline_final is not None
+        and baseline_final >= 1.0
+        and ratio_value is not None
+        and ratio_value > 0.0
+    ):
+        expected_ratio = final_value / baseline_final
+        if not math.isclose(ratio_value, expected_ratio, rel_tol=1e-6, abs_tol=1e-6):
+            errors.append(
+                "Primary metric ratio mismatch: "
+                f"recorded={ratio_value:.12f}, expected={expected_ratio:.12f}"
+            )
+    return errors
+
+
+def _validate_accuracy_metric(report: dict[str, Any], pm: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    if "ratio_vs_baseline" in pm:
+        errors.append(
+            "primary_metric.ratio_vs_baseline is not allowed for accuracy; "
+            "use delta_vs_baseline_pp."
+        )
+    delta_pp = _coerce_float(pm.get("delta_vs_baseline_pp"))
+    preview_value = _coerce_float(pm.get("preview"))
+    final_value = _coerce_float(pm.get("final"))
+    baseline_ref = report.get("baseline_ref")
+    baseline_pm = (
+        baseline_ref.get("primary_metric") if isinstance(baseline_ref, dict) else None
+    )
+    try:
+        baseline_kind = normalize_metric_kind(
+            baseline_pm.get("kind") if isinstance(baseline_pm, dict) else None
+        )
+    except (MetricKindContractError, ValueError):
+        baseline_kind = None
+    if baseline_kind != "accuracy":
+        errors.append(
+            "Accuracy verification requires an accuracy baseline primary metric."
+        )
+    baseline_final = (
+        _coerce_float(baseline_pm.get("final"))
+        if isinstance(baseline_pm, dict)
+        else None
+    )
+    if delta_pp is None:
+        errors.append(
+            "primary_metric.delta_vs_baseline_pp must be finite for accuracy."
+        )
+    if final_value is None or not 0.0 <= final_value <= 1.0:
+        errors.append("Accuracy primary_metric.final must be finite in [0, 1].")
+    if preview_value is None or not 0.0 <= preview_value <= 1.0:
+        errors.append("Accuracy primary_metric.preview must be finite in [0, 1].")
+    if baseline_final is None or not 0.0 <= baseline_final <= 1.0:
+        errors.append("Accuracy verification requires baseline final in [0, 1].")
+    if delta_pp is not None and final_value is not None and baseline_final is not None:
+        expected_delta_pp = 100.0 * (final_value - baseline_final)
+        if not math.isclose(delta_pp, expected_delta_pp, rel_tol=1e-9, abs_tol=1e-9):
+            errors.append(
+                "Accuracy baseline delta mismatch: "
+                f"recorded={delta_pp:.12f} expected={expected_delta_pp:.12f}"
+            )
+    return errors
+
+
 def _validate_primary_metric(report: dict[str, Any]) -> list[str]:
     errors: list[str] = []
+    errors.extend(validate_system_overhead(report))
+    status = report.get("status")
+    if isinstance(status, str) and status.strip().lower() in {
+        "failed",
+        "error",
+        "rollback",
+        "cancelled",
+    }:
+        errors.append(
+            f"report status {status!r} is not a successful evaluation outcome."
+        )
+    flags = report.get("flags")
+    rollback_reason = flags.get("rollback_reason") if isinstance(flags, dict) else None
+    if isinstance(rollback_reason, str) and rollback_reason.strip():
+        errors.append(
+            "report records a rollback and cannot be verified as a successful "
+            "evaluation outcome."
+        )
     pm = report.get("primary_metric", {}) or {}
     if not isinstance(pm, dict) or not pm:
         errors.append("report missing primary_metric block.")
@@ -217,65 +374,15 @@ def _validate_primary_metric(report: dict[str, Any]) -> list[str]:
     if kind is None:
         errors.append("report missing primary_metric.kind.")
         return errors
-    ratio_vs_baseline = pm.get("ratio_vs_baseline")
-    final = pm.get("final")
     pm_invalid = _declares_invalid_primary_metric(pm)
+    if pm_invalid:
+        errors.append("report primary_metric is invalid or degraded.")
+        return errors
 
     if is_ppl_metric_kind(kind):
-        baseline_ref = report.get("baseline_ref", {}) or {}
-        baseline_pm = (
-            baseline_ref.get("primary_metric")
-            if isinstance(baseline_ref, dict)
-            else None
-        )
-        baseline_final = None
-        if isinstance(baseline_pm, dict):
-            bv = baseline_pm.get("final")
-            baseline_final_value = _coerce_float(bv)
-            if baseline_final_value is not None:
-                baseline_final = baseline_final_value
-        final_value = _coerce_float(final)
-        baseline_final_value = _coerce_float(baseline_final)
-        if final_value is not None and baseline_final_value is not None:
-            if baseline_final_value <= 0.0:
-                errors.append(
-                    f"Baseline final must be > 0.0 to compute ratio (found {baseline_final})."
-                )
-            else:
-                expected_ratio = final_value / baseline_final_value
-                ratio_value = _coerce_float(ratio_vs_baseline)
-                if ratio_value is None:
-                    errors.append(
-                        "report is missing a finite primary_metric.ratio_vs_baseline value."
-                    )
-                elif not math.isclose(
-                    ratio_value,
-                    expected_ratio,
-                    rel_tol=1e-6,
-                    abs_tol=1e-6,
-                ):
-                    errors.append(
-                        "Primary metric ratio mismatch: "
-                        f"recorded={ratio_value:.12f}, expected={expected_ratio:.12f}"
-                    )
-        else:
-            if (isinstance(final, (int, float)) and not _is_finite_number(final)) and (
-                not pm_invalid
-            ):
-                errors.append(
-                    "Primary metric final is non-finite but primary_metric.invalid is not set."
-                )
-    else:
-        if pm_invalid:
-            return errors
-        if ratio_vs_baseline is None or not isinstance(ratio_vs_baseline, (int, float)):
-            errors.append(
-                "report missing primary_metric.ratio_vs_baseline for non-ppl metric."
-            )
-        elif not _is_finite_number(ratio_vs_baseline):
-            errors.append(
-                "report is missing a finite primary_metric.ratio_vs_baseline value."
-            )
+        errors.extend(_validate_ppl_metric(report, pm, kind))
+    elif kind == "accuracy":
+        errors.extend(_validate_accuracy_metric(report, pm))
 
     return errors
 
@@ -379,8 +486,8 @@ def _recompute_validation_flags(
         target_ratio=target_ratio,
         pm_acceptance_range=pm_acceptance_range,
         pm_drift_band=pm_drift_band,
-        guard_overhead=report.get("guard_overhead")
-        if isinstance(report.get("guard_overhead"), dict)
+        guard_metric_impact=report.get("guard_metric_impact")
+        if isinstance(report.get("guard_metric_impact"), dict)
         else None,
         primary_metric=pm,
         moe=report.get("moe") if isinstance(report.get("moe"), dict) else None,
@@ -405,7 +512,7 @@ def _validate_primary_metric_policy(
         return []
 
     flags = recompute_validation_flags_fn(report)
-    if bool(flags.get("primary_metric_acceptable", True)):
+    if flags.get("primary_metric_acceptable") is True:
         return []
 
     telemetry = report.get("telemetry")
@@ -447,29 +554,55 @@ def _validate_release_gate_outcomes(report: dict[str, Any]) -> list[str]:
                 f"(found {validation.get(key)!r})."
             )
 
-    if (
-        "primary_metric_tail" in report
-        or "primary_metric_tail_acceptable" in validation
-    ) and validation.get("primary_metric_tail_acceptable") is not True:
+    tail_present = "primary_metric_tail" in report
+    tail_flag_present = "primary_metric_tail_acceptable" in validation
+    primary_metric = report.get("primary_metric")
+    tail_required = False
+    if isinstance(primary_metric, dict):
+        try:
+            tail_required = is_ppl_metric_kind(primary_metric.get("kind"))
+        except MetricKindContractError:
+            tail_required = False
+    if tail_required and not tail_present:
         errors.append(
-            "Release verification requires validation.primary_metric_tail_acceptable == "
-            f"true (found {validation.get('primary_metric_tail_acceptable')!r})."
+            "Release verification requires primary_metric_tail evidence for a "
+            "perplexity primary metric."
+        )
+    if tail_present:
+        try:
+            tail_outcome = require_primary_metric_tail(report["primary_metric_tail"])
+        except PrimaryMetricTailContractError as exc:
+            errors.append(f"Release verification rejected primary_metric_tail: {exc}.")
+        else:
+            expected_tail_flag = tail_outcome.acceptable
+            if (
+                validation.get("primary_metric_tail_acceptable")
+                is not expected_tail_flag
+            ):
+                errors.append(
+                    "Release verification requires validation.primary_metric_tail_acceptable "
+                    f"to equal the exact tail outcome ({expected_tail_flag!r}; found "
+                    f"{validation.get('primary_metric_tail_acceptable')!r})."
+                )
+            if not expected_tail_flag:
+                errors.append(
+                    "Release verification rejected the primary metric tail gate."
+                )
+    elif tail_flag_present:
+        errors.append(
+            "Release verification rejects validation.primary_metric_tail_acceptable "
+            "without primary_metric_tail evidence."
         )
 
-    guard_overhead = report.get("guard_overhead")
-    skipped = isinstance(guard_overhead, dict) and (
-        bool(guard_overhead.get("skipped", False))
-        or str(guard_overhead.get("mode", "")).strip().lower() == "skipped"
-    )
+    guard_metric_impact = report.get("guard_metric_impact")
     if (
-        isinstance(guard_overhead, dict)
-        and guard_overhead
-        and not skipped
-        and validation.get("guard_overhead_acceptable") is not True
+        isinstance(guard_metric_impact, dict)
+        and guard_metric_impact
+        and validation.get("guard_metric_impact_acceptable") is not True
     ):
         errors.append(
-            "Release verification requires validation.guard_overhead_acceptable == "
-            f"true (found {validation.get('guard_overhead_acceptable')!r})."
+            "Release verification requires validation.guard_metric_impact_acceptable == "
+            f"true (found {validation.get('guard_metric_impact_acceptable')!r})."
         )
 
     return errors

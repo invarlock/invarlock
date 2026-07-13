@@ -3,8 +3,7 @@
 pack_test_sign_manifest() {
     local pack_dir="$1"
     local repo_root="${TEST_ROOT:-$(pwd)}"
-    python3 "${repo_root}/scripts/evidence_packs/python/manifest_writer.py" sign \
-        --manifest "${pack_dir}/manifest.json" \
-        --generate-ephemeral \
+    PYTHONPATH="${repo_root}" python3 -m tests._support_evidence_pack_signing \
+        "${pack_dir}/manifest.json" \
         >/dev/null
 }

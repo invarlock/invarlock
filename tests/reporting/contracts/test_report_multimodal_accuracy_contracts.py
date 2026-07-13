@@ -36,7 +36,7 @@ def test_build_primary_metric_analysis_populates_multimodal_coverage_and_pairing
                 "kind": "accuracy",
                 "preview": 1.0,
                 "final": 1.0,
-                "ratio_vs_baseline": 0.0,
+                "delta_vs_baseline_pp": 0.0,
                 "n_preview": 1,
                 "n_final": 1,
             },
@@ -83,3 +83,35 @@ def test_build_primary_metric_analysis_populates_multimodal_coverage_and_pairing
     assert stats["coverage"]["final"]["used"] == 1
     assert stats["window_match_fraction"] == 1.0
     assert stats["window_overlap_fraction"] == 0.0
+
+
+def test_build_primary_metric_analysis_ignores_unsubstantiated_pair_count() -> None:
+    report = {
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+                "ratio_vs_baseline": 1.0,
+            },
+            "paired_windows": 5,
+            "bootstrap": {},
+        },
+        "data": {"preview_n": 0, "final_n": 0},
+        "evaluation_windows": {},
+        "meta": {"auto": {"tier": "balanced"}},
+    }
+    baseline = {
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "preview": 10.0,
+            "final": 10.0,
+        },
+        "ppl_final": 10.0,
+    }
+
+    analysis, _ = build_primary_metric_analysis(
+        report, baseline, baseline, {"windows": {}}
+    )
+
+    assert analysis["stats"]["paired_windows"] == 0

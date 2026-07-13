@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 from collections.abc import Iterator
@@ -16,6 +17,11 @@ from typing import Any
 
 from invarlock import runtime_security_paths as path_helpers
 from invarlock.core import config_loader as _config_loader
+from invarlock.evidence_pack_json import (
+    StrictJsonError,
+    parse_json_bytes,
+    read_regular_file_bytes,
+)
 from invarlock.public_contracts import RUNTIME_MANIFEST_CONTRACT_VERSION
 
 inspect_config_dependencies = _config_loader.inspect_config_dependencies
@@ -29,6 +35,8 @@ CONTAINER_EXECUTION_ENV = "INVARLOCK_CONTAINER_EXECUTION"
 CONTAINER_ENGINE_ENV = "INVARLOCK_CONTAINER_ENGINE"
 RUNTIME_IMAGE_ENV = "INVARLOCK_RUNTIME_IMAGE"
 RUNTIME_IMAGE_DIGEST_ENV = "INVARLOCK_RUNTIME_IMAGE_DIGEST"
+SOURCE_BUNDLE_DIGEST_ENV = "INVARLOCK_SOURCE_BUNDLE_SHA256"
+SOURCE_BUNDLE_READ_ONLY_ENV = "INVARLOCK_SOURCE_BUNDLE_READ_ONLY"
 RUNTIME_MANIFEST_FILENAME = "runtime.manifest.json"
 RUNTIME_MANIFEST_VERSION = 1
 RUNTIME_VERIFIER_CONTRACT_VERSION = RUNTIME_MANIFEST_CONTRACT_VERSION
@@ -37,6 +45,7 @@ RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT = "invarlock-runtime:cuda-local"
 RUNTIME_IMAGE_DEFAULT = "ghcr.io/invarlock/invarlock-runtime:latest"
 _CONTAINER_INSPECT_TIMEOUT_SECONDS = 30
 _CONTAINER_EXECUTION_TIMEOUT_SECONDS = 24 * 60 * 60
+_SHA256_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 _FALSE_VALUES = {"0", "false", "no", "off"}
@@ -53,6 +62,8 @@ __all__ = [
     "CONTAINER_ENGINE_ENV",
     "RUNTIME_IMAGE_ENV",
     "RUNTIME_IMAGE_DIGEST_ENV",
+    "SOURCE_BUNDLE_DIGEST_ENV",
+    "SOURCE_BUNDLE_READ_ONLY_ENV",
     "RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT",
     "RUNTIME_MANIFEST_FILENAME",
     "RUNTIME_MANIFEST_VERSION",
@@ -92,6 +103,7 @@ class ContainerLaunchPlan:
     argv_mounts: tuple[Path, ...]
     needs_cwd_host_mirror: bool
     gpu_passthrough: bool
+    workspace_read_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -142,6 +154,24 @@ class _ContainerLaunchContext:
     base_mounts: tuple[Path, ...]
 
 
+@dataclass(frozen=True)
+class _ContainerImageInspection:
+    """Identity fields observed from one local container-engine inspection."""
+
+    image_id: str
+    repo_digests: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _ObservedContainerImage:
+    """Immutable local identity selected for one container launch."""
+
+    immutable_ref: str
+    image_digest: str
+    image_id: str
+    repo_digests: tuple[str, ...]
+
+
 _RUNTIME_SECURITY_POLICY: ContextVar[RuntimeSecurityPolicy | None] = ContextVar(
     "invarlock_runtime_security_policy",
     default=None,
@@ -186,7 +216,9 @@ def _json_safe(value: Any) -> Any:
         normalized_items = [_json_safe(item) for item in value]
         return sorted(
             normalized_items,
-            key=lambda item: json.dumps(item, sort_keys=True, separators=(",", ":")),
+            key=lambda item: json.dumps(
+                item, sort_keys=True, separators=(",", ":"), allow_nan=False
+            ),
         )
     if isinstance(value, (list, tuple)):
         return [_json_safe(item) for item in value]
@@ -194,7 +226,12 @@ def _json_safe(value: Any) -> Any:
 
 
 def serialize_canonical_json(payload: Any) -> str:
-    return json.dumps(_json_safe(payload), sort_keys=True, separators=(",", ":"))
+    return json.dumps(
+        _json_safe(payload),
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
 
 
 def _sha256_bytes(payload: bytes) -> str:
@@ -202,7 +239,7 @@ def _sha256_bytes(payload: bytes) -> str:
 
 
 def _sha256_path(path: Path) -> str:
-    return _sha256_bytes(path.read_bytes())
+    return _sha256_bytes(read_regular_file_bytes(path, label="runtime manifest input"))
 
 
 def network_allowed() -> bool:
@@ -268,6 +305,30 @@ def resolve_runtime_image_digest() -> str | None:
     return digest
 
 
+def _declared_runtime_image_digest(image: str) -> str | None:
+    explicit_raw = os.environ.get(RUNTIME_IMAGE_DIGEST_ENV, "").strip()
+    embedded_raw = image.split("@", 1)[1] if "@" in image else ""
+    explicit = explicit_raw.lower()
+    embedded = embedded_raw.lower()
+    if explicit and (
+        explicit != explicit_raw or not _SHA256_DIGEST_RE.fullmatch(explicit)
+    ):
+        raise RuntimeError(
+            f"{RUNTIME_IMAGE_DIGEST_ENV} must be lowercase sha256:<64 hex>."
+        )
+    if embedded and (
+        embedded != embedded_raw or not _SHA256_DIGEST_RE.fullmatch(embedded)
+    ):
+        raise RuntimeError(
+            "The runtime image digest must be lowercase sha256:<64 hex>."
+        )
+    if explicit and embedded and explicit != embedded:
+        raise RuntimeError(
+            "The declared runtime image digest does not match the image reference."
+        )
+    return explicit or embedded or None
+
+
 def _runtime_provenance_image_ref(image_ref: str, image_digest: str | None) -> str:
     if image_ref in {
         RUNTIME_IMAGE_LOCAL_DEFAULT,
@@ -275,6 +336,8 @@ def _runtime_provenance_image_ref(image_ref: str, image_digest: str | None) -> s
     }:
         return image_ref
     if "@sha256:" in image_ref:
+        return image_ref
+    if _SHA256_DIGEST_RE.fullmatch(image_ref):
         return image_ref
     if image_digest:
         return f"{image_ref}@{image_digest}"
@@ -287,7 +350,9 @@ def _runtime_provenance_image_ref(image_ref: str, image_digest: str | None) -> s
     )
 
 
-def _inspect_container_image(engine: str, image: str) -> tuple[bool, str | None]:
+def _inspect_container_image_identity(
+    engine: str, image: str
+) -> _ContainerImageInspection | None:
     try:
         completed = subprocess.run(
             [
@@ -304,24 +369,85 @@ def _inspect_container_image(engine: str, image: str) -> tuple[bool, str | None]
             timeout=_CONTAINER_INSPECT_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired:
-        return False, None
+        return None
     if completed.returncode != 0:
-        return False, None
+        return None
     lines = [line.strip() for line in completed.stdout.splitlines() if line.strip()]
     repo_digests: list[str] = []
     if lines:
         try:
-            payload = json.loads(lines[0])
-        except json.JSONDecodeError:
+            payload = parse_json_bytes(
+                lines[0].encode("utf-8"), label="container inspect output"
+            )
+        except StrictJsonError:
             payload = None
         if isinstance(payload, list):
-            repo_digests = [str(item) for item in payload if isinstance(item, str)]
-    for digest_ref in repo_digests:
-        if "@sha256:" in digest_ref:
-            return True, digest_ref.split("@", 1)[1]
-    if len(lines) >= 2 and lines[1].startswith("sha256:"):
-        return True, lines[1]
-    return True, None
+            repo_digests = sorted(
+                {
+                    str(item).strip().lower()
+                    for item in payload
+                    if isinstance(item, str)
+                    and "@" in item
+                    and _SHA256_DIGEST_RE.fullmatch(
+                        str(item).rsplit("@", 1)[1].strip().lower()
+                    )
+                }
+            )
+    image_id = lines[1].lower() if len(lines) >= 2 else ""
+    if not _SHA256_DIGEST_RE.fullmatch(image_id):
+        return None
+    return _ContainerImageInspection(
+        image_id=image_id,
+        repo_digests=tuple(repo_digests),
+    )
+
+
+def _resolve_observed_container_image(
+    engine: str, image: str
+) -> _ObservedContainerImage:
+    inspection = _inspect_container_image_identity(engine, image)
+    if inspection is None:
+        raise RuntimeError(
+            "The selected runtime image is not available for immutable local "
+            "identity inspection. Pull or build it before delegated execution."
+        )
+    declared = _declared_runtime_image_digest(image)
+    repo_refs_by_digest = {
+        reference.rsplit("@", 1)[1]: reference for reference in inspection.repo_digests
+    }
+    if declared is not None:
+        if declared == inspection.image_id:
+            immutable_ref = inspection.image_id
+        elif declared in repo_refs_by_digest:
+            immutable_ref = repo_refs_by_digest[declared]
+        else:
+            observed = sorted({inspection.image_id, *repo_refs_by_digest})
+            raise RuntimeError(
+                "The declared runtime image digest does not match the observed "
+                f"local image identity (observed={observed!r})."
+            )
+        selected_digest = declared
+    elif repo_refs_by_digest:
+        selected_digest = sorted(repo_refs_by_digest)[0]
+        immutable_ref = repo_refs_by_digest[selected_digest]
+    else:
+        selected_digest = inspection.image_id
+        immutable_ref = inspection.image_id
+    return _ObservedContainerImage(
+        immutable_ref=immutable_ref,
+        image_digest=selected_digest,
+        image_id=inspection.image_id,
+        repo_digests=inspection.repo_digests,
+    )
+
+
+def _inspect_container_image(engine: str, image: str) -> tuple[bool, str | None]:
+    inspection = _inspect_container_image_identity(engine, image)
+    if inspection is None:
+        return False, None
+    if inspection.repo_digests:
+        return True, inspection.repo_digests[0].rsplit("@", 1)[1]
+    return True, inspection.image_id
 
 
 def _runtime_image_build_command(image: str) -> str:
@@ -637,14 +763,16 @@ def write_runtime_manifest(
         "generated_at_utc": datetime.now(UTC).isoformat(),
         "verifier_contract_version": RUNTIME_VERIFIER_CONTRACT_VERSION,
         "report": {
-            "path": str(report),
+            # Runtime manifests travel with their sibling report into evidence
+            # packs and public archives.  Record the sibling name instead of a
+            # machine-local absolute path so the binding remains portable and
+            # does not disclose the producer filesystem.
+            "path": report.name,
             "filename": report.name,
             "sha256": _sha256_path(report),
         },
         "config": {
-            "path": str(Path(config_path).resolve())
-            if config_path is not None
-            else None,
+            "path": Path(config_path).name if config_path is not None else None,
             "sha256": digest,
             "source": digest_source,
         },
@@ -661,11 +789,28 @@ def write_runtime_manifest(
             "allow_third_party_plugins": runtime_execution.allow_third_party_plugins,
         },
     }
-    if isinstance(extra, dict) and extra:
-        manifest["context"] = _json_safe(extra)
+    context = dict(extra) if isinstance(extra, dict) else {}
+    source_bundle_digest = os.environ.get(SOURCE_BUNDLE_DIGEST_ENV, "").strip()
+    source_bundle_read_only = _coerce_bool(os.environ.get(SOURCE_BUNDLE_READ_ONLY_ENV))
+    if source_bundle_digest or source_bundle_read_only is not None:
+        if (
+            not _SHA256_DIGEST_RE.fullmatch(source_bundle_digest)
+            or source_bundle_read_only is not True
+        ):
+            raise RuntimeError(
+                "Source-bundle provenance requires a lowercase sha256 digest "
+                "and a read-only delegated workspace."
+            )
+        context["source_bundle"] = {
+            "read_only": True,
+            "sha256": source_bundle_digest,
+        }
+    if context:
+        manifest["context"] = _json_safe(context)
     manifest_path = report.parent / RUNTIME_MANIFEST_FILENAME
     manifest_path.write_text(
-        json.dumps(_json_safe(manifest), indent=2, sort_keys=True) + "\n",
+        json.dumps(_json_safe(manifest), indent=2, sort_keys=True, allow_nan=False)
+        + "\n",
         encoding="utf-8",
     )
     return manifest_path
@@ -683,15 +828,17 @@ def load_runtime_manifest(
             issue_code=RuntimeManifestLoadIssueCode.MISSING,
         )
     try:
-        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except OSError:
+        raw = read_regular_file_bytes(manifest_path, label=RUNTIME_MANIFEST_FILENAME)
+    except StrictJsonError:
         return RuntimeManifestLoadResult(
             path=manifest_path,
             payload=None,
             issue_code=RuntimeManifestLoadIssueCode.READ_FAILED,
             issue_message=f"unable to read {manifest_path.name}",
         )
-    except json.JSONDecodeError:
+    try:
+        payload = parse_json_bytes(raw, label=RUNTIME_MANIFEST_FILENAME)
+    except StrictJsonError:
         return RuntimeManifestLoadResult(
             path=manifest_path,
             payload=None,

@@ -5,7 +5,7 @@ import importlib
 import importlib.util
 import sys
 
-from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.rendering.markdown import render_report_markdown
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_schema import REPORT_SCHEMA_VERSION, validate_report
 
@@ -21,6 +21,8 @@ def test_removed_reporting_facades_are_not_importable() -> None:
     assert importlib.util.find_spec("invarlock.reporting.report_builder") is None
     assert importlib.util.find_spec("invarlock.reporting.report_make_support") is None
     assert importlib.util.find_spec("invarlock.reporting.verify_checks") is None
+    assert importlib.util.find_spec("invarlock.reporting.render") is None
+    assert importlib.util.find_spec("invarlock.reporting.report_files") is None
 
 
 def test_reporting_package_root_import_is_light_and_source_compatible(monkeypatch):
@@ -37,7 +39,7 @@ def test_reporting_package_root_import_is_light_and_source_compatible(monkeypatc
     for mod in [
         "invarlock.reporting",
         "invarlock.reporting.html",
-        "invarlock.reporting.render",
+        "invarlock.reporting.rendering.markdown",
         "invarlock.reporting.report_make",
     ]:
         sys.modules.pop(mod, None)

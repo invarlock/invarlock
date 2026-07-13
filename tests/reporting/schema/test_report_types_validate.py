@@ -23,10 +23,10 @@ def test_validate_report_true_minimal():
     assert validate_report(r) is True
 
 
-def test_validate_report_true_when_primary_metric_final_is_none():
+def test_validate_report_rejects_primary_metric_final_none():
     r = _make_valid_report()
     r["metrics"]["primary_metric"]["final"] = None
-    assert validate_report(r) is True
+    assert validate_report(r) is False
 
 
 def test_validate_report_missing_top_level():

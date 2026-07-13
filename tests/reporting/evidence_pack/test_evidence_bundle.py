@@ -4,7 +4,9 @@ import os
 from pathlib import Path
 
 from invarlock.reporting.report_bundle import save_evaluation_bundle
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _minimal_run_report() -> dict:
@@ -12,9 +14,11 @@ def _minimal_run_report() -> dict:
         "meta": {
             "model_id": "stub",
             "adapter": "hf_causal",
+            "auto": {"tier": "balanced"},
             "device": "cpu",
             "seed": 7,
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "dummy",
             "split": "validation",
@@ -39,9 +43,6 @@ def _minimal_run_report() -> dict:
                 "ratio_vs_baseline": 1.0,
                 "display_ci": [1.0, 1.0],
             },
-            # Legacy fields can still be present
-            "ppl_preview": 10.0,
-            "ppl_final": 10.0,
             "bootstrap": {"replicates": 200, "alpha": 0.05, "method": "percentile"},
         },
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [2.3]}},

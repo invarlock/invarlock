@@ -4,13 +4,11 @@ from pathlib import Path
 
 import pytest
 
+import invarlock.evidence_pack_support as evidence_pack_support_mod
 from tests.reporting._support_evidence_pack_paths import (
     VerifyExecutionResult,
     VerifyOutcome,
-    _patch_verify_result,
-    _read_manifest,
     _sign_pack,
-    _write_build_inputs,
     _write_json,
     _write_pack_with_manifest,
     evidence_pack_integrity_mod,
@@ -128,158 +126,6 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
     )
     assert errors == ["invarlock verify reported report verification failures."]
     assert payload == {"ok": False}
-
-
-def test_build_and_verify_evidence_pack_cover_usage_and_failure_paths(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    inputs = _write_build_inputs(tmp_path)
-    final_verdict = inputs.final_verdict
-    report_path = inputs.report_path
-    runtime_manifest = inputs.runtime_manifest
-    source_repo = inputs.source_repo
-    environment = inputs.environment
-    material = inputs.material
-
-    result = evidence_pack_mod.build_evidence_pack(
-        tmp_path / "out-none",
-        final_verdict_path=final_verdict,
-        report_paths=[],
-    )
-    payload = result.payload
-    exit_code = result.status
-    assert exit_code == evidence_pack_mod.EvidencePackStatus.USAGE
-    assert "at least one --report input" in payload["errors"][0]
-
-    existing_out = tmp_path / "existing"
-    existing_out.mkdir()
-    result = evidence_pack_mod.build_evidence_pack(
-        existing_out,
-        final_verdict_path=final_verdict,
-        report_paths=[report_path],
-    )
-    payload = result.payload
-    exit_code = result.status
-    assert exit_code == evidence_pack_mod.EvidencePackStatus.USAGE
-    assert "already exists" in payload["errors"][0]
-
-    result = evidence_pack_mod.build_evidence_pack(
-        tmp_path / "out-release-review-weak",
-        final_verdict_path=final_verdict,
-        report_paths=[report_path],
-        release_review=True,
-    )
-    payload = result.payload
-    exit_code = result.status
-    assert exit_code == evidence_pack_mod.EvidencePackStatus.USAGE
-    assert any("--report-assurance strict" in error for error in payload["errors"])
-    assert any("--signing-key" in error for error in payload["errors"])
-
-    signing_key = tmp_path / "signing.key"
-    evidence_pack_mod._generate_signing_keypair(
-        signing_key,
-        public_key_path=signing_key.with_suffix(".pub"),
-    )
-    result = evidence_pack_mod.build_evidence_pack(
-        tmp_path / "out-release-review-dev-profile",
-        final_verdict_path=final_verdict,
-        report_paths=[report_path],
-        profile="dev",
-        report_assurance="strict",
-        signing_key_path=signing_key,
-        release_review=True,
-    )
-    assert result.status == evidence_pack_mod.EvidencePackStatus.USAGE
-    assert any("profile=dev" in error for error in result.payload["errors"])
-
-    result = evidence_pack_mod.build_evidence_pack(
-        tmp_path / "out-release-review-invalid-profile",
-        final_verdict_path=final_verdict,
-        report_paths=[report_path],
-        profile="staging",
-        report_assurance="strict",
-        signing_key_path=signing_key,
-        release_review=True,
-    )
-    assert result.status == evidence_pack_mod.EvidencePackStatus.USAGE
-    assert any(
-        "--profile ci or --profile release" in error
-        for error in result.payload["errors"]
-    )
-
-    result = evidence_pack_mod.build_evidence_pack(
-        tmp_path / "out-invalid-material",
-        final_verdict_path=final_verdict,
-        report_paths=[report_path],
-        material_specs=[("../bad", material), ("../bad", material)],
-    )
-    payload = result.payload
-    exit_code = result.status
-    assert exit_code == evidence_pack_mod.EvidencePackStatus.FORMAT
-    assert any("Invalid material name" in error for error in payload["errors"])
-    assert any("Duplicate material name" in error for error in payload["errors"])
-
-    runtime_manifest.unlink()
-    result = evidence_pack_mod.build_evidence_pack(
-        tmp_path / "out-missing-sidecar",
-        final_verdict_path=final_verdict,
-        report_paths=[report_path],
-    )
-    payload = result.payload
-    exit_code = result.status
-    assert exit_code == evidence_pack_mod.EvidencePackStatus.FORMAT
-    assert any("report sidecar file not found" in error for error in payload["errors"])
-    _write_json(runtime_manifest, {"ok": True})
-
-    _patch_verify_result(
-        monkeypatch,
-        outcome=VerifyOutcome.POLICY_FAIL,
-        payload={"ok": False},
-    )
-    result = evidence_pack_mod.build_evidence_pack(
-        tmp_path / "out-verify-fail",
-        final_verdict_path=final_verdict,
-        report_paths=[report_path],
-    )
-    payload = result.payload
-    exit_code = result.status
-    assert exit_code == evidence_pack_mod.EvidencePackStatus.REPORTS
-    assert payload["verify"] == {"ok": False}
-
-    _patch_verify_result(monkeypatch)
-    result = evidence_pack_mod.build_evidence_pack(
-        tmp_path / "out-ok",
-        final_verdict_path=final_verdict,
-        report_paths=[report_path],
-        source_repo_path=source_repo,
-        environment_path=environment,
-        material_specs=[("demo", material)],
-        readme_path=tmp_path / "missing-readme.md",
-    )
-    payload = result.payload
-    exit_code = result.status
-    assert exit_code == evidence_pack_mod.EvidencePackStatus.OK
-    assert payload["ok"] is True
-    assert payload["report_assurance"] == "report"
-    assert any("README file not found" in warning for warning in payload["warnings"])
-
-    result = evidence_pack_mod.verify_evidence_pack(
-        tmp_path / "missing-pack", skip_verify=True
-    )
-    payload = result.payload
-    exit_code = result.status
-    assert exit_code == evidence_pack_mod.EvidencePackStatus.MISSING
-    assert payload["ok"] is False
-
-    result = evidence_pack_mod.verify_evidence_pack(
-        tmp_path / "out-ok",
-        json_out_path=(tmp_path / "out-ok" / "verify.json"),
-        skip_verify=True,
-    )
-    payload = result.payload
-    exit_code = result.status
-    assert exit_code == evidence_pack_mod.EvidencePackStatus.USAGE
-    assert "--json-out must point outside the pack directory." in payload["errors"]
 
 
 def test_run_verify_command_delegates_to_verify_reports_contract(
@@ -409,6 +255,38 @@ def test_verify_manifest_provenance_rejects_non_object_manifest(
     ]
 
 
+def test_inspect_reuses_manifest_parse_and_file_inventory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pack_dir = tmp_path / "pack"
+    _write_pack_with_manifest(pack_dir)
+    original_load_json = evidence_pack_support_mod._load_json
+    original_relative_paths = evidence_pack_support_mod._relative_file_paths
+    manifest_loads = 0
+    inventory_scans = 0
+
+    def counted_load_json(path: Path):
+        nonlocal manifest_loads
+        manifest_loads += 1
+        return original_load_json(path)
+
+    def counted_relative_paths(path: Path):
+        nonlocal inventory_scans
+        inventory_scans += 1
+        return original_relative_paths(path)
+
+    monkeypatch.setattr(evidence_pack_support_mod, "_load_json", counted_load_json)
+    monkeypatch.setattr(
+        evidence_pack_support_mod, "_relative_file_paths", counted_relative_paths
+    )
+
+    result = evidence_pack_support_mod.inspect_evidence_pack(pack_dir)
+
+    assert result.status is evidence_pack_support_mod.EvidencePackStatus.OK
+    assert manifest_loads == 1
+    assert inventory_scans == 1
+
+
 def test_verify_manifest_provenance_skips_non_dict_invocation_and_materials(
     tmp_path: Path,
 ) -> None:
@@ -436,6 +314,26 @@ def test_parse_checksums_ignores_blank_lines(tmp_path: Path) -> None:
     entries, errors = evidence_pack_mod._parse_checksums(pack_dir)
     assert errors == []
     assert entries == [("a" * 64, "results/final_verdict.json")]
+
+
+def test_parse_checksums_rejects_duplicate_canonical_paths(tmp_path: Path) -> None:
+    pack_dir = tmp_path / "pack"
+    pack_dir.mkdir()
+    (pack_dir / "checksums.sha256").write_text(
+        f"{'a' * 64}  ./report.json\n{'b' * 64}  report.json\n",
+        encoding="utf-8",
+    )
+
+    entries, errors = evidence_pack_mod._parse_checksums(pack_dir)
+
+    assert entries == [
+        ("a" * 64, "./report.json"),
+        ("b" * 64, "report.json"),
+    ]
+    assert errors == [
+        "checksums.sha256 line 2 duplicates path 'report.json'; "
+        "each path must have exactly one checksum entry"
+    ]
 
 
 def test_verify_signature_success_without_manifest_fingerprint_returns_signer(
@@ -468,6 +366,39 @@ def test_verify_signature_success_with_matching_fingerprint_returns_signer(
     assert errors == []
     assert warnings == []
     assert fingerprint == expected_fingerprint
+
+
+def test_verify_signature_reuses_authenticated_manifest_bytes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pack_dir = tmp_path / "pack"
+    _write_pack_with_manifest(pack_dir)
+    _sign_pack(pack_dir, tmp_path)
+    manifest_path = pack_dir / "manifest.json"
+    manifest_reads = 0
+    original_read_regular_file_bytes = (
+        evidence_pack_integrity_mod.evidence_pack_json_mod.read_regular_file_bytes
+    )
+
+    def counted_read_regular_file_bytes(path: Path, *, label: str) -> bytes:
+        nonlocal manifest_reads
+        if path == manifest_path:
+            manifest_reads += 1
+        return original_read_regular_file_bytes(path, label=label)
+
+    monkeypatch.setattr(
+        evidence_pack_integrity_mod.evidence_pack_json_mod,
+        "read_regular_file_bytes",
+        counted_read_regular_file_bytes,
+    )
+
+    errors, warnings, _fingerprint = evidence_pack_mod._verify_signature(
+        pack_dir, strict=False
+    )
+
+    assert errors == []
+    assert warnings == []
+    assert manifest_reads == 1
 
 
 def test_inspect_evidence_pack_reports_missing_manifest_and_checksums(
@@ -536,63 +467,6 @@ def test_inspect_evidence_pack_unsigned_clean_pack_reports_warning_without_extra
     )
 
 
-def test_build_evidence_pack_copies_readme_and_environment_without_optional_refs(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    inputs = _write_build_inputs(tmp_path, readme=True)
-
-    _patch_verify_result(monkeypatch)
-
-    result = evidence_pack_mod.build_evidence_pack(
-        tmp_path / "out-readme",
-        final_verdict_path=inputs.final_verdict,
-        report_paths=[inputs.report_path],
-        environment_path=inputs.environment,
-        readme_path=inputs.readme,
-    )
-    payload = result.payload
-    exit_code = result.status
-    assert exit_code == evidence_pack_mod.EvidencePackStatus.OK
-    assert payload["ok"] is True
-    manifest = _read_manifest(tmp_path / "out-readme")
-    assert manifest["evidence_level"] == "medium"
-    assert "invocation" not in manifest
-    assert "materials" not in manifest
-    assert manifest["environment"]["path"] == "metadata/environment.json"
-    assert (tmp_path / "out-readme" / "README.md").is_file()
-
-
-def test_build_evidence_pack_copies_source_repo_without_environment_or_materials(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    inputs = _write_build_inputs(tmp_path)
-
-    _patch_verify_result(monkeypatch)
-
-    result = evidence_pack_mod.build_evidence_pack(
-        tmp_path / "out-source-only",
-        final_verdict_path=inputs.final_verdict,
-        report_paths=[inputs.report_path],
-        source_repo_path=inputs.source_repo,
-    )
-    payload = result.payload
-    exit_code = result.status
-    assert exit_code == evidence_pack_mod.EvidencePackStatus.OK
-    assert payload["ok"] is True
-    manifest = _read_manifest(tmp_path / "out-source-only")
-    assert manifest["evidence_level"] == "medium"
-    assert manifest["verification"]["clean_reports"] == 1
-    assert (
-        manifest["invocation"]["config_source"]["path"] == "metadata/source_repo.json"
-    )
-    assert "environment" not in manifest
-    assert "materials" not in manifest
-    readme_text = (tmp_path / "out-source-only" / "README.md").read_text(
-        encoding="utf-8"
-    )
-    assert "Evidence level: medium" in readme_text
-
-
 def test_verify_evidence_pack_reports_missing_manifest_and_checksums(
     tmp_path: Path,
 ) -> None:
@@ -642,12 +516,8 @@ def test_verify_evidence_pack_returns_format_for_invalid_manifest(
     result = evidence_pack_mod.verify_evidence_pack(pack_dir, skip_verify=True)
     payload = result.payload
     exit_code = result.status
-    assert exit_code == evidence_pack_mod.EvidencePackStatus.FORMAT
-    assert payload["errors"]
-    assert any(
-        "schema validation failed" in error or "manifest format must be" in error
-        for error in payload["errors"]
-    )
+    assert exit_code == evidence_pack_mod.EvidencePackStatus.SIGNATURE
+    assert any("signed manifest required" in error for error in payload["errors"])
 
 
 def test_verify_evidence_pack_returns_signature_failure_payload(

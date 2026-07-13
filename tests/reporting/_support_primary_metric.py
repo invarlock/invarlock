@@ -1,18 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 
 def pm(cert: dict) -> dict:
-    """Return primary_metric with safe defaults for tests.
-
-    Ensures display_ci is present and 2-length for comparisons.
-    """
     assert "primary_metric" in cert, "missing primary_metric"
-    m = dict(cert["primary_metric"])  # shallow copy
-    if "display_ci" not in m and isinstance(m.get("final"), int | float):
-        m["display_ci"] = [m["final"], m["final"]]
-    return m
+    metric = dict(cert["primary_metric"])
+    if "display_ci" not in metric and isinstance(metric.get("final"), int | float):
+        metric["display_ci"] = [metric["final"], metric["final"]]
+    return metric
 
 
 def ppl_report(
@@ -77,3 +74,37 @@ def window_report(
             },
         },
     }
+
+
+def independent_slice_summary(
+    mean: float,
+    *,
+    preview_windows: int,
+    final_windows: int,
+    degenerate: bool = False,
+) -> dict[str, Any]:
+    """Build complete canonical independent preview/final test evidence."""
+
+    return {
+        "mean": float(mean),
+        "ci": [float(mean), float(mean)],
+        "basis": "independent_disjoint_slices",
+        "paired": False,
+        "ci_method": "none",
+        "ci_reason": "deterministic_test_fixture",
+        "preview_windows": int(preview_windows),
+        "final_windows": int(final_windows),
+        "degenerate": bool(degenerate),
+        "degenerate_reason": "constant_fixture" if degenerate else None,
+    }
+
+
+__all__ = [
+    "baseline_ref",
+    "classification_baseline_raw",
+    "classification_report",
+    "independent_slice_summary",
+    "pm",
+    "ppl_report",
+    "window_report",
+]

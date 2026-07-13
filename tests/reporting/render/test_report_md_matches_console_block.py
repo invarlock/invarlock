@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.rendering.markdown import render_report_markdown
 from invarlock.reporting.report_make import REPORT_SCHEMA_VERSION
 from invarlock.reporting.report_summary import compute_console_validation_block
 
@@ -30,7 +30,7 @@ def _minimal_cert(pm_kind: str = "ppl_causal", guard_evaluated: bool = False) ->
             "invariants_pass": True,
             "spectral_stable": True,
             "rmt_stable": True,
-            "guard_overhead_acceptable": True,
+            "guard_metric_impact_acceptable": True,
         },
         "primary_metric": {
             "kind": pm_kind,
@@ -46,13 +46,13 @@ def _minimal_cert(pm_kind: str = "ppl_causal", guard_evaluated: bool = False) ->
         "policy_provenance": {},
     }
     if guard_evaluated:
-        cert["guard_overhead"] = {
+        cert["guard_metric_impact"] = {
             "evaluated": True,
-            "overhead_ratio": 1.005,
-            "overhead_threshold": 0.01,
+            "degradation": 1.005,
+            "degradation_limit": 0.01,
         }
     else:
-        cert["guard_overhead"] = {}
+        cert["guard_metric_impact"] = {}
     return cert
 
 
@@ -80,30 +80,33 @@ def _extract_quality_gate_rows(md: str) -> list[str]:
     return rows
 
 
-def test_md_overall_status_matches_console_dev_no_overhead() -> None:
+def test_md_overall_status_matches_console_dev_no_metric_impact() -> None:
     cert = _minimal_cert(pm_kind="ppl_causal", guard_evaluated=False)
     block = compute_console_validation_block(cert)
     md = render_report_markdown(cert)
     expected = "PASS" if block["overall_pass"] else "FAIL"
     assert (
-        f"**Overall Status:** ✅ {expected}" in md
-        or f"**Overall Status:** ❌ {expected}" in md
+        f"**Report-local Gate Status:** ✅ {expected}" in md
+        or f"**Report-local Gate Status:** ❌ {expected}" in md
     )
+    assert "REPORT-LOCAL / UNVERIFIED RENDER" in md
 
 
-def test_md_quality_gates_match_console_presence_with_and_without_overhead() -> None:
-    # No overhead evaluated: only Primary Metric and Preview Final Drift gates appear
+def test_md_quality_gates_match_console_presence_with_and_without_metric_impact() -> (
+    None
+):
+    # Without metric-impact evidence, only primary metric and drift gates appear.
     cert = _minimal_cert(pm_kind="ppl_causal", guard_evaluated=False)
     md = render_report_markdown(cert)
     rows = _extract_quality_gate_rows(md)
     assert "Primary Metric Acceptable" in rows
     assert "Preview Final Drift Acceptable" in rows
-    assert all(r != "Guard Overhead Acceptable" for r in rows)
+    assert all(r != "Guard Metric Impact Acceptable" for r in rows)
 
-    # With overhead evaluated: Guard Overhead row appears
+    # With metric-impact evidence, the Guard Metric Impact row appears.
     cert2 = _minimal_cert(pm_kind="ppl_causal", guard_evaluated=True)
     md2 = render_report_markdown(cert2)
     rows2 = _extract_quality_gate_rows(md2)
     assert "Primary Metric Acceptable" in rows2
     assert "Preview Final Drift Acceptable" in rows2
-    assert "Guard Overhead Acceptable" in rows2
+    assert "Guard Metric Impact Acceptable" in rows2

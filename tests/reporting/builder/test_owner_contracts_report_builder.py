@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import invarlock.reporting.report_files as report_files
+import invarlock.reporting.report_bundle as report_bundle_module
 from invarlock.core.exceptions import MetricsError
 from invarlock.reporting import report_builder_support, run_report_contract
 from invarlock.reporting.report_types import create_empty_report
@@ -87,33 +87,45 @@ def test_report_builder_support_covers_meta_and_baseline_fallback_paths() -> Non
     assert complete_diagnostics == []
 
     report = {
-        "metrics": {"primary_metric": {"kind": "acc"}},
+        "metrics": {"primary_metric": {"kind": "accuracy"}},
     }
     assert report_builder_support._direct_baseline_metric(report, None) is None
     assert report_builder_support._direct_baseline_metric(
         report,
-        {"primary_metric": {"kind": "acc", "final": 9.0}},
-    ) == {"kind": "acc", "final": 9.0}
+        {"primary_metric": {"kind": "accuracy", "final": 0.9}},
+    ) == {"kind": "accuracy", "final": 0.9}
+    assert (
+        report_builder_support._direct_baseline_metric(
+            report,
+            {"ppl_final": 5.0, "ppl_preview": "bad"},
+        )
+        is None
+    )
+    assert (
+        report_builder_support._direct_baseline_metric(
+            report,
+            {"ppl_final": 6.0, "ppl_preview": 5.5},
+        )
+        is None
+    )
     assert report_builder_support._direct_baseline_metric(
         report,
-        {"ppl_final": 5.0, "ppl_preview": "bad"},
-    ) == {"kind": "acc", "preview": 5.0, "final": 5.0}
-    assert report_builder_support._direct_baseline_metric(
-        report,
-        {"ppl_final": 6.0, "ppl_preview": 5.5},
-    ) == {"kind": "acc", "preview": 5.5, "final": 6.0}
-    assert report_builder_support._direct_baseline_metric(
-        report,
-        {"metrics": {"primary_metric": {"kind": "acc", "final": 7.0}}},
-    ) == {"kind": "acc", "final": 7.0}
-    assert report_builder_support._direct_baseline_metric(
-        report,
-        {"metrics": {"ppl_final": 8.0}},
-    ) == {"kind": "acc", "preview": 8.0, "final": 8.0}
-    assert report_builder_support._direct_baseline_metric(
-        report,
-        {"metrics": {"ppl_final": 8.0, "ppl_preview": float("nan")}},
-    ) == {"kind": "acc", "preview": 8.0, "final": 8.0}
+        {"metrics": {"primary_metric": {"kind": "accuracy", "final": 0.7}}},
+    ) == {"kind": "accuracy", "final": 0.7}
+    assert (
+        report_builder_support._direct_baseline_metric(
+            report,
+            {"metrics": {"ppl_final": 8.0}},
+        )
+        is None
+    )
+    assert (
+        report_builder_support._direct_baseline_metric(
+            report,
+            {"metrics": {"ppl_final": 8.0, "ppl_preview": float("nan")}},
+        )
+        is None
+    )
     assert (
         report_builder_support._direct_baseline_metric(
             report,
@@ -137,8 +149,8 @@ def test_report_builder_support_covers_meta_and_baseline_fallback_paths() -> Non
         report_builder_support._direct_baseline_metric(
             report,
             {
-                "primary_metric": {"kind": "acc", "final": "bad"},
-                "metrics": {"primary_metric": {"kind": "acc", "final": "bad"}},
+                "primary_metric": {"kind": "accuracy", "final": "bad"},
+                "metrics": {"primary_metric": {"kind": "accuracy", "final": "bad"}},
             },
         )
         is None
@@ -153,11 +165,11 @@ def test_report_builder_support_covers_meta_and_baseline_fallback_paths() -> Non
         {"run_id": "base", "model_id": "baseline", "tokenizer_hash": "tokhash"},
         compute_primary_metric_from_report_fn=lambda payload: (
             {
-                "kind": "acc",
+                "kind": "accuracy",
                 "final": 0.8,
             }
             if "evaluation_windows" in payload
-            else {"kind": "acc", "final": 0.7}
+            else {"kind": "accuracy", "final": 0.7}
         ),
     )
     assert baseline_ref["primary_metric"]["final"] == 0.8
@@ -165,7 +177,7 @@ def test_report_builder_support_covers_meta_and_baseline_fallback_paths() -> Non
     assert baseline_ref["tokenizer_hash"] == "tokhash"
     direct_baseline_ref = report_builder_support.build_baseline_reference(
         report,
-        {"metrics": {"primary_metric": {"kind": "acc", "final": 0.95}}},
+        {"metrics": {"primary_metric": {"kind": "accuracy", "final": 0.95}}},
         {"run_id": "direct", "model_id": "baseline"},
     )
     assert direct_baseline_ref["primary_metric"]["final"] == 0.95
@@ -176,7 +188,7 @@ def test_report_builder_support_covers_meta_and_baseline_fallback_paths() -> Non
         def get(self, key, default=None):
             raise ValueError("boom")
 
-    with pytest.raises(MetricsError, match="E233"):
+    with pytest.raises(ValueError, match="boom"):
         report_builder_support.build_baseline_reference(
             report,
             {"metrics": ExplodingMetrics()},
@@ -199,7 +211,7 @@ def test_report_builder_support_covers_meta_and_baseline_fallback_paths() -> Non
             {},
             {},
             compute_primary_metric_from_report_fn=lambda _payload: {
-                "kind": "acc",
+                "kind": "accuracy",
                 "final": float("nan"),
             },
         )
@@ -305,7 +317,7 @@ def test_run_report_contract_covers_env_collection_and_persistence_edges(
         auto_config=None,
         resolved_device="cpu",
         seed_bundle={"python": 7},
-        guard_overhead_threshold=0.01,
+        guard_metric_degradation_limit=0.01,
         model_profile=SimpleNamespace(name="causal"),
         determinism_meta={},
         pm_acceptance_range=None,
@@ -321,7 +333,7 @@ def test_run_report_contract_covers_env_collection_and_persistence_edges(
         run_config=SimpleNamespace(event_path=tmp_path / "events.jsonl"),
         resolved_loss_type="causal",
         timings={"load": 1.0},
-        guard_overhead_payload=None,
+        guard_metric_impact_payload=None,
         baseline=None,
         preview_records=[],
         final_records=[],
@@ -361,7 +373,7 @@ def test_run_report_contract_covers_env_collection_and_persistence_edges(
         },
         merge_core_timing_metrics_fn=lambda timings, metrics: {**timings, **metrics},
         build_metrics_payload_fn=lambda **_kwargs: {"primary_metric": {"final": 1.0}},
-        prepare_guard_overhead_report_fn=lambda payload, **_kwargs: payload,
+        prepare_guard_metric_impact_report_fn=lambda payload, **_kwargs: payload,
         finalize_run_provenance_fn=lambda **_kwargs: {"ok": True},
         build_guard_entries_fn=lambda guards: [] if guards is None else [{"name": "x"}],
         build_flags_payload_fn=lambda guards: (
@@ -381,7 +393,7 @@ def test_run_report_contract_covers_env_collection_and_persistence_edges(
         out.write_text("{}", encoding="utf-8")
         return {"json": out}
 
-    monkeypatch.setattr(report_files, "save_report", _save_report)
+    monkeypatch.setattr(report_bundle_module, "save_report", _save_report)
 
     result = run_report_contract.persist_run_report_outputs(
         report=create_empty_report(),
@@ -396,7 +408,9 @@ def test_run_report_contract_covers_env_collection_and_persistence_edges(
     assert result.telemetry_saved_path is None
     assert result.telemetry_error == "telemetry unavailable"
 
-    monkeypatch.setattr(report_files, "save_report", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        report_bundle_module, "save_report", lambda *_args, **_kwargs: {}
+    )
     with pytest.raises(RuntimeError, match="json artifact path"):
         run_report_contract.persist_run_report_outputs(
             report=create_empty_report(),

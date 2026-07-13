@@ -9,7 +9,6 @@ from typing import Any, cast
 
 from invarlock.core.metric_kind_contract import is_ppl_metric_kind
 
-from .normalizer import normalize_run_report
 from .report_types import RunReport, validate_report
 
 _PARSE_EXCEPTIONS = (
@@ -58,13 +57,35 @@ def _generate_run_id(report: RunReport | dict[str, Any]) -> str:
 def normalize_and_validate_run_report(
     report: RunReport | dict[str, Any],
 ) -> RunReport:
-    """Normalize a run report and fail closed on invalid structure."""
+    """Accept only the current canonical run-report structure."""
 
-    if isinstance(report, dict):
-        report = normalize_run_report(report)
     if not validate_report(report):
-        raise ValueError("Invalid RunReport structure")
-    return report
+        raise ValueError("Invalid canonical RunReport structure")
+    return cast(RunReport, copy.deepcopy(report))
+
+
+def validated_run_report_view(
+    report: RunReport | dict[str, Any],
+) -> RunReport:
+    """Validate and return a read-only-by-contract view for report assembly.
+
+    This internal hot-path helper deliberately avoids cloning the complete report.
+    Callers must not mutate the returned object or retain nested values in outputs
+    without copying them first.  Public normalization keeps its defensive-copy
+    semantics through :func:`normalize_and_validate_run_report`.
+    """
+
+    if not validate_report(report):
+        raise ValueError("Invalid canonical RunReport structure")
+    return cast(RunReport, report)
+
+
+def validate_canonical_run_report(report: object) -> RunReport:
+    """Accept only the current canonical run-report contract."""
+
+    if not validate_report(report):
+        raise ValueError("Invalid canonical RunReport structure")
+    return cast(RunReport, copy.deepcopy(report))
 
 
 def _baseline_guard_metrics_block(
@@ -94,9 +115,9 @@ def _baseline_coerce_valid_ppl(value: Any, *, label: str) -> float:
     if not (isinstance(value, int | float) and math.isfinite(float(value))):
         raise ValueError(f"Invalid baseline {label}: expected finite numeric value.")
     out = float(value)
-    if out <= 0.0:
+    if out < 1.0:
         raise ValueError(
-            f"Invalid baseline {label}: expected value > 0.0, observed {out}."
+            f"Invalid baseline {label}: expected value >= 1.0, observed {out}."
         )
     return out
 
@@ -106,18 +127,6 @@ def _baseline_normalize_kind(value: Any) -> str:
         return str(value or "").strip().lower()
     except _PARSE_EXCEPTIONS:
         return ""
-
-
-def _baseline_optional_short_string(
-    value: Any, *, limit: int | None = None
-) -> str | None:
-    try:
-        text = str(value).strip()
-    except _PARSE_EXCEPTIONS:
-        return None
-    if not text:
-        return None
-    return text[:limit] if limit is not None else text
 
 
 def _baseline_derive_ppl_from_logloss_block(block: Any) -> float | None:
@@ -162,82 +171,7 @@ def _baseline_derive_ppl_from_logloss_block(block: Any) -> float | None:
     return float(ppl) if math.isfinite(ppl) else None
 
 
-def _baseline_v1_output(
-    baseline: dict[str, Any],
-    *,
-    pm: dict[str, Any] | Any,
-    pm_is_ppl: bool,
-    ppl_final_raw: Any,
-) -> dict[str, Any]:
-    if not (
-        isinstance(ppl_final_raw, int | float) and math.isfinite(float(ppl_final_raw))
-    ):
-        evaluation_windows = baseline.get("evaluation_windows")
-        if isinstance(evaluation_windows, dict):
-            ppl_final_raw = _baseline_derive_ppl_from_logloss_block(
-                evaluation_windows.get("final")
-            )
-    if (
-        not (
-            isinstance(ppl_final_raw, int | float)
-            and math.isfinite(float(ppl_final_raw))
-        )
-        and not pm_is_ppl
-    ):
-        evaluation_windows = baseline.get("evaluation_windows")
-        has_window_payload = isinstance(evaluation_windows, dict) and bool(
-            evaluation_windows.get("final") or evaluation_windows.get("preview")
-        )
-        if not isinstance(pm, dict) or not pm:
-            if not has_window_payload:
-                raise ValueError(
-                    "Invalid baseline metrics.primary_metric: expected a non-empty "
-                    "primary metric block or finite ppl_final."
-                )
-            return {
-                "run_id": _baseline_optional_short_string(
-                    baseline.get("meta", {}).get("commit_sha"),
-                    limit=16,
-                ),
-                "model_id": _baseline_optional_short_string(
-                    baseline.get("meta", {}).get("model_id")
-                ),
-                "spectral": baseline.get("spectral_base", {}),
-                "rmt": baseline.get("rmt_base", {}),
-                "invariants": baseline.get("invariants", {}),
-            }
-        out: dict[str, Any] = {
-            "run_id": _baseline_optional_short_string(
-                baseline.get("meta", {}).get("commit_sha"),
-                limit=16,
-            ),
-            "model_id": _baseline_optional_short_string(
-                baseline.get("meta", {}).get("model_id")
-            ),
-            "spectral": baseline.get("spectral_base", {}),
-            "rmt": baseline.get("rmt_base", {}),
-            "invariants": baseline.get("invariants", {}),
-        }
-        if isinstance(pm, dict) and pm:
-            out["primary_metric"] = copy.deepcopy(pm)
-        return out
-    ppl_final = _baseline_coerce_valid_ppl(ppl_final_raw, label="metrics.ppl_final")
-    return {
-        "run_id": _baseline_optional_short_string(
-            baseline.get("meta", {}).get("commit_sha"),
-            limit=16,
-        ),
-        "model_id": _baseline_optional_short_string(
-            baseline.get("meta", {}).get("model_id")
-        ),
-        "ppl_final": ppl_final,
-        "spectral": baseline.get("spectral_base", {}),
-        "rmt": baseline.get("rmt_base", {}),
-        "invariants": baseline.get("invariants", {}),
-    }
-
-
-def _baseline_normalized_v1_eval_report(
+def _baseline_comparison_output(
     baseline: dict[str, Any],
     *,
     pm: dict[str, Any] | Any,
@@ -280,8 +214,8 @@ def _baseline_normalized_v1_eval_report(
         if isinstance(baseline.get("metrics"), dict)
         else {}
     )
-    window_overlap = baseline["metrics"].get("window_overlap_fraction", float("nan"))
-    window_match = baseline["metrics"].get("window_match_fraction", float("nan"))
+    window_overlap = baseline["metrics"].get("window_overlap_fraction")
+    window_match = baseline["metrics"].get("window_match_fraction")
 
     baseline_tokenizer_hash = None
     try:
@@ -294,6 +228,7 @@ def _baseline_normalized_v1_eval_report(
     baseline_out: dict[str, Any] = {
         "run_id": _generate_run_id(baseline),
         "model_id": baseline["meta"]["model_id"],
+        "adapter": baseline["meta"].get("adapter"),
         "spectral": _baseline_merged_guard_metrics(
             baseline, "spectral", baseline["metrics"].get("spectral", {})
         ),
@@ -304,10 +239,12 @@ def _baseline_normalized_v1_eval_report(
         "moe": baseline["metrics"].get("moe", {}),
         "evaluation_windows": baseline_eval_windows,
         "bootstrap": bootstrap_info,
-        "window_overlap_fraction": window_overlap,
-        "window_match_fraction": window_match,
         "tokenizer_hash": baseline_tokenizer_hash,
     }
+    if _finite_float_or_none(window_overlap) is not None:
+        baseline_out["window_overlap_fraction"] = float(window_overlap)
+    if _finite_float_or_none(window_match) is not None:
+        baseline_out["window_match_fraction"] = float(window_match)
     if isinstance(pm, dict) and pm:
         baseline_out["primary_metric"] = copy.deepcopy(pm)
 
@@ -329,155 +266,126 @@ def _baseline_normalized_v1_eval_report(
     return baseline_out
 
 
-def _baseline_canonical_output(baseline: dict[str, Any]) -> dict[str, Any]:
-    run_id = _baseline_optional_short_string(baseline.get("run_id"))
-    model_id = _baseline_optional_short_string(baseline.get("model_id"))
-    if run_id is None or model_id is None:
-        raise ValueError(
-            "Invalid baseline: canonical baseline dict requires non-empty run_id "
-            "and model_id."
-        )
+def _canonical_baseline_output(baseline: dict[str, Any]) -> dict[str, Any]:
+    run_id = baseline.get("run_id")
+    model_id = baseline.get("model_id")
+    if not isinstance(run_id, str) or not run_id.strip():
+        raise ValueError("Invalid canonical baseline: run_id must be non-empty.")
+    if not isinstance(model_id, str) or not model_id.strip():
+        raise ValueError("Invalid canonical baseline: model_id must be non-empty.")
 
     baseline_out = copy.deepcopy(baseline)
-    baseline_out["run_id"] = run_id
-    baseline_out["model_id"] = model_id
-
+    baseline_out["run_id"] = run_id.strip()
+    baseline_out["model_id"] = model_id.strip()
     primary_metric = baseline_out.get("primary_metric")
-    if primary_metric is not None and not isinstance(primary_metric, dict):
+    if not isinstance(primary_metric, dict) or not primary_metric:
         raise ValueError(
-            "Invalid baseline primary_metric: expected a mapping when provided."
+            "Invalid canonical baseline: primary_metric must be a non-empty mapping."
         )
-    pm_kind = (
-        _baseline_normalize_kind(primary_metric.get("kind"))
-        if isinstance(primary_metric, dict)
-        else ""
-    )
+    pm_kind = _baseline_normalize_kind(primary_metric.get("kind"))
     pm_is_ppl = _is_ppl_kind(pm_kind)
-
+    if not pm_is_ppl and pm_kind != "accuracy":
+        raise ValueError("Invalid canonical baseline: unsupported metric kind.")
+    if pm_is_ppl and "delta_vs_baseline_pp" in primary_metric:
+        raise ValueError("PPL baselines cannot contain delta_vs_baseline_pp.")
+    if pm_kind == "accuracy" and "ratio_vs_baseline" in primary_metric:
+        raise ValueError("Accuracy baselines cannot contain ratio_vs_baseline.")
+    metric_final = _finite_float_or_none(primary_metric.get("final"))
+    metric_preview = _finite_float_or_none(primary_metric.get("preview"))
+    ratio = primary_metric.get("ratio_vs_baseline")
+    if pm_is_ppl and ratio is not None:
+        ratio_value = _finite_float_or_none(ratio)
+        if ratio_value is None or ratio_value <= 0.0:
+            raise ValueError("PPL baseline ratio must be finite and positive.")
+    if pm_kind == "accuracy":
+        if metric_final is None or not 0.0 <= metric_final <= 1.0:
+            raise ValueError("Accuracy baseline final must be finite in [0, 1].")
+        if metric_preview is not None and not 0.0 <= metric_preview <= 1.0:
+            raise ValueError("Accuracy baseline preview must be finite in [0, 1].")
+        delta_pp = primary_metric.get("delta_vs_baseline_pp")
+        if delta_pp is not None and _finite_float_or_none(delta_pp) is None:
+            raise ValueError("Accuracy baseline delta must be finite when present.")
+        baseline_out.pop("ppl_final", None)
+        baseline_out.pop("ppl_preview", None)
+        return baseline_out
     ppl_final = _finite_float_or_none(baseline_out.get("ppl_final"))
     ppl_preview = _finite_float_or_none(baseline_out.get("ppl_preview"))
-    if ppl_final is None and isinstance(primary_metric, dict) and pm_is_ppl:
-        ppl_final = _finite_float_or_none(primary_metric.get("final"))
+    if ppl_final is None:
+        ppl_final = metric_final
         if ppl_preview is None:
-            ppl_preview = _finite_float_or_none(
-                primary_metric.get("preview", primary_metric.get("final"))
-            )
-
+            ppl_preview = metric_preview if metric_preview is not None else metric_final
     if ppl_final is None:
         baseline_out.pop("ppl_final", None)
         baseline_out.pop("ppl_preview", None)
-        if pm_is_ppl:
-            raise ValueError(
-                "Invalid baseline: ppl baselines require a finite top-level "
-                "ppl_final or primary_metric.final."
-            )
-        return baseline_out
-
-    normalized_ppl_final = _baseline_coerce_valid_ppl(ppl_final, label="ppl_final")
-    baseline_out["ppl_final"] = normalized_ppl_final
+        raise ValueError(
+            "Invalid canonical baseline: ppl metrics require finite ppl_final."
+        )
+    baseline_out["ppl_final"] = _baseline_coerce_valid_ppl(ppl_final, label="ppl_final")
     if ppl_preview is None:
         baseline_out.pop("ppl_preview", None)
-        return baseline_out
-
-    normalized_ppl_preview = _baseline_coerce_valid_ppl(
-        ppl_preview, label="ppl_preview"
-    )
-    if "ppl_preview" in baseline_out or not math.isclose(
-        float(normalized_ppl_preview),
-        float(normalized_ppl_final),
-        rel_tol=0.0,
-        abs_tol=0.0,
-    ):
-        baseline_out["ppl_preview"] = normalized_ppl_preview
     else:
-        baseline_out.pop("ppl_preview", None)
+        baseline_out["ppl_preview"] = _baseline_coerce_valid_ppl(
+            ppl_preview, label="ppl_preview"
+        )
     return baseline_out
 
 
 def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
-    """Normalize baseline payloads into a canonical comparison dictionary."""
+    """Normalize a canonical RunReport or canonical comparison baseline."""
 
     if not isinstance(baseline, dict):
-        raise ValueError("Baseline must be a RunReport dict or canonical baseline dict")
-
-    schema_version = baseline.get("schema_version")
-    if (
-        schema_version is not None
-        and schema_version != "baseline-v1"
-        and not ("meta" in baseline and "metrics" in baseline and "edit" in baseline)
-    ):
-        raise ValueError(f"Unsupported baseline schema_version: {schema_version!r}")
-
-    if baseline.get("schema_version") == "baseline-v1":
-        metrics_blk = baseline.get("metrics", {}) or {}
-        pm = (
-            metrics_blk.get("primary_metric", {})
-            if isinstance(metrics_blk, dict)
-            else {}
-        )
-        pm_kind = (
-            _baseline_normalize_kind(pm.get("kind")) if isinstance(pm, dict) else ""
-        )
-        pm_is_ppl = _is_ppl_kind(pm_kind)
-        ppl_final_raw = (
-            metrics_blk.get("ppl_final") if isinstance(metrics_blk, dict) else None
-        )
-        if (
-            not (
-                isinstance(ppl_final_raw, int | float)
-                and math.isfinite(float(ppl_final_raw))
-            )
-            and pm_is_ppl
-            and isinstance(pm, dict)
-        ):
-            final_value = pm.get("final")
-            if isinstance(final_value, int | float):
-                ppl_final_raw = float(final_value)
-        baseline_dict = cast(dict[str, Any], baseline)
-        return _baseline_v1_output(
-            baseline_dict,
-            pm=pm,
-            pm_is_ppl=pm_is_ppl,
-            ppl_final_raw=ppl_final_raw,
-        )
-
-    if "meta" in baseline and "metrics" in baseline and "edit" in baseline:
-        metrics_blk = baseline.get("metrics", {}) or {}
-        pm = (
-            metrics_blk.get("primary_metric", {})
-            if isinstance(metrics_blk, dict)
-            else {}
-        )
-        pm_kind = (
-            _baseline_normalize_kind(pm.get("kind")) if isinstance(pm, dict) else ""
-        )
-        pm_is_ppl = _is_ppl_kind(pm_kind)
-        metrics_ppl_final: float | None = _finite_float_or_none(
-            metrics_blk.get("ppl_final")
-        )
-        metrics_ppl_preview: float | None = _finite_float_or_none(
-            metrics_blk.get("ppl_preview")
-        )
-        if metrics_ppl_final is None and pm_is_ppl:
-            try:
-                final_value = pm.get("final")
-                preview_value = pm.get("preview", final_value)
-                if isinstance(final_value, int | float):
-                    metrics_ppl_final = float(final_value)
-                if isinstance(preview_value, int | float):
-                    metrics_ppl_preview = float(preview_value)
-            except _PARSE_EXCEPTIONS:  # pragma: no cover
-                pass
-        baseline_dict = cast(dict[str, Any], baseline)
-        return _baseline_normalized_v1_eval_report(
-            baseline_dict,
-            pm=pm,
-            pm_is_ppl=pm_is_ppl,
-            metrics_ppl_final=metrics_ppl_final,
-            metrics_ppl_preview=metrics_ppl_preview,
-        )
-
-    return _baseline_canonical_output(baseline)
+        raise ValueError("Invalid canonical baseline or RunReport structure")
+    if "schema_version" in baseline:
+        raise ValueError("Versioned legacy baseline schemas are not accepted")
+    run_report_sections = {
+        "meta",
+        "data",
+        "edit",
+        "guards",
+        "metrics",
+        "artifacts",
+        "flags",
+    }
+    if not run_report_sections.issubset(baseline):
+        return _canonical_baseline_output(cast(dict[str, Any], baseline))
+    canonical = normalize_and_validate_run_report(baseline)
+    baseline_dict = cast(dict[str, Any], canonical)
+    metrics_blk = baseline_dict["metrics"]
+    pm = metrics_blk.get("primary_metric", {})
+    if not isinstance(pm, dict) or not pm:
+        raise ValueError("Canonical RunReport baseline requires primary_metric.")
+    pm_kind = _baseline_normalize_kind(pm.get("kind"))
+    pm_is_ppl = _is_ppl_kind(pm_kind)
+    if not pm_is_ppl and pm_kind != "accuracy":
+        raise ValueError("Canonical RunReport baseline has unsupported metric kind.")
+    if pm_is_ppl and "delta_vs_baseline_pp" in pm:
+        raise ValueError("PPL baselines cannot contain delta_vs_baseline_pp.")
+    if pm_kind == "accuracy" and "ratio_vs_baseline" in pm:
+        raise ValueError("Accuracy baselines cannot contain ratio_vs_baseline.")
+    pm_final = _finite_float_or_none(pm.get("final"))
+    pm_preview = _finite_float_or_none(pm.get("preview"))
+    if pm_kind == "accuracy":
+        if pm_final is None or not 0.0 <= pm_final <= 1.0:
+            raise ValueError("Accuracy baseline final must be finite in [0, 1].")
+        if pm_preview is not None and not 0.0 <= pm_preview <= 1.0:
+            raise ValueError("Accuracy baseline preview must be finite in [0, 1].")
+    else:
+        if pm_final is None or pm_final < 1.0:
+            raise ValueError("PPL baseline final must be finite and at least 1.0.")
+        if pm_preview is not None and pm_preview < 1.0:
+            raise ValueError("PPL baseline preview must be finite and at least 1.0.")
+    metrics_ppl_final = _finite_float_or_none(metrics_blk.get("ppl_final"))
+    metrics_ppl_preview = _finite_float_or_none(metrics_blk.get("ppl_preview"))
+    if metrics_ppl_final is None and pm_is_ppl:
+        metrics_ppl_final = pm_final
+        metrics_ppl_preview = pm_preview if pm_preview is not None else pm_final
+    return _baseline_comparison_output(
+        baseline_dict,
+        pm=pm,
+        pm_is_ppl=pm_is_ppl,
+        metrics_ppl_final=metrics_ppl_final,
+        metrics_ppl_preview=metrics_ppl_preview,
+    )
 
 
 __all__ = ["normalize_and_validate_run_report", "normalize_baseline"]

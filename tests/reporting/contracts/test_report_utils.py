@@ -67,7 +67,12 @@ def test_validate_evaluation_report_rejects_non_boolean_flags() -> None:
             "seq_len": 8,
             "windows": {"preview": 0, "final": 0},
         },
-        "primary_metric": {"kind": "ppl_causal", "final": 10.0},
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "preview": 10.0,
+            "final": 10.0,
+            "ratio_vs_baseline": 1.0,
+        },
         "validation": {"primary_metric_acceptable": "yes"},  # invalid type
     }
     assert schema_mod.validate_report(bad) is False
@@ -114,7 +119,12 @@ def test_validate_evaluation_report_accepts_optional_evaluation_realism() -> Non
             "seq_len": 8,
             "windows": {"preview": 0, "final": 0, "stats": {}},
         },
-        "primary_metric": {"kind": "ppl_causal", "final": 10.0},
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "preview": 10.0,
+            "final": 10.0,
+            "ratio_vs_baseline": 1.0,
+        },
         "validation": {"primary_metric_acceptable": True},
         "evaluation_realism": {
             "mode": "generation",
@@ -185,11 +195,11 @@ def test_console_validation_block_guard_skipped_and_included() -> None:
     # Not evaluated: guard row omitted
     block1 = compute_console_validation_block(base)
     labels1 = block1["labels"]
-    assert all(label != "Guard Overhead Acceptable" for label in labels1)
+    assert all(label != "Guard Metric Impact Acceptable" for label in labels1)
 
     # Evaluated: include guard row
     base2 = dict(base)
-    base2["guard_overhead"] = {"evaluated": True}
+    base2["guard_metric_impact"] = {"evaluated": True}
     block2 = compute_console_validation_block(base2)
     labels2 = block2["labels"]
-    assert "Guard Overhead Acceptable" in labels2
+    assert "Guard Metric Impact Acceptable" in labels2

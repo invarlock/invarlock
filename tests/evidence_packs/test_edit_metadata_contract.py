@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from scripts.evidence_packs.python import (
-    create_edits_batch as batch_edit_mod,
+from invarlock.evidence_pack_edit_common import (
+    EDIT_PROVENANCE_FAMILIES as PACKAGE_EDIT_PROVENANCE_FAMILIES,
 )
 from scripts.evidence_packs.python import (
     task_tools_reports,
@@ -16,19 +16,29 @@ from scripts.evidence_packs.python import (
 from scripts.evidence_packs.python.editing import (
     validate_artifact as edit_artifact_mod,
 )
+from scripts.evidence_packs.python.editing.edit_metadata_contract import (
+    EDIT_PROVENANCE_FAMILIES as PRODUCER_EDIT_PROVENANCE_FAMILIES,
+)
 from scripts.evidence_packs.python.editing.implementations import (
     DEPLOYABLE_OPTIMIZED_SUBJECT,
     EDIT_SEMANTICS_DEPLOYABLE,
+    EVIDENCE_ONLY_PACK,
     build_edit_metadata,
     build_validation_edit_metadata,
+    normalize_coverage,
+    parse_edit_specs_json,
+    read_edit_metadata,
     validate_edit_metadata,
-)
-from scripts.evidence_packs.python.task_tools import (
-    build_edit_artifact_summary,
+    write_edit_metadata,
 )
 
 save_artifact_mod = edit_artifact_mod
 deployable_validator_mod = edit_artifact_mod
+_REAL_COVERAGE = {"edited_tensors": 1, "edited_params": 1, "total_params": 1}
+
+
+def test_edit_provenance_taxonomy_has_one_package_owned_definition() -> None:
+    assert PRODUCER_EDIT_PROVENANCE_FAMILIES is PACKAGE_EDIT_PROVENANCE_FAMILIES
 
 
 def _write_minimal_artifact(path: Path, metadata: dict[str, object] | None) -> None:
@@ -57,6 +67,192 @@ def test_validation_edit_metadata_has_contract_fields() -> None:
     assert metadata["optimized_deployment_backend"] is False
     assert metadata["packed_quantized_storage"] is False
     assert validate_edit_metadata(metadata) == []
+
+
+def test_validation_edit_metadata_rejects_impossible_coverage_claims() -> None:
+    metadata = build_validation_edit_metadata(
+        edit_type="lora_merge",
+        scope="attn",
+        coverage=_REAL_COVERAGE,
+    )
+    metadata["coverage"] = {
+        "edited_tensors": -1,
+        "edited_params": 1.5,
+        "total_params": 0,
+        "coverage_ratio": 42.0,
+    }
+
+    errors = validate_edit_metadata(metadata)
+
+    assert any(
+        "edited_tensors must be a non-negative integer" in error for error in errors
+    )
+    assert any(
+        "edited_params must be a non-negative integer" in error for error in errors
+    )
+    assert any(
+        "coverage_ratio must be finite and between 0 and 1" in error for error in errors
+    )
+
+
+def test_validation_edit_metadata_requires_exact_coverage_ratio() -> None:
+    metadata = build_validation_edit_metadata(
+        edit_type="lora_merge",
+        scope="attn",
+        coverage={"edited_tensors": 1, "edited_params": 1, "total_params": 3},
+    )
+    metadata["coverage"]["coverage_ratio"] = (1 / 3) + 1e-15
+
+    errors = validate_edit_metadata(metadata)
+
+    assert "coverage.coverage_ratio must equal edited_params / total_params" in errors
+
+
+@pytest.mark.parametrize(
+    "edit_type", ("fp8_quant", "lowrank_svd", "FP8-QUANT", "LOWRANK-SVD")
+)
+def test_unverifiable_generated_metadata_cannot_bypass_storage_contract(
+    edit_type: str,
+) -> None:
+    with pytest.raises(ValueError, match="dedicated storage and replay contract"):
+        build_edit_metadata(
+            edit_type=edit_type,
+            scope="ffn",
+            storage_format="forged_generic_storage",
+            actual_storage_format="forged_generic_storage",
+        )
+
+    forged = build_validation_edit_metadata(
+        edit_type="quant_rtn", scope="ffn", coverage=_REAL_COVERAGE
+    )
+    forged.update(
+        {
+            "edit_type": edit_type,
+            "storage_format": "forged_generic_storage",
+            "actual_storage_format": "forged_generic_storage",
+        }
+    )
+
+    errors = validate_edit_metadata(forged)
+
+    assert any("dedicated storage and replay contract" in error for error in errors)
+
+
+def test_edit_spec_json_and_coverage_normalization_reject_ambiguous_inputs() -> None:
+    assert parse_edit_specs_json('[{"spec": "quant_rtn:4:32:ffn"}]') == [
+        {"spec": "quant_rtn:4:32:ffn"}
+    ]
+    with pytest.raises(ValueError, match="Invalid edit_specs JSON"):
+        parse_edit_specs_json("{")
+    with pytest.raises(ValueError, match="must be a JSON list"):
+        parse_edit_specs_json('{"spec": "quant_rtn:4:32:ffn"}')
+
+    assert normalize_coverage(None) == {
+        "edited_tensors": 0,
+        "edited_params": 0,
+        "total_params": 0,
+        "coverage_ratio": 0.0,
+    }
+    with pytest.raises(ValueError, match="edited_count is unsupported"):
+        normalize_coverage(
+            {
+                "edited_count": "2",
+                "edited_params": "3",
+                "total_params": "4",
+            }
+        )
+    with pytest.raises(ValueError, match="must be a non-negative integer"):
+        normalize_coverage(
+            {
+                "edited_tensors": -2,
+                "edited_params": object(),
+                "total_params": float("inf"),
+                "coverage_ratio": 9.0,
+            }
+        )
+
+
+def test_zero_coverage_is_only_producible_for_an_explicit_no_model_route() -> None:
+    with pytest.raises(ValueError, match="positive for a proof-routed model edit"):
+        build_validation_edit_metadata(edit_type="quant_rtn", scope="ffn")
+
+    metadata = build_edit_metadata(
+        edit_type="noop",
+        scope="none",
+        artifact_class=EVIDENCE_ONLY_PACK,
+    )
+
+    assert metadata["coverage"] == {
+        "edited_tensors": 0,
+        "edited_params": 0,
+        "total_params": 0,
+        "coverage_ratio": 0.0,
+    }
+    assert validate_edit_metadata(metadata) == []
+
+
+def test_edit_metadata_file_round_trip_and_non_object_rejection(tmp_path: Path) -> None:
+    metadata_path = tmp_path / "nested" / "edit_metadata.json"
+    metadata = build_validation_edit_metadata(
+        edit_type="quant_rtn", scope="ffn", coverage=_REAL_COVERAGE
+    )
+
+    write_edit_metadata(metadata_path, metadata)
+
+    assert read_edit_metadata(metadata_path) == metadata
+    assert metadata_path.read_text(encoding="utf-8").endswith("\n")
+
+    metadata_path.write_text("[]", encoding="utf-8")
+    with pytest.raises(ValueError, match="must be a JSON object"):
+        read_edit_metadata(metadata_path)
+
+
+def test_validation_contract_reports_independent_subject_and_deployable_failures() -> (
+    None
+):
+    subject = build_validation_edit_metadata(
+        edit_type="quant_rtn", scope="ffn", coverage=_REAL_COVERAGE
+    )
+    subject.update(
+        {
+            "schema": "unknown",
+            "artifact_class": "unknown",
+            "edit_type": "",
+            "coverage": None,
+            "deployable_as_hf_checkpoint": False,
+        }
+    )
+    subject_errors = validate_edit_metadata(
+        subject,
+        expected_edit_type="magnitude_prune",
+        expected_artifact_class="validation_subject_checkpoint",
+    )
+    assert any("unknown edit metadata schema" in error for error in subject_errors)
+    assert any("invalid artifact_class" in error for error in subject_errors)
+    assert any("artifact_class mismatch" in error for error in subject_errors)
+    assert any("edit_type must be" in error for error in subject_errors)
+    assert any("edit_type mismatch" in error for error in subject_errors)
+    assert "coverage must be an object" in subject_errors
+
+    deployable = _deployable_metadata()
+    deployable.update(
+        {
+            "optimized_deployment_backend": False,
+            "packed_quantized_storage": False,
+            "backend": "",
+            "deployable_as_hf_checkpoint": False,
+        }
+    )
+    deployable_errors = validate_edit_metadata(deployable)
+    assert (
+        "deployable artifacts must set optimized_deployment_backend=true"
+        in deployable_errors
+    )
+    assert "deployable artifacts must set packed_quantized_storage=true" in (
+        deployable_errors
+    )
+    assert "deployable artifacts must record a backend" in deployable_errors
+    assert any("deployable_as_hf_checkpoint=true" in e for e in deployable_errors)
 
 
 def test_validation_edit_metadata_accepts_optional_provenance_and_impact() -> None:
@@ -94,6 +290,7 @@ def test_validate_edit_metadata_rejects_malformed_topology_and_delta_privacy() -
     metadata = build_validation_edit_metadata(
         edit_type="lora_merge",
         scope="attn",
+        coverage=_REAL_COVERAGE,
         extra={
             "edit_topology": {
                 "artifact_kind": "raw_delta",
@@ -124,6 +321,7 @@ def test_validate_edit_metadata_rejects_malformed_optional_provenance() -> None:
     metadata = build_validation_edit_metadata(
         edit_type="custom",
         scope="all",
+        coverage=_REAL_COVERAGE,
         edit_provenance={
             "edit_family": "unsupported_edit_family",
             "edit_count": 0,
@@ -146,6 +344,7 @@ def test_validate_edit_metadata_rejects_non_string_optional_taxonomy_values() ->
     metadata = build_validation_edit_metadata(
         edit_type="custom",
         scope="all",
+        coverage=_REAL_COVERAGE,
         edit_provenance={"edit_family": ["lora_merge"]},
         edit_impact={"scenario_types": ["target_success", {"kind": "bad"}]},
     )
@@ -261,7 +460,7 @@ def test_task_tools_structural_failure_report_helpers(tmp_path: Path) -> None:
     payload = task_tools_reports.build_structural_failure_report(
         error_type="nan_injection",
         message="simulated",
-        base_report={**base_report, "validation": "bad", "guard_overhead": "bad"},
+        base_report={**base_report, "validation": "bad", "guard_metric_impact": "bad"},
         source_report=source_report,
         source_report_path="source/report.json",
         edited_report_path="edited/report.json",
@@ -269,7 +468,9 @@ def test_task_tools_structural_failure_report_helpers(tmp_path: Path) -> None:
     )
     assert payload["run_id"] == "run-1-structural-failure-nan_injection"
     assert payload["validation"]["invariants_pass"] is False
-    assert payload["guard_overhead"]["evaluated"] is True
+    assert payload["guard_metric_impact"]["evaluated"] is False
+    assert payload["guard_metric_impact"]["passed"] is False
+    assert payload["validation"]["guard_metric_impact_acceptable"] is False
     assert payload["primary_metric"]["degraded_reason"] == "structural_failure"
     assert payload["invariants"]["status"] == "fail"
     assert payload["spectral"]["status"] == "structural_failure"
@@ -350,391 +551,3 @@ def _deployable_metadata() -> dict[str, object]:
         parameters={"bits": 8},
         coverage={"edited_tensors": 1, "edited_params": 1, "total_params": 1},
     )
-
-
-def _write_deployable_sidecars(report_dir: Path) -> None:
-    report_dir.mkdir(parents=True, exist_ok=True)
-    (report_dir / "backend_inventory.json").write_text(
-        json.dumps(
-            {
-                "schema": "invarlock/backend-inventory-v1",
-                "adapter": "hf_bnb",
-                "backend": "bitsandbytes",
-                "backend_version": "0.1",
-                "transformers_version": "1.0",
-                "quantization_config": {"bits": 4},
-                "quantized_module_count": 1,
-                "quantized_module_types": ["bitsandbytes.nn.Linear8bitLt"],
-                "device_map": "cuda:0",
-                "memory_footprint": {
-                    "reported_bytes": 1024,
-                    "method": "get_memory_footprint",
-                },
-                "load_smoke": True,
-                "inference_smoke": True,
-            }
-        ),
-        encoding="utf-8",
-    )
-    (report_dir / "memory_report.json").write_text(
-        json.dumps(
-            {
-                "schema": "invarlock/deployable-memory-report-v1",
-                "ok": True,
-                "runtime_memory_reduction_observed": True,
-            }
-        ),
-        encoding="utf-8",
-    )
-    (report_dir / "load_smoke.json").write_text(
-        json.dumps({"schema": "invarlock/deployable-load-smoke-v1", "ok": True}),
-        encoding="utf-8",
-    )
-    (report_dir / "inference_smoke.json").write_text(
-        json.dumps({"schema": "invarlock/deployable-inference-smoke-v1", "ok": True}),
-        encoding="utf-8",
-    )
-
-
-def test_validate_deployable_artifact_checks_sidecar_schemas_and_ok(
-    monkeypatch, tmp_path: Path
-) -> None:
-    artifact = tmp_path / "deployable"
-    report_dir = tmp_path / "report"
-    _write_minimal_artifact(artifact, _deployable_metadata())
-    _write_deployable_sidecars(report_dir)
-    monkeypatch.setattr(
-        deployable_validator_mod,
-        "_package_version",
-        lambda _package_name: "0.1",
-        raising=True,
-    )
-
-    payload = deployable_validator_mod.validate_deployable_artifact(
-        artifact,
-        backend="bitsandbytes",
-        report_dir=report_dir,
-        smoke=True,
-    )
-
-    assert payload["ok"] is True
-    assert payload["load_smoke"] is True
-    assert payload["inference_smoke"] is True
-    assert payload["runtime_memory_reduction_observed"] is True
-
-    (report_dir / "load_smoke.json").write_text(
-        json.dumps({"schema": "invarlock/deployable-load-smoke-v1", "ok": False}),
-        encoding="utf-8",
-    )
-    payload = deployable_validator_mod.validate_deployable_artifact(
-        artifact,
-        backend="bitsandbytes",
-        report_dir=report_dir,
-        smoke=True,
-    )
-    assert payload["ok"] is False
-    assert payload["load_smoke"] is False
-    assert "load_smoke.json ok must be true" in payload["issues"]
-
-    _write_deployable_sidecars(report_dir)
-    (report_dir / "backend_inventory.json").write_text(
-        json.dumps(
-            {
-                "schema": "wrong",
-                "backend": "bitsandbytes",
-                "load_smoke": True,
-                "inference_smoke": True,
-                "quantized_module_count": 1,
-                "quantized_module_types": [],
-                "memory_footprint": {},
-            }
-        ),
-        encoding="utf-8",
-    )
-    payload = deployable_validator_mod.validate_deployable_artifact(
-        artifact,
-        backend="bitsandbytes",
-        report_dir=report_dir,
-        smoke=True,
-    )
-    assert payload["ok"] is False
-    assert any(
-        issue.startswith("backend_inventory.json schema mismatch")
-        for issue in payload["issues"]
-    )
-
-    _write_deployable_sidecars(report_dir)
-    backend_inventory = json.loads(
-        (report_dir / "backend_inventory.json").read_text(encoding="utf-8")
-    )
-    backend_inventory["backend"] = "other_backend"
-    (report_dir / "backend_inventory.json").write_text(
-        json.dumps(backend_inventory),
-        encoding="utf-8",
-    )
-    payload = deployable_validator_mod.validate_deployable_artifact(
-        artifact,
-        backend="bitsandbytes",
-        report_dir=report_dir,
-        smoke=True,
-    )
-    assert payload["ok"] is False
-    assert any(
-        issue.startswith("backend_inventory.json backend mismatch")
-        for issue in payload["issues"]
-    )
-
-    _write_deployable_sidecars(report_dir)
-    backend_inventory = json.loads(
-        (report_dir / "backend_inventory.json").read_text(encoding="utf-8")
-    )
-    backend_inventory["load_smoke"] = False
-    (report_dir / "backend_inventory.json").write_text(
-        json.dumps(backend_inventory),
-        encoding="utf-8",
-    )
-    payload = deployable_validator_mod.validate_deployable_artifact(
-        artifact,
-        backend="bitsandbytes",
-        report_dir=report_dir,
-        smoke=True,
-    )
-    assert payload["ok"] is False
-    assert "backend_inventory.json load_smoke must be true" in payload["issues"]
-
-    _write_deployable_sidecars(report_dir)
-    backend_inventory = json.loads(
-        (report_dir / "backend_inventory.json").read_text(encoding="utf-8")
-    )
-    backend_inventory["inference_smoke"] = False
-    (report_dir / "backend_inventory.json").write_text(
-        json.dumps(backend_inventory),
-        encoding="utf-8",
-    )
-    payload = deployable_validator_mod.validate_deployable_artifact(
-        artifact,
-        backend="bitsandbytes",
-        report_dir=report_dir,
-        smoke=True,
-    )
-    assert payload["ok"] is False
-    assert "backend_inventory.json inference_smoke must be true" in payload["issues"]
-
-    _write_deployable_sidecars(report_dir)
-    (report_dir / "inference_smoke.json").write_text(
-        json.dumps({"schema": "invarlock/deployable-inference-smoke-v1", "ok": False}),
-        encoding="utf-8",
-    )
-    payload = deployable_validator_mod.validate_deployable_artifact(
-        artifact,
-        backend="bitsandbytes",
-        report_dir=report_dir,
-        smoke=True,
-    )
-    assert payload["ok"] is False
-    assert payload["inference_smoke"] is False
-    assert "inference_smoke.json ok must be true" in payload["issues"]
-
-    payload = deployable_validator_mod.validate_deployable_artifact(
-        artifact,
-        backend="bitsandbytes",
-        report_dir=None,
-        smoke=False,
-    )
-    assert payload["ok"] is False
-    assert payload["load_smoke"] is False
-    assert payload["inference_smoke"] is False
-    assert "deployable validation requires --report-dir sidecars" in payload["issues"]
-
-
-def test_save_subject_replace_restores_existing_output_on_swap_failure(
-    monkeypatch, tmp_path: Path
-) -> None:
-    output = tmp_path / "subject"
-    output.mkdir()
-    (output / "marker.txt").write_text("original", encoding="utf-8")
-    staging = save_artifact_mod.staging_path_for(output)
-    staging.mkdir()
-    (staging / "marker.txt").write_text("new", encoding="utf-8")
-    original_rename = Path.rename
-
-    def _rename_with_staging_failure(self: Path, target: Path) -> Path:
-        if self == staging:
-            raise OSError("simulated staging swap failure")
-        return original_rename(self, target)
-
-    monkeypatch.setattr(Path, "rename", _rename_with_staging_failure)
-
-    try:
-        try:
-            save_artifact_mod._replace_output(staging, output)
-        except OSError as exc:
-            assert "simulated staging swap failure" in str(exc)
-        else:  # pragma: no cover - defensive assertion
-            raise AssertionError("expected staging swap failure")
-    finally:
-        monkeypatch.setattr(Path, "rename", original_rename)
-
-    assert output.is_dir()
-    assert (output / "marker.txt").read_text(encoding="utf-8") == "original"
-    assert staging.is_dir()
-
-
-def test_batch_edit_artifact_can_avoid_model_deepcopy(
-    monkeypatch, tmp_path: Path
-) -> None:
-    class NoDeepcopyModel:
-        def __deepcopy__(self, memo: dict[object, object]) -> object:
-            raise AssertionError("deepcopy should not be used")
-
-    class Stats:
-        edited_tensors = 1
-
-        def coverage_payload(self) -> dict[str, object]:
-            return {"edited_tensors": 1, "edited_params": 1, "total_params": 1}
-
-    saved: dict[str, object] = {}
-
-    monkeypatch.setattr(
-        batch_edit_mod,
-        "apply_rtn_dequantized_simulation",
-        lambda model, *, bits, group_size, scope: Stats(),
-    )
-    monkeypatch.setattr(
-        batch_edit_mod,
-        "save_edited_subject_artifact",
-        lambda **kwargs: saved.update(kwargs),
-    )
-    monkeypatch.setattr(batch_edit_mod, "_clear_memory", lambda: None)
-
-    model = NoDeepcopyModel()
-    batch_edit_mod._create_edit_artifact(
-        model=model,
-        tokenizer=object(),
-        parsed_spec={"type": "quant_rtn", "bits": 4, "group_size": 32, "scope": "ffn"},
-        edit_path=tmp_path / "edit",
-        clone_model=False,
-    )
-
-    assert saved["model"] is model
-
-
-def test_edit_artifact_summary_counts_scenario_taxonomy(tmp_path: Path) -> None:
-    pack_dir = tmp_path / "pack"
-    report_dir = pack_dir / "reports" / "model" / "quant_4bit_clean" / "run_1"
-    report_dir.mkdir(parents=True)
-    metadata = build_validation_edit_metadata(
-        edit_type="quant_rtn",
-        scope="ffn",
-        parameters={"bits": 4, "group_size": 32},
-        coverage={"edited_tensors": 1, "edited_params": 1, "total_params": 1},
-        edit_provenance={
-            "edit_family": "quantization_dequantized",
-            "edit_method": "deterministic_rtn",
-        },
-        edit_impact={"scenario_types": ["target_success"]},
-        extra={
-            "edit_topology": {"artifact_kind": "checkpoint"},
-            "delta_privacy": {"delta_available": "none"},
-        },
-    )
-    (report_dir / "edit_metadata.json").write_text(
-        json.dumps(metadata), encoding="utf-8"
-    )
-    scenarios = tmp_path / "scenarios.json"
-    scenarios.write_text(
-        json.dumps(
-            {
-                "schema": "evidence_pack_scenarios_v1",
-                "schema_version": 1,
-                "scenarios": [
-                    {
-                        "id": "quant_4bit_clean",
-                        "category": "clean",
-                        "artifact_class": "validation_subject_checkpoint",
-                        "failure_class": "common_edit.quant_rtn",
-                        "generation": {
-                            "kind": "edit",
-                            "edit_spec": "quant_rtn:clean:ffn",
-                        },
-                    },
-                    {
-                        "id": "nan_injection",
-                        "category": "error_injection",
-                        "artifact_class": "fault_injection_fixture",
-                        "generation": {"kind": "error"},
-                    },
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    summary = build_edit_artifact_summary(pack_dir, scenarios)
-
-    assert summary["counts"]["validation_subject_checkpoint"] == 1
-    assert summary["counts"]["fault_injection_fixture"] == 1
-    assert summary["by_scenario"]["quant_4bit_clean"]["metadata_present"] is True
-    assert (
-        summary["by_scenario"]["quant_4bit_clean"]["storage_format"]
-        == "float_dequantized"
-    )
-    assert summary["by_scenario"]["quant_4bit_clean"]["edit_provenance"] == {
-        "edit_family": "quantization_dequantized",
-        "edit_method": "deterministic_rtn",
-    }
-    assert summary["by_scenario"]["quant_4bit_clean"]["edit_impact"] == {
-        "scenario_types": ["target_success"]
-    }
-    assert summary["by_scenario"]["quant_4bit_clean"]["edit_topology"] == {
-        "artifact_kind": "checkpoint"
-    }
-    assert summary["by_scenario"]["quant_4bit_clean"]["delta_privacy"] == {
-        "delta_available": "none"
-    }
-
-
-def test_edit_artifact_summary_reports_deployable_smokes(tmp_path: Path) -> None:
-    pack_dir = tmp_path / "pack"
-    report_dir = pack_dir / "reports" / "model" / "deploy_bnb_8bit_clean" / "run_1"
-    report_dir.mkdir(parents=True)
-    (report_dir / "deployable_artifact_validation.json").write_text(
-        json.dumps(
-            {
-                "schema": "invarlock/deployable-artifact-validation-v1",
-                "ok": True,
-                "backend": "bitsandbytes",
-                "load_smoke": True,
-                "inference_smoke": True,
-            }
-        ),
-        encoding="utf-8",
-    )
-    scenarios = tmp_path / "scenarios.json"
-    scenarios.write_text(
-        json.dumps(
-            {
-                "schema": "evidence_pack_scenarios_v1",
-                "schema_version": 1,
-                "scenarios": [
-                    {
-                        "id": "deploy_bnb_8bit_clean",
-                        "category": "deployable_clean",
-                        "artifact_class": "deployable_optimized_subject",
-                        "generation": {
-                            "kind": "deployable_edit",
-                            "backend": "bitsandbytes",
-                            "edit_spec": "bnb_8bit:clean:ffn",
-                        },
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    summary = build_edit_artifact_summary(pack_dir, scenarios)
-
-    assert summary["deployable_subjects"]["backends"] == ["bitsandbytes"]
-    assert summary["deployable_subjects"]["all_reload_smokes_passed"] is True
-    assert summary["deployable_subjects"]["all_inference_smokes_passed"] is True

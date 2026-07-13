@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from invarlock.reporting import render_markdown as render_markdown_mod
 from invarlock.reporting import report_summary as console_mod
 from invarlock.reporting import utils as render_helpers_mod
+from invarlock.reporting.rendering import markdown as render_markdown_mod
 
 
 def test_compute_console_validation_block_handles_guard(monkeypatch):
     labels = [
         "Primary Metric Acceptable",
-        "Guard Overhead Acceptable",
+        "Guard Metric Impact Acceptable",
         "Invariants Pass",
     ]
     monkeypatch.setattr(
@@ -19,17 +19,19 @@ def test_compute_console_validation_block_handles_guard(monkeypatch):
         "validation": {
             "primary_metric_acceptable": True,
             "invariants_pass": False,
-            "guard_overhead_acceptable": True,
+            "guard_metric_impact_acceptable": True,
         },
-        "guard_overhead": {"evaluated": False, "ok": True},
+        "guard_metric_impact": {"evaluated": False, "ok": True},
     }
     block = console_mod.compute_console_validation_block(evaluation_report)
-    assert "Guard Overhead Acceptable" not in block["labels"]
+    assert "Guard Metric Impact Acceptable" not in block["labels"]
     assert block["overall_pass"] is False
 
-    evaluation_report["guard_overhead"]["evaluated"] = True
+    evaluation_report["guard_metric_impact"]["evaluated"] = True
     block2 = console_mod.compute_console_validation_block(evaluation_report)
-    guard_rows = [row for row in block2["rows"] if "Guard Overhead" in row["label"]]
+    guard_rows = [
+        row for row in block2["rows"] if "Guard Metric Impact" in row["label"]
+    ]
     assert guard_rows and guard_rows[0]["ok"] is True
     assert block2["overall_pass"] is False
 

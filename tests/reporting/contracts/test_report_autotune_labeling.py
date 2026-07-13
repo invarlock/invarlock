@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.rendering.markdown import render_report_markdown
 from invarlock.reporting.report_make import REPORT_SCHEMA_VERSION
 
 
@@ -28,7 +28,7 @@ def test_autotune_labeling_is_informational() -> None:
             "invariants_pass": True,
             "spectral_stable": True,
             "rmt_stable": True,
-            "guard_overhead_acceptable": True,
+            "guard_metric_impact_acceptable": True,
         },
         "primary_metric": {
             "kind": "ppl_causal",
@@ -42,7 +42,7 @@ def test_autotune_labeling_is_informational() -> None:
         "policies": {},
         "resolved_policy": {},
         "policy_provenance": {},
-        "guard_overhead": {},
+        "guard_metric_impact": {},
     }
     md = render_report_markdown(cert)
     assert "Target Ratio vs Baseline:" not in md

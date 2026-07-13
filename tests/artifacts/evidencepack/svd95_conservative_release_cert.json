@@ -46,7 +46,7 @@
     ]
   },
   "validation": {
-    "guard_overhead_acceptable": true,
+    "guard_metric_impact_acceptable": true,
     "invariants_pass": true,
     "preview_final_drift_acceptable": true,
     "primary_metric_acceptable": true,

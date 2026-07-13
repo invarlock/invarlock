@@ -32,7 +32,7 @@ def _normalized_preset_payload(
     stride: int,
     preview_n: int,
     final_n: int,
-    skip_overhead_check: bool,
+    skip_guard_metric_impact_check: bool,
 ) -> dict[str, Any]:
     normalized = _mapping(payload)
 
@@ -43,10 +43,10 @@ def _normalized_preset_payload(
     dataset["final_n"] = final_n
     normalized["dataset"] = dataset
 
-    if skip_overhead_check:
+    if skip_guard_metric_impact_check:
         context = _mapping(normalized.get("context"))
         run = _mapping(context.get("run"))
-        run["skip_overhead_check"] = True
+        run["skip_guard_metric_impact_check"] = True
         context["run"] = run
         normalized["context"] = context
 
@@ -60,7 +60,7 @@ def normalize_staged_preset(
     stride: int,
     preview_n: int,
     final_n: int,
-    skip_overhead_check: bool,
+    skip_guard_metric_impact_check: bool,
 ) -> None:
     yaml = _load_yaml_module()
     raw = preset_path.read_text()
@@ -71,7 +71,7 @@ def normalize_staged_preset(
         stride=stride,
         preview_n=preview_n,
         final_n=final_n,
-        skip_overhead_check=skip_overhead_check,
+        skip_guard_metric_impact_check=skip_guard_metric_impact_check,
     )
     preset_path.write_text(yaml.safe_dump(normalized, sort_keys=False))
 
@@ -145,7 +145,7 @@ def _normalize_staged_preset(args: argparse.Namespace) -> int:
         stride=stride,
         preview_n=preview_n,
         final_n=final_n,
-        skip_overhead_check=bool(args.skip_overhead_check),
+        skip_guard_metric_impact_check=bool(args.skip_guard_metric_impact_check),
     )
     return 0
 
@@ -158,6 +158,9 @@ def _validate_baseline_report(args: argparse.Namespace) -> int:
     expected_assurance = str(getattr(args, "expected_assurance", "off"))
     expected_preview_n = getattr(args, "expected_preview_n", None)
     expected_final_n = getattr(args, "expected_final_n", None)
+    expected_identity_json = str(
+        getattr(args, "expected_model_identity_json", "") or ""
+    )
 
     try:
         payload = json.loads(report_path.read_text(encoding="utf-8"))
@@ -186,6 +189,22 @@ def _validate_baseline_report(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 1
+    if expected_identity_json:
+        try:
+            expected_identity = json.loads(expected_identity_json)
+        except json.JSONDecodeError:
+            print("baseline_report_expected_identity_invalid", file=sys.stderr)
+            return 1
+        from invarlock.core.checkpoint_identity import validated_model_identity
+
+        expected_identity = validated_model_identity(expected_identity)
+        observed_identity = validated_model_identity(meta.get("model_identity"))
+        if expected_identity is None:
+            print("baseline_report_expected_identity_invalid", file=sys.stderr)
+            return 1
+        if observed_identity != expected_identity:
+            print("baseline_report_model_identity_mismatch", file=sys.stderr)
+            return 1
 
     context = payload.get("context")
     if not isinstance(context, dict):

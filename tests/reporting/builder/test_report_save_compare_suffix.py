@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from invarlock.reporting.report_files import save_report
+from invarlock.reporting.report_bundle import save_report
 from invarlock.reporting.report_types import create_empty_report
 
 
@@ -15,7 +15,11 @@ def _mk_report() -> dict:
     r["data"]["split"] = "validation"
     r["data"]["seq_len"] = 8
     r["data"]["stride"] = 8
-    r["metrics"]["primary_metric"] = {"kind": "ppl_causal", "final": 10.0}
+    r["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": 10.0,
+        "final": 10.0,
+    }
     r["metrics"]["latency_ms_per_tok"] = 1.0
     r["metrics"]["memory_mb_peak"] = 10.0
     return r

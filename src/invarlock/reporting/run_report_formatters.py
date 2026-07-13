@@ -9,10 +9,10 @@ Supports side-by-side comparison for bare vs guarded edit analysis.
 from __future__ import annotations
 
 import html
-import json
 from datetime import datetime
 from typing import Any, cast
 
+from invarlock.json_serialization import dumps_finite_json
 from invarlock.public_contracts import REPORT_SCHEMA_VERSION
 
 from .branding import (
@@ -22,7 +22,7 @@ from .branding import (
     markdown_brand_line,
     version_label,
 )
-from .normalizer import normalize_run_report
+from .report_normalization import validate_canonical_run_report
 from .report_types import RunReport, validate_report
 
 _PARSE_EXCEPTIONS = (AttributeError, KeyError, OverflowError, TypeError, ValueError)
@@ -48,7 +48,7 @@ def to_json(report: RunReport, indent: int = 2) -> str:
     # Ensure all values are JSON serializable
     json_data = _sanitize_for_json(json_data)
 
-    return json.dumps(json_data, indent=indent, ensure_ascii=False)
+    return dumps_finite_json(json_data, indent=indent, ensure_ascii=False)
 
 
 def _coerce_run_reports(
@@ -56,14 +56,16 @@ def _coerce_run_reports(
     compare: RunReport | dict[str, Any] | None = None,
 ) -> tuple[RunReport, RunReport | None]:
     # Normalize external dicts to canonical RunReport values before rendering.
-    rp: RunReport = normalize_run_report(report) if isinstance(report, dict) else report
-    cmp: RunReport | None = (
-        normalize_run_report(compare) if isinstance(compare, dict) else compare
-    )
-    if not validate_report(rp):
-        raise ValueError("Invalid primary RunReport structure")
-    if cmp and not validate_report(cmp):
-        raise ValueError("Invalid comparison RunReport structure")
+    try:
+        rp = validate_canonical_run_report(report)
+    except ValueError as exc:
+        raise ValueError("Invalid primary RunReport structure") from exc
+    try:
+        cmp: RunReport | None = (
+            validate_canonical_run_report(compare) if compare is not None else None
+        )
+    except ValueError as exc:
+        raise ValueError("Invalid comparison RunReport structure") from exc
     return rp, cmp
 
 
@@ -205,16 +207,20 @@ def _generate_single_markdown(report: RunReport) -> list[str]:
     )
     if isinstance(pm, dict) and pm:
         kind = str(pm.get("kind") or "primary")
+        kind_name = kind.strip().lower()
         prev = pm.get("preview")
         fin = pm.get("final")
-        ratio = pm.get("ratio_vs_baseline")
+        comparison_field = (
+            "delta_vs_baseline_pp" if kind_name == "accuracy" else "ratio_vs_baseline"
+        )
+        comparison = pm.get(comparison_field)
         parts = [f"- **Primary Metric** ({kind})"]
         if isinstance(prev, int | float):
             parts.append(f"preview={prev:.3f}")
         if isinstance(fin, int | float):
             parts.append(f"final={fin:.3f}")
-        if isinstance(ratio, int | float):
-            parts.append(f"ratio_vs_baseline={ratio:.3f}")
+        if isinstance(comparison, int | float):
+            parts.append(f"{comparison_field}={comparison:.3f}")
         lines.append(" — ".join(parts) if len(parts) > 1 else parts[0])
     else:
         # When primary_metric is absent, do not attempt fallbacks
@@ -252,17 +258,23 @@ def _generate_single_markdown(report: RunReport) -> list[str]:
     if isinstance(pm, dict) and pm:
         lines.append("## Primary Metric")
         lines.append("")
-        lines.append("| Kind | Preview | Final | Ratio vs Baseline |")
-        lines.append("|------|---------|-------|-------------------|")
         kind = str(pm.get("kind") or "primary")
+        kind_name = kind.strip().lower()
+        comparison_label = (
+            "Delta vs Baseline (pp)" if kind_name == "accuracy" else "Ratio vs Baseline"
+        )
+        lines.append(f"| Kind | Preview | Final | {comparison_label} |")
+        lines.append("|------|---------|-------|-------------------|")
         prev = pm.get("preview")
         fin = pm.get("final")
-        ratio = pm.get("ratio_vs_baseline")
+        comparison = pm.get(
+            "delta_vs_baseline_pp" if kind_name == "accuracy" else "ratio_vs_baseline"
+        )
 
         def _fmt(x):
             return f"{x:.3f}" if isinstance(x, int | float) else "N/A"
 
-        lines.append(f"| {kind} | {_fmt(prev)} | {_fmt(fin)} | {_fmt(ratio)} |")
+        lines.append(f"| {kind} | {_fmt(prev)} | {_fmt(fin)} | {_fmt(comparison)} |")
         lines.append("")
         # Append system metrics
         lines.append("## System Metrics")
@@ -384,7 +396,8 @@ def _generate_single_markdown(report: RunReport) -> list[str]:
     )
     ratio_val = None
     if isinstance(pm_sum, dict):
-        rv = pm_sum.get("ratio_vs_baseline")
+        pm_kind = str(pm_sum.get("kind") or "").strip().lower()
+        rv = pm_sum.get("ratio_vs_baseline") if pm_kind.startswith("ppl") else None
         if isinstance(rv, int | float):
             ratio_val = float(rv)
     params_changed = report["edit"]["deltas"]["params_changed"]

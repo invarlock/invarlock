@@ -8,6 +8,23 @@ import pytest
 import invarlock.runtime_security as runtime_security
 import invarlock.runtime_security_helpers as runtime_security_helpers
 
+_IMMUTABLE_IMAGE_ID = "sha256:" + "e" * 64
+
+
+@pytest.fixture(autouse=True)
+def _observe_immutable_runtime_image(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_resolve_observed_container_image",
+        lambda engine, image: runtime_security_helpers._ObservedContainerImage(
+            immutable_ref=_IMMUTABLE_IMAGE_ID,
+            image_digest=_IMMUTABLE_IMAGE_ID,
+            image_id=_IMMUTABLE_IMAGE_ID,
+            repo_digests=(),
+        ),
+        raising=True,
+    )
+
 
 def _plan(
     argv: list[str],
@@ -15,13 +32,47 @@ def _plan(
     mounts: tuple[Path, ...] = (),
     needs_mirror: bool = False,
     gpu_passthrough: bool = False,
+    workspace_read_only: bool = False,
 ) -> runtime_security.ContainerLaunchPlan:
     return runtime_security.ContainerLaunchPlan(
         argv=tuple(argv),
         argv_mounts=mounts,
         needs_cwd_host_mirror=needs_mirror,
         gpu_passthrough=gpu_passthrough,
+        workspace_read_only=workspace_read_only,
     )
+
+
+def test_container_command_mounts_only_workspace_read_only(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    output = tmp_path / "output"
+    output.mkdir()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "container_image_available_locally",
+        lambda image, engine=None: True,
+        raising=True,
+    )
+
+    command = runtime_security.build_container_command(
+        _plan(
+            ["verify"],
+            mounts=(output,),
+            workspace_read_only=True,
+        )
+    )
+
+    assert f"{tmp_path}:/workspace:ro" in command
+    assert f"{output}:{output}" in command
+    assert f"{output}:{output}:ro" not in command
 
 
 def test_apply_runtime_allowances_and_delegate_container_command(monkeypatch) -> None:
@@ -209,7 +260,7 @@ def test_build_container_python_command_uses_python_entrypoint_for_repo_script(
     assert "-e" in command
     assert "PYTHONPATH=/workspace/src" in command
     assert "EXTRA=1" in command
-    assert "ghcr.io/invarlock/runtime:test" in command
+    assert _IMMUTABLE_IMAGE_ID in command
     assert "/workspace/scripts/evidence_packs/python/run_from_config.py" in command
 
 
@@ -354,7 +405,7 @@ def test_build_container_python_module_command_uses_module_entrypoint(
     ]
     assert command[6:8] == ["--gpus", "all"]
     assert "all" in command
-    assert "ghcr.io/invarlock/runtime:test" in command
+    assert _IMMUTABLE_IMAGE_ID in command
     assert "-m" in command
     assert "invarlock.cli.config_execution" in command
     assert "PYTHONPATH=/workspace/src" in command
@@ -688,7 +739,7 @@ def test_build_container_command_uses_launch_plan_and_deduplicates_mounts(
     assert "PYTHONPATH=/workspace/src" in command
     assert "EXTRA=1" in command
     assert command[-4:] == [
-        "ghcr.io/invarlock/runtime:test",
+        _IMMUTABLE_IMAGE_ID,
         "evaluate",
         "--config",
         "cfg.yaml",

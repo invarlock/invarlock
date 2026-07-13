@@ -42,48 +42,55 @@ def format_debug_metric_diffs(
         raw_pm_blk: Any = metrics.get("primary_metric", {})
         if isinstance(raw_pm_blk, dict):
             pm_blk = raw_pm_blk
-        ppl_final_v1 = float(pm_blk.get("final", float("nan")))
+        recorded_final = float(pm_blk.get("final", float("nan")))
     except _PARSE_EXCEPTIONS:
-        ppl_final_v1 = float("nan")
+        recorded_final = float("nan")
     try:
-        ppl_prev_v1 = float(pm_blk.get("preview", float("nan")))
+        recorded_preview = float(pm_blk.get("preview", float("nan")))
     except _PARSE_EXCEPTIONS:
-        ppl_prev_v1 = float("nan")
+        recorded_preview = float("nan")
     try:
-        ppl_final_v2 = float(pm.get("final", float("nan")))
+        recomputed_final = float(pm.get("final", float("nan")))
     except _PARSE_EXCEPTIONS:
-        ppl_final_v2 = float("nan")
+        recomputed_final = float("nan")
     try:
-        ppl_prev_v2 = float(pm.get("preview", float("nan")))
+        recomputed_preview = float(pm.get("preview", float("nan")))
     except _PARSE_EXCEPTIONS:
-        ppl_prev_v2 = float("nan")
+        recomputed_preview = float("nan")
 
-    if math.isfinite(ppl_final_v1) and math.isfinite(ppl_final_v2):
-        diffs.append(f"final: v1-v1 = {ppl_final_v2 - ppl_final_v1:+.9f}")
+    if math.isfinite(recorded_final) and math.isfinite(recomputed_final):
+        diffs.append(
+            f"final: recomputed-recorded = {recomputed_final - recorded_final:+.9f}"
+        )
         try:
             diffs.append(
-                f"Δlog(final): {math.log(ppl_final_v2) - math.log(ppl_final_v1):+.9f}"
+                "Δlog(final): "
+                f"{math.log(recomputed_final) - math.log(recorded_final):+.9f}"
             )
         except _PARSE_EXCEPTIONS:
             pass
-    if math.isfinite(ppl_prev_v1) and math.isfinite(ppl_prev_v2):
-        diffs.append(f"preview: v1-v1 = {ppl_prev_v2 - ppl_prev_v1:+.9f}")
+    if math.isfinite(recorded_preview) and math.isfinite(recomputed_preview):
+        diffs.append(
+            "preview: recomputed-recorded = "
+            f"{recomputed_preview - recorded_preview:+.9f}"
+        )
         try:
             diffs.append(
-                f"Δlog(preview): {math.log(ppl_prev_v2) - math.log(ppl_prev_v1):+.9f}"
+                "Δlog(preview): "
+                f"{math.log(recomputed_preview) - math.log(recorded_preview):+.9f}"
             )
         except _PARSE_EXCEPTIONS:
             pass
 
     try:
-        ratio_v2 = float(pm.get("ratio_vs_baseline", float("nan")))
+        recomputed_ratio = float(pm.get("ratio_vs_baseline", float("nan")))
     except _PARSE_EXCEPTIONS:
-        ratio_v2 = float("nan")
+        recomputed_ratio = float("nan")
     try:
-        ratio_v1 = float(pm_blk.get("ratio_vs_baseline", float("nan")))
+        recorded_ratio = float(pm_blk.get("ratio_vs_baseline", float("nan")))
     except _PARSE_EXCEPTIONS:
-        ratio_v1 = float("nan")
-    if (not math.isfinite(ratio_v1)) and isinstance(baseline_report_data, dict):
+        recorded_ratio = float("nan")
+    if (not math.isfinite(recorded_ratio)) and isinstance(baseline_report_data, dict):
         try:
             metrics_block = baseline_report_data.get("metrics") or {}
             primary_metric_block = (
@@ -102,13 +109,16 @@ def format_debug_metric_diffs(
             if (
                 math.isfinite(base_final)
                 and base_final > 0
-                and math.isfinite(ppl_final_v1)
+                and math.isfinite(recorded_final)
             ):
-                ratio_v1 = ppl_final_v1 / base_final
+                recorded_ratio = recorded_final / base_final
         except _PARSE_EXCEPTIONS:
             pass
-    if math.isfinite(ratio_v1) and math.isfinite(ratio_v2):
-        diffs.append(f"ratio_vs_baseline: v1-v1 = {ratio_v2 - ratio_v1:+.9f}")
+    if math.isfinite(recorded_ratio) and math.isfinite(recomputed_ratio):
+        diffs.append(
+            "ratio_vs_baseline: recomputed-recorded = "
+            f"{recomputed_ratio - recorded_ratio:+.9f}"
+        )
     return "; ".join(diffs)
 
 

@@ -1,46 +1,15 @@
 from __future__ import annotations
 
-from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_make import make_report
+from invarlock.reporting.rendering.markdown import render_report_markdown
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
+from tests.reporting.overhead._support import overhead_run_report
 
 
 def _mk_minimal_report(metrics: dict) -> dict:
-    return {
-        "meta": {
-            "model_id": "gpt2",
-            "adapter": "hf_causal",
-            "device": "cpu",
-            "seed": 42,
-            "ts": "now",
-        },
-        "data": {
-            "dataset": "dummy",
-            "split": "validation",
-            "seq_len": 8,
-            "stride": 4,
-            "preview_n": 1,
-            "final_n": 1,
-        },
-        "edit": {
-            "name": "noop",
-            "plan_digest": "noop",
-            "deltas": {
-                "params_changed": 0,
-                "heads_pruned": 0,
-                "neurons_pruned": 0,
-                "layers_modified": 0,
-                "sparsity": None,
-                "bitwidth_map": None,
-            },
-        },
-        "guards": [],
-        "metrics": {
-            "ppl_preview": 10.0,
-            "ppl_final": 10.0,
-            "ppl_ratio": 1.0,
-            "ppl_preview_ci": (10.0, 10.0),
-            "ppl_final_ci": (10.0, 10.0),
-            "ppl_ratio_ci": (1.0, 1.0),
+    return overhead_run_report(
+        metrics={
             "primary_metric": {
                 "kind": "ppl_causal",
                 "preview": 10.0,
@@ -50,9 +19,10 @@ def _mk_minimal_report(metrics: dict) -> dict:
             "throughput_tok_per_s": 50.0,
             **metrics,
         },
-        "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
-        "flags": {"guard_recovered": False, "rollback_reason": None},
-    }
+        edit_name="noop",
+        tier="balanced",
+        profile="dev",
+    )
 
 
 def test_evaluation_report_system_overhead_table_and_primary_metric_metadata():
@@ -76,7 +46,7 @@ def test_evaluation_report_system_overhead_table_and_primary_metric_metadata():
         "ci": (-1.2, +1.5),
         "preview": 0.80,
         "final": 0.85,
-        "ratio_vs_baseline": +0.05,
+        "delta_vs_baseline_pp": +5.0,
     }
 
     cert = make_report(report, baseline)

@@ -52,7 +52,7 @@ def test_compute_report_digest_handles_non_mapping_metric_sections() -> None:
     )
 
     assert isinstance(digest, str)
-    assert len(digest) == 16
+    assert len(digest) == 64
 
 
 def test_build_provenance_block_ignores_noncanonical_optional_fields() -> None:

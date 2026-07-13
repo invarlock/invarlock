@@ -7,52 +7,57 @@ from invarlock.reporting.report_make import (
     REPORT_JSON_SCHEMA,
     make_report,
 )
+from tests.reporting._support_canonical_reports import canonical_run_report
 
 
 def _mk_report() -> dict[str, Any]:
-    return {
-        "meta": {
-            "model_id": "gpt2",
-            "adapter": "hf_causal",
-            "device": "cpu",
-            "seed": 42,
-            "seeds": {"python": 42, "numpy": 42, "torch": 42},
-        },
-        "data": {
-            "dataset": "dummy",
-            "split": "validation",
-            "seq_len": 8,
-            "stride": 4,
-            "preview_n": 2,
-            "final_n": 2,
-        },
-        "edit": {"name": "noop", "plan_digest": "noop"},
-        "metrics": {
-            # Ensure paired path with finite CI width
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 50.0,
-                "final": 50.0,
-                "ratio_vs_baseline": 1.0,
-                "display_ci": (0.98, 1.02),
+    return canonical_run_report(
+        {
+            "meta": {
+                "model_id": "gpt2",
+                "adapter": "hf_causal",
+                "auto": {"tier": "balanced"},
+                "device": "cpu",
+                "seed": 42,
+                "seeds": {"python": 42, "numpy": 42, "torch": 42},
             },
-            "bootstrap": {"replicates": 200, "alpha": 0.05},
-        },
-        "evaluation_windows": {
-            "preview": {
-                "window_ids": [1, 2],
-                "logloss": [math.log(50.0), math.log(50.0)],
-                "token_counts": [100, 200],
+            "context": {"profile": "dev"},
+            "data": {
+                "dataset": "dummy",
+                "split": "validation",
+                "seq_len": 8,
+                "stride": 4,
+                "preview_n": 2,
+                "final_n": 2,
             },
-            "final": {
-                "window_ids": [3, 4],
-                "logloss": [math.log(50.0), math.log(50.0)],
-                "token_counts": [100, 200],
+            "edit": {"name": "noop", "plan_digest": "noop"},
+            "metrics": {
+                # Ensure paired path with finite CI width
+                "primary_metric": {
+                    "kind": "ppl_causal",
+                    "preview": 50.0,
+                    "final": 50.0,
+                    "ratio_vs_baseline": 1.0,
+                    "display_ci": (0.98, 1.02),
+                },
+                "bootstrap": {"replicates": 200, "alpha": 0.05},
             },
-        },
-        "guards": [],
-        "artifacts": {"events_path": "", "logs_path": ""},
-    }
+            "evaluation_windows": {
+                "preview": {
+                    "window_ids": [1, 2],
+                    "logloss": [math.log(50.0), math.log(50.0)],
+                    "token_counts": [100, 200],
+                },
+                "final": {
+                    "window_ids": [3, 4],
+                    "logloss": [math.log(50.0), math.log(50.0)],
+                    "token_counts": [100, 200],
+                },
+            },
+            "guards": [],
+            "artifacts": {"events_path": "", "logs_path": ""},
+        }
+    )
 
 
 def test_evaluation_report_schema_includes_confidence_block():

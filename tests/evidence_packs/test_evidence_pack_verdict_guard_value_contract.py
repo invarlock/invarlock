@@ -55,7 +55,7 @@ def test_verdict_contract_rejects_baseline_only_spectral_guard_value(
         "spectral_stable": True,
         "rmt_stable": True,
         "preview_final_drift_acceptable": True,
-        "guard_overhead_acceptable": True,
+        "guard_metric_impact_acceptable": True,
     }
     write_cert(
         baseline_path,
@@ -142,7 +142,7 @@ def test_verdict_contract_accepts_new_spectral_cap_as_guard_value(
         "spectral_stable": True,
         "rmt_stable": True,
         "preview_final_drift_acceptable": True,
-        "guard_overhead_acceptable": True,
+        "guard_metric_impact_acceptable": True,
     }
     write_cert(
         baseline_path,
@@ -199,7 +199,7 @@ def test_verdict_contract_rejects_guard_value_when_rmt_signal_is_baseline(
         "spectral_stable": True,
         "rmt_stable": False,
         "preview_final_drift_acceptable": True,
-        "guard_overhead_acceptable": True,
+        "guard_metric_impact_acceptable": True,
     }
     write_cert(baseline_path, validation=validation, invariants_status="pass")
     write_cert(subject_path, validation=validation, invariants_status="pass")
@@ -280,7 +280,7 @@ def test_verdict_contract_supports_detectors_all_of(tmp_path: Path) -> None:
             "spectral_stable": True,
             "rmt_stable": True,
             "preview_final_drift_acceptable": True,
-            "guard_overhead_acceptable": True,
+            "guard_metric_impact_acceptable": True,
         },
         invariants_status="pass",
     )

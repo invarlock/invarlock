@@ -1,57 +1,52 @@
 from __future__ import annotations
 
 import argparse
-import copy
 import gc
 import os
 import sys
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 import torch
 
 try:
     from .editing.implementations import (
-        apply_dense_lora_merge_delta,
-        apply_dense_lowrank_approximation,
-        apply_dense_magnitude_prune,
-        apply_fp8_dequantized_simulation,
-        apply_rtn_dequantized_simulation,
-        apply_tiny_fine_tune_update,
-        build_fine_tune_validation_metadata,
-        build_lora_merge_validation_metadata,
-        build_validation_edit_metadata,
+        generated_transformation_edit_dir_name,
         parse_edit_specs_json,
+        real_training_edit_migration_message,
         resolve_batch_entry,
     )
-    from .editing.validate_artifact import (
-        save_edited_subject_artifact,
-        validate_edit_artifact,
+    from .editing.streaming_pruning import materialize_magnitude_pruned_artifact
+    from .editing.streaming_transform import materialize_transformation_artifact
+    from .editing.transformation_contract import (
+        SYNTHETIC_DENSE_UPDATE,
+        SYNTHETIC_LOWRANK_DELTA,
+        TransformationContractError,
+        canonical_transformation_spec,
+        validate_transformation_scope,
     )
-    from .runtime_tools import require_remote_code_opt_in
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from editing.implementations import (
-        apply_dense_lora_merge_delta,
-        apply_dense_lowrank_approximation,
-        apply_dense_magnitude_prune,
-        apply_fp8_dequantized_simulation,
-        apply_rtn_dequantized_simulation,
-        apply_tiny_fine_tune_update,
-        build_fine_tune_validation_metadata,
-        build_lora_merge_validation_metadata,
-        build_validation_edit_metadata,
+        generated_transformation_edit_dir_name,
         parse_edit_specs_json,
+        real_training_edit_migration_message,
         resolve_batch_entry,
     )
-    from editing.validate_artifact import (
-        save_edited_subject_artifact,
-        validate_edit_artifact,
+    from editing.streaming_pruning import materialize_magnitude_pruned_artifact
+    from editing.streaming_transform import materialize_transformation_artifact
+    from editing.transformation_contract import (
+        SYNTHETIC_DENSE_UPDATE,
+        SYNTHETIC_LOWRANK_DELTA,
+        TransformationContractError,
+        canonical_transformation_spec,
+        validate_transformation_scope,
     )
-    from runtime_tools import require_remote_code_opt_in
-from transformers import AutoModelForCausalLM, AutoTokenizer
 
-_BATCH_EDIT_STRATEGIES = {"reload", "deepcopy"}
+_STREAMING_TRANSFORMATION_TYPES = frozenset(
+    {"quant_rtn", SYNTHETIC_LOWRANK_DELTA, SYNTHETIC_DENSE_UPDATE}
+)
+_UNSUPPORTED_GENERATED_EDIT_TYPES = frozenset({"fp8_quant", "lowrank_svd"})
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -72,6 +67,45 @@ def _parse_edit_specs_json(raw_payload: str) -> list[object]:
     return parse_edit_specs_json(raw_payload)
 
 
+def _preflight_reject_real_training_specs(edit_specs: list[object]) -> None:
+    """Reject real training labels before no-grad setup or model loading."""
+
+    for spec_entry in edit_specs:
+        if not isinstance(spec_entry, dict):
+            continue
+        raw_spec = str(spec_entry.get("spec") or spec_entry.get("type") or "")
+        requested_type = raw_spec.split(":", maxsplit=1)[0]
+        message = real_training_edit_migration_message(requested_type)
+        if message is not None:
+            raise ValueError(message)
+
+
+def _raw_edit_type(spec_entry: object) -> str:
+    if not isinstance(spec_entry, dict):
+        return ""
+    raw_spec = str(spec_entry.get("spec") or spec_entry.get("type") or "")
+    return raw_spec.split(":", maxsplit=1)[0]
+
+
+def _preflight_reject_unverifiable_generated_specs(edit_specs: list[object]) -> None:
+    """Reject unsupported generated families before any model/runtime setup."""
+
+    for spec_entry in edit_specs:
+        requested_type = _raw_edit_type(spec_entry)
+        if requested_type in _UNSUPPORTED_GENERATED_EDIT_TYPES:
+            raise ValueError(
+                f"{requested_type} requires a dedicated storage and replay contract"
+            )
+
+
+def _is_magnitude_prune(parsed_spec: dict[str, object]) -> bool:
+    return str(parsed_spec.get("type") or "") == "magnitude_prune"
+
+
+def _is_streaming_transformation(parsed_spec: dict[str, object]) -> bool:
+    return str(parsed_spec.get("type") or "") in _STREAMING_TRANSFORMATION_TYPES
+
+
 def _configure_determinism() -> None:
     mode = os.environ.get("PACK_DETERMINISM", "").strip().lower()
     if mode == "strict":
@@ -83,236 +117,214 @@ def _configure_determinism() -> None:
     torch.set_grad_enabled(False)
 
 
-def _load_tokenizer(baseline_path: Path) -> Any:
-    trust_remote_code = require_remote_code_opt_in("create_edits_batch.py")
-    return AutoTokenizer.from_pretrained(
-        baseline_path,
-        trust_remote_code=trust_remote_code,
-    )
+def _reject_removed_batch_strategy_selector() -> None:
+    """Fail closed instead of silently preserving the removed mutable mode."""
 
-
-def _load_baseline_model(baseline_path: Path) -> Any:
-    trust_remote_code = require_remote_code_opt_in("create_edits_batch.py")
-    return AutoModelForCausalLM.from_pretrained(
-        baseline_path,
-        dtype=torch.bfloat16,
-        trust_remote_code=trust_remote_code,
-        device_map="auto",
-        low_cpu_mem_usage=True,
-    )
-
-
-def _batch_edit_strategy() -> str:
-    raw = os.environ.get("PACK_BATCH_EDIT_STRATEGY", "reload").strip().lower()
-    if raw not in _BATCH_EDIT_STRATEGIES:
+    if "PACK_BATCH_EDIT_STRATEGY" in os.environ:
         raise ValueError(
-            "PACK_BATCH_EDIT_STRATEGY must be one of: "
-            + ", ".join(sorted(_BATCH_EDIT_STRATEGIES))
+            "PACK_BATCH_EDIT_STRATEGY is no longer supported; verifier-grade "
+            "generated edits are always materialized directly from safetensors"
         )
-    return raw
 
 
 def _get_edit_dir_name(parsed_spec: dict[str, object], version: str) -> str:
-    if parsed_spec.get("edit_dir_name"):
-        return str(parsed_spec["edit_dir_name"])
-
     edit_type = str(parsed_spec["type"])
+    migration_message = real_training_edit_migration_message(edit_type)
+    if migration_message is not None:
+        raise ValueError(migration_message)
+
+    def canonical_generated_dir_name(computed: str) -> str:
+        supplied = parsed_spec.get("edit_dir_name")
+        if supplied not in (None, "", computed):
+            raise ValueError(
+                "verifier-grade generated transformations require their canonical "
+                "directory identity"
+            )
+        return computed
+
     if edit_type == "quant_rtn":
-        return f"quant_{parsed_spec['bits']}bit_{version}"
-    if edit_type == "fp8_quant":
-        return f"fp8_{parsed_spec['format']}_{version}"
+        return canonical_generated_dir_name(
+            generated_transformation_edit_dir_name(
+                edit_type=edit_type,
+                parameters={
+                    "bits": parsed_spec.get("bits"),
+                    "group_size": parsed_spec.get("group_size"),
+                },
+                scope=parsed_spec.get("scope"),
+                version=version,
+            )
+        )
     if edit_type == "magnitude_prune":
         pct = int(float(parsed_spec["ratio"]) * 100)
         return f"prune_{pct}pct_{version}"
-    if edit_type == "lowrank_svd":
-        return f"svd_rank{parsed_spec['rank']}_{version}"
-    if edit_type == "lora_merge":
-        return f"lora_rank{parsed_spec['rank']}_{version}"
-    if edit_type == "fine_tune":
-        return f"fine_tune_step{parsed_spec['steps']}_{version}"
+    if edit_type in _UNSUPPORTED_GENERATED_EDIT_TYPES:
+        raise ValueError(
+            f"{edit_type} requires a dedicated storage and replay contract"
+        )
+    if edit_type == "synthetic_lowrank_delta":
+        return canonical_generated_dir_name(
+            generated_transformation_edit_dir_name(
+                edit_type=edit_type,
+                parameters={
+                    "rank": parsed_spec.get("rank"),
+                    "scale": parsed_spec.get("scale"),
+                },
+                scope=parsed_spec.get("scope"),
+                version=version,
+            )
+        )
+    if edit_type == "synthetic_dense_update":
+        return canonical_generated_dir_name(
+            generated_transformation_edit_dir_name(
+                edit_type=edit_type,
+                parameters={
+                    "step_size": parsed_spec.get("step_size"),
+                    "iterations": parsed_spec.get("iterations"),
+                },
+                scope=parsed_spec.get("scope"),
+                version=version,
+            )
+        )
+    if parsed_spec.get("edit_dir_name"):
+        return str(parsed_spec["edit_dir_name"])
     return f"{edit_type}_{version}"
-
-
-def _build_edited_model_and_metadata(
-    model: Any,
-    parsed_spec: dict[str, object],
-    *,
-    clone_model: bool = True,
-) -> tuple[Any, dict[str, object]]:
-    edited = copy.deepcopy(model) if clone_model else model
-    edit_type = str(parsed_spec["type"])
-    if edit_type == "quant_rtn":
-        bits = int(parsed_spec["bits"])
-        group_size = int(parsed_spec["group_size"])
-        scope = str(parsed_spec["scope"])
-        stats = apply_rtn_dequantized_simulation(
-            edited,
-            bits=bits,
-            group_size=group_size,
-            scope=scope,
-        )
-        metadata = build_validation_edit_metadata(
-            edit_type="quant_rtn",
-            scope=scope,
-            parameters={"bits": bits, "group_size": group_size},
-            coverage=stats.coverage_payload(),
-            extra={
-                "quantization_mode": "rtn_dequantized_external_subject_simulation",
-                "quantized_params": stats.edited_tensors,
-            },
-        )
-        return edited, metadata
-    if edit_type == "magnitude_prune":
-        ratio = float(parsed_spec["ratio"])
-        scope = str(parsed_spec["scope"])
-        stats = apply_dense_magnitude_prune(edited, sparsity=ratio, scope=scope)
-        metadata = build_validation_edit_metadata(
-            edit_type="magnitude_prune",
-            scope=scope,
-            parameters={"target_sparsity": ratio},
-            coverage=stats.coverage_payload(),
-            extra={
-                "target_sparsity": ratio,
-                "actual_sparsity": stats.details.get("actual_sparsity"),
-                "pruned_params": stats.edited_tensors,
-            },
-        )
-        return edited, metadata
-    if edit_type == "lowrank_svd":
-        rank = int(parsed_spec["rank"])
-        scope = str(parsed_spec["scope"])
-        stats = apply_dense_lowrank_approximation(edited, rank=rank, scope=scope)
-        metadata = build_validation_edit_metadata(
-            edit_type="lowrank_svd",
-            scope=scope,
-            parameters={"rank": rank},
-            coverage=stats.coverage_payload(),
-            extra={
-                "rank": rank,
-                "modified_matrices": stats.edited_tensors,
-                "avg_energy_retained": stats.details.get("avg_energy_retained"),
-                "base_scope": stats.details.get("base_scope"),
-                "layer_limit": stats.details.get("layer_limit"),
-                "layer": stats.details.get("layer"),
-            },
-        )
-        return edited, metadata
-    if edit_type == "lora_merge":
-        rank = int(parsed_spec["rank"])
-        alpha = float(parsed_spec["alpha"])
-        scope = str(parsed_spec["scope"])
-        stats = apply_dense_lora_merge_delta(
-            edited,
-            rank=rank,
-            alpha=alpha,
-            scope=scope,
-        )
-        metadata = build_lora_merge_validation_metadata(
-            scope=scope,
-            rank=rank,
-            alpha=alpha,
-            stats=stats,
-        )
-        return edited, metadata
-    if edit_type == "fine_tune":
-        learning_rate = float(parsed_spec["learning_rate"])
-        steps = int(parsed_spec["steps"])
-        scope = str(parsed_spec["scope"])
-        stats = apply_tiny_fine_tune_update(
-            edited,
-            learning_rate=learning_rate,
-            steps=steps,
-            scope=scope,
-        )
-        metadata = build_fine_tune_validation_metadata(
-            scope=scope,
-            learning_rate=learning_rate,
-            steps=steps,
-            stats=stats,
-        )
-        return edited, metadata
-    if edit_type == "fp8_quant":
-        format_type = str(parsed_spec["format"])
-        scope = str(parsed_spec["scope"])
-        stats = apply_fp8_dequantized_simulation(
-            edited,
-            format_type=format_type,
-            scope=scope,
-        )
-        metadata = build_validation_edit_metadata(
-            edit_type="fp8_quant",
-            scope=scope,
-            parameters={"format": format_type},
-            coverage=stats.coverage_payload(),
-            extra={
-                "quantization_mode": "fp8_dequantized_external_subject_simulation",
-                "format": format_type,
-                "quantized_tensors": stats.edited_tensors,
-                "avg_relative_error": stats.details.get("avg_relative_error"),
-                "torch_fp8_dtype_available": stats.details.get(
-                    "torch_fp8_dtype_available"
-                ),
-            },
-        )
-        return edited, metadata
-    raise ValueError(f"Unknown edit type: {edit_type}")
 
 
 def _clear_memory() -> None:
     gc.collect()
-    torch.cuda.empty_cache()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
-def _edit_artifact_complete(edit_path: Path) -> bool:
-    return bool(validate_edit_artifact(edit_path, require_metadata=True))
-
-
-def _create_edit_artifact(
+def _create_streaming_magnitude_prune_artifact(
     *,
-    model: Any,
-    tokenizer: Any,
+    baseline_path: Path,
     parsed_spec: dict[str, object],
     edit_path: Path,
-    clone_model: bool = True,
 ) -> None:
-    edited_model, metadata = _build_edited_model_and_metadata(
-        model,
-        parsed_spec,
-        clone_model=clone_model,
-    )
-    save_edited_subject_artifact(
-        model=edited_model,
-        tokenizer=tokenizer,
+    """Materialize pruning without loading a mutable Transformers model."""
+    if not _is_magnitude_prune(parsed_spec):
+        raise ValueError("streaming pruning helper received a non-pruning edit")
+    ratio = float(parsed_spec["ratio"])
+    scope = str(parsed_spec["scope"])
+    result = materialize_magnitude_pruned_artifact(
+        baseline_path=baseline_path,
         output_path=edit_path,
-        metadata=metadata,
+        sparsity=ratio,
+        scope=scope,
     )
-    del edited_model
-    _clear_memory()
+    print(
+        "    Streaming prune: "
+        f"{result['selected_tensors']} tensors, "
+        f"{result['effective_changed_params']:,} changed"
+    )
+
+
+def _canonical_transformation_inputs(
+    parsed_spec: Mapping[str, object],
+) -> tuple[str, dict[str, object], str]:
+    """Validate a resolved batch payload against the replay contract."""
+
+    edit_type = str(parsed_spec.get("type") or "")
+    scope = validate_transformation_scope(parsed_spec.get("scope"))
+    if edit_type == "quant_rtn":
+        raw_parameters: dict[str, object] = {
+            "bits": parsed_spec.get("bits"),
+            "group_size": parsed_spec.get("group_size"),
+        }
+    elif edit_type == SYNTHETIC_LOWRANK_DELTA:
+        raw_parameters = {
+            "rank": parsed_spec.get("rank"),
+            "scale": parsed_spec.get("scale"),
+        }
+    elif edit_type == SYNTHETIC_DENSE_UPDATE:
+        raw_parameters = {
+            "step_size": parsed_spec.get("step_size"),
+            "iterations": parsed_spec.get("iterations"),
+        }
+    else:
+        raise TransformationContractError(
+            f"{edit_type!r} is not a verifier-grade generated transformation"
+        )
+    specification = canonical_transformation_spec(edit_type, raw_parameters)
+    parameters = specification.get("parameters")
+    if not isinstance(parameters, Mapping):  # contract invariant
+        raise TransformationContractError("canonical transformation parameters missing")
+    return edit_type, dict(parameters), scope
+
+
+def _create_streaming_transformation_artifact(
+    *,
+    baseline_path: Path,
+    parsed_spec: dict[str, object],
+    edit_path: Path,
+) -> None:
+    """Materialize a supported transform without loading a Transformers model."""
+
+    edit_type, parameters, scope = _canonical_transformation_inputs(parsed_spec)
+    result = materialize_transformation_artifact(
+        baseline_path=baseline_path,
+        output_path=edit_path,
+        edit_type=edit_type,
+        parameters=parameters,
+        scope=scope,
+    )
+    print(
+        "    Streaming transformation: "
+        f"{edit_type}, {result['selected_tensors']} tensors, "
+        f"{result['actual_changes']['value_changed_params']:,} changed"
+    )
+
+
+def _materialize_pending_edit_artifact(
+    *,
+    baseline_path: Path,
+    parsed_spec: dict[str, object],
+    edit_path: Path,
+) -> None:
+    if _is_magnitude_prune(parsed_spec):
+        _create_streaming_magnitude_prune_artifact(
+            baseline_path=baseline_path,
+            parsed_spec=parsed_spec,
+            edit_path=edit_path,
+        )
+        return
+    if _is_streaming_transformation(parsed_spec):
+        _create_streaming_transformation_artifact(
+            baseline_path=baseline_path,
+            parsed_spec=parsed_spec,
+            edit_path=edit_path,
+        )
+        return
+    raise ValueError(
+        f"Unsupported batch edit type: {parsed_spec.get('type')!r}; "
+        "use a dedicated verifier-grade generation path"
+    )
 
 
 def _process_spec_entry(
     *,
     spec_entry: object,
     model_output_dir: Path,
-    model: Any,
-    tokenizer: Any,
-    clone_model: bool = True,
+    baseline_path: Path,
 ) -> tuple[int, int]:
-    pending, created, failed = _resolve_pending_spec_entry(
-        spec_entry=spec_entry,
-        model_output_dir=model_output_dir,
-    )
+    try:
+        pending, created, failed = _resolve_pending_spec_entry(
+            spec_entry=spec_entry,
+            model_output_dir=model_output_dir,
+        )
+    except (KeyError, OSError, RuntimeError, TypeError, ValueError) as exc:
+        print(f"    ERROR: {exc}", file=sys.stderr)
+        return 0, 1
     if pending is None:
         return created, failed
 
     parsed, edit_path = pending
     try:
-        _create_edit_artifact(
-            model=model,
-            tokenizer=tokenizer,
+        _materialize_pending_edit_artifact(
+            baseline_path=baseline_path,
             parsed_spec=parsed,
             edit_path=edit_path,
-            clone_model=clone_model,
         )
     except (KeyError, OSError, RuntimeError, TypeError, ValueError) as exc:
         print(f"    ERROR: {exc}", file=sys.stderr)
@@ -340,19 +352,49 @@ def _resolve_pending_spec_entry(
         return None, 0, 0
     parsed = parsed_resolved.to_batch_payload()
 
+    # The lifecycle rewrites only receipt-verified clean selections into
+    # explicit literals before entering this generic streaming helper.  The exact
+    # canonical parameters and scope must bind the final path: a selection
+    # bundle cannot point two different candidates at one shared directory.
+    if "v2_selection_edit_dir_name" in spec_entry:
+        raise ValueError(
+            "retired v2 clean-selection artifact directory field is not accepted"
+        )
+    selected_dir = spec_entry.get("selection_edit_dir_name")
+    if selected_dir is not None:
+        expected_dir = _get_edit_dir_name(parsed, version)
+        if (
+            version != "clean"
+            or not isinstance(selected_dir, str)
+            or selected_dir != expected_dir
+        ):
+            raise ValueError("invalid clean-selection artifact directory")
+        parsed["edit_dir_name"] = selected_dir
+
     if parsed_resolved.skip:
         print(f"  Skip (tuned edit preset skipped): {spec_str}")
         return None, 0, 0
     if not parsed_resolved.selected:
+        reason = getattr(parsed_resolved, "reason", "")
+        if reason:
+            raise ValueError(reason)
         raise ValueError(
             f"Tuned edit preset missing for {spec_str}: {parsed_resolved.status}"
         )
 
     edit_dir_name = _get_edit_dir_name(parsed, version)
     edit_path = model_output_dir / "models" / edit_dir_name
-    if _edit_artifact_complete(edit_path):
-        print(f"  Skip (exists): {edit_dir_name}")
-        return None, 1, 0
+    # A final artifact must never be trusted or counted solely because it has
+    # metadata/receipt-shaped files.  The materializers can resume only their
+    # own digest-bound staging directories; an occupied final path is either a
+    # prior publication or untrusted residue and requires explicit operator
+    # action rather than a silent reuse.
+    if edit_path.exists() or edit_path.is_symlink():
+        raise ValueError(
+            "refusing final artifact reuse at "
+            f"{edit_path}; resumable generation uses the materializer staging "
+            "directory only"
+        )
 
     print(f"  Creating: {edit_dir_name}...")
     return (parsed, edit_path), 0, 0
@@ -362,9 +404,7 @@ def _process_edit_specs(
     *,
     edit_specs: list[object],
     model_output_dir: Path,
-    model: Any,
-    tokenizer: Any,
-    clone_model: bool = True,
+    baseline_path: Path,
 ) -> tuple[int, int]:
     created_count = 0
     failed_count = 0
@@ -372,53 +412,10 @@ def _process_edit_specs(
         created, failed = _process_spec_entry(
             spec_entry=spec_entry,
             model_output_dir=model_output_dir,
-            model=model,
-            tokenizer=tokenizer,
-            clone_model=clone_model,
+            baseline_path=baseline_path,
         )
         created_count += created
         failed_count += failed
-    return created_count, failed_count
-
-
-def _process_edit_specs_reloading_model(
-    *,
-    edit_specs: list[object],
-    baseline_path: Path,
-    model_output_dir: Path,
-    tokenizer: Any,
-) -> tuple[int, int]:
-    created_count = 0
-    failed_count = 0
-    for spec_entry in edit_specs:
-        model: Any | None = None
-        try:
-            pending, created, failed = _resolve_pending_spec_entry(
-                spec_entry=spec_entry,
-                model_output_dir=model_output_dir,
-            )
-            if pending is None:
-                created_count += created
-                failed_count += failed
-                continue
-            parsed, edit_path = pending
-            model = _load_baseline_model(baseline_path)
-            _create_edit_artifact(
-                model=model,
-                tokenizer=tokenizer,
-                parsed_spec=parsed,
-                edit_path=edit_path,
-                clone_model=False,
-            )
-            print(f"    Saved: {edit_path}")
-            created_count += 1
-        except (KeyError, OSError, RuntimeError, TypeError, ValueError) as exc:
-            print(f"    ERROR: {exc}", file=sys.stderr)
-            failed_count += 1
-        finally:
-            if model is not None:
-                del model
-            _clear_memory()
     return created_count, failed_count
 
 
@@ -429,45 +426,23 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         edit_specs = _parse_edit_specs_json(args.edit_specs_json)
+        _preflight_reject_real_training_specs(edit_specs)
+        _preflight_reject_unverifiable_generated_specs(edit_specs)
+        _reject_removed_batch_strategy_selector()
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
     _configure_determinism()
+    print(f"Creating {len(edit_specs)} edits...")
+    print("Materializing every verifier-grade edit directly from safetensors...")
     try:
-        strategy = _batch_edit_strategy()
-    except ValueError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
-
-    print(f"Creating {len(edit_specs)} edits with strategy={strategy}...")
-
-    model: Any | None = None
-    try:
-        tokenizer = _load_tokenizer(baseline_path)
-        if strategy == "deepcopy":
-            model = _load_baseline_model(baseline_path)
-            print("Baseline loaded once. Creating edits via model deepcopy...")
-            created_count, failed_count = _process_edit_specs(
-                edit_specs=edit_specs,
-                model_output_dir=model_output_dir,
-                model=model,
-                tokenizer=tokenizer,
-                clone_model=True,
-            )
-        else:
-            print(
-                "Reloading baseline per edit to avoid model deepcopy memory spikes..."
-            )
-            created_count, failed_count = _process_edit_specs_reloading_model(
-                edit_specs=edit_specs,
-                baseline_path=baseline_path,
-                model_output_dir=model_output_dir,
-                tokenizer=tokenizer,
-            )
+        created_count, failed_count = _process_edit_specs(
+            edit_specs=edit_specs,
+            baseline_path=baseline_path,
+            model_output_dir=model_output_dir,
+        )
     finally:
-        if model is not None:
-            del model
         _clear_memory()
 
     print(f"Batch complete: {created_count} created, {failed_count} failed")

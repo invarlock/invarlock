@@ -15,7 +15,7 @@ def _stub_finalize_dependencies(monkeypatch) -> None:
         return None
 
     for name in (
-        "attach_quality_overhead",
+        "attach_guard_metric_impact",
         "attach_policy_digest",
         "attach_secondary_metrics",
         "attach_classification",
@@ -97,12 +97,13 @@ def test_build_evaluation_report_preserves_top_level_guard_outcomes() -> None:
         policies={},
         resolved_policy={},
         policy_provenance={},
+        policy_resolution={},
         provenance={},
         plugin_provenance={},
         edit_name=None,
         artifacts_payload={},
         validation_filtered={},
-        guard_overhead_section={},
+        guard_metric_impact_section={},
         pm_tail_result={},
     )
 
@@ -177,7 +178,8 @@ def test_finalize_evaluation_report_handles_non_dict_tiny_relax_sections(
     assert evaluation_report["assurance"]["runtime_provenance_verification_status"] == (
         "pending"
     )
-    assert evaluation_report["assurance"]["verdict"] == "pending_verifier"
+    assert evaluation_report["assurance"]["verdict"] == "fail"
+    assert evaluation_report["assurance"]["blocking_reasons"]
 
 
 def test_finalize_evaluation_report_handles_existing_tiny_relax_flag(

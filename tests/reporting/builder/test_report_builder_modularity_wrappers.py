@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from invarlock.reporting.report_builder_support import (
     build_baseline_reference,
     extract_report_meta,
 )
-from invarlock.reporting.report_overhead import (
-    compute_quality_overhead_from_guard,
-    prepare_guard_overhead_section,
+from invarlock.reporting.report_metric_impact import (
+    compute_guard_metric_impact_from_guard,
+    prepare_guard_metric_impact_section,
 )
 from invarlock.reporting.report_policy import (
     resolve_pm_acceptance_range_from_report,
@@ -17,30 +19,35 @@ from invarlock.reporting.report_policy import (
 )
 from invarlock.reporting.report_provenance import build_provenance_block
 from invarlock.reporting.report_types import create_empty_report
-from invarlock.reporting.report_validation import compute_validation_flags
+from invarlock.reporting.validation.report import compute_validation_flags
+from tests.reporting._support_guard_metric_impact import ppl_arm_report
 
 
 def test_reporting_owner_modules_expose_injection_points():
     result = SimpleNamespace(
         metrics={
-            "overhead_ratio": 1.02,
-            "overhead_percent": 2.0,
-            "bare_ppl": 10.0,
-            "guarded_ppl": 10.2,
+            "metric_kind": "ppl_causal",
+            "direction": "lower",
+            "degradation_basis": "relative_increase",
+            "degradation": 0.02,
+            "display_value": 2.0,
+            "display_unit": "percent",
+            "bare_value": 10.0,
+            "guarded_value": 10.2,
         },
         messages=["ok"],
         warnings=[],
         errors=[],
-        checks={"ratio": True},
+        checks={"guard_metric_impact": True},
         passed=True,
     )
-    payload, passed = prepare_guard_overhead_section(
+    payload, passed = prepare_guard_metric_impact_section(
         {
-            "bare_report": {"metrics": {}},
-            "guarded_report": {"metrics": {}},
-            "overhead_threshold": 0.05,
+            "bare_report": ppl_arm_report(10.0),
+            "guarded_report": ppl_arm_report(10.2),
+            "degradation_limit": 0.05,
         },
-        validate_guard_overhead_fn=lambda *_a, **_k: result,
+        validate_guard_metric_impact_fn=lambda *_a, **_k: result,
     )
     assert payload["evaluated"] is True
     assert passed is True
@@ -52,13 +59,21 @@ def test_reporting_owner_modules_expose_injection_points():
         point = 10.0 if report is bare_report else 10.5
         return {"final": point}
 
-    quality = compute_quality_overhead_from_guard(
+    quality = compute_guard_metric_impact_from_guard(
         {"bare_report": bare_report, "guarded_report": guarded_report},
         pm_kind_hint="ppl_causal",
         compute_primary_metric_from_report_fn=_pm,
         get_metric_fn=lambda _kind: SimpleNamespace(direction="lower"),
     )
-    assert quality == {"basis": "ratio", "value": 1.05, "kind": "ppl_causal"}
+    assert quality is not None
+    assert quality["metric_kind"] == "ppl_causal"
+    assert quality["direction"] == "lower"
+    assert quality["bare_value"] == 10.0
+    assert quality["guarded_value"] == 10.5
+    assert quality["degradation_basis"] == "relative_increase"
+    assert quality["degradation"] == pytest.approx(0.05)
+    assert quality["display_value"] == pytest.approx(5.0)
+    assert quality["display_unit"] == "percent"
 
     prov = build_provenance_block(
         {"run_id": "edited", "provenance": {"dataset_split": "eval"}},
@@ -95,7 +110,7 @@ def test_reporting_owner_modules_expose_injection_points():
         tier="balanced",
         _ppl_metrics={"preview_total_tokens": 60000, "final_total_tokens": 60000},
         target_ratio=1.0,
-        guard_overhead={},
+        guard_metric_impact={},
         primary_metric={},
         moe={},
         dataset_capacity={"tokens_available": 200000},

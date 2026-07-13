@@ -7,7 +7,7 @@ import re
 import shutil
 import sys
 import zlib
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -91,43 +91,6 @@ def fix_layer_drop_config(
                 config.sliding_window = sliding_window
             except _CONFIG_ATTR_ERRORS:
                 pass
-
-
-def fix_layer_drop_config_json(
-    config: MutableMapping[str, Any],
-    *,
-    total_layers: int,
-    kept_layers: int,
-    baseline_config: Mapping[str, Any] | None = None,
-) -> None:
-    if not isinstance(total_layers, int) or not isinstance(kept_layers, int):
-        return
-    if total_layers < 1 or kept_layers < 1 or kept_layers > total_layers:
-        return
-
-    for key in ("num_hidden_layers", "n_layer", "num_layers"):
-        if key in config:
-            try:
-                config[key] = int(kept_layers)
-            except (TypeError, ValueError, OverflowError):
-                pass
-
-    for name, value in list(config.items()):
-        if "layer" not in name:
-            continue
-        if not isinstance(value, list):
-            continue
-        if len(value) != total_layers:
-            continue
-        config[name] = value[:kept_layers]
-
-    if baseline_config is None:
-        return
-
-    if config.get("sliding_window") is None:
-        sliding_window = baseline_config.get("sliding_window")
-        if isinstance(sliding_window, int) and sliding_window > 0:
-            config["sliding_window"] = sliding_window
 
 
 def _is_norm_module(module: torch.nn.Module) -> bool:

@@ -5,7 +5,7 @@ from datetime import datetime
 import pytest
 
 from invarlock.core.exceptions import ValidationError
-from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.rendering.markdown import render_report_markdown
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import create_empty_report
 from invarlock.reporting.run_report_formatters import (
@@ -14,6 +14,7 @@ from invarlock.reporting.run_report_formatters import (
     to_json,
     to_markdown,
 )
+from tests.reporting._support_canonical_reports import make_canonical_report
 
 
 def _minimal_report():
@@ -25,13 +26,16 @@ def _minimal_report():
             "adapter": "hf_causal",
             "commit": "deadbeefcafebabe",
             "device": "cpu",
+            "auto": {"tier": "balanced"},
         }
     )
+    r["context"] = {"profile": "dev", "assurance": {"mode": "off"}}
     r["data"].update(
         {
             "dataset": "toyset",
             "split": "validation",
             "seq_len": 8,
+            "stride": 8,
             "preview_n": 2,
             "final_n": 2,
         }
@@ -52,9 +56,6 @@ def _minimal_report():
     )
     r["metrics"].update(
         {
-            "ppl_preview": 10.0,
-            "ppl_final": 9.5,
-            "ppl_ratio": 0.95,
             "ppl_preview_ci": (9.8, 10.2),
             "ppl_final_ci": (9.3, 9.7),
             "ppl_ratio_ci": (0.93, 0.97),
@@ -105,16 +106,12 @@ def test_sanitize_for_json_properties():
     assert isinstance(out["dt"], str) and out["num"] == 1 and out["lst"][1] == "x"
 
 
-def test_make_report_accepts_baseline_v1_schema():
+def test_make_report_accepts_canonical_baseline_schema():
     report = _minimal_report()
-    baseline = {
-        "schema_version": "baseline-v1",
-        "meta": {"tokenizer_hash": "abc"},
-        "metrics": {
-            "primary_metric": {"kind": "ppl_causal", "preview": 10.0, "final": 9.5}
-        },
-    }
-    assert make_report(report, baseline)["schema_version"] == "v1"
+    baseline = _minimal_report()
+    baseline["edit"]["name"] = "noop"
+    baseline["metrics"]["primary_metric"].update({"preview": 10.0, "final": 9.5})
+    assert make_canonical_report(report, baseline)["schema_version"] == "v1"
 
 
 def test_to_markdown_default_title():
@@ -131,7 +128,7 @@ def test_to_html_with_compare():
 
 
 def test_save_report_cert_requires_baseline(tmp_path):
-    from invarlock.reporting.report_files import save_report
+    from invarlock.reporting.report_bundle import save_report
 
     r = _minimal_report()
     with pytest.raises(ValueError, match="save_evaluation_bundle"):
@@ -141,7 +138,8 @@ def test_save_report_cert_requires_baseline(tmp_path):
 def test_make_report_markdown_smoke():
     r = _minimal_report()
     baseline = _minimal_report()
-    md = render_report_markdown(make_report(r, baseline))
+    baseline["edit"]["name"] = "noop"
+    md = render_report_markdown(make_canonical_report(r, baseline))
     assert isinstance(md, str) and len(md) > 0
 
 
@@ -152,6 +150,7 @@ def test_markdown_guard_reports_section():
     r1["guards"] = [
         {
             "name": "spectral",
+            "passed": False,
             "policy": {},
             "metrics": {},
             "actions": [],
@@ -161,6 +160,7 @@ def test_markdown_guard_reports_section():
     r2["guards"] = [
         {
             "name": "spectral",
+            "passed": True,
             "policy": {},
             "metrics": {},
             "actions": [],

@@ -63,9 +63,19 @@ def _build_recompute_summary(
     primary_metric: dict[str, Any],
     tolerance: float,
 ) -> dict[str, Any] | None:
-    recompute: dict[str, Any] | None = None
+    family = _metric_family(kind)
+    if family == "other":
+        return None
+
+    def not_performed(reason: str) -> dict[str, Any]:
+        return {
+            "family": family,
+            "performed": False,
+            "ok": None,
+            "reason": reason,
+        }
+
     try:
-        family = _metric_family(kind)
         if family == "accuracy":
             metrics = cert_obj.get("metrics")
             cls = metrics.get("classification", {}) if isinstance(metrics, dict) else {}
@@ -73,11 +83,19 @@ def _build_recompute_summary(
             n_total = cls.get("n_total") if isinstance(cls, dict) else None
             n_correct_value = _coerce_finite_float(n_correct)
             n_total_value = _coerce_finite_float(n_total)
+            if n_correct is None or n_total is None:
+                return not_performed("missing_evidence")
+            if n_correct_value is None or n_total_value is None:
+                return not_performed("malformed_evidence")
+            if n_total_value == 0.0:
+                return not_performed("zero_denominator")
             if (
-                n_correct_value is not None
-                and n_total_value is not None
-                and n_total_value > 0.0
+                n_total_value < 0.0
+                or n_correct_value < 0.0
+                or n_correct_value > n_total_value
             ):
+                return not_performed("malformed_evidence")
+            if n_total_value > 0.0:
                 acc = n_correct_value / n_total_value
                 display_final = (
                     primary_metric.get("final")
@@ -91,11 +109,11 @@ def _build_recompute_summary(
                 )
                 recompute = {
                     "family": family,
+                    "performed": True,
                     "ok": ok,
                     "reason": None if ok else "mismatch",
                 }
-            else:
-                recompute = {"family": family, "ok": True, "reason": "skipped"}
+                return recompute
         elif family == "ppl":
             evaluation_windows = (
                 cert_obj.get("evaluation_windows", {})
@@ -107,53 +125,57 @@ def _build_recompute_summary(
                 if isinstance(evaluation_windows, dict)
                 else None
             )
-            if isinstance(final_window, dict):
-                logloss = final_window.get("logloss")
-                token_counts = final_window.get("token_counts")
-                if (
-                    isinstance(logloss, list)
-                    and isinstance(token_counts, list)
-                    and logloss
-                    and token_counts
-                    and len(logloss) == len(token_counts)
-                ):
-                    try:
-                        numerator = sum(
-                            float(a) * float(b)
-                            for a, b in zip(logloss, token_counts, strict=False)
-                        )
-                        denominator = sum(float(b) for b in token_counts)
-                        ok = True
-                        if denominator > 0:
-                            recomputed = float(math.exp(numerator / denominator))
-                            display_final = (
-                                primary_metric.get("final")
-                                if isinstance(primary_metric, dict)
-                                else None
-                            )
-                            display_final_value = _coerce_finite_float(display_final)
-                            ok = bool(
-                                display_final_value is not None
-                                and abs(display_final_value - recomputed)
-                                <= max(1e-12, tolerance)
-                            )
-                        recompute = {
-                            "family": family,
-                            "ok": ok,
-                            "reason": None if ok else "mismatch",
-                        }
-                    except _VERIFY_OUTPUT_EXCEPTIONS:
-                        recompute = {
-                            "family": family,
-                            "ok": True,
-                            "reason": "skipped",
-                        }
-                else:
-                    recompute = {"family": family, "ok": True, "reason": "skipped"}
-    except _VERIFY_OUTPUT_EXCEPTIONS:
-        recompute = None
+            if not isinstance(final_window, dict):
+                return not_performed("missing_evidence")
+            logloss = final_window.get("logloss")
+            token_counts = final_window.get("token_counts")
+            if logloss is None or token_counts is None:
+                return not_performed("missing_evidence")
+            if not isinstance(logloss, list) or not isinstance(token_counts, list):
+                return not_performed("malformed_evidence")
+            if not logloss or not token_counts:
+                return not_performed("missing_evidence")
+            if len(logloss) != len(token_counts):
+                return not_performed("malformed_evidence")
 
-    return recompute
+            losses = [_coerce_finite_float(value) for value in logloss]
+            weights = [_coerce_finite_float(value) for value in token_counts]
+            if any(value is None for value in losses + weights):
+                return not_performed("malformed_evidence")
+            finite_losses = [float(value) for value in losses if value is not None]
+            finite_weights = [float(value) for value in weights if value is not None]
+            if any(value < 0.0 for value in finite_weights):
+                return not_performed("malformed_evidence")
+            denominator = math.fsum(finite_weights)
+            if denominator <= 0.0:
+                return not_performed("zero_denominator")
+            numerator = math.fsum(
+                loss * weight
+                for loss, weight in zip(finite_losses, finite_weights, strict=True)
+            )
+            recomputed = float(math.exp(numerator / denominator))
+            if not math.isfinite(recomputed) or recomputed <= 0.0:
+                return not_performed("malformed_evidence")
+            display_final = (
+                primary_metric.get("final")
+                if isinstance(primary_metric, dict)
+                else None
+            )
+            display_final_value = _coerce_finite_float(display_final)
+            ok = bool(
+                display_final_value is not None
+                and abs(display_final_value - recomputed) <= max(1e-12, tolerance)
+            )
+            return {
+                "family": family,
+                "performed": True,
+                "ok": ok,
+                "reason": None if ok else "mismatch",
+            }
+    except _VERIFY_OUTPUT_EXCEPTIONS:
+        return not_performed("malformed_evidence")
+
+    return not_performed("malformed_evidence")
 
 
 def build_verify_json_result_item(
@@ -171,8 +193,10 @@ def build_verify_json_result_item(
     kind = str(
         (primary_metric.get("kind") if isinstance(primary_metric, dict) else "") or ""
     ).lower()
-    ratio = (
-        primary_metric.get("ratio_vs_baseline")
+    comparison = (
+        primary_metric.get(
+            "delta_vs_baseline_pp" if kind == "accuracy" else "ratio_vs_baseline"
+        )
         if isinstance(primary_metric, dict)
         else None
     )
@@ -202,12 +226,15 @@ def build_verify_json_result_item(
         "kind": kind,
         "ok": ok,
         "reason": reason,
-        "ratio_vs_baseline": _coerce_finite_float(ratio),
         "ci": ci_out,
         "recompute": recompute,
         "guard_warnings_present": warnings_present,
         "warning_count": warning_count,
     }
+    if kind == "accuracy":
+        item["delta_vs_baseline_pp"] = _coerce_finite_float(comparison)
+    elif kind.startswith("ppl"):
+        item["ratio_vs_baseline"] = _coerce_finite_float(comparison)
     if verification:
         item["verification"] = verification
     return item
@@ -220,14 +247,17 @@ def build_verify_json_payload(
     reason: str,
     tolerance: float,
     load_report_fn: Callable[[Path], dict[str, Any]],
+    report_by_path: dict[str, dict[str, Any]] | None = None,
     verification_by_path: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     for cert_path in reports:
-        try:
-            cert_obj = load_report_fn(cert_path)
-        except _VERIFY_OUTPUT_EXCEPTIONS:
-            cert_obj = {}
+        cert_obj = (report_by_path or {}).get(str(cert_path))
+        if cert_obj is None:
+            try:
+                cert_obj = load_report_fn(cert_path)
+            except _VERIFY_OUTPUT_EXCEPTIONS:
+                cert_obj = {}
         results.append(
             build_verify_json_result_item(
                 cert_path,
@@ -263,7 +293,6 @@ def build_verify_error_payload(
                 "kind": "",
                 "ok": False,
                 "reason": reason,
-                "ratio_vs_baseline": None,
                 "ci": None,
             }
         ],
@@ -287,8 +316,11 @@ def build_verify_success_line(report: dict[str, Any]) -> str:
         if isinstance(ppl, dict)
         else None
     )
-    ratio = (
-        primary_metric.get("ratio_vs_baseline")
+    kind_name = kind.lower()
+    comparison = (
+        primary_metric.get(
+            "delta_vs_baseline_pp" if kind_name == "accuracy" else "ratio_vs_baseline"
+        )
         if isinstance(primary_metric, dict)
         else None
     )
@@ -296,7 +328,7 @@ def build_verify_success_line(report: dict[str, Any]) -> str:
     ci_out = _coerce_ci_output(ci)
     ci_text = None
     width = None
-    ratio_value = _coerce_finite_float(ratio)
+    comparison_value = _coerce_finite_float(comparison)
     if ci_out is not None:
         ci_lo, ci_hi = ci_out
         ci_text = f"ci=[{ci_lo:.6f},{ci_hi:.6f}]"
@@ -306,8 +338,11 @@ def build_verify_success_line(report: dict[str, Any]) -> str:
         parts.append(f"metric={kind}")
     if _is_non_bool_number(n_prev) and _is_non_bool_number(n_fin):
         parts.append(f"n={n_prev}/{n_fin}")
-    if ratio_value is not None:
-        parts.append(f"point={ratio_value:.6f}")
+    if kind_name == "accuracy":
+        if comparison_value is not None:
+            parts.append(f"delta_vs_baseline_pp={comparison_value:.6f}")
+    elif comparison_value is not None:
+        parts.append(f"point={comparison_value:.6f}")
     if ci_text is not None:
         parts.append(ci_text)
     if isinstance(width, (int, float)):

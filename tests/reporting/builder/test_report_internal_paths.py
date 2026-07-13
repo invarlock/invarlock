@@ -2,35 +2,21 @@ from __future__ import annotations
 
 import math
 
+from invarlock.reporting import report_metric_impact as report_metric_impact_mod
 from invarlock.reporting import report_normalization as report_normalization_mod
-from invarlock.reporting import report_overhead as report_overhead_mod
 from invarlock.reporting import report_provenance as provenance_mod
 from invarlock.reporting.policy_utils import _build_resolved_policies
 from invarlock.reporting.utils import _coerce_int, _sanitize_seed_bundle
+from tests.reporting._support_report_builder import create_mock_baseline
 
 
-def test_normalize_baseline_variants():
-    # baseline-v1 fields
-    b1 = {
-        "schema_version": "baseline-v1",
-        "meta": {"commit_sha": "cafebabedeadbeef", "model_id": "m"},
-        "metrics": {"ppl_final": 50.0},
-        "spectral_base": {"caps": 0},
-        "rmt_base": {"outliers": 0},
-        "invariants": {"status": "pass"},
-    }
-    out = report_normalization_mod.normalize_baseline(b1)
-    assert out.get("model_id") == "m"
-    assert "ppl_final" in out
+def test_normalize_canonical_baseline():
+    baseline = create_mock_baseline(model_id="m", ppl_final=49.0)
 
-    # RunReport-like baseline without ppl_*, derive from PM
-    base_rr = {
-        "meta": {"model_id": "m"},
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 49.0}},
-        "edit": {"plan": {}, "plan_digest": "noop"},
-    }
-    out2 = report_normalization_mod.normalize_baseline(base_rr)
-    assert math.isfinite(out2.get("ppl_final", float("nan")))
+    normalized = report_normalization_mod.normalize_baseline(baseline)
+
+    assert normalized["model_id"] == "m"
+    assert math.isfinite(normalized["ppl_final"])
 
 
 def test_coerce_and_sanitize_seed_bundle():
@@ -62,7 +48,7 @@ def test_format_helpers_and_resolved_policies():
     assert isinstance(res.get("confidence", {}), dict)
 
 
-def test_compute_report_and_quality_overhead():
+def test_compute_report_and_guard_metric_impact():
     # Small bare/guarded PM reports
     bare = {
         "evaluation_windows": {
@@ -74,10 +60,11 @@ def test_compute_report_and_quality_overhead():
             "final": {"logloss": [4.0, 4.1], "token_counts": [100, 100]}
         }
     }
-    out = report_overhead_mod.compute_quality_overhead_from_guard(
+    out = report_metric_impact_mod.compute_guard_metric_impact_from_guard(
         {"bare_report": bare, "guarded_report": guarded}, pm_kind_hint="ppl_causal"
     )
-    assert out and out["basis"] == "ratio" and out["value"] > 1.0
+    assert out and out["degradation_basis"] == "relative_increase"
+    assert out["degradation"] > 0.0
 
     # compute_report_digest minimal
     digest = provenance_mod.compute_report_digest(
