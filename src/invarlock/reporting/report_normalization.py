@@ -200,14 +200,19 @@ def _baseline_comparison_output(
     non_ppl_without_ppl_metrics = metrics_ppl_final is None and not pm_is_ppl
 
     baseline_eval_windows = {
-        "final": {
-            "window_ids": list(final_windows.get("window_ids", [])),
+        phase: {
+            "window_ids": list(windows.get("window_ids", [])),
+            "example_ids": [str(value) for value in windows.get("example_ids", [])],
             "logloss": [
                 float(x)
-                for x in final_windows.get("logloss", [])
+                for x in windows.get("logloss", [])
                 if isinstance(x, int | float)
             ],
         }
+        for phase, windows in (
+            ("preview", preview_windows),
+            ("final", final_windows),
+        )
     }
     bootstrap_info = (
         baseline["metrics"].get("bootstrap", {})

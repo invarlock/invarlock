@@ -110,6 +110,20 @@ def _window_payload(window: Mapping[str, Any] | None) -> dict[str, Any]:
     processor_identity = window_map.get("processor_identity")
     if isinstance(processor_identity, Mapping):
         payload["processor_identity"] = dict(processor_identity)
+    is_multimodal = bool(payload["example_ids"]) and bool(
+        payload.get("records") or payload.get("input_records")
+    )
+    if is_multimodal:
+        for key in (
+            "window_ids",
+            "input_ids",
+            "attention_masks",
+            "masked_token_counts",
+            "actual_token_counts",
+            "labels",
+        ):
+            if not payload[key]:
+                payload.pop(key)
     return payload
 
 

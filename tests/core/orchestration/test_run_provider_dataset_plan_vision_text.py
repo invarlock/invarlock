@@ -444,7 +444,7 @@ def test_vision_text_dataset_plan_normal_path_handles_noncallable_digest() -> No
     assert result.final_count == 1
     assert result.preview_records[0]["example_id"] == "ex-1"
     assert result.final_records[0]["example_id"] == "ex-2"
-    assert result.calibration_data[0]["window_id"] == "preview::0"
-    assert result.calibration_data[1]["window_id"] == "final::0"
+    assert result.calibration_data[0]["window_id"] == "preview::ex-1"
+    assert result.calibration_data[1]["window_id"] == "final::ex-2"
     assert result.dataset_meta["provider_digest"] == {}
     assert result.final_records[0]["seq_len"] == 6

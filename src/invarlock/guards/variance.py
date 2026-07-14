@@ -62,6 +62,31 @@ def _tap_patterns_from_policy(policy: dict[str, Any]) -> list[str]:
     return tap_patterns
 
 
+def _bind_multimodal_processor_identity(guard: Any, adapter: Any) -> None:
+    """Bind a multimodal adapter's tokenizer identity into the run dataset context."""
+    if adapter is None:
+        return
+    processor_identity = getattr(adapter, "processor_identity", None)
+    if not isinstance(processor_identity, Mapping):
+        return
+    tokenizer_sha256 = processor_identity.get("tokenizer_sha256")
+    if not isinstance(tokenizer_sha256, str) or not tokenizer_sha256.strip():
+        raise ValueError(
+            "multimodal processor identity must provide a non-empty tokenizer_sha256"
+        )
+    dataset_meta = getattr(guard, "_dataset_meta", None)
+    if not isinstance(dataset_meta, dict):
+        raise ValueError(
+            "multimodal processor identity requires a mutable run dataset context"
+        )
+    existing = dataset_meta.get("tokenizer_hash")
+    if existing is not None and existing != tokenizer_sha256:
+        raise ValueError(
+            "multimodal tokenizer identity mismatch between dataset context and adapter"
+        )
+    dataset_meta["tokenizer_hash"] = tokenizer_sha256
+
+
 def prepare_guard(
     guard: Any,
     model: nn.Module,
@@ -129,6 +154,8 @@ def prepare_guard(
         if "tap" in policy:
             guard._tap_patterns = _tap_patterns_from_policy(guard._policy)
             guard._stats["tap"] = list(guard._tap_patterns)
+
+    _bind_multimodal_processor_identity(guard, adapter)
 
     guard._log_event(
         "prepare",
@@ -532,16 +559,20 @@ class VarianceGuard(Guard):
         if isinstance(pairing_baseline, dict):
             preview_section = pairing_baseline.get("preview") or {}
             final_section = pairing_baseline.get("final") or {}
-            pairing_reference.extend(
-                self._normalize_pairing_ids(
-                    "preview", preview_section.get("window_ids") or []
-                )
+            preview_ids = (
+                preview_section.get("window_ids")
+                or preview_section.get("example_ids")
+                or []
+            )
+            final_ids = (
+                final_section.get("window_ids")
+                or final_section.get("example_ids")
+                or []
             )
             pairing_reference.extend(
-                self._normalize_pairing_ids(
-                    "final", final_section.get("window_ids") or []
-                )
+                self._normalize_pairing_ids("preview", preview_ids)
             )
+            pairing_reference.extend(self._normalize_pairing_ids("final", final_ids))
             if pairing_reference:
                 joined = "||".join(pairing_reference)
                 import hashlib

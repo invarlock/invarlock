@@ -165,6 +165,40 @@ def test_serialize_evaluation_windows_keeps_records_and_processor_digest() -> No
     }
 
 
+def test_serialize_multimodal_windows_omits_empty_token_only_fields() -> None:
+    payload = serialize_evaluation_windows(
+        {
+            "preview": {
+                "example_ids": ["ex-1"],
+                "records": [{"id": "ex-1", "correct": True}],
+                "input_records": [{"id": "ex-1", "answers": ["cat"]}],
+                "processor_identity": {
+                    "tokenizer_sha256": "sha256:" + "a" * 64,
+                    "processor_sha256": "sha256:" + "b" * 64,
+                },
+            },
+            "final": {
+                "example_ids": ["ex-2"],
+                "records": [{"id": "ex-2", "correct": False}],
+            },
+        }
+    )
+
+    assert payload is not None
+    assert payload["preview"]["example_ids"] == ["ex-1"]
+    assert payload["preview"]["records"] == [{"id": "ex-1", "correct": True}]
+    assert payload["preview"]["processor_identity"]["tokenizer_sha256"] == (
+        "sha256:" + "a" * 64
+    )
+    for phase in ("preview", "final"):
+        assert "window_ids" not in payload[phase]
+        assert "input_ids" not in payload[phase]
+        assert "attention_masks" not in payload[phase]
+        assert "masked_token_counts" not in payload[phase]
+        assert "actual_token_counts" not in payload[phase]
+        assert "labels" not in payload[phase]
+
+
 def test_build_fallback_evaluation_windows_for_multimodal_records() -> None:
     payload = build_fallback_evaluation_windows(
         [

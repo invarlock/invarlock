@@ -229,13 +229,13 @@ def _vision_text_dataset_plan(
     seq_len = int(getattr(cfg_dataset, "seq_len", 0) or 0)
     calibration_data: list[dict[str, Any]] = []
     for arm, records in (("preview", preview_records), ("final", final_records)):
-        for index, record in enumerate(records):
+        for record in records:
             record["seq_len"] = seq_len
             record["example_id"] = str(
                 record.get("id") or record.get("example_id") or ""
             )
             entry = dict(record)
-            entry["window_id"] = f"{arm}::{index}"
+            entry["window_id"] = f"{arm}::{record['example_id']}"
             calibration_data.append(entry)
 
     preview_ids = [str(record["example_id"]) for record in preview_records]
