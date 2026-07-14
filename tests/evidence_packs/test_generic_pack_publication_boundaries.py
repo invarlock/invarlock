@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -123,6 +124,36 @@ def test_prepublication_privacy_gate_rejects_host_paths(tmp_path: Path) -> None:
     )
     errors = publication_privacy_errors(tmp_path)
     assert any("macos_user_home_path" in error for error in errors)
+
+
+def test_prepublication_privacy_gate_decodes_json_before_path_scan(
+    tmp_path: Path,
+) -> None:
+    public_file = tmp_path / "reports/model/scenario/evaluation.report.json"
+    public_file.parent.mkdir(parents=True)
+    public_file.write_text(
+        json.dumps({"prediction": "F:\n<think>\n</think>\ntrucks"}) + "\n",
+        encoding="utf-8",
+    )
+
+    errors = publication_privacy_errors(tmp_path)
+
+    assert not any("windows_host_path" in error for error in errors)
+
+
+def test_prepublication_privacy_gate_rejects_decoded_json_windows_path(
+    tmp_path: Path,
+) -> None:
+    public_file = tmp_path / "reports/model/scenario/evaluation.report.json"
+    public_file.parent.mkdir(parents=True)
+    public_file.write_text(
+        json.dumps({"checkpoint": "C:\\private\\input.jsonl"}) + "\n",
+        encoding="utf-8",
+    )
+
+    errors = publication_privacy_errors(tmp_path)
+
+    assert any("windows_host_path" in error for error in errors)
 
 
 @pytest.mark.parametrize(

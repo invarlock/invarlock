@@ -222,7 +222,7 @@ def _structured_string_values(value: Any) -> list[str]:
     return []
 
 
-def _decoded_structured_strings(path: Path, text: str) -> list[str]:
+def _decoded_structured_strings(path: Path, text: str) -> tuple[bool, list[str]]:
     try:
         if path.suffix == ".json":
             documents = [json.loads(text)]
@@ -231,13 +231,13 @@ def _decoded_structured_strings(path: Path, text: str) -> list[str]:
         elif path.suffix in {".yaml", ".yml"}:
             documents = list(yaml.safe_load_all(text))
         else:
-            return []
+            return False, []
     except (json.JSONDecodeError, yaml.YAMLError):
-        return []
+        return False, []
     values: list[str] = []
     for document in documents:
         values.extend(_structured_string_values(document))
-    return values
+    return True, values
 
 
 def _structured_key_values(value: Any) -> list[tuple[str, Any]]:
@@ -308,14 +308,19 @@ def _check_public_evidence_privacy(errors: list[str], root: Path) -> None:
         except (OSError, UnicodeDecodeError) as exc:
             errors.append(f"{_relative(path)}: unable to scan public text: {exc}")
             continue
-        lines = text.splitlines()
-        for line_number, line in enumerate(lines, start=1):
+        decoded, values = _decoded_structured_strings(path, text)
+        scan_raw_text = path.suffix not in {".json", ".jsonl"} or not decoded
+        if scan_raw_text:
+            lines = text.splitlines()
+            for line_number, line in enumerate(lines, start=1):
+                for name, pattern, message in PRIVATE_EXECUTION_PATTERNS:
+                    if pattern.search(line):
+                        errors.append(
+                            f"{_relative(path)}:{line_number}: {name}: {message}"
+                        )
+        for value in values:
             for name, pattern, message in PRIVATE_EXECUTION_PATTERNS:
-                if pattern.search(line):
-                    errors.append(f"{_relative(path)}:{line_number}: {name}: {message}")
-        for value in _decoded_structured_strings(path, text):
-            for name, pattern, message in PRIVATE_EXECUTION_PATTERNS:
-                if not pattern.search(value) or value in text:
+                if not pattern.search(value) or (scan_raw_text and value in text):
                     continue
                 errors.append(f"{_relative(path)}: decoded value: {name}: {message}")
         for name in _structured_privacy_errors(path, text):
