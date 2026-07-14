@@ -282,7 +282,12 @@ def _materialize_multimodal_pairing_schedule(
                 entry = baseline_record
 
             entry["example_id"] = example_id
-            entry["window_id"] = f"{arm}::{index}"
+            # Multimodal pairing is identity-based: the variance guard derives its
+            # expected schedule from the authenticated example IDs.  Preserve that
+            # identity in calibration batches instead of replacing it with a
+            # positional index, which would make an unchanged baseline/subject
+            # pair fail closed as a schedule mismatch.
+            entry["window_id"] = f"{arm}::{example_id}"
             target_records.append(dict(entry))
             materialized.append(entry)
 
