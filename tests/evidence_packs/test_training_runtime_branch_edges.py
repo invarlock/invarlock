@@ -27,6 +27,7 @@ from tests.evidence_packs._support_training_runtime import (
     FakeLoraConfig,
     FakePeftModel,
     RecordingAdamW,
+    pin_fake_training_toolchain,
 )
 from tests.evidence_packs._support_training_runtime_branch_contracts import (
     _FakeFunction,
@@ -35,6 +36,7 @@ from tests.evidence_packs._support_training_runtime_branch_contracts import (
 
 @pytest.fixture
 def fake_runtime(monkeypatch: pytest.MonkeyPatch) -> runtime.RuntimeDependencies:
+    pin_fake_training_toolchain(monkeypatch)
     FakeAutoModel.reload_baseline = False
     FakeAutoModel.source_state = None
     dependencies = runtime.RuntimeDependencies(
@@ -153,6 +155,19 @@ def test_profile_device_determinism_and_toolchain_failures_are_actionable() -> N
     )
     with pytest.raises(runtime.TrainingRuntimeError, match="torch=.*transformers"):
         runtime._require_expected_toolchain(profile, deps, None)
+
+
+def test_toolchain_normalizes_torch_wheel_build_suffix() -> None:
+    observed = runtime._package_toolchain(
+        SimpleNamespace(__version__="2.11.0+cu128"), "5.12.0", "0.19.1"
+    )
+
+    assert observed == {
+        "python": runtime.platform.python_version(),
+        "torch": "2.11.0",
+        "transformers": "5.12.0",
+        "peft": "0.19.1",
+    }
 
 
 def test_training_rows_reject_digest_json_text_and_count_tampering(

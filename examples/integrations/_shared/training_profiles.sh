@@ -95,7 +95,7 @@ import shutil
 import tempfile
 import sys
 
-MARKER_SCHEMA = "invarlock.integration_training_output.v1"
+MARKER_SCHEMA = "invarlock.integration_training_output.v2"
 
 repo_root = Path(sys.argv[1]).expanduser().resolve()
 sys.path.insert(0, str(repo_root / "src"))
@@ -136,6 +136,8 @@ expected = {
     "subject_path": str(path),
     "st_dev": stat.st_dev,
     "st_ino": stat.st_ino,
+    "st_mtime_ns": stat.st_mtime_ns,
+    "st_ctime_ns": stat.st_ctime_ns,
 }
 if ownership != expected:
     raise SystemExit(f"Refusing ownership-marker mismatch for subject output: {path}")
@@ -174,7 +176,7 @@ from pathlib import Path
 import tempfile
 import sys
 
-MARKER_SCHEMA = "invarlock.integration_training_output.v1"
+MARKER_SCHEMA = "invarlock.integration_training_output.v2"
 
 repo_root = Path(sys.argv[1]).expanduser().resolve()
 requested_path = Path(sys.argv[2]).expanduser()
@@ -192,6 +194,8 @@ payload = {
     "subject_path": str(path),
     "st_dev": stat.st_dev,
     "st_ino": stat.st_ino,
+    "st_mtime_ns": stat.st_mtime_ns,
+    "st_ctime_ns": stat.st_ctime_ns,
 }
 marker = path.parent / f".{path.name}.invarlock-training-output.json"
 if marker.exists() or marker.is_symlink():
@@ -321,10 +325,12 @@ except StrictJsonError as exc:
     raise SystemExit(f"Unable to validate training-output ownership marker: {exc}") from exc
 stat = subject_dir.stat(follow_symlinks=False)
 expected_ownership = {
-    "schema": "invarlock.integration_training_output.v1",
+    "schema": "invarlock.integration_training_output.v2",
     "subject_path": str(subject_dir),
     "st_dev": stat.st_dev,
     "st_ino": stat.st_ino,
+    "st_mtime_ns": stat.st_mtime_ns,
+    "st_ctime_ns": stat.st_ctime_ns,
 }
 if ownership != expected_ownership:
     raise SystemExit("Training subject identity changed after materialization")

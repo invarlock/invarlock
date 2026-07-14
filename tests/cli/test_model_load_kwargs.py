@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import pytest
@@ -329,7 +330,7 @@ def test_load_model_with_cfg_rejects_preload_tree_substitution(tmp_path) -> None
 
 
 @pytest.mark.unit
-def test_load_model_with_cfg_rejects_tree_swap_and_revert_during_load(
+def test_load_model_with_cfg_rejects_observable_tree_swap_and_revert_during_load(
     tmp_path,
 ) -> None:
     checkpoint = tmp_path / "checkpoint"
@@ -359,6 +360,9 @@ def test_load_model_with_cfg_rejects_tree_swap_and_revert_during_load(
         def load_model(self, model_id: str, device: str | None = None, **kwargs):
             del device, kwargs
             model_path = Path(model_id)
+            # Overlay filesystems can expose ctime at millisecond precision. Cross a
+            # clock tick so the stat-token contract is exercised deterministically.
+            time.sleep(0.01)
             model_path.replace(held)
             malicious.replace(model_path)
             assert (model_path / "model.safetensors").read_bytes() == b"malicious"

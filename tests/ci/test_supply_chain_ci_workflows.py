@@ -16,6 +16,7 @@ TRANSFORMERS_LOCKFILES = (
     Path("requirements/workflows/hf-py313.txt"),
     Path("requirements/workflows/runtime-image-py312.txt"),
     Path("requirements/workflows/runtime-image-py312-aarch64.txt"),
+    Path("requirements/workflows/training-profile-py312.txt"),
 )
 TRANSFORMERS_512_HASHES = {
     "500be9eb644ede81c3103eee7687fc36d05dd75d1c76686c3820b26396fe7c7c",

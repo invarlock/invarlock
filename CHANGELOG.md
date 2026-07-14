@@ -53,6 +53,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated the pinned CodeQL, uv setup, Ruff, and Setuptools validation
   toolchain.
 
+### Removed
+
+- Removed the superseded tracked public-evidence corpus, compatibility
+  summaries, and historical failure fixtures after replacing them with compact
+  catalog indexes and hash-bound release-asset distribution.
+- Removed the legacy model-evidence sweep workflow, remote queue and scheduler
+  stack, campaign runner, and overlapping evidence-workflow wrappers after
+  consolidating execution around the catalog-bound lane command.
+- Removed duplicate tiny fine-tuning and PEFT materializers plus superseded
+  evidence-pack internals and guard-overhead guidance after replacing them with
+  immutable training profiles and current primary-metric impact documentation.
+
 ### Fixed
 
 - Fixed strict evidence-pack verification to bind each subject report to signed,
@@ -71,6 +83,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   independently supplied verifier input.
 - Fixed public-evidence, packaged-data, support-matrix, and model-catalog
   consistency checks so superseded results cannot be presented as current.
+- Fixed public-evidence privacy screening to inspect decoded JSON values,
+  avoiding false host-path matches in escaped model output while retaining
+  rejection of actual host paths.
+- Fixed source-checkout CLI and immutable training-profile CI isolation, Torch
+  wheel-version normalization, strict source-matrix import-path preservation,
+  and training-output ownership checks against immediate inode reuse.
+- Fixed training-artifact hashing to detect same-size concurrent rewrites even
+  when the underlying filesystem does not advance modification timestamps.
 - Fixed static-analysis findings in evidence utility CLIs, pruning-contract key
   validation, report-config cleanup, and verification export helpers.
 

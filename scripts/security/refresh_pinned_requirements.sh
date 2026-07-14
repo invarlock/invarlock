@@ -195,6 +195,13 @@ run_workflow_locks() {
     --python-platform aarch64-unknown-linux-gnu \
     --torch-backend cpu
 
+  compile_req_platform \
+    "${WORKFLOW_DIR}/training-profile.in" \
+    "${WORKFLOW_DIR}/training-profile-py312.txt" \
+    --python-version 3.12 \
+    --python-platform x86_64-unknown-linux-gnu \
+    --torch-backend cpu
+
   compile_pyproject "${WORKFLOW_DIR}/precommit-ci-py313.txt" \
     --python-version 3.13 \
     --extra precommit-ci

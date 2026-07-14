@@ -27,6 +27,7 @@ from tests.evidence_packs._support_training_runtime import (
     FakeLoraConfig,
     RecordingAdamW,
     TinyTokenizer,
+    pin_fake_training_toolchain,
 )
 from tests.evidence_packs._support_training_runtime import (
     fake_peft_dependencies as _fake_peft_dependencies,
@@ -35,6 +36,7 @@ from tests.evidence_packs._support_training_runtime import (
 
 @pytest.fixture
 def fake_runtime(monkeypatch: pytest.MonkeyPatch) -> runtime.RuntimeDependencies:
+    pin_fake_training_toolchain(monkeypatch)
     FakeAutoModel.reload_baseline = False
     FakeAutoModel.source_state = None
     dependencies = runtime.RuntimeDependencies(

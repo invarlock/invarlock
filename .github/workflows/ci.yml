@@ -73,13 +73,6 @@ jobs:
           INVARLOCK_REQUIRE_LOCAL_HF: "1"
         run: make local-hf-pipeline-smoke
 
-      - name: Run real tiny training profiles
-        env:
-          INVARLOCK_REQUIRE_REAL_TRAINING: "1"
-        run: >-
-          python -m pytest -q -m integration
-          tests/evidence_packs/test_training_runtime.py
-
       - name: Run mutation smoke
         run: make mutation-smoke
 
@@ -129,6 +122,44 @@ jobs:
 
       - name: Packaging smoke (minimal install)
         run: make packaging-smoke-minimal
+
+  training-profiles:
+    runs-on: ubuntu-latest
+    env:
+      INVARLOCK_LIGHT_IMPORT: "1"
+      PYTHONPATH: ${{ github.workspace }}/src
+      PYTHONWARNINGS: "default"
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.12.13"
+
+      - name: Cache pip
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        if: ${{ github.actor != 'nektos/act' }}
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-training-profile-py312-${{ hashFiles('requirements/workflows/training-profile-py312.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-training-profile-py312-
+
+      - name: Install immutable training profile
+        run: >-
+          python -m pip install
+          --require-hashes
+          --extra-index-url https://download.pytorch.org/whl/cpu
+          -r requirements/workflows/training-profile-py312.txt
+
+      - name: Run real tiny training profiles
+        env:
+          INVARLOCK_REQUIRE_REAL_TRAINING: "1"
+        run: >-
+          python -m pytest -q -m integration
+          tests/evidence_packs/test_training_runtime.py
 
   coverage-enforce:
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full == 'true') }}

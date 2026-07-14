@@ -11,6 +11,24 @@ import torch.nn.functional as functional
 from scripts.evidence_packs.python.editing import training_runtime as runtime
 
 
+def pin_fake_training_toolchain(monkeypatch: Any) -> None:
+    """Keep unit-training fakes independent of the host interpreter stack."""
+
+    def toolchain(
+        _torch: Any, transformers_version: str, peft_version: str | None
+    ) -> dict[str, str]:
+        value = {
+            "python": "3.12.13",
+            "torch": "2.11.0",
+            "transformers": transformers_version,
+        }
+        if peft_version is not None:
+            value["peft"] = peft_version
+        return value
+
+    monkeypatch.setattr(runtime, "_package_toolchain", toolchain)
+
+
 class TinyTokenizer:
     calls: list[dict[str, Any]] = []
     pad_token_id = 0

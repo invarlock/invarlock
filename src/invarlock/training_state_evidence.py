@@ -167,8 +167,31 @@ def directory_sha256(path: Path, *, exclude: frozenset[str] = frozenset()) -> st
                 _open_matches(pre=pre, opened=opened, relative=relative)
                 _update_part(hasher, relative.encode("utf-8"))
                 hasher.update(struct.pack(">Q", opened.st_size))
+                content_hasher = sha256()
+                bytes_read = 0
                 while chunk := os.read(file_fd, 1024 * 1024):
                     hasher.update(chunk)
+                    content_hasher.update(chunk)
+                    bytes_read += len(chunk)
+                try:
+                    os.lseek(file_fd, 0, os.SEEK_SET)
+                except OSError as exc:
+                    raise TrainingStateEvidenceError(
+                        f"artifact file could not be verified after hashing: {relative}"
+                    ) from exc
+                verification_hasher = sha256()
+                verification_bytes = 0
+                while chunk := os.read(file_fd, 1024 * 1024):
+                    verification_hasher.update(chunk)
+                    verification_bytes += len(chunk)
+                if (
+                    bytes_read != opened.st_size
+                    or verification_bytes != opened.st_size
+                    or content_hasher.digest() != verification_hasher.digest()
+                ):
+                    raise TrainingStateEvidenceError(
+                        f"artifact file changed during hashing: {relative}"
+                    )
                 post = os.fstat(file_fd)
                 path_post = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
                 if _stat_snapshot(opened) != _stat_snapshot(post) or _stat_identity(

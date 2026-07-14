@@ -47,6 +47,27 @@ def test_ci_adds_actionlint_and_packaging_smoke_gates() -> None:
     packaging_step = _find_step_by_name(min_steps, "Packaging smoke (minimal install)")
     assert packaging_step["run"] == "make packaging-smoke-minimal"
 
+    training_job = workflow["jobs"]["training-profiles"]
+    assert training_job["timeout-minutes"] == 20
+    training_steps = training_job["steps"]
+    setup_python = _find_step_by_name(training_steps, "Set up Python")
+    assert setup_python["with"]["python-version"] == "3.12.13"
+    install_training = _find_step_by_name(
+        training_steps, "Install immutable training profile"
+    )
+    assert "--require-hashes" in install_training["run"]
+    assert (
+        "--extra-index-url https://download.pytorch.org/whl/cpu"
+        in install_training["run"]
+    )
+    assert "training-profile-py312.txt" in install_training["run"]
+    training_step = _find_step_by_name(
+        training_steps, "Run real tiny training profiles"
+    )
+    assert training_step["env"]["INVARLOCK_REQUIRE_REAL_TRAINING"] == "1"
+    assert "-m integration" in training_step["run"]
+    assert "test_training_runtime.py" in training_step["run"]
+
 
 def test_ci_verify_full_runs_explicit_closure_gates() -> None:
     workflow = _load_workflow(Path(".github/workflows/ci.yml"))

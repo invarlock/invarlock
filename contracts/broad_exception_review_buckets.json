@@ -29,8 +29,8 @@
     {
       "path": "src/invarlock/cli/evaluate_report_phase.py",
       "lines": [
-        169,
-        194
+        170,
+        195
       ],
       "bucket": "acceptable",
       "rationale": "Receipt-bound selection finalizers are extension boundaries with heterogeneous failures; both catches terminate report publication through the explicit fail callback."

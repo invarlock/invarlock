@@ -205,11 +205,9 @@ def _context_paths(tmp_path: Path, *, corrupt_runtime: bool) -> dict[str, Path]:
     }
 
 
-def _run_real_evaluate(
+def _run_module_evaluate(
     paths: dict[str, Path], *, tmp_path: Path
 ) -> subprocess.CompletedProcess[str]:
-    executable = Path(sys.executable).with_name("invarlock")
-    assert executable.is_file()
     environment = os.environ.copy()
     for name in (
         "INVARLOCK_ALLOW_HOST_EXECUTION",
@@ -220,9 +218,12 @@ def _run_real_evaluate(
     ):
         environment.pop(name, None)
     environment["INVARLOCK_CONTAINER_EXECUTION"] = "1"
+    environment["PYTHONPATH"] = str(Path(__file__).resolve().parents[3] / "src")
     return subprocess.run(
         [
-            str(executable),
+            sys.executable,
+            "-m",
+            "invarlock",
             "evaluate",
             "--baseline",
             str(paths["baseline"]),
@@ -251,10 +252,10 @@ def _run_real_evaluate(
     )
 
 
-def test_installed_cli_accepts_complete_clean_selection_flags_before_model_work(
+def test_module_cli_accepts_complete_clean_selection_flags_before_model_work(
     tmp_path: Path,
 ) -> None:
-    result = _run_real_evaluate(
+    result = _run_module_evaluate(
         _context_paths(tmp_path, corrupt_runtime=False), tmp_path=tmp_path
     )
 
@@ -263,10 +264,10 @@ def test_installed_cli_accepts_complete_clean_selection_flags_before_model_work(
     assert "candidate baseline checkpoint" not in result.stdout + result.stderr
 
 
-def test_installed_cli_fails_closed_on_truncated_pre_evaluation_runtime_proof(
+def test_module_cli_fails_closed_on_truncated_pre_evaluation_runtime_proof(
     tmp_path: Path,
 ) -> None:
-    result = _run_real_evaluate(
+    result = _run_module_evaluate(
         _context_paths(tmp_path, corrupt_runtime=True), tmp_path=tmp_path
     )
 

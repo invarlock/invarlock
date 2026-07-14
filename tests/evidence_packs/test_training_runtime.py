@@ -30,6 +30,7 @@ from tests.evidence_packs._support_training_runtime import (
     RecordingAdamW,
     TinyCausalLM,
     TinyTokenizer,
+    pin_fake_training_toolchain,
     reset_training_fakes,
 )
 from tests.evidence_packs._support_training_runtime import (
@@ -44,6 +45,7 @@ def reset_fakes() -> None:
 
 @pytest.fixture
 def fake_runtime(monkeypatch: pytest.MonkeyPatch) -> runtime.RuntimeDependencies:
+    pin_fake_training_toolchain(monkeypatch)
     dependencies = runtime.RuntimeDependencies(
         torch=torch,
         auto_model=FakeAutoModel,

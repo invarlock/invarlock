@@ -539,9 +539,12 @@ def _replay_strict_verification(
 ) -> list[ValidationIssue]:
     env = os.environ.copy()
     source_path = str(repo_root / "src")
-    env["PYTHONPATH"] = source_path + (
-        os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else ""
-    )
+    inherited_pythonpath = [
+        str(Path(entry).resolve())
+        for entry in env.get("PYTHONPATH", "").split(os.pathsep)
+        if entry
+    ]
+    env["PYTHONPATH"] = os.pathsep.join([source_path, *inherited_pythonpath])
     with tempfile.TemporaryDirectory(prefix="invarlock-source-matrix-") as temp_dir:
         snapshot_dir = Path(temp_dir)
         snapshot_report = snapshot_dir / "evaluation.report.json"

@@ -161,9 +161,10 @@ def train(
 def toolchain(
     torch: Any, transformers_version: str, peft_version: str | None
 ) -> dict[str, str]:
+    torch_version = str(torch.__version__).split("+", 1)[0]
     value = {
         "python": platform.python_version(),
-        "torch": str(torch.__version__),
+        "torch": torch_version,
         "transformers": transformers_version,
     }
     if peft_version is not None:

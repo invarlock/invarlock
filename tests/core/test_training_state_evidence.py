@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import struct
 from pathlib import Path
 
 import pytest
@@ -40,6 +41,22 @@ def test_manifest_digest_changes_with_tensor_content() -> None:
     assert state_manifest_sha256(before) != state_manifest_sha256(after)
 
 
+def test_directory_hash_preserves_canonical_single_pass_digest(tmp_path: Path) -> None:
+    artifact = tmp_path / "artifact"
+    artifact.mkdir()
+    payload = b"stable-training-artifact"
+    (artifact / "model.bin").write_bytes(payload)
+
+    expected = hashlib.sha256(state_evidence.HASH_DOMAIN + b"directory-tree\0")
+    relative = b"model.bin"
+    expected.update(struct.pack(">Q", len(relative)))
+    expected.update(relative)
+    expected.update(struct.pack(">Q", len(payload)))
+    expected.update(payload)
+
+    assert state_evidence.directory_sha256(artifact) == "sha256:" + expected.hexdigest()
+
+
 def test_streaming_delta_binds_exact_scope_and_rejects_out_of_scope() -> None:
     before = {
         "target": torch.arange(29, dtype=torch.float32),
@@ -69,7 +86,7 @@ def test_streaming_delta_binds_exact_scope_and_rejects_out_of_scope() -> None:
         )
 
 
-def test_directory_hash_rejects_file_mutation_during_descriptor_read(
+def test_directory_hash_rejects_same_size_mutation_with_coarse_timestamps(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     artifact = tmp_path / "artifact"
@@ -77,7 +94,12 @@ def test_directory_hash_rejects_file_mutation_during_descriptor_read(
     target = artifact / "model.bin"
     target.write_bytes(b"a" * (2 * 1024 * 1024))
     original_read = state_evidence.os.read
+    original_snapshot = state_evidence._stat_snapshot
     mutated = False
+
+    def coarse_snapshot(value):
+        device, inode, size, _mtime_ns, _ctime_ns = original_snapshot(value)
+        return device, inode, size, 0, 0
 
     def mutate_after_read(fd: int, size: int) -> bytes:
         nonlocal mutated
@@ -87,6 +109,7 @@ def test_directory_hash_rejects_file_mutation_during_descriptor_read(
             target.write_bytes(b"b" * (2 * 1024 * 1024))
         return chunk
 
+    monkeypatch.setattr(state_evidence, "_stat_snapshot", coarse_snapshot)
     monkeypatch.setattr(state_evidence.os, "read", mutate_after_read)
     with pytest.raises(TrainingStateEvidenceError, match="changed during hashing"):
         state_evidence.directory_sha256(artifact)
