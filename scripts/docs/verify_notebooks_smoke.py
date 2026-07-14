@@ -439,6 +439,9 @@ def _demo_verify_pass_report() -> dict:
             raise RuntimeError(
                 "Cannot build canonical notebook demo evidence."
             ) from exc
+    raise RuntimeError(
+        "Cannot build canonical notebook demo evidence without src/invarlock."
+    )
 
 
 def _write_json(path: Path, payload: object) -> None:

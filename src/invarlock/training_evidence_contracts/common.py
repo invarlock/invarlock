@@ -57,7 +57,7 @@ TRAINING_EDIT_TYPES = frozenset(_CANONICAL_PRODUCER_DECLARATIONS)
 _SHA256_RE = re.compile(r"sha256:[a-f0-9]{64}\Z")
 _REVISION_RE = re.compile(r"[a-f0-9]{40,64}\Z")
 _PROFILE_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
-_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+.-]{0,127}\Z")
+_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_+.-]{0,127}\Z")
 _PATH_RE = re.compile(r"[^\x00\r\n]+\Z")
 
 _PROOF_COMMON_FIELDS = frozenset(

@@ -311,6 +311,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     except ValueError as exc:
         parser.error(str(exc))
+        return 2
     json_path = output_dir / "guard-validation-smoke.json"
     md_path = output_dir / "guard-validation-smoke.md"
     json_path.write_text(

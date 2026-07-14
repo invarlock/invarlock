@@ -71,6 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   independently supplied verifier input.
 - Fixed public-evidence, packaged-data, support-matrix, and model-catalog
   consistency checks so superseded results cannot be presented as current.
+- Fixed static-analysis findings in evidence utility CLIs, pruning-contract key
+  validation, report-config cleanup, and verification export helpers.
 
 ## [0.12.1] - 2026-07-05
 

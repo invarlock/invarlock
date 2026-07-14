@@ -619,6 +619,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     except TrainingEvidenceProofProducerError as exc:
         parser.error(str(exc))
+        return 2
     print(json.dumps(proof, allow_nan=False, sort_keys=True))
     return 0
 

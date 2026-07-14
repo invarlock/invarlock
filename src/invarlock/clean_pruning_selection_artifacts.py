@@ -483,7 +483,7 @@ def _assert_pruning_replay(
     digest-only topology assertion.
     """
 
-    if set(replay) != _PRUNING_REPLAY_FIELDS:
+    if frozenset(replay) != _PRUNING_REPLAY_FIELDS:
         raise CleanPruningSelectionEvidenceError(
             "pruning replay sidecar has unbound or missing fields"
         )
@@ -628,7 +628,7 @@ def _assert_runtime_reload_proof(
     *,
     artifact_identity: Mapping[str, str],
 ) -> None:
-    if set(runtime) != _RUNTIME_RELOAD_PROOF_FIELDS:
+    if frozenset(runtime) != _RUNTIME_RELOAD_PROOF_FIELDS:
         raise CleanPruningSelectionEvidenceError(
             "pruning runtime reload proof has unbound or missing fields"
         )
@@ -658,7 +658,7 @@ def _assert_runtime_reload_proof(
     load_diagnostics = runtime.get("load_diagnostics")
     if (
         not isinstance(load_diagnostics, Mapping)
-        or set(load_diagnostics) != _RUNTIME_LOAD_DIAGNOSTICS_FIELDS
+        or frozenset(load_diagnostics) != _RUNTIME_LOAD_DIAGNOSTICS_FIELDS
         or load_diagnostics.get("schema") != RUNTIME_LOAD_DIAGNOSTICS_SCHEMA
     ):
         raise CleanPruningSelectionEvidenceError(
@@ -672,7 +672,7 @@ def _assert_runtime_reload_proof(
     for index, diagnostic in enumerate(reloads):
         if (
             not isinstance(diagnostic, Mapping)
-            or set(diagnostic) != _RUNTIME_LOAD_DIAGNOSTIC_FIELDS
+            or frozenset(diagnostic) != _RUNTIME_LOAD_DIAGNOSTIC_FIELDS
         ):
             raise CleanPruningSelectionEvidenceError(
                 f"pruning runtime reload proof load diagnostics reload {index} is invalid"
@@ -687,7 +687,7 @@ def _assert_runtime_reload_proof(
     storage_key_audit = runtime.get("storage_key_audit")
     if (
         not isinstance(storage_key_audit, Mapping)
-        or set(storage_key_audit) != _RUNTIME_STORAGE_KEY_AUDIT_ENVELOPE_FIELDS
+        or frozenset(storage_key_audit) != _RUNTIME_STORAGE_KEY_AUDIT_ENVELOPE_FIELDS
         or storage_key_audit.get("schema") != RUNTIME_STORAGE_KEY_AUDIT_SCHEMA
     ):
         raise CleanPruningSelectionEvidenceError(
@@ -702,7 +702,7 @@ def _assert_runtime_reload_proof(
     for index, audit in enumerate(audits):
         if (
             not isinstance(audit, Mapping)
-            or set(audit) != _RUNTIME_STORAGE_KEY_AUDIT_FIELDS
+            or frozenset(audit) != _RUNTIME_STORAGE_KEY_AUDIT_FIELDS
         ):
             raise CleanPruningSelectionEvidenceError(
                 f"pruning runtime reload proof storage-key audit reload {index} is invalid"

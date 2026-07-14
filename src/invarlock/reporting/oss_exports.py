@@ -221,7 +221,7 @@ def _verify_result_error(message: str) -> NoReturn:
 def _require_json_boolean(value: Any, *, label: str) -> bool:
     if isinstance(value, bool):
         return value
-    _verify_result_error(f"{label} must be a JSON boolean.")
+    raise VerifyResultValidationError(f"{label} must be a JSON boolean.")
 
 
 def _require_json_string(

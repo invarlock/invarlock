@@ -97,15 +97,16 @@ def emit_evaluation_report_phase(
             )
             flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
             descriptor = os.open(resolved_config_path, flags, 0o600)
+            write_complete = False
             try:
                 with os.fdopen(descriptor, "wb") as handle:
                     handle.write(resolved_config_bytes)
                     handle.flush()
                     os.fsync(handle.fileno())
-            except BaseException:
-                if resolved_config_path.exists():
+                write_complete = True
+            finally:
+                if not write_complete and resolved_config_path.exists():
                     resolved_config_path.unlink()
-                raise
             manifest_config_path = resolved_config_path
         except (OSError, StrictJsonError) as exc:
             if request.assurance_mode == "strict":

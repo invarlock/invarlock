@@ -224,9 +224,10 @@ def _exact_mapping(
     value: object, *, label: str, fields: frozenset[str]
 ) -> Mapping[str, object]:
     payload = _mapping(value, label=label)
-    if set(payload) != fields:
-        missing = sorted(fields - set(payload))
-        extra = sorted(set(payload) - fields)
+    payload_fields = frozenset(payload)
+    if payload_fields != fields:
+        missing = sorted(fields - payload_fields)
+        extra = sorted(payload_fields - fields)
         raise CleanPruningSelectionEvidenceError(
             f"{label} has unbound, missing, or arbitrary fields "
             f"(missing={missing}, extra={extra})"
@@ -295,7 +296,7 @@ def _scope(value: object, *, label: str) -> str:
         raise CleanPruningSelectionEvidenceError(
             f"{label} must be one of ffn, attn, or all"
         )
-    return cast(str, value)
+    return value
 
 
 def _pruning_spec(value: object, *, label: str) -> dict[str, object]:

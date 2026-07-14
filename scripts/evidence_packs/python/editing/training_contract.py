@@ -129,7 +129,7 @@ class LoraTrainingProfile(BaseTrainingProfile):
     lora: LoraSpec
 
 
-type TrainingProfile = FineTuneTrainingProfile | LoraTrainingProfile
+TrainingProfile = FineTuneTrainingProfile | LoraTrainingProfile
 
 
 def canonical_json_bytes(value: Any) -> bytes:
