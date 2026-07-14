@@ -532,6 +532,17 @@ def load_resolved_inputs(
     return payload, _sha256_bytes(raw)
 
 
+def _declared_artifact_roles(entry: Mapping[str, object]) -> dict[str, str]:
+    required_artifacts = entry.get("required_artifacts")
+    if not isinstance(required_artifacts, list):
+        return {}
+    return {
+        str(item.get("role")): str(item.get("path"))
+        for item in required_artifacts
+        if isinstance(item, Mapping)
+    }
+
+
 def validate_embedded_catalog_binding(
     pack_dir: Path,
     manifest: Mapping[str, object],
@@ -622,11 +633,7 @@ def validate_embedded_catalog_binding(
         expected_role_paths["input_materialization"] = material_paths[
             "input-materialization"
         ]
-    declared_roles = {
-        str(item.get("role")): str(item.get("path"))
-        for item in entry.get("required_artifacts", [])
-        if isinstance(item, Mapping)
-    }
+    declared_roles = _declared_artifact_roles(entry)
     expected_declared = (
         _VISION_REQUIRED_ARTIFACTS if vision else _BASE_REQUIRED_ARTIFACTS
     )

@@ -158,10 +158,12 @@ def _portable_runtime_path(
     errors: list[str],
     required_leaf: str | None = None,
 ) -> str | None:
-    path = PurePosixPath(value) if isinstance(value, str) else None
+    if not isinstance(value, str):
+        errors.append(f"catalog evidence {label} is not portable")
+        return None
+    path = PurePosixPath(value)
     if (
-        path is None
-        or path.is_absolute()
+        path.is_absolute()
         or not path.parts
         or any(part in {"", ".", ".."} for part in path.parts)
     ):
@@ -299,9 +301,15 @@ def _expected_runtime_config(
     tier = execution.get("tier")
     assurance_mode = execution.get("assurance_mode")
     execution_mode = execution.get("execution_mode")
-    if not all(
-        isinstance(value, str) and value
-        for value in (profile, tier, assurance_mode, execution_mode)
+    if (
+        not isinstance(profile, str)
+        or not profile
+        or not isinstance(tier, str)
+        or not tier
+        or not isinstance(assurance_mode, str)
+        or not assurance_mode
+        or not isinstance(execution_mode, str)
+        or not execution_mode
     ):
         errors.append("catalog evidence execution policy is invalid")
         return None

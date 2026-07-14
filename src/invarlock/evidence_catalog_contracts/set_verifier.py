@@ -225,6 +225,7 @@ def verify_evidence_pack_set(
     """Verify every supplied pack and require exact catalog coverage."""
 
     _preflight_pack_set_paths(pack_dirs=pack_dirs, receipt_path=receipt_path)
+    payload: dict[str, object]
     anchor_errors: list[str] = []
     if _SHA256_RE.fullmatch(expected_catalog_digest) is None:
         anchor_errors.append("independent_catalog_anchor_required")
@@ -235,7 +236,7 @@ def verify_evidence_pack_set(
     if _SHA256_RE.fullmatch(expected_runtime_image_digest) is None:
         anchor_errors.append("independent_runtime_image_anchor_required")
     if anchor_errors:
-        payload: dict[str, object] = {
+        payload = {
             "format_version": EVIDENCE_PACK_SET_RECEIPT_FORMAT,
             "ok": False,
             "catalog_digest": None,
@@ -253,7 +254,7 @@ def verify_evidence_pack_set(
         _write_receipt(receipt_path, payload)
         return EvidencePackResult(payload=payload, status=EvidencePackStatus.USAGE)
     if expected_fingerprint is None and trust_store_path is None:
-        payload: dict[str, object] = {
+        payload = {
             "format_version": EVIDENCE_PACK_SET_RECEIPT_FORMAT,
             "ok": False,
             "catalog_digest": None,
@@ -275,7 +276,7 @@ def verify_evidence_pack_set(
     try:
         catalog = load_evidence_catalog(catalog_path)
     except EvidenceCatalogError:
-        payload: dict[str, object] = {
+        payload = {
             "format_version": EVIDENCE_PACK_SET_RECEIPT_FORMAT,
             "ok": False,
             "catalog_digest": None,
@@ -315,6 +316,7 @@ def verify_evidence_pack_set(
 
     observed: list[str] = []
     pack_payloads: list[dict[str, object]] = []
+    provenance: dict[str, object]
     for pack_dir in pack_dirs:
         snapshot, snapshot_errors = PackSnapshot.capture(pack_dir)
         if snapshot is None:
