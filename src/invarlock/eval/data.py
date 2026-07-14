@@ -382,6 +382,10 @@ class VisionTextProvider(EvaluationProvider):
         self._seed = int(seed) if seed is not None else None
         self._items_override = list(items or [])
         self._examples_cache: list[dict[str, Any]] | None = None
+        self._materialized_dataset: dict[str, str | None] | None = None
+        self.dataset_name: str | None = None
+        self.config_name: str | None = None
+        self.revision: str | None = None
 
     def available_splits(self) -> list[str]:
         return ["validation"]
@@ -456,6 +460,19 @@ class VisionTextProvider(EvaluationProvider):
                 materialization = load_materialization_snapshot(file_path)
             except ValueError as exc:
                 raise _DataErr(code="E306", message=str(exc)) from exc
+            if self._materialized_dataset is None:
+                self._materialized_dataset = dict(materialization.dataset)
+                self.dataset_name = materialization.dataset["id"]
+                self.config_name = materialization.dataset["config_name"]
+                self.revision = materialization.dataset["revision"]
+            elif materialization.dataset != self._materialized_dataset:
+                raise _DataErr(
+                    code="E306",
+                    message=(
+                        "NO-SAMPLES: vision_text manifests bind different source "
+                        "dataset coordinates"
+                    ),
+                )
             for line_no, obj in enumerate(materialization.records, start=1):
                 prompt = obj.get("prompt")
                 image_path = obj.get("image_path")

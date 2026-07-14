@@ -36,10 +36,15 @@ class _FakeImage:
         handle.write(self.payload)
 
 
-def _materialize(tmp_path: Path, *, count: int = 3) -> tuple[Path, list[dict]]:
+def _materialize(
+    tmp_path: Path,
+    *,
+    count: int = 3,
+    dataset: str = "public/vision-test",
+) -> tuple[Path, list[dict]]:
     mod = load_script_module("materialize_vision_text_dataset")
     config = mod.MaterializeConfig(
-        dataset="public/vision-test",
+        dataset=dataset,
         split="validation",
         revision="a" * 40,
         config_name=None,
@@ -94,6 +99,9 @@ def test_vision_text_provider_digest_and_schedule_stable(tmp_path):
     assert d1["provider"] == "vision_text"
     assert d1["version"] >= 1
     assert d1["transform_pipeline"] == pipeline
+    assert p1.dataset_name == "public/vision-test"
+    assert p1.config_name is None
+    assert p1.revision == "a" * 40
     # IDs use length-safe canonical JSON rather than ambiguous concatenation.
     assert d1["ids_sha256"] == _sha256_hex(
         canonical_json_bytes(["img-001", "img-002", "img-003"])
@@ -134,6 +142,22 @@ def test_vision_text_provider_handles_missing_bytes():
     empty_hash = _sha256_hex(b"").encode()
     combined = _sha256_hex(empty_hash + empty_hash)
     assert digest["images_sha256"] == combined
+
+
+def test_vision_text_provider_rejects_mixed_materialization_identities(
+    tmp_path: Path,
+) -> None:
+    first, _ = _materialize(tmp_path / "first", count=1)
+    second, _ = _materialize(
+        tmp_path / "second",
+        count=1,
+        dataset="other/vision-test",
+    )
+
+    provider = VisionTextProvider(data_files=[str(first), str(second)])
+
+    with pytest.raises(Exception, match="different source dataset coordinates"):
+        provider.examples()
 
 
 def test_vision_text_provider_raises_for_missing_image(tmp_path):
@@ -449,7 +473,16 @@ def test_load_materialization_snapshot_rejects_semantic_and_order_mismatches(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     manifest_bytes = b'{"id":"one"}\n'
-    payload = {"records": [{"id": "one"}], "semantic_digest": "sha256:semantic"}
+    payload = {
+        "dataset": {
+            "id": "public/vision-test",
+            "config_name": None,
+            "revision": "a" * 40,
+            "split": "validation",
+        },
+        "records": [{"id": "one"}],
+        "semantic_digest": "sha256:semantic",
+    }
     monkeypatch.setattr(
         vision_evidence_mod,
         "read_json_object_snapshot",
@@ -470,6 +503,7 @@ def test_load_materialization_snapshot_rejects_semantic_and_order_mismatches(
     )
     assert snapshot.records == ({"id": "one"},)
     assert snapshot.bindings == {"one": {"id": "one"}}
+    assert snapshot.dataset == payload["dataset"]
 
     monkeypatch.setattr(
         vision_evidence_mod,

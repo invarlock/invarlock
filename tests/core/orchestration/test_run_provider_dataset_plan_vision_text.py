@@ -20,6 +20,9 @@ from tests.core._support_run_provider_dataset_plan import (
 def test_build_provider_dataset_plan_supports_vision_text_examples() -> None:
     provider = SimpleNamespace(
         name="vision_text",
+        dataset_name="public/vision-test",
+        config_name=None,
+        revision="a" * 40,
         examples=lambda split="validation": [
             {
                 "id": "ex-1",
@@ -86,6 +89,8 @@ def test_build_provider_dataset_plan_supports_vision_text_examples() -> None:
     assert result.final_records[0]["example_id"] == "ex-2"
     assert result.dataset_meta["provider_kind"] == "vision_text"
     assert result.dataset_meta["provider_digest"]["provider"] == "vision_text"
+    assert result.dataset_meta["dataset_name"] == "public/vision-test"
+    assert result.dataset_meta["revision"] == "a" * 40
 
 
 def test_vision_text_dataset_plan_requires_examples_and_keeps_window_capacity() -> None:

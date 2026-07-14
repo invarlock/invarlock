@@ -29,6 +29,7 @@ class VisionMaterializationSnapshot:
     manifest_sha256: str
     materialization_digest: str
     bindings: dict[str, dict[str, Any]]
+    dataset: dict[str, str | None]
 
 
 def load_materialization_snapshot(
@@ -77,12 +78,28 @@ def load_materialization_snapshot(
         for record in evidence_records
         if isinstance(record, Mapping) and isinstance(record.get("id"), str)
     }
+    dataset = payload.get("dataset")
+    assert isinstance(dataset, dict)
     return VisionMaterializationSnapshot(
         manifest_bytes=manifest_bytes,
         records=records,
         manifest_sha256=manifest_sha256,
         materialization_digest=str(payload["semantic_digest"]),
         bindings=bindings,
+        dataset={
+            "id": str(dataset["id"]),
+            "config_name": (
+                str(dataset["config_name"])
+                if dataset.get("config_name") is not None
+                else None
+            ),
+            "revision": (
+                str(dataset["revision"])
+                if dataset.get("revision") is not None
+                else None
+            ),
+            "split": str(dataset["split"]),
+        },
     )
 
 

@@ -279,6 +279,10 @@ def _vision_text_dataset_plan(
         "loss_type": resolved_loss_type,
         "window_plan": window_plan,
     }
+    for key in ("dataset_name", "config_name", "revision"):
+        value = getattr(data_provider, key, None)
+        if isinstance(value, str) and value:
+            dataset_meta[key] = value
 
     return ProviderDatasetPlanResult(
         data_provider=data_provider,
