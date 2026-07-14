@@ -16,6 +16,7 @@ from invarlock.cli.evaluate_report_phase import (
 )
 from invarlock.cli.output import resolve_output_style
 from invarlock.core.exceptions import ConfigError, MetricsError, ValidationError
+from invarlock.evidence_pack_json import StrictJsonError
 
 
 def _base_request(tmp_path: Path, **overrides: Any) -> EvaluationReportRequest:
@@ -495,3 +496,147 @@ def test_evaluate_report_phase_fails_closed_when_pruning_selection_raises(
             1,
         )
     ]
+
+
+@pytest.mark.parametrize("assurance_mode", ["strict", "off"])
+def test_evaluate_report_phase_handles_absent_resolved_config_by_assurance_mode(
+    assurance_mode: str, tmp_path: Path
+) -> None:
+    failures: list[tuple[str, int]] = []
+    manifests: list[dict[str, Any]] = []
+    emit_evaluation_report_phase(
+        _base_request(
+            tmp_path,
+            resolved_subject_config=None,
+            assurance_mode=assurance_mode,
+        ),
+        _base_runtime(
+            fail_fn=lambda message, *, exit_code: failures.append((message, exit_code)),
+            emit_runtime_manifest_fn=lambda _path, **kwargs: manifests.append(kwargs),
+        ),
+    )
+
+    if assurance_mode == "strict":
+        assert failures == [
+            ("Strict evaluation requires the exact resolved subject config.", 1)
+        ]
+        assert manifests == []
+    else:
+        assert failures == []
+        assert manifests[0]["config_path"] is None
+
+
+@pytest.mark.parametrize("assurance_mode", ["strict", "off"])
+def test_evaluate_report_phase_handles_config_preservation_failure_by_mode(
+    assurance_mode: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    failures: list[tuple[str, int]] = []
+    manifests: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        phase_mod, "read_regular_file_bytes", lambda *_args, **_kwargs: b"model: {}\n"
+    )
+    monkeypatch.setattr(
+        phase_mod.os,
+        "open",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("exclusive create")),
+    )
+
+    emit_evaluation_report_phase(
+        _base_request(tmp_path, assurance_mode=assurance_mode),
+        _base_runtime(
+            fail_fn=lambda message, *, exit_code: failures.append((message, exit_code)),
+            emit_runtime_manifest_fn=lambda _path, **kwargs: manifests.append(kwargs),
+        ),
+    )
+
+    if assurance_mode == "strict":
+        assert failures == [
+            ("Could not preserve resolved evaluation config: exclusive create", 1)
+        ]
+        assert manifests == []
+    else:
+        assert failures == []
+        assert manifests[0]["config_path"] is None
+
+
+def test_evaluate_report_phase_removes_partial_config_after_write_failure(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    failures: list[tuple[str, int]] = []
+    monkeypatch.setattr(
+        phase_mod.os,
+        "fsync",
+        lambda *_args: (_ for _ in ()).throw(OSError("sync denied")),
+    )
+
+    emit_evaluation_report_phase(
+        _base_request(tmp_path, assurance_mode="strict"),
+        _base_runtime(
+            fail_fn=lambda message, *, exit_code: failures.append((message, exit_code))
+        ),
+    )
+
+    assert failures == [
+        ("Could not preserve resolved evaluation config: sync denied", 1)
+    ]
+    assert not (tmp_path / "reports/resolved-config.yaml").exists()
+
+
+@pytest.mark.parametrize("assurance_mode", ["strict", "off"])
+def test_evaluate_report_phase_handles_malformed_report_provenance_by_mode(
+    assurance_mode: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    failures: list[tuple[str, int]] = []
+    manifests: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        phase_mod,
+        "read_json_object_snapshot",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            StrictJsonError("duplicate context")
+        ),
+    )
+
+    emit_evaluation_report_phase(
+        _base_request(tmp_path, assurance_mode=assurance_mode),
+        _base_runtime(
+            fail_fn=lambda message, *, exit_code: failures.append((message, exit_code)),
+            emit_runtime_manifest_fn=lambda _path, **kwargs: manifests.append(kwargs),
+        ),
+    )
+
+    if assurance_mode == "strict":
+        assert failures == [
+            (
+                "Could not load evaluation report provenance: duplicate context",
+                1,
+            )
+        ]
+        assert manifests == []
+    else:
+        assert failures == []
+        assert "evaluation_inputs" not in manifests[0]["extra"]
+
+
+def test_evaluate_report_phase_carries_authenticated_evaluation_inputs(
+    tmp_path: Path,
+) -> None:
+    manifests: list[dict[str, Any]] = []
+    request = _base_request(tmp_path)
+    report_path = tmp_path / "reports/evaluation.report.json"
+    report_path.write_text(
+        '{"context":{"evaluation_inputs":{"lane_id":"lane-a"}}}\n',
+        encoding="utf-8",
+    )
+
+    emit_evaluation_report_phase(
+        request,
+        _base_runtime(
+            emit_runtime_manifest_fn=lambda _path, **kwargs: manifests.append(kwargs)
+        ),
+    )
+
+    assert manifests[0]["extra"]["evaluation_inputs"] == {"lane_id": "lane-a"}

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from invarlock import evidence_pack_scenario_contract as scenario_contract
 from invarlock.evidence_pack_scenario_contract import (
     ArtifactClass,
     GenerationKind,
@@ -372,6 +373,147 @@ def test_real_training_scenarios_require_a_closed_profile_snapshot_binding() -> 
         ScenarioContractError, match="only valid for a training-profile"
     ):
         parse_scenario_contract(unrelated)
+
+
+def _replace_generation(
+    record: dict[str, object], **updates: object
+) -> dict[str, object]:
+    generation = record["generation"]
+    assert isinstance(generation, dict)
+    generation.update(updates)
+    return record
+
+
+def _replace_training_profile(
+    record: dict[str, object], **updates: object
+) -> dict[str, object]:
+    profile = record["training_profile"]
+    assert isinstance(profile, dict)
+    profile.update(updates)
+    return record
+
+
+@pytest.mark.parametrize(
+    ("record", "message"),
+    [
+        ({**_evidence_only(), "id": "report\n001"}, "canonical string"),
+        (
+            {**_evidence_only(), "artifact_class": "legacy_report"},
+            "artifact_class.*unsupported",
+        ),
+        (
+            _validation_edit("quant_rtn:4:32:all", version="trained"),
+            "generation.version",
+        ),
+        (_validation_edit("magnitude_prune:0:all"), "positive decimal"),
+        (_validation_edit("magnitude_prune:1:all"), "sparsity"),
+        (_validation_edit("quant_rtn:4:32:"), "scope"),
+        (_validation_edit("quant_rtn:4:32:all@"), "scope"),
+        (_validation_edit("quant_rtn:4:32:all@layers"), "scope"),
+        (_validation_edit("quant_rtn:4:32:all@foo=1"), "scope"),
+        (_validation_edit("quant_rtn:4:32:all@layers=01"), "scope"),
+        (_validation_edit("quant_rtn:4:32:all@layers=0"), "scope"),
+        (_validation_edit("quant_rtn:4:32:all@layers=2,layer=2"), "scope"),
+        (_validation_edit("quant_rtn:4:32:all@layer=1,layers=2"), "scope"),
+        (_validation_edit("lora_merge:clean", version="clean"), "clean edit_spec"),
+        (_validation_edit("quant_rtn:4:32"), "four fields"),
+        (_validation_edit("quant_rtn:9:32:all"), "bits must be"),
+        (_validation_edit("magnitude_prune:0.5"), "three fields"),
+        (_validation_edit("synthetic_lowrank_delta:8:64"), "four fields"),
+        (_validation_edit("synthetic_dense_update:0.1:3"), "four fields"),
+        (_validation_edit("lora_merge:4:8", version="trained"), "four fields"),
+        (_validation_edit("fine_tune:0.1:2", version="trained"), "four fields"),
+        (_deployable_bnb("bnb_8bit:8"), "three fields"),
+        (_deployable_bnb("bnb_8bit:4:all"), "bits must be"),
+        (_deployable_bnb("bnb_8bit:8:ffn"), "scope must be"),
+        (_validation_edit(":"), "begin with an edit type"),
+        (
+            _validation_edit("bnb_8bit:8:all"),
+            "requires generation.kind='deployable_edit'",
+        ),
+        (
+            _deployable_bnb("quant_rtn:4:all"),
+            "requires generation.kind='edit'",
+        ),
+        (
+            _replace_generation(_error(), env={}),
+            "generation.env must not be empty",
+        ),
+        (
+            _replace_generation(_error(), error_type="legacy_fault"),
+            "error_type.*unsupported",
+        ),
+        (
+            _replace_generation(_error(), env_by_model={}),
+            "env_by_model must not be empty",
+        ),
+        (
+            {
+                key: value
+                for key, value in _deployable_bnb().items()
+                if key != "optimized_deployment_backend"
+            },
+            "requires optimized_deployment_backend=true",
+        ),
+        (
+            {
+                **_validation_edit("quant_rtn:4:32:all"),
+                "optimized_deployment_backend": True,
+            },
+            "non-deployable scenario",
+        ),
+        (
+            _replace_training_profile(
+                _validation_edit("lora_merge:4:8:attn"), profile_id="bad/profile"
+            ),
+            "profile_id is invalid",
+        ),
+        (
+            _replace_training_profile(
+                _validation_edit("lora_merge:4:8:attn"),
+                snapshot_path="metadata/training_profiles/other.json",
+            ),
+            "canonical profile snapshot path",
+        ),
+        (
+            _replace_training_profile(
+                _validation_edit("lora_merge:4:8:attn"),
+                snapshot_sha256="not-a-digest",
+            ),
+            "snapshot_sha256",
+        ),
+        (
+            {**_error(), "training_profile": {}},
+            "only valid for a training-profile edit",
+        ),
+        (
+            {**_evidence_only(), "training_profile": {}},
+            "only valid for a training-profile edit",
+        ),
+    ],
+)
+def test_dispatch_contract_rejects_ambiguous_boundary_values(
+    record: dict[str, object], message: str
+) -> None:
+    with pytest.raises(ScenarioContractError, match=message):
+        parse_scenario_contract(record)
+
+
+def test_deployable_parser_rejects_internal_noncanonical_combinations() -> None:
+    with pytest.raises(ScenarioContractError, match="only supports"):
+        scenario_contract._deployable_edit(
+            edit_type=scenario_contract.EditType.QUANT_RTN,
+            parts=["quant_rtn", "4", "all"],
+            version="deployable",
+            backend="bitsandbytes",
+        )
+    with pytest.raises(ScenarioContractError, match="generation.version"):
+        scenario_contract._deployable_edit(
+            edit_type=scenario_contract.EditType.BNB_8BIT,
+            parts=["bnb_8bit", "8", "all"],
+            version="legacy",
+            backend="bitsandbytes",
+        )
 
 
 def test_active_scenario_manifest_is_within_the_closed_contract() -> None:

@@ -6,6 +6,7 @@ import pytest
 
 from invarlock import clean_pruning_selection_runtime as pruning
 from invarlock import clean_selection_runtime as selection
+from invarlock.clean_selection import artifacts
 
 
 def _selection_context(tmp_path: Path) -> selection.CleanSelectionEvaluationContext:
@@ -82,6 +83,24 @@ def test_runtime_helpers_reject_nonobjects_and_changed_snapshots(
         runtime._snapshot_unchanged(  # type: ignore[attr-defined]
             path, expected=b'{"old":true}\n', label="snapshot"
         )
+
+
+@pytest.mark.parametrize("runtime", [selection, pruning])
+def test_runtime_snapshot_and_atomic_write_success_paths(
+    runtime: object, tmp_path: Path
+) -> None:
+    snapshot = tmp_path / "snapshot.json"
+    snapshot.write_text("{}\n", encoding="utf-8")
+    assert (
+        runtime._snapshot_unchanged(  # type: ignore[attr-defined]
+            snapshot, expected=b"{}\n", label="snapshot"
+        )
+        == {}
+    )
+
+    output = tmp_path / "output.json"
+    runtime._atomic_write_json(output, {"ok": True})  # type: ignore[attr-defined]
+    assert output.read_text(encoding="utf-8") == '{\n  "ok": true\n}\n'
 
 
 @pytest.mark.parametrize(
@@ -410,3 +429,126 @@ def test_clean_pruning_context_checks_repeat_and_optional_checkpoint_bindings(
         pruning.CleanPruningSelectionRuntimeError, match="receipt identity"
     ):
         pruning.load_clean_pruning_selection_evaluation_context(**paths, repeat_index=0)
+
+
+def test_runtime_contexts_skip_optional_checkpoint_binding_when_absent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    cases = [
+        (
+            selection,
+            {
+                "baseline_identity": {"kind": "tree", "sha256": "baseline"},
+                "transformation": {"edit_type": "quant_rtn"},
+                "original_model_key": "model",
+                "candidate_id": "candidate",
+            },
+            "validate_selection_execution_receipt",
+            "validate_candidate_replay_runtime",
+            "load_clean_selection_evaluation_context",
+        ),
+        (
+            pruning,
+            {
+                "baseline_identity": {"kind": "tree", "sha256": "baseline"},
+                "pruning": {"edit_type": "magnitude_prune"},
+                "original_model_key": "model",
+                "candidate_id": "candidate",
+            },
+            "validate_clean_pruning_execution_receipt",
+            "validate_clean_pruning_candidate_replay_runtime",
+            "load_clean_pruning_selection_evaluation_context",
+        ),
+    ]
+    for runtime, receipt, receipt_validator, replay_validator, loader_name in cases:
+        config = {"schedule": {"evaluation_repeats": 1}}
+
+        def snapshot(
+            path: Path,
+            *,
+            _config: dict[str, object] = config,
+            _receipt: dict[str, object] = receipt,
+            **_kwargs: object,
+        ) -> tuple[bytes, dict[str, object]]:
+            if path.name == "config.json":
+                return b"config", _config
+            if path.name == "receipt.json":
+                return b"receipt", _receipt
+            return b"{}", {}
+
+        monkeypatch.setattr(runtime, "strict_json_object_snapshot", snapshot)
+        monkeypatch.setattr(
+            runtime,
+            receipt_validator,
+            lambda *_args, _receipt=receipt, **_kwargs: _receipt,
+        )
+        monkeypatch.setattr(
+            runtime,
+            replay_validator,
+            lambda **_kwargs: {"kind": "tree", "sha256": "artifact"},
+        )
+        monkeypatch.setattr(
+            runtime,
+            "_assert_checkpoint_identity",
+            lambda *_args, **_kwargs: pytest.fail("optional checkpoint was inspected"),
+        )
+        loader = getattr(runtime, loader_name)
+        context = loader(
+            selection_config_path=tmp_path / "config.json",
+            execution_receipt_path=tmp_path / "receipt.json",
+            replay_path=tmp_path / "replay.json",
+            runtime_proof_path=tmp_path / "runtime.json",
+            repeat_index=0,
+        )
+        assert context.candidate_id == "candidate"
+
+
+@pytest.mark.parametrize(
+    ("runtime", "context_factory", "patcher", "finalizer"),
+    [
+        (
+            selection,
+            _selection_context,
+            _patch_selection_finalizer,
+            selection.finalize_clean_selection_evaluation_report,
+        ),
+        (
+            pruning,
+            _pruning_context,
+            _patch_pruning_finalizer,
+            pruning.finalize_clean_pruning_selection_evaluation_report,
+        ),
+    ],
+)
+def test_runtime_finalizers_create_missing_provenance_and_return_run_link(
+    runtime: object,
+    context_factory: object,
+    patcher: object,
+    finalizer: object,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    del runtime
+    report = {"run_id": "run-1", "meta": {}}
+    patcher(monkeypatch, report)  # type: ignore[operator]
+    link = finalizer(  # type: ignore[operator]
+        tmp_path / "report.json",
+        context=context_factory(tmp_path),  # type: ignore[operator]
+    )
+    assert link["report_run_id"] == "run-1"
+
+
+def test_clean_selection_runtime_diagnostics_reject_malformed_reload_records() -> None:
+    diagnostics = {
+        "schema": artifacts.RUNTIME_LOAD_DIAGNOSTICS_SCHEMA,
+        "reloads": [{}, {}],
+    }
+    with pytest.raises(artifacts.CleanSelectionEvidenceError, match="reload 0"):
+        artifacts._assert_clean_load_diagnostics(diagnostics)
+
+    storage_audit = {
+        "schema": artifacts.RUNTIME_STORAGE_KEY_AUDIT_SCHEMA,
+        "reloads": [{}, {}],
+    }
+    with pytest.raises(artifacts.CleanSelectionEvidenceError, match="reload 0"):
+        artifacts._assert_clean_storage_key_audit(storage_audit)
