@@ -16,14 +16,15 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "docs/README.md",
-        "docs/reference/model-adapters.md"
+        "docs/reference/model-adapters.md",
+        "public_evidence/published_basis/gpt2-causal-hf"
       ],
       "notes": "Maintained catalog lane gpt2-causal-hf.",
       "support_groups": [
         "baseline_reference"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "bert-roberta-mlm",
@@ -40,14 +41,15 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "docs/README.md",
-        "docs/reference/model-adapters.md"
+        "docs/reference/model-adapters.md",
+        "public_evidence/published_basis/bert-mlm-hf"
       ],
       "notes": "Maintained catalog lane bert-mlm-hf.",
       "support_groups": [
         "baseline_reference"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "mistral-7b-causal-lm",
@@ -63,15 +65,16 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/mistral_7b_512.yaml",
-        "configs/calibration/null_sweep_mistral_7b.yaml"
+        "configs/calibration/null_sweep_mistral_7b.yaml",
+        "public_evidence/published_basis/mistral-7b-causal-hf"
       ],
       "notes": "Maintained catalog lane mistral-7b-causal-hf.",
       "support_groups": [
         "published_modern",
         "enterprise_permissive"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "ministral-3-8b-text-causal-lm",
@@ -87,7 +90,8 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/ministral3_8b_512.yaml",
-        "configs/calibration/null_sweep_ministral3_8b.yaml"
+        "configs/calibration/null_sweep_ministral3_8b.yaml",
+        "public_evidence/published_basis/ministral-3-8b-text-causal-hf"
       ],
       "notes": "Maintained catalog lane ministral-3-8b-text-causal-hf.",
       "support_groups": [
@@ -96,8 +100,8 @@
         "small_local",
         "enterprise_permissive"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "ministral-3-14b-text-causal-lm",
@@ -113,7 +117,8 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/ministral3_14b_512.yaml",
-        "configs/calibration/null_sweep_ministral3_14b.yaml"
+        "configs/calibration/null_sweep_ministral3_14b.yaml",
+        "public_evidence/published_basis/ministral-3-14b-text-causal-hf"
       ],
       "notes": "Maintained catalog lane ministral-3-14b-text-causal-hf.",
       "support_groups": [
@@ -121,8 +126,8 @@
         "practical_shortlist",
         "enterprise_permissive"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "qwen2-7b-causal-lm",
@@ -138,14 +143,15 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen2_7b_512.yaml",
-        "configs/calibration/null_sweep_qwen2_7b.yaml"
+        "configs/calibration/null_sweep_qwen2_7b.yaml",
+        "public_evidence/published_basis/qwen2-7b-causal-hf"
       ],
       "notes": "Maintained catalog lane qwen2-7b-causal-hf.",
       "support_groups": [
         "published_modern"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "qwen2-5-7b-causal-lm",
@@ -161,14 +167,15 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen2_5_7b_512.yaml",
-        "configs/calibration/null_sweep_qwen2_5_7b.yaml"
+        "configs/calibration/null_sweep_qwen2_5_7b.yaml",
+        "public_evidence/published_basis/qwen2-5-7b-causal-hf"
       ],
       "notes": "Maintained catalog lane qwen2-5-7b-causal-hf.",
       "support_groups": [
         "published_modern"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "qwen2-5-14b-causal-lm",
@@ -184,14 +191,15 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen2_5_14b_512.yaml",
-        "configs/calibration/null_sweep_qwen2_5_14b.yaml"
+        "configs/calibration/null_sweep_qwen2_5_14b.yaml",
+        "public_evidence/published_basis/qwen2-5-14b-causal-hf"
       ],
       "notes": "Maintained catalog lane qwen2-5-14b-causal-hf.",
       "support_groups": [
         "published_modern"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "qwen3-causal-lm",
@@ -207,15 +215,16 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen3_8b_512.yaml",
-        "configs/calibration/null_sweep_qwen3_8b.yaml"
+        "configs/calibration/null_sweep_qwen3_8b.yaml",
+        "public_evidence/published_basis/qwen3-causal-hf"
       ],
       "notes": "Maintained catalog lane qwen3-causal-hf.",
       "support_groups": [
         "published_modern",
         "reasoning_focused"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "deepseek-r1-distill-qwen-causal-lm",
@@ -231,15 +240,16 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/deepseek_r1_distill_qwen_7b_512.yaml",
-        "configs/calibration/null_sweep_deepseek_r1_distill_qwen_7b.yaml"
+        "configs/calibration/null_sweep_deepseek_r1_distill_qwen_7b.yaml",
+        "public_evidence/published_basis/deepseek-r1-distill-qwen-causal-hf"
       ],
       "notes": "Maintained catalog lane deepseek-r1-distill-qwen-causal-hf.",
       "support_groups": [
         "published_modern",
         "reasoning_focused"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "phi-4-text-causal-lm",
@@ -255,15 +265,16 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/phi4_reasoning_plus_512.yaml",
-        "configs/calibration/null_sweep_phi4_reasoning_plus.yaml"
+        "configs/calibration/null_sweep_phi4_reasoning_plus.yaml",
+        "public_evidence/published_basis/phi-4-text-causal-hf"
       ],
       "notes": "Maintained catalog lane phi-4-text-causal-hf.",
       "support_groups": [
         "published_modern",
         "reasoning_focused"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "gemma-4-e2b-text-causal-lm",
@@ -279,7 +290,8 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/gemma4_e2b_512.yaml",
-        "configs/calibration/null_sweep_gemma4_e2b.yaml"
+        "configs/calibration/null_sweep_gemma4_e2b.yaml",
+        "public_evidence/published_basis/gemma4-e2b-text-causal-hf"
       ],
       "notes": "Maintained catalog lane gemma4-e2b-text-causal-hf.",
       "support_groups": [
@@ -287,8 +299,8 @@
         "small_local",
         "enterprise_permissive"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "tinyllama-1-1b-causal-lm",
@@ -304,15 +316,16 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/tinyllama_1_1b_512.yaml",
-        "configs/calibration/null_sweep_tinyllama_1_1b.yaml"
+        "configs/calibration/null_sweep_tinyllama_1_1b.yaml",
+        "public_evidence/published_basis/tinyllama-1-1b-causal-hf"
       ],
       "notes": "Maintained catalog lane tinyllama-1-1b-causal-hf.",
       "support_groups": [
         "published_modern",
         "small_local"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "olmo-2-7b-causal-lm",
@@ -328,14 +341,15 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/olmo2_7b_512.yaml",
-        "configs/calibration/null_sweep_olmo2_7b.yaml"
+        "configs/calibration/null_sweep_olmo2_7b.yaml",
+        "public_evidence/published_basis/olmo-2-7b-causal-hf"
       ],
       "notes": "Maintained catalog lane olmo-2-7b-causal-hf.",
       "support_groups": [
         "published_modern"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "olmo-2-13b-causal-lm",
@@ -351,14 +365,15 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/olmo2_13b_512.yaml",
-        "configs/calibration/null_sweep_olmo2_13b.yaml"
+        "configs/calibration/null_sweep_olmo2_13b.yaml",
+        "public_evidence/published_basis/olmo-2-13b-causal-hf"
       ],
       "notes": "Maintained catalog lane olmo-2-13b-causal-hf.",
       "support_groups": [
         "published_modern"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "openllama-7b-causal-lm",
@@ -374,14 +389,15 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/open_llama_7b_512.yaml",
-        "configs/calibration/null_sweep_open_llama_7b.yaml"
+        "configs/calibration/null_sweep_open_llama_7b.yaml",
+        "public_evidence/published_basis/open-llama-7b-causal-hf"
       ],
       "notes": "Maintained catalog lane open-llama-7b-causal-hf.",
       "support_groups": [
         "published_modern"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "falcon-7b-causal-lm",
@@ -397,14 +413,15 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/falcon_7b_512.yaml",
-        "configs/calibration/null_sweep_falcon_7b.yaml"
+        "configs/calibration/null_sweep_falcon_7b.yaml",
+        "public_evidence/published_basis/falcon-7b-causal-hf"
       ],
       "notes": "Maintained catalog lane falcon-7b-causal-hf.",
       "support_groups": [
         "published_modern"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "qwen3-5-causal-lm",
@@ -420,7 +437,8 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen3_5_9b_512.yaml",
-        "configs/calibration/null_sweep_qwen3_5_9b.yaml"
+        "configs/calibration/null_sweep_qwen3_5_9b.yaml",
+        "public_evidence/published_basis/qwen3-5-causal-hf"
       ],
       "notes": "Maintained catalog lane qwen3-5-causal-hf.",
       "support_groups": [
@@ -428,8 +446,8 @@
         "practical_shortlist",
         "enterprise_permissive"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "granite-4-1-3b-causal-lm",
@@ -445,7 +463,8 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/granite4_1_3b_512.yaml",
-        "configs/calibration/null_sweep_granite4_1_3b.yaml"
+        "configs/calibration/null_sweep_granite4_1_3b.yaml",
+        "public_evidence/published_basis/granite-4-1-3b-causal-hf"
       ],
       "support_groups": [
         "published_modern",
@@ -453,8 +472,8 @@
         "enterprise_permissive"
       ],
       "notes": "Maintained catalog lane granite-4-1-3b-causal-hf.",
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "flan-t5-base-seq2seq-lm",
@@ -470,15 +489,16 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml",
-        "configs/calibration/null_sweep_flan_t5_base.yaml"
+        "configs/calibration/null_sweep_flan_t5_base.yaml",
+        "public_evidence/published_basis/flan-t5-base-seq2seq-hf"
       ],
       "support_groups": [
         "published_modern",
         "seq2seq"
       ],
       "notes": "Maintained catalog lane flan-t5-base-seq2seq-hf.",
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "gemma-4-12b-any-to-any-lm",
@@ -531,7 +551,8 @@
         "scripts/model_evidence/materialize_vision_text_dataset.py",
         "contracts/evidence_catalog_v1.json",
         "tests/cli/test_preset_multimodal_presets.py",
-        "tests/core/test_public_evidence_catalog.py"
+        "tests/core/test_public_evidence_catalog.py",
+        "public_evidence/published_basis/gemma4-e4b-image-text-hf"
       ],
       "support_groups": [
         "published_modern",
@@ -540,8 +561,8 @@
         "multimodal_candidate"
       ],
       "notes": "Maintained catalog lane gemma4-e4b-image-text-hf.",
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "gemma-4-e2b-image-text-lm",
@@ -562,7 +583,8 @@
         "scripts/model_evidence/materialize_vision_text_dataset.py",
         "contracts/evidence_catalog_v1.json",
         "tests/cli/test_preset_multimodal_presets.py",
-        "tests/core/test_public_evidence_catalog.py"
+        "tests/core/test_public_evidence_catalog.py",
+        "public_evidence/published_basis/gemma4-e2b-image-text-hf"
       ],
       "support_groups": [
         "published_modern",
@@ -571,8 +593,8 @@
         "multimodal_candidate"
       ],
       "notes": "Maintained catalog lane gemma4-e2b-image-text-hf.",
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "qwen3-5-4b-image-text-lm",
@@ -593,7 +615,8 @@
         "scripts/model_evidence/materialize_vision_text_dataset.py",
         "contracts/evidence_catalog_v1.json",
         "tests/cli/test_preset_multimodal_presets.py",
-        "tests/core/test_public_evidence_catalog.py"
+        "tests/core/test_public_evidence_catalog.py",
+        "public_evidence/published_basis/qwen3-5-4b-image-text-hf"
       ],
       "notes": "Maintained catalog lane qwen3-5-4b-image-text-hf.",
       "support_groups": [
@@ -603,8 +626,8 @@
         "practical_shortlist",
         "enterprise_permissive"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "qwen3-5-2b-image-text-lm",
@@ -625,7 +648,8 @@
         "scripts/model_evidence/materialize_vision_text_dataset.py",
         "contracts/evidence_catalog_v1.json",
         "tests/cli/test_preset_multimodal_presets.py",
-        "tests/core/test_public_evidence_catalog.py"
+        "tests/core/test_public_evidence_catalog.py",
+        "public_evidence/published_basis/qwen3-5-2b-image-text-hf"
       ],
       "notes": "Maintained catalog lane qwen3-5-2b-image-text-hf.",
       "support_groups": [
@@ -634,8 +658,8 @@
         "multimodal_candidate",
         "enterprise_permissive"
       ],
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "qwen-3-5-27b-image-text-scoped-lm",
@@ -876,15 +900,16 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/olmoe_1b_7b_0924_512.yaml",
-        "configs/calibration/null_sweep_olmoe_1b_7b_0924.yaml"
+        "configs/calibration/null_sweep_olmoe_1b_7b_0924.yaml",
+        "public_evidence/published_basis/olmoe-1b-7b-0924-causal-hf"
       ],
       "support_groups": [
         "moe_candidate",
         "small_local"
       ],
       "notes": "Maintained catalog lane olmoe-1b-7b-0924-causal-hf.",
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "ministral-3-3b-text-causal-lm",
@@ -900,7 +925,8 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/ministral3_3b_512.yaml",
-        "configs/calibration/null_sweep_ministral3_3b.yaml"
+        "configs/calibration/null_sweep_ministral3_3b.yaml",
+        "public_evidence/published_basis/ministral-3-3b-text-causal-hf"
       ],
       "support_groups": [
         "published_modern",
@@ -908,8 +934,8 @@
         "enterprise_permissive"
       ],
       "notes": "Maintained catalog lane ministral-3-3b-text-causal-hf.",
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "granite-4-1-8b-causal-lm",
@@ -925,15 +951,16 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/granite4_1_8b_512.yaml",
-        "configs/calibration/null_sweep_granite4_1_8b.yaml"
+        "configs/calibration/null_sweep_granite4_1_8b.yaml",
+        "public_evidence/published_basis/granite-4-1-8b-causal-hf"
       ],
       "support_groups": [
         "practical_shortlist",
         "enterprise_permissive"
       ],
       "notes": "Maintained catalog lane granite-4-1-8b-causal-hf.",
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "smollm3-3b-causal-lm",
@@ -949,14 +976,15 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/smollm3_3b_512.yaml",
-        "configs/calibration/null_sweep_smollm3_3b.yaml"
+        "configs/calibration/null_sweep_smollm3_3b.yaml",
+        "public_evidence/published_basis/smollm3-3b-causal-hf"
       ],
       "support_groups": [
         "small_local"
       ],
       "notes": "Maintained catalog lane smollm3-3b-causal-hf.",
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "phi-4-mini-causal-lm",
@@ -972,15 +1000,16 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/phi4_mini_512.yaml",
-        "configs/calibration/null_sweep_phi4_mini.yaml"
+        "configs/calibration/null_sweep_phi4_mini.yaml",
+        "public_evidence/published_basis/phi-4-mini-causal-hf"
       ],
       "support_groups": [
         "small_local",
         "reasoning_focused"
       ],
       "notes": "Maintained catalog lane phi-4-mini-causal-hf.",
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "deepseek-r1-distill-qwen-14b-causal-lm",
@@ -996,15 +1025,16 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/deepseek_r1_distill_qwen_14b_512.yaml",
-        "configs/calibration/null_sweep_deepseek_r1_distill_qwen_14b.yaml"
+        "configs/calibration/null_sweep_deepseek_r1_distill_qwen_14b.yaml",
+        "public_evidence/published_basis/deepseek-r1-distill-qwen-14b-causal-hf"
       ],
       "support_groups": [
         "published_modern",
         "reasoning_focused"
       ],
       "notes": "Maintained catalog lane deepseek-r1-distill-qwen-14b-causal-hf.",
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "deepseek-r1-0528-qwen3-8b-causal-lm",
@@ -1020,15 +1050,16 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/deepseek_r1_0528_qwen3_8b_512.yaml",
-        "configs/calibration/null_sweep_deepseek_r1_0528_qwen3_8b.yaml"
+        "configs/calibration/null_sweep_deepseek_r1_0528_qwen3_8b.yaml",
+        "public_evidence/published_basis/deepseek-r1-0528-qwen3-8b-causal-hf"
       ],
       "support_groups": [
         "published_modern",
         "reasoning_focused"
       ],
       "notes": "Maintained catalog lane deepseek-r1-0528-qwen3-8b-causal-hf.",
-      "evidence_status": "not_created",
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     }
   ],
   "implemented_coverage": [

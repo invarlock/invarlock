@@ -236,45 +236,45 @@ The evidence column reports current artifacts only. A lane changes to **Availabl
 
 | Surface | Lane ID | Adapter | Evidence |
 | --- | --- | --- | --- |
-| BERT / RoBERTa MLM | `bert-mlm-hf` | `hf_mlm` | **Evidence not yet created** |
-| DeepSeek-R1-0528-Qwen3 8B causal LM | `deepseek-r1-0528-qwen3-8b-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| DeepSeek-R1-Distill-Qwen 14B causal LM | `deepseek-r1-distill-qwen-14b-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| DeepSeek-R1-Distill-Qwen causal LM | `deepseek-r1-distill-qwen-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| Falcon 7B causal LM | `falcon-7b-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| FLAN-T5 base seq2seq LM | `flan-t5-base-seq2seq-hf` | `hf_seq2seq` | **Evidence not yet created** |
+| BERT / RoBERTa MLM | `bert-mlm-hf` | `hf_mlm` | **Available** |
+| DeepSeek-R1-0528-Qwen3 8B causal LM | `deepseek-r1-0528-qwen3-8b-causal-hf` | `hf_causal` | **Available** |
+| DeepSeek-R1-Distill-Qwen 14B causal LM | `deepseek-r1-distill-qwen-14b-causal-hf` | `hf_causal` | **Available** |
+| DeepSeek-R1-Distill-Qwen causal LM | `deepseek-r1-distill-qwen-causal-hf` | `hf_causal` | **Available** |
+| Falcon 7B causal LM | `falcon-7b-causal-hf` | `hf_causal` | **Available** |
+| FLAN-T5 base seq2seq LM | `flan-t5-base-seq2seq-hf` | `hf_seq2seq` | **Available** |
 | Gemma 4 12B any-to-any LM | `gemma4-12b-any-to-any-hf` | `hf_multimodal` | **Evidence not yet created** |
 | Gemma 4 26B-A4B MoE image-text LM | `gemma4-26b-a4b-moe-image-text-hf` | `hf_multimodal` | **Evidence not yet created** |
 | Gemma 4 31B image-text LM | `gemma4-31b-image-text-hf` | `hf_multimodal` | **Evidence not yet created** |
-| Gemma 4 E2B image-text LM | `gemma4-e2b-image-text-hf` | `hf_multimodal` | **Evidence not yet created** |
-| Gemma 4 E2B causal LM (text-only eval) | `gemma4-e2b-text-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| Gemma 4 E4B image-text LM | `gemma4-e4b-image-text-hf` | `hf_multimodal` | **Evidence not yet created** |
+| Gemma 4 E2B image-text LM | `gemma4-e2b-image-text-hf` | `hf_multimodal` | **Available** |
+| Gemma 4 E2B causal LM (text-only eval) | `gemma4-e2b-text-causal-hf` | `hf_causal` | **Available** |
+| Gemma 4 E4B image-text LM | `gemma4-e4b-image-text-hf` | `hf_multimodal` | **Available** |
 | GPT-OSS 20B causal LM | `gpt-oss-20b-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| GPT-2 causal LM | `gpt2-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| Granite 4.1 3B causal LM | `granite-4-1-3b-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| Granite 4.1 8B causal LM | `granite-4-1-8b-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| Ministral 3 14B causal LM (text-only eval) | `ministral-3-14b-text-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| Ministral 3 3B causal LM (text-only eval) | `ministral-3-3b-text-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| Ministral 3 8B causal LM (text-only eval) | `ministral-3-8b-text-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| Mistral 7B causal LM | `mistral-7b-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| GPT-2 causal LM | `gpt2-causal-hf` | `hf_causal` | **Available** |
+| Granite 4.1 3B causal LM | `granite-4-1-3b-causal-hf` | `hf_causal` | **Available** |
+| Granite 4.1 8B causal LM | `granite-4-1-8b-causal-hf` | `hf_causal` | **Available** |
+| Ministral 3 14B causal LM (text-only eval) | `ministral-3-14b-text-causal-hf` | `hf_causal` | **Available** |
+| Ministral 3 3B causal LM (text-only eval) | `ministral-3-3b-text-causal-hf` | `hf_causal` | **Available** |
+| Ministral 3 8B causal LM (text-only eval) | `ministral-3-8b-text-causal-hf` | `hf_causal` | **Available** |
+| Mistral 7B causal LM | `mistral-7b-causal-hf` | `hf_causal` | **Available** |
 | Mixtral 8x7B MoE causal LM | `mixtral-8x7b-moe-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| OLMo 2 13B causal LM | `olmo-2-13b-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| OLMo 2 7B causal LM | `olmo-2-7b-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| OLMoE 1B-active/7B-total causal LM | `olmoe-1b-7b-0924-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| OpenLLaMA 7B causal LM | `open-llama-7b-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| Phi-4 mini causal LM | `phi-4-mini-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| Phi-4 causal LM (text-only eval) | `phi-4-text-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| Qwen2.5 14B causal LM | `qwen2-5-14b-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| Qwen2.5 7B causal LM | `qwen2-5-7b-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| Qwen2 7B causal LM | `qwen2-7b-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| OLMo 2 13B causal LM | `olmo-2-13b-causal-hf` | `hf_causal` | **Available** |
+| OLMo 2 7B causal LM | `olmo-2-7b-causal-hf` | `hf_causal` | **Available** |
+| OLMoE 1B-active/7B-total causal LM | `olmoe-1b-7b-0924-causal-hf` | `hf_causal` | **Available** |
+| OpenLLaMA 7B causal LM | `open-llama-7b-causal-hf` | `hf_causal` | **Available** |
+| Phi-4 mini causal LM | `phi-4-mini-causal-hf` | `hf_causal` | **Available** |
+| Phi-4 causal LM (text-only eval) | `phi-4-text-causal-hf` | `hf_causal` | **Available** |
+| Qwen2.5 14B causal LM | `qwen2-5-14b-causal-hf` | `hf_causal` | **Available** |
+| Qwen2.5 7B causal LM | `qwen2-5-7b-causal-hf` | `hf_causal` | **Available** |
+| Qwen2 7B causal LM | `qwen2-7b-causal-hf` | `hf_causal` | **Available** |
 | Qwen3 30B-A3B MoE causal LM | `qwen3-30b-a3b-moe-causal-hf` | `hf_causal` | **Evidence not yet created** |
 | Qwen3.5 27B image-text LM (scoped) | `qwen3-5-27b-image-text-scoped-hf` | `hf_multimodal` | **Evidence not yet created** |
-| Qwen3.5 2B image-text LM | `qwen3-5-2b-image-text-hf` | `hf_multimodal` | **Evidence not yet created** |
-| Qwen3.5 4B image-text LM | `qwen3-5-4b-image-text-hf` | `hf_multimodal` | **Evidence not yet created** |
-| Qwen3.5 causal LM | `qwen3-5-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Qwen3.5 2B image-text LM | `qwen3-5-2b-image-text-hf` | `hf_multimodal` | **Available** |
+| Qwen3.5 4B image-text LM | `qwen3-5-4b-image-text-hf` | `hf_multimodal` | **Available** |
+| Qwen3.5 causal LM | `qwen3-5-causal-hf` | `hf_causal` | **Available** |
 | Qwen3.6 27B image-text LM (scoped) | `qwen3-6-27b-image-text-scoped-hf` | `hf_multimodal` | **Evidence not yet created** |
-| Qwen3 causal LM | `qwen3-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| SmolLM3 3B causal LM | `smollm3-3b-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| TinyLlama 1.1B causal LM | `tinyllama-1-1b-causal-hf` | `hf_causal` | **Evidence not yet created** |
+| Qwen3 causal LM | `qwen3-causal-hf` | `hf_causal` | **Available** |
+| SmolLM3 3B causal LM | `smollm3-3b-causal-hf` | `hf_causal` | **Available** |
+| TinyLlama 1.1B causal LM | `tinyllama-1-1b-causal-hf` | `hf_causal` | **Available** |
 
 Machine-readable definitions live in `contracts/evidence_catalog_v1.json` and `contracts/support_matrix.json`. Model and adapter implementation details live in the [Model Family Catalog](reference/model-family-catalog.md).
 

@@ -17,13 +17,15 @@ support table and current evidence state live in
 
 ## Current status
 
-The current index contains strictly verified evidence for 23 of the 39
+The current index contains strictly verified evidence for 31 of the 39
 maintained lanes. Those rows are labeled **Available** and link to their
-evidence packs and verification receipts. The other 16 rows retain the label
+evidence packs and verification receipts. The other 8 rows retain the label
 **Evidence not yet created** until current-contract evidence is published.
 
 Each available row has a corresponding entry in
-`public_evidence/published_basis_index.json`.
+`public_evidence/published_basis_index.json`. The compact index is carried by
+source tags and installed wheels; the complete 31-lane evidence tree is the
+hash-bound GitHub Release asset recorded by every artifact entry.
 
 ## Creating and verifying current evidence
 
@@ -41,9 +43,12 @@ caller.
 The complete invocation and execution boundary are documented in
 `scripts/evidence_packs/README.md`.
 
-To add a completed result to the repository, place the verified pack under
-`public_evidence/` and change its lane from `not_created` to `available` in the
-index and support matrix.
+To publish completed results, stage the verified packs under
+`public_evidence/published_basis/`, update each lane from `not_created` to
+`available`, build the archive, and run
+`scripts/checks/sync_packaged_public_evidence.py` with the external asset URL,
+SHA-256, size, and archive root. Commit the compact source and packaged indexes;
+upload the full archive as the corresponding GitHub Release asset.
 
 ## What an available lane contains
 
@@ -67,7 +72,9 @@ evaluation.
 
 ## Review workflow
 
-Inspect the catalog and an available pack with the public CLI:
+Download the release asset named in the index, verify its recorded SHA-256 and
+size, and unpack it at the repository root. Then inspect the catalog and an
+available pack with the public CLI:
 
 ```bash
 invarlock advanced evidence-catalog validate \

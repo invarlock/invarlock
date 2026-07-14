@@ -171,14 +171,16 @@ The maintained public contract data ships in two places:
 - installed wheels, under `invarlock/_data/contracts/*.json`
 - source tags in the repository
 
-Repo tags and installed wheels are the only maintained public contract
-carriers.
+Repo tags and installed wheels are the maintained public contract carriers.
+Full evidence packs are separate immutable GitHub Release assets referenced by
+the compact index; they are evidence carriers, not contract authorities.
 
 Source tags and installed wheels ship the same compact current-evidence index
 at `invarlock/_data/public_evidence/published_basis_index.json`. An empty index
 uses `status=not_created` and the label **Evidence not yet created**. Completed
 lanes add hash-bound artifact entries as their current evidence becomes
-available.
+available. Each externalized entry records the release-asset URL, archive
+SHA-256, byte size, archive root, and logical path.
 
 ## Policy packs
 

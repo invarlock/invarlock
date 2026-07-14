@@ -40,8 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   declared identity consistency, not execution attestation.
 - Consolidated catalog evidence execution around the repository-owned lane
   command and retired overlapping sweep and campaign orchestration surfaces.
-- Aligned public evidence with the model catalog so every lane reports either a
-  strictly verified pack or `no evidence created yet`.
+- Published current strictly verified evidence packs for 31 model-catalog lanes
+  through a hash-bound GitHub Release asset and compact source/wheel index, and
+  aligned the remaining catalog rows with the **Evidence not yet created**
+  status used by the support matrix and documentation.
 - Updated integration examples to distinguish real training, serialization,
   reload, merge, pruning, and quantization workflows from synthetic fixtures
   and to validate their emitted artifacts fail closed.

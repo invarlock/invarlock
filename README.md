@@ -239,7 +239,9 @@ pip install "invarlock[probes]"
 - [Assurance Case](docs/assurance/00-assurance-case.md)
 
 [Evidence Catalog](docs/user-guide/public-evidence-walkthrough.md) tracks which
-maintained lanes have current evidence artifacts.
+maintained lanes have current evidence artifacts. Source tags and wheels carry
+the compact hash-bound index; the full evidence tree is distributed as the
+GitHub Release asset named in that index.
 
 ## Project
 

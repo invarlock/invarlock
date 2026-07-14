@@ -17,13 +17,17 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
         "baseline_reference"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/gpt2-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/gpt2-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "bert-mlm-hf",
@@ -31,13 +35,17 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_mlm",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
         "baseline_reference"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/bert-mlm-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/bert-mlm-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "mistral-7b-causal-hf",
@@ -45,14 +53,18 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
         "published_modern",
         "enterprise_permissive"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/mistral-7b-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/mistral-7b-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "ministral-3-8b-text-causal-hf",
@@ -60,7 +72,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -72,7 +84,11 @@
       "representative_models": [
         "mistralai/Ministral-3-8B-Instruct-2512-BF16"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/ministral-3-8b-text-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/ministral-3-8b-text-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "ministral-3-14b-text-causal-hf",
@@ -80,7 +96,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -91,7 +107,11 @@
       "representative_models": [
         "mistralai/Ministral-3-14B-Instruct-2512-BF16"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/ministral-3-14b-text-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/ministral-3-14b-text-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "qwen2-7b-causal-hf",
@@ -99,13 +119,17 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
         "published_modern"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/qwen2-7b-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/qwen2-7b-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "qwen2-5-7b-causal-hf",
@@ -113,13 +137,17 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
         "published_modern"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/qwen2-5-7b-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/qwen2-5-7b-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "qwen2-5-14b-causal-hf",
@@ -127,13 +155,17 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
         "published_modern"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/qwen2-5-14b-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/qwen2-5-14b-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "qwen3-causal-hf",
@@ -141,14 +173,18 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
         "published_modern",
         "reasoning_focused"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/qwen3-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/qwen3-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "deepseek-r1-distill-qwen-causal-hf",
@@ -156,14 +192,18 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
         "published_modern",
         "reasoning_focused"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/deepseek-r1-distill-qwen-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/deepseek-r1-distill-qwen-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "phi-4-text-causal-hf",
@@ -171,14 +211,18 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
         "published_modern",
         "reasoning_focused"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/phi-4-text-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/phi-4-text-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "gemma4-e2b-text-causal-hf",
@@ -186,7 +230,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -197,7 +241,11 @@
       "representative_models": [
         "google/gemma-4-E2B-it"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/gemma4-e2b-text-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/gemma4-e2b-text-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "tinyllama-1-1b-causal-hf",
@@ -205,14 +253,18 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
         "published_modern",
         "small_local"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/tinyllama-1-1b-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/tinyllama-1-1b-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "olmo-2-7b-causal-hf",
@@ -220,7 +272,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -229,7 +281,11 @@
       "representative_models": [
         "allenai/OLMo-2-1124-7B"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/olmo-2-7b-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/olmo-2-7b-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "olmo-2-13b-causal-hf",
@@ -237,7 +293,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -246,7 +302,11 @@
       "representative_models": [
         "allenai/OLMo-2-1124-13B-Instruct"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/olmo-2-13b-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/olmo-2-13b-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "open-llama-7b-causal-hf",
@@ -254,7 +314,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -263,7 +323,11 @@
       "representative_models": [
         "openlm-research/open_llama_7b"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/open-llama-7b-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/open-llama-7b-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "falcon-7b-causal-hf",
@@ -271,7 +335,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -280,7 +344,11 @@
       "representative_models": [
         "tiiuae/falcon-7b"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/falcon-7b-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/falcon-7b-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "qwen3-5-causal-hf",
@@ -288,7 +356,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -296,7 +364,11 @@
         "practical_shortlist",
         "enterprise_permissive"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/qwen3-5-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/qwen3-5-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "granite-4-1-3b-causal-hf",
@@ -304,7 +376,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -315,7 +387,11 @@
       "representative_models": [
         "ibm-granite/granite-4.1-3b"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/granite-4-1-3b-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/granite-4-1-3b-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "flan-t5-base-seq2seq-hf",
@@ -323,7 +399,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_seq2seq",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -333,7 +409,11 @@
       "representative_models": [
         "google/flan-t5-base"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/flan-t5-base-seq2seq-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/flan-t5-base-seq2seq-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "gemma4-12b-any-to-any-hf",
@@ -361,7 +441,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_multimodal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -373,7 +453,11 @@
       "representative_models": [
         "google/gemma-4-E4B-it"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/gemma4-e4b-image-text-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/gemma4-e4b-image-text-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "gemma4-e2b-image-text-hf",
@@ -381,7 +465,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_multimodal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -393,7 +477,11 @@
       "representative_models": [
         "google/gemma-4-E2B-it"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/gemma4-e2b-image-text-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/gemma4-e2b-image-text-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "qwen3-5-4b-image-text-hf",
@@ -401,7 +489,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_multimodal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -414,7 +502,11 @@
       "representative_models": [
         "Qwen/Qwen3.5-4B"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/qwen3-5-4b-image-text-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/qwen3-5-4b-image-text-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "qwen3-5-2b-image-text-hf",
@@ -422,7 +514,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_multimodal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -434,7 +526,11 @@
       "representative_models": [
         "Qwen/Qwen3.5-2B"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/qwen3-5-2b-image-text-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/qwen3-5-2b-image-text-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "qwen3-5-27b-image-text-scoped-hf",
@@ -577,7 +673,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -587,7 +683,11 @@
       "representative_models": [
         "allenai/OLMoE-1B-7B-0924"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/olmoe-1b-7b-0924-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/olmoe-1b-7b-0924-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "ministral-3-3b-text-causal-hf",
@@ -595,7 +695,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -606,7 +706,11 @@
       "representative_models": [
         "mistralai/Ministral-3-3B-Instruct-2512-BF16"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/ministral-3-3b-text-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/ministral-3-3b-text-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "granite-4-1-8b-causal-hf",
@@ -614,7 +718,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -624,7 +728,11 @@
       "representative_models": [
         "ibm-granite/granite-4.1-8b"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/granite-4-1-8b-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/granite-4-1-8b-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "smollm3-3b-causal-hf",
@@ -632,7 +740,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -641,7 +749,11 @@
       "representative_models": [
         "HuggingFaceTB/SmolLM3-3B"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/smollm3-3b-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/smollm3-3b-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "phi-4-mini-causal-hf",
@@ -649,7 +761,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -659,7 +771,11 @@
       "representative_models": [
         "microsoft/Phi-4-mini-instruct"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/phi-4-mini-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/phi-4-mini-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "deepseek-r1-distill-qwen-14b-causal-hf",
@@ -667,7 +783,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -677,7 +793,11 @@
       "representative_models": [
         "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/deepseek-r1-distill-qwen-14b-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/deepseek-r1-distill-qwen-14b-causal-hf/verification_receipt.json"
+      }
     },
     {
       "lane_id": "deepseek-r1-0528-qwen3-8b-causal-hf",
@@ -685,7 +805,7 @@
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "published_basis",
-      "evidence_status": "not_created",
+      "evidence_status": "available",
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "support_groups": [
@@ -695,7 +815,11 @@
       "representative_models": [
         "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B"
       ],
-      "evidence_status_label": "Evidence not yet created"
+      "evidence_status_label": "Available",
+      "evidence": {
+        "evidence_pack": "public_evidence/published_basis/deepseek-r1-0528-qwen3-8b-causal-hf/evidence_pack",
+        "verification_receipt": "public_evidence/published_basis/deepseek-r1-0528-qwen3-8b-causal-hf/verification_receipt.json"
+      }
     }
   ]
 }
