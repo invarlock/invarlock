@@ -50,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refocused the root and documentation landing pages on the evaluate, verify,
   and report workflow, current contracts, supported model families, and public
   evidence status.
+- Updated the pinned CodeQL, uv setup, Ruff, and Setuptools validation
+  toolchain.
 
 ### Fixed
 

@@ -1,5 +1,5 @@
 [build-system]
-requires      = ["setuptools>=82.0.1", "wheel"]
+requires      = ["setuptools>=83.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -63,6 +63,7 @@ adapters = [
 
 # Hugging Face workflow (adapters + evaluation stack)
 hf = [
+  "setuptools>=83.0.0",
   "torch>=2.11.0,!=2.12.0",
   "accelerate>=0.26.0",
   "transformers>=5.12.0",
@@ -193,6 +194,7 @@ gpu = [
 
 # Convenience install for advanced evidence-pack/policy/plugins/calibration workflows.
 advanced = [
+  "setuptools>=83.0.0",
   "torch>=2.11.0,!=2.12.0",
   "transformers>=5.12.0",
   "protobuf>=4.25",
@@ -251,7 +253,7 @@ dev = [
   "pytest>=7.0",
   "pytest-cov>=7.1.0",
   "pytest-xdist>=3.6",
-  "ruff==0.15.20",
+  "ruff==0.15.21",
   "black>=23.0",
   "mypy>=1.0",
   "hypothesis>=6.98",
@@ -269,11 +271,12 @@ dev = [
 ]
 
 ci = [
+  "setuptools>=83.0.0",
   "pytest>=7.0",
   "pytest-cov>=7.1.0",
   "pytest-xdist>=3.6",
   "hypothesis>=6.98",
-  "ruff==0.15.20",
+  "ruff==0.15.21",
   "mypy>=1.0",
   "mkdocs>=1.5",
   "mkdocs-material>=9.7.6",
@@ -297,7 +300,7 @@ precommit-ci = [
 
 release-ci = [
   "build>=0.10.0",
-  "setuptools>=82.0.1",
+  "setuptools>=83.0.0",
   "wheel==0.46.3",
   "requests>=2.33.0",
   "twine>=4.0.0",
