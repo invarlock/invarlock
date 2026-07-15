@@ -177,14 +177,15 @@ def _collect_files(root_descriptor: int) -> tuple[_FileRecord, ...]:
             raise TensorRTLLMIdentityError(
                 "engine bundle directory cannot be listed safely"
             ) from exc
-        for entry in entries:
-            logical_name = _logical_name((*parts, entry))
+        logical_entries = [(entry, _logical_name((*parts, entry))) for entry in entries]
+        for _entry, logical_name in logical_entries:
             folded = logical_name.casefold()
             if folded in casefold_names:
                 raise TensorRTLLMIdentityError(
                     f"engine bundle contains a casefold collision at {logical_name!r}"
                 )
             casefold_names.add(folded)
+        for entry, logical_name in logical_entries:
             try:
                 before = os.stat(
                     entry,

@@ -39,6 +39,28 @@ _REQUIRE_ISOLATED_NETWORK_NAMESPACE = llama_cpp._require_isolated_network_namesp
 _OBSERVE_LINUX_CPU = llama_cpp._observe_linux_cpu
 
 
+def _authenticated_test_cpu() -> llama_cpp.RuntimeDeviceFacts:
+    canonical_identity = {
+        "fields": {"model name": ["observed test CPU"]},
+        "machine": "test-machine",
+    }
+    identity_sha256 = hashlib.sha256(
+        json.dumps(
+            canonical_identity,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    return llama_cpp.RuntimeDeviceFacts(
+        device_kind="cpu",
+        device_name=(
+            f"observed test CPU [test-machine; cpu_identity_sha256={identity_sha256}]"
+        ),
+    )
+
+
 @pytest.fixture(autouse=True)
 def _authenticated_test_container(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("INVARLOCK_CONTAINER_EXECUTION", "1")
@@ -46,14 +68,7 @@ def _authenticated_test_container(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE", "invarlock-runtime@" + _IMAGE_DIGEST)
     monkeypatch.setattr(llama_cpp, "strict_container_boundary_present", lambda: True)
     monkeypatch.setattr(llama_cpp, "_require_isolated_network_namespace", lambda: None)
-    monkeypatch.setattr(
-        llama_cpp,
-        "_observe_linux_cpu",
-        lambda: llama_cpp.RuntimeDeviceFacts(
-            device_kind="cpu",
-            device_name="observed test CPU",
-        ),
-    )
+    monkeypatch.setattr(llama_cpp, "_observe_linux_cpu", _authenticated_test_cpu)
 
 
 def _string(value: str) -> bytes:
@@ -502,8 +517,7 @@ def test_llama_cpp_scores_in_order_and_emits_bound_receipt(tmp_path: Path) -> No
     assert receipt.backend.source_sha256 == spec.settings["backend_source_sha256"]
     assert receipt.artifact_identity == provider.identify_artifact(spec)
     assert receipt.outer_image_digest == _IMAGE_DIGEST
-    assert receipt.device.device_kind == "cpu"
-    assert "cpu_identity_sha256=" in receipt.device.device_name
+    assert receipt.device == _authenticated_test_cpu()
     assert receipt.device.compute_capability is None
     assert receipt.device.driver_version is None
     assert (

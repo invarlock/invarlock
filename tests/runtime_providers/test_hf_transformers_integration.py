@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.metadata
 import json
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.core.runtime_provider import (
     EvaluationBatch,
     EvaluationRecord,
+    HFSnapshotArtifactIdentity,
     ModelRuntimeSpec,
     RuntimeExecutionContext,
     artifact_identity_sha256,
@@ -161,12 +163,14 @@ def test_hf_provider_receipts_a_real_tiny_local_transformers_journey(
     assert verified.value == 1.0
     assert receipt.backend.name == "transformers+torch"
     assert receipt.backend.version == (
-        f"transformers={transformers.__version__};torch={torch.__version__}"
+        f"transformers={importlib.metadata.version('transformers')};"
+        f"torch={importlib.metadata.version('torch')}"
     )
     assert receipt.backend.source_sha256 is not None
     assert receipt.backend.binary_sha256 is not None
     assert receipt.backend.build_sha256 is not None
     assert receipt.device.device_kind == "cpu"
+    assert isinstance(receipt.artifact_identity, HFSnapshotArtifactIdentity)
     assert receipt.artifact_identity.tokenizer_metadata_sha256 == tokenizer_sha256
     assert receipt.artifact_identity.checkpoint_tree_sha256 == tree_sha256.removeprefix(
         "sha256:"

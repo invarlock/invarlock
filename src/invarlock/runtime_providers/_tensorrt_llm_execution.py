@@ -53,6 +53,21 @@ def _directory_identity(value: os.stat_result) -> tuple[int, int, int]:
     return (value.st_dev, value.st_ino, value.st_mode)
 
 
+def _parent_entry_is_protected(
+    parent: os.stat_result,
+    entry: os.stat_result,
+) -> bool:
+    if parent.st_mode & 0o022 == 0:
+        return True
+    trusted_uids = {0, os.geteuid()}
+    return (
+        stat.S_ISDIR(parent.st_mode)
+        and parent.st_mode & stat.S_ISVTX != 0
+        and parent.st_uid in trusted_uids
+        and entry.st_uid in trusted_uids
+    )
+
+
 def _hash_descriptor(descriptor: int, expected_size: int) -> str:
     os.lseek(descriptor, 0, os.SEEK_SET)
     remaining = expected_size
@@ -106,10 +121,7 @@ class _PinnedFile:
                 "pinned file root cannot be opened"
             ) from exc
         try:
-            if require_secure_parents and os.fstat(parent_descriptor).st_mode & 0o022:
-                raise TensorRTLLMExecutionError(
-                    "pinned file path has a group- or other-writable parent"
-                )
+            parent_stat = os.fstat(parent_descriptor)
             for component in absolute.parts[1:-1]:
                 try:
                     next_descriptor = os.open(
@@ -119,21 +131,32 @@ class _PinnedFile:
                     raise TensorRTLLMExecutionError(
                         "pinned file path contains a symlink or inaccessible directory"
                     ) from exc
+                try:
+                    next_stat = os.fstat(next_descriptor)
+                    if require_secure_parents and not _parent_entry_is_protected(
+                        parent_stat, next_stat
+                    ):
+                        raise TensorRTLLMExecutionError(
+                            "pinned file path has a group- or other-writable parent"
+                        )
+                except Exception:
+                    os.close(next_descriptor)
+                    raise
                 os.close(parent_descriptor)
                 parent_descriptor = next_descriptor
-                if (
-                    require_secure_parents
-                    and os.fstat(parent_descriptor).st_mode & 0o022
-                ):
-                    raise TensorRTLLMExecutionError(
-                        "pinned file path has a group- or other-writable parent"
-                    )
+                parent_stat = next_stat
             try:
                 named = os.stat(
                     absolute.name,
                     dir_fd=parent_descriptor,
                     follow_symlinks=False,
                 )
+                if require_secure_parents and not _parent_entry_is_protected(
+                    parent_stat, named
+                ):
+                    raise TensorRTLLMExecutionError(
+                        "pinned file path has a group- or other-writable parent"
+                    )
                 descriptor = os.open(
                     absolute.name,
                     os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW,

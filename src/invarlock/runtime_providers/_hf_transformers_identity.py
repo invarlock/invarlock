@@ -12,11 +12,17 @@ import importlib
 import importlib.metadata
 import json
 import platform
+import re
 from collections.abc import Mapping
 from pathlib import Path
 
 from invarlock.core.runtime_provider import RuntimeBackendIdentity, RuntimeDeviceFacts
 from invarlock.evidence_pack_json import StrictJsonError, read_regular_file_bytes
+
+_LOCAL_VERSION_PATTERN = re.compile(
+    r"^(?P<public>[^+]+)\+(?P<local>[a-z0-9]+(?:[._-][a-z0-9]+)*)$",
+    re.IGNORECASE,
+)
 
 
 def _sha256(payload: bytes) -> str:
@@ -173,6 +179,34 @@ def _distribution_identity(name: str) -> dict[str, str]:
     }
 
 
+def _runtime_version_matches_distribution(
+    imported_version: object, installed_version: str
+) -> bool:
+    """Match an exact public version while accounting for PEP 440 local labels."""
+
+    def _split_local(value: object) -> tuple[str, str | None] | None:
+        if not isinstance(value, str) or not value or value.strip() != value:
+            return None
+        if "+" not in value:
+            return value, None
+        match = _LOCAL_VERSION_PATTERN.fullmatch(value)
+        if match is None:
+            return None
+        normalized_local = re.sub(r"[._-]+", ".", match.group("local")).lower()
+        return match.group("public"), normalized_local
+
+    imported = _split_local(imported_version)
+    installed = _split_local(installed_version)
+    if imported is None or installed is None or imported[0] != installed[0]:
+        return False
+    imported_local, installed_local = imported[1], installed[1]
+    return (
+        imported_local is None
+        or installed_local is None
+        or imported_local == installed_local
+    )
+
+
 def _installed_backend_identity(model: object) -> RuntimeBackendIdentity:
     """Bind the imported HF/Torch runtime to installed distribution material."""
 
@@ -183,11 +217,15 @@ def _installed_backend_identity(model: object) -> RuntimeBackendIdentity:
     torch_distribution = _distribution_identity("torch")
     transformers_version = getattr(transformers, "__version__", None)
     torch_version = getattr(torch, "__version__", None)
-    if transformers_version != transformers_distribution["version"]:
+    if not _runtime_version_matches_distribution(
+        transformers_version, transformers_distribution["version"]
+    ):
         raise RuntimeError(
             "imported transformers version does not match installed distribution"
         )
-    if torch_version != torch_distribution["version"]:
+    if not _runtime_version_matches_distribution(
+        torch_version, torch_distribution["version"]
+    ):
         raise RuntimeError(
             "imported torch version does not match installed distribution"
         )

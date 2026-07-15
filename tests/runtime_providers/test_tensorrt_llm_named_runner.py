@@ -138,6 +138,68 @@ def test_runner_and_interpreter_reject_untrusted_ownership_or_mode(
         tensorrt_llm_session._resolve_vendor_python()  # noqa: SLF001
 
 
+def test_pinned_file_allows_only_owned_entries_under_trusted_sticky_parent(
+    tmp_path: Path,
+) -> None:
+    sticky_parent = tmp_path / "sticky"
+    sticky_parent.mkdir()
+    sticky_parent.chmod(0o1777)
+    executable = sticky_parent / "runner"
+    executable.write_text("runner", encoding="utf-8")
+    executable.chmod(0o700)
+
+    pinned = tensorrt_llm_execution._PinnedFile.open(  # noqa: SLF001
+        executable,
+        expected_sha256=None,
+        require_executable=True,
+        require_secure_parents=True,
+    )
+    pinned.close()
+
+    sticky_parent.chmod(0o0777)
+    with pytest.raises(
+        TensorRTLLMExecutionError, match="group- or other-writable parent"
+    ):
+        tensorrt_llm_execution._PinnedFile.open(  # noqa: SLF001
+            executable,
+            expected_sha256=None,
+            require_executable=True,
+            require_secure_parents=True,
+        )
+
+
+def test_sticky_parent_requires_trusted_directory_and_entry_owners() -> None:
+    current_uid = os.geteuid()
+    untrusted_uid = max(current_uid, 0) + 1000
+
+    def facts(*, mode: int, uid: int) -> os.stat_result:
+        return os.stat_result((mode, 1, 1, 1, uid, 1, 0, 0, 0, 0))
+
+    trusted_parent = facts(mode=0o41777, uid=0)
+    trusted_entry = facts(mode=0o40700, uid=current_uid)
+    untrusted_parent = facts(mode=0o41777, uid=untrusted_uid)
+    untrusted_entry = facts(mode=0o40700, uid=untrusted_uid)
+
+    assert (
+        tensorrt_llm_execution._parent_entry_is_protected(  # noqa: SLF001
+            trusted_parent, trusted_entry
+        )
+        is True
+    )
+    assert (
+        tensorrt_llm_execution._parent_entry_is_protected(  # noqa: SLF001
+            untrusted_parent, trusted_entry
+        )
+        is False
+    )
+    assert (
+        tensorrt_llm_execution._parent_entry_is_protected(  # noqa: SLF001
+            trusted_parent, untrusted_entry
+        )
+        is False
+    )
+
+
 def test_provider_rejects_writable_root_mount(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

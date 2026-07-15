@@ -230,6 +230,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed static-analysis findings in runtime type-alias exports, evidence utility
   CLIs, pruning-contract key validation, report-config cleanup, and verification
   export helpers.
+- Fixed cross-platform runtime-provider checks so Hugging Face local build
+  suffixes reconcile with installed distribution versions, TensorRT-LLM accepts
+  trusted entries beneath sticky temporary directories while rejecting unsafe
+  writable parents or ownership, and engine-name casefold collisions fail
+  consistently on case-sensitive filesystems.
 
 ## [0.12.1] - 2026-07-05
 

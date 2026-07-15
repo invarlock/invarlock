@@ -322,6 +322,7 @@ def test_identity_rejects_casefold_collisions_and_nested_directories(
 ) -> None:
     collision = _bundle(tmp_path / "collision")
     original_listdir = os.listdir
+    original_stat = os.stat
 
     def colliding_listdir(descriptor: int) -> list[str]:
         entries = original_listdir(descriptor)
@@ -329,12 +330,19 @@ def test_identity_rejects_casefold_collisions_and_nested_directories(
             return [*entries, "RANK0.ENGINE"]
         return entries
 
-    monkeypatch.setattr(os, "listdir", colliding_listdir)
+    def case_sensitive_stat(path, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003, ANN202
+        if path == "RANK0.ENGINE":
+            raise FileNotFoundError(path)
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(tensorrt_llm_identity.os, "listdir", colliding_listdir)
+    monkeypatch.setattr(tensorrt_llm_identity.os, "stat", case_sensitive_stat)
     with pytest.raises(
         tensorrt_llm_identity.TensorRTLLMIdentityError, match="casefold collision"
     ):
         _read(collision)
-    monkeypatch.setattr(os, "listdir", original_listdir)
+    monkeypatch.setattr(tensorrt_llm_identity.os, "listdir", original_listdir)
+    monkeypatch.setattr(tensorrt_llm_identity.os, "stat", original_stat)
 
     nested = _bundle(tmp_path / "nested")
     nested.joinpath("lora").mkdir()

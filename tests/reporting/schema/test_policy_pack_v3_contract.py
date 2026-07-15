@@ -16,7 +16,7 @@ from invarlock.public_contracts import load_policy_pack_schema
 def _dataset_identity() -> dict[str, object]:
     return {
         "provider": "local_jsonl",
-        "dataset_name": "partner-regression-v1",
+        "dataset_name": "paired-regression-v1",
         "config_name": None,
         "revision": "a" * 40,
         "split": "validation",
