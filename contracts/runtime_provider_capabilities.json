@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/runtime_provider_capabilities.json",
+  "title": "InvarLock Runtime Provider Capabilities",
+  "type": "object",
+  "required": [
+    "format_version",
+    "provider_name",
+    "provider_abi",
+    "artifact_formats",
+    "tasks",
+    "metrics",
+    "execution_modes",
+    "required_extra",
+    "required_image",
+    "platform_constraints",
+    "evidence_surfaces",
+    "supported_claim_sets",
+    "degraded_modes",
+    "unavailable_modes"
+  ],
+  "properties": {
+    "format_version": {
+      "const": "runtime-provider-capabilities-v1"
+    },
+    "provider_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "provider_abi": {
+      "const": "1"
+    },
+    "artifact_formats": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["hf_snapshot", "gguf", "tensorrt_llm_engine"]
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["text_causal"]
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "exact_match",
+          "multiple_choice_accuracy",
+          "normalized_nll_per_utf8_byte"
+        ]
+      }
+    },
+    "execution_modes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["in_process", "local_process", "container"]
+      }
+    },
+    "required_extra": {
+      "anyOf": [
+        {"type": "null"},
+        {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"}
+      ]
+    },
+    "required_image": {
+      "anyOf": [
+        {"type": "null"},
+        {"type": "string", "pattern": "^\\S+$"}
+      ]
+    },
+    "platform_constraints": {
+      "$ref": "#/$defs/uniqueStrings"
+    },
+    "evidence_surfaces": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "behavior",
+          "tokenizer",
+          "weights",
+          "modules",
+          "activations",
+          "build"
+        ]
+      }
+    },
+    "supported_claim_sets": {
+      "allOf": [
+        {"$ref": "#/$defs/uniqueStrings"},
+        {"minItems": 1}
+      ]
+    },
+    "degraded_modes": {
+      "$ref": "#/$defs/uniqueStrings"
+    },
+    "unavailable_modes": {
+      "$ref": "#/$defs/uniqueStrings"
+    }
+  },
+  "$defs": {
+    "uniqueStrings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^\\S(?:.*\\S)?$"
+      }
+    }
+  },
+  "additionalProperties": false
+}
