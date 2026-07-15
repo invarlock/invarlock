@@ -663,6 +663,7 @@ def test_subject_config_preserves_explicit_adapter_and_canonical_strict_chain() 
     assert config["model"] == {
         "id": "org/subject",
         "adapter": "custom_adapter",
+        "runtime_provider": {"name": "hf_transformers", "settings": {}},
     }
     assert config["guards"]["order"] == list(CANONICAL_GUARD_CHAIN)
 

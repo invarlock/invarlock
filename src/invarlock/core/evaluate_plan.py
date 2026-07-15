@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import tempfile
 from copy import deepcopy
 from dataclasses import dataclass
@@ -14,6 +15,7 @@ from .assurance_contract import (
 from .checkpoint_identity import LEGACY_MODEL_IDENTITY_FIELDS, resolve_model_identity
 
 _TEXT_NORMALIZATION_ERRORS = (RuntimeError, TypeError, ValueError)
+_RUNTIME_PROVIDER_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
 DEFAULT_EVALUATE_GUARDS_ORDER = list(CANONICAL_GUARD_CHAIN)
 
@@ -32,6 +34,8 @@ class EvaluateCommandPlan:
     tier_name: str
     baseline_adapter_name: str
     subject_adapter_name: str
+    baseline_runtime_provider_name: str
+    subject_runtime_provider_name: str
     adapter_auto: bool
     baseline_adapter_auto: bool
     subject_adapter_auto: bool
@@ -68,6 +72,35 @@ def stable_text(value: object, fallback: str = "") -> str:
         return str(value)
     except _TEXT_NORMALIZATION_ERRORS:
         return fallback
+
+
+def normalize_runtime_provider_name(value: object) -> str:
+    """Return a canonical provider name for evaluate planning."""
+
+    normalized = stable_text(value, "hf_transformers").strip()
+    if _RUNTIME_PROVIDER_NAME.fullmatch(normalized) is None:
+        raise ValueError(
+            "Runtime provider names must be lowercase plugin names containing only "
+            "letters, digits, and underscores."
+        )
+    return normalized
+
+
+def _runtime_provider_block(
+    provider_name: str,
+    *,
+    model_block: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    settings: dict[str, Any] = {}
+    existing = model_block.get("runtime_provider") if model_block else None
+    if (
+        isinstance(existing, dict)
+        and existing.get("name", provider_name) == provider_name
+    ):
+        existing_settings = existing.get("settings")
+        if isinstance(existing_settings, dict):
+            settings = deepcopy(existing_settings)
+    return {"name": provider_name, "settings": settings}
 
 
 def resolve_evaluate_execution_policy(
@@ -232,6 +265,7 @@ def build_baseline_run_config(
     *,
     model_id: str,
     adapter_name: str,
+    runtime_provider_name: str = "hf_transformers",
     model_identity: dict[str, str] | None = None,
     output_dir: str,
     profile: str,
@@ -241,9 +275,16 @@ def build_baseline_run_config(
     execution_mode: str = "unknown",
 ) -> dict[str, Any]:
     _reject_legacy_model_identity(preset_data, label="Preset config")
+    normalized_runtime_provider = normalize_runtime_provider_name(runtime_provider_name)
+    preset_model = preset_data.get("model")
+    preset_model_block = preset_model if isinstance(preset_model, dict) else None
     model_config: dict[str, Any] = {
         "id": model_id,
         "adapter": adapter_name,
+        "runtime_provider": _runtime_provider_block(
+            normalized_runtime_provider,
+            model_block=preset_model_block,
+        ),
     }
     if model_identity is not None:
         model_config["model_identity"] = deepcopy(model_identity)
@@ -275,6 +316,7 @@ def build_subject_noop_run_config(
     *,
     model_id: str,
     adapter_name: str,
+    runtime_provider_name: str = "hf_transformers",
     model_identity: dict[str, str] | None = None,
     output_dir: str,
     profile: str,
@@ -287,6 +329,7 @@ def build_subject_noop_run_config(
         preset_data,
         model_id=model_id,
         adapter_name=adapter_name,
+        runtime_provider_name=runtime_provider_name,
         model_identity=model_identity,
         output_dir=output_dir,
         profile=profile,
@@ -303,6 +346,7 @@ def build_subject_edit_run_config(
     *,
     subject_model_id: str,
     adapter_name: str,
+    runtime_provider_name: str = "hf_transformers",
     model_identity: dict[str, str] | None = None,
     output_dir: str,
     profile: str,
@@ -315,6 +359,7 @@ def build_subject_edit_run_config(
     cfg_loaded = deepcopy(loaded_edit_config)
     _reject_legacy_model_identity(cfg_loaded, label="Edit config")
     model_block = dict(cfg_loaded.get("model") or {})
+    normalized_runtime_provider = normalize_runtime_provider_name(runtime_provider_name)
     raw_model_id = model_block.get("id")
     if not isinstance(raw_model_id, str) or raw_model_id.startswith("<"):
         model_block["id"] = subject_model_id
@@ -324,6 +369,10 @@ def build_subject_edit_run_config(
         "adapter"
     ):
         model_block["adapter"] = adapter_name
+    model_block["runtime_provider"] = _runtime_provider_block(
+        normalized_runtime_provider,
+        model_block=model_block,
+    )
     model_block.pop("model_identity", None)
     if model_identity is not None:
         model_block["model_identity"] = deepcopy(model_identity)
@@ -379,6 +428,8 @@ def build_evaluate_command_plan(
     subject_revision: str | None = None,
     baseline_adapter: str = "auto",
     subject_adapter: str = "auto",
+    baseline_runtime_provider: str = "hf_transformers",
+    subject_runtime_provider: str = "hf_transformers",
     tmp_dir_candidate: str | None = None,
     assurance_mode: str = "strict",
     execution_mode: str = "container",
@@ -388,21 +439,35 @@ def build_evaluate_command_plan(
     profile_name = stable_text(profile, "dev")
     tier_name = stable_text(tier, "balanced")
     normalized_assurance_mode = normalize_assurance_mode(assurance_mode)
+    baseline_runtime_provider_name = normalize_runtime_provider_name(
+        baseline_runtime_provider
+    )
+    subject_runtime_provider_name = normalize_runtime_provider_name(
+        subject_runtime_provider
+    )
 
-    def _resolve_side_adapter(raw_adapter: str, model_id: str) -> tuple[str, bool]:
+    def _resolve_side_adapter(
+        raw_adapter: str,
+        model_id: str,
+        runtime_provider_name: str,
+    ) -> tuple[str, bool]:
         raw_adapter_name = stable_text(raw_adapter, "auto")
         is_auto = raw_adapter_name.strip().lower() in {"auto", "auto_hf"}
         if is_auto:
-            return str(resolve_auto_adapter_fn(model_id)), True
+            if runtime_provider_name == "hf_transformers":
+                return str(resolve_auto_adapter_fn(model_id)), True
+            return "auto", True
         return raw_adapter_name, False
 
     baseline_adapter_name, baseline_adapter_auto = _resolve_side_adapter(
         baseline_adapter,
         baseline_model_id,
+        baseline_runtime_provider_name,
     )
     subject_adapter_name, subject_adapter_auto = _resolve_side_adapter(
         subject_adapter,
         subject_model_id,
+        subject_runtime_provider_name,
     )
     adapter_auto = baseline_adapter_auto or subject_adapter_auto
 
@@ -453,6 +518,7 @@ def build_evaluate_command_plan(
         preset_data,
         model_id=normalized_source_model_id,
         adapter_name=str(baseline_adapter_name),
+        runtime_provider_name=baseline_runtime_provider_name,
         model_identity=baseline_identity,
         output_dir=str(Path(out) / "source"),
         profile=profile_name,
@@ -466,6 +532,8 @@ def build_evaluate_command_plan(
         tier_name=tier_name,
         baseline_adapter_name=str(baseline_adapter_name),
         subject_adapter_name=str(subject_adapter_name),
+        baseline_runtime_provider_name=baseline_runtime_provider_name,
+        subject_runtime_provider_name=subject_runtime_provider_name,
         adapter_auto=adapter_auto,
         baseline_adapter_auto=baseline_adapter_auto,
         subject_adapter_auto=subject_adapter_auto,
@@ -503,6 +571,7 @@ __all__ = [
     "determine_subject_label",
     "load_evaluate_preset_data",
     "normalize_model_id",
+    "normalize_runtime_provider_name",
     "resolve_evaluate_execution_policy",
     "resolve_evaluate_tmp_dir",
     "resolve_guards_order",

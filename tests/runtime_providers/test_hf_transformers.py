@@ -20,12 +20,15 @@ from invarlock.core.runtime_provider import (
     artifact_identity_sha256,
 )
 from invarlock.core.runtime_provider.types import JSONScalar
-from invarlock.runtime_providers.hf_transformers import HFTransformersProvider
+from invarlock.runtime_providers.hf_transformers import (
+    HFTransformersProvider,
+    HFTransformersSessionFactory,
+)
 
 
 def _spec(**settings: JSONScalar) -> ModelRuntimeSpec:
     merged_settings: dict[str, JSONScalar] = {
-        "immutable_revision": "revision-123",
+        "immutable_revision": "1" * 40,
         "checkpoint_tree_sha256": "a" * 64,
         "tokenizer_metadata_sha256": "b" * 64,
     }
@@ -208,6 +211,64 @@ def test_hf_provider_reuses_bound_adapter_model_and_scorer_without_loading() -> 
         session.runtime_receipt()
 
 
+def test_hf_session_factory_defers_scorer_binding_without_duplicate_load() -> None:
+    adapter = object()
+    native_model = object()
+    batch = _batch()
+    spec = _spec()
+    scored: list[EvaluationBatch] = []
+    factory = HFTransformersSessionFactory(
+        spec=spec,
+        authenticated_artifact_identity=(
+            HFTransformersProvider().identify_artifact(spec)
+        ),
+        model_adapter=adapter,
+        native_model=native_model,
+        strict=True,
+        allow_network=False,
+        container_image_digest="sha256:" + "2" * 64,
+        device_kind="cpu",
+    )
+
+    def scorer(candidate: EvaluationBatch) -> ScoringObservation:
+        scored.append(candidate)
+        return _observation(
+            candidate,
+            artifact_sha256=factory.artifact_identity_sha256,
+        )
+
+    session = factory.open(scorer)
+
+    assert session.model_adapter() is adapter
+    assert session.native_model() is native_model
+    assert session.score(batch).artifact_identity_sha256 == (
+        factory.artifact_identity_sha256
+    )
+    assert scored == [batch]
+
+
+def test_hf_session_factory_rejects_loaded_artifact_identity_mismatch() -> None:
+    spec = _spec()
+    mismatched_identity = HFSnapshotArtifactIdentity(
+        model_id=spec.model_id,
+        immutable_revision="2" * 40,
+        checkpoint_tree_sha256="a" * 64,
+        tokenizer_metadata_sha256="b" * 64,
+    )
+
+    with pytest.raises(ValueError, match="authenticated artifact identity"):
+        HFTransformersSessionFactory(
+            spec=spec,
+            authenticated_artifact_identity=mismatched_identity,
+            model_adapter=object(),
+            native_model=object(),
+            strict=True,
+            allow_network=False,
+            container_image_digest="sha256:" + "2" * 64,
+            device_kind="cpu",
+        )
+
+
 def test_hf_session_closes_bound_resources_exactly_once() -> None:
     calls: list[str] = []
     batch = _batch()
@@ -362,7 +423,7 @@ def test_hf_provider_identifies_bound_snapshot_without_exposing_path() -> None:
 
     assert isinstance(identity, HFSnapshotArtifactIdentity)
     assert identity.model_id == "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-    assert identity.immutable_revision == "revision-123"
+    assert identity.immutable_revision == "1" * 40
     assert identity.checkpoint_tree_sha256 == "a" * 64
     assert identity.tokenizer_metadata_sha256 == "b" * 64
 
@@ -398,7 +459,7 @@ def test_hf_provider_rejects_unbound_local_path_instead_of_leaking_it(tmp_path) 
         model_id=str(private_checkpoint),
         adapter_name="hf_causal",
         settings={
-            "immutable_revision": "revision-123",
+            "immutable_revision": "1" * 40,
             "tokenizer_metadata_sha256": "b" * 64,
         },
     )
@@ -431,3 +492,8 @@ def test_hf_provider_rejects_wrong_provider_unknown_settings_and_unbound_identit
         provider.validate_config(unknown_setting)
     with pytest.raises(ValueError, match="immutable identity"):
         provider.identify_artifact(unbound)
+
+
+def test_hf_provider_rejects_mutable_revision_even_with_tree_digest() -> None:
+    with pytest.raises(ValueError, match="40-64 character"):
+        HFTransformersProvider().identify_artifact(_spec(immutable_revision="main"))

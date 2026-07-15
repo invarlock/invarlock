@@ -143,6 +143,40 @@ def _resolve_evaluate_tmp_dir() -> Path:
     return resolve_evaluate_tmp_dir(os.environ.get("INVARLOCK_EVALUATE_TMP_DIR"))
 
 
+def _resolve_evaluate_runtime_provider_selection(
+    plan: Any,
+    *,
+    debug_fn: Any,
+) -> str:
+    debug_fn(
+        "Runtime providers -> "
+        f"baseline={plan.baseline_runtime_provider_name}, "
+        f"subject={plan.subject_runtime_provider_name}"
+    )
+    return str(plan.subject_runtime_provider_name)
+
+
+def _require_supported_evaluate_runtime_providers(plan: Any, *, fail_fn: Any) -> None:
+    """Fail before execution when the legacy path cannot honor a selection."""
+
+    selected = (
+        ("baseline", str(plan.baseline_runtime_provider_name)),
+        ("subject", str(plan.subject_runtime_provider_name)),
+    )
+    unsupported = tuple(
+        f"{side}={provider}"
+        for side, provider in selected
+        if provider != "hf_transformers"
+    )
+    if unsupported:
+        fail_fn(
+            "The evaluate execution path currently supports only the "
+            "'hf_transformers' runtime provider; unsupported selection(s): "
+            + ", ".join(unsupported),
+            exit_code=2,
+        )
+
+
 def _render_banner_lines(title: str, context: str) -> list[str]:
     return _render_banner_lines_impl(title, context)
 
@@ -361,6 +395,8 @@ def evaluate_command(
     baseline_report: str | None = None,
     baseline_adapter: str = "auto",
     subject_adapter: str = "auto",
+    baseline_runtime_provider: str = "hf_transformers",
+    subject_runtime_provider: str = "hf_transformers",
     device: str | None = None,
     profile: str = "ci",
     tier: str = "balanced",
@@ -498,6 +534,8 @@ def evaluate_command(
             subject_revision=subject_revision,
             baseline_adapter=baseline_adapter,
             subject_adapter=subject_adapter,
+            baseline_runtime_provider=baseline_runtime_provider,
+            subject_runtime_provider=subject_runtime_provider,
             profile=profile,
             tier=tier,
             preset=preset,
@@ -516,12 +554,16 @@ def evaluate_command(
         _fail(f"Preset not found: {exc}", exit_code=2)
     except ValueError as exc:
         _fail(str(exc), exit_code=2)
+    _require_supported_evaluate_runtime_providers(plan, fail_fn=_fail)
     if plan_start is not None:
         timings["plan"] = max(0.0, float(cli_output.perf_counter() - plan_start))
     profile_name = plan.profile_name
     tier_name = plan.tier_name
     baseline_eff_adapter = plan.baseline_adapter_name
     subject_eff_adapter = plan.subject_adapter_name
+    subject_eff_runtime_provider = _resolve_evaluate_runtime_provider_selection(
+        plan, debug_fn=_debug
+    )
     adapter_auto = plan.adapter_auto
     adapter_display = (
         subject_eff_adapter
@@ -545,7 +587,6 @@ def evaluate_command(
             "Adapter:auto -> "
             f"baseline={baseline_eff_adapter}, subject={subject_eff_adapter}"
         )
-
     # Choose preset. If none provided and repo preset is missing (pip install
     # scenario), fall back to a minimal built-in universal preset so the
     # flag-only quick start works without cloning the repo.
@@ -619,6 +660,7 @@ def evaluate_command(
                 no_color=no_color,
                 tmp_dir=tmp_dir,
                 model_identity=plan.subject_identity,
+                runtime_provider=subject_eff_runtime_provider,
             ),
             phase_runtime,
         )

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
@@ -281,11 +281,70 @@ class HFTransformersProvider:
                 )
         return _HFTransformersSession(
             _adapter=cast(ModelAdapter, context.model_adapter),
-            _model=cast(object, context.native_model),
+            _model=context.native_model,
             _scorer=cast(RuntimeScorer, context.scorer),
             _close_callback=context.close_callback,
             _artifact_identity_sha256=context.artifact_identity_sha256,
         )
 
 
-__all__ = ["HFTransformersProvider", "INVARLOCK_RUNTIME_PROVIDER_ABI"]
+@dataclass(frozen=True)
+class HFTransformersSessionFactory:
+    """Bind the existing HF load once and accept the scorer at its later boundary.
+
+    Core orchestration resolves and loads the adapter/model before its guarded scorer
+    exists. This factory is the narrow hand-off between those phases: it stores the
+    exact objects and never calls an adapter loader. Once the scorer is available,
+    ``open`` creates the provider session without duplicating model state.
+    """
+
+    spec: ModelRuntimeSpec
+    authenticated_artifact_identity: HFSnapshotArtifactIdentity
+    model_adapter: object = field(repr=False, compare=False)
+    native_model: object = field(repr=False, compare=False)
+    strict: bool
+    allow_network: bool
+    container_image_digest: str | None
+    device_kind: str
+    artifact_identity_sha256: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        provider = HFTransformersProvider()
+        provider.validate_config(self.spec)
+        declared_identity = provider.identify_artifact(self.spec)
+        if self.authenticated_artifact_identity != declared_identity:
+            raise ValueError(
+                "authenticated artifact identity does not match the runtime spec"
+            )
+        identity_sha256 = artifact_identity_sha256(self.authenticated_artifact_identity)
+        object.__setattr__(self, "artifact_identity_sha256", identity_sha256)
+
+    def open(
+        self,
+        scorer: RuntimeScorer,
+        *,
+        close_callback: Callable[[], None] | None = None,
+    ) -> _HFTransformersSession:
+        """Open over an injected scorer and the exact prebound adapter/model."""
+
+        return HFTransformersProvider().open(
+            self.spec,
+            RuntimeExecutionContext(
+                strict=self.strict,
+                allow_network=self.allow_network,
+                container_image_digest=self.container_image_digest,
+                device_kind=self.device_kind,
+                artifact_identity_sha256=self.artifact_identity_sha256,
+                model_adapter=self.model_adapter,
+                native_model=self.native_model,
+                scorer=scorer,
+                close_callback=close_callback,
+            ),
+        )
+
+
+__all__ = [
+    "HFTransformersProvider",
+    "HFTransformersSessionFactory",
+    "INVARLOCK_RUNTIME_PROVIDER_ABI",
+]

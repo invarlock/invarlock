@@ -81,6 +81,7 @@ class SubjectEvaluationRequest:
     no_color: bool
     tmp_dir: Path
     model_identity: dict[str, str] | None = None
+    runtime_provider: str = "hf_transformers"
 
 
 def _profile_effective_dataset_config(
@@ -258,6 +259,7 @@ def run_subject_evaluation_phase(
             cfg_loaded,
             subject_model_id=request.subject_model_id,
             adapter_name=str(request.adapter),
+            runtime_provider_name=request.runtime_provider,
             model_identity=request.model_identity,
             output_dir=str(Path(request.out) / "edited"),
             profile=request.profile_name,
@@ -320,6 +322,7 @@ def run_subject_evaluation_phase(
             request.preset_data,
             model_id=request.subject_model_id,
             adapter_name=str(request.adapter),
+            runtime_provider_name=request.runtime_provider,
             model_identity=request.model_identity,
             output_dir=str(Path(request.out) / "edited"),
             profile=request.profile_name,

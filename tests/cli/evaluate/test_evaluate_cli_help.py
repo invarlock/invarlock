@@ -17,6 +17,8 @@ def test_cli_evaluate_help():
     assert "--baseline-report" in stdout
     assert "--baseline-revision" in stdout
     assert "--subject-revision" in stdout
+    assert "--baseline-runtime-provider" in stdout
+    assert "--subject-runtime-provider" in stdout
     assert "remote baseline" in stdout
     assert "remote subject" in stdout
     assert stdout.count("40-64 character lowercase hexadecimal revision") == 2

@@ -3,11 +3,77 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 from typer.testing import CliRunner
 
 from invarlock.cli.app import app
 from tests.cli._support_effective_config import preserve_effective_config
+
+
+@pytest.mark.parametrize(
+    ("provider_flag", "provider", "expected_selection"),
+    [
+        ("--baseline-runtime-provider", "onnx_runtime", "baseline=onnx_runtime"),
+        ("--subject-runtime-provider", "llama_cpp", "subject=llama_cpp"),
+    ],
+)
+def test_evaluate_rejects_non_hf_runtime_provider_before_execution(
+    monkeypatch,
+    tmp_path: Path,
+    provider_flag: str,
+    provider: str,
+    expected_selection: str,
+) -> None:
+    import invarlock.cli.commands.evaluate as evaluate_mod
+
+    phase_calls: list[str] = []
+
+    def _unexpected_baseline(*_args, **_kwargs):
+        phase_calls.append("baseline")
+        raise AssertionError("baseline evaluation must not start")
+
+    def _unexpected_subject(*_args, **_kwargs):
+        phase_calls.append("subject")
+        raise AssertionError("subject evaluation must not start")
+
+    monkeypatch.setattr(
+        evaluate_mod, "run_baseline_evaluation_phase", _unexpected_baseline
+    )
+    monkeypatch.setattr(
+        evaluate_mod, "run_subject_evaluation_phase", _unexpected_subject
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "evaluate",
+            "--baseline",
+            "org/baseline",
+            "--subject",
+            "org/subject",
+            "--baseline-adapter",
+            "hf_causal",
+            "--subject-adapter",
+            "hf_causal",
+            provider_flag,
+            provider,
+            "--profile",
+            "dev",
+            "--assurance",
+            "off",
+            "--out",
+            str(tmp_path / "runs"),
+            "--report-out",
+            str(tmp_path / "report"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "supports only the 'hf_transformers'" in result.stdout
+    assert "runtime provider" in result.stdout
+    assert expected_selection in result.stdout
+    assert phase_calls == []
 
 
 def test_evaluate_hf_id_normalization_and_preset_fallback(monkeypatch, tmp_path: Path):
@@ -68,6 +134,10 @@ def test_evaluate_hf_id_normalization_and_preset_fallback(monkeypatch, tmp_path:
             "auto",
             "--subject-adapter",
             "auto",
+            "--baseline-runtime-provider",
+            "hf_transformers",
+            "--subject-runtime-provider",
+            "hf_transformers",
             "--profile",
             "dev",
             "--assurance",
@@ -87,8 +157,16 @@ def test_evaluate_hf_id_normalization_and_preset_fallback(monkeypatch, tmp_path:
         "kind": "remote_revision",
         "revision": "a" * 40,
     }
+    assert baseline_cfg["model"]["runtime_provider"] == {
+        "name": "hf_transformers",
+        "settings": {},
+    }
     subject_cfg = captured[1][1]
     assert subject_cfg["model"]["id"] == "org/modelB"
+    assert subject_cfg["model"]["runtime_provider"] == {
+        "name": "hf_transformers",
+        "settings": {},
+    }
     assert "model_identity" not in subject_cfg["model"]
 
 

@@ -136,7 +136,7 @@ def test_model_artifact_identity_variants_reject_paths_and_bad_digests() -> None
 
     hf = HFSnapshotArtifactIdentity(
         model_id="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-        immutable_revision="revision-123",
+        immutable_revision="1" * 40,
         checkpoint_tree_sha256="a" * 64,
         tokenizer_metadata_sha256="b" * 64,
     )
@@ -178,6 +178,8 @@ def test_model_artifact_identity_variants_reject_paths_and_bad_digests() -> None
 
     with pytest.raises(ValueError, match="absolute or traversal path"):
         dataclasses.replace(gguf, artifact_name="/models/model.gguf")
+    with pytest.raises(ValueError, match="40-64 character"):
+        dataclasses.replace(hf, immutable_revision="main")
     with pytest.raises(ValueError, match="absolute or traversal path"):
         dataclasses.replace(engine, bundle_name="../engine")
     with pytest.raises(ValueError, match="sha256"):

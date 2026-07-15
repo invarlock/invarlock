@@ -34,6 +34,7 @@ _SETTING_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _IMAGE_DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 _COMPUTE_CAPABILITY = re.compile(r"^[0-9]{1,2}\.[0-9]{1,2}$")
+_IMMUTABLE_REMOTE_REVISION = re.compile(r"^[0-9a-f]{40,64}$")
 
 _ARTIFACT_FORMATS = frozenset({"hf_snapshot", "gguf", "tensorrt_llm_engine"})
 _TASKS = frozenset({"text_causal"})
@@ -225,9 +226,11 @@ class HFSnapshotArtifactIdentity:
     def __post_init__(self) -> None:
         _require_safe_logical_name(self.model_id, field_name="model_id")
         if self.immutable_revision is not None:
-            _require_safe_logical_name(
-                self.immutable_revision, field_name="immutable_revision"
-            )
+            if _IMMUTABLE_REMOTE_REVISION.fullmatch(self.immutable_revision) is None:
+                raise ValueError(
+                    "immutable_revision must be a 40-64 character lowercase "
+                    "hexadecimal revision"
+                )
         _require_optional_sha256(
             self.checkpoint_tree_sha256, field_name="checkpoint_tree_sha256"
         )

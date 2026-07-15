@@ -40,7 +40,7 @@
         "immutable_revision": {
           "anyOf": [
             {"type": "null"},
-            {"$ref": "#/$defs/logicalName"}
+            {"type": "string", "pattern": "^[0-9a-f]{40,64}$"}
           ]
         },
         "checkpoint_tree_sha256": {

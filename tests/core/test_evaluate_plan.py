@@ -150,7 +150,11 @@ def test_build_baseline_run_config_injects_evaluate_context() -> None:
         assurance_mode="off",
     )
 
-    assert cfg["model"] == {"id": "org/model", "adapter": "hf_causal"}
+    assert cfg["model"] == {
+        "id": "org/model",
+        "adapter": "hf_causal",
+        "runtime_provider": {"name": "hf_transformers", "settings": {}},
+    }
     assert cfg["edit"] == {"name": "noop", "plan": {}}
     assert cfg["output"] == {"dir": "runs/source"}
     assert cfg["guards"] == {"order": ["g1", "g2"]}
@@ -181,6 +185,7 @@ def test_build_baseline_run_config_uses_only_typed_model_identity() -> None:
         "id": "org/model",
         "adapter": "hf_causal",
         "model_identity": identity,
+        "runtime_provider": {"name": "hf_transformers", "settings": {}},
     }
 
 
@@ -218,7 +223,11 @@ def test_build_subject_edit_run_config_normalizes_placeholders_and_guards() -> N
         assurance_mode="off",
     )
 
-    assert cfg["model"] == {"id": "hf:org/model", "adapter": "hf_causal"}
+    assert cfg["model"] == {
+        "id": "hf:org/model",
+        "adapter": "hf_causal",
+        "runtime_provider": {"name": "hf_transformers", "settings": {}},
+    }
     assert cfg["output"] == {"dir": "runs/edited"}
     assert cfg["context"] == {
         "profile": "ci",
@@ -521,6 +530,124 @@ def test_build_evaluate_command_plan_supports_split_side_adapters(
     assert plan.source_model_id == "org/source"
     assert plan.subject_model_id == "org/subject-4bit"
     assert plan.baseline_config["model"]["adapter"] == "hf_causal"
+
+
+def test_legacy_and_explicit_hf_provider_plans_are_identical(tmp_path: Path) -> None:
+    common = {
+        "baseline_model_id": "org/source",
+        "subject_model_id": "org/subject",
+        "baseline_adapter": "hf_causal",
+        "subject_adapter": "hf_causal",
+        "profile": "ci",
+        "tier": "balanced",
+        "preset": None,
+        "out": "runs",
+        "edit_config": None,
+        "edit_label": None,
+        "resolve_auto_adapter_fn": lambda _model_id: "hf_causal",
+        "load_yaml_fn": lambda _path: {},
+        "tmp_dir_candidate": str(tmp_path / "scratch"),
+        "assurance_mode": "off",
+    }
+
+    legacy = build_evaluate_command_plan(**common)
+    explicit = build_evaluate_command_plan(
+        **common,
+        baseline_runtime_provider="hf_transformers",
+        subject_runtime_provider="hf_transformers",
+    )
+
+    assert legacy == explicit
+    assert legacy.baseline_runtime_provider_name == "hf_transformers"
+    assert legacy.subject_runtime_provider_name == "hf_transformers"
+    assert legacy.baseline_config["model"]["runtime_provider"] == {
+        "name": "hf_transformers",
+        "settings": {},
+    }
+
+
+def test_evaluate_plan_routes_side_specific_runtime_providers(tmp_path: Path) -> None:
+    resolved: list[str] = []
+
+    plan = build_evaluate_command_plan(
+        baseline_model_id="org/source",
+        subject_model_id="models/subject.gguf",
+        baseline_adapter="hf_causal",
+        subject_adapter="auto",
+        baseline_runtime_provider="hf_transformers",
+        subject_runtime_provider="llama_cpp",
+        profile="ci",
+        tier="balanced",
+        preset=None,
+        out="runs",
+        edit_config=None,
+        edit_label=None,
+        resolve_auto_adapter_fn=lambda model_id: (
+            resolved.append(model_id) or "hf_causal"
+        ),
+        load_yaml_fn=lambda _path: {},
+        tmp_dir_candidate=str(tmp_path / "scratch"),
+        assurance_mode="off",
+    )
+
+    assert resolved == []
+    assert plan.baseline_runtime_provider_name == "hf_transformers"
+    assert plan.subject_runtime_provider_name == "llama_cpp"
+    assert plan.subject_adapter_name == "auto"
+    assert plan.baseline_config["model"]["runtime_provider"]["name"] == (
+        "hf_transformers"
+    )
+
+
+def test_subject_runtime_provider_selection_overrides_stale_edit_provider() -> None:
+    config = build_subject_edit_run_config(
+        {},
+        {
+            "model": {
+                "id": "<MODEL_ID>",
+                "runtime_provider": {
+                    "name": "llama_cpp",
+                    "settings": {"binary": "stale"},
+                },
+            },
+            "edit": {"name": "noop"},
+        },
+        subject_model_id="org/model",
+        adapter_name="hf_causal",
+        runtime_provider_name="hf_transformers",
+        output_dir="runs/edited",
+        profile="ci",
+        tier="balanced",
+        guards_order=DEFAULT_EVALUATE_GUARDS_ORDER,
+        assurance_mode="off",
+    )
+
+    assert config["model"]["runtime_provider"] == {
+        "name": "hf_transformers",
+        "settings": {},
+    }
+
+
+@pytest.mark.parametrize("name", ["HFTransformers", "bad-provider", "../provider"])
+def test_evaluate_plan_rejects_noncanonical_runtime_provider_name(
+    name: str, tmp_path: Path
+) -> None:
+    with pytest.raises(ValueError, match="Runtime provider names"):
+        build_evaluate_command_plan(
+            baseline_model_id="org/source",
+            subject_model_id="org/subject",
+            baseline_runtime_provider=name,
+            profile="ci",
+            tier="balanced",
+            preset=None,
+            out="runs",
+            edit_config=None,
+            edit_label=None,
+            resolve_auto_adapter_fn=lambda _model_id: "hf_causal",
+            load_yaml_fn=lambda _path: {},
+            tmp_dir_candidate=str(tmp_path / "scratch"),
+            assurance_mode="off",
+        )
 
 
 def test_build_evaluate_command_plan_strict_rejects_custom_guard_order(
