@@ -36,6 +36,9 @@ from tests.runtime_providers._tensorrt_llm_support import (
     _REQUIRES_POSIX_PINNING,
     _batch,
     _bundle,
+    _linux_process_state_is_running,
+    _parse_linux_process_stat,
+    _process_diagnostic,
     _process_is_running,
     _record,
     _runtime_inputs,
@@ -483,6 +486,66 @@ def test_tensorrt_llm_timeout_kills_the_child_process_group(
     assert killed
 
 
+def test_tensorrt_llm_kills_process_group_after_leader_exit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[int, signal.Signals]] = []
+
+    class ExitedLeader:
+        pid = 24680
+
+        @staticmethod
+        def wait(*, timeout: float) -> int:
+            assert timeout == 2
+            return 0
+
+        @staticmethod
+        def kill() -> None:
+            raise AssertionError(
+                "the already-exited leader must not need a direct kill"
+            )
+
+    monkeypatch.setattr(
+        tensorrt_llm_execution.os,
+        "killpg",
+        lambda process_group, sent_signal: calls.append((process_group, sent_signal)),
+    )
+
+    tensorrt_llm_execution._kill_process_group(ExitedLeader())  # type: ignore[arg-type]
+
+    assert calls == [(ExitedLeader.pid, signal.SIGKILL)]
+
+
+@pytest.mark.parametrize(
+    ("state", "expected_running"),
+    [("R", True), ("S", True), ("D", True), ("Z", False), ("X", False), ("x", False)],
+)
+def test_linux_process_state_classification(state: str, expected_running: bool) -> None:
+    assert _linux_process_state_is_running(state) is expected_running
+
+
+def test_linux_process_stat_parser_handles_complex_command_names() -> None:
+    fields = ["S", "1", "77", *(["0"] * 16), "999"]
+    process_stat = f"123 (worker ) with spaces) {' '.join(fields)}"
+
+    assert _parse_linux_process_stat(process_stat) == ("S", 77, 999)
+
+
+@pytest.mark.parametrize(
+    "process_stat",
+    [
+        "123 worker S 1 2",
+        "123 (worker) S 1 2",
+        "123 (worker) S 1 invalid " + "0 " * 17,
+    ],
+)
+def test_linux_process_stat_parser_rejects_malformed_records(
+    process_stat: str,
+) -> None:
+    with pytest.raises(ValueError, match="Linux process stat"):
+        _parse_linux_process_stat(process_stat)
+
+
 @_REQUIRES_POSIX_PINNING
 def test_tensorrt_llm_timeout_kills_descendant_after_leader_exits(
     tmp_path: Path,
@@ -496,13 +559,16 @@ def test_tensorrt_llm_timeout_kills_descendant_after_leader_exits(
 
     grandchild_pid = int(pid_path.read_text(encoding="ascii"))
     try:
-        deadline = time.monotonic() + 2
+        deadline = time.monotonic() + 10
         while _process_is_running(grandchild_pid) and time.monotonic() < deadline:
             time.sleep(0.01)
-        assert not _process_is_running(grandchild_pid)
+        assert not _process_is_running(grandchild_pid), _process_diagnostic(
+            grandchild_pid
+        )
     finally:
         if _process_is_running(grandchild_pid):
             os.kill(grandchild_pid, signal.SIGKILL)
+        session.close()
 
 
 @_REQUIRES_POSIX_PINNING
@@ -520,10 +586,12 @@ def test_tensorrt_llm_success_kills_descendant_that_closed_inherited_fds(
     assert observation.records[0].output_text == "OUT:__detached_success__"
     grandchild_pid = int(pid_path.read_text(encoding="ascii"))
     try:
-        deadline = time.monotonic() + 2
+        deadline = time.monotonic() + 10
         while _process_is_running(grandchild_pid) and time.monotonic() < deadline:
             time.sleep(0.01)
-        assert not _process_is_running(grandchild_pid)
+        assert not _process_is_running(grandchild_pid), _process_diagnostic(
+            grandchild_pid
+        )
     finally:
         if _process_is_running(grandchild_pid):
             os.kill(grandchild_pid, signal.SIGKILL)

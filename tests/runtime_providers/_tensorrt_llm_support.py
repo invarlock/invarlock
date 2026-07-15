@@ -280,9 +280,57 @@ def _process_is_running(pid: int) -> bool:
     except ProcessLookupError:
         return False
     status_path = Path(f"/proc/{pid}/stat")
-    if status_path.exists():
+    if Path("/proc").is_dir():
         try:
-            return status_path.read_text(encoding="ascii").split()[2] != "Z"
-        except (OSError, IndexError):
+            process_stat = status_path.read_text(encoding="ascii")
+        except (FileNotFoundError, ProcessLookupError):
             return False
+        except OSError as exc:
+            raise AssertionError(f"could not inspect Linux process {pid}") from exc
+        state, _process_group, _start_time = _parse_linux_process_stat(process_stat)
+        return _linux_process_state_is_running(state)
     return True
+
+
+def _parse_linux_process_stat(process_stat: str) -> tuple[str, int, int]:
+    """Parse state, process group, and start time from one procfs stat record."""
+
+    closing_delimiter = process_stat.rfind(") ")
+    if closing_delimiter < 0:
+        raise ValueError("Linux process stat is missing its command delimiter")
+    fields = process_stat[closing_delimiter + 2 :].split()
+    if len(fields) < 20:
+        raise ValueError("Linux process stat is truncated")
+    state = fields[0]
+    if len(state) != 1:
+        raise ValueError("Linux process stat has an invalid state")
+    try:
+        process_group = int(fields[2])
+        start_time = int(fields[19])
+    except ValueError as exc:
+        raise ValueError("Linux process stat has invalid numeric fields") from exc
+    return state, process_group, start_time
+
+
+def _linux_process_state_is_running(state: str) -> bool:
+    return state not in {"Z", "X", "x"}
+
+
+def _process_diagnostic(pid: int) -> str:
+    status_path = Path(f"/proc/{pid}/stat")
+    if not Path("/proc").is_dir():
+        return f"pid={pid}; procfs unavailable"
+    try:
+        process_stat = status_path.read_text(encoding="ascii")
+    except (FileNotFoundError, ProcessLookupError):
+        return f"pid={pid}; process absent"
+    except OSError as exc:
+        return f"pid={pid}; procfs read failed: {type(exc).__name__}"
+    try:
+        state, process_group, start_time = _parse_linux_process_stat(process_stat)
+    except ValueError as exc:
+        return f"pid={pid}; malformed procfs stat: {exc}"
+    return (
+        f"pid={pid}; state={state}; process_group={process_group}; "
+        f"start_time={start_time}"
+    )
