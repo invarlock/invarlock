@@ -12,7 +12,7 @@
   ],
   "properties": {
     "format": {
-      "enum": ["policy-pack-v1", "policy-pack-v2"]
+      "enum": ["policy-pack-v1", "policy-pack-v2", "policy-pack-v3"]
     },
     "tier": {
       "enum": ["aggressive", "balanced", "conservative"]
@@ -98,6 +98,84 @@
     },
     "metadata": {
       "type": "object"
+    },
+    "behavioral_claim": {
+      "type": "object",
+      "required": [
+        "claim_set",
+        "allowed_provider_names",
+        "allowed_artifact_formats",
+        "required_capabilities",
+        "metric_policy"
+      ],
+      "properties": {
+        "claim_set": {
+          "const": "invarlock-runtime-behavioral-regression-v1"
+        },
+        "allowed_provider_names": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+          }
+        },
+        "allowed_artifact_formats": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["hf_snapshot", "gguf", "tensorrt_llm_engine"]
+          }
+        },
+        "required_capabilities": {
+          "type": "object",
+          "required": ["tasks", "metrics", "evidence_surfaces"],
+          "properties": {
+            "tasks": {
+              "const": ["text_causal"]
+            },
+            "metrics": {
+              "const": ["exact_match"]
+            },
+            "evidence_surfaces": {
+              "type": "array",
+              "minItems": 2,
+              "uniqueItems": true,
+              "items": {
+                "enum": ["behavior", "tokenizer", "build"]
+              },
+              "allOf": [
+                {"contains": {"const": "behavior"}},
+                {"contains": {"const": "tokenizer"}}
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "metric_policy": {
+          "type": "object",
+          "required": ["kind", "minimum_subject_score", "maximum_regression"],
+          "properties": {
+            "kind": {
+              "const": "exact_match"
+            },
+            "minimum_subject_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "maximum_regression": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false,
@@ -164,6 +242,37 @@
             }
           }
         }
+      }
+    },
+    {
+      "if": {
+        "properties": {"format": {"const": "policy-pack-v3"}},
+        "required": ["format"]
+      },
+      "then": {
+        "required": ["behavioral_claim"],
+        "properties": {
+          "resolved_policy": {
+            "not": {"required": ["guard_authority"]}
+          },
+          "compatibility": {
+            "required": ["dataset_identity"],
+            "properties": {
+              "support_tiers": {
+                "items": {
+                  "enum": [
+                    "maintained_catalog",
+                    "supported_experimental",
+                    "community_experimental"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "not": {"required": ["behavioral_claim"]}
       }
     }
   ]

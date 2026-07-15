@@ -22,7 +22,7 @@ _WEIGHT_EDIT_EVIDENCE = frozenset(
     {"behavior", "tokenizer", "weights", "modules", "activations"}
 )
 _BEHAVIORAL_EVIDENCE = frozenset({"behavior", "tokenizer"})
-_REPLAYABLE_BEHAVIORAL_METRICS = frozenset({"exact_match", "multiple_choice_accuracy"})
+_REPLAYABLE_BEHAVIORAL_METRICS = frozenset({"exact_match"})
 
 
 @dataclass(frozen=True)
@@ -107,11 +107,17 @@ def evaluate_runtime_claim_compatibility(
                     f"{role} provider '{capabilities.provider_name}' must expose "
                     "in_process execution for the weight-edit claim."
                 )
-    elif not _REPLAYABLE_BEHAVIORAL_METRICS.intersection(shared_metrics):
-        errors.append(
-            "Runtime behavioral assurance requires a shared verifier-replayable "
-            "metric (exact_match or multiple_choice_accuracy)."
+    else:
+        shared_metrics = tuple(
+            metric
+            for metric in shared_metrics
+            if metric in _REPLAYABLE_BEHAVIORAL_METRICS
         )
+        if not shared_metrics:
+            errors.append(
+                "Runtime behavioral assurance requires the shared "
+                "verifier-replayable metric exact_match."
+            )
 
     return RuntimeClaimCompatibility(
         claim_set=claim_set,

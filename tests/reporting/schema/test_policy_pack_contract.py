@@ -430,7 +430,7 @@ def test_policy_pack_verify_remains_strict_when_schema_library_is_unavailable(
 
 def test_policy_pack_rejects_unknown_format() -> None:
     pack = build_policy_pack(tier="balanced", resolved_policy={})
-    pack["format"] = "policy-pack-v3"
+    pack["format"] = "policy-pack-v4"
 
     assert any("policy-pack-v2" in error for error in verify_policy_pack(pack))
 

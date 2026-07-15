@@ -21,7 +21,7 @@ def _capabilities(
     modes: tuple[str, ...],
     surfaces: tuple[str, ...],
     claims: tuple[str, ...],
-    metrics: tuple[str, ...] = ("exact_match", "multiple_choice_accuracy"),
+    metrics: tuple[str, ...] = ("exact_match",),
 ) -> RuntimeProviderCapabilities:
     return RuntimeProviderCapabilities(
         provider_name=name,
@@ -44,6 +44,7 @@ def _hf_capabilities() -> RuntimeProviderCapabilities:
         modes=("in_process",),
         surfaces=("behavior", "tokenizer", "weights", "modules", "activations"),
         claims=(ASSURANCE_CLAIM_SET, RUNTIME_BEHAVIORAL_CLAIM_SET),
+        metrics=("exact_match", "multiple_choice_accuracy"),
     )
 
 
@@ -105,15 +106,18 @@ def test_behavioral_claim_accepts_hf_to_gguf_without_weight_surfaces() -> None:
     )
 
     assert result.ok is True
-    assert result.shared_metrics == ("exact_match", "multiple_choice_accuracy")
+    assert result.shared_metrics == ("exact_match",)
 
 
-def test_behavioral_claim_fails_closed_without_shared_replayable_metric() -> None:
-    gguf = dataclasses.replace(
-        _gguf_capabilities(), metrics=("normalized_nll_per_utf8_byte",)
-    )
+@pytest.mark.parametrize(
+    "metrics", [("multiple_choice_accuracy",), ("normalized_nll_per_utf8_byte",)]
+)
+def test_behavioral_claim_fails_closed_without_exact_match(
+    metrics: tuple[str, ...],
+) -> None:
+    gguf = dataclasses.replace(_gguf_capabilities(), metrics=metrics)
 
-    with pytest.raises(ValueError, match="shared verifier-replayable metric"):
+    with pytest.raises(ValueError, match="metric exact_match"):
         require_runtime_claim_compatibility(
             RUNTIME_BEHAVIORAL_CLAIM_SET,
             baseline=_hf_capabilities(),
