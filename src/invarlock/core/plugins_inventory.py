@@ -146,7 +146,7 @@ def _support_metadata(
     for key in (
         "support_tier",
         "strict_assurance_allowed",
-        "published_basis",
+        "maintained_catalog",
         "deployment_claim",
     ):
         if key in info:
@@ -370,7 +370,7 @@ def adapter_inventory_json_items(rows: list[InventoryRow]) -> list[dict[str, Any
             "status": row.get("status"),
             "support_tier": row.get("support_tier"),
             "strict_assurance_allowed": row.get("strict_assurance_allowed"),
-            "published_basis": row.get("published_basis"),
+            "maintained_catalog": row.get("maintained_catalog"),
             "deployment_claim": row.get("deployment_claim"),
             "backend": _adapter_backend_payload(row),
             "capability": row.get("capability"),
@@ -394,7 +394,7 @@ def generic_inventory_json_items(
             "origin": _module_origin(str(row.get("module") or "")),
             "support_tier": row.get("support_tier"),
             "strict_assurance_allowed": row.get("strict_assurance_allowed"),
-            "published_basis": row.get("published_basis"),
+            "maintained_catalog": row.get("maintained_catalog"),
             "deployment_claim": row.get("deployment_claim"),
         }
         for row in rows
@@ -417,7 +417,7 @@ def combined_plugins_json_items(
                 "origin": _module_origin(str(row.get("module") or "")),
                 "support_tier": row.get("support_tier"),
                 "strict_assurance_allowed": row.get("strict_assurance_allowed"),
-                "published_basis": row.get("published_basis"),
+                "maintained_catalog": row.get("maintained_catalog"),
                 "deployment_claim": row.get("deployment_claim"),
                 "backend": _adapter_backend_payload(row),
             }

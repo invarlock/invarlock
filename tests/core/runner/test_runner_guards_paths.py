@@ -151,6 +151,8 @@ def test_coerce_and_normalize_guard_results_cover_typed_and_raw_paths() -> None:
             "diagnostics": [{"message": "from raw", "family": "ffn"}],
             "violations": ["string violation"],
             "baseline_metrics": {"sigma": 0.9},
+            "errors": ["retained error"],
+            "warnings": ["retained warning"],
         }
     )
 
@@ -158,6 +160,8 @@ def test_coerce_and_normalize_guard_results_cover_typed_and_raw_paths() -> None:
     assert normalized_raw["violations"] == [{"message": "string violation"}]
     assert normalized_raw["diagnostics"][0]["details"] == {"family": "ffn"}
     assert normalized_raw["baseline_metrics"] == {"sigma": 0.9}
+    assert "errors" not in normalized_raw
+    assert "warnings" not in normalized_raw
 
 
 def test_normalize_guard_result_rejects_unsupported_types() -> None:

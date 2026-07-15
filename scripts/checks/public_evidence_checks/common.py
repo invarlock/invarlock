@@ -19,11 +19,11 @@ PACKAGED_PUBLIC_EVIDENCE_INDEX = (
     / "invarlock"
     / "_data"
     / "public_evidence"
-    / "published_basis_index.json"
+    / "catalog_evidence_index.json"
 )
 META_FILENAME = "evidence.meta.json"
 SCHEMA = "invarlock.public_evidence.meta.v1"
-PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION = "public-evidence-index-v1"
+PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION = "public-evidence-index-v2"
 CANONICAL_PACK_REPORT = (
     Path("evidence_pack") / "reports" / "report-001" / "evaluation.report.json"
 )

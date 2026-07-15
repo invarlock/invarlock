@@ -28,7 +28,7 @@ def test_policy_build_and_verify_cli(tmp_path: Path) -> None:
     )
     compatibility = tmp_path / "compatibility.json"
     compatibility.write_text(
-        json.dumps({"support_tiers": ["published_basis"]}),
+        json.dumps({"support_tiers": ["maintained_catalog"]}),
         encoding="utf-8",
     )
     out = tmp_path / "policy-pack.json"

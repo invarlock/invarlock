@@ -27,7 +27,7 @@ def test_plugins_guards_and_edits_text_and_json():
     rj = CliRunner().invoke(app, ["advanced", "plugins", "guards", "--json"])
     assert rj.exit_code == 0
     pj = json.loads(rj.stdout.strip().splitlines()[-1])
-    assert pj.get("format_version") == "plugins-v1" and pj.get("category") == "guards"
+    assert pj.get("format_version") == "plugins-v2" and pj.get("category") == "guards"
 
 
 def test_plugins_datasets_text_table():

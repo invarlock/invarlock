@@ -12,7 +12,7 @@
   ],
   "properties": {
     "format": {
-      "const": "policy-pack-v1"
+      "enum": ["policy-pack-v1", "policy-pack-v2"]
     },
     "tier": {
       "enum": ["aggressive", "balanced", "conservative"]
@@ -48,11 +48,7 @@
           "minItems": 1,
           "uniqueItems": true,
           "items": {
-            "enum": [
-              "published_basis",
-              "supported_experimental",
-              "community_experimental"
-            ]
+            "type": "string"
           }
         },
         "adapter_families": {
@@ -104,5 +100,71 @@
       "type": "object"
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {"format": {"const": "policy-pack-v1"}},
+        "required": ["format"]
+      },
+      "then": {
+        "properties": {
+          "resolved_policy": {
+            "not": {"required": ["guard_authority"]}
+          },
+          "compatibility": {
+            "properties": {
+              "support_tiers": {
+                "items": {
+                  "enum": [
+                    "published_basis",
+                    "supported_experimental",
+                    "community_experimental"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"format": {"const": "policy-pack-v2"}},
+        "required": ["format"]
+      },
+      "then": {
+        "properties": {
+          "resolved_policy": {
+            "required": ["guard_authority"],
+            "properties": {
+              "guard_authority": {
+                "type": "object",
+                "required": ["spectral", "rmt", "variance"],
+                "properties": {
+                  "spectral": {"enum": ["observe", "enforce"]},
+                  "rmt": {"enum": ["observe", "enforce"]},
+                  "variance": {"enum": ["observe", "enforce"]}
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "compatibility": {
+            "properties": {
+              "support_tiers": {
+                "items": {
+                  "enum": [
+                    "maintained_catalog",
+                    "supported_experimental",
+                    "community_experimental"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

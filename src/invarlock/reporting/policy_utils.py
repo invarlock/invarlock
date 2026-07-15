@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from invarlock.core.auto_tuning import get_tier_policies, resolve_tier_policies
+from invarlock.guards.authority import DEFAULT_GUARD_AUTHORITY
 
 from .report_policy import TIER_RATIO_LIMITS
 from .report_types import RunReport
@@ -233,7 +234,13 @@ def _build_resolved_policies(
         tier_key, edit_name=None, explicit_overrides=explicit_overrides, profile=profile
     )
 
-    resolved: dict[str, Any] = {}
+    resolved: dict[str, Any] = {
+        "guard_authority": copy.deepcopy(
+            base.get("guard_authority", DEFAULT_GUARD_AUTHORITY)
+            if isinstance(base, dict)
+            else DEFAULT_GUARD_AUTHORITY
+        )
+    }
 
     def _safe_float(value: Any, default: float) -> float:
         try:

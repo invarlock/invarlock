@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib.metadata import (
@@ -58,7 +59,7 @@ class PluginInfo:
     entry_point: Any | None = None
     support_tier: str = "third_party"
     strict_assurance_allowed: bool = False
-    published_basis: bool = False
+    maintained_catalog: bool = False
     deployment_claim: bool = False
 
 
@@ -71,6 +72,35 @@ def _select_entry_points(eps: Any, group: str) -> list[EntryPoint]:
     else:
         selected = cast("Iterable[EntryPoint]", eps.get(group, []))
     return list(selected)
+
+
+def _normalized_distribution_name(value: str) -> str:
+    """Normalize a distribution name using the packaging-name equivalence rule."""
+
+    return re.sub(r"[-_.]+", "-", value).lower()
+
+
+def _is_identical_shipped_entry_point(
+    entry_point: EntryPoint,
+    plugin_type: str,
+) -> bool:
+    """Return whether discovery rediscovered this installed InvarLock built-in."""
+
+    dist = getattr(entry_point, "dist", None)
+    dist_name = getattr(dist, "name", None)
+    dist_version = getattr(dist, "version", None)
+    if (
+        not isinstance(dist_name, str)
+        or _normalized_distribution_name(dist_name) != "invarlock"
+        or dist_version != INVARLOCK_VERSION
+    ):
+        return False
+
+    value = getattr(entry_point, "value", None)
+    for spec in builtin_plugin_specs(plugin_type):
+        if entry_point.name == spec.name:
+            return value == f"{spec.module}:{spec.class_name}"
+    return False
 
 
 class CoreRegistry:
@@ -169,7 +199,7 @@ class CoreRegistry:
                 registry[
                     spec.name
                 ].strict_assurance_allowed = spec.strict_assurance_allowed
-                registry[spec.name].published_basis = spec.published_basis
+                registry[spec.name].maintained_catalog = spec.maintained_catalog
                 registry[spec.name].deployment_claim = spec.deployment_claim
 
     def _register_entry_points(
@@ -180,6 +210,8 @@ class CoreRegistry:
     ) -> None:
         for entry_point in entry_points_for_group:
             if entry_point.name in registry:
+                if _is_identical_shipped_entry_point(entry_point, plugin_type):
+                    continue
                 raise RuntimeError(
                     f"Duplicate {plugin_type.rstrip('s')} plugin name: {entry_point.name}"
                 )
@@ -410,7 +442,7 @@ class CoreRegistry:
             "entry_point_group": entry_group if info.entry_point else None,
             "support_tier": info.support_tier,
             "strict_assurance_allowed": info.strict_assurance_allowed,
-            "published_basis": info.published_basis,
+            "maintained_catalog": info.maintained_catalog,
             "deployment_claim": info.deployment_claim,
         }
 

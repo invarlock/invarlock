@@ -19,17 +19,17 @@ REPORT_SCHEMA_VERSION = "v1"
 EVIDENCE_PACK_FORMAT_VERSION = "evidence-pack-v1"
 EVIDENCE_CATALOG_FORMAT_VERSION = "invarlock/evidence-catalog-v1"
 EVIDENCE_CATALOG_VALIDATE_OUTPUT_FORMAT_VERSION = "evidence-catalog-validate-v1"
-PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION = "public-evidence-index-v1"
+PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION = "public-evidence-index-v2"
 RUNTIME_MANIFEST_CONTRACT_VERSION = "runtime-manifest-v1"
 DOCTOR_OUTPUT_FORMAT_VERSION = "doctor-v1"
-PLUGINS_OUTPUT_FORMAT_VERSION = "plugins-v1"
+PLUGINS_OUTPUT_FORMAT_VERSION = "plugins-v2"
 VERIFY_OUTPUT_FORMAT_VERSION = "verify-v1"
 RUNTIME_VERIFY_OUTPUT_FORMAT_VERSION = "runtime-verify-v1"
 POLICY_PACK_VERIFY_OUTPUT_FORMAT_VERSION = "policy-pack-verify-v1"
 EVIDENCE_PACK_VERIFY_OUTPUT_FORMAT_VERSION = "evidence-pack-verify-v1"
 CLI_STABILITY_POLICY_VERSION = "cli-stability-v1"
-ADAPTER_SUPPORT_TIER_POLICY_VERSION = "adapter-support-tiers-v1"
-MODEL_CLASSIFICATION_FORMAT_VERSION = "model-classification-v1"
+ADAPTER_SUPPORT_TIER_POLICY_VERSION = "adapter-support-tiers-v2"
+MODEL_CLASSIFICATION_FORMAT_VERSION = "model-classification-v2"
 
 STABLE_CLI_JSON_SURFACES: dict[str, str] = {
     "invarlock doctor --json": DOCTOR_OUTPUT_FORMAT_VERSION,
@@ -175,9 +175,9 @@ def load_model_family_catalog() -> dict[str, Any]:
     data.setdefault("implemented_coverage", [])
     data.setdefault("usage_only", [])
     data.setdefault(
-        "published_basis_candidates_text_le_14b",
+        "maintained_catalog_candidates_text_le_14b",
         {
-            "format_version": "published-basis-candidates-text-le-14b-v1",
+            "format_version": "maintained-catalog-candidates-text-le-14b-v1",
             "candidates": [],
         },
     )
@@ -196,7 +196,7 @@ def load_public_evidence_index() -> dict[str, Any]:
     try:
         payload = json.loads(
             PACKAGE_PUBLIC_EVIDENCE_ROOT.joinpath(
-                "published_basis_index.json"
+                "catalog_evidence_index.json"
             ).read_text(encoding="utf-8")
         )
     except (
@@ -207,15 +207,15 @@ def load_public_evidence_index() -> dict[str, Any]:
         UnicodeDecodeError,
         json.JSONDecodeError,
     ) as exc:
-        raise ContractLoadError("published_basis_index.json", reason=str(exc)) from exc
+        raise ContractLoadError("catalog_evidence_index.json", reason=str(exc)) from exc
     if not isinstance(payload, dict):
         raise ContractLoadError(
-            "published_basis_index.json",
+            "catalog_evidence_index.json",
             reason=f"expected JSON object, got {type(payload).__name__}",
         )
     if payload.get("format_version") != PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION:
         raise ContractLoadError(
-            "published_basis_index.json",
+            "catalog_evidence_index.json",
             reason=(f"format_version must be {PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION}"),
         )
     payload.setdefault("entries", [])
@@ -289,11 +289,11 @@ def adapter_capability(adapter_name: str) -> dict[str, Any] | None:
     return adapter_capability_map().get(adapter_name)
 
 
-def published_basis_lanes() -> list[dict[str, Any]]:
+def maintained_catalog_lanes() -> list[dict[str, Any]]:
     return [
         lane
         for lane in support_lanes()
-        if lane.get("support_tier") == "published_basis"
+        if lane.get("support_tier") == "maintained_catalog"
     ]
 
 
@@ -340,7 +340,7 @@ def public_subcontract_catalog() -> dict[str, dict[str, Any]]:
         },
         "public_evidence_index": {
             "version": PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION,
-            "source": ("invarlock/_data/public_evidence/published_basis_index.json"),
+            "source": ("invarlock/_data/public_evidence/catalog_evidence_index.json"),
             "compatibility": "generated_from_public_evidence_source_tree",
             "carrier_policy": load_public_evidence_index().get("carrier_policy", {}),
         },
@@ -440,7 +440,7 @@ __all__ = [
     "load_runtime_manifest_schema",
     "load_verify_output_schema",
     "load_support_matrix",
-    "published_basis_lanes",
+    "maintained_catalog_lanes",
     "public_subcontract_catalog",
     "stable_cli_json_surfaces",
     "support_lane_by_id",

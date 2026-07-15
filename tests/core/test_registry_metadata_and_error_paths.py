@@ -183,6 +183,63 @@ def test_registry_rejects_entry_point_name_collisions(monkeypatch) -> None:
         registry.list_adapters()
 
 
+def test_registry_ignores_identical_entry_points_from_its_own_distribution(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "1")
+    groups = {
+        plugin_type: [
+            EntryPointStub(
+                name=spec.name,
+                value=f"{spec.module}:{spec.class_name}",
+                dist=DistStub("InvarLock", reg.INVARLOCK_VERSION),
+            )
+            for spec in builtin_plugin_specs(plugin_type)
+        ]
+        for plugin_type in ("adapters", "edits", "guards")
+    }
+    monkeypatch.setattr(reg, "entry_points", lambda: SelectEntryPoints(**groups))
+
+    registry = reg.CoreRegistry()
+
+    assert set(registry.list_adapters()) == {
+        spec.name for spec in builtin_plugin_specs("adapters")
+    }
+    assert set(registry.list_edits()) == {
+        spec.name for spec in builtin_plugin_specs("edits")
+    }
+    assert set(registry.list_guards()) == {
+        spec.name for spec in builtin_plugin_specs("guards")
+    }
+    assert registry.get_plugin_info("hf_auto", "adapters")["status"] == "Built-in"
+
+
+@pytest.mark.parametrize(
+    ("distribution", "value"),
+    [
+        ("third-party-adapter", "invarlock.adapters.auto:HF_Auto_Adapter"),
+        ("invarlock", "invarlock.adapters.auto:DifferentAdapter"),
+    ],
+)
+def test_registry_rejects_nonidentical_collisions_with_builtin_entry_points(
+    monkeypatch, distribution: str, value: str
+) -> None:
+    monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "1")
+    entry_point = EntryPointStub(
+        name="hf_auto",
+        value=value,
+        dist=DistStub(distribution, "1.0"),
+    )
+    monkeypatch.setattr(
+        reg,
+        "entry_points",
+        lambda: SelectEntryPoints(adapters=[entry_point]),
+    )
+
+    with pytest.raises(RuntimeError, match="Duplicate adapter plugin name: hf_auto"):
+        reg.CoreRegistry().list_adapters()
+
+
 def test_registry_entry_points_with_distinct_names_support_typed_getters(
     monkeypatch,
 ) -> None:

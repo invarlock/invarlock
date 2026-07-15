@@ -17,8 +17,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = REPO_ROOT / "public_evidence"
 SUPPORT_MATRIX = REPO_ROOT / "contracts" / "support_matrix.json"
 PACKAGED_ROOT = REPO_ROOT / "src" / "invarlock" / "_data" / "public_evidence"
-INDEX_FILENAME = "published_basis_index.json"
-INDEX_FORMAT_VERSION = "public-evidence-index-v1"
+INDEX_FILENAME = "catalog_evidence_index.json"
+INDEX_FORMAT_VERSION = "public-evidence-index-v2"
+CURRENT_EVIDENCE_ROOT_NAME = "catalog_evidence"
+LEGACY_EVIDENCE_ROOT_NAME = "published_basis"
+EVIDENCE_ROOT_NAMES = frozenset({CURRENT_EVIDENCE_ROOT_NAME, LEGACY_EVIDENCE_ROOT_NAME})
 SOURCE_REPOSITORY_FULL = "full_public_evidence_artifacts"
 SOURCE_REPOSITORY_EXTERNAL = "compact_index_and_external_assets"
 
@@ -70,8 +73,12 @@ def _validate_public_evidence_index(path: Path, payload: dict[str, Any]) -> None
     entries = payload.get("entries")
     if not isinstance(entries, list):
         raise ValueError(f"{path}: entries must be a list")
-    if payload.get("published_basis_count") != len(entries):
-        raise ValueError(f"{path}: published_basis_count must match entries")
+    if payload.get("catalog_evidence_count") != len(entries):
+        raise ValueError(f"{path}: catalog_evidence_count must match entries")
+    for field in ("catalog_evidence_file_count", "catalog_evidence_size_bytes"):
+        value = payload.get(field)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"{path}: {field} must be a non-negative integer")
     if not entries and (
         payload.get("status") != "not_created"
         or payload.get("status_label") != "Evidence not yet created"
@@ -98,6 +105,13 @@ def _directory_summary(path: Path) -> dict[str, Any]:
     }
 
 
+def _unique_file_totals(path: Path) -> tuple[int, int]:
+    """Count each logical carrier file once, independent of artifact roles."""
+
+    files = sorted(item for item in path.rglob("*") if item.is_file())
+    return len(files), sum(item.stat().st_size for item in files)
+
+
 def _artifact_summary(path: Path) -> dict[str, Any]:
     if path.is_file():
         return {
@@ -110,13 +124,13 @@ def _artifact_summary(path: Path) -> dict[str, Any]:
     return {"kind": "missing"}
 
 
-def _published_lane_map(support_matrix_path: Path) -> dict[str, list[str]]:
+def _maintained_lane_map(support_matrix_path: Path) -> dict[str, list[str]]:
     payload = _load_json_object(support_matrix_path)
     lanes_by_slug: dict[str, list[str]] = {}
     for lane in payload.get("lanes", []):
         if not isinstance(lane, dict):
             continue
-        if lane.get("support_tier") != "published_basis":
+        if lane.get("support_tier") != "maintained_catalog":
             continue
         lane_id = lane.get("lane_id")
         evidence = lane.get("evidence")
@@ -126,13 +140,17 @@ def _published_lane_map(support_matrix_path: Path) -> dict[str, list[str]]:
             if not isinstance(value, str):
                 continue
             parts = PurePosixPath(value).parts
-            if len(parts) < 3 or parts[:2] != ("public_evidence", "published_basis"):
+            if (
+                len(parts) < 3
+                or parts[0] != "public_evidence"
+                or parts[1] not in EVIDENCE_ROOT_NAMES
+            ):
                 continue
             lanes_by_slug.setdefault(parts[2], []).append(lane_id)
     return {slug: sorted(set(lanes)) for slug, lanes in lanes_by_slug.items()}
 
 
-def _published_support_artifacts(
+def _maintained_support_artifacts(
     support_matrix_path: Path,
 ) -> dict[str, dict[str, str]]:
     payload = _load_json_object(support_matrix_path)
@@ -140,7 +158,7 @@ def _published_support_artifacts(
     for lane in payload.get("lanes", []):
         if not isinstance(lane, dict):
             continue
-        if lane.get("support_tier") != "published_basis":
+        if lane.get("support_tier") != "maintained_catalog":
             continue
         evidence = lane.get("evidence")
         if not isinstance(evidence, dict):
@@ -150,7 +168,11 @@ def _published_support_artifacts(
             if artifact_key is None or not isinstance(value, str):
                 continue
             parts = PurePosixPath(value).parts
-            if len(parts) < 3 or parts[:2] != ("public_evidence", "published_basis"):
+            if (
+                len(parts) < 3
+                or parts[0] != "public_evidence"
+                or parts[1] not in EVIDENCE_ROOT_NAMES
+            ):
                 continue
             artifacts_by_slug.setdefault(parts[2], {}).setdefault(
                 artifact_key,
@@ -205,9 +227,9 @@ def build_public_evidence_index(
     source_root = source_root.resolve()
     if source_index_path is None:
         source_index_path = source_root / INDEX_FILENAME
-    published_root = source_root / "published_basis"
-    has_local_entries = published_root.is_dir() and any(
-        published_root.glob("*/evidence.meta.json")
+    catalog_evidence_root = source_root / CURRENT_EVIDENCE_ROOT_NAME
+    has_local_entries = catalog_evidence_root.is_dir() and any(
+        catalog_evidence_root.glob("*/evidence.meta.json")
     )
     if not has_local_entries and source_index_path.is_file():
         index = _load_json_object(source_index_path)
@@ -215,19 +237,18 @@ def build_public_evidence_index(
         return index
     if not has_local_entries:
         raise FileNotFoundError(
-            f"published basis directory or source index not found: "
-            f"{published_root}, {source_index_path}"
+            f"catalog evidence directory or source index not found: "
+            f"{catalog_evidence_root}, {source_index_path}"
         )
     if not support_matrix_path.is_file():
         raise FileNotFoundError(f"support matrix not found: {support_matrix_path}")
 
-    lanes_by_slug = _published_lane_map(support_matrix_path)
-    support_artifacts_by_slug = _published_support_artifacts(support_matrix_path)
+    lanes_by_slug = _maintained_lane_map(support_matrix_path)
+    support_artifacts_by_slug = _maintained_support_artifacts(support_matrix_path)
     entries: list[dict[str, Any]] = []
-    total_size = 0
-    total_files = 0
+    total_files, total_size = _unique_file_totals(catalog_evidence_root)
 
-    for meta_path in sorted(published_root.glob("*/evidence.meta.json")):
+    for meta_path in sorted(catalog_evidence_root.glob("*/evidence.meta.json")):
         artifact_dir = meta_path.parent
         metadata = _load_json_object(meta_path)
         artifact_paths = metadata.get("artifact_paths")
@@ -242,9 +263,6 @@ def build_public_evidence_index(
             summary = _artifact_summary(artifact_path)
             summary["path"] = _logical_path(artifact_path, source_root=source_root)
             artifacts[key] = summary
-            if summary.get("kind") in {"file", "directory"}:
-                total_size += int(summary.get("size_bytes") or 0)
-                total_files += int(summary.get("file_count") or 1)
         for key, logical_path in sorted(
             support_artifacts_by_slug.get(artifact_dir.name, {}).items()
         ):
@@ -256,9 +274,6 @@ def build_public_evidence_index(
             summary = _artifact_summary(artifact_path)
             summary["path"] = logical_path
             artifacts[key] = summary
-            if summary.get("kind") in {"file", "directory"}:
-                total_size += int(summary.get("size_bytes") or 0)
-                total_files += int(summary.get("file_count") or 1)
 
         entry: dict[str, Any] = {
             "slug": artifact_dir.name,
@@ -280,9 +295,9 @@ def build_public_evidence_index(
             "installed_wheel": "compact_index_only",
         },
         "source_root": "public_evidence",
-        "published_basis_count": len(entries),
-        "published_basis_file_count": total_files,
-        "published_basis_size_bytes": total_size,
+        "catalog_evidence_count": len(entries),
+        "catalog_evidence_file_count": total_files,
+        "catalog_evidence_size_bytes": total_size,
         "entries": entries,
     }
     if external_asset is not None:
@@ -305,10 +320,14 @@ def check_packaged_public_evidence(
 ) -> list[str]:
     errors: list[str] = []
     index_path = packaged_root / INDEX_FILENAME
-    legacy_tree = packaged_root / "published_basis"
-    if legacy_tree.exists():
+    full_evidence_trees = [
+        packaged_root / root_name for root_name in sorted(EVIDENCE_ROOT_NAMES)
+    ]
+    for full_tree in full_evidence_trees:
+        if not full_tree.exists():
+            continue
         errors.append(
-            f"legacy packaged public evidence tree must be removed: {legacy_tree}"
+            f"full packaged public evidence tree must be removed: {full_tree}"
         )
     try:
         expected = build_public_evidence_index(
@@ -366,11 +385,14 @@ def sync_packaged_public_evidence(
     if updated:
         index_path.write_text(content, encoding="utf-8")
 
-    legacy_tree = packaged_root / "published_basis"
-    removed_legacy_tree = legacy_tree.exists()
-    if removed_legacy_tree:
-        shutil.rmtree(legacy_tree)
-    return updated, removed_legacy_tree, source_index_updated
+    full_evidence_trees = [
+        packaged_root / root_name for root_name in sorted(EVIDENCE_ROOT_NAMES)
+    ]
+    removed_full_tree = any(path.exists() for path in full_evidence_trees)
+    for full_tree in full_evidence_trees:
+        if full_tree.exists():
+            shutil.rmtree(full_tree)
+    return updated, removed_full_tree, source_index_updated
 
 
 def _external_asset_from_args(args: argparse.Namespace) -> dict[str, Any] | None:
@@ -422,8 +444,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--source-index",
         default=None,
         help=(
-            "Source-tree compact index used when public_evidence/published_basis "
-            "is externalized. Defaults to public_evidence/published_basis_index.json."
+            "Source-tree compact index used when public_evidence/catalog_evidence "
+            "is externalized. Defaults to public_evidence/catalog_evidence_index.json."
         ),
     )
     parser.add_argument(
@@ -436,7 +458,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--external-asset-size-bytes", type=int, default=None)
     parser.add_argument(
         "--external-asset-archive-root",
-        default="public_evidence/published_basis",
+        default="public_evidence/catalog_evidence",
     )
     return parser.parse_args(argv)
 
@@ -463,7 +485,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             (
                 updated,
-                removed_legacy_tree,
+                removed_full_tree,
                 source_index_updated,
             ) = sync_packaged_public_evidence(
                 source_root=source_root,
@@ -478,7 +500,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print(
             "Synchronized packaged public evidence index "
-            f"(updated={updated}, removed_legacy_tree={removed_legacy_tree}, "
+            f"(updated={updated}, removed_full_tree={removed_full_tree}, "
             f"source_index_updated={source_index_updated})."
         )
 

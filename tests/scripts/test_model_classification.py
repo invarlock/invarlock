@@ -84,6 +84,39 @@ def test_model_classification_accepts_current_contracts() -> None:
     assert payload["finding_count"] == 0
 
 
+def test_model_classification_rejects_legacy_published_lifecycle(
+    monkeypatch, tmp_path: Path
+) -> None:
+    mod = _load_script_module()
+    classification, support, catalog, evidence_catalog = _current_contracts()
+    classification["entries"][0]["classification"] = "published"
+    classification_path, support_path, catalog_path, evidence_catalog_path = (
+        _write_contracts(
+            tmp_path,
+            classification=classification,
+            support=support,
+            catalog=catalog,
+            evidence_catalog=evidence_catalog,
+        )
+    )
+    _patch_contract_paths(
+        monkeypatch,
+        mod,
+        classification_path=classification_path,
+        support_path=support_path,
+        catalog_path=catalog_path,
+        evidence_catalog_path=evidence_catalog_path,
+    )
+
+    findings = mod.audit()
+
+    assert any(
+        finding.scope == "model_classification:gpt2-causal-hf"
+        and "unknown classification 'published'" in finding.message
+        for finding in findings
+    )
+
+
 def test_model_classification_catches_blocked_checkpoint_reintroduction(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -117,7 +150,7 @@ def test_model_classification_catches_blocked_checkpoint_reintroduction(
     )
 
 
-def test_model_classification_catches_published_basis_candidate_decision_drift(
+def test_model_classification_catches_maintained_catalog_candidate_decision_drift(
     monkeypatch, tmp_path: Path
 ) -> None:
     mod = _load_script_module()
@@ -147,7 +180,7 @@ def test_model_classification_catches_published_basis_candidate_decision_drift(
     findings = mod.audit()
 
     assert any(
-        finding.scope == "published_basis_candidate:broader-bert-like-mlms"
+        finding.scope == "maintained_catalog_candidate:broader-bert-like-mlms"
         and "requires classification 'blocked'" in finding.message
         for finding in findings
     )

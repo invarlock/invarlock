@@ -4,12 +4,29 @@ import json
 import os
 import subprocess
 import sys
+from argparse import Namespace
 from pathlib import Path
 
+from invarlock.core.assurance_contract import ASSURANCE_CLAIM_SET_V2
+from invarlock.guards.authority import DEFAULT_GUARD_AUTHORITY
+from scripts.smoke.gpt2_journey_helpers import write_strict_bundle_fixture
 from tests.scripts._support_peft_torchao_integration_examples import (
     REPO_ROOT,
     TORCHAO_DIR,
 )
+
+
+def test_current_strict_smoke_fixture_binds_v2_guard_authority(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "evaluation.report.json"
+
+    assert write_strict_bundle_fixture(Namespace(report=report_path)) == 0
+
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["assurance"]["claim_set"] == ASSURANCE_CLAIM_SET_V2
+    assert report["resolved_policy"]["guard_authority"] == DEFAULT_GUARD_AUTHORITY
+    assert report["assurance"]["guard_authority"] == DEFAULT_GUARD_AUTHORITY
 
 
 def test_shared_compare_wrapper_checks_report_materialization() -> None:
@@ -216,7 +233,7 @@ raise SystemExit(f"unexpected fake invarlock command: {{args!r}}")
     baseline_report = tmp_path / "acceptance-baseline.report.json"
     baseline_report.write_text('{"schema": "raw-baseline"}\n', encoding="utf-8")
     policy_pack = tmp_path / "acceptance-policy-pack.json"
-    policy_pack.write_text('{"schema": "policy-pack-v1"}\n', encoding="utf-8")
+    policy_pack.write_text('{"schema": "policy-pack-v2"}\n', encoding="utf-8")
     env["INVARLOCK_ACCEPTANCE_BASELINE_REPORT"] = str(baseline_report)
     env["INVARLOCK_ACCEPTANCE_POLICY_PACK"] = str(policy_pack)
     env["FAKE_EXPECTED_BASELINE_REPORT"] = str(baseline_report)

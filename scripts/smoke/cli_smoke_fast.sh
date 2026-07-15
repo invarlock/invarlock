@@ -411,7 +411,7 @@ TMP_DIR="$WORK_ROOT/tmp"
 mkdir -p "$TMP_DIR"
 printf '%s\n' '{"metrics":{"pm_ratio":{"ratio_limit_base":1.1}}}' >"$TMP_DIR/resolved_policy.json"
 printf '%s\n' '[{"path":"metrics.pm_ratio.ratio_limit_base","value":1.1}]' >"$TMP_DIR/policy_overrides.json"
-printf '%s\n' '{"support_tiers":["published_basis"]}' >"$TMP_DIR/policy_compatibility.json"
+printf '%s\n' '{"support_tiers":["maintained_catalog"]}' >"$TMP_DIR/policy_compatibility.json"
 EVIDENCE_PACK_REPORT_DIR="$TMP_DIR/evidence_pack_report"
 mkdir -p "$EVIDENCE_PACK_REPORT_DIR"
 # smoke-plan-fixture-contract: invarlock.reporting.verify_contract

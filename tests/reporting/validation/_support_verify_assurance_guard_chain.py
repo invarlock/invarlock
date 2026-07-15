@@ -11,10 +11,11 @@ from invarlock.core.assurance_contract import (
     ASSURANCE_CLAIM_SET,
     CANONICAL_GUARD_CHAIN,
 )
+from invarlock.guards.authority import DEFAULT_GUARD_AUTHORITY
 from invarlock.reporting.report_provenance import compute_report_digest
 from invarlock.reporting.verify_contract import run_verify_reports
 from invarlock.runtime_provenance import RuntimeProvenanceResult
-from tests.cli._support_verify_runtime_provenance import (
+from tests.cli.verify._support_runtime_provenance import (
     _matching_strict_ppl_baseline,
     _write_matching_strict_policy_pack,
     bind_runtime_policy_receipt,
@@ -377,6 +378,7 @@ def _report(guard_chain: list[str]) -> dict:
         },
         "auto": {"tier": "balanced"},
         "resolved_policy": {
+            "guard_authority": copy.deepcopy(DEFAULT_GUARD_AUTHORITY),
             "spectral": {"measurement_contract": spectral_contract},
             "rmt": {"measurement_contract": rmt_contract},
         },
@@ -539,6 +541,7 @@ def _report(guard_chain: list[str]) -> dict:
             "profile": "ci",
             "tier": "balanced",
             "claim_set": ASSURANCE_CLAIM_SET,
+            "guard_authority": copy.deepcopy(DEFAULT_GUARD_AUTHORITY),
             "canonical_guard_chain": list(CANONICAL_GUARD_CHAIN),
             "guard_chain_observed": guard_chain,
             "canonical_guard_chain_enforced": guard_chain

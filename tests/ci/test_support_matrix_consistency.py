@@ -39,7 +39,7 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
     lanes = contract["lanes"]
     docs_labels = _parse_docs_evidence_labels()
     public_index = json.loads(
-        Path("public_evidence/published_basis_index.json").read_text(encoding="utf-8")
+        Path("public_evidence/catalog_evidence_index.json").read_text(encoding="utf-8")
     )
 
     runner = CliRunner()
@@ -65,7 +65,7 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
 
     assert len(lanes) == 39
     assert len({lane["family"] for lane in lanes}) == 39
-    assert {lane["support_tier"] for lane in lanes} == {"published_basis"}
+    assert {lane["support_tier"] for lane in lanes} == {"maintained_catalog"}
     available = {
         lane["lane_id"] for lane in lanes if lane["evidence_status"] == "available"
     }
@@ -91,3 +91,15 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
 
     expected_docs = {lane["lane_id"]: lane["evidence_status_label"] for lane in lanes}
     assert docs_labels == expected_docs
+
+    catalog_docs = Path("docs/reference/model-family-catalog.md").read_text(
+        encoding="utf-8"
+    )
+    assert (
+        f"Strictly verified frozen-v1 evidence is **Available** for "
+        f"{len(available)} lanes"
+    ) in catalog_docs
+    assert f"The other {len(not_created)} lanes" in catalog_docs
+    assert "All 39 lanes are `noop` same-checkpoint compatibility runs" in catalog_docs
+    assert all("published_modern" not in lane["support_groups"] for lane in lanes)
+    assert any("modern_open_weight" in lane["support_groups"] for lane in lanes)

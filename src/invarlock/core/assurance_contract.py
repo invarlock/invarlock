@@ -12,6 +12,7 @@ from invarlock.core.assurance_guard_validation import (
 from invarlock.core.assurance_plugin_validation import (
     strict_plugin_provenance_errors,
 )
+from invarlock.guards.authority import resolved_guard_authority
 
 CANONICAL_GUARD_CHAIN = (
     "invariants",
@@ -20,7 +21,9 @@ CANONICAL_GUARD_CHAIN = (
     "variance",
     "invariants",
 )
-ASSURANCE_CLAIM_SET = "invarlock-weight-edit-regression-v1"
+LEGACY_ASSURANCE_CLAIM_SET = "invarlock-weight-edit-regression-v1"
+ASSURANCE_CLAIM_SET = "invarlock-weight-edit-regression-v2"
+ASSURANCE_CLAIM_SET_V2 = ASSURANCE_CLAIM_SET
 ASSURANCE_MODES = {"strict", "off"}
 VERIFY_ASSURANCE_MODES = {"report", "strict", "off"}
 STRICT_ASSURANCE_PROFILES = {"ci", "release"}
@@ -76,6 +79,8 @@ def report_tiny_relax_enabled(report: dict[str, Any] | None) -> bool:
 
 @dataclass(frozen=True)
 class AssuranceVerdict:
+    claim_set: str
+    guard_authority: dict[str, str] | None
     mode: str
     profile: str
     tier: str
@@ -90,11 +95,11 @@ class AssuranceVerdict:
     runtime_provenance_verification_status: str
 
     def as_report_section(self, *, observed_guard_chain: list[str]) -> dict[str, Any]:
-        return {
+        section = {
             "mode": self.mode,
             "profile": self.profile,
             "tier": self.tier,
-            "claim_set": ASSURANCE_CLAIM_SET,
+            "claim_set": self.claim_set,
             "canonical_guard_chain": list(CANONICAL_GUARD_CHAIN),
             "guard_chain_observed": list(observed_guard_chain),
             "canonical_guard_chain_enforced": self.canonical_guard_chain_enforced,
@@ -109,6 +114,9 @@ class AssuranceVerdict:
             "verified_assurance_verdict": self.verified_assurance_verdict,
             "blocking_reasons": list(self.blocking_reasons),
         }
+        if self.guard_authority is not None:
+            section["guard_authority"] = dict(self.guard_authority)
+        return section
 
 
 def normalize_assurance_mode(mode: object, *, default: str = "strict") -> str:
@@ -322,8 +330,12 @@ def build_assurance_section(
         "verified" if runtime_provenance_verified is True else "pending"
     )
     provenance_verified = runtime_provenance_verified is True
+    guard_authority, authority_errors, has_v2_authority = resolved_guard_authority(
+        report
+    )
     reasons: list[str] = []
     if assurance_mode == "strict":
+        reasons.extend(authority_errors)
         reasons.extend(
             strict_evaluate_policy_errors(
                 assurance_mode=assurance_mode,
@@ -366,6 +378,10 @@ def build_assurance_section(
         verdict = "pass"
         verified_assurance_verdict = "pass"
     return AssuranceVerdict(
+        claim_set=(
+            ASSURANCE_CLAIM_SET_V2 if has_v2_authority else LEGACY_ASSURANCE_CLAIM_SET
+        ),
+        guard_authority=(guard_authority if has_v2_authority else None),
         mode=assurance_mode,
         profile=profile,
         tier=tier,
@@ -392,14 +408,30 @@ def strict_report_policy_errors(
     if not require_strict:
         return []
     errors: list[str] = []
+    guard_authority, authority_errors, has_v2_authority = resolved_guard_authority(
+        report
+    )
+    errors.extend(authority_errors)
     if report_tiny_relax_enabled(report):
         errors.append("strict assurance forbids development-only tiny_relax policy.")
     assurance = report.get("assurance")
     if not isinstance(assurance, dict):
         errors.append("strict assurance report missing assurance section.")
     else:
-        if assurance.get("claim_set") != ASSURANCE_CLAIM_SET:
+        expected_claim_set = (
+            ASSURANCE_CLAIM_SET_V2 if has_v2_authority else LEGACY_ASSURANCE_CLAIM_SET
+        )
+        if assurance.get("claim_set") != expected_claim_set:
             errors.append("strict assurance report has unknown claim_set.")
+        submitted_authority = assurance.get("guard_authority")
+        if has_v2_authority:
+            if submitted_authority != guard_authority:
+                errors.append(
+                    "strict assurance.guard_authority must exactly match "
+                    "resolved_policy.guard_authority."
+                )
+        elif "guard_authority" in assurance:
+            errors.append("legacy strict assurance cannot declare guard_authority.")
         if assurance.get("mode") != "strict":
             errors.append("strict assurance report mode must be strict.")
         if assurance.get("verdict") != "pending_verifier":
@@ -518,6 +550,8 @@ def _dedupe(items: list[str]) -> list[str]:
 
 __all__ = [
     "ASSURANCE_CLAIM_SET",
+    "ASSURANCE_CLAIM_SET_V2",
+    "LEGACY_ASSURANCE_CLAIM_SET",
     "ASSURANCE_MODES",
     "CANONICAL_GUARD_CHAIN",
     "STRICT_ASSURANCE_PROFILES",

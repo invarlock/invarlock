@@ -23,7 +23,7 @@ from scripts.model_evidence.negative_fixture_generation import (
     NegativeFixtureError,
     generate,
 )
-from tests.cli._support_verify_runtime_provenance import (
+from tests.cli.verify._support_runtime_provenance import (
     _bind_strict_baseline,
     _matching_strict_policy_pack,
     _matching_strict_ppl_baseline,

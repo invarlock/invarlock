@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 
+from invarlock.guards.authority import DEFAULT_GUARD_AUTHORITY
 from invarlock.reporting.report_primary_metric_policy import is_ppl_kind as _is_ppl_kind
 from invarlock.reporting.report_schema import validate_report
 from invarlock.reporting.report_types import AutoConfig, RunReport, create_empty_report
@@ -198,11 +199,19 @@ def test_make_evaluation_report_marks_unstable_when_token_floor_violated(
     report["metrics"]["preview_total_tokens"] = 10
     report["metrics"]["final_total_tokens"] = 10
 
+    tier_policies = {
+        "balanced": {
+            "guard_authority": dict(DEFAULT_GUARD_AUTHORITY),
+            "metrics": {"pm_ratio": {"min_tokens": 100}},
+        }
+    }
     monkeypatch.setattr(
         "invarlock.core.auto_tuning.get_tier_policies",
-        lambda *_args, **_kwargs: {
-            "balanced": {"metrics": {"pm_ratio": {"min_tokens": 100}}}
-        },
+        lambda *_args, **_kwargs: tier_policies,
+    )
+    monkeypatch.setattr(
+        "invarlock.reporting.report_primary_metric_analysis.get_tier_policies",
+        lambda *_args, **_kwargs: tier_policies,
     )
     monkeypatch.setattr(
         "invarlock.core.bootstrap.compute_paired_delta_log_ci",

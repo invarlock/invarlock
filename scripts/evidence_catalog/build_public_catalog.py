@@ -41,11 +41,11 @@ def build_catalog() -> dict[str, object]:
     published = {
         str(lane["lane_id"]): lane
         for lane in support["lanes"]
-        if isinstance(lane, dict) and lane.get("support_tier") == "published_basis"
+        if isinstance(lane, dict) and lane.get("support_tier") == "maintained_catalog"
     }
     if len(published) != 39 or set(catalog.entries) != set(published):
         raise ValueError(
-            "public evidence catalog must equal the exact 39-entry published basis"
+            "public evidence catalog must equal the exact 39-entry maintained catalog"
         )
 
     config_root = (REPO_ROOT / "configs").resolve(strict=True)

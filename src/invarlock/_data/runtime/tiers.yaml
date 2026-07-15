@@ -10,6 +10,10 @@
 # Provenance/digest: docs/assurance/11-policy-provenance.md
 
 balanced:
+  guard_authority:
+    spectral: enforce
+    rmt: enforce
+    variance: enforce
   metrics:
     pm_ratio:
       ratio_limit_base: 1.10
@@ -81,6 +85,10 @@ balanced:
       other: 0.01
 
 conservative:
+  guard_authority:
+    spectral: enforce
+    rmt: enforce
+    variance: enforce
   metrics:
     pm_ratio:
       ratio_limit_base: 1.05
@@ -152,6 +160,10 @@ conservative:
       other: 0.01
 
 aggressive:
+  guard_authority:
+    spectral: enforce
+    rmt: enforce
+    variance: enforce
   metrics:
     pm_ratio:
       ratio_limit_base: 1.20

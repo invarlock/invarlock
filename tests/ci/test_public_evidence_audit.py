@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
+import tarfile
 from pathlib import Path
 
 import pytest
@@ -12,6 +14,8 @@ from scripts.checks.public_evidence_checks.common import (
     _sha256_file,
 )
 from scripts.checks.public_evidence_checks.index import (
+    _archive_regular_files,
+    _check_external_asset_downloads,
     _check_packaged_public_evidence_index,
 )
 
@@ -199,27 +203,29 @@ def test_public_evidence_audit_validates_packaged_index_local_artifacts(
     tmp_path: Path,
 ) -> None:
     evidence_root = tmp_path / "public_evidence"
-    artifact_dir = evidence_root / "published_basis" / "demo"
+    artifact_dir = evidence_root / "catalog_evidence" / "demo"
     artifact_dir.mkdir(parents=True)
     (evidence_root / "README.md").write_text("# public evidence\n", encoding="utf-8")
     report_path = artifact_dir / "evaluation.report.json"
     report_path.write_text('{"ok": true}\n', encoding="utf-8")
-    index_path = tmp_path / "published_basis_index.json"
+    index_path = tmp_path / "catalog_evidence_index.json"
     index_path.write_text(
         json.dumps(
             {
                 "format_version": PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION,
                 "carrier_policy": {"installed_wheel": "compact_index_only"},
-                "published_basis_count": 1,
+                "catalog_evidence_count": 1,
+                "catalog_evidence_file_count": 1,
+                "catalog_evidence_size_bytes": report_path.stat().st_size,
                 "entries": [
                     {
                         "slug": "demo",
-                        "path": "public_evidence/published_basis/demo",
+                        "path": "public_evidence/catalog_evidence/demo",
                         "artifacts": {
                             "evaluation_report": {
                                 "kind": "file",
                                 "path": (
-                                    "public_evidence/published_basis/demo/"
+                                    "public_evidence/catalog_evidence/demo/"
                                     "evaluation.report.json"
                                 ),
                                 "size_bytes": report_path.stat().st_size,
@@ -248,22 +254,24 @@ def test_public_evidence_audit_requires_external_asset_for_missing_index_artifac
 ) -> None:
     evidence_root = tmp_path / "public_evidence"
     evidence_root.mkdir(parents=True)
-    index_path = tmp_path / "published_basis_index.json"
+    index_path = tmp_path / "catalog_evidence_index.json"
     index_path.write_text(
         json.dumps(
             {
                 "format_version": PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION,
                 "carrier_policy": {"installed_wheel": "compact_index_only"},
-                "published_basis_count": 1,
+                "catalog_evidence_count": 1,
+                "catalog_evidence_file_count": 1,
+                "catalog_evidence_size_bytes": 11,
                 "entries": [
                     {
                         "slug": "demo",
-                        "path": "public_evidence/published_basis/demo",
+                        "path": "public_evidence/catalog_evidence/demo",
                         "artifacts": {
                             "evaluation_report": {
                                 "kind": "file",
                                 "path": (
-                                    "public_evidence/published_basis/demo/"
+                                    "public_evidence/catalog_evidence/demo/"
                                     "evaluation.report.json"
                                 ),
                                 "size_bytes": 11,
@@ -295,22 +303,24 @@ def test_public_evidence_audit_accepts_external_asset_for_missing_index_artifact
 ) -> None:
     evidence_root = tmp_path / "public_evidence"
     evidence_root.mkdir(parents=True)
-    index_path = tmp_path / "published_basis_index.json"
+    index_path = tmp_path / "catalog_evidence_index.json"
     index_path.write_text(
         json.dumps(
             {
                 "format_version": PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION,
                 "carrier_policy": {"installed_wheel": "compact_index_only"},
-                "published_basis_count": 1,
+                "catalog_evidence_count": 1,
+                "catalog_evidence_file_count": 1,
+                "catalog_evidence_size_bytes": 11,
                 "entries": [
                     {
                         "slug": "demo",
-                        "path": "public_evidence/published_basis/demo",
+                        "path": "public_evidence/catalog_evidence/demo",
                         "artifacts": {
                             "evaluation_report": {
                                 "kind": "file",
                                 "path": (
-                                    "public_evidence/published_basis/demo/"
+                                    "public_evidence/catalog_evidence/demo/"
                                     "evaluation.report.json"
                                 ),
                                 "size_bytes": 11,
@@ -322,6 +332,7 @@ def test_public_evidence_audit_accepts_external_asset_for_missing_index_artifact
                                     ),
                                     "size_bytes": 11,
                                     "sha256": "sha256:" + "0" * 64,
+                                    "archive_root": "public_evidence/catalog_evidence",
                                 },
                             }
                         },
@@ -340,6 +351,97 @@ def test_public_evidence_audit_accepts_external_asset_for_missing_index_artifact
     )
 
     assert errors == []
+
+
+def test_external_carrier_counts_unique_regular_archive_files(tmp_path: Path) -> None:
+    archive_path = tmp_path / "evidence.tar.gz"
+    members = {
+        "public_evidence/catalog_evidence/demo/evidence.meta.json": b"{}\n",
+        "public_evidence/catalog_evidence/demo/evidence_pack/manifest.json": b"{}\n",
+        "public_evidence/catalog_evidence/demo/evidence_pack/report.json": b"report\n",
+    }
+    with tarfile.open(archive_path, "w:gz") as archive:
+        for name, data in members.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            archive.addfile(info, io.BytesIO(data))
+
+    files = _archive_regular_files(
+        archive_path, archive_root="public_evidence/catalog_evidence"
+    )
+
+    assert files == {name: len(data) for name, data in members.items()}
+
+
+@pytest.mark.parametrize(
+    "member_type", [tarfile.SYMTYPE, tarfile.LNKTYPE, tarfile.FIFOTYPE]
+)
+def test_external_carrier_rejects_nonregular_members_outside_archive_root(
+    tmp_path: Path,
+    member_type: bytes,
+) -> None:
+    archive_path = tmp_path / "evidence.tar.gz"
+    with tarfile.open(archive_path, "w:gz") as archive:
+        evidence = tarfile.TarInfo(
+            "public_evidence/catalog_evidence/demo/evidence.meta.json"
+        )
+        evidence_data = b"{}\n"
+        evidence.size = len(evidence_data)
+        archive.addfile(evidence, io.BytesIO(evidence_data))
+
+        unsafe = tarfile.TarInfo("outside-selected-root")
+        unsafe.type = member_type
+        if member_type in {tarfile.SYMTYPE, tarfile.LNKTYPE}:
+            unsafe.linkname = "public_evidence/catalog_evidence"
+        archive.addfile(unsafe)
+
+    with pytest.raises(ValueError, match="non-regular archive member"):
+        _archive_regular_files(
+            archive_path,
+            archive_root="public_evidence/catalog_evidence",
+        )
+
+
+def test_external_asset_download_recomputes_unique_carrier_totals(
+    tmp_path: Path,
+) -> None:
+    archive_path = tmp_path / "evidence.tar.gz"
+    members = {
+        "public_evidence/catalog_evidence/demo/evidence.meta.json": b"{}\n",
+        "public_evidence/catalog_evidence/demo/evidence_pack/manifest.json": b"{}\n",
+        "public_evidence/catalog_evidence/demo/evidence_pack/report.json": b"report\n",
+    }
+    with tarfile.open(archive_path, "w:gz") as archive:
+        for name, data in members.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            archive.addfile(info, io.BytesIO(data))
+    url = archive_path.as_uri()
+    digest = _sha256_file(archive_path)
+    size_bytes = archive_path.stat().st_size
+    external_assets = {
+        (url, digest, size_bytes): {"archive_root": "public_evidence/catalog_evidence"}
+    }
+
+    errors: list[str] = []
+    _check_external_asset_downloads(
+        errors,
+        tmp_path / "index.json",
+        external_assets,
+        expected_file_count=len(members),
+        expected_size_bytes=sum(map(len, members.values())),
+    )
+    assert errors == []
+
+    errors = []
+    _check_external_asset_downloads(
+        errors,
+        tmp_path / "index.json",
+        external_assets,
+        expected_file_count=len(members) + 1,
+        expected_size_bytes=sum(map(len, members.values())),
+    )
+    assert any("unique external carrier files" in error for error in errors)
 
 
 def test_public_evidence_audit_rejects_private_execution_details(
@@ -477,7 +579,7 @@ def test_public_evidence_audit_rejects_low_quality_published_image_text(
     (evidence_root / "README.md").parent.mkdir(parents=True)
     (evidence_root / "README.md").write_text("# public evidence\n", encoding="utf-8")
     _write_minimal_evidence_dir(
-        evidence_root / "published_basis" / "weak_vlm",
+        evidence_root / "catalog_evidence" / "weak_vlm",
         module=module,
         report={
             "dataset": {"provider": "vision_text"},
@@ -507,7 +609,7 @@ def test_public_evidence_audit_accepts_adequate_published_image_text_shape_recor
     (evidence_root / "README.md").parent.mkdir(parents=True)
     (evidence_root / "README.md").write_text("# public evidence\n", encoding="utf-8")
     _write_minimal_evidence_dir(
-        evidence_root / "published_basis" / "adequate_vlm",
+        evidence_root / "catalog_evidence" / "adequate_vlm",
         module=module,
         report={
             "dataset": {"provider": "vision_text"},
@@ -543,7 +645,7 @@ def test_public_evidence_audit_rejects_bad_embedded_answer_shape(
     (evidence_root / "README.md").parent.mkdir(parents=True)
     (evidence_root / "README.md").write_text("# public evidence\n", encoding="utf-8")
     _write_minimal_evidence_dir(
-        evidence_root / "published_basis" / "verbose_vlm",
+        evidence_root / "catalog_evidence" / "verbose_vlm",
         module=module,
         report={
             "dataset": {"provider": "vision_text"},

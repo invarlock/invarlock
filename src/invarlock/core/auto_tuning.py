@@ -15,6 +15,11 @@ from typing import Any
 
 import yaml
 
+from invarlock.guards.authority import (
+    DEFAULT_GUARD_AUTHORITY,
+    guard_authority_errors,
+)
+
 _RUNTIME_YAML_LOAD_ERRORS = (
     AttributeError,
     FileNotFoundError,
@@ -38,6 +43,7 @@ __all__ = [
 # Base tier policy mappings
 TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
     "conservative": {
+        "guard_authority": copy.deepcopy(DEFAULT_GUARD_AUTHORITY),
         "metrics": {
             "pm_ratio": {
                 "ratio_limit_base": 1.05,
@@ -120,6 +126,7 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     "balanced": {
+        "guard_authority": copy.deepcopy(DEFAULT_GUARD_AUTHORITY),
         "metrics": {
             "pm_ratio": {
                 "ratio_limit_base": 1.10,
@@ -198,6 +205,7 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     "aggressive": {
+        "guard_authority": copy.deepcopy(DEFAULT_GUARD_AUTHORITY),
         "metrics": {
             "pm_ratio": {
                 "ratio_limit_base": 1.20,
@@ -374,6 +382,10 @@ def _tier_entry_to_policy(tier_entry: dict[str, Any]) -> dict[str, dict[str, Any
     if isinstance(metrics, dict):
         out["metrics"] = copy.deepcopy(metrics)
 
+    guard_authority = tier_entry.get("guard_authority")
+    if isinstance(guard_authority, dict):
+        out["guard_authority"] = copy.deepcopy(guard_authority)
+
     spectral_src = tier_entry.get("spectral_guard")
     if isinstance(spectral_src, dict):
         spectral = copy.deepcopy(spectral_src)
@@ -493,6 +505,8 @@ def resolve_tier_policies(
     if isinstance(guards, dict):
         for guard_name, guard_overrides in guards.items():
             key = str(guard_name).lower()
+            if key == "authority":
+                key = "guard_authority"
             if not isinstance(guard_overrides, dict):
                 continue
             if key in policies and isinstance(policies[key], dict):
@@ -510,6 +524,7 @@ def resolve_tier_policies(
     # Apply explicit overrides (highest precedence)
     if explicit_overrides:
         for guard_name, overrides in explicit_overrides.items():
+            guard_name = "guard_authority" if guard_name == "authority" else guard_name
             if guard_name in policies and isinstance(policies.get(guard_name), dict):
                 if isinstance(overrides, dict):
                     policies[guard_name] = _deep_merge(policies[guard_name], overrides)
@@ -517,6 +532,12 @@ def resolve_tier_policies(
                 # Create new guard policy if not in base tier
                 policies[guard_name] = copy.deepcopy(overrides)
 
+    authority = policies.get("guard_authority")
+    authority_errors = guard_authority_errors(
+        authority, path="resolved_policy.guard_authority"
+    )
+    if authority_errors:
+        raise ValueError("; ".join(authority_errors))
     return policies
 
 

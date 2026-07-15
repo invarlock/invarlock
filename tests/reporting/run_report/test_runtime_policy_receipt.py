@@ -54,6 +54,11 @@ def test_runtime_policy_receipt_binds_exact_applied_guard_policies() -> None:
     assert resolved is not source
     assert resolved["spectral"] == _guards()[0]["policy"]
     assert resolved["metrics"] == source["metrics"]
+    assert resolved["guard_authority"] == {
+        "spectral": "enforce",
+        "rmt": "enforce",
+        "variance": "enforce",
+    }
     assert receipt["format_version"] == RUNTIME_POLICY_RECEIPT_FORMAT
     assert receipt["source"] == "runtime"
     assert receipt["guard_policies"] == ["rmt", "spectral", "variance"]
@@ -140,6 +145,15 @@ def test_evaluation_policy_context_prefers_runtime_receipt() -> None:
     ("overrides", "message"),
     [
         ({"runtime_policies": {}}, "resolved policy is empty"),
+        (
+            {
+                "runtime_policies": {
+                    **_runtime_policy(),
+                    "guard_authority": {"spectral": "observe"},
+                }
+            },
+            "guard_authority",
+        ),
         ({"tier": "unknown"}, "tier is unsupported"),
         ({"profile": "unknown"}, "profile is unsupported"),
         ({"edit_name": "  "}, "edit_name is required"),

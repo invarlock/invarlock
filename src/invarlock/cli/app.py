@@ -588,8 +588,9 @@ def _verify_typed(
         None,
         "--policy-pack",
         help=(
-            "Independently supplied policy-pack-v1 JSON/YAML authorization. Required "
-            "for strict verification so the report cannot choose its own thresholds."
+            "Independently supplied policy-pack-v2 JSON/YAML authorization; frozen "
+            "policy-pack-v1 inputs remain accepted. Required for strict verification "
+            "so the report cannot choose its own thresholds."
         ),
     ),
     baseline: str | None = typer.Option(

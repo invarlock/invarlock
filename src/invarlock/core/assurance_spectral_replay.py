@@ -511,9 +511,18 @@ def _validate_public_spectral_summary(
 
 
 def replay_spectral_guard(
-    report: Mapping[str, Any], entry: Mapping[str, Any], source: str
+    report: Mapping[str, Any],
+    entry: Mapping[str, Any],
+    source: str,
+    *,
+    enforce_outcome: bool = True,
 ) -> list[str]:
-    """Replay one retained spectral record and its public summary mirrors."""
+    """Replay one retained spectral record and its public summary mirrors.
+
+    ``enforce_outcome`` changes only whether a complete cap-budget finding is
+    acceptance-blocking. Fatal findings and incomplete or inconsistent evidence
+    always fail replay.
+    """
 
     errors: list[str] = []
     metrics = _mapping(entry.get("metrics"))
@@ -731,7 +740,7 @@ def replay_spectral_guard(
 
     if fatal_violations:
         errors.append("replayed spectral evidence contains fatal violations.")
-    if caps_exceeded:
+    if caps_exceeded and enforce_outcome:
         errors.append("replayed spectral evidence exceeds the selected-cap budget.")
     return errors
 

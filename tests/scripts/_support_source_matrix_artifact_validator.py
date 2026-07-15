@@ -14,7 +14,7 @@ from scripts.evidence_packs.python.editing.training_contract import (
 from scripts.evidence_packs.python.editing.training_profile_snapshot import (
     produce_training_profile_snapshot,
 )
-from tests.cli._support_verify_runtime_provenance import (
+from tests.cli.verify._support_runtime_provenance import (
     _VALID_TEST_IMAGE_DIGEST,
     _matching_strict_policy_pack,
     _matching_strict_ppl_baseline,

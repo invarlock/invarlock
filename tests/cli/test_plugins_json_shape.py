@@ -6,12 +6,30 @@ from typer.testing import CliRunner
 from invarlock.cli.app import app
 
 
+def test_plugins_json_without_category_emits_one_envelope():
+    result = CliRunner().invoke(app, ["advanced", "plugins", "list", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert payload["format_version"] == "plugins-v2"
+    assert payload["category"] == "all"
+    assert isinstance(payload["items"], list)
+    assert {item["kind"] for item in payload["items"]} == {
+        "adapter",
+        "dataset",
+        "edit",
+        "guard",
+    }
+    required = {"name", "kind", "module", "entry_point"}
+    assert all(required <= set(item) for item in payload["items"])
+
+
 @pytest.mark.parametrize("cat", ["adapters", "guards", "edits", "plugins"])
 def test_plugins_json_shape_and_order(cat):
     r = CliRunner().invoke(app, ["advanced", "plugins", "list", cat, "--json"])
     assert r.exit_code == 0, r.output
     payload = json.loads(r.stdout.strip().splitlines()[-1])
-    assert payload["format_version"] == "plugins-v1"
+    assert payload["format_version"] == "plugins-v2"
     assert payload["category"] == cat
     items = payload["items"]
     assert isinstance(items, list) and items

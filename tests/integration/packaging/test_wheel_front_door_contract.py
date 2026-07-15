@@ -28,6 +28,29 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")
+def test_wheel_install_can_enable_third_party_plugin_discovery(
+    installed_wheel_env: InstalledWheelEnv, tmp_path: Path
+) -> None:
+    discovery = _run(
+        installed_wheel_env.python_exe,
+        [
+            "-c",
+            (
+                "from invarlock.core.registry import CoreRegistry; "
+                "registry = CoreRegistry(); "
+                "assert 'hf_auto' in registry.list_adapters(); "
+                "assert 'quant_rtn' in registry.list_edits(); "
+                "assert 'invariants' in registry.list_guards()"
+            ),
+        ],
+        cwd=tmp_path,
+        env={"INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS": "1"},
+    )
+
+    assert discovery.returncode == 0, discovery.stdout + discovery.stderr
+
+
+@pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")
 def test_wheel_install_verifies_strict_report_bundle_outside_repo_tree(
     installed_wheel_env: InstalledWheelEnv, tmp_path: Path
 ) -> None:

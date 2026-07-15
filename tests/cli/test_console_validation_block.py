@@ -127,3 +127,29 @@ def test_guard_metric_impact_row_omitted_when_not_evaluated(tmp_path: Path) -> N
     block = compute_console_validation_block(cert)
     labels = [row["label"] for row in block.get("rows", [])]
     assert "Guard Metric Impact Acceptable" not in labels
+
+
+def test_observed_guard_finding_is_visible_but_nonblocking() -> None:
+    report = {
+        "resolved_policy": {
+            "guard_authority": {
+                "spectral": "observe",
+                "rmt": "enforce",
+                "variance": "enforce",
+            }
+        },
+        "validation": {
+            "primary_metric_acceptable": True,
+            "preview_final_drift_acceptable": True,
+            "invariants_pass": True,
+            "spectral_stable": False,
+            "rmt_stable": True,
+        },
+    }
+
+    block = compute_console_validation_block(report)
+
+    spectral = next(row for row in block["rows"] if row["label"] == "Spectral Stable")
+    assert spectral["ok"] is False
+    assert spectral["status"] == "⚠️ OBSERVED"
+    assert block["overall_pass"] is True

@@ -15,10 +15,10 @@ if str(REPO_ROOT) not in sys.path:
 
 from invarlock.reporting.report_schema import validate_report  # noqa: E402
 from scripts.checks.public_evidence_checks.artifacts import (  # noqa: E402
+    _check_catalog_evidence_multimodal_quality,
     _check_guard_value_demo,
-    _check_published_basis_multimodal_quality,
     _check_signed_pack,
-    _is_direct_published_basis_artifact,
+    _is_direct_catalog_evidence_artifact,
     _require_path,
 )
 from scripts.checks.public_evidence_checks.common import (  # noqa: E402
@@ -30,6 +30,9 @@ from scripts.checks.public_evidence_checks.common import (  # noqa: E402
     _check_public_evidence_privacy,
     _load_json,
     _relative,
+)
+from scripts.checks.public_evidence_checks.guard_scenarios import (  # noqa: E402
+    check_historical_guard_scenario_observations,
 )
 from scripts.checks.public_evidence_checks.index import (  # noqa: E402
     _check_packaged_public_evidence_index,
@@ -103,6 +106,11 @@ def check_public_evidence(
         )
     if root == PUBLIC_EVIDENCE_ROOT.resolve():
         _check_packaged_public_evidence_index(
+            errors,
+            root,
+            fetch_external_assets=fetch_external_assets,
+        )
+        check_historical_guard_scenario_observations(
             errors,
             root,
             fetch_external_assets=fetch_external_assets,
@@ -187,10 +195,12 @@ def check_public_evidence(
                 errors, artifact_dir, artifact_paths, "evaluation_report"
             )
             _require_path(errors, artifact_dir, artifact_paths, "runtime_manifest")
-        if report_path is not None and _is_direct_published_basis_artifact(
+        if report_path is not None and _is_direct_catalog_evidence_artifact(
             artifact_dir, root
         ):
-            _check_published_basis_multimodal_quality(errors, artifact_dir, report_path)
+            _check_catalog_evidence_multimodal_quality(
+                errors, artifact_dir, report_path
+            )
         if (
             report_path is not None
             and root == PUBLIC_EVIDENCE_ROOT.resolve()

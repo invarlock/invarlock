@@ -4,7 +4,7 @@ import pytest
 
 from invarlock.core.checkpoint_identity import LEGACY_MODEL_IDENTITY_FIELDS
 from invarlock.reporting import verify_baseline as baseline_mod
-from tests.cli._support_verify_runtime_provenance import (
+from tests.cli.verify._support_runtime_provenance import (
     _matching_strict_ppl_baseline,
     _strict_provenance_gate_cert,
 )

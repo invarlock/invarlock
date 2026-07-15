@@ -317,7 +317,7 @@ security-ci = [
 
 # Entry points for built-in and optional plugins
 [project.entry-points."invarlock.edits"]
-quant_rtn = "invarlock.edits:RTNQuantEdit"
+quant_rtn = "invarlock.edits.quant_rtn:RTNQuantEdit"
 
 [project.entry-points."invarlock.guards"]
 spectral = "invarlock.guards.spectral:SpectralGuard"

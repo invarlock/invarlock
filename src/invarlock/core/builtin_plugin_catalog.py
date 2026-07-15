@@ -13,14 +13,14 @@ class BuiltinPluginSpec:
     required_deps: tuple[str, ...] = ()
     support_tier: str = "core_supported"
     strict_assurance_allowed: bool = True
-    published_basis: bool = False
+    maintained_catalog: bool = False
     deployment_claim: bool = False
 
     def support_metadata(self) -> dict[str, object]:
         return {
             "support_tier": self.support_tier,
             "strict_assurance_allowed": self.strict_assurance_allowed,
-            "published_basis": self.published_basis,
+            "maintained_catalog": self.maintained_catalog,
             "deployment_claim": self.deployment_claim,
         }
 
@@ -168,7 +168,7 @@ def builtin_plugin_support_metadata(
     return {
         "support_tier": "third_party",
         "strict_assurance_allowed": False,
-        "published_basis": False,
+        "maintained_catalog": False,
         "deployment_claim": False,
     }
 

@@ -11,10 +11,10 @@ def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
         "_load_contract_or_raise",
         lambda filename: {
             "support_matrix.json": {
-                "format_version": "support-matrix-v1",
+                "format_version": "support-matrix-v2",
                 "lanes": [
                     {"lane_id": "first", "support_tier": "community_experimental"},
-                    {"lane_id": "second", "support_tier": "published_basis"},
+                    {"lane_id": "second", "support_tier": "maintained_catalog"},
                     "bad",
                 ],
             },
@@ -27,14 +27,14 @@ def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
                 ],
             },
             "model_family_catalog.json": {
-                "format_version": "model-family-catalog-v1",
+                "format_version": "model-family-catalog-v2",
                 "declared_support": [
                     {"family_id": "gpt2-causal-lm", "display_name": "GPT-2 causal LM"},
                     "bad",
                 ],
                 "implemented_coverage": [],
                 "usage_only": [],
-                "published_basis_candidates_text_le_14b": {"candidates": []},
+                "maintained_catalog_candidates_text_le_14b": {"candidates": []},
                 "recommended_additions": [],
             },
             "plugin_compatibility.json": {
@@ -49,7 +49,7 @@ def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
     assert contracts.support_lane_by_id("missing") is None
     assert contracts.support_lane_by_id("second") == {
         "lane_id": "second",
-        "support_tier": "published_basis",
+        "support_tier": "maintained_catalog",
     }
     assert contracts.adapter_capability_map() == {
         "good": {"adapter": "good", "guard_coverage": "full"}

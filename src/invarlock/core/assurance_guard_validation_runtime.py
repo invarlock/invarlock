@@ -84,7 +84,124 @@ def _invariants_errors(
     return errors
 
 
-def _variance_errors(report: Mapping[str, Any], *, require_complete: bool) -> list[str]:
+def _observed_variance_errors(
+    variance: Mapping[str, Any],
+    *,
+    passed: Any,
+    reason: Any,
+    reason_is_complete_negative: bool,
+    require_complete: bool,
+    enforce_outcome: bool,
+) -> list[str]:
+    if passed is not False or enforce_outcome:
+        return []
+    errors: list[str] = []
+    if not reason_is_complete_negative:
+        displayed_reason = reason if isinstance(reason, str) and reason else "missing"
+        errors.append(
+            f"variance predictive_gate.reason={displayed_reason} is not a "
+            "complete observed outcome."
+        )
+    if not require_complete:
+        return errors
+    calibration = _mapping(variance.get("calibration"))
+    coverage = (
+        _nonnegative_int(calibration.get("coverage"))
+        if calibration is not None
+        else None
+    )
+    minimum = (
+        _nonnegative_int(calibration.get("min_coverage"))
+        if calibration is not None
+        else None
+    )
+    if (
+        calibration is None
+        or calibration.get("status") != "complete"
+        or coverage is None
+        or minimum is None
+        or minimum <= 0
+        or coverage < minimum
+    ):
+        errors.append(
+            "observed variance outcome requires complete calibration with "
+            "adequate coverage."
+        )
+    return errors
+
+
+def _variance_noop_errors(
+    report: Mapping[str, Any],
+    variance: Mapping[str, Any],
+    *,
+    enabled: Any,
+    monitor_only: Any,
+    edit_is_noop: bool,
+    reason_is_no_adjustment: bool,
+    require_complete: bool,
+) -> list[str]:
+    if not require_complete:
+        return []
+    errors: list[str] = []
+    if edit_is_noop and not reason_is_no_adjustment:
+        errors.append(
+            "strict no-op variance requires "
+            "predictive_gate.reason=no_adjustment_required."
+        )
+    if not (reason_is_no_adjustment or edit_is_noop):
+        return errors
+
+    edit = _mapping(report.get("edit"))
+    if edit is None or _normalized_token(str(edit.get("name") or "")) != "noop":
+        errors.append("variance no_adjustment_required requires edit.name=noop.")
+
+    structure = _mapping(report.get("structure"))
+    params_changed = (
+        _nonnegative_int(structure.get("params_changed"))
+        if structure is not None
+        else None
+    )
+    if params_changed != 0:
+        errors.append(
+            "variance no_adjustment_required requires "
+            "structure.params_changed=0 as an integer."
+        )
+    if enabled is not False:
+        errors.append(
+            "variance no_adjustment_required requires variance.enabled=false."
+        )
+    if monitor_only is not False:
+        errors.append(
+            "variance no_adjustment_required requires variance.monitor_only=false."
+        )
+
+    calibration = _mapping(variance.get("calibration"))
+    if calibration is None:
+        errors.append(
+            "variance no_adjustment_required requires variance.calibration evidence."
+        )
+        return errors
+    if calibration.get("status") != "no_scaling_required":
+        errors.append(
+            "variance no_adjustment_required requires "
+            "variance.calibration.status=no_scaling_required."
+        )
+    coverage = _nonnegative_int(calibration.get("coverage"))
+    minimum = _nonnegative_int(calibration.get("min_coverage"))
+    if minimum is None or minimum <= 0 or coverage is None or coverage < minimum:
+        errors.append(
+            "variance no_adjustment_required requires adequate variance "
+            "calibration coverage."
+        )
+    return errors
+
+
+def _variance_errors(
+    report: Mapping[str, Any],
+    *,
+    require_complete: bool,
+    enforce_outcome: bool = True,
+) -> list[str]:
     variance = _mapping(report.get("variance"))
     if variance is None:
         return []
@@ -120,7 +237,7 @@ def _variance_errors(report: Mapping[str, Any], *, require_complete: bool) -> li
     if require_complete or "passed" in predictive:
         if not isinstance(passed, bool):
             errors.append("variance.predictive_gate.passed must be a boolean.")
-        elif passed is not True:
+        elif passed is not True and enforce_outcome:
             errors.append("variance.predictive_gate.passed is false.")
 
     reason = predictive.get("reason")
@@ -135,65 +252,43 @@ def _variance_errors(report: Mapping[str, Any], *, require_complete: bool) -> li
     reason_is_gain = bool(
         isinstance(reason, str) and _normalized_token(reason) == "ci-gain-met"
     )
+    complete_negative_reasons = {
+        "ci-contains-zero",
+        "gain-below-threshold",
+        "mean-not-negative",
+        "regression-detected",
+    }
+    reason_is_complete_negative = bool(
+        isinstance(reason, str)
+        and _normalized_token(reason) in complete_negative_reasons
+    )
     if passed is True and not (reason_is_no_adjustment or reason_is_gain):
         displayed_reason = reason if isinstance(reason, str) and reason else "missing"
         errors.append(
             f"variance predictive_gate.reason={displayed_reason} cannot be a "
             "passing result."
         )
-    if require_complete and edit_is_noop and not reason_is_no_adjustment:
-        errors.append(
-            "strict no-op variance requires "
-            "predictive_gate.reason=no_adjustment_required."
+    errors.extend(
+        _observed_variance_errors(
+            variance,
+            passed=passed,
+            reason=reason,
+            reason_is_complete_negative=reason_is_complete_negative,
+            require_complete=require_complete,
+            enforce_outcome=enforce_outcome,
         )
-    if require_complete and (reason_is_no_adjustment or edit_is_noop):
-        if edit is None or _normalized_token(str(edit.get("name") or "")) != "noop":
-            errors.append("variance no_adjustment_required requires edit.name=noop.")
-
-        structure = _mapping(report.get("structure"))
-        params_changed = (
-            _nonnegative_int(structure.get("params_changed"))
-            if structure is not None
-            else None
+    )
+    errors.extend(
+        _variance_noop_errors(
+            report,
+            variance,
+            enabled=enabled,
+            monitor_only=monitor_only,
+            edit_is_noop=edit_is_noop,
+            reason_is_no_adjustment=reason_is_no_adjustment,
+            require_complete=require_complete,
         )
-        if params_changed != 0:
-            errors.append(
-                "variance no_adjustment_required requires "
-                "structure.params_changed=0 as an integer."
-            )
-
-        if enabled is not False:
-            errors.append(
-                "variance no_adjustment_required requires variance.enabled=false."
-            )
-        if monitor_only is not False:
-            errors.append(
-                "variance no_adjustment_required requires variance.monitor_only=false."
-            )
-
-        calibration = _mapping(variance.get("calibration"))
-        if calibration is None:
-            errors.append(
-                "variance no_adjustment_required requires variance.calibration evidence."
-            )
-        else:
-            if calibration.get("status") != "no_scaling_required":
-                errors.append(
-                    "variance no_adjustment_required requires "
-                    "variance.calibration.status=no_scaling_required."
-                )
-            coverage = _nonnegative_int(calibration.get("coverage"))
-            minimum = _nonnegative_int(calibration.get("min_coverage"))
-            if (
-                minimum is None
-                or minimum <= 0
-                or coverage is None
-                or coverage < minimum
-            ):
-                errors.append(
-                    "variance no_adjustment_required requires adequate variance "
-                    "calibration coverage."
-                )
+    )
     if require_complete and reason_is_gain:
         errors.extend(_variance_gain_errors(variance, predictive, enabled=enabled))
     return errors

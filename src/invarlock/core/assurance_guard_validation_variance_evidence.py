@@ -39,7 +39,9 @@ def _variance_inventory_errors(
     inventory: list[tuple[str, dict[str, Any], str]],
     *,
     require_complete: bool,
+    enforce_outcome: bool = True,
 ) -> list[str]:
+    _ = enforce_outcome
     matches = [
         (entry, source) for name, entry, source in inventory if name == "variance"
     ]
@@ -170,11 +172,15 @@ def _variance_inventory_errors(
                 source=source,
             )
         )
-    if (
-        require_complete
-        and isinstance(reason, str)
-        and _normalized_token(reason) == "ci-gain-met"
-    ):
+    normalized_reason = _normalized_token(reason) if isinstance(reason, str) else ""
+    replayable_predictive_reasons = {
+        "ci-gain-met",
+        "ci-contains-zero",
+        "gain-below-threshold",
+        "mean-not-negative",
+        "regression-detected",
+    }
+    if require_complete and normalized_reason in replayable_predictive_reasons:
         for top_key, raw_key in (
             ("ve_enabled_during_validation", "ve_enabled_during_validation"),
             ("subject_restored_after_ab", "subject_restored_after_ab"),
@@ -315,13 +321,14 @@ def _variance_inventory_errors(
             )
         )
 
-        errors.extend(
-            _variance_raw_gain_errors(
-                metrics,
-                raw_policy,
-                source=source,
+        if normalized_reason == "ci-gain-met":
+            errors.extend(
+                _variance_raw_gain_errors(
+                    metrics,
+                    raw_policy,
+                    source=source,
+                )
             )
-        )
     return errors
 
 

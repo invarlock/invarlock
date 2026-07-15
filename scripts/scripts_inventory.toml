@@ -52,6 +52,7 @@ paths = [
   "scripts/checks/public_evidence_checks/__init__.py",
   "scripts/checks/public_evidence_checks/artifacts.py",
   "scripts/checks/public_evidence_checks/common.py",
+  "scripts/checks/public_evidence_checks/guard_scenarios.py",
   "scripts/checks/public_evidence_checks/index.py",
   "scripts/checks/public_evidence_checks/negative_fixtures.py",
   "scripts/checks/public_evidence_checks/summaries.py",

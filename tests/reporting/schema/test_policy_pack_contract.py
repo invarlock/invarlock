@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 
@@ -21,7 +22,7 @@ def test_policy_pack_digest_verification_round_trip(tmp_path: Path) -> None:
         tier="balanced",
         resolved_policy={"metrics": {"pm_ratio": {"ratio_limit_base": 1.1}}},
         overrides=[{"path": "metrics.pm_ratio.ratio_limit_base", "value": 1.1}],
-        compatibility={"support_tiers": ["published_basis"]},
+        compatibility={"support_tiers": ["maintained_catalog"]},
         approval={"owner": "oss"},
     )
     out = tmp_path / "policy-pack.json"
@@ -36,7 +37,7 @@ def test_policy_pack_verification_rejects_digest_mismatch() -> None:
         tier="balanced",
         resolved_policy={"metrics": {"pm_ratio": {"ratio_limit_base": 1.1}}},
         overrides=[{"path": "metrics.pm_ratio.ratio_limit_base", "value": 1.1}],
-        compatibility={"support_tiers": ["published_basis"]},
+        compatibility={"support_tiers": ["maintained_catalog"]},
     )
     pack["policy_digest"] = "0000000000000000"
     errors = verify_policy_pack(pack)
@@ -48,7 +49,7 @@ def test_policy_pack_digest_binds_dataset_compatibility() -> None:
         tier="balanced",
         resolved_policy={"metrics": {"pm_ratio": {"ratio_limit_base": 1.1}}},
         compatibility={
-            "support_tiers": ["published_basis"],
+            "support_tiers": ["maintained_catalog"],
             "dataset_identity": {
                 "provider": "hf_text",
                 "dataset_name": "Salesforce/wikitext",
@@ -73,7 +74,7 @@ def test_policy_pack_verification_rejects_format_mismatch() -> None:
     pack["format"] = "wrong-format"
 
     errors = verify_policy_pack(pack)
-    assert any("policy pack format must be policy-pack-v1" in error for error in errors)
+    assert any("policy pack format must be policy-pack-v2" in error for error in errors)
 
 
 def test_policy_pack_load_yaml_and_reject_malformed_override_shapes(
@@ -83,7 +84,7 @@ def test_policy_pack_load_yaml_and_reject_malformed_override_shapes(
     yaml_pack.write_text(
         "\n".join(
             [
-                "format: policy-pack-v1",
+                "format: policy-pack-v2",
                 "tier: balanced",
                 "resolved_policy:",
                 "  metrics:",
@@ -95,7 +96,7 @@ def test_policy_pack_load_yaml_and_reject_malformed_override_shapes(
                 "policy_digest: placeholder",
                 "compatibility:",
                 "  support_tiers:",
-                "    - published_basis",
+                "    - maintained_catalog",
             ]
         )
         + "\n",
@@ -132,12 +133,12 @@ def test_policy_pack_structured_text_loader_supports_json_and_yaml() -> None:
         bytes(range(256)),
         json.dumps(
             {
-                "format": "policy-pack-v1",
+                "format": "policy-pack-v2",
                 "tier": "balanced",
                 "resolved_policy": {"metrics": {"pm_ratio": {"ratio_limit_base": 1.1}}},
                 "overrides": [],
                 "policy_digest": "placeholder",
-                "compatibility": {"support_tiers": ["published_basis"]},
+                "compatibility": {"support_tiers": ["maintained_catalog"]},
             }
         ).encode("utf-8"),
     ],
@@ -166,8 +167,8 @@ def test_policy_pack_build_defaults_and_metadata() -> None:
         metadata={"author": "tests"},
     )
 
-    assert pack["format"] == "policy-pack-v1"
-    assert pack["compatibility"] == {"support_tiers": ["published_basis"]}
+    assert pack["format"] == "policy-pack-v2"
+    assert pack["compatibility"] == {"support_tiers": ["maintained_catalog"]}
     assert pack["metadata"] == {"author": "tests"}
     assert "approval" not in pack
     assert pack["policy_digest"] == compute_policy_pack_digest(
@@ -177,6 +178,78 @@ def test_policy_pack_build_defaults_and_metadata() -> None:
         metadata=pack["metadata"],
     )
     assert len(pack["policy_digest"]) == len("sha256:") + 64
+
+
+def test_policy_pack_v2_binds_exact_guard_authority_defaults() -> None:
+    pack = build_policy_pack(
+        tier="balanced",
+        resolved_policy={"metrics": {"pm_ratio": {"ratio_limit_base": 1.1}}},
+    )
+
+    assert pack["resolved_policy"]["guard_authority"] == {
+        "spectral": "enforce",
+        "rmt": "enforce",
+        "variance": "enforce",
+    }
+    assert verify_policy_pack(pack) == []
+
+    for malformed in (
+        None,
+        {"spectral": "enforce", "rmt": "enforce"},
+        {
+            "spectral": "enforce",
+            "rmt": "enforce",
+            "variance": "enforce",
+            "invariants": "observe",
+        },
+        {"spectral": "ignore", "rmt": "enforce", "variance": "enforce"},
+    ):
+        candidate = dict(pack)
+        candidate["resolved_policy"] = dict(pack["resolved_policy"])
+        if malformed is None:
+            candidate["resolved_policy"].pop("guard_authority")
+        else:
+            candidate["resolved_policy"]["guard_authority"] = malformed
+        candidate["policy_digest"] = policy_pack_mod._compute_policy_pack_digest(
+            {key: value for key, value in candidate.items() if key != "policy_digest"}
+        )
+        assert any(
+            "guard_authority" in error for error in verify_policy_pack(candidate)
+        )
+
+
+def test_legacy_policy_pack_rejects_any_explicit_guard_authority() -> None:
+    pack = build_policy_pack(tier="balanced", resolved_policy={"metrics": {}})
+    pack["format"] = "policy-pack-v1"
+    pack["compatibility"]["support_tiers"] = ["published_basis"]
+    pack["resolved_policy"].pop("guard_authority")
+    pack["policy_digest"] = policy_pack_mod._compute_policy_pack_digest(
+        {key: value for key, value in pack.items() if key != "policy_digest"}
+    )
+    assert verify_policy_pack(pack) == []
+
+    for explicit_authority in (
+        {
+            "spectral": "enforce",
+            "rmt": "enforce",
+            "variance": "enforce",
+        },
+        {
+            "spectral": "observe",
+            "rmt": "enforce",
+            "variance": "enforce",
+        },
+        None,
+    ):
+        candidate = copy.deepcopy(pack)
+        candidate["resolved_policy"]["guard_authority"] = explicit_authority
+        candidate["policy_digest"] = policy_pack_mod._compute_policy_pack_digest(
+            {key: value for key, value in candidate.items() if key != "policy_digest"}
+        )
+        assert any(
+            "policy-pack-v1 cannot declare resolved_policy.guard_authority" in error
+            for error in verify_policy_pack(candidate)
+        )
 
 
 def test_policy_pack_load_rejects_non_mapping_payload(tmp_path: Path) -> None:
@@ -206,7 +279,7 @@ def test_policy_pack_load_rejects_duplicate_object_members(
 def test_policy_pack_load_rejects_yaml_merge_keys(tmp_path: Path) -> None:
     path = tmp_path / "merged.yaml"
     path.write_text(
-        "defaults: &defaults\n  support_tiers: [published_basis]\n"
+        "defaults: &defaults\n  support_tiers: [maintained_catalog]\n"
         "compatibility:\n  <<: *defaults\n",
         encoding="utf-8",
     )
@@ -355,11 +428,33 @@ def test_policy_pack_verify_remains_strict_when_schema_library_is_unavailable(
     assert any("compatibility contains unknown fields" in error for error in errors)
 
 
-def test_policy_pack_rejects_retired_v2_format() -> None:
+def test_policy_pack_rejects_unknown_format() -> None:
     pack = build_policy_pack(tier="balanced", resolved_policy={})
-    pack["format"] = "policy-pack-v2"
+    pack["format"] = "policy-pack-v3"
 
-    assert any("policy-pack-v1" in error for error in verify_policy_pack(pack))
+    assert any("policy-pack-v2" in error for error in verify_policy_pack(pack))
+
+
+def test_policy_pack_verifier_accepts_frozen_v1_pack_read_only() -> None:
+    pack = build_policy_pack(tier="balanced", resolved_policy={})
+    pack["format"] = "policy-pack-v1"
+    pack["compatibility"]["support_tiers"] = ["published_basis"]
+    pack["resolved_policy"].pop("guard_authority")
+    pack["policy_digest"] = policy_pack_mod._compute_policy_pack_digest(
+        {key: value for key, value in pack.items() if key != "policy_digest"}
+    )
+
+    assert verify_policy_pack(pack) == []
+
+
+def test_policy_pack_v2_rejects_legacy_support_tier() -> None:
+    pack = build_policy_pack(tier="balanced", resolved_policy={})
+    pack["compatibility"]["support_tiers"] = ["published_basis"]
+    pack["policy_digest"] = policy_pack_mod._compute_policy_pack_digest(
+        {key: value for key, value in pack.items() if key != "policy_digest"}
+    )
+
+    assert any("unsupported value" in error for error in verify_policy_pack(pack))
 
 
 @pytest.mark.parametrize(
@@ -417,7 +512,7 @@ def test_policy_pack_manual_shape_validator_covers_every_nested_authority() -> N
             (
                 changed(
                     lambda p: p["compatibility"].update(
-                        {"support_tiers": ["published_basis", 1]}
+                        {"support_tiers": ["maintained_catalog", 1]}
                     )
                 ),
                 "non-empty strings",
@@ -425,7 +520,7 @@ def test_policy_pack_manual_shape_validator_covers_every_nested_authority() -> N
             (
                 changed(
                     lambda p: p["compatibility"].update(
-                        {"support_tiers": ["published_basis", "published_basis"]}
+                        {"support_tiers": ["maintained_catalog", "maintained_catalog"]}
                     )
                 ),
                 "unique",
@@ -436,7 +531,7 @@ def test_policy_pack_manual_shape_validator_covers_every_nested_authority() -> N
                         {
                             "support_tiers": [
                                 "supported_experimental",
-                                "published_basis",
+                                "maintained_catalog",
                             ]
                         }
                     )

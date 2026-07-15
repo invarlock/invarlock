@@ -44,7 +44,11 @@ def test_evidence_pack_repo_assets_not_in_wheel(tmp_path):
         assert "invarlock/_data/contracts/verify_output.schema.json" in names
         assert "invarlock/_data/contracts/support_matrix.json" in names
         assert "invarlock/_data/contracts/model_family_catalog.json" in names
-        assert "invarlock/_data/public_evidence/published_basis_index.json" in names
+        assert "invarlock/_data/public_evidence/catalog_evidence_index.json" in names
+        assert not any(
+            name.startswith("invarlock/_data/public_evidence/catalog_evidence/")
+            for name in names
+        )
         assert not any(
             name.startswith("invarlock/_data/public_evidence/published_basis/")
             for name in names

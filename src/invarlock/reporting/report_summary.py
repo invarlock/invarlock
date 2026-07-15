@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from invarlock.core.auto_tuning import get_tier_policies
+from invarlock.guards.authority import (
+    guard_is_enforced,
+    resolved_guard_authority,
+)
 from invarlock.json_serialization import normalize_optional_nonfinite_json
 from invarlock.public_contracts import load_json_contract
 
@@ -52,6 +56,7 @@ def compute_console_validation_block(
     guard_evaluated = (
         bool(guard_ctx.get("evaluated")) if isinstance(guard_ctx, dict) else False
     )
+    authority, _, _ = resolved_guard_authority(evaluation_report)
 
     def _to_key(label: str) -> str:
         return label.strip().lower().replace(" ", "_")
@@ -62,12 +67,21 @@ def compute_console_validation_block(
     for label in labels:
         key = _to_key(label)
         ok = validation.get(key) is True
+        guard_name = {
+            "spectral_stable": "spectral",
+            "rmt_stable": "rmt",
+        }.get(key)
+        observed = bool(
+            guard_name is not None
+            and not guard_is_enforced(authority, guard_name)
+            and validation.get(key) is False
+        )
         if key == "guard_metric_impact_acceptable" and not guard_evaluated:
             continue
         rows.append(
             {
                 "label": label,
-                "status": "✅ PASS" if ok else "❌ FAIL",
+                "status": "⚠️ OBSERVED" if observed else "✅ PASS" if ok else "❌ FAIL",
                 "evaluated": key != "guard_metric_impact_acceptable" or guard_evaluated,
                 "ok": ok,
             }
@@ -79,9 +93,11 @@ def compute_console_validation_block(
         "primary_metric_acceptable",
         "preview_final_drift_acceptable",
         "invariants_pass",
-        "spectral_stable",
-        "rmt_stable",
     ]
+    if guard_is_enforced(authority, "spectral"):
+        keys_for_overall.append("spectral_stable")
+    if guard_is_enforced(authority, "rmt"):
+        keys_for_overall.append("rmt_stable")
     if guard_evaluated:
         keys_for_overall.append("guard_metric_impact_acceptable")
 

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import re
+import tarfile
 import tempfile
 import urllib.request
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from scripts.checks.public_evidence_checks.common import (
@@ -20,6 +21,26 @@ from scripts.checks.public_evidence_checks.common import (
     _resolve_public_evidence_path,
     _sha256_file,
 )
+
+_EVIDENCE_PATH_PREFIXES = (
+    "public_evidence/catalog_evidence/",
+    # Immutable assets published before the support-tier rename retain this
+    # archive path. New assets use catalog_evidence.
+    "public_evidence/published_basis/",
+)
+_EVIDENCE_ROOTS = tuple(prefix.removesuffix("/") for prefix in _EVIDENCE_PATH_PREFIXES)
+
+
+def _is_safe_evidence_path(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and value.startswith(_EVIDENCE_PATH_PREFIXES)
+        and ".." not in Path(value).parts
+    )
+
+
+def _is_safe_evidence_root(value: object) -> bool:
+    return isinstance(value, str) and value in _EVIDENCE_ROOTS
 
 
 def _check_packaged_public_evidence_index(
@@ -59,10 +80,16 @@ def _check_packaged_public_evidence_index(
     if not isinstance(entries, list):
         errors.append(f"{_relative(index_path)}: entries must be a list")
         return
-    if index.get("published_basis_count") != len(entries):
+    if index.get("catalog_evidence_count") != len(entries):
         errors.append(
-            f"{_relative(index_path)}: published_basis_count must match entries"
+            f"{_relative(index_path)}: catalog_evidence_count must match entries"
         )
+    for field in ("catalog_evidence_file_count", "catalog_evidence_size_bytes"):
+        value = index.get(field)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            errors.append(
+                f"{_relative(index_path)}: {field} must be a non-negative integer"
+            )
     if not entries:
         if index.get("status") != "not_created":
             errors.append(
@@ -87,11 +114,7 @@ def _check_packaged_public_evidence_index(
             errors.append(
                 f"{_relative(index_path)}: entries[{entry_index}].slug required"
             )
-        if (
-            not isinstance(entry_path, str)
-            or not entry_path.startswith("public_evidence/published_basis/")
-            or ".." in Path(entry_path).parts
-        ):
+        if not _is_safe_evidence_path(entry_path):
             errors.append(
                 f"{_relative(index_path)}: entries[{entry_index}].path invalid"
             )
@@ -111,11 +134,7 @@ def _check_packaged_public_evidence_index(
                 continue
             artifact_path_raw = summary.get("path")
             kind = summary.get("kind")
-            if (
-                not isinstance(artifact_path_raw, str)
-                or not artifact_path_raw.startswith("public_evidence/published_basis/")
-                or ".." in Path(artifact_path_raw).parts
-            ):
+            if not _is_safe_evidence_path(artifact_path_raw):
                 errors.append(
                     f"{_relative(index_path)}: {slug}.{artifact_name}.path invalid"
                 )
@@ -189,8 +208,31 @@ def _check_packaged_public_evidence_index(
                 errors.append(
                     f"{_relative(index_path)}: {slug}.{artifact_name}.kind invalid"
                 )
+    local_carrier_root = public_evidence_root / "catalog_evidence"
+    if local_carrier_root.is_dir():
+        unique_files = sorted(
+            path for path in local_carrier_root.rglob("*") if path.is_file()
+        )
+        if index.get("catalog_evidence_file_count") != len(unique_files):
+            errors.append(
+                f"{_relative(index_path)}: catalog_evidence_file_count does not "
+                "match unique local carrier files"
+            )
+        if index.get("catalog_evidence_size_bytes") != sum(
+            path.stat().st_size for path in unique_files
+        ):
+            errors.append(
+                f"{_relative(index_path)}: catalog_evidence_size_bytes does not "
+                "match unique local carrier files"
+            )
     if fetch_external_assets:
-        _check_external_asset_downloads(errors, index_path, external_assets)
+        _check_external_asset_downloads(
+            errors,
+            index_path,
+            external_assets,
+            expected_file_count=index.get("catalog_evidence_file_count"),
+            expected_size_bytes=index.get("catalog_evidence_size_bytes"),
+        )
 
 
 def _check_external_artifact_reference(
@@ -226,10 +268,20 @@ def _check_external_artifact_reference(
             "size_bytes invalid"
         )
     archive_path = external.get("archive_path")
+    archive_root = external.get("archive_root")
+    if not _is_safe_evidence_root(archive_root):
+        errors.append(
+            f"{_relative(index_path)}: {slug}.{artifact_name}.external_asset."
+            "archive_root invalid"
+        )
     if archive_path is not None and (
         not isinstance(archive_path, str)
         or archive_path.startswith("/")
         or ".." in Path(archive_path).parts
+        or (
+            isinstance(archive_root, str)
+            and not archive_path.startswith(f"{archive_root}/")
+        )
     ):
         errors.append(
             f"{_relative(index_path)}: {slug}.{artifact_name}.external_asset."
@@ -251,11 +303,37 @@ def _collect_external_asset(
         external_assets.setdefault((url, sha256, size_bytes), external)
 
 
+def _archive_regular_files(path: Path, *, archive_root: str) -> dict[str, int]:
+    files: dict[str, int] = {}
+    with tarfile.open(path, "r:*") as archive:
+        for member in archive:
+            logical = PurePosixPath(member.name)
+            if logical.is_absolute() or ".." in logical.parts:
+                raise ValueError(f"unsafe archive member {member.name!r}")
+            name = logical.as_posix()
+            if member.isdir():
+                continue
+            if not member.isfile() or member.issym() or member.islnk():
+                raise ValueError(f"non-regular archive member {name!r}")
+            if not name.startswith(f"{archive_root}/"):
+                continue
+            if name in files:
+                raise ValueError(f"duplicate archive member {name!r}")
+            files[name] = member.size
+    if not files:
+        raise ValueError(f"archive contains no regular files below {archive_root!r}")
+    return files
+
+
 def _check_external_asset_downloads(
     errors: list[str],
     index_path: Path,
     external_assets: dict[tuple[str, str, int], dict[str, Any]],
+    *,
+    expected_file_count: object,
+    expected_size_bytes: object,
 ) -> None:
+    carrier_files: dict[str, int] = {}
     for url, expected_sha, expected_size in sorted(external_assets):
         try:
             with (
@@ -268,7 +346,23 @@ def _check_external_asset_downloads(
                     handle.write(chunk)
                     digest.update(chunk)
                     total += len(chunk)
-        except OSError as exc:
+                handle.flush()
+                actual_sha = "sha256:" + digest.hexdigest()
+                if actual_sha == expected_sha and total == expected_size:
+                    archive_root = external_assets[
+                        (url, expected_sha, expected_size)
+                    ].get("archive_root")
+                    if _is_safe_evidence_root(archive_root):
+                        archive_files = _archive_regular_files(
+                            Path(handle.name), archive_root=archive_root
+                        )
+                        for name, size in archive_files.items():
+                            previous = carrier_files.setdefault(name, size)
+                            if previous != size:
+                                raise ValueError(
+                                    f"archive member size disagrees across assets: {name}"
+                                )
+        except (OSError, tarfile.TarError, ValueError) as exc:
             errors.append(
                 f"{_relative(index_path)}: external asset download failed {url}: {exc}"
             )
@@ -281,6 +375,17 @@ def _check_external_asset_downloads(
         if total != expected_size:
             errors.append(
                 f"{_relative(index_path)}: external asset size mismatch {url}"
+            )
+    if carrier_files:
+        if expected_file_count != len(carrier_files):
+            errors.append(
+                f"{_relative(index_path)}: catalog_evidence_file_count does not "
+                "match unique external carrier files"
+            )
+        if expected_size_bytes != sum(carrier_files.values()):
+            errors.append(
+                f"{_relative(index_path)}: catalog_evidence_size_bytes does not "
+                "match unique external carrier files"
             )
 
 

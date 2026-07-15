@@ -91,6 +91,26 @@ def test_missing_primary_metric_verdict_is_not_rendered_as_pass() -> None:
     assert "Catastrophic Spike Gate (hard stop) | ℹ️ NOT EVALUATED" in rendered
 
 
+def test_observed_guard_findings_are_rendered_as_observed() -> None:
+    cert = deepcopy(_base_evaluation_report())
+    cert["resolved_policy"] = {
+        "guard_authority": {
+            "spectral": "observe",
+            "rmt": "observe",
+            "variance": "enforce",
+        }
+    }
+    cert["validation"]["spectral_stable"] = False
+    cert["validation"]["rmt_stable"] = False
+    cert["spectral"] = {"caps_applied": 6, "max_caps": 5}
+    cert["rmt"] = {"stable": False, "status": "unstable"}
+
+    rendered = render_mod.render_report_markdown(cert)
+
+    assert "Spectral Stability | ⚠️ OBSERVED" in rendered
+    assert "RMT Health | ⚠️ OBSERVED" in rendered
+
+
 def test_render_report_markdown_handles_sparse_spectral_sections():
     cert = deepcopy(_base_evaluation_report())
     cert["plugins"]["guards"] = [

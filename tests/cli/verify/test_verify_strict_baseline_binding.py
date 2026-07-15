@@ -15,7 +15,7 @@ from invarlock.reporting.verify_strict_schedule import (
     _append_strict_supplied_baseline_binding_errors,
     _schedule_digest,
 )
-from tests.cli._support_verify_runtime_provenance import (
+from tests.cli.verify._support_runtime_provenance import (
     _VALID_TEST_IMAGE_DIGEST,
     _final_window_schedule_digest,
     _matching_strict_accuracy_baseline,

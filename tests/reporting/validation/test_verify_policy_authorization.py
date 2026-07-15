@@ -4,6 +4,12 @@ from copy import deepcopy
 
 import pytest
 
+import invarlock.policy_pack as policy_pack_mod
+from invarlock.core.assurance_contract import (
+    ASSURANCE_CLAIM_SET_V2,
+    LEGACY_ASSURANCE_CLAIM_SET,
+)
+from invarlock.guards.authority import DEFAULT_GUARD_AUTHORITY
 from invarlock.policy_pack import build_policy_pack
 from invarlock.reporting import verify_policy
 from invarlock.reporting.verify_policy import (
@@ -21,13 +27,14 @@ def _policy() -> dict:
         },
         "spectral": {"max_caps": 5},
         "rmt": {"epsilon_default": 0.01},
+        "guard_authority": deepcopy(DEFAULT_GUARD_AUTHORITY),
     }
 
 
 def _report(policy: dict | None = None, *, tier: str = "balanced") -> dict:
     return {
         "resolved_policy": deepcopy(policy if policy is not None else _policy()),
-        "assurance": {"tier": tier},
+        "assurance": {"tier": tier, "claim_set": ASSURANCE_CLAIM_SET_V2},
         "auto": {"tier": tier},
         "dataset": {
             "provider": "local_jsonl",
@@ -49,7 +56,7 @@ def _pack(
         tier=tier,
         resolved_policy=policy,
         compatibility={
-            "support_tiers": support_tiers or ["published_basis"],
+            "support_tiers": support_tiers or ["maintained_catalog"],
             "dataset_identity": deepcopy(_report()["dataset"]),
         },
     )
@@ -70,6 +77,39 @@ def test_strict_policy_authorization_accepts_exact_acceptance_policy() -> None:
     pack = _pack(policy)
 
     assert _errors(_report(policy), pack) == []
+
+
+def test_strict_policy_authorization_accepts_frozen_v1_pack() -> None:
+    policy = _policy()
+    policy.pop("guard_authority")
+    pack = _pack(policy)
+    pack["format"] = "policy-pack-v1"
+    pack["resolved_policy"].pop("guard_authority")
+    pack["compatibility"]["support_tiers"] = ["published_basis"]
+    pack["policy_digest"] = policy_pack_mod._compute_policy_pack_digest(
+        {key: value for key, value in pack.items() if key != "policy_digest"}
+    )
+
+    report = _report(policy)
+    report["assurance"]["claim_set"] = LEGACY_ASSURANCE_CLAIM_SET
+    assert _errors(report, pack) == []
+
+
+def test_invalid_v1_policy_pack_diagnostic_names_submitted_format() -> None:
+    policy = _policy()
+    policy.pop("guard_authority")
+    pack = _pack(policy)
+    pack["format"] = "policy-pack-v1"
+    pack["resolved_policy"]["guard_authority"] = deepcopy(DEFAULT_GUARD_AUTHORITY)
+    pack["compatibility"]["support_tiers"] = ["published_basis"]
+    pack["policy_digest"] = policy_pack_mod._compute_policy_pack_digest(
+        {key: value for key, value in pack.items() if key != "policy_digest"}
+    )
+
+    errors = _errors(_report(policy), pack)
+
+    assert any(error.startswith("Invalid policy-pack-v1:") for error in errors)
+    assert not any("Invalid policy-pack-v2:" in error for error in errors)
 
 
 def test_strict_policy_authorization_rejects_missing_external_pack() -> None:
@@ -115,12 +155,12 @@ def test_strict_policy_authorization_rejects_tampered_pack_digest() -> None:
     assert any("policy digest mismatch" in error for error in _errors(_report(), pack))
 
 
-def test_strict_policy_authorization_requires_published_basis_support() -> None:
+def test_strict_policy_authorization_requires_maintained_catalog_support() -> None:
     pack = _pack(_policy(), support_tiers=["community_experimental"])
 
     errors = _errors(_report(), pack)
 
-    assert any("must authorize published_basis" in error for error in errors)
+    assert any("must authorize maintained_catalog" in error for error in errors)
 
 
 def test_strict_policy_authorization_rejects_missing_report_policy() -> None:

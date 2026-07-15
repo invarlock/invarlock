@@ -65,6 +65,41 @@ def _emit_plugins_json(
     typer.echo(json.dumps(payload, ensure_ascii=False, allow_nan=False))
 
 
+def _all_plugins_json_items(
+    *,
+    registry: Any,
+    providers: list[str],
+    only: str | None,
+    hide_unsupported: bool,
+    adapter_rows_loader: AdapterRowsLoader,
+    generic_rows_loader: GenericRowsLoader,
+    provider_registry_loader: ProviderRegistryLoader,
+) -> list[dict[str, Any]]:
+    adapter_rows = _filter_only_rows(adapter_rows_loader(registry), only)
+    if hide_unsupported:
+        adapter_rows = [
+            row for row in adapter_rows if row.get("status") != "unsupported"
+        ]
+    guard_rows = _filter_only_rows(generic_rows_loader(registry, "guards"), only)
+    edit_rows = _filter_only_rows(generic_rows_loader(registry, "edits"), only)
+    dataset_rows = [
+        {
+            **row,
+            "kind": "dataset",
+            "entry_point": None,
+        }
+        for row in dataset_inventory_json_items(providers, provider_registry_loader())
+    ]
+    return [
+        *combined_plugins_json_items(
+            adapter_rows=adapter_rows,
+            guard_rows=guard_rows,
+            edit_rows=edit_rows,
+        ),
+        *dataset_rows,
+    ]
+
+
 def _filter_only_rows(
     rows: list[dict[str, Any]], only: str | None
 ) -> list[dict[str, Any]]:
@@ -594,6 +629,20 @@ def handle_plugins_category(
             )
         return
     if category is None or category in ["list", "all"]:
+        if json_out:
+            _emit_plugins_json(
+                "all",
+                _all_plugins_json_items(
+                    registry=registry,
+                    providers=sorted(list_providers_fn()),
+                    only=only,
+                    hide_unsupported=hide_unsupported,
+                    adapter_rows_loader=adapter_rows_loader,
+                    generic_rows_loader=generic_rows_loader,
+                    provider_registry_loader=provider_registry_loader,
+                ),
+            )
+            return
         _show_plugin_category(
             "Guard Plugins",
             registry.list_guards(),

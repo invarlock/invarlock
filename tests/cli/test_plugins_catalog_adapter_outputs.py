@@ -82,10 +82,10 @@ def test_plugins_discovery_disabled_json(monkeypatch, capsys):
     payload = json.loads(capsys.readouterr().out.strip())
     assert any(item["name"] == "hf_causal" for item in payload["items"])
     assert payload["contracts"]["model_family_catalog"]["format_version"] == (
-        "model-family-catalog-v1"
+        "model-family-catalog-v2"
     )
     assert payload["model_family_catalog"]["format_version"] == (
-        "model-family-catalog-v1"
+        "model-family-catalog-v2"
     )
 
 
@@ -165,10 +165,10 @@ def test_plugins_adapters_json_statuses(monkeypatch, capsys):
     lines = capsys.readouterr().out.strip().splitlines()
     payload = json.loads(lines[-1])
     assert payload["contracts"]["model_family_catalog"]["format_version"] == (
-        "model-family-catalog-v1"
+        "model-family-catalog-v2"
     )
     assert payload["model_family_catalog"]["format_version"] == (
-        "model-family-catalog-v1"
+        "model-family-catalog-v2"
     )
     statuses = {item["name"]: item["status"] for item in payload["items"]}
     assert statuses["hf_auto"] == "ready"

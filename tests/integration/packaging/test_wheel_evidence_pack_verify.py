@@ -126,18 +126,18 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
                 "import invarlock.cli.app; "
                 "import invarlock.public_contracts as public_contracts; "
                 "catalog = sorted(public_contracts.contract_catalog().keys()); "
-                "published_basis = {"
+                "maintained_catalog = {"
                 "lane['lane_id']: {"
                 "'status': lane['evidence_status'], "
                 "'label': lane['evidence_status_label'], "
                 "'has_evidence_paths': 'evidence' in lane"
                 "} "
                 "for lane in public_contracts.load_support_matrix()['lanes'] "
-                "if lane.get('support_tier') == 'published_basis'"
+                "if lane.get('support_tier') == 'maintained_catalog'"
                 "}; "
                 "print(json.dumps({"
                 "'catalog': catalog, "
-                "'published_basis': published_basis"
+                "'maintained_catalog': maintained_catalog"
                 "}, sort_keys=True))"
             ),
         ],
@@ -148,8 +148,8 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
     exported_contracts = json.loads(cli_app_import.stdout.strip())
     assert "metric_kinds" in exported_contracts["catalog"]
     assert "support_matrix" in exported_contracts["catalog"]
-    published_basis = exported_contracts["published_basis"]
-    assert len(published_basis) == 39
+    maintained_catalog = exported_contracts["maintained_catalog"]
+    assert len(maintained_catalog) == 39
     available_count = sum(
         evidence
         == {
@@ -157,7 +157,7 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
             "label": "Available",
             "has_evidence_paths": True,
         }
-        for evidence in published_basis.values()
+        for evidence in maintained_catalog.values()
     )
     not_created_count = sum(
         evidence
@@ -166,9 +166,9 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
             "label": "Evidence not yet created",
             "has_evidence_paths": False,
         }
-        for evidence in published_basis.values()
+        for evidence in maintained_catalog.values()
     )
-    assert available_count + not_created_count == len(published_basis)
+    assert available_count + not_created_count == len(maintained_catalog)
 
     doctor = _run(
         installed_wheel_env.cli_exe,
@@ -189,12 +189,15 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
                 "from importlib import resources; "
                 "import invarlock.public_contracts as public_contracts; "
                 "index = public_contracts.load_public_evidence_index(); "
-                "legacy_tree = resources.files('invarlock').joinpath("
-                "'_data', 'public_evidence', 'published_basis'"
+                "evidence_root = resources.files('invarlock').joinpath("
+                "'_data', 'public_evidence'"
                 "); "
                 "print(json.dumps({"
                 "'index': index, "
-                "'legacy_tree_exists': legacy_tree.is_dir()"
+                "'full_tree_exists': any("
+                "evidence_root.joinpath(name).is_dir() "
+                "for name in ('catalog_evidence', 'published_basis')"
+                ")"
                 "}, sort_keys=True))"
             ),
         ],
@@ -205,9 +208,9 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
     )
     public_evidence_payload = json.loads(installed_public_evidence.stdout.strip())
     index = public_evidence_payload["index"]
-    assert index["format_version"] == "public-evidence-index-v1"
+    assert index["format_version"] == "public-evidence-index-v2"
     assert index["carrier_policy"]["installed_wheel"] == "compact_index_only"
-    assert index["published_basis_count"] == available_count
+    assert index["catalog_evidence_count"] == available_count
     assert len(index["entries"]) == available_count
     if index["entries"]:
         assert "status" not in index
@@ -215,7 +218,7 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
     else:
         assert index["status"] == "not_created"
         assert index["status_label"] == "Evidence not yet created"
-    assert public_evidence_payload["legacy_tree_exists"] is False
+    assert public_evidence_payload["full_tree_exists"] is False
 
 
 @pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")

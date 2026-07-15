@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import math
@@ -14,6 +15,10 @@ from invarlock.evidence_pack_json import (
     StrictJsonError,
     parse_json_bytes,
     read_regular_file_bytes,
+)
+from invarlock.guards.authority import (
+    DEFAULT_GUARD_AUTHORITY,
+    guard_authority_errors,
 )
 from invarlock.public_contracts import load_policy_pack_schema
 
@@ -33,16 +38,24 @@ else:  # pragma: no cover - exercised when jsonschema is installed
         jsonschema.ValidationError,
     )
 
-POLICY_PACK_FORMAT = "policy-pack-v1"
+POLICY_PACK_FORMAT = "policy-pack-v2"
+LEGACY_POLICY_PACK_FORMAT = "policy-pack-v1"
+POLICY_PACK_FORMATS = frozenset({LEGACY_POLICY_PACK_FORMAT, POLICY_PACK_FORMAT})
 POLICY_PACK_DIGEST_PREFIX = "sha256:"
 
 POLICY_PACK_TIERS = frozenset({"aggressive", "balanced", "conservative"})
 POLICY_PACK_SUPPORT_TIER_ORDER = (
-    "published_basis",
+    "maintained_catalog",
     "supported_experimental",
     "community_experimental",
 )
 POLICY_PACK_SUPPORT_TIERS = frozenset(POLICY_PACK_SUPPORT_TIER_ORDER)
+LEGACY_POLICY_PACK_SUPPORT_TIER_ORDER = (
+    "published_basis",
+    "supported_experimental",
+    "community_experimental",
+)
+LEGACY_POLICY_PACK_SUPPORT_TIERS = frozenset(LEGACY_POLICY_PACK_SUPPORT_TIER_ORDER)
 POLICY_PACK_REQUIRED_FIELDS = frozenset(
     {"format", "tier", "resolved_policy", "overrides", "policy_digest", "compatibility"}
 )
@@ -275,10 +288,23 @@ def _policy_pack_shape_errors(pack: dict[str, Any]) -> list[str]:
         errors.append(
             "policy pack contains unknown fields: " + ", ".join(sorted(unknown))
         )
-    if pack.get("format") != POLICY_PACK_FORMAT:
+    pack_format = pack.get("format")
+    if pack_format not in POLICY_PACK_FORMATS:
         errors.append(
-            f"policy pack format must be {POLICY_PACK_FORMAT} (found {pack.get('format')!r})"
+            "policy pack format must be "
+            f"{POLICY_PACK_FORMAT} or {LEGACY_POLICY_PACK_FORMAT} "
+            f"(found {pack_format!r})"
         )
+    support_tiers = (
+        LEGACY_POLICY_PACK_SUPPORT_TIERS
+        if pack_format == LEGACY_POLICY_PACK_FORMAT
+        else POLICY_PACK_SUPPORT_TIERS
+    )
+    support_tier_order = (
+        LEGACY_POLICY_PACK_SUPPORT_TIER_ORDER
+        if pack_format == LEGACY_POLICY_PACK_FORMAT
+        else POLICY_PACK_SUPPORT_TIER_ORDER
+    )
     tier = pack.get("tier")
     if tier not in POLICY_PACK_TIERS:
         errors.append("tier must be aggressive, balanced, or conservative")
@@ -288,6 +314,18 @@ def _policy_pack_shape_errors(pack: dict[str, Any]) -> list[str]:
         errors.append("resolved_policy must be an object")
     else:
         errors.extend(_json_value_errors(resolved_policy, path="resolved_policy"))
+        raw_authority = resolved_policy.get("guard_authority")
+        if pack_format == POLICY_PACK_FORMAT:
+            errors.extend(
+                guard_authority_errors(
+                    raw_authority,
+                    path="resolved_policy.guard_authority",
+                )
+            )
+        elif "guard_authority" in resolved_policy:
+            errors.append(
+                "policy-pack-v1 cannot declare resolved_policy.guard_authority"
+            )
 
     overrides = pack.get("overrides")
     if not isinstance(overrides, list):
@@ -330,8 +368,8 @@ def _policy_pack_shape_errors(pack: dict[str, Any]) -> list[str]:
                 _ordered_string_list_errors(
                     compatibility["support_tiers"],
                     path="compatibility.support_tiers",
-                    allowed=POLICY_PACK_SUPPORT_TIERS,
-                    canonical_order=POLICY_PACK_SUPPORT_TIER_ORDER,
+                    allowed=support_tiers,
+                    canonical_order=support_tier_order,
                 )
             )
         for field in ("adapter_families", "runtime_lanes"):
@@ -409,13 +447,15 @@ def compute_policy_pack_digest(
     compatibility_obj = (
         dict(compatibility)
         if isinstance(compatibility, dict)
-        else {"support_tiers": ["published_basis"]}
+        else {"support_tiers": ["maintained_catalog"]}
     )
     normalized_overrides = _normalize_overrides(overrides)
+    resolved = copy.deepcopy(resolved_policy)
+    resolved.setdefault("guard_authority", dict(DEFAULT_GUARD_AUTHORITY))
     digest_payload = {
         "format": POLICY_PACK_FORMAT,
         "tier": tier,
-        "resolved_policy": resolved_policy,
+        "resolved_policy": resolved,
         "overrides": normalized_overrides,
         "compatibility": compatibility_obj,
     }
@@ -447,11 +487,13 @@ def build_policy_pack(
         raise ValueError("metadata must be an object")
     normalized_overrides = _normalize_overrides(overrides)
     compatibility_obj = dict(compatibility) if isinstance(compatibility, dict) else {}
-    compatibility_obj.setdefault("support_tiers", ["published_basis"])
+    compatibility_obj.setdefault("support_tiers", ["maintained_catalog"])
+    resolved = copy.deepcopy(resolved_policy)
+    resolved.setdefault("guard_authority", dict(DEFAULT_GUARD_AUTHORITY))
     pack: dict[str, Any] = {
         "format": POLICY_PACK_FORMAT,
         "tier": tier,
-        "resolved_policy": resolved_policy,
+        "resolved_policy": resolved,
         "overrides": normalized_overrides,
         "compatibility": compatibility_obj,
     }
@@ -547,6 +589,7 @@ def exercise_policy_pack_bytes(data: bytes) -> None:
 
 
 __all__ = [
+    "LEGACY_POLICY_PACK_FORMAT",
     "POLICY_PACK_FORMAT",
     "POLICY_PACK_DIGEST_PREFIX",
     "build_policy_pack",

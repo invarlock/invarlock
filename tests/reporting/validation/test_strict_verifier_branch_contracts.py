@@ -8,7 +8,7 @@ import pytest
 from invarlock.reporting import verify_baseline as baseline_mod
 from invarlock.reporting import verify_bootstrap as bootstrap_mod
 from invarlock.reporting import verify_strict_schedule as schedule_mod
-from tests.cli._support_verify_runtime_provenance import (
+from tests.cli.verify._support_runtime_provenance import (
     _matching_strict_accuracy_baseline,
     _matching_strict_ppl_baseline,
     _strict_accuracy_cert,

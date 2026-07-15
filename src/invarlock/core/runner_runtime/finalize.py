@@ -4,6 +4,10 @@ import math
 import time
 from typing import Any
 
+from invarlock.guards.authority import (
+    DEFAULT_GUARD_AUTHORITY,
+    guard_authority_errors,
+)
 from invarlock.primary_metric_tail import (
     PrimaryMetricTailContractError,
     require_primary_metric_tail,
@@ -11,6 +15,7 @@ from invarlock.primary_metric_tail import (
 
 from ..api import ModelAdapter, RunConfig, RunReport
 from ..types import LogLevel, RunStatus
+from .guard_acceptance import guard_result_is_acceptable
 
 _ROLLBACK_ERRORS = (
     AttributeError,
@@ -32,8 +37,25 @@ def finalize_phase(
 ) -> str:
     """Finalize or roll back based on guard and metric results."""
     runner._log_event("finalize", "start", LogLevel.INFO)
-    all_guards_passed = all(
-        result.get("passed", False) for result in guard_results.values()
+    tier_policies = report.meta.get("tier_policies")
+    raw_authority = (
+        tier_policies.get("guard_authority")
+        if isinstance(tier_policies, dict)
+        else None
+    )
+    authority_errors = (
+        guard_authority_errors(raw_authority, path="tier_policies.guard_authority")
+        if raw_authority is not None
+        else []
+    )
+    authority = (
+        {str(key): str(value) for key, value in raw_authority.items()}
+        if isinstance(raw_authority, dict) and not authority_errors
+        else dict(DEFAULT_GUARD_AUTHORITY)
+    )
+    all_guards_passed = not authority_errors and all(
+        guard_result_is_acceptable(name, result, authority)
+        for name, result in guard_results.items()
     )
 
     pm = metrics.get("primary_metric", {}) if isinstance(metrics, dict) else {}

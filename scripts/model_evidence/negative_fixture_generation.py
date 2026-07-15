@@ -99,6 +99,7 @@ STRUCTURAL_FAILURE_TEXT = (
     "strict ppl evidence requires",
     "provider-digest-missing",
     "invalid policy-pack-v1",
+    "invalid policy-pack-v2",
 )
 
 
