@@ -3,6 +3,9 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 from types import ModuleType
 
@@ -261,7 +264,7 @@ def test_container_command_is_immutable_offline_and_source_free(tmp_path: Path) 
     )
     rendered = " ".join(command)
 
-    assert command.count("--mount") == 2
+    assert command.count("--mount") == 3
     assert "--network none" in rendered
     assert "--read-only" in command
     assert "--cap-drop ALL" in rendered
@@ -280,6 +283,11 @@ def test_container_command_is_immutable_offline_and_source_free(tmp_path: Path) 
         f"src={script},dst=/opt/invarlock-blackbox/gguf_runtime_blackbox.py,readonly"
         in command
     )
+    assert (
+        "type=bind,"
+        f"src={script.with_name('_gguf_runtime_blackbox_cli.py')},"
+        "dst=/opt/invarlock-blackbox/_gguf_runtime_blackbox_cli.py,readonly" in command
+    )
     assert digest in command
     assert "PYTHONPATH" not in rendered
     assert "src=/src" not in rendered
@@ -292,6 +300,27 @@ def test_container_command_is_immutable_offline_and_source_free(tmp_path: Path) 
             model_path=tmp_path / "unsafe,model.gguf",
             script_path=script,
         )
+
+
+def test_direct_script_loads_adjacent_support_without_repository_imports(
+    tmp_path: Path,
+) -> None:
+    environment = os.environ.copy()
+    environment.pop("PYTHONPATH", None)
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--help"],
+        cwd=tmp_path,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0
+    assert "Run the optional pinned GGUF release black-box twice." in result.stdout
+    assert result.stderr == ""
 
 
 def test_result_validation_rejects_wrong_output_and_image() -> None:

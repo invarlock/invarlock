@@ -492,8 +492,26 @@ def test_inside_provider_rejects_each_broken_trust_binding(
         blackbox._inside_provider_result(image_digest=supplied)
 
 
-def test_inside_cli_journey_executes_the_complete_installed_cli_contract(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("failure", "expected"),
+    [
+        (None, None),
+        ("schedule_digest", "schedule does not match"),
+        ("schedule_clobber", "clobbered its schedule"),
+        ("binding_result", "binding does not match"),
+        ("directed_binding", "bindings are not exact"),
+        ("policy", "policy is not exactly directed"),
+        ("pair_result", "paired receipt did not pass"),
+        ("pair_clobber", "clobbered its paired receipt"),
+        ("inventory", "artifact inventory is incomplete"),
+        ("receipt_determinism", "receipts are not deterministic"),
+    ],
+)
+def test_inside_cli_journey_enforces_the_complete_installed_cli_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str | None,
+    expected: str | None,
 ) -> None:
     digest = "sha256:" + "3" * 64
     work = tmp_path / "private-work"
@@ -540,6 +558,17 @@ def test_inside_cli_journey_executes_the_complete_installed_cli_contract(
         del expected_format, timeout_seconds
         command = arguments[0]
         if not expect_success:
+            if failure == "schedule_clobber" and command == "build-schedule":
+                output = Path(arguments[arguments.index("--out") + 1])
+                write_json(output, {"clobbered": True})
+            elif failure == "pair_clobber" and command == "verify-pair":
+                receipt = Path(arguments[arguments.index("--receipt") + 1])
+                write_json(receipt, {"clobbered": True})
+            elif failure == "receipt_determinism" and command == "verify-pair":
+                subject = Path(arguments[arguments.index("--subject") + 1])
+                write_json(
+                    subject / "runtime-provider.receipt.json", {"different": True}
+                )
             return {"ok": False}
         output = (
             Path(arguments[arguments.index("--out") + 1])
@@ -549,26 +578,39 @@ def test_inside_cli_journey_executes_the_complete_installed_cli_contract(
         if command == "build-schedule":
             assert output is not None
             write_json(output, exact_schedule())
-            return {"schedule_sha256": blackbox.CLI_SCHEDULE_SHA256}
+            return {
+                "schedule_sha256": (
+                    "0" * 64
+                    if failure == "schedule_digest"
+                    else blackbox.CLI_SCHEDULE_SHA256
+                )
+            }
         if command == "prepare-binding":
             assert output is not None
-            write_json(output, expected_binding)
+            binding = expected_binding
+            if failure == "directed_binding" and output.name == "subject-binding.json":
+                binding = expected_binding | {"provider_name": "wrong"}
+            write_json(output, binding)
             return {
-                "artifact_identity_sha256": blackbox.ARTIFACT_IDENTITY_SHA256,
+                "artifact_identity_sha256": (
+                    "0" * 64
+                    if failure == "binding_result"
+                    else blackbox.ARTIFACT_IDENTITY_SHA256
+                ),
                 "execution_settings_sha256": blackbox.CLI_EXECUTION_SETTINGS_SHA256,
             }
         if command == "build-policy":
             assert output is not None
+            claim = {
+                "schedule_sha256": blackbox.CLI_SCHEDULE_SHA256,
+                "baseline": expected_binding,
+                "subject": expected_binding,
+            }
+            if failure == "policy":
+                claim["subject"] = {"provider_name": "wrong"}
             write_json(
                 output,
-                {
-                    "behavioral_claim": {
-                        "schedule_sha256": blackbox.CLI_SCHEDULE_SHA256,
-                        "baseline": expected_binding,
-                        "subject": expected_binding,
-                    },
-                    "policy_digest": policy_digest,
-                },
+                {"behavioral_claim": claim, "policy_digest": policy_digest},
             )
             return {"policy_digest": policy_digest}
         if command == "run-side":
@@ -596,10 +638,21 @@ def test_inside_cli_journey_executes_the_complete_installed_cli_contract(
                     "verdict": "pass",
                 },
             )
-            return {"baseline_score": 1.0, "subject_score": 1.0, "regression": 0.0}
+            if failure == "inventory":
+                write_json(baseline / "unexpected.json", {"unexpected": True})
+            return {
+                "baseline_score": 1.0,
+                "subject_score": 0.0 if failure == "pair_result" else 1.0,
+                "regression": 0.0,
+            }
         raise AssertionError(command)
 
     monkeypatch.setattr(blackbox, "_run_installed_cli", installed_cli)
+
+    if expected is not None:
+        with pytest.raises(blackbox.GGUFBlackBoxError, match=expected):
+            blackbox._inside_cli_journey(image_digest=digest)
+        return
 
     result = blackbox._inside_cli_journey(image_digest=digest)
 

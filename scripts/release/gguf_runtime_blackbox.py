@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import importlib.metadata
 import json
 import os
@@ -17,6 +18,17 @@ from collections.abc import Sequence
 from dataclasses import asdict
 from pathlib import Path
 from typing import Final
+
+try:
+    from scripts.release import _gguf_runtime_blackbox_cli as _cli_support
+except ModuleNotFoundError as exc:
+    if exc.name not in {
+        "scripts",
+        "scripts.release",
+        "scripts.release._gguf_runtime_blackbox_cli",
+    }:
+        raise
+    _cli_support = importlib.import_module("_gguf_runtime_blackbox_cli")
 
 FIXTURE_REPOSITORY: Final = "ggml-org/tiny-llamas"
 FIXTURE_REVISION: Final = "99dd1a73db5a37100bd4ae633f4cfce6560e1567"
@@ -69,6 +81,7 @@ CLI_EXECUTION_SETTINGS_SHA256: Final = (
 CLI_JOURNEY_FORMAT: Final = "invarlock/gguf-runtime-cli-journey-v1"
 
 _CONTAINER_SCRIPT: Final = "/opt/invarlock-blackbox/gguf_runtime_blackbox.py"
+_CONTAINER_SUPPORT: Final = "/opt/invarlock-blackbox/_gguf_runtime_blackbox_cli.py"
 _CONTAINER_MODEL: Final = "/fixtures/stories15M-q4_0.gguf"
 _CONTAINER_EXECUTABLE: Final = "/opt/llama.cpp/llama-completion"
 _CONTAINER_SOURCE: Final = "/opt/llama.cpp/source/llama.cpp-b10015.tar.gz"
@@ -234,9 +247,10 @@ def _container_command(
 ) -> tuple[str, ...]:
     if _IMAGE_DIGEST.fullmatch(image_digest) is None:
         raise GGUFBlackBoxError("the GGUF runtime image digest is invalid")
+    support_path = script_path.with_name("_gguf_runtime_blackbox_cli.py")
     if any(
         "," in str(path) or any(ord(character) < 32 for character in str(path))
-        for path in (model_path, script_path)
+        for path in (model_path, script_path, support_path)
     ):
         raise GGUFBlackBoxError("a container mount source is not safely representable")
     return (
@@ -262,6 +276,8 @@ def _container_command(
         f"type=bind,src={model_path},dst={_CONTAINER_MODEL},readonly",
         "--mount",
         f"type=bind,src={script_path},dst={_CONTAINER_SCRIPT},readonly",
+        "--mount",
+        f"type=bind,src={support_path},dst={_CONTAINER_SUPPORT},readonly",
         "-e",
         "INVARLOCK_CONTAINER_EXECUTION=1",
         "-e",
@@ -739,27 +755,7 @@ def _inside_provider_result(*, image_digest: str) -> dict[str, object]:
 
 
 def _write_canonical_new(path: Path, value: object) -> None:
-    payload = _canonical_json(value)
-    flags = (
-        os.O_WRONLY
-        | os.O_CREAT
-        | os.O_EXCL
-        | getattr(os, "O_CLOEXEC", 0)
-        | getattr(os, "O_NOFOLLOW", 0)
-    )
-    try:
-        descriptor = os.open(path, flags, 0o600)
-    except OSError as exc:
-        raise GGUFBlackBoxError("a private CLI input could not be created") from exc
-    try:
-        with os.fdopen(descriptor, "wb", closefd=False) as handle:
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
-    except OSError as exc:
-        raise GGUFBlackBoxError("a private CLI input could not be written") from exc
-    finally:
-        os.close(descriptor)
+    _cli_support.write_canonical_new(globals(), path, value)
 
 
 def _run_installed_cli(
@@ -769,134 +765,33 @@ def _run_installed_cli(
     expect_success: bool = True,
     timeout_seconds: int = 240,
 ) -> dict[str, object]:
-    status, stdout, _stderr = _run_captured(
-        (
-            _CONTAINER_CLI,
-            "advanced",
-            "runtime-behavior",
-            *arguments,
-            "--json",
-        ),
+    return _cli_support.run_installed_cli(
+        globals(),
+        arguments,
+        expected_format=expected_format,
+        expect_success=expect_success,
         timeout_seconds=timeout_seconds,
-        stdout_limit=_MAX_CLI_OUTPUT_BYTES,
-        stderr_limit=_MAX_CLI_OUTPUT_BYTES,
     )
-    if not stdout.endswith(b"\n") or stdout.endswith(b"\n\n"):
-        raise GGUFBlackBoxError("the installed CLI result framing is invalid")
-    try:
-        decoded = json.loads(stdout[:-1])
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise GGUFBlackBoxError("the installed CLI result is invalid") from exc
-    if not isinstance(decoded, dict) or _canonical_json(decoded) != stdout[:-1]:
-        raise GGUFBlackBoxError("the installed CLI result is not canonical JSON")
-    if decoded.get("format_version") != expected_format:
-        raise GGUFBlackBoxError("the installed CLI result format does not match")
-    expected_status = 0 if expect_success else 2
-    if status != expected_status or decoded.get("ok") is not expect_success:
-        raise GGUFBlackBoxError("the installed CLI command outcome does not match")
-    return decoded
 
 
 def _path_free_strings(value: object) -> bool:
-    if isinstance(value, str):
-        return (
-            not any(
-                marker in value
-                for marker in ("/tmp/", "/fixtures/", "/opt/", "/Users/", "/root/")
-            )
-            and _WINDOWS_PATH.search(value) is None
-        )
-    if isinstance(value, list):
-        return all(_path_free_strings(item) for item in value)
-    if isinstance(value, dict):
-        return all(
-            isinstance(key, str)
-            and _path_free_strings(key)
-            and _path_free_strings(item)
-            for key, item in value.items()
-        )
-    return value is None or isinstance(value, bool | int | float)
+    return _cli_support.path_free_strings(globals(), value)
 
 
 def _portable_json(
     path: Path, *, manifest: bool = False
 ) -> tuple[bytes, dict[str, object]]:
-    try:
-        metadata = path.lstat()
-        if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > _MAX_RESULT_BYTES:
-            raise GGUFBlackBoxError("a CLI artifact is not a bounded regular file")
-        payload = path.read_bytes()
-    except OSError as exc:
-        raise GGUFBlackBoxError("a CLI artifact could not be read") from exc
-
-    duplicate = False
-
-    def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
-        nonlocal duplicate
-        result: dict[str, object] = {}
-        for key, value in pairs:
-            if key in result:
-                duplicate = True
-            result[key] = value
-        return result
-
-    try:
-        decoded = json.loads(payload, object_pairs_hook=_unique_object)
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise GGUFBlackBoxError("a CLI artifact is not valid JSON") from exc
-    if duplicate or not isinstance(decoded, dict):
-        raise GGUFBlackBoxError("a CLI artifact is not a unique JSON object")
-    expected = (
-        (json.dumps(decoded, indent=2, sort_keys=True, allow_nan=False) + "\n").encode(
-            "utf-8"
-        )
-        if manifest
-        else _canonical_json(decoded)
-    )
-    if payload != expected:
-        raise GGUFBlackBoxError("a CLI artifact does not use its canonical encoding")
-    if not _path_free_strings(decoded):
-        raise GGUFBlackBoxError("a CLI artifact contains a host or runtime path")
-    return payload, decoded
+    return _cli_support.portable_json(globals(), path, manifest=manifest)
 
 
 def _native_cli_arguments(*, image_digest: str, settings: Path) -> tuple[str, ...]:
-    return (
-        "--provider",
-        "llama_cpp",
-        "--model-id",
-        f"gguf-sha256-{FIXTURE_SHA256}.gguf",
-        "--settings",
-        str(settings),
-        "--artifact",
-        _CONTAINER_MODEL,
-        "--backend-executable",
-        _CONTAINER_EXECUTABLE,
-        "--backend-source",
-        _CONTAINER_SOURCE,
-        "--container-image-digest",
-        image_digest,
+    return _cli_support.native_cli_arguments(
+        globals(), image_digest=image_digest, settings=settings
     )
 
 
 def _expected_side_bindings(side: Path) -> dict[str, str]:
-    return {
-        "artifact_identity_sidecar_sha256": _sha256_file_unbounded(
-            side / "model-artifact.identity.json"
-        ),
-        "evaluation_report_sha256": _sha256_file_unbounded(
-            side / "evaluation.report.json"
-        ),
-        "provider_receipt_sidecar_sha256": _sha256_file_unbounded(
-            side / "runtime-provider.receipt.json"
-        ),
-        "runtime_manifest_sha256": _sha256_file_unbounded(
-            side / "runtime.manifest.json"
-        ),
-        "scoring_observation_sidecar_sha256": _sha256_file_unbounded(
-            side / "runtime-scoring.observation.json"
-        ),
-    }
+    return _cli_support.expected_side_bindings(globals(), side)
 
 
 def _validate_cli_side(
@@ -905,330 +800,16 @@ def _validate_cli_side(
     role: str,
     image_digest: str,
 ) -> dict[str, object]:
-    expected_names = {
-        "evaluation.report.json",
-        "model-artifact.identity.json",
-        "runtime-behavior.config.json",
-        "runtime-provider.receipt.json",
-        "runtime-scoring.observation.json",
-        "runtime.manifest.json",
-    }
-    try:
-        if (
-            side.is_symlink()
-            or {entry.name for entry in side.iterdir()} != expected_names
-        ):
-            raise GGUFBlackBoxError("a CLI side bundle has an unexpected file set")
-    except OSError as exc:
-        raise GGUFBlackBoxError("a CLI side bundle cannot be inspected") from exc
-    decoded: dict[str, dict[str, object]] = {}
-    for name in sorted(expected_names):
-        _payload, value = _portable_json(
-            side / name,
-            manifest=name == "runtime.manifest.json",
-        )
-        decoded[name] = value
-    observation = decoded["runtime-scoring.observation.json"]
-    if observation != _expected_observation(schedule_sha256=CLI_SCHEDULE_SHA256):
-        raise GGUFBlackBoxError("the CLI side observation does not match the pin")
-    if hashlib.sha256(_canonical_json(observation)).hexdigest() != (
-        CLI_SCORING_OBSERVATION_SHA256
-    ):
-        raise GGUFBlackBoxError("the CLI side observation digest does not match")
-    receipt = decoded["runtime-provider.receipt.json"]
-    _validate_provider_receipt(
-        receipt,
+    return _cli_support.validate_cli_side(
+        globals(),
+        side,
+        role=role,
         image_digest=image_digest,
-        batch_size=1,
-        observation_sha256=CLI_SCORING_OBSERVATION_SHA256,
     )
-    report = decoded["evaluation.report.json"]
-    if (
-        report.get("role") != role
-        or report.get("verdict") != "observation_verified"
-        or report.get("score") != 1.0
-        or report.get("correct_records") != 1
-        or report.get("total_records") != 1
-        or report.get("schedule_sha256") != CLI_SCHEDULE_SHA256
-    ):
-        raise GGUFBlackBoxError("the CLI side report did not verify the known answer")
-    return receipt
 
 
 def _inside_cli_journey(*, image_digest: str) -> dict[str, object]:
-    for name in (
-        "INVARLOCK_ALLOW_HOST_EXECUTION",
-        "INVARLOCK_ALLOW_NETWORK",
-        "INVARLOCK_ALLOW_REMOTE_CODE",
-        "INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS",
-        "INVARLOCK_ALLOW_UNVERIFIED_PROVENANCE",
-    ):
-        if os.environ.get(name) != "0":
-            raise GGUFBlackBoxError(
-                "the CLI journey requires a fail-closed environment"
-            )
-    cli = Path(_CONTAINER_CLI)
-    try:
-        cli_metadata = cli.lstat()
-    except OSError as exc:
-        raise GGUFBlackBoxError("the installed InvarLock CLI is unavailable") from exc
-    if not stat.S_ISREG(cli_metadata.st_mode) or not os.access(cli, os.X_OK):
-        raise GGUFBlackBoxError("the installed InvarLock CLI is not executable")
-
-    root = Path(_CONTAINER_WORK_ROOT)
-    try:
-        root.mkdir(mode=0o700)
-    except OSError as exc:
-        raise GGUFBlackBoxError(
-            "the private CLI workspace could not be created"
-        ) from exc
-    records = root / "records.json"
-    dataset = root / "dataset.json"
-    settings = root / "settings.json"
-    schedule = root / "schedule.json"
-    baseline_binding = root / "baseline-binding.json"
-    subject_binding = root / "subject-binding.json"
-    policy = root / "policy.json"
-    baseline_side = root / "baseline-side"
-    subject_side = root / "subject-side"
-    pair_receipt = root / "pair-receipt.json"
-
-    _write_canonical_new(
-        records,
-        [
-            {
-                "expected_output": EXPECTED_OUTPUT,
-                "input_text": PROMPT,
-                "record_id": RECORD_ID,
-            }
-        ],
-    )
-    _write_canonical_new(
-        dataset,
-        {
-            "config_name": None,
-            "dataset_name": None,
-            "provider": "local_manifest",
-            "revision": None,
-            "split": "release-canary",
-        },
-    )
-    backend_binary_sha256 = _sha256_file_unbounded(Path(_CONTAINER_EXECUTABLE))
-    _write_canonical_new(
-        settings,
-        {
-            "artifact_byte_length": FIXTURE_BYTE_LENGTH,
-            "artifact_sha256": FIXTURE_SHA256,
-            "backend_binary_sha256": backend_binary_sha256,
-            "backend_source_sha256": LLAMA_CPP_SOURCE_SHA256,
-            "backend_version": _normalized_backend_version(),
-            "batch_size": 1,
-            "context_length": 256,
-            "gguf_metadata_sha256": FIXTURE_METADATA_SHA256,
-            "max_output_tokens": 16,
-            "seed": 7,
-            "tensor_inventory_sha256": FIXTURE_TENSOR_INVENTORY_SHA256,
-            "timeout_seconds": 120,
-            "tokenizer_metadata_sha256": FIXTURE_TOKENIZER_METADATA_SHA256,
-        },
-    )
-
-    schedule_arguments = (
-        "build-schedule",
-        "--records",
-        str(records),
-        "--dataset-identity",
-        str(dataset),
-        "--out",
-        str(schedule),
-    )
-    schedule_result = _run_installed_cli(
-        schedule_arguments,
-        expected_format="runtime-behavior-build-schedule-cli-v1",
-    )
-    if schedule_result.get("schedule_sha256") != CLI_SCHEDULE_SHA256:
-        raise GGUFBlackBoxError("the installed CLI schedule does not match the pin")
-    schedule_before = _sha256_file_unbounded(schedule)
-    _run_installed_cli(
-        schedule_arguments,
-        expected_format="runtime-behavior-build-schedule-cli-v1",
-        expect_success=False,
-    )
-    if _sha256_file_unbounded(schedule) != schedule_before:
-        raise GGUFBlackBoxError("the installed CLI clobbered its schedule")
-
-    native_arguments = _native_cli_arguments(
-        image_digest=image_digest,
-        settings=settings,
-    )
-    for output in (baseline_binding, subject_binding):
-        binding_result = _run_installed_cli(
-            ("prepare-binding", *native_arguments, "--out", str(output)),
-            expected_format="runtime-behavior-prepare-binding-cli-v1",
-        )
-        if (
-            binding_result.get("artifact_identity_sha256") != ARTIFACT_IDENTITY_SHA256
-            or binding_result.get("execution_settings_sha256")
-            != CLI_EXECUTION_SETTINGS_SHA256
-        ):
-            raise GGUFBlackBoxError("the installed CLI binding does not match the pin")
-    baseline_binding_bytes, baseline_binding_value = _portable_json(baseline_binding)
-    subject_binding_bytes, subject_binding_value = _portable_json(subject_binding)
-    expected_binding = {
-        "artifact_format": "gguf",
-        "artifact_identity_sha256": ARTIFACT_IDENTITY_SHA256,
-        "execution_settings_sha256": CLI_EXECUTION_SETTINGS_SHA256,
-        "outer_image_digest": image_digest,
-        "provider_name": "llama_cpp",
-    }
-    if (
-        baseline_binding_value != expected_binding
-        or subject_binding_value != expected_binding
-        or baseline_binding_bytes != subject_binding_bytes
-    ):
-        raise GGUFBlackBoxError("the directed CLI bindings are not exact")
-
-    policy_result = _run_installed_cli(
-        (
-            "build-policy",
-            "--schedule",
-            str(schedule),
-            "--baseline-binding",
-            str(baseline_binding),
-            "--subject-binding",
-            str(subject_binding),
-            "--tier",
-            "balanced",
-            "--minimum-subject-score",
-            "1.0",
-            "--maximum-regression",
-            "0.0",
-            "--evidence-surface",
-            "behavior",
-            "--evidence-surface",
-            "tokenizer",
-            "--out",
-            str(policy),
-        ),
-        expected_format="runtime-behavior-build-policy-cli-v1",
-    )
-    policy_bytes, policy_value = _portable_json(policy)
-    policy_digest = policy_result.get("policy_digest")
-    claim = policy_value.get("behavioral_claim")
-    if (
-        not isinstance(policy_digest, str)
-        or _POLICY_DIGEST.fullmatch(policy_digest) is None
-        or policy_value.get("policy_digest") != policy_digest
-        or not isinstance(claim, dict)
-        or claim.get("schedule_sha256") != CLI_SCHEDULE_SHA256
-        or claim.get("baseline") != expected_binding
-        or claim.get("subject") != expected_binding
-    ):
-        raise GGUFBlackBoxError("the installed CLI policy is not exactly directed")
-
-    for role, output in (("baseline", baseline_side), ("subject", subject_side)):
-        _run_installed_cli(
-            (
-                "run-side",
-                "--role",
-                role,
-                *native_arguments,
-                "--schedule",
-                str(schedule),
-                "--policy-pack",
-                str(policy),
-                "--out",
-                str(output),
-            ),
-            expected_format="runtime-behavior-run-side-cli-v1",
-        )
-        _validate_cli_side(output, role=role, image_digest=image_digest)
-
-    pair_arguments = (
-        "verify-pair",
-        "--baseline",
-        str(baseline_side),
-        "--subject",
-        str(subject_side),
-        "--schedule",
-        str(schedule),
-        "--policy-pack",
-        str(policy),
-        "--receipt",
-        str(pair_receipt),
-    )
-    pair_result = _run_installed_cli(
-        pair_arguments,
-        expected_format="runtime-behavior-verify-pair-cli-v1",
-    )
-    pair_bytes, pair_value = _portable_json(pair_receipt)
-    expected_pair = {
-        "baseline": _expected_side_bindings(baseline_side),
-        "baseline_score": 1.0,
-        "claim_set": "invarlock-runtime-behavioral-regression-v1",
-        "format_version": "invarlock/runtime-behavioral-claim-receipt-v1",
-        "metric": "exact_match",
-        "policy_digest": policy_digest,
-        "regression": 0.0,
-        "schedule_sha256": CLI_SCHEDULE_SHA256,
-        "subject": _expected_side_bindings(subject_side),
-        "subject_score": 1.0,
-        "verdict": "pass",
-    }
-    if pair_value != expected_pair or any(
-        pair_result.get(name) != value
-        for name, value in (
-            ("baseline_score", 1.0),
-            ("subject_score", 1.0),
-            ("regression", 0.0),
-        )
-    ):
-        raise GGUFBlackBoxError("the installed CLI paired receipt did not pass")
-    pair_before = hashlib.sha256(pair_bytes).hexdigest()
-    _run_installed_cli(
-        pair_arguments,
-        expected_format="runtime-behavior-verify-pair-cli-v1",
-        expect_success=False,
-    )
-    if _sha256_file_unbounded(pair_receipt) != pair_before:
-        raise GGUFBlackBoxError("the installed CLI clobbered its paired receipt")
-
-    portable_paths = [schedule, baseline_binding, subject_binding, policy, pair_receipt]
-    portable_paths.extend(sorted(baseline_side.iterdir()))
-    portable_paths.extend(sorted(subject_side.iterdir()))
-    if len(portable_paths) != 17:
-        raise GGUFBlackBoxError("the CLI portable artifact inventory is incomplete")
-    for path in portable_paths:
-        _portable_json(path, manifest=path.name == "runtime.manifest.json")
-
-    baseline_receipt = baseline_side / "runtime-provider.receipt.json"
-    subject_receipt = subject_side / "runtime-provider.receipt.json"
-    baseline_receipt_bytes, baseline_receipt_value = _portable_json(baseline_receipt)
-    if baseline_receipt_bytes != subject_receipt.read_bytes():
-        raise GGUFBlackBoxError("the same-artifact CLI receipts are not deterministic")
-    _observation_bytes, observation_value = _portable_json(
-        baseline_side / "runtime-scoring.observation.json"
-    )
-    return {
-        "artifact_identity_sha256": ARTIFACT_IDENTITY_SHA256,
-        "binding_sha256": hashlib.sha256(baseline_binding_bytes).hexdigest(),
-        "execution_settings_sha256": CLI_EXECUTION_SETTINGS_SHA256,
-        "format_version": CLI_JOURNEY_FORMAT,
-        "observation": observation_value,
-        "observation_sha256": CLI_SCORING_OBSERVATION_SHA256,
-        "policy_digest": policy_digest,
-        "policy_file_sha256": hashlib.sha256(policy_bytes).hexdigest(),
-        "portable_artifact_count": len(portable_paths),
-        "provider_receipt": baseline_receipt_value,
-        "provider_receipt_sha256": hashlib.sha256(baseline_receipt_bytes).hexdigest(),
-        "schedule_sha256": CLI_SCHEDULE_SHA256,
-        "verification": {
-            "baseline_score": 1.0,
-            "regression": 0.0,
-            "subject_score": 1.0,
-            "verdict": "pass",
-        },
-    }
+    return _cli_support.inside_cli_journey(globals(), image_digest=image_digest)
 
 
 def _inside_result(*, image_digest: str) -> dict[str, object]:
