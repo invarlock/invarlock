@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import subprocess
 import sys
 
@@ -9,78 +10,29 @@ from invarlock.core.config_runtime import InvarLockConfig, RuntimeProviderConfig
 from invarlock.core.registry import CoreRegistry
 from invarlock.core.runtime_provider import (
     EvaluationBatch,
-    EvaluationRecord,
     HFSnapshotArtifactIdentity,
     ModelRuntimeSpec,
+    RuntimeDeviceFacts,
     RuntimeExecutionContext,
+    RuntimeExecutionSettings,
     RuntimeProvider,
-    RuntimeScoringRecord,
     RuntimeSession,
     ScoringObservation,
     artifact_identity_sha256,
 )
-from invarlock.core.runtime_provider.types import JSONScalar
+from invarlock.runtime_provider_evidence import encode_scoring_observation
 from invarlock.runtime_providers.hf_transformers import (
     HFTransformersProvider,
     HFTransformersSessionFactory,
 )
-
-
-def _spec(**settings: JSONScalar) -> ModelRuntimeSpec:
-    merged_settings: dict[str, JSONScalar] = {
-        "immutable_revision": "1" * 40,
-        "checkpoint_tree_sha256": "a" * 64,
-        "tokenizer_metadata_sha256": "b" * 64,
-    }
-    merged_settings.update(settings)
-    return ModelRuntimeSpec(
-        provider_name="hf_transformers",
-        model_id="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-        adapter_name="hf_causal",
-        settings=merged_settings,
-    )
-
-
-def _batch() -> EvaluationBatch:
-    return EvaluationBatch(
-        schedule_sha256="c" * 64,
-        records=(
-            EvaluationRecord(
-                record_id="sample-1",
-                input_text="hello",
-                input_sha256="d" * 64,
-                expected_output="world",
-            ),
-        ),
-    )
-
-
-def _artifact_sha256(spec: ModelRuntimeSpec | None = None) -> str:
-    provider = HFTransformersProvider()
-    return artifact_identity_sha256(provider.identify_artifact(spec or _spec()))
-
-
-def _observation(
-    batch: EvaluationBatch, *, artifact_sha256: str = "e" * 64
-) -> ScoringObservation:
-    return ScoringObservation(
-        provider_name="hf_transformers",
-        artifact_identity_sha256=artifact_sha256,
-        schedule_sha256=batch.schedule_sha256,
-        records=(
-            RuntimeScoringRecord(
-                record_id="sample-1",
-                input_sha256="d" * 64,
-                status="ok",
-                output_text="world",
-                output_sha256="f" * 64,
-                logprob_sum=-1.25,
-                token_count=2,
-                utf8_byte_count=5,
-            ),
-        ),
-        aggregate_source_sha256="1" * 64,
-    )
+from tests.runtime_providers._hf_transformers_helpers import (
+    _IMAGE_DIGEST,
+    _artifact_sha256,
+    _authenticated_test_runtime,  # noqa: F401
+    _batch,
+    _observation,
+    _spec,
+)
 
 
 def test_hf_provider_module_imports_no_backend() -> None:
@@ -122,6 +74,7 @@ def test_hf_provider_declares_full_in_process_capabilities() -> None:
         "weights",
         "modules",
         "activations",
+        "build",
     )
     assert capabilities.metrics == ("exact_match", "multiple_choice_accuracy")
     assert capabilities.supported_claim_sets == (
@@ -184,14 +137,16 @@ def test_hf_provider_reuses_bound_adapter_model_and_scorer_without_loading() -> 
     observation = _observation(batch, artifact_sha256=artifact_sha256)
     scored: list[EvaluationBatch] = []
 
-    def scorer(candidate: EvaluationBatch) -> ScoringObservation:
+    def scorer(
+        candidate: EvaluationBatch, _settings: RuntimeExecutionSettings
+    ) -> ScoringObservation:
         scored.append(candidate)
         return observation
 
     context = RuntimeExecutionContext(
         strict=True,
         allow_network=False,
-        container_image_digest="sha256:" + "2" * 64,
+        container_image_digest=_IMAGE_DIGEST,
         device_kind="cpu",
         artifact_identity_sha256=artifact_sha256,
         model_adapter=adapter,
@@ -207,8 +162,107 @@ def test_hf_provider_reuses_bound_adapter_model_and_scorer_without_loading() -> 
     assert session.native_model() is native_model
     assert session.score(batch) is observation
     assert scored == [batch]
-    with pytest.raises(RuntimeError, match="provenance facts"):
+    receipt = session.runtime_receipt()
+    assert receipt.plugin.name == "hf_transformers"
+    assert receipt.backend.name == "transformers+torch"
+    assert receipt.artifact_identity == HFTransformersProvider().identify_artifact(spec)
+    assert receipt.execution_settings == RuntimeExecutionSettings(
+        seed=7,
+        context_length=128,
+        batch_size=1,
+        max_output_tokens=16,
+        timeout_seconds=30,
+        allow_network=False,
+    )
+    assert receipt.device == RuntimeDeviceFacts(
+        device_kind="cpu", device_name="authenticated test device"
+    )
+    assert receipt.outer_image_digest == _IMAGE_DIGEST
+    assert (
+        receipt.scoring_observation_sha256
+        == hashlib.sha256(encode_scoring_observation(observation)).hexdigest()
+    )
+
+
+def test_hf_receipt_is_unavailable_before_complete_scoring() -> None:
+    spec = _spec()
+    session = HFTransformersProvider().open(
+        spec,
+        RuntimeExecutionContext(
+            strict=True,
+            allow_network=False,
+            container_image_digest=_IMAGE_DIGEST,
+            device_kind="cpu",
+            artifact_identity_sha256=_artifact_sha256(spec),
+            model_adapter=object(),
+            native_model=object(),
+            scorer=_observation,
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="before scoring"):
         session.runtime_receipt()
+
+
+def test_hf_strict_scorer_receives_exact_provider_settings_object() -> None:
+    spec = _spec()
+    batch = _batch()
+    received: list[RuntimeExecutionSettings] = []
+
+    def settings_observer(
+        candidate: EvaluationBatch, settings: RuntimeExecutionSettings
+    ) -> ScoringObservation:
+        received.append(settings)
+        return _observation(
+            candidate,
+            settings,
+            artifact_sha256=_artifact_sha256(spec),
+        )
+
+    session = HFTransformersProvider().open(
+        spec,
+        RuntimeExecutionContext(
+            strict=True,
+            allow_network=False,
+            container_image_digest=_IMAGE_DIGEST,
+            device_kind="cpu",
+            artifact_identity_sha256=_artifact_sha256(spec),
+            model_adapter=object(),
+            native_model=object(),
+            scorer=settings_observer,
+        ),
+    )
+
+    session.score(batch)
+    receipt = session.runtime_receipt()
+
+    assert received == [receipt.execution_settings]
+    assert received[0] is receipt.execution_settings
+
+
+def test_hf_strict_scorer_rejects_legacy_one_argument_contract() -> None:
+    spec = _spec()
+    batch = _batch()
+
+    def legacy_scorer(candidate: EvaluationBatch) -> ScoringObservation:
+        return _observation(candidate, artifact_sha256=_artifact_sha256(spec))
+
+    session = HFTransformersProvider().open(
+        spec,
+        RuntimeExecutionContext(
+            strict=True,
+            allow_network=False,
+            container_image_digest=_IMAGE_DIGEST,
+            device_kind="cpu",
+            artifact_identity_sha256=_artifact_sha256(spec),
+            model_adapter=object(),
+            native_model=object(),
+            scorer=legacy_scorer,  # type: ignore[arg-type]
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="exact runtime execution settings"):
+        session.score(batch)
 
 
 def test_hf_session_factory_defers_scorer_binding_without_duplicate_load() -> None:
@@ -226,11 +280,13 @@ def test_hf_session_factory_defers_scorer_binding_without_duplicate_load() -> No
         native_model=native_model,
         strict=True,
         allow_network=False,
-        container_image_digest="sha256:" + "2" * 64,
+        container_image_digest=_IMAGE_DIGEST,
         device_kind="cpu",
     )
 
-    def scorer(candidate: EvaluationBatch) -> ScoringObservation:
+    def scorer(
+        candidate: EvaluationBatch, _settings: RuntimeExecutionSettings
+    ) -> ScoringObservation:
         scored.append(candidate)
         return _observation(
             candidate,
@@ -264,7 +320,7 @@ def test_hf_session_factory_rejects_loaded_artifact_identity_mismatch() -> None:
             native_model=object(),
             strict=True,
             allow_network=False,
-            container_image_digest="sha256:" + "2" * 64,
+            container_image_digest=_IMAGE_DIGEST,
             device_kind="cpu",
         )
 
@@ -275,7 +331,7 @@ def test_hf_session_closes_bound_resources_exactly_once() -> None:
     context = RuntimeExecutionContext(
         strict=True,
         allow_network=False,
-        container_image_digest="sha256:" + "2" * 64,
+        container_image_digest=_IMAGE_DIGEST,
         device_kind="cpu",
         artifact_identity_sha256=_artifact_sha256(),
         model_adapter=object(),
@@ -307,7 +363,7 @@ def test_hf_provider_requires_prebound_execution_objects(
     values = {
         "strict": True,
         "allow_network": False,
-        "container_image_digest": "sha256:" + "2" * 64,
+        "container_image_digest": _IMAGE_DIGEST,
         "device_kind": "cpu",
         "artifact_identity_sha256": _artifact_sha256(),
         "model_adapter": object(),
@@ -326,7 +382,7 @@ def test_hf_provider_rejects_network_enabled_strict_context() -> None:
     context = RuntimeExecutionContext(
         strict=True,
         allow_network=True,
-        container_image_digest="sha256:" + "2" * 64,
+        container_image_digest=_IMAGE_DIGEST,
         device_kind="cpu",
         artifact_identity_sha256=_artifact_sha256(),
         model_adapter=object(),
@@ -351,12 +407,12 @@ def test_hf_session_rejects_scorer_pairing_drift() -> None:
     context = RuntimeExecutionContext(
         strict=True,
         allow_network=False,
-        container_image_digest="sha256:" + "2" * 64,
+        container_image_digest=_IMAGE_DIGEST,
         device_kind="cpu",
         artifact_identity_sha256=_artifact_sha256(),
         model_adapter=object(),
         native_model=object(),
-        scorer=lambda _batch: mismatched,
+        scorer=lambda _batch, _settings: mismatched,
         close_callback=None,
     )
     session = HFTransformersProvider().open(_spec(), context)
@@ -365,18 +421,52 @@ def test_hf_session_rejects_scorer_pairing_drift() -> None:
         session.score(batch)
 
 
+def test_hf_failed_rescore_invalidates_previous_observation_receipt() -> None:
+    batch = _batch()
+    artifact_sha256 = _artifact_sha256()
+    valid = _observation(batch, artifact_sha256=artifact_sha256)
+    invalid = ScoringObservation(
+        provider_name="hf_transformers",
+        artifact_identity_sha256=artifact_sha256,
+        schedule_sha256="9" * 64,
+        records=valid.records,
+        aggregate_source_sha256="1" * 64,
+    )
+    observations = iter((valid, invalid))
+    session = HFTransformersProvider().open(
+        _spec(),
+        RuntimeExecutionContext(
+            strict=True,
+            allow_network=False,
+            container_image_digest=_IMAGE_DIGEST,
+            device_kind="cpu",
+            artifact_identity_sha256=artifact_sha256,
+            model_adapter=object(),
+            native_model=object(),
+            scorer=lambda _batch, _settings: next(observations),
+        ),
+    )
+    session.score(batch)
+    session.runtime_receipt()
+
+    with pytest.raises(ValueError, match="schedule"):
+        session.score(batch)
+    with pytest.raises(RuntimeError, match="before scoring"):
+        session.runtime_receipt()
+
+
 def test_hf_session_rejects_scorer_artifact_identity_drift() -> None:
     batch = _batch()
     mismatched = _observation(batch, artifact_sha256="9" * 64)
     context = RuntimeExecutionContext(
         strict=True,
         allow_network=False,
-        container_image_digest="sha256:" + "2" * 64,
+        container_image_digest=_IMAGE_DIGEST,
         device_kind="cpu",
         artifact_identity_sha256=_artifact_sha256(),
         model_adapter=object(),
         native_model=object(),
-        scorer=lambda _batch: mismatched,
+        scorer=lambda _batch, _settings: mismatched,
         close_callback=None,
     )
     session = HFTransformersProvider().open(_spec(), context)
@@ -389,7 +479,7 @@ def test_hf_provider_rejects_context_artifact_identity_drift() -> None:
     context = RuntimeExecutionContext(
         strict=True,
         allow_network=False,
-        container_image_digest="sha256:" + "2" * 64,
+        container_image_digest=_IMAGE_DIGEST,
         device_kind="cpu",
         artifact_identity_sha256="9" * 64,
         model_adapter=object(),
@@ -406,7 +496,7 @@ def test_hf_provider_requires_artifact_identity_in_strict_mode() -> None:
     context = RuntimeExecutionContext(
         strict=True,
         allow_network=False,
-        container_image_digest="sha256:" + "2" * 64,
+        container_image_digest=_IMAGE_DIGEST,
         device_kind="cpu",
         model_adapter=object(),
         native_model=object(),
