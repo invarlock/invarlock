@@ -429,6 +429,10 @@ def _write_archive(path: Path, files: Mapping[str, bytes]) -> None:
             os.link(temporary, path)
         except FileExistsError as exc:
             raise RuntimeReleaseEvidenceError("output asset already exists") from exc
+        except OSError as exc:
+            raise RuntimeReleaseEvidenceError(
+                "output asset could not be published"
+            ) from exc
     except Exception:
         raise
     finally:

@@ -226,6 +226,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed installed-package plugin discovery so InvarLock's identical shipped
   entry points are not rejected as duplicate built-ins, while packaging drift
   and third-party name collisions continue to fail closed.
+- Fixed runtime release-evidence publication to normalize non-collision
+  filesystem link failures into closed CLI errors after cleaning temporary
+  files, avoiding raw exception and host-path disclosure.
 - Fixed static-analysis findings in evidence utility CLIs, pruning-contract key
   validation, report-config cleanup, and verification export helpers.
 
