@@ -307,7 +307,10 @@ def test_qualification_rejects_changed_bindings_and_cross_gpu_results(
     monkeypatch.setattr(
         fixture, "read_tensorrt_llm_artifact_identity", lambda *_a, **_k: identity
     )
-    results = iter(({"ok": True}, {"ok": False}))
+    first = _canary_payload()
+    second = _canary_payload()
+    second["runtime_provider_receipt_sha256"] = "f" * 64
+    results = iter((first, second))
     monkeypatch.setattr(fixture, "_canary_one", lambda **_k: next(results))
     with pytest.raises(fixture.TensorRTLLMFixtureError, match="evidence differs"):
         fixture.qualify_two_gpu(
@@ -431,6 +434,10 @@ def test_canary_requires_exact_schema_and_bindings(
     extra["extra"] = True
     with pytest.raises(fixture.TensorRTLLMFixtureError, match="open schema"):
         run(extra)
+    missing_receipt_digest = _canary_payload()
+    del missing_receipt_digest["runtime_provider_receipt_sha256"]
+    with pytest.raises(fixture.TensorRTLLMFixtureError, match="open schema"):
+        run(missing_receipt_digest)
     wrong_output = _canary_payload(output="f" * 64)
     with pytest.raises(fixture.TensorRTLLMFixtureError, match="result is invalid"):
         run(wrong_output)
@@ -441,6 +448,50 @@ def test_canary_requires_exact_schema_and_bindings(
     bad_digest["scoring_observation_sha256"] = "bad"
     with pytest.raises(fixture.TensorRTLLMFixtureError, match="digest is invalid"):
         run(bad_digest)
+    bad_receipt_digest = _canary_payload()
+    bad_receipt_digest["runtime_provider_receipt_sha256"] = "bad"
+    with pytest.raises(fixture.TensorRTLLMFixtureError, match="digest is invalid"):
+        run(bad_receipt_digest)
+
+
+def test_canary_command_isolated_and_mounts_read_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    command: list[str] = []
+
+    def run(captured: list[str], **_kwargs: object):
+        command.extend(captured)
+        return (0, fixture._canonical_json(_canary_payload()), b"")
+
+    monkeypatch.setattr(fixture, "_run_captured", run)
+    fixture._canary_one(
+        engine="docker",
+        image="sha256:" + "a" * 64,
+        image_digest="sha256:" + "a" * 64,
+        selector="device=0",
+        fixture=tmp_path,
+        manifest={
+            "expected_output_sha256": "7" * 64,
+            "selected_engine_identity": {"engine_bundle_tree_sha256": "1" * 64},
+            "tokenizer_sha256": "4" * 64,
+        },
+        expected_artifact_identity_sha256=_EXPECTED_ARTIFACT_SHA256,
+    )
+
+    assert "invarlock.runtime_providers.tensorrt_llm_canary" in command
+    assert command[command.index("--network") + 1] == "none"
+    assert "--read-only" in command
+    assert command[command.index("--cap-drop") + 1] == "ALL"
+    assert command[command.index("--security-opt") + 1] == "no-new-privileges"
+    assert command.count("--tmpfs") == 1
+    assert (
+        command[command.index("--tmpfs") + 1] == "/tmp:rw,noexec,nosuid,nodev,size=8g"
+    )
+    assert all(
+        mount.endswith(":ro")
+        for index, mount in enumerate(command)
+        if index > 0 and command[index - 1] == "--volume"
+    )
 
 
 def test_promotion_tags_only_bound_immutable_digest(
@@ -517,6 +568,19 @@ def test_promotion_fails_closed_on_tag_race_and_invalid_summary(
     invalid["output_sha256"] = "bad"
     path.write_bytes(fixture._canonical_json(invalid))
     with pytest.raises(fixture.TensorRTLLMFixtureError, match="output_sha256"):
+        fixture._load_qualification_summary(path)
+    invalid = _qualification_summary()
+    invalid["runtime_provider_receipt_sha256"] = "bad"
+    path.write_bytes(fixture._canonical_json(invalid))
+    with pytest.raises(
+        fixture.TensorRTLLMFixtureError,
+        match="runtime_provider_receipt_sha256",
+    ):
+        fixture._load_qualification_summary(path)
+    invalid = _qualification_summary()
+    del invalid["runtime_provider_receipt_sha256"]
+    path.write_bytes(fixture._canonical_json(invalid))
+    with pytest.raises(fixture.TensorRTLLMFixtureError, match="invalid schema"):
         fixture._load_qualification_summary(path)
 
 

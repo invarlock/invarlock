@@ -20,7 +20,10 @@ from invarlock.core.runtime_provider import (
 from invarlock.reporting.validation.runtime_behavioral_observation import (
     runtime_scoring_records_sha256,
 )
-from invarlock.runtime_provider_evidence import encode_scoring_observation
+from invarlock.runtime_provider_evidence import (
+    encode_runtime_provider_receipt,
+    encode_scoring_observation,
+)
 from invarlock.runtime_providers import tensorrt_llm_canary as canary
 from invarlock.runtime_providers.tensorrt_llm import TensorRTLLMProvider
 from invarlock.runtime_providers.tensorrt_llm_session import (
@@ -109,6 +112,7 @@ def test_candidate_qualification_uses_real_provider_session_contract(
     info = _runner_info()
     calls: list[str] = []
     receipt_versions: list[str] = []
+    emitted_receipts: list[RuntimeProviderReceipt] = []
 
     monkeypatch.setattr(canary, "_raw_runner_info", lambda _runner: info)
 
@@ -154,7 +158,7 @@ def test_candidate_qualification_uses_real_provider_session_contract(
         def runtime_receipt(self) -> RuntimeProviderReceipt:
             calls.append("receipt")
             assert self.observation is not None
-            return RuntimeProviderReceipt(
+            receipt = RuntimeProviderReceipt(
                 plugin=RuntimeProviderPluginIdentity(
                     name="tensorrt_llm",
                     distribution="invarlock",
@@ -189,6 +193,8 @@ def test_candidate_qualification_uses_real_provider_session_contract(
                     encode_scoring_observation(self.observation)
                 ).hexdigest(),
             )
+            emitted_receipts.append(receipt)
+            return receipt
 
         def close(self) -> None:
             calls.append("close")
@@ -235,6 +241,7 @@ def test_candidate_qualification_uses_real_provider_session_contract(
 
     calls.clear()
     receipt_versions[:] = ["0.0.0", "0.0.0"]
+    emitted_receipts.clear()
     result = canary.qualify_candidate(
         **qualification_args,
         expected_output_sha256=hashlib.sha256(b"qualified").hexdigest(),
@@ -242,6 +249,13 @@ def test_candidate_qualification_uses_real_provider_session_contract(
 
     assert result["ok"] is True
     assert result["artifact_identity_sha256"] == artifact_identity_sha256(identity)
+    assert len(emitted_receipts) == 2
+    assert (
+        result["runtime_provider_receipt_sha256"]
+        == hashlib.sha256(
+            encode_runtime_provider_receipt(emitted_receipts[-1])
+        ).hexdigest()
+    )
     assert calls == [
         "validate",
         "open",

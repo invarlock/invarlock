@@ -48,6 +48,7 @@ QUALIFICATION_KEYS: Final = frozenset(
         "gpu_count",
         "ok",
         "output_sha256",
+        "runtime_provider_receipt_sha256",
         "tokenizer_sha256",
     }
 )
@@ -448,7 +449,12 @@ def load_qualification_summary(path: Path) -> dict[str, object]:
         or IMAGE_DIGEST_RE.fullmatch(image_digest) is None
     ):
         raise FixtureContractError("the qualification summary image digest is invalid")
-    for name in ("engine_bundle_tree_sha256", "output_sha256", "tokenizer_sha256"):
+    for name in (
+        "engine_bundle_tree_sha256",
+        "output_sha256",
+        "runtime_provider_receipt_sha256",
+        "tokenizer_sha256",
+    ):
         value = summary.get(name)
         if not isinstance(value, str) or SHA256_RE.fullmatch(value) is None:
             raise FixtureContractError(f"the qualification summary {name} is invalid")

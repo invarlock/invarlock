@@ -31,19 +31,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   TensorRT-LLM requires a reviewed pinned-model inventory, an exact-base
   two-device hardware preflight, a candidate CUDA smoke, and derived
   engine-tree, tokenizer, and fixed-output bindings; its canary requires
-  byte-identical provider evidence across two fresh sessions. The isolated
-  runner requires InvarLock's deterministic execution marker and fixed decoding
-  settings, and records CUDA runtime version separately from driver version.
-  Failed qualification leaves
+  byte-identical provider evidence across two fresh sessions per GPU and the
+  same canonical provider-receipt digest across GPUs. That digest is bound into
+  the closed qualification summary. The isolated runner requires InvarLock's
+  deterministic execution marker and fixed decoding settings, and records CUDA
+  runtime version separately from driver version. Failed qualification leaves
   the existing stable local tag unchanged, and TensorRT-LLM still requires
   separate NVIDIA platform and real-engine qualification. CUDA and TensorRT-LLM
   qualification targets accept explicit Docker GPU selectors; CUDA smokes now
   require a visible selected device and execute a real tensor kernel. A
   maintained two-GPU TensorRT-LLM flow now snapshots a reviewed pinned model,
-  builds and cross-executes a real engine independently on both devices,
-  validates closed artifact-bound results through the immutable candidate
-  image ID, rejects selector aliases and non-matching compute capabilities, and
-  promotes only the digest bound by the qualification summary.
+  builds an engine independently on each device, cross-executes the frozen
+  primary engine on both devices, validates closed artifact-bound results
+  through the immutable candidate image ID, rejects selector aliases and
+  non-matching compute capabilities, sizes the isolated canary workspace for
+  authenticated engine snapshots, and promotes only the digest bound by the
+  qualification summary.
 - Added policy-bound `observe` and `enforce` authority for spectral, RMT, and
   variance findings in `policy-pack-v2`. Observation mode retains complete
   guard execution, provenance, replay, and reporting while leaving primary

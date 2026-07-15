@@ -379,12 +379,14 @@ def qualify_candidate(
         raise TensorRTLLMCanaryError(
             "candidate provider receipt is not deterministic across sessions"
         )
+    runtime_provider_receipt_sha256 = hashlib.sha256(first_receipt_bytes).hexdigest()
     return {
         "artifact_identity_sha256": artifact_sha256,
         "engine_bundle_tree_sha256": expected_engine_tree_sha256,
         "format_version": _FORMAT,
         "ok": True,
         "output_sha256": expected_output_sha256,
+        "runtime_provider_receipt_sha256": runtime_provider_receipt_sha256,
         "scoring_observation_sha256": first_receipt.scoring_observation_sha256,
         "tokenizer_metadata_sha256": expected_tokenizer_sha256,
     }

@@ -69,9 +69,11 @@ capability 9.0 before the candidate build starts. The candidate image must pass
 the CUDA/runtime smoke before either GPU builds an engine. The flow derives and
 binds the engine-tree, tokenizer, and fixed-output digests.
 Each canary runs two single-rank scores of the fixed `InvarLock` prompt through
-fresh provider sessions on each GPU before tagging the configured stable local
-image. Missing or malformed inputs fail before building; any fixture, output,
-evidence-replay,
+fresh provider sessions on each GPU, requires byte-identical canonical
+observations and provider receipts between those two sessions, and then
+requires the canonical provider-receipt digest to match across GPUs before
+tagging the configured stable local image. Missing or malformed inputs fail
+before building; any fixture, output, evidence-replay,
 hardware-binding, or determinism mismatch fails before promotion. If runtime
 qualification fails after the candidate is built, the target retains that
 candidate for diagnosis. No failure path creates or replaces the stable tag.
@@ -83,9 +85,10 @@ targets Linux with an NVIDIA GPU; its runner observes the CUDA device, compute
 capability, driver, and runtime, then requires the observed compute capability
 to match the engine target. Each isolated score requires InvarLock's
 `FORCE_DETERMINISTIC=1` execution marker and fixed greedy decoding settings. The
-canary establishes repeatability for its reviewed fixture by requiring
-byte-identical evidence across two fresh sessions. The closed environment also
-sets backend telemetry and usage-reporting opt-out variables.
+canary establishes per-GPU repeatability for its reviewed fixture by requiring
+byte-identical evidence across two fresh sessions, then binds cross-GPU
+canonical provider-receipt equality into the qualification summary. The closed
+environment also sets backend telemetry and usage-reporting opt-out variables.
 
 ## End-to-End Behavioral Journey
 
@@ -329,8 +332,9 @@ visible CUDA device. It checks the pinned package/image environment and the
 runner information protocol. The required dual-GPU canary then authenticates
 the generated engine tree and tokenizer file, executes real scores in fresh
 provider sessions on both GPUs, and requires byte-identical canonical
-observations and receipts. Those checks qualify the
-local image tag, but do not establish a behavioral claim for a particular
+observations and receipts across two sessions on each GPU, then requires the
+canonical provider-receipt digest to match across GPUs. Those checks qualify
+the local image tag, but do not establish a behavioral claim for a particular
 schedule. That claim still requires a real `run-side` using the intended engine
 and tokenizer, followed by `verify-pair` against the intended schedule and
 policy.

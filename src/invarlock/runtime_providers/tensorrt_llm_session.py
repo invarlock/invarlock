@@ -61,6 +61,10 @@ _ENGINE_NAME = re.compile(r"^rank(0|[1-9][0-9]*)\.engine$")
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _COMPUTE_CAPABILITY = re.compile(r"^(0|[1-9][0-9]?)\.(0|[1-9][0-9]?)$")
 _CUDA_RUNTIME_VERSION = re.compile(r"^[0-9]+(?:\.[0-9]+)+$")
+# Minimal read-only vendor paths pinned by the TensorRT-LLM 1.2.1 runtime image.
+_TENSORRT_LLM_LD_LIBRARY_PATH = "/usr/local/tensorrt/lib"
+_TENSORRT_LLM_OPAL_PREFIX = "/opt/hpcx/ompi"
+_TENSORRT_LLM_PATH = "/opt/hpcx/ompi/bin:/usr/bin:/bin"
 _fcntl = importlib.import_module("fcntl") if os.name == "posix" else None
 
 
@@ -310,8 +314,11 @@ class _RunDirectory:
             "INVARLOCK_CONTAINER_EXECUTION": "1",
             "LANG": "C.UTF-8",
             "LC_ALL": "C.UTF-8",
+            "LD_LIBRARY_PATH": _TENSORRT_LLM_LD_LIBRARY_PATH,
             "NO_COLOR": "1",
             "NO_PROXY": "*",
+            "OPAL_PREFIX": _TENSORRT_LLM_OPAL_PREFIX,
+            "PATH": _TENSORRT_LLM_PATH,
             "TELEMETRY_DISABLED": "1",
             "TOKENIZERS_PARALLELISM": "false",
             "TRANSFORMERS_OFFLINE": "1",

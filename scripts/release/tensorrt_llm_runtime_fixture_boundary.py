@@ -61,6 +61,7 @@ CANARY_KEYS: Final = frozenset(
         "format_version",
         "ok",
         "output_sha256",
+        "runtime_provider_receipt_sha256",
         "scoring_observation_sha256",
         "tokenizer_metadata_sha256",
     }

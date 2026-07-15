@@ -48,6 +48,7 @@ def canary_payload(
         "format_version": fixture.CANARY_FORMAT,
         "ok": True,
         "output_sha256": output,
+        "runtime_provider_receipt_sha256": "8" * 64,
         "scoring_observation_sha256": "9" * 64,
         "tokenizer_metadata_sha256": tokenizer,
     }
@@ -85,6 +86,7 @@ def qualification_summary() -> dict[str, object]:
         "gpu_count": 2,
         "ok": True,
         "output_sha256": "7" * 64,
+        "runtime_provider_receipt_sha256": "8" * 64,
         "tokenizer_sha256": "4" * 64,
     }
 

@@ -234,6 +234,58 @@ def _record(record_id: str, text: str) -> EvaluationRecord:
     )
 
 
+def test_tensorrt_llm_closed_environment_pins_vendor_runtime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/tmp/ambient-libraries")
+    monkeypatch.setenv("OPAL_PREFIX", "/tmp/ambient-opal")
+    monkeypatch.setenv("PATH", "/tmp/ambient-bin")
+    monkeypatch.setenv("INVARLOCK_TEST_SECRET", "must-not-cross-boundary")
+    run_directory = tensorrt_llm_session._RunDirectory(  # noqa: SLF001
+        path=tmp_path,
+        descriptor=-1,
+        initial_stat=tmp_path.stat(),
+    )
+    monkeypatch.setattr(run_directory, "recheck", lambda: None)
+
+    environment = run_directory.environment()
+
+    rendered = str(tmp_path)
+    assert environment == {
+        "CUDA_DEVICE_ORDER": "PCI_BUS_ID",
+        "DO_NOT_TRACK": "1",
+        "FORCE_DETERMINISTIC": "1",
+        "HF_DATASETS_OFFLINE": "1",
+        "HF_HUB_DISABLE_TELEMETRY": "1",
+        "HF_HUB_OFFLINE": "1",
+        "HOME": rendered,
+        "INVARLOCK_CONTAINER_EXECUTION": "1",
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "LD_LIBRARY_PATH": "/usr/local/tensorrt/lib",
+        "NO_COLOR": "1",
+        "NO_PROXY": "*",
+        "OPAL_PREFIX": "/opt/hpcx/ompi",
+        "PATH": "/opt/hpcx/ompi/bin:/usr/bin:/bin",
+        "TELEMETRY_DISABLED": "1",
+        "TOKENIZERS_PARALLELISM": "false",
+        "TRANSFORMERS_OFFLINE": "1",
+        "TRTLLM_NO_USAGE_STATS": "1",
+        "TMPDIR": rendered,
+        "XDG_CACHE_HOME": rendered,
+    }
+    fixed_paths = [environment["OPAL_PREFIX"]]
+    fixed_paths.extend(
+        entry
+        for variable in ("LD_LIBRARY_PATH", "PATH")
+        for entry in environment[variable].split(":")
+    )
+    assert all(
+        Path(entry).is_absolute() and entry not in {rendered, "/tmp", "/var/tmp"}
+        for entry in fixed_paths
+    )
+
+
 def _batch(*records: EvaluationRecord) -> EvaluationBatch:
     return EvaluationBatch(schedule_sha256="c" * 64, records=tuple(records))
 

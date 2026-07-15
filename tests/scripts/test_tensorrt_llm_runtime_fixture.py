@@ -420,7 +420,11 @@ def test_qualify_two_gpu_reauthenticates_and_writes_path_free_summary(
     monkeypatch.setattr(
         fixture, "read_tensorrt_llm_artifact_identity", lambda *_a, **_k: identity
     )
-    canary = {"format_version": fixture.CANARY_FORMAT, "ok": True}
+    canary = {
+        "format_version": fixture.CANARY_FORMAT,
+        "ok": True,
+        "runtime_provider_receipt_sha256": "8" * 64,
+    }
 
     def fake_canary(**kwargs: object):
         assert kwargs["image"] == "sha256:" + "a" * 64
@@ -437,7 +441,9 @@ def test_qualify_two_gpu_reauthenticates_and_writes_path_free_summary(
     )
     assert summary["gpu_count"] == 2
     assert summary["ok"] is True
+    assert summary["runtime_provider_receipt_sha256"] == "8" * 64
     assert json.loads(output.read_text()) == summary
+    assert fixture._load_qualification_summary(output) == summary
     assert str(tmp_path) not in output.read_text()
 
 

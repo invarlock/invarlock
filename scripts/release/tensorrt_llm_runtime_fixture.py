@@ -634,7 +634,7 @@ def _canary_one(
         "--security-opt",
         "no-new-privileges",
         "--tmpfs",
-        "/tmp:rw,noexec,nosuid,nodev,size=2g",
+        "/tmp:rw,noexec,nosuid,nodev,size=8g",
         "--env",
         "FORCE_DETERMINISTIC=1",
         "--env",
@@ -685,7 +685,10 @@ def _canary_one(
     }
     if any(result.get(name) != value for name, value in fixed.items()):
         raise TensorRTLLMFixtureError("a candidate canary result is invalid")
-    for name in ("scoring_observation_sha256",):
+    for name in (
+        "runtime_provider_receipt_sha256",
+        "scoring_observation_sha256",
+    ):
         value = result.get(name)
         if not isinstance(value, str) or _SHA256.fullmatch(value) is None:
             raise TensorRTLLMFixtureError("a candidate canary digest is invalid")
@@ -750,6 +753,9 @@ def qualify_two_gpu(
         "gpu_count": 2,
         "ok": True,
         "output_sha256": manifest["expected_output_sha256"],
+        "runtime_provider_receipt_sha256": results[0][
+            "runtime_provider_receipt_sha256"
+        ],
         "tokenizer_sha256": tokenizer_digest,
     }
     _write_new_json(output, summary)
