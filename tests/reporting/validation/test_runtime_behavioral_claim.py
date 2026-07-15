@@ -28,6 +28,11 @@ from invarlock.reporting.validation.runtime_behavioral_claim import (
 from invarlock.reporting.validation.runtime_behavioral_observation import (
     runtime_scoring_records_sha256,
 )
+from invarlock.runtime_behavioral_claim_receipt import (
+    RuntimeBehavioralEvidenceBindings,
+    build_runtime_behavioral_claim_receipt,
+    verify_runtime_behavioral_claim_receipt,
+)
 
 
 def _sha256(text: str) -> str:
@@ -244,6 +249,44 @@ def test_paired_behavioral_claim_replays_both_sides_and_applies_policy() -> None
     assert result.subject_score == 0.75
     assert result.regression == 0.25
     assert result.schedule_sha256 == _schedule().schedule_sha256
+
+
+def test_strict_paired_replay_builds_a_portable_digest_only_receipt() -> None:
+    result = _verify()
+    baseline = RuntimeBehavioralEvidenceBindings(
+        runtime_manifest_sha256=_sha256("baseline-manifest"),
+        evaluation_report_sha256=_sha256("baseline-report"),
+        provider_receipt_sidecar_sha256=_sha256("baseline-receipt"),
+        scoring_observation_sidecar_sha256=_sha256("baseline-observation"),
+        artifact_identity_sidecar_sha256=_sha256("baseline-artifact"),
+    )
+    subject = RuntimeBehavioralEvidenceBindings(
+        runtime_manifest_sha256=_sha256("subject-manifest"),
+        evaluation_report_sha256=_sha256("subject-report"),
+        provider_receipt_sidecar_sha256=_sha256("subject-receipt"),
+        scoring_observation_sidecar_sha256=_sha256("subject-observation"),
+        artifact_identity_sidecar_sha256=_sha256("subject-artifact"),
+    )
+
+    receipt = build_runtime_behavioral_claim_receipt(
+        baseline=baseline,
+        subject=subject,
+        verification=result,
+    )
+
+    assert receipt.baseline_score == 1.0
+    assert receipt.subject_score == 0.75
+    assert receipt.regression == 0.25
+    assert receipt.verdict == "pass"
+    assert (
+        verify_runtime_behavioral_claim_receipt(
+            receipt.to_payload(),
+            expected_baseline=baseline,
+            expected_subject=subject,
+            expected_verification=result,
+        )
+        == receipt
+    )
 
 
 def test_paired_behavioral_claim_rejects_policy_digest_tampering() -> None:

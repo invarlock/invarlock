@@ -37,6 +37,9 @@ MODEL_ARTIFACT_IDENTITY_FORMAT_VERSION = "invarlock/model-artifact-identity-v1"
 RUNTIME_PROVIDER_RECEIPT_FORMAT_VERSION = "invarlock/runtime-provider-receipt-v1"
 RUNTIME_SCORING_OBSERVATION_FORMAT_VERSION = "invarlock/runtime-scoring-observation-v1"
 RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT_VERSION = "invarlock/runtime-behavioral-schedule-v1"
+RUNTIME_BEHAVIORAL_CLAIM_RECEIPT_FORMAT_VERSION = (
+    "invarlock/runtime-behavioral-claim-receipt-v1"
+)
 
 STABLE_CLI_JSON_SURFACES: dict[str, str] = {
     "invarlock doctor --json": DOCTOR_OUTPUT_FORMAT_VERSION,
@@ -281,6 +284,12 @@ def load_runtime_behavioral_schedule_schema() -> dict[str, Any]:
     return _load_object_contract_or_raise("runtime_behavioral_schedule.schema.json")
 
 
+def load_runtime_behavioral_claim_receipt_schema() -> dict[str, Any]:
+    return _load_object_contract_or_raise(
+        "runtime_behavioral_claim_receipt.schema.json"
+    )
+
+
 def load_verify_output_schema() -> dict[str, Any]:
     return _load_object_contract_or_raise("verify_output.schema.json")
 
@@ -389,6 +398,11 @@ def public_subcontract_catalog() -> dict[str, dict[str, Any]]:
             "source": "contracts/runtime_behavioral_schedule.schema.json",
             "compatibility": "closed_versioned_schedule",
         },
+        "runtime_behavioral_claim_receipt": {
+            "version": RUNTIME_BEHAVIORAL_CLAIM_RECEIPT_FORMAT_VERSION,
+            "source": "contracts/runtime_behavioral_claim_receipt.schema.json",
+            "compatibility": "closed_versioned_receipt",
+        },
         "cli_stability_policy": {
             "version": CLI_STABILITY_POLICY_VERSION,
             "source": "docs/reference/cli.md",
@@ -469,6 +483,9 @@ def contract_catalog() -> dict[str, Any]:
         "runtime_behavioral_schedule": contract_reference(
             "runtime_behavioral_schedule.schema.json"
         ),
+        "runtime_behavioral_claim_receipt": contract_reference(
+            "runtime_behavioral_claim_receipt.schema.json"
+        ),
         "verify_output": contract_reference("verify_output.schema.json"),
         "evidence_pack_manifest": contract_reference(
             "evidence_pack_manifest.schema.json"
@@ -503,6 +520,7 @@ __all__ = [
     "RUNTIME_PROVIDER_RECEIPT_FORMAT_VERSION",
     "RUNTIME_SCORING_OBSERVATION_FORMAT_VERSION",
     "RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT_VERSION",
+    "RUNTIME_BEHAVIORAL_CLAIM_RECEIPT_FORMAT_VERSION",
     "RUNTIME_VERIFY_OUTPUT_FORMAT_VERSION",
     "STABLE_CLI_JSON_SURFACES",
     "VERIFY_OUTPUT_FORMAT_VERSION",
@@ -528,6 +546,7 @@ __all__ = [
     "load_runtime_provider_receipt_schema",
     "load_runtime_scoring_observation_schema",
     "load_runtime_behavioral_schedule_schema",
+    "load_runtime_behavioral_claim_receipt_schema",
     "load_verify_output_schema",
     "load_support_matrix",
     "maintained_catalog_lanes",
