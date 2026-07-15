@@ -30,7 +30,10 @@ def test_invarlock_config_is_explicit_mutable_mapping() -> None:
 def test_invarlock_config_section_accessors_fail_closed() -> None:
     cfg = InvarLockConfig.from_sections(model={"id": "gpt2"}, extra=7)
     assert cfg.section("missing") is None
-    assert cfg.section("model") == {"id": "gpt2"}
+    assert cfg.section("model") == {
+        "id": "gpt2",
+        "runtime_provider": {"name": "hf_transformers", "settings": {}},
+    }
     with pytest.raises(KeyError, match="required"):
         cfg.require_section("dataset")
     with pytest.raises(TypeError, match="must be a mapping"):
