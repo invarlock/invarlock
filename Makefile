@@ -2,7 +2,7 @@
 # Optional development shortcuts
 .PHONY: release-preflight
 .PHONY: runtime-image-gguf runtime-smoke-gguf runtime-blackbox-gguf
-.PHONY: runtime-image-tensorrt-llm runtime-smoke-tensorrt-llm runtime-canary-tensorrt-llm
+.PHONY: runtime-image-tensorrt-llm-candidate runtime-fixture-tensorrt-llm runtime-canary-tensorrt-llm-dual runtime-image-tensorrt-llm-dual runtime-image-tensorrt-llm runtime-smoke-tensorrt-llm runtime-canary-tensorrt-llm
 
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration test-assurance lint typecheck mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-fast verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce coverage-enforce-parallel mutation-smoke statistical-calibration-fast statistical-calibration-slow docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-dry contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync scripts-inventory-check scripts-audit architecture-fragmentation-check guard-fallback-audit runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda-quant runtime-image-cuda-quant-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-quant runtime-smoke-cuda-podman runtime-smoke-cuda-quant-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door local-hf-env-check local-hf-env-refresh local-hf-pipeline-smoke local-hf-pipeline-smoke-locked ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-inventory-check
 
@@ -35,18 +35,29 @@ LLAMA_CPP_SOURCE_SHA256 ?= 5ab75e394f4c71425ecce64a213dab3b8e3e9cfe0f19d0dcda4d5
 LLAMA_CPP_APT_SNAPSHOT ?= 20260712T232152Z
 LLAMA_CPP_BUILD_JOBS ?= 2
 RUNTIME_IMAGE_TENSORRT_LLM ?= invarlock-runtime:tensorrt-llm-local
-RUNTIME_IMAGE_TENSORRT_LLM_BUILD ?= $(RUNTIME_IMAGE_TENSORRT_LLM)-candidate
+RUNTIME_IMAGE_TENSORRT_LLM_BUILD ?= invarlock-runtime:tensorrt-llm-local-candidate
 TENSORRT_LLM_DOCKER_GPUS ?= all
-TENSORRT_LLM_BASE_IMAGE ?= nvcr.io/nvidia/tensorrt-llm/release:1.2.1@sha256:33cd085b772947bd22b7273886539331420404e5d2a4a039945241945ff927b9
-TENSORRT_LLM_CANARY_ENGINE_BUNDLE ?=
-TENSORRT_LLM_CANARY_TOKENIZER_CONTRACT ?=
-TENSORRT_LLM_CANARY_ENGINE_TREE_SHA256 ?=
-TENSORRT_LLM_CANARY_TOKENIZER_SHA256 ?=
-TENSORRT_LLM_CANARY_EXPECTED_OUTPUT_SHA256 ?=
+TENSORRT_LLM_FIXTURE_MODEL_DIR ?=
+TENSORRT_LLM_FIXTURE_MODEL_INVENTORY_SHA256 ?=
+TENSORRT_LLM_FIXTURE_DIR ?= artifacts/runtime-qualification/tensorrt-llm
+TENSORRT_LLM_PRIMARY_DOCKER_GPUS ?= device=0
+TENSORRT_LLM_SECONDARY_DOCKER_GPUS ?= device=1
 RUNTIME_IMAGE_CUDA_INDEX_URL ?= https://download.pytorch.org/whl/cu128
 RUNTIME_IMAGE_CUDA_APT_SNAPSHOT ?= 20260712T232152Z
 RUNTIME_SOURCE_DATE_EPOCH ?= $(shell git log -1 --pretty=%ct 2>/dev/null)
 RUNTIME_IMAGE_BUILD_COMMAND = $(if $(filter docker,$(CONTAINER_ENGINE)),$(CONTAINER_ENGINE) buildx build --load --provenance=false,$(CONTAINER_ENGINE) build)
+
+_safe_make_export = $(if $(filter file,$(origin $(1))),$($(1)),$(value $(1)))
+export INVARLOCK_TENSORRT_LLM_CONTAINER_ENGINE := $(call _safe_make_export,CONTAINER_ENGINE)
+export INVARLOCK_TENSORRT_LLM_IMAGE := $(call _safe_make_export,RUNTIME_IMAGE_TENSORRT_LLM_BUILD)
+export INVARLOCK_TENSORRT_LLM_STABLE_TAG := $(call _safe_make_export,RUNTIME_IMAGE_TENSORRT_LLM)
+export INVARLOCK_TENSORRT_LLM_GPU_0 := $(call _safe_make_export,TENSORRT_LLM_PRIMARY_DOCKER_GPUS)
+export INVARLOCK_TENSORRT_LLM_GPU_1 := $(call _safe_make_export,TENSORRT_LLM_SECONDARY_DOCKER_GPUS)
+export INVARLOCK_TENSORRT_LLM_SMOKE_GPU := $(call _safe_make_export,TENSORRT_LLM_DOCKER_GPUS)
+export INVARLOCK_TENSORRT_LLM_MODEL := $(call _safe_make_export,TENSORRT_LLM_FIXTURE_MODEL_DIR)
+export INVARLOCK_TENSORRT_LLM_FIXTURE_ROOT := $(call _safe_make_export,TENSORRT_LLM_FIXTURE_DIR)
+export INVARLOCK_TENSORRT_LLM_MODEL_INVENTORY_SHA256 := $(call _safe_make_export,TENSORRT_LLM_FIXTURE_MODEL_INVENTORY_SHA256)
+export INVARLOCK_TENSORRT_LLM_SOURCE_DATE_EPOCH := $(call _safe_make_export,RUNTIME_SOURCE_DATE_EPOCH)
 RUNTIME_IMAGE_DIGEST ?= sha256:local-runtime-image
 SECURITY_ARTIFACT_DIR ?= artifacts/supply-chain
 SECURITY_RUN ?= uv run --isolated --locked --extra security-ci
@@ -476,25 +487,24 @@ runtime-image-gguf:  ## Build the pinned llama.cpp runtime-provider image
 	$(CONTAINER_ENGINE) image tag $(RUNTIME_IMAGE_GGUF_BUILD) $(RUNTIME_IMAGE_GGUF)
 	$(CONTAINER_ENGINE) image rm $(RUNTIME_IMAGE_GGUF_BUILD) >/dev/null
 
-runtime-image-tensorrt-llm:  ## Build and qualify the pinned TensorRT-LLM runtime-provider image
-	@test "$(CONTAINER_ENGINE)" = "docker" || { echo "❌ The TensorRT-LLM image currently requires Docker BuildKit."; exit 1; }
-	@test -n "$(RUNTIME_SOURCE_DATE_EPOCH)" || { echo "❌ Unable to derive the source epoch; set RUNTIME_SOURCE_DATE_EPOCH explicitly for archive builds."; exit 1; }
-	@test -n "$(TENSORRT_LLM_CANARY_ENGINE_BUNDLE)" || { echo "❌ Set TENSORRT_LLM_CANARY_ENGINE_BUNDLE before building; stable qualification requires a real engine canary."; exit 1; }
-	@test -n "$(TENSORRT_LLM_CANARY_TOKENIZER_CONTRACT)" || { echo "❌ Set TENSORRT_LLM_CANARY_TOKENIZER_CONTRACT before building; stable qualification requires a real tokenizer contract."; exit 1; }
-	@test -d "$(TENSORRT_LLM_CANARY_ENGINE_BUNDLE)" || { echo "❌ TensorRT-LLM canary engine bundle is not a directory."; exit 1; }
-	@test -f "$(TENSORRT_LLM_CANARY_TOKENIZER_CONTRACT)" || { echo "❌ TensorRT-LLM canary tokenizer contract is not a file."; exit 1; }
-	@value="$(TENSORRT_LLM_CANARY_ENGINE_TREE_SHA256)"; case "$$value" in *[!0-9a-f]*|"") echo "❌ Set TENSORRT_LLM_CANARY_ENGINE_TREE_SHA256 to the reviewed lowercase digest before building."; exit 1;; esac; test "$${#value}" -eq 64 || { echo "❌ TENSORRT_LLM_CANARY_ENGINE_TREE_SHA256 must contain exactly 64 hex characters."; exit 1; }
-	@value="$(TENSORRT_LLM_CANARY_TOKENIZER_SHA256)"; case "$$value" in *[!0-9a-f]*|"") echo "❌ Set TENSORRT_LLM_CANARY_TOKENIZER_SHA256 to the reviewed lowercase digest before building."; exit 1;; esac; test "$${#value}" -eq 64 || { echo "❌ TENSORRT_LLM_CANARY_TOKENIZER_SHA256 must contain exactly 64 hex characters."; exit 1; }
-	@value="$(TENSORRT_LLM_CANARY_EXPECTED_OUTPUT_SHA256)"; case "$$value" in *[!0-9a-f]*|"") echo "❌ Set TENSORRT_LLM_CANARY_EXPECTED_OUTPUT_SHA256 to the reviewed fixed-prompt output digest before building."; exit 1;; esac; test "$${#value}" -eq 64 || { echo "❌ TENSORRT_LLM_CANARY_EXPECTED_OUTPUT_SHA256 must contain exactly 64 hex characters."; exit 1; }
-	SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH) $(RUNTIME_IMAGE_BUILD_COMMAND) \
-		--build-arg SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH) \
-		--build-arg TENSORRT_LLM_BASE_IMAGE=$(TENSORRT_LLM_BASE_IMAGE) \
-		-f runtime/Dockerfile.tensorrt-llm \
-		-t $(RUNTIME_IMAGE_TENSORRT_LLM_BUILD) .
-	$(MAKE) runtime-smoke-tensorrt-llm RUNTIME_IMAGE_TENSORRT_LLM=$(RUNTIME_IMAGE_TENSORRT_LLM_BUILD)
-	$(MAKE) runtime-canary-tensorrt-llm RUNTIME_IMAGE_TENSORRT_LLM=$(RUNTIME_IMAGE_TENSORRT_LLM_BUILD)
-	$(CONTAINER_ENGINE) image tag $(RUNTIME_IMAGE_TENSORRT_LLM_BUILD) $(RUNTIME_IMAGE_TENSORRT_LLM)
-	$(CONTAINER_ENGINE) image rm $(RUNTIME_IMAGE_TENSORRT_LLM_BUILD) >/dev/null
+runtime-image-tensorrt-llm-candidate:  ## Build the TensorRT-LLM candidate before real-fixture qualification
+	$(PYTHON) scripts/release/tensorrt_llm_runtime_fixture.py build-image
+
+runtime-fixture-tensorrt-llm:  ## Build and freeze the real TensorRT-LLM fixture independently on two GPUs
+	$(PYTHON) scripts/release/tensorrt_llm_runtime_fixture.py build-fixture
+
+runtime-canary-tensorrt-llm-dual:  ## Qualify one frozen real engine independently on two GPUs
+	$(PYTHON) scripts/release/tensorrt_llm_runtime_fixture.py qualify-two-gpu
+
+runtime-image-tensorrt-llm-dual:  ## Build, create a real fixture on two GPUs, qualify, then promote the stable tag
+	$(PYTHON) scripts/release/tensorrt_llm_runtime_fixture.py preflight
+	$(MAKE) runtime-image-tensorrt-llm-candidate
+	$(PYTHON) scripts/release/tensorrt_llm_runtime_fixture.py smoke-image
+	$(MAKE) runtime-fixture-tensorrt-llm
+	$(MAKE) runtime-canary-tensorrt-llm-dual
+	$(PYTHON) scripts/release/tensorrt_llm_runtime_fixture.py promote
+
+runtime-image-tensorrt-llm: runtime-image-tensorrt-llm-dual  ## Build and qualify the pinned TensorRT-LLM runtime-provider image
 
 runtime-smoke:  ## Smoke the local container runtime image
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
@@ -522,54 +532,12 @@ runtime-blackbox-gguf:  ## Run the optional pinned GGUF behavior black-box twice
 		--image "$(RUNTIME_IMAGE_GGUF)" \
 		--model "$(GGUF_BLACKBOX_MODEL)"
 
+runtime-smoke-tensorrt-llm: export INVARLOCK_TENSORRT_LLM_IMAGE := $(call _safe_make_export,RUNTIME_IMAGE_TENSORRT_LLM)
 runtime-smoke-tensorrt-llm:  ## Smoke TensorRT-LLM imports and CUDA visibility on an NVIDIA host
-	@test "$(CONTAINER_ENGINE)" = "docker" || { echo "❌ The TensorRT-LLM smoke requires Docker with the NVIDIA Container Toolkit."; exit 1; }
-	$(CONTAINER_ENGINE) run --rm \
-		--gpus "$(TENSORRT_LLM_DOCKER_GPUS)" \
-		--network none \
-		--read-only \
-		--tmpfs /tmp:rw,nosuid,nodev,noexec \
-		-e INVARLOCK_CONTAINER_EXECUTION=1 \
-		--entrypoint /bin/sh \
-		$(RUNTIME_IMAGE_TENSORRT_LLM) \
-		-ec '/opt/invarlock/bin/tensorrt-llm-runner --invarlock-runtime-info-v1; /opt/invarlock/cli-venv/bin/invarlock advanced runtime-behavior --help >/dev/null; /opt/invarlock/cli-venv/bin/invarlock advanced plugins runtime-providers --json >/dev/null; /opt/invarlock/bin/vendor-python -c "import importlib.metadata as m, os, torch, invarlock, tensorrt_llm; assert os.environ.get('\''TRT_LLM_VERSION'\'') == '\''1.2.1'\''; assert m.version('\''tensorrt_llm'\'') == '\''1.2.1'\''; assert os.environ.get('\''NVIDIA_VISIBLE_DEVICES'\'') not in {None, '\'''\'', '\''void'\''}; assert torch.cuda.is_available(), '\''CUDA is not visible'\''; print('\''TensorRT-LLM runtime contract ok'\'')"'
+	$(PYTHON) scripts/release/tensorrt_llm_runtime_fixture.py smoke-image
 
-runtime-canary-tensorrt-llm:  ## Score one prompt through the real-engine fixture required for stable qualification
-	@if { test -z "$(TENSORRT_LLM_CANARY_ENGINE_BUNDLE)" && test -n "$(TENSORRT_LLM_CANARY_TOKENIZER_CONTRACT)"; } || { test -n "$(TENSORRT_LLM_CANARY_ENGINE_BUNDLE)" && test -z "$(TENSORRT_LLM_CANARY_TOKENIZER_CONTRACT)"; }; then \
-		echo "❌ Set both TensorRT-LLM canary paths or neither."; exit 1; \
-	fi
-	@if test -z "$(TENSORRT_LLM_CANARY_ENGINE_BUNDLE)"; then \
-		echo "❌ TensorRT-LLM stable qualification requires an authenticated real-engine canary; the candidate remains unqualified."; \
-		exit 1; \
-	elif test -z "$(TENSORRT_LLM_CANARY_ENGINE_TREE_SHA256)" || test -z "$(TENSORRT_LLM_CANARY_TOKENIZER_SHA256)" || test -z "$(TENSORRT_LLM_CANARY_EXPECTED_OUTPUT_SHA256)"; then \
-		echo "❌ TensorRT-LLM stable qualification requires reviewed engine, tokenizer, and fixed-output digests; the candidate remains unqualified."; \
-		exit 1; \
-	else \
-			test -d "$(TENSORRT_LLM_CANARY_ENGINE_BUNDLE)" || { echo "❌ TensorRT-LLM canary engine bundle is not a directory."; exit 1; }; \
-			test -f "$(TENSORRT_LLM_CANARY_TOKENIZER_CONTRACT)" || { echo "❌ TensorRT-LLM canary tokenizer contract is not a file."; exit 1; }; \
-			image_digest="$$($(CONTAINER_ENGINE) image inspect --format '{{.Id}}' "$(RUNTIME_IMAGE_TENSORRT_LLM)")"; \
-			case "$$image_digest" in sha256:[0-9a-f][0-9a-f]*) ;; *) echo "❌ TensorRT-LLM candidate image digest is not canonical."; exit 1 ;; esac; \
-			test "$${#image_digest}" -eq 71 || { echo "❌ TensorRT-LLM candidate image digest is not canonical."; exit 1; }; \
-			$(CONTAINER_ENGINE) run --rm \
-				--gpus "$(TENSORRT_LLM_DOCKER_GPUS)" \
-				--network none \
-				--read-only \
-				--tmpfs /tmp:rw,nosuid,nodev,noexec \
-				-e INVARLOCK_CONTAINER_EXECUTION=1 \
-				-e INVARLOCK_RUNTIME_IMAGE_DIGEST="$$image_digest" \
-				-e INVARLOCK_RUNTIME_IMAGE="$$image_digest" \
-				-v "$(abspath $(TENSORRT_LLM_CANARY_ENGINE_BUNDLE)):/opt/invarlock/canary/engine:ro" \
-				-v "$(abspath $(TENSORRT_LLM_CANARY_TOKENIZER_CONTRACT)):/opt/invarlock/canary/tokenizer.json:ro" \
-				--entrypoint /opt/invarlock/cli-venv/bin/python \
-				$(RUNTIME_IMAGE_TENSORRT_LLM) \
-				-m invarlock.runtime_providers.tensorrt_llm_canary \
-				--engine-bundle /opt/invarlock/canary/engine \
-				--tokenizer-contract /opt/invarlock/canary/tokenizer.json \
-				--runner /opt/invarlock/bin/tensorrt-llm-runner \
-				--expected-engine-tree-sha256 "$(TENSORRT_LLM_CANARY_ENGINE_TREE_SHA256)" \
-				--expected-tokenizer-sha256 "$(TENSORRT_LLM_CANARY_TOKENIZER_SHA256)" \
-				--expected-output-sha256 "$(TENSORRT_LLM_CANARY_EXPECTED_OUTPUT_SHA256)"; \
-		fi
+runtime-canary-tensorrt-llm: runtime-canary-tensorrt-llm-dual  ## Qualify the maintained real-engine fixture on two GPUs
+
 
 .PHONY: container-default-smoke container-default-smoke-podman container-front-door-smoke container-front-door-smoke-podman
 container-default-smoke: runtime-image  ## Smoke the default container-backed evaluate path end-to-end

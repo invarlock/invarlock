@@ -1,4 +1,3 @@
-ARG TENSORRT_LLM_BASE_IMAGE=nvcr.io/nvidia/tensorrt-llm/release:1.2.1@sha256:33cd085b772947bd22b7273886539331420404e5d2a4a039945241945ff927b9
 ARG WHEEL_BUILD_BASE=python:3.12-slim@sha256:3d5ed973e45820f5ba5e46bd065bd88b3a504ff0724d85980dcd05eab361fcf4
 ARG SOURCE_DATE_EPOCH=0
 
@@ -43,7 +42,7 @@ RUN python -m pip download \
 # NVIDIA publishes this multi-architecture manifest for the stable TensorRT-LLM
 # 1.2.1 release. Digest pinning prevents a mutable tag from changing the runtime
 # beneath an authenticated provider receipt.
-FROM ${TENSORRT_LLM_BASE_IMAGE}
+FROM nvcr.io/nvidia/tensorrt-llm/release:1.2.1@sha256:33cd085b772947bd22b7273886539331420404e5d2a4a039945241945ff927b9
 
 ARG SOURCE_DATE_EPOCH
 ARG TENSORRT_LLM_VERSION=1.2.1

@@ -29,11 +29,10 @@ belong in separately built, reviewed runtime images:
 make runtime-image-gguf \
   GGUF_BLACKBOX_MODEL=/path/to/stories15M-q4_0.gguf
 make runtime-image-tensorrt-llm \
-  TENSORRT_LLM_CANARY_ENGINE_BUNDLE=/path/to/authenticated-engine-bundle \
-  TENSORRT_LLM_CANARY_TOKENIZER_CONTRACT=/path/to/tokenizer-contract.json \
-  TENSORRT_LLM_CANARY_ENGINE_TREE_SHA256=<reviewed-64-hex-tree-digest> \
-  TENSORRT_LLM_CANARY_TOKENIZER_SHA256=<reviewed-64-hex-file-digest> \
-  TENSORRT_LLM_CANARY_EXPECTED_OUTPUT_SHA256=<reviewed-64-hex-output-digest>
+  TENSORRT_LLM_FIXTURE_MODEL_DIR=/path/to/pinned-snapshot \
+  TENSORRT_LLM_FIXTURE_MODEL_INVENTORY_SHA256=<reviewed-64-hex-inventory> \
+  TENSORRT_LLM_PRIMARY_DOCKER_GPUS=device=0 \
+  TENSORRT_LLM_SECONDARY_DOCKER_GPUS=device=1
 ```
 
 The build targets use pinned backend inputs. Record the resulting image's
@@ -63,16 +62,19 @@ license terms. Running its smoke or provider path additionally requires Docker
 with the NVIDIA Container Toolkit, a compatible NVIDIA driver, and a supported
 NVIDIA GPU. Building the image alone is not hardware qualification.
 
-The TensorRT-LLM build first creates a clearly named candidate image. It runs
-the CUDA/runtime smoke and two single-rank scores of the fixed `InvarLock`
-prompt through fresh provider sessions before tagging the configured stable
-local image. The engine and tokenizer paths, their independently reviewed
-digests, and the reviewed output-text digest are required before the build
-starts. Missing or malformed bindings fail before building; any fixture,
-output, evidence-replay, or determinism mismatch fails before promotion. If a
-runtime qualification fails after the candidate is built, the target retains
-that candidate for diagnosis. No failure path creates or replaces the stable
-tag.
+The TensorRT-LLM flow first checks the reviewed model inventory, output
+location, image tags, source epoch, and GPU selectors. A fixed exact-base probe
+then resolves both selectors to distinct physical GPUs and requires compute
+capability 9.0 before the candidate build starts. The candidate image must pass
+the CUDA/runtime smoke before either GPU builds an engine. The flow derives and
+binds the engine-tree, tokenizer, and fixed-output digests.
+Each canary runs two single-rank scores of the fixed `InvarLock` prompt through
+fresh provider sessions on each GPU before tagging the configured stable local
+image. Missing or malformed inputs fail before building; any fixture, output,
+evidence-replay,
+hardware-binding, or determinism mismatch fails before promotion. If runtime
+qualification fails after the candidate is built, the target retains that
+candidate for diagnosis. No failure path creates or replaces the stable tag.
 
 Both native providers use the `first_party_experimental` plugin-maturity tier.
 GGUF currently targets Linux CPU execution with the pinned llama.cpp build and
@@ -299,12 +301,7 @@ Build and smoke the backend image on the platform where it will run:
 ```bash
 make runtime-smoke-gguf
 make runtime-smoke-tensorrt-llm
-make runtime-canary-tensorrt-llm \
-  TENSORRT_LLM_CANARY_ENGINE_BUNDLE=/path/to/authenticated-engine-bundle \
-  TENSORRT_LLM_CANARY_TOKENIZER_CONTRACT=/path/to/tokenizer-contract.json \
-  TENSORRT_LLM_CANARY_ENGINE_TREE_SHA256=<reviewed-64-hex-tree-digest> \
-  TENSORRT_LLM_CANARY_TOKENIZER_SHA256=<reviewed-64-hex-file-digest> \
-  TENSORRT_LLM_CANARY_EXPECTED_OUTPUT_SHA256=<reviewed-64-hex-output-digest>
+make runtime-canary-tensorrt-llm
 ```
 
 The GGUF stable-image build requires its 19,077,344-byte black-box fixture,
@@ -329,18 +326,41 @@ both runs.
 
 The TensorRT-LLM smoke requires Docker with the NVIDIA Container Toolkit and a
 visible CUDA device. It checks the pinned package/image environment and the
-runner information protocol. The required canary then authenticates the
-reviewed engine tree and tokenizer file, executes two real scores in fresh
-provider sessions, requires the reviewed output digest, and requires
-byte-identical canonical observations and receipts. Those checks qualify the
+runner information protocol. The required dual-GPU canary then authenticates
+the generated engine tree and tokenizer file, executes real scores in fresh
+provider sessions on both GPUs, and requires byte-identical canonical
+observations and receipts. Those checks qualify the
 local image tag, but do not establish a behavioral claim for a particular
 schedule. That claim still requires a real `run-side` using the intended engine
 and tokenizer, followed by `verify-pair` against the intended schedule and
 policy.
 
-On a multi-GPU host, set `TENSORRT_LLM_DOCKER_GPUS=device=0` (or another
-reviewed Docker GPU selector) to reserve one device for qualification while
-independent CUDA validation uses the other device.
+The maintained multi-GPU fixture target starts from the pinned NVIDIA NGC
+image and an already local TinyLlama snapshot at revision
+`fe8a4ea1ffedaf415f4da2f062534de366a451e6`. Review the snapshot inventory
+digest before running it:
+
+```bash
+make runtime-image-tensorrt-llm-dual \
+  TENSORRT_LLM_FIXTURE_MODEL_DIR=/path/to/pinned-snapshot \
+  TENSORRT_LLM_FIXTURE_MODEL_INVENTORY_SHA256=<reviewed-64-hex-inventory> \
+  TENSORRT_LLM_PRIMARY_DOCKER_GPUS=device=0 \
+  TENSORRT_LLM_SECONDARY_DOCKER_GPUS=device=1
+```
+
+The target copies the model and fixture worker into a new owned snapshot,
+builds an engine independently on each selected GPU, and freezes the primary
+engine only after both GPUs can execute it with identical fixed output. The two
+engine serializations may differ in bytes; the manifest records that result
+without treating byte identity as a requirement. Qualification resolves the
+candidate tag once, executes the immutable image ID, validates closed result
+schemas and artifact bindings on both GPUs, and assigns the stable tag from the
+qualified image digest rather than from the mutable candidate tag. Outputs
+under `artifacts/runtime-qualification/` are local qualification material and
+are not public evidence packs.
+
+A qualified fixture or canary still does not establish schedule-level behavior;
+that requires `run-side` and `verify-pair` with the intended policy.
 
 ## Hugging Face Use
 

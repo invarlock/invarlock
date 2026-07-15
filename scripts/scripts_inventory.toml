@@ -223,9 +223,9 @@ stability = "release-critical"
 audience = "release-only"
 expected_runtime = "medium"
 network = "optional"
-gpu = "never"
-invoked_by = ["make release-preflight", "make release-evidence-check", "make empirical-guard-inventory-check (standalone diagnostic)"]
-description = "Release checks, offline-bundle helpers, and a separate non-authoritative empirical-artifact inventory."
+gpu = "optional"
+invoked_by = ["make release-preflight", "make release-evidence-check", "make runtime-image-tensorrt-llm-dual", "make empirical-guard-inventory-check (standalone diagnostic)"]
+description = "Release checks, offline-bundle helpers, native-runtime qualification, and a separate non-authoritative empirical-artifact inventory."
 paths = [
   "scripts/release/**",
 ]

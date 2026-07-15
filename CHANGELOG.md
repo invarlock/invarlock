@@ -28,15 +28,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   activation, numerical, performance, export, or backend equivalence.
 - Added pinned native runtime-image qualification targets. GGUF requires its
   two-container behavior black-box before assigning the stable local tag.
-  TensorRT-LLM requires a CUDA smoke plus reviewed engine-tree, tokenizer, and
-  fixed-output digests; its canary requires byte-identical provider evidence
-  across two fresh sessions. The isolated runner requires InvarLock's
-  deterministic execution marker and fixed decoding settings, and records CUDA
-  runtime version separately from driver version. Failed qualification leaves
+  TensorRT-LLM requires a reviewed pinned-model inventory, an exact-base
+  two-device hardware preflight, a candidate CUDA smoke, and derived
+  engine-tree, tokenizer, and fixed-output bindings; its canary requires
+  byte-identical provider evidence across two fresh sessions. The isolated
+  runner requires InvarLock's deterministic execution marker and fixed decoding
+  settings, and records CUDA runtime version separately from driver version.
+  Failed qualification leaves
   the existing stable local tag unchanged, and TensorRT-LLM still requires
   separate NVIDIA platform and real-engine qualification. CUDA and TensorRT-LLM
   qualification targets accept explicit Docker GPU selectors; CUDA smokes now
-  require a visible selected device and execute a real tensor kernel.
+  require a visible selected device and execute a real tensor kernel. A
+  maintained two-GPU TensorRT-LLM flow now snapshots a reviewed pinned model,
+  builds and cross-executes a real engine independently on both devices,
+  validates closed artifact-bound results through the immutable candidate
+  image ID, rejects selector aliases and non-matching compute capabilities, and
+  promotes only the digest bound by the qualification summary.
 - Added policy-bound `observe` and `enforce` authority for spectral, RMT, and
   variance findings in `policy-pack-v2`. Observation mode retains complete
   guard execution, provenance, replay, and reporting while leaving primary
@@ -170,6 +177,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed TensorRT-LLM qualification to accept an explicit Docker GPU selector,
   allowing independent single-GPU workers on multi-GPU hosts without exposing
   every device to each container.
+- Fixed TensorRT-LLM engine authentication to ignore read-driven access-time
+  changes while still rejecting changes to names, sizes, device/inode identity,
+  mode, modification time, status-change time, or content.
 - Fixed documentation and CLI examples so strict commands include every
   independently supplied verifier input.
 - Fixed public-evidence, packaged-data, support-matrix, and model-catalog

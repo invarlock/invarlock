@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 STABLE_IMAGE = (
@@ -13,8 +16,9 @@ def test_tensorrt_llm_image_pins_official_stable_multiarch_manifest() -> None:
         encoding="utf-8"
     )
 
-    assert f"ARG TENSORRT_LLM_BASE_IMAGE={STABLE_IMAGE}" in text
-    assert "FROM ${TENSORRT_LLM_BASE_IMAGE}" in text
+    assert f"FROM {STABLE_IMAGE}" in text
+    assert "ARG TENSORRT_LLM_BASE_IMAGE" not in text
+    assert "FROM ${TENSORRT_LLM_BASE_IMAGE}" not in text
     assert "1.2.0rc" not in text
     assert "1.3.0rc" not in text
     assert "release:latest" not in text
@@ -61,7 +65,9 @@ def test_tensorrt_image_isolates_cli_from_vendor_backend_environment() -> None:
     dockerfile = (Path.cwd() / "runtime" / "Dockerfile.tensorrt-llm").read_text(
         encoding="utf-8"
     )
-    makefile = (Path.cwd() / "Makefile").read_text(encoding="utf-8")
+    boundary = (
+        Path.cwd() / "scripts" / "release" / "tensorrt_llm_runtime_fixture_boundary.py"
+    ).read_text(encoding="utf-8")
 
     assert "FROM ${WHEEL_BUILD_BASE} AS cli-dependencies" in dockerfile
     assert "-r /tmp/core-py312.txt" in dockerfile
@@ -75,91 +81,138 @@ def test_tensorrt_image_isolates_cli_from_vendor_backend_environment() -> None:
         "/opt/invarlock/cli-venv/bin/invarlock advanced plugins "
         "runtime-providers --json" in dockerfile
     )
-    assert "/opt/invarlock/bin/vendor-python -c" in makefile
+    assert "/opt/invarlock/bin/vendor-python -c" in boundary
     assert (
         "/opt/invarlock/cli-venv/bin/invarlock advanced runtime-behavior --help"
-        in makefile
+        in boundary
     )
 
 
-def test_makefile_qualifies_candidate_before_stable_tag() -> None:
+def test_makefile_uses_the_safe_dual_flow_for_public_tensorrt_targets() -> None:
     text = (Path.cwd() / "Makefile").read_text(encoding="utf-8")
 
-    assert f"TENSORRT_LLM_BASE_IMAGE ?= {STABLE_IMAGE}" in text
-    assert "runtime-image-tensorrt-llm:" in text
-    assert "runtime-image-tensorrt-llm: runtime-image" not in text
-    assert "-f runtime/Dockerfile.tensorrt-llm" in text
-    assert "RUNTIME_IMAGE_TENSORRT_LLM_BUILD ?=" in text
-    assert "runtime-smoke-tensorrt-llm:" in text
+    assert "TENSORRT_LLM_BASE_IMAGE" not in text
+    assert "runtime-image-tensorrt-llm: runtime-image-tensorrt-llm-dual" in text
+    assert "runtime-canary-tensorrt-llm: runtime-canary-tensorrt-llm-dual" in text
     assert (
-        "$(MAKE) runtime-smoke-tensorrt-llm "
-        "RUNTIME_IMAGE_TENSORRT_LLM=$(RUNTIME_IMAGE_TENSORRT_LLM_BUILD)"
-    ) in text
-    assert (
-        "$(MAKE) runtime-canary-tensorrt-llm "
-        "RUNTIME_IMAGE_TENSORRT_LLM=$(RUNTIME_IMAGE_TENSORRT_LLM_BUILD)"
-    ) in text
-    build = text.index("runtime-image-tensorrt-llm:")
-    preflight_engine = text.index(
-        "Set TENSORRT_LLM_CANARY_ENGINE_BUNDLE before building", build
+        "$(PYTHON) scripts/release/tensorrt_llm_runtime_fixture.py smoke-image" in text
     )
-    preflight_tokenizer = text.index(
-        "Set TENSORRT_LLM_CANARY_TOKENIZER_CONTRACT before building", build
+    assert "--build-arg TENSORRT_LLM_BASE_IMAGE" not in text
+
+
+def test_makefile_dual_gpu_flow_builds_fixture_before_stable_promotion() -> None:
+    text = (Path.cwd() / "Makefile").read_text(encoding="utf-8")
+
+    exports = (
+        "CONTAINER_ENGINE",
+        "IMAGE",
+        "STABLE_TAG",
+        "GPU_0",
+        "GPU_1",
+        "SMOKE_GPU",
+        "MODEL",
+        "FIXTURE_ROOT",
+        "MODEL_INVENTORY_SHA256",
+        "SOURCE_DATE_EPOCH",
     )
-    preflight_engine_digest = text.index(
-        "Set TENSORRT_LLM_CANARY_ENGINE_TREE_SHA256", build
+    for name in exports:
+        assert f"export INVARLOCK_TENSORRT_LLM_{name} :=" in text
+
+    candidate = text.index("runtime-image-tensorrt-llm-candidate:")
+    fixture = text.index("runtime-fixture-tensorrt-llm:", candidate)
+    qualification = text.index("runtime-canary-tensorrt-llm-dual:", fixture)
+    flow = text.index("runtime-image-tensorrt-llm-dual:", qualification)
+    public_alias = text.index("runtime-image-tensorrt-llm:", flow)
+    blocks = (
+        text[candidate:fixture],
+        text[fixture:qualification],
+        text[qualification:flow],
+        text[flow:public_alias],
     )
-    preflight_tokenizer_digest = text.index(
-        "Set TENSORRT_LLM_CANARY_TOKENIZER_SHA256", build
+    assert "tensorrt_llm_runtime_fixture.py build-image" in blocks[0]
+    assert "tensorrt_llm_runtime_fixture.py build-fixture" in blocks[1]
+    assert "tensorrt_llm_runtime_fixture.py qualify-two-gpu" in blocks[2]
+    assert "tensorrt_llm_runtime_fixture.py promote" in blocks[3]
+    ordered = (
+        "tensorrt_llm_runtime_fixture.py preflight",
+        "runtime-image-tensorrt-llm-candidate",
+        "tensorrt_llm_runtime_fixture.py smoke-image",
+        "runtime-fixture-tensorrt-llm",
+        "runtime-canary-tensorrt-llm-dual",
+        "tensorrt_llm_runtime_fixture.py promote",
     )
-    preflight_output_digest = text.index(
-        "Set TENSORRT_LLM_CANARY_EXPECTED_OUTPUT_SHA256", build
+    positions = tuple(blocks[3].index(value) for value in ordered)
+    assert positions == tuple(sorted(positions))
+    unsafe = (
+        "CONTAINER_ENGINE",
+        "RUNTIME_IMAGE_TENSORRT_LLM",
+        "TENSORRT_LLM_PRIMARY_DOCKER_GPUS",
+        "TENSORRT_LLM_SECONDARY_DOCKER_GPUS",
+        "TENSORRT_LLM_FIXTURE_MODEL_DIR",
+        "TENSORRT_LLM_FIXTURE_MODEL_INVENTORY_SHA256",
+        "TENSORRT_LLM_FIXTURE_DIR",
+        "RUNTIME_SOURCE_DATE_EPOCH",
     )
-    image_build = text.index("-f runtime/Dockerfile.tensorrt-llm", build)
-    smoke = text.index("$(MAKE) runtime-smoke-tensorrt-llm", build)
-    canary = text.index("$(MAKE) runtime-canary-tensorrt-llm", smoke)
-    stable_tag = text.index("image tag $(RUNTIME_IMAGE_TENSORRT_LLM_BUILD)", canary)
-    assert build < preflight_engine < image_build
-    assert build < preflight_tokenizer < image_build
-    assert build < preflight_engine_digest < image_build
-    assert build < preflight_tokenizer_digest < image_build
-    assert build < preflight_output_digest < image_build
-    assert image_build < smoke < canary < stable_tag
-    assert "TENSORRT_LLM_DOCKER_GPUS ?= all" in text
-    assert '--gpus "$(TENSORRT_LLM_DOCKER_GPUS)"' in text
-    assert "--network none" in text
-    assert "--read-only" in text
-    assert "--tmpfs /tmp:rw,nosuid,nodev,noexec" in text
-    assert "torch.cuda.is_available()" in text
-    assert "NVIDIA_VISIBLE_DEVICES" in text
-    assert "m.version(" in text
-    assert "tensorrt_llm" in text
-    assert "1.2.1" in text
-    assert (
-        "/opt/invarlock/bin/tensorrt-llm-runner --invarlock-runtime-info-v1"
-    ) in text
-    assert "runtime-canary-tensorrt-llm:" in text
-    assert "image inspect --format '{{.Id}}'" in text
-    assert '-e INVARLOCK_RUNTIME_IMAGE_DIGEST="$$image_digest"' in text
-    assert '-e INVARLOCK_RUNTIME_IMAGE="$$image_digest"' in text
-    assert "-m invarlock.runtime_providers.tensorrt_llm_canary" in text
-    assert "--entrypoint /opt/invarlock/cli-venv/bin/python" in text
-    assert "--engine-bundle /opt/invarlock/canary/engine" in text
-    assert "--tokenizer-contract /opt/invarlock/canary/tokenizer.json" in text
-    assert "--runner /opt/invarlock/bin/tensorrt-llm-runner" in text
-    assert (
-        '--expected-engine-tree-sha256 "$(TENSORRT_LLM_CANARY_ENGINE_TREE_SHA256)"'
-        in text
+    for recipe in blocks:
+        for name in unsafe:
+            assert f"$({name})" not in recipe
+
+
+def test_dual_flow_invalid_inputs_fail_before_docker_or_candidate_build(
+    tmp_path: Path,
+) -> None:
+    marker = tmp_path / "docker-started"
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    docker = bin_dir / "docker"
+    docker.write_text(
+        f"#!/bin/sh\ntouch {marker}\nexit 99\n",
+        encoding="utf-8",
     )
-    assert (
-        '--expected-tokenizer-sha256 "$(TENSORRT_LLM_CANARY_TOKENIZER_SHA256)"' in text
+    docker.chmod(0o700)
+    environment = dict(os.environ)
+    environment["PATH"] = f"{bin_dir}{os.pathsep}{environment['PATH']}"
+    result = subprocess.run(
+        [
+            "make",
+            "runtime-image-tensorrt-llm-dual",
+            f"PYTHON={sys.executable}",
+            f"TENSORRT_LLM_FIXTURE_MODEL_DIR={tmp_path / 'missing-model'}",
+            f"TENSORRT_LLM_FIXTURE_DIR={tmp_path / 'fixture'}",
+            f"TENSORRT_LLM_FIXTURE_MODEL_INVENTORY_SHA256={'1' * 64}",
+            "RUNTIME_SOURCE_DATE_EPOCH=1784073600",
+        ],
+        cwd=Path.cwd(),
+        capture_output=True,
+        check=False,
+        env=environment,
+        text=True,
     )
-    assert (
-        "--expected-output-sha256 "
-        '"$(TENSORRT_LLM_CANARY_EXPECTED_OUTPUT_SHA256)"' in text
+    assert result.returncode != 0
+    assert "preflight" in result.stdout
+    assert "runtime-image-tensorrt-llm-candidate" not in result.stdout
+    assert not marker.exists()
+
+
+def test_make_override_cannot_escape_before_python_validation(tmp_path: Path) -> None:
+    marker = tmp_path / "escaped"
+    payload = f'candidate:tag"; touch {marker}; #'
+    result = subprocess.run(
+        [
+            "make",
+            "runtime-image-tensorrt-llm-candidate",
+            f"PYTHON={sys.executable}",
+            f"RUNTIME_IMAGE_TENSORRT_LLM_BUILD={payload}",
+            "RUNTIME_SOURCE_DATE_EPOCH=1784073600",
+        ],
+        cwd=Path.cwd(),
+        capture_output=True,
+        check=False,
+        text=True,
     )
-    assert "reviewed engine, tokenizer, and fixed-output digests" in text
-    assert "stable qualification requires an authenticated real-engine canary" in text
+    assert result.returncode != 0
+    assert not marker.exists()
+    assert "candidate tag is invalid" in result.stderr
 
 
 def test_tensorrt_qualification_docs_require_reviewed_repeatable_fixture() -> None:
@@ -167,10 +220,11 @@ def test_tensorrt_qualification_docs_require_reviewed_repeatable_fixture() -> No
         encoding="utf-8"
     )
 
-    assert "TENSORRT_LLM_CANARY_ENGINE_TREE_SHA256" in text
-    assert "TENSORRT_LLM_CANARY_TOKENIZER_SHA256" in text
-    assert "TENSORRT_LLM_CANARY_EXPECTED_OUTPUT_SHA256" in text
+    assert "TENSORRT_LLM_FIXTURE_MODEL_INVENTORY_SHA256" in text
+    assert "TENSORRT_LLM_PRIMARY_DOCKER_GPUS" in text
+    assert "TENSORRT_LLM_SECONDARY_DOCKER_GPUS" in text
+    assert "older single-GPU target" not in text
     assert "two single-rank scores" in text
     assert "fresh provider sessions" in text
-    assert "byte-identical canonical observations and receipts" in text
+    assert "byte-identical canonical observations and provider receipts" in text
     assert "`FORCE_DETERMINISTIC=1`" in text
