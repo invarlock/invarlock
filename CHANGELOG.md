@@ -180,6 +180,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed TensorRT-LLM engine authentication to ignore read-driven access-time
   changes while still rejecting changes to names, sizes, device/inode identity,
   mode, modification time, status-change time, or content.
+- Fixed TensorRT-LLM qualification to initialize the pinned vendor library
+  environment without contaminating strict machine output, keep required
+  runtime caches inside the bounded temporary filesystem, and recognize both
+  canonical proprietary and open-kernel NVIDIA driver-version records.
 - Fixed documentation and CLI examples so strict commands include every
   independently supplied verifier input.
 - Fixed public-evidence, packaged-data, support-matrix, and model-catalog

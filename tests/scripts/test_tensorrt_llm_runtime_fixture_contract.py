@@ -57,6 +57,8 @@ def test_parse_object_rejects_duplicate_keys_and_nonfinite() -> None:
         fixture._parse_object(b'{"value":NaN}', label="test")
     with pytest.raises(fixture.TensorRTLLMFixtureError, match="strict JSON"):
         fixture._parse_object(b"not-json", label="test")
+    with pytest.raises(fixture.TensorRTLLMFixtureError, match="strict JSON"):
+        fixture._parse_object(b'vendor banner\n{"ok":true}', label="test")
     with pytest.raises(fixture.TensorRTLLMFixtureError, match="JSON object"):
         fixture._parse_object(b"[]", label="test")
 

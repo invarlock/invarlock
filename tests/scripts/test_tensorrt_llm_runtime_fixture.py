@@ -148,6 +148,14 @@ def test_candidate_smoke_uses_the_inspected_digest_and_validated_selector(
     )
     assert digest in commands[0]
     assert "candidate:tag" not in commands[0]
+    entrypoint = commands[0].index("--entrypoint")
+    assert commands[0][entrypoint : entrypoint + 2] == (
+        "--entrypoint",
+        "/bin/bash",
+    )
+    assert all(
+        value in commands[0] for value in fixture._boundary.VENDOR_CACHE_ENV_ARGS
+    )
     assert result["candidate_image_digest"] == digest
     with pytest.raises(fixture.TensorRTLLMFixtureError, match="selector"):
         fixture.smoke_candidate_image(
@@ -172,24 +180,6 @@ def test_candidate_build_and_smoke_fail_closed_on_container_errors(
         fixture.smoke_candidate_image(
             engine="docker", image="candidate:tag", selector="device=0"
         )
-
-
-def test_docker_prefix_is_non_privileged_and_offline(tmp_path: Path) -> None:
-    worker = tmp_path / "worker.py"
-    command = fixture._docker_prefix(
-        engine="docker",
-        selector="device=1",
-        worker=worker,
-        image="candidate",
-    )
-    assert command[:6] == ["docker", "run", "--rm", "--gpus", "device=1", "--network"]
-    assert "none" in command
-    assert "--read-only" in command
-    assert command[command.index("--cap-drop") + 1] == "ALL"
-    assert "no-new-privileges" in command
-    assert "--privileged" not in command
-    assert "--entrypoint" not in command
-    assert command[-2:] == ["candidate", "/opt/invarlock/bin/vendor-python"]
 
 
 def test_build_fixture_runs_two_builds_and_two_cross_gpu_probes(
@@ -389,6 +379,19 @@ def test_low_level_build_probe_and_canary_commands_are_closed(
     )
     assert all(
         command[command.index("--gpus") + 1] in {"device=0", "device=1"}
+        for command in commands
+    )
+    assert all(
+        command[command.index("--entrypoint") + 1] == "/bin/bash"
+        for command in commands
+    )
+    assert all(
+        command[command.index("-c") : command.index("-c") + 3]
+        == ["-c", 'exec "$@"', "--"]
+        for command in commands
+    )
+    assert all(
+        all(value in command for value in fixture._boundary.VENDOR_CACHE_ENV_ARGS)
         for command in commands
     )
 

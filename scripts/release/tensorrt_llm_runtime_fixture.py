@@ -313,9 +313,14 @@ def preflight_flow(
 
 
 def _docker_prefix(
-    *, engine: str, selector: str, worker: Path, image: str
+    *,
+    engine: str,
+    selector: str,
+    worker: Path,
+    image: str,
+    volumes: Sequence[str] = (),
 ) -> list[str]:
-    return [
+    command = [
         engine,
         "run",
         "--rm",
@@ -340,11 +345,21 @@ def _docker_prefix(
         "INVARLOCK_CONTAINER_EXECUTION=1",
         "--env",
         "TRANSFORMERS_OFFLINE=1",
+        *_boundary.VENDOR_CACHE_ENV_ARGS,
         "--volume",
         f"{worker}:{_WORKER_CONTAINER}:ro",
-        image,
-        "/opt/invarlock/bin/vendor-python",
     ]
+    for volume in volumes:
+        command.extend(("--volume", volume))
+    command.extend(
+        (
+            *_boundary.VENDOR_BASH_ENTRYPOINT,
+            image,
+            *_boundary.VENDOR_ARGV_TRAMPOLINE,
+            "/opt/invarlock/bin/vendor-python",
+        )
+    )
+    return command
 
 
 def _validate_build_result(payload: bytes) -> None:
@@ -363,14 +378,15 @@ def _build_one(
     *, engine: str, image: str, selector: str, worker: Path, model: Path, output: Path
 ) -> None:
     command = _docker_prefix(
-        engine=engine, selector=selector, worker=worker, image=image
+        engine=engine,
+        selector=selector,
+        worker=worker,
+        image=image,
+        volumes=(
+            f"{model}:{_MODEL_CONTAINER}:ro",
+            f"{output.parent}:{_OUTPUT_CONTAINER}:rw",
+        ),
     )
-    command[-2:-2] = [
-        "--volume",
-        f"{model}:{_MODEL_CONTAINER}:ro",
-        "--volume",
-        f"{output.parent}:{_OUTPUT_CONTAINER}:rw",
-    ]
     command.extend(
         (
             _WORKER_CONTAINER,
@@ -410,14 +426,15 @@ def _probe_one(
     *, engine: str, image: str, selector: str, worker: Path, fixture: Path
 ) -> str:
     command = _docker_prefix(
-        engine=engine, selector=selector, worker=worker, image=image
+        engine=engine,
+        selector=selector,
+        worker=worker,
+        image=image,
+        volumes=(
+            f"{fixture / 'engine'}:{_ENGINE_CONTAINER}:ro",
+            f"{fixture / 'tokenizer.json'}:{_TOKENIZER_CONTAINER}:ro",
+        ),
     )
-    command[-2:-2] = [
-        "--volume",
-        f"{fixture / 'engine'}:{_ENGINE_CONTAINER}:ro",
-        "--volume",
-        f"{fixture / 'tokenizer.json'}:{_TOKENIZER_CONTAINER}:ro",
-    ]
     command.extend(
         (
             _WORKER_CONTAINER,
@@ -628,11 +645,14 @@ def _canary_one(
         f"INVARLOCK_RUNTIME_IMAGE={image_digest}",
         "--env",
         f"INVARLOCK_RUNTIME_IMAGE_DIGEST={image_digest}",
+        *_boundary.VENDOR_CACHE_ENV_ARGS,
         "--volume",
         f"{fixture / 'engine'}:/opt/invarlock/canary/engine:ro",
         "--volume",
         f"{fixture / 'tokenizer.json'}:/opt/invarlock/canary/tokenizer.json:ro",
+        *_boundary.VENDOR_BASH_ENTRYPOINT,
         image,
+        *_boundary.VENDOR_ARGV_TRAMPOLINE,
         "/opt/invarlock/bin/vendor-python",
         "-m",
         "invarlock.runtime_providers.tensorrt_llm_canary",

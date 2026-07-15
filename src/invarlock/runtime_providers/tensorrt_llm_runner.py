@@ -40,7 +40,19 @@ _MAX_SETTING_VALUE = 1024 * 1024
 _MAX_TIMEOUT_SECONDS = 24 * 60 * 60
 _IPV4_ROUTE_PATH = Path("/proc/net/route")
 _IPV6_ROUTE_PATH = Path("/proc/net/ipv6_route")
-_DRIVER_VERSION = re.compile(r"Kernel Module\s+([0-9]+(?:\.[0-9]+)+)")
+_DRIVER_VERSION = re.compile(
+    r"^NVRM version: NVIDIA UNIX "
+    r"(?:(?:x86_64|aarch64) Kernel Module|"
+    r"Open Kernel Module for (?:x86_64|aarch64))"
+    r"[ \t]+([0-9]+(?:\.[0-9]+)+)[ \t]+"
+    r"(?:Release Build[ \t]+\([A-Za-z0-9_.@/-]+\)[ \t]+)?"
+    r"(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[ \t]+"
+    r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[ \t]+"
+    r"(?:[1-9]|[12][0-9]|3[01])[ \t]+"
+    r"(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9][ \t]+UTC[ \t]+"
+    r"(?:19|20)[0-9]{2}$",
+    re.MULTILINE,
+)
 _CUDA_RUNTIME_VERSION = re.compile(r"^[0-9]+(?:\.[0-9]+)+$")
 _CRITICAL_BACKEND_FILES = (
     "tensorrt_llm/__init__.py",
@@ -589,11 +601,11 @@ def _observed_backend_build_sha256() -> str:
     ).hexdigest()
 
 
-def _read_driver_version() -> str:
+def _read_driver_version(
+    *, version_path: Path = Path("/proc/driver/nvidia/version")
+) -> str:
     try:
-        payload = Path("/proc/driver/nvidia/version").read_text(
-            encoding="ascii", errors="strict"
-        )
+        payload = version_path.read_text(encoding="ascii", errors="strict")
     except (OSError, UnicodeError) as exc:
         raise TensorRTLLMRunnerError("NVIDIA driver version is unavailable") from exc
     match = _DRIVER_VERSION.search(payload)

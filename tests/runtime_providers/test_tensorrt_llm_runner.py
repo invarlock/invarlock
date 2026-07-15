@@ -267,6 +267,64 @@ def test_cuda_runtime_version_probe_fails_closed() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        (
+            "NVRM version: NVIDIA UNIX x86_64 Kernel Module  "
+            "550.54.15  Tue Mar  5 15:41:53 UTC 2024\n",
+            "550.54.15",
+        ),
+        (
+            "NVRM version: NVIDIA UNIX Open Kernel Module for x86_64  "
+            "580.126.09  Release Build  "
+            "(dvs-builder@U22-I3-AM02-24-3)  Wed Jan  7 22:51:36 UTC 2026\n"
+            "GCC version: gcc version 13.3.0\n",
+            "580.126.09",
+        ),
+    ],
+)
+def test_driver_version_accepts_canonical_nvidia_layouts(
+    tmp_path: Path, payload: str, expected: str
+) -> None:
+    version = tmp_path / "version"
+    version.write_text(payload, encoding="ascii")
+
+    assert runner._read_driver_version(version_path=version) == expected  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "Kernel Module 580.126.09\n",
+        "NVRM version: vendor Kernel Module 580.126.09\n",
+        "NVRM version: NVIDIA UNIX Kernel Module  580.126.09  "
+        "Wed Jan  7 22:51:36 UTC 2026\n",
+        "NVRM version: NVIDIA UNIX Open Kernel Module 580.126.09\n",
+        "NVRM version: NVIDIA UNIX Open Kernel Module for x86_64 invalid\n",
+        "NVRM version: NVIDIA UNIX Open Kernel Module for x86_64  "
+        "580.126.09 forged suffix\n",
+    ],
+)
+def test_driver_version_rejects_noncanonical_text(tmp_path: Path, payload: str) -> None:
+    version = tmp_path / "version"
+    version.write_text(payload, encoding="ascii")
+
+    with pytest.raises(runner.TensorRTLLMRunnerError, match="not canonical"):
+        runner._read_driver_version(version_path=version)  # noqa: SLF001
+
+
+def test_driver_version_rejects_unavailable_or_non_ascii_sources(
+    tmp_path: Path,
+) -> None:
+    version = tmp_path / "version"
+    with pytest.raises(runner.TensorRTLLMRunnerError, match="unavailable"):
+        runner._read_driver_version(version_path=version)  # noqa: SLF001
+    version.write_bytes(b"NVRM version: \xff")
+    with pytest.raises(runner.TensorRTLLMRunnerError, match="unavailable"):
+        runner._read_driver_version(version_path=version)  # noqa: SLF001
+
+
 def test_runner_backend_build_identity_changes_with_live_module_bytes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

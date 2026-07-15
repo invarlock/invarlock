@@ -28,6 +28,18 @@ BASE_DIGEST: Final = (
 BASE_IMAGE: Final = "nvcr.io/nvidia/tensorrt-llm/release:1.2.1@" + BASE_DIGEST
 BUILD_FORMAT: Final = "invarlock/tensorrt-llm-runtime-image-build-v1"
 SMOKE_FORMAT: Final = "invarlock/tensorrt-llm-runtime-image-smoke-v1"
+VENDOR_CACHE_ENV_ARGS: Final = (
+    "--env",
+    "HOME=/tmp/invarlock-home",
+    "--env",
+    "XDG_CACHE_HOME=/tmp/invarlock-cache",
+    "--env",
+    "HF_HOME=/tmp/invarlock-hf",
+    "--env",
+    "FLASHINFER_WORKSPACE_DIR=/tmp/invarlock-flashinfer",
+)
+VENDOR_BASH_ENTRYPOINT: Final = ("--entrypoint", "/bin/bash")
+VENDOR_ARGV_TRAMPOLINE: Final = ("-c", 'exec "$@"', "--")
 ENV_CONTAINER_ENGINE: Final = "INVARLOCK_TENSORRT_LLM_CONTAINER_ENGINE"
 ENV_IMAGE: Final = "INVARLOCK_TENSORRT_LLM_IMAGE"
 ENV_STABLE_TAG: Final = "INVARLOCK_TENSORRT_LLM_STABLE_TAG"
@@ -342,8 +354,8 @@ def smoke_candidate_image(
         "/tmp:rw,nosuid,nodev,noexec",
         "--env",
         "INVARLOCK_CONTAINER_EXECUTION=1",
-        "--entrypoint",
-        "/bin/sh",
+        *VENDOR_CACHE_ENV_ARGS,
+        *VENDOR_BASH_ENTRYPOINT,
         digest,
         "-ec",
         script,
