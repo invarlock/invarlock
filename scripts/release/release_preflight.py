@@ -5,7 +5,7 @@ This command deliberately keeps artifact *shape* checks separate from release
 approval.  It proves that the checked-out commit is the requested clean commit,
 that the two built distributions have the expected metadata and hashes, and
 that an isolated installed-wheel interpreter is not importing the checkout.
-It then runs the current negative-evidence audit. It does not publish anything.
+It then audits the current public-evidence index. It does not publish anything.
 """
 
 from __future__ import annotations
@@ -662,14 +662,13 @@ def validate_installed_wheel_import(
         )
 
 
-def _run_current_negative_evidence_audit(config: ReleasePreflightConfig) -> None:
+def _run_current_public_evidence_audit(config: ReleasePreflightConfig) -> None:
     public_evidence_root = (config.repo_root / "public_evidence").resolve()
     command = [
         sys.executable,
         str(config.repo_root / "scripts" / "checks" / "check_public_evidence.py"),
         "--root",
         str(public_evidence_root),
-        "--require-current-negative-evidence",
     ]
     completed = subprocess.run(
         command,
@@ -682,7 +681,7 @@ def _run_current_negative_evidence_audit(config: ReleasePreflightConfig) -> None
         ),
     )
     if completed.returncode != 0:
-        raise ReleasePreflightError("current negative-evidence audit failed")
+        raise ReleasePreflightError("current public-evidence audit failed")
 
 
 def run_release_preflight(config: ReleasePreflightConfig) -> dict[str, Any]:
@@ -690,7 +689,7 @@ def run_release_preflight(config: ReleasePreflightConfig) -> dict[str, Any]:
     validate_clean_exact_checkout(config)
     artifacts = validate_distributions(config)
     _probe_installed_wheel(config, artifacts.wheel)
-    _run_current_negative_evidence_audit(config)
+    _run_current_public_evidence_audit(config)
     validate_clean_exact_checkout(config)
     return {
         "schema": PREFLIGHT_SCHEMA,
@@ -709,7 +708,7 @@ def run_release_preflight(config: ReleasePreflightConfig) -> dict[str, Any]:
         ],
         "installed_wheel_import": "isolated_venv_from_candidate_wheel",
         "installed_wheel_runtime_surface": "passed",
-        "current_negative_evidence": "passed",
+        "current_public_evidence": "passed",
     }
 
 

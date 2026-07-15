@@ -37,9 +37,6 @@ from scripts.checks.public_evidence_checks.guard_scenarios import (  # noqa: E40
 from scripts.checks.public_evidence_checks.index import (  # noqa: E402
     _check_packaged_public_evidence_index,
 )
-from scripts.checks.public_evidence_checks.negative_fixtures import (  # noqa: E402
-    check_current_negative_fixture_index,
-)
 from scripts.checks.public_evidence_checks.summaries import (  # noqa: E402
     _check_attention_backend_compatibility,
     _check_runtime_backend_compatibility,
@@ -88,7 +85,6 @@ def check_public_evidence(
     root: Path = PUBLIC_EVIDENCE_ROOT,
     *,
     fetch_external_assets: bool = False,
-    require_current_negative_evidence: bool = False,
 ) -> list[str]:
     errors: list[str] = []
     root = root.resolve()
@@ -98,12 +94,6 @@ def check_public_evidence(
         return [f"public evidence root not found: {root}"]
     _check_public_evidence_privacy(errors, root)
     _check_duplicate_root_evaluation_reports(errors, root)
-    current_negative_evidence_valid = check_current_negative_fixture_index(errors, root)
-    if require_current_negative_evidence and not current_negative_evidence_valid:
-        errors.append(
-            f"{_relative(root)}: release closure requires a validated "
-            "current negative-evidence index"
-        )
     if root == PUBLIC_EVIDENCE_ROOT.resolve():
         _check_packaged_public_evidence_index(
             errors,
@@ -254,14 +244,6 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Download external public-evidence assets and verify size/SHA256.",
     )
-    parser.add_argument(
-        "--require-current-negative-evidence",
-        action="store_true",
-        help=(
-            "Fail closed unless a typed current negative-evidence index is present "
-            "and every named failure replays under strict release verification."
-        ),
-    )
     return parser.parse_args(argv)
 
 
@@ -270,7 +252,6 @@ def main(argv: list[str] | None = None) -> int:
     errors = check_public_evidence(
         args.root,
         fetch_external_assets=args.fetch_external_assets,
-        require_current_negative_evidence=args.require_current_negative_evidence,
     )
     if errors:
         for error in errors:

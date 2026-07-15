@@ -139,6 +139,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed full public evidence packs from source and wheel distributions; the
   compact catalog index now binds the corresponding GitHub Release asset.
+- Removed the standalone negative-fixture publisher and source-tree bundle
+  contract. Release preflight now audits the compact current public-evidence
+  index; deterministic guard-scenario and fail-closed verifier suites remain
+  repository gates, while historical observations remain non-authoritative.
 - Removed superseded evidence-generation entry points in favor of the
   catalog-bound lane command.
 - Removed duplicate tiny fine-tuning and PEFT materializers in favor of the

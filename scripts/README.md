@@ -16,8 +16,8 @@ The checked taxonomy lives in `scripts/scripts_inventory.toml`:
   points. See `scripts/smoke/README.md` for the per-script smoke map.
 - `catalog-lane-production`: single-lane catalog evaluation, verification, and
   signed staging-pack production.
-- `model-evidence`: bounded public-input materialization and negative-fixture
-  helpers.
+- `model-evidence`: bounded public-input materialization for maintained catalog
+  lanes.
 - `evidence-packs`: local artifact validators and evidence-pack verification.
 - `release`: release evidence and offline-bundle helpers.
 - `security-supply-chain`: SBOM, CVE audit, pip-audit, requirements pinning, and

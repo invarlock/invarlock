@@ -397,7 +397,7 @@ def test_installed_wheel_probe_rejects_each_failed_isolation_step(
         preflight._probe_installed_wheel(_config(tmp_path), tmp_path / "candidate.whl")
 
 
-def test_negative_evidence_subprocess_gate_fails_closed(
+def test_public_evidence_subprocess_gate_fails_closed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     config = _config(tmp_path)
@@ -406,8 +406,8 @@ def test_negative_evidence_subprocess_gate_fails_closed(
         "run",
         lambda *_args, **_kwargs: subprocess.CompletedProcess([], 2, "", "failure"),
     )
-    with pytest.raises(preflight.ReleasePreflightError, match="negative-evidence"):
-        preflight._run_current_negative_evidence_audit(config)
+    with pytest.raises(preflight.ReleasePreflightError, match="public-evidence"):
+        preflight._run_current_public_evidence_audit(config)
 
 
 def test_config_from_args_resolves_checkout_relative_paths(tmp_path: Path) -> None:

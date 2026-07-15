@@ -64,25 +64,6 @@ def test_public_evidence_audit_respects_root_override(tmp_path: Path) -> None:
     assert module.check_public_evidence(evidence_root) == []
 
 
-def test_public_evidence_release_closure_requires_current_negative_index(
-    tmp_path: Path,
-) -> None:
-    module = _load_audit_module()
-    evidence_root = tmp_path / "public_evidence"
-    evidence_root.mkdir()
-    (evidence_root / "README.md").write_text("# public evidence\n", encoding="utf-8")
-
-    errors = module.check_public_evidence(
-        evidence_root,
-        require_current_negative_evidence=True,
-    )
-
-    assert errors == [
-        f"{evidence_root}: release closure requires a validated "
-        "current negative-evidence index"
-    ]
-
-
 def test_historical_reclassification_requires_explicit_noncurrent_metadata(
     tmp_path: Path,
 ) -> None:
