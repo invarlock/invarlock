@@ -381,25 +381,24 @@ def _evaluate_stress_gating(
 def _evaluate_error_injection_gating(
     model_names: list[str],
     by_key: dict[tuple[str, str, str], dict[str, Any]],
+    *,
     scenario_ids: set[str],
+    scenario_index: dict[str, dict[str, Any]],
 ) -> list[dict[str, Any]]:
     failures: list[dict[str, Any]] = []
     for scenario_id in sorted(scenario_ids):
-        missed = [
-            record
-            for record in _scenario_records(
-                model_names,
-                by_key,
-                category="error_injection",
-                scenario_id=scenario_id,
-            )
-            if not bool(record["detectors_hit"])
-        ]
+        present = _scenario_records(
+            model_names,
+            by_key,
+            category="error_injection",
+            scenario_id=scenario_id,
+        )
+        missed = [record for record in present if not bool(record["detectors_hit"])]
         if missed:
             failures.append(
                 {
                     "requirement": "error_injection_detected",
-                    "message": "Error injections must trigger expected detector signals",
+                    "message": "Error-injection scenarios must satisfy expected detector outcomes",
                     "scenario": scenario_id,
                     "failures": [
                         {
@@ -409,6 +408,28 @@ def _evaluate_error_injection_gating(
                             "path": record["path"],
                         }
                         for record in missed
+                    ],
+                }
+            )
+
+        spec = scenario_index.get(scenario_id, {})
+        strictness = str(spec.get("strictness") or "").strip().lower()
+        if strictness != "must_pass":
+            continue
+        failed_records = [record for record in present if not bool(record["passed"])]
+        if failed_records:
+            failures.append(
+                {
+                    "requirement": "error_injection_required_pass",
+                    "message": "Required-pass error-injection scenarios must PASS",
+                    "scenario": scenario_id,
+                    "failures": [
+                        {
+                            "model": record["model"],
+                            "reasons": record["reasons"],
+                            "path": record["path"],
+                        }
+                        for record in failed_records
                     ],
                 }
             )
@@ -683,7 +704,8 @@ def generate_verdict(
         _evaluate_error_injection_gating(
             model_names,
             by_key,
-            catalog.gating_by_category.get("error_injection", set()),
+            scenario_ids=catalog.gating_by_category.get("error_injection", set()),
+            scenario_index=catalog.scenario_index,
         )
     )
     failed_requirements.extend(

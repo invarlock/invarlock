@@ -81,15 +81,26 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
         "guard_metric_impact_acceptable": True,
     }
 
-    write_cert(
+    baseline_report = (
         model_dir
         / "baseline_reports"
         / "ci_balanced_seq512_pv4_fn4"
-        / "baseline_report.json",
+        / "baseline_report.json"
+    )
+    write_cert(
+        baseline_report,
         validation=shared_validation,
         invariants_status="pass",
         spectral_caps_applied=0,
         spectral_violations=[],
+    )
+    write_ve_probe(
+        baseline_report.parent / "ve_probe.json",
+        signal=False,
+        proposed_scales=32,
+        would_enable=False,
+        ab_gain=-0.1,
+        report_path=baseline_report,
     )
 
     # Clean edits (3) => must PASS. Deployable BNB8 is verified by
@@ -269,6 +280,17 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
             ("model.layers.31.mlp.up_proj", "ffn", 3.9),
         ],
     )
+    write_cert(
+        model_dir
+        / "reports"
+        / "errors"
+        / "spectral_moderate_scale_attn_l31_o_s105"
+        / "evaluation.report.json",
+        validation=shared_validation,
+        invariants_status="pass",
+        spectral_caps_applied=0,
+        spectral_violations=[],
+    )
 
     ve_cert = (
         model_dir
@@ -321,10 +343,10 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     )
     write_ve_probe(
         targeted_ve_cert.parent / "ve_probe.json",
-        signal=False,
+        signal=True,
         proposed_scales=32,
-        would_enable=False,
-        ab_gain=-0.1,
+        would_enable=True,
+        ab_gain=0.01,
     )
 
     verdict = run_verdict(repo_root, output_dir)
@@ -341,13 +363,13 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     assert counts["trained_total"] == 2
     assert counts["trained_pass"] == 2
     assert counts["stress_total"] == 4
-    assert counts["error_injection_total"] == 15
+    assert counts["error_injection_total"] == 16
     assert counts["informational_stress_signaled"] == 3
     assert counts["primary_guard_required_scenarios"] == 8
     assert counts["primary_guard_required_hits"] == 8
 
     guard_summary = verdict["guard_signal_summary"]
-    assert guard_summary["records_total"] == 25
+    assert guard_summary["records_total"] == 26
     signals = guard_summary["signals"]
     assert signals["primary_metric"]["flagged"] == 12
     assert signals["primary_metric"]["unique"] == 3
@@ -374,7 +396,7 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     assert category["deployable"]["any_flag"] == 0
     assert category["stress"]["reports"] == 4
     assert category["stress"]["any_flag"] == 4
-    assert category["error_injection"]["reports"] == 15
+    assert category["error_injection"]["reports"] == 16
     assert category["error_injection"]["any_flag"] == 13
     assert verdict["manifest"]["path"] == "scripts/evidence_packs/scenarios.json"
     bindings = {binding["path"]: binding for binding in verdict["report_bindings"]}

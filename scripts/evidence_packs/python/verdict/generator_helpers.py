@@ -178,14 +178,7 @@ def _variance_signal(cert: dict[str, Any] | None) -> bool:
     probe = cert.get("ve_probe")
     if not isinstance(probe, dict):
         return False
-    if _as_bool(probe.get("signal"), default=False):
-        return True
-    if _as_bool(probe.get("would_enable"), default=False):
-        return True
-    if _as_int(probe.get("proposed_scales"), default=0) > 0:
-        return True
-    gain = _as_float(probe.get("ab_gain"), default=None)
-    return gain is not None and gain > 0.0
+    return _as_bool(probe.get("signal"), default=False)
 
 
 def _invariants_signal(cert: dict[str, Any] | None) -> bool:
@@ -245,8 +238,14 @@ def _guard_baseline_relative_summary(
 ) -> dict[str, Any]:
     guard_name = guard.strip().lower()
     baseline_available = isinstance(baseline_cert, dict)
+    if guard_name == "variance":
+        baseline_available = isinstance(baseline_cert, dict) and isinstance(
+            baseline_cert.get("ve_probe"), dict
+        )
     subject_signal = _guard_signal(cert, guard_name)
-    baseline_signal = _guard_signal(baseline_cert, guard_name)
+    baseline_signal = _guard_signal(
+        baseline_cert if baseline_available else None, guard_name
+    )
     payload: dict[str, Any] = {
         "baseline_available": baseline_available,
         "subject_signal": subject_signal,
@@ -404,16 +403,21 @@ def _guard_relative_detector_matches(
     if not isinstance(guard, str) or not guard.strip():
         return False
     guard_name = guard.strip().lower()
+    expected = detector.get("expected", True)
+    if not isinstance(expected, bool):
+        return False
     if guard_name != "spectral":
         summary = _guard_baseline_relative_summary(cert, baseline_cert, guard_name)
-        return bool(summary.get("relative_signal"))
+        return bool(summary.get("relative_signal")) is expected
     if not isinstance(baseline_cert, dict):
         return False
     summary = _guard_baseline_relative_summary(cert, baseline_cert, guard_name)
     min_new_modules = detector.get("min_new_modules")
     min_delta_count = detector.get("min_delta_count")
     if min_new_modules is None and min_delta_count is None:
-        return bool(summary.get("relative_signal"))
+        return bool(summary.get("relative_signal")) is expected
+    if expected is False:
+        return False
     for key, minimum in (
         ("new_caps_applied", min_new_modules),
         ("delta_caps_applied", min_delta_count),

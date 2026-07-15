@@ -61,7 +61,7 @@ def _rmt_probe(
             "epsilon_default": 0.01,
             "epsilon_by_family": {"ffn": 0.01},
             "edge_base_by_family": {"ffn": 1.0},
-            "edge_cur_by_family": {"ffn": 1.0},
+            "edge_cur_by_family": {"ffn": 1.0 if stable else 2.0},
         },
         "binding": binding or _binding(_report()),
     }
@@ -248,3 +248,82 @@ def test_probe_contract_rejects_nested_string_and_nonfinite_values() -> None:
     ]
     with pytest.raises(ProbeValidationError, match="field types"):
         validate_probe_payload("rmt_probe.json", typed)
+
+
+def test_rmt_probe_contract_recomputes_epsilon_violation_math() -> None:
+    typed = _rmt_probe()
+    typed["epsilon_violations"][0]["allowed"] = 1.02
+    with pytest.raises(ProbeValidationError, match="arithmetic"):
+        validate_probe_payload("rmt_probe.json", typed)
+
+    typed = _rmt_probe()
+    typed["stable"] = True
+    with pytest.raises(ProbeValidationError, match="status"):
+        validate_probe_payload("rmt_probe.json", typed)
+
+    # The ordinary subject guard and baseline-relative epsilon comparison are
+    # distinct measurements. Their statuses may legitimately differ, but the
+    # three representations of the ordinary guard must agree.
+    typed = _rmt_probe()
+    typed["passed"] = True
+    typed["stable_guard"] = True
+    typed["metrics"]["stable"] = True
+    assert validate_probe_payload("rmt_probe.json", typed)["stable"] is False
+
+    typed["passed"] = False
+    with pytest.raises(ProbeValidationError, match="status"):
+        validate_probe_payload("rmt_probe.json", typed)
+
+
+@pytest.mark.parametrize(
+    "mutation,match",
+    [
+        ("aggregate", "arithmetic"),
+        ("policy", "epsilon policy"),
+        ("missing-violation", "do not match family aggregates"),
+        ("duplicate-family", "unknown or duplicate family"),
+    ],
+)
+def test_rmt_probe_contract_binds_policy_aggregates_and_violation_set(
+    mutation: str, match: str
+) -> None:
+    typed = _rmt_probe()
+    if mutation == "aggregate":
+        typed["metrics"]["edge_cur_by_family"]["ffn"] = 1.0
+    elif mutation == "policy":
+        typed["metrics"]["epsilon_default"] = 0.02
+    elif mutation == "missing-violation":
+        typed["epsilon_violations"] = []
+        typed["stable"] = True
+    else:
+        typed["epsilon_violations"].append(dict(typed["epsilon_violations"][0]))
+
+    with pytest.raises(ProbeValidationError, match=match):
+        validate_probe_payload("rmt_probe.json", typed)
+
+
+def test_ve_probe_contract_requires_positive_signal_semantics() -> None:
+    typed = _ve_probe()
+    typed["ab_gain"] = -0.1
+    with pytest.raises(ProbeValidationError, match="positive measured gain"):
+        validate_probe_payload("ve_probe.json", typed)
+
+    typed = _ve_probe()
+    typed["predictive_gate"] = {"would_enable": False, "reason": "enabled"}
+    with pytest.raises(ProbeValidationError, match="enable decision"):
+        validate_probe_payload("ve_probe.json", typed)
+
+    typed = _ve_probe()
+    typed["ratio_ci"] = [0.9, 0.8]
+    with pytest.raises(ProbeValidationError, match="interval is reversed"):
+        validate_probe_payload("ve_probe.json", typed)
+
+    typed = _ve_probe()
+    typed["ppl_with_ve"] = None
+    with pytest.raises(ProbeValidationError, match="paired"):
+        validate_probe_payload("ve_probe.json", typed)
+
+    typed = _ve_probe()
+    typed["ratio_ci"] = [-0.1, 0.9]
+    with pytest.raises(ProbeValidationError, match="must be positive"):
+        validate_probe_payload("ve_probe.json", typed)

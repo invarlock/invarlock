@@ -53,9 +53,11 @@ def write_cert(
     )
 
 
-def write_rmt_probe(path: Path, *, stable: bool) -> None:
+def write_rmt_probe(
+    path: Path, *, stable: bool, report_path: Path | None = None
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    report_path = path.parent / "evaluation.report.json"
+    report_path = report_path or path.parent / "evaluation.report.json"
     report_raw = report_path.read_bytes()
     report = json.loads(report_raw)
     payload = {
@@ -104,9 +106,10 @@ def write_ve_probe(
     proposed_scales: int | None = None,
     would_enable: bool | None = None,
     ab_gain: float | None = None,
+    report_path: Path | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    report_path = path.parent / "evaluation.report.json"
+    report_path = report_path or path.parent / "evaluation.report.json"
     report_raw = report_path.read_bytes()
     report = json.loads(report_raw)
     if proposed_scales is None:
@@ -115,6 +118,8 @@ def write_ve_probe(
         would_enable = signal
     if ab_gain is None:
         ab_gain = 0.01 if signal else 0.0
+    ppl_no_ve = 10.0
+    ppl_with_ve = ppl_no_ve * (1.0 - float(ab_gain))
     payload = {
         "schema": "invarlock/ve-probe-v1",
         "probe": "ve_probe_v1",
@@ -124,9 +129,9 @@ def write_ve_probe(
         "gate_reason": "enabled" if would_enable else "rejected",
         "proposed_scales": int(proposed_scales),
         "ab_gain": float(ab_gain),
-        "ppl_no_ve": 10.0,
-        "ppl_with_ve": 9.0 if signal else 10.0,
-        "abs_improvement": 1.0 if signal else 0.0,
+        "ppl_no_ve": ppl_no_ve,
+        "ppl_with_ve": ppl_with_ve,
+        "abs_improvement": ppl_no_ve - ppl_with_ve,
         "ratio_ci": [0.8, 0.9] if signal else None,
         "predictive_gate": {
             "would_enable": bool(would_enable),
@@ -154,6 +159,8 @@ def write_guard_value_manifest(
     category: str = "stress",
     primary_guard: str = "spectral",
     detectors_all_of: list[dict[str, Any]] | None = None,
+    strictness: str = "must_detect",
+    primary_guard_required: bool = True,
 ) -> None:
     if detectors_all_of is None:
         detectors_all_of = [
@@ -172,12 +179,12 @@ def write_guard_value_manifest(
                         "id": scenario_id,
                         "category": category,
                         "failure_class": "test.guard_value",
-                        "strictness": "must_detect",
+                        "strictness": strictness,
                         "intent": "guard_value",
                         "primary_guard": primary_guard,
                         "generation": {"kind": "edit", "edit_spec": "noop"},
                         "requirements": {
-                            "primary_guard_required": True,
+                            "primary_guard_required": primary_guard_required,
                             "detectors_all_of": detectors_all_of,
                         },
                     }
