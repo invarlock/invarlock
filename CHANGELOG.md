@@ -11,8 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added a first-party runtime-provider ABI and registry with built-in Hugging
   Face support through the optional `[hf]` extra and process-isolated
-  GGUF/llama.cpp and TensorRT-LLM connectors. Machine-readable inventory
-  distinguishes connector availability, backend delivery, and the metadata-only
+  GGUF/llama.cpp and TensorRT-LLM connectors. The machine-readable
+  `invarlock advanced plugins runtime-providers` inventory distinguishes
+  connector availability, backend delivery, and the metadata-only
   `runtime_qualification: not_probed` state. GGUF and TensorRT-LLM use the
   `first_party_experimental` plugin-maturity tier; connector readiness and
   strict-contract eligibility do not qualify a backend, image, platform, or
@@ -21,9 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `run-side`, and `verify-pair` commands for the native providers. They derive
   canonical schedules and role bindings, authorize exact per-role inputs,
   produce each strict side separately, and replay the baseline/subject pair into
-  a positive digest-only receipt. Strict Hugging Face runtime-behavior evidence
-  uses the provider-owned exact model/artifact-bound scorer through the Python
-  API, while normal `evaluate` behavior is unchanged. Cross-runtime claims are
+  a positive digest-only receipt. `evaluate` now records provider selection
+  through `--baseline-runtime-provider` and `--subject-runtime-provider`; its
+  execution path remains Hugging Face-only and directs native-provider
+  comparisons to the advanced runtime-behavior workflow. Strict Hugging Face
+  runtime-behavior evidence uses the provider-owned exact
+  model/artifact-bound scorer through the Python API. Cross-runtime claims are
   limited to policy-bound exact-match behavior and do not imply weight,
   activation, numerical, performance, export, or backend equivalence.
 - Added provider-owned `inspect-inputs` derivation for GGUF/llama.cpp and
@@ -32,31 +36,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no-clobber settings without accepting caller-supplied hashes. A runnable
   mixed-provider example and operator guide now cover the full schedule,
   directed-policy, side-production, and paired-verification transaction.
-- Added pinned native runtime-image qualification targets. GGUF requires its
+- Added pinned native runtime-image qualification targets. GGUF requires a
   two-container behavior black-box before assigning the stable local tag.
-  TensorRT-LLM requires a reviewed pinned-model inventory, an exact-base
-  two-device hardware preflight, a candidate CUDA smoke, and derived
-  engine-tree, tokenizer, and fixed-output bindings; its canary requires
-  byte-identical provider evidence across two fresh sessions per GPU and the
-  same canonical provider-receipt digest across GPUs. That digest is bound into
-  the closed qualification summary. The isolated runner requires InvarLock's
-  deterministic execution marker and fixed decoding settings, and records CUDA
-  runtime version separately from driver version. Each TensorRT-LLM session
-  authenticates and executes the fixed installed launcher from the reviewed
-  runtime image's read-only root filesystem, verifies a no-new-privileges and
-  zero-capability boundary, and rechecks launcher and interpreter identities
-  around each invocation. Failed qualification leaves
-  the existing stable local tag unchanged, and TensorRT-LLM still requires
-  separate NVIDIA platform and real-engine qualification. CUDA and TensorRT-LLM
-  qualification targets accept explicit Docker GPU selectors; CUDA smokes now
-  require a visible selected device and execute a real tensor kernel. A
-  maintained two-GPU TensorRT-LLM flow now snapshots a reviewed pinned model,
-  builds an engine independently on each device, cross-executes the frozen
-  primary engine on both devices, validates closed artifact-bound results
-  through the immutable candidate image ID, rejects selector aliases and
-  non-matching compute capabilities, sizes the isolated canary workspace for
-  authenticated engine snapshots, and promotes only the digest bound by the
-  qualification summary.
+  TensorRT-LLM uses explicit GPU selectors, real CUDA execution, reviewed model
+  and image inputs, matched-device preflight, independently built engines, and
+  cross-device execution of the frozen primary engine. Qualification binds the
+  engine, tokenizer, settings, immutable candidate image, and canonical
+  provider receipt; it promotes only the qualified digest and leaves an
+  existing stable tag unchanged on failure. GGUF and TensorRT-LLM remain
+  experimental, and TensorRT-LLM requires separate NVIDIA platform and
+  real-engine qualification.
 - Added deterministic compact runtime release-evidence assets with public
   qualification-receipt and asset-index contracts. Each asset embeds canonical
   sanitized provider summaries, source and image bindings, independently
@@ -165,12 +154,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed full public evidence packs from source and wheel distributions; the
   compact catalog index now binds the corresponding GitHub Release asset.
-- Removed the standalone negative-fixture publisher and source-tree bundle
-  contract. Release preflight now audits the compact current public-evidence
-  index; deterministic guard-scenario and fail-closed verifier suites remain
-  repository gates, while historical observations remain non-authoritative.
-- Removed superseded evidence-generation entry points in favor of the
-  catalog-bound lane command.
+- Removed the standalone negative-fixture publisher, source-tree bundle
+  contract, and superseded evidence-generation entry points in favor of the
+  compact current public-evidence index and catalog-bound lane command. Release
+  preflight audits the compact index; deterministic guard-scenario and
+  fail-closed verifier suites remain repository gates, while historical
+  observations remain non-authoritative.
 - Removed duplicate tiny fine-tuning and PEFT materializers in favor of the
   immutable training profiles.
 
@@ -191,17 +180,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prompt, answer, and image identity bindings remain verified.
 - Fixed modern dense and MoE adapter routing, quantized-wrapper compatibility,
   snapshot restoration, and runtime dependency pins exercised by catalog lanes.
-- Fixed TensorRT-LLM qualification to accept an explicit Docker GPU selector,
-  allowing independent single-GPU workers on multi-GPU hosts without exposing
-  every device to each container.
-- Fixed TensorRT-LLM engine authentication to ignore read-driven access-time
-  changes while still rejecting changes to names, sizes, device/inode identity,
-  mode, modification time, status-change time, or content.
-- Fixed TensorRT-LLM qualification to initialize the pinned vendor library
-  environment without contaminating strict machine output, keep required
-  runtime and engine-build timing caches inside the bounded temporary
-  filesystem, validate content-derived engine bundle names, and recognize both
-  canonical proprietary and open-kernel NVIDIA driver-version records.
+- Fixed TensorRT-LLM qualification and engine authentication for read-driven
+  access-time changes, clean vendor-runtime initialization, bounded timing
+  caches, content-derived engine names, and proprietary or open-kernel NVIDIA
+  driver records while preserving strict rejection of substantive artifact
+  changes.
 - Fixed documentation and CLI examples so strict commands include every
   independently supplied verifier input.
 - Fixed public-evidence, packaged-data, support-matrix, and model-catalog
@@ -219,17 +202,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed installed-package plugin discovery so InvarLock's identical shipped
   entry points are not rejected as duplicate built-ins, while packaging drift
   and third-party name collisions continue to fail closed.
-- Fixed runtime release-evidence publication to normalize non-collision
-  filesystem link failures into closed CLI errors after cleaning temporary
-  files, avoiding raw exception and host-path disclosure.
-- Fixed runtime release-evidence staging to create archives and checksum
-  handoffs with owner-read-only permissions and to fail closed if command
-  dispatch completes without a validated result.
+- Fixed runtime release-evidence publication and staging to normalize
+  filesystem link failures into closed CLI errors, clean temporary state,
+  create owner-read-only archive and checksum handoffs, and require a validated
+  command result.
 - Fixed native GGUF and TensorRT-LLM run-directory setup to close descriptors
   and remove temporary state if the initial filesystem identity snapshot fails.
-- Fixed static-analysis findings in runtime type-alias exports, evidence utility
-  CLIs, pruning-contract key validation, report-config cleanup, and verification
-  export helpers.
 - Fixed cross-platform runtime-provider checks so Hugging Face local build
   suffixes reconcile with installed distribution versions, TensorRT-LLM accepts
   trusted entries beneath sticky temporary directories while rejecting unsafe
