@@ -15,6 +15,7 @@ from invarlock.core.config_runtime import (
     InvarLockConfig,
     ModelConfig,
     OutputConfig,
+    RuntimeProviderConfig,
     VarianceGuardConfig,
 )
 
@@ -95,6 +96,8 @@ def test_invarlock_config_accessors_mutation_and_model_dump() -> None:
     )
 
     assert isinstance(cfg.model, ModelConfig)
+    assert isinstance(cfg.model.runtime_provider, RuntimeProviderConfig)
+    assert cfg.model.runtime_provider.name == "hf_transformers"
     assert cfg.edit.name == "quant_rtn"
     assert cfg.dataset.provider == "wikitext2"
     assert isinstance(cfg.output, OutputConfig)
@@ -112,6 +115,81 @@ def test_invarlock_config_accessors_mutation_and_model_dump() -> None:
     del cfg["context"]
     with pytest.raises(KeyError, match="required"):
         _ = cfg.context
+
+
+def test_runtime_provider_config_normalizes_legacy_and_explicit_selection() -> None:
+    legacy = InvarLockConfig({"model": {"id": "gpt2", "adapter": "hf_causal"}})
+    explicit = InvarLockConfig(
+        {
+            "model": {
+                "id": "gpt2",
+                "adapter": "hf_causal",
+                "runtime_provider": {
+                    "name": "hf_transformers",
+                    "settings": {},
+                },
+            }
+        }
+    )
+
+    assert legacy.model_dump() == explicit.model_dump()
+    assert legacy.model_dump()["model"]["runtime_provider"] == {
+        "name": "hf_transformers",
+        "settings": {},
+    }
+
+
+def test_non_hf_runtime_provider_treats_auto_as_absent_and_rejects_hf_adapter() -> None:
+    cfg = InvarLockConfig(
+        {
+            "model": {
+                "id": "model.gguf",
+                "adapter": "auto",
+                "runtime_provider": {"name": "llama_cpp", "settings": {}},
+            }
+        }
+    )
+    assert cfg.model.adapter is None
+    assert "adapter" not in cfg.model_dump()["model"]
+
+    with pytest.raises(ValueError, match="cannot use HF adapter 'hf_causal'"):
+        InvarLockConfig(
+            {
+                "model": {
+                    "id": "model.gguf",
+                    "adapter": "hf_causal",
+                    "runtime_provider": {"name": "llama_cpp", "settings": {}},
+                }
+            }
+        )
+
+    with pytest.raises(ValueError, match="cannot use HF adapter 'hf_causal'"):
+        ModelConfig(
+            id="model.gguf",
+            adapter="hf_causal",
+            runtime_provider=RuntimeProviderConfig(name="llama_cpp"),
+        )
+
+
+@pytest.mark.parametrize(
+    ("runtime_provider", "message"),
+    [
+        ("llama_cpp", "must be a mapping"),
+        ({"name": "llama_cpp", "settings": []}, "settings must be a mapping"),
+        ({"name": "LLAMA CPP", "settings": {}}, "canonical lowercase"),
+        ({"name": "1runtime", "settings": {}}, "canonical lowercase"),
+        ({"name": "llama-cpp", "settings": {}}, "canonical lowercase"),
+        ({"name": "r" * 65, "settings": {}}, "canonical lowercase"),
+        ({"name": "llama_cpp", "settings": {}, "shell": "true"}, "Unsupported"),
+    ],
+)
+def test_runtime_provider_config_rejects_noncanonical_shapes(
+    runtime_provider: object, message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        InvarLockConfig(
+            {"model": {"id": "model", "runtime_provider": runtime_provider}}
+        )
 
 
 def test_invarlock_config_missing_sections_fail_closed() -> None:

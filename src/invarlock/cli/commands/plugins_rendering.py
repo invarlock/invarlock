@@ -18,7 +18,9 @@ from invarlock.core.plugins_inventory import (
     filter_inventory_rows,
     gather_adapter_inventory_rows,
     gather_generic_inventory_rows,
+    gather_runtime_provider_inventory_rows,
     generic_inventory_json_items,
+    runtime_provider_inventory_json_items,
 )
 from invarlock.public_contracts import (
     adapter_capability,
@@ -33,6 +35,7 @@ ExtrasChecker = Callable[[str, str], str]
 AdapterRowsLoader = Callable[[Any], list[dict[str, Any]]]
 GenericPluginCategory = Literal["guards", "edits"]
 GenericRowsLoader = Callable[[Any, GenericPluginCategory], list[dict[str, Any]]]
+RuntimeProviderRowsLoader = Callable[[Any], list[dict[str, Any]]]
 ProviderRegistryLoader = Callable[[], dict[str, Any]]
 
 
@@ -73,6 +76,7 @@ def _all_plugins_json_items(
     hide_unsupported: bool,
     adapter_rows_loader: AdapterRowsLoader,
     generic_rows_loader: GenericRowsLoader,
+    runtime_provider_rows_loader: RuntimeProviderRowsLoader,
     provider_registry_loader: ProviderRegistryLoader,
 ) -> list[dict[str, Any]]:
     adapter_rows = _filter_only_rows(adapter_rows_loader(registry), only)
@@ -82,6 +86,9 @@ def _all_plugins_json_items(
         ]
     guard_rows = _filter_only_rows(generic_rows_loader(registry, "guards"), only)
     edit_rows = _filter_only_rows(generic_rows_loader(registry, "edits"), only)
+    runtime_provider_rows = _filter_only_rows(
+        runtime_provider_rows_loader(registry), only
+    )
     dataset_rows = [
         {
             **row,
@@ -96,6 +103,7 @@ def _all_plugins_json_items(
             guard_rows=guard_rows,
             edit_rows=edit_rows,
         ),
+        *runtime_provider_inventory_json_items(runtime_provider_rows),
         *dataset_rows,
     ]
 
@@ -146,6 +154,10 @@ def gather_generic_rows(
         plugin_type=cast(PluginCategory, plugin_type),
         extras_checker=extras_checker,
     )
+
+
+def gather_runtime_provider_rows(registry: Any) -> list[dict[str, Any]]:
+    return gather_runtime_provider_inventory_rows(registry=registry)
 
 
 def _print_adapters_compact(rows: list[dict[str, Any]], *, console: Any) -> None:
@@ -302,7 +314,7 @@ def _print_generic_compact(
     need = sum(1 for row in rows if row["status"] == "needs_extra")
     ready = sum(1 for row in rows if row["status"] == "ready")
     table = Table(title=f"{title} — ready: {ready} · missing-extras: {need}")
-    table.add_column("Name", style="cyan")
+    table.add_column("Name", style="cyan", no_wrap=True)
     table.add_column("Origin", style="dim")
     table.add_column("Mode", style="dim")
     table.add_column("Backend", style="magenta")
@@ -313,7 +325,11 @@ def _print_generic_compact(
             row.get("backend"), row.get("backend_version")
         )
         origin_disp = row.get("origin", row.get("support", "")).capitalize()
-        mode_disp = "Guard" if row.get("mode") == "guard" else "Edit"
+        mode_disp = {
+            "guard": "Guard",
+            "edit": "Edit",
+            "runtime-provider": "Runtime provider",
+        }.get(str(row.get("mode")), "Plugin")
         if row["status"] == "ready":
             status_disp = "Ready"
         elif row["status"] == "needs_extra":
@@ -357,7 +373,11 @@ def _print_generic_verbose(
         table.add_row(
             row["name"],
             (row.get("origin") or row.get("support") or "").capitalize(),
-            ("Guard" if row.get("mode") == "guard" else "Edit"),
+            {
+                "guard": "Guard",
+                "edit": "Edit",
+                "runtime-provider": "Runtime provider",
+            }.get(str(row.get("mode")), "Plugin"),
             backend_disp,
             version_disp,
             row["status"].replace("needs_extra", "Needs extra").capitalize(),
@@ -373,6 +393,10 @@ def _print_generic_json(
     rows: list[dict[str, Any]], kind: GenericPluginCategory
 ) -> None:
     _emit_plugins_json(kind, generic_inventory_json_items(rows, kind=kind))
+
+
+def _print_runtime_provider_json(rows: list[dict[str, Any]]) -> None:
+    _emit_plugins_json("runtime-providers", runtime_provider_inventory_json_items(rows))
 
 
 def _render_dataset_table(
@@ -492,6 +516,7 @@ def _show_plugin_category(
     console: Any,
     adapter_rows_loader: AdapterRowsLoader,
     generic_rows_loader: GenericRowsLoader,
+    runtime_provider_rows_loader: RuntimeProviderRowsLoader,
     provider_registry_loader: ProviderRegistryLoader,
 ) -> None:
     if not plugin_list and plugin_type != "adapters":
@@ -529,6 +554,19 @@ def _show_plugin_category(
             _print_generic_compact(rows, title, console=console)
         return
 
+    if plugin_type == "runtime_providers":
+        rows = _filter_only_rows(runtime_provider_rows_loader(registry), only)
+        if explain:
+            _explain_generic(explain, "runtime_providers", rows=rows, console=console)
+            return
+        if json_out:
+            _print_runtime_provider_json(rows)
+        elif verbose:
+            _print_generic_verbose(rows, title, console=console)
+        else:
+            _print_generic_compact(rows, title, console=console)
+        return
+
     _render_dataset_table(
         title,
         plugin_list,
@@ -551,6 +589,7 @@ def handle_plugins_category(
     console: Any,
     adapter_rows_loader: AdapterRowsLoader,
     generic_rows_loader: GenericRowsLoader,
+    runtime_provider_rows_loader: RuntimeProviderRowsLoader,
     provider_registry_loader: ProviderRegistryLoader,
 ) -> None:
     if category == "guards":
@@ -567,6 +606,7 @@ def handle_plugins_category(
             console=console,
             adapter_rows_loader=adapter_rows_loader,
             generic_rows_loader=generic_rows_loader,
+            runtime_provider_rows_loader=runtime_provider_rows_loader,
             provider_registry_loader=provider_registry_loader,
         )
         return
@@ -584,6 +624,7 @@ def handle_plugins_category(
             console=console,
             adapter_rows_loader=adapter_rows_loader,
             generic_rows_loader=generic_rows_loader,
+            runtime_provider_rows_loader=runtime_provider_rows_loader,
             provider_registry_loader=provider_registry_loader,
         )
         return
@@ -601,6 +642,29 @@ def handle_plugins_category(
             console=console,
             adapter_rows_loader=adapter_rows_loader,
             generic_rows_loader=generic_rows_loader,
+            runtime_provider_rows_loader=runtime_provider_rows_loader,
+            provider_registry_loader=provider_registry_loader,
+        )
+        return
+    if category in {"runtime-providers", "runtime_providers"}:
+        list_runtime_providers = getattr(registry, "list_runtime_providers", None)
+        provider_names = (
+            list(list_runtime_providers()) if callable(list_runtime_providers) else []
+        )
+        _show_plugin_category(
+            "Runtime Providers",
+            provider_names,
+            "runtime_providers",
+            registry=registry,
+            only=only,
+            verbose=verbose,
+            json_out=json_out,
+            explain=explain,
+            hide_unsupported=hide_unsupported,
+            console=console,
+            adapter_rows_loader=adapter_rows_loader,
+            generic_rows_loader=generic_rows_loader,
+            runtime_provider_rows_loader=runtime_provider_rows_loader,
             provider_registry_loader=provider_registry_loader,
         )
         return
@@ -625,6 +689,7 @@ def handle_plugins_category(
                 console=console,
                 adapter_rows_loader=adapter_rows_loader,
                 generic_rows_loader=generic_rows_loader,
+                runtime_provider_rows_loader=runtime_provider_rows_loader,
                 provider_registry_loader=provider_registry_loader,
             )
         return
@@ -639,6 +704,7 @@ def handle_plugins_category(
                     hide_unsupported=hide_unsupported,
                     adapter_rows_loader=adapter_rows_loader,
                     generic_rows_loader=generic_rows_loader,
+                    runtime_provider_rows_loader=runtime_provider_rows_loader,
                     provider_registry_loader=provider_registry_loader,
                 ),
             )
@@ -656,6 +722,7 @@ def handle_plugins_category(
             console=console,
             adapter_rows_loader=adapter_rows_loader,
             generic_rows_loader=generic_rows_loader,
+            runtime_provider_rows_loader=runtime_provider_rows_loader,
             provider_registry_loader=provider_registry_loader,
         )
         _show_plugin_category(
@@ -671,6 +738,7 @@ def handle_plugins_category(
             console=console,
             adapter_rows_loader=adapter_rows_loader,
             generic_rows_loader=generic_rows_loader,
+            runtime_provider_rows_loader=runtime_provider_rows_loader,
             provider_registry_loader=provider_registry_loader,
         )
         _show_plugin_category(
@@ -686,8 +754,30 @@ def handle_plugins_category(
             console=console,
             adapter_rows_loader=adapter_rows_loader,
             generic_rows_loader=generic_rows_loader,
+            runtime_provider_rows_loader=runtime_provider_rows_loader,
             provider_registry_loader=provider_registry_loader,
         )
+        list_runtime_providers = getattr(registry, "list_runtime_providers", None)
+        runtime_providers = (
+            list(list_runtime_providers()) if callable(list_runtime_providers) else []
+        )
+        if runtime_providers:
+            _show_plugin_category(
+                "Runtime Providers",
+                runtime_providers,
+                "runtime_providers",
+                registry=registry,
+                only=only,
+                verbose=verbose,
+                json_out=json_out,
+                explain=explain,
+                hide_unsupported=hide_unsupported,
+                console=console,
+                adapter_rows_loader=adapter_rows_loader,
+                generic_rows_loader=generic_rows_loader,
+                runtime_provider_rows_loader=runtime_provider_rows_loader,
+                provider_registry_loader=provider_registry_loader,
+            )
         providers = sorted(list_providers_fn())
         if providers:
             _show_plugin_category(
@@ -703,6 +793,7 @@ def handle_plugins_category(
                 console=console,
                 adapter_rows_loader=adapter_rows_loader,
                 generic_rows_loader=generic_rows_loader,
+                runtime_provider_rows_loader=runtime_provider_rows_loader,
                 provider_registry_loader=provider_registry_loader,
             )
         return
@@ -714,6 +805,9 @@ def handle_plugins_category(
                     adapter_rows=adapter_rows_loader(registry),
                     guard_rows=generic_rows_loader(registry, "guards"),
                     edit_rows=generic_rows_loader(registry, "edits"),
+                )
+                + runtime_provider_inventory_json_items(
+                    runtime_provider_rows_loader(registry)
                 ),
             )
         else:
@@ -730,6 +824,7 @@ def handle_plugins_category(
                 console=console,
                 adapter_rows_loader=adapter_rows_loader,
                 generic_rows_loader=generic_rows_loader,
+                runtime_provider_rows_loader=runtime_provider_rows_loader,
                 provider_registry_loader=provider_registry_loader,
             )
             _show_plugin_category(
@@ -745,6 +840,7 @@ def handle_plugins_category(
                 console=console,
                 adapter_rows_loader=adapter_rows_loader,
                 generic_rows_loader=generic_rows_loader,
+                runtime_provider_rows_loader=runtime_provider_rows_loader,
                 provider_registry_loader=provider_registry_loader,
             )
             _show_plugin_category(
@@ -760,12 +856,36 @@ def handle_plugins_category(
                 console=console,
                 adapter_rows_loader=adapter_rows_loader,
                 generic_rows_loader=generic_rows_loader,
+                runtime_provider_rows_loader=runtime_provider_rows_loader,
                 provider_registry_loader=provider_registry_loader,
             )
+            list_runtime_providers = getattr(registry, "list_runtime_providers", None)
+            runtime_providers = (
+                list(list_runtime_providers())
+                if callable(list_runtime_providers)
+                else []
+            )
+            if runtime_providers:
+                _show_plugin_category(
+                    "Runtime Providers",
+                    runtime_providers,
+                    "runtime_providers",
+                    registry=registry,
+                    only=only,
+                    verbose=verbose,
+                    json_out=json_out,
+                    explain=explain,
+                    hide_unsupported=hide_unsupported,
+                    console=console,
+                    adapter_rows_loader=adapter_rows_loader,
+                    generic_rows_loader=generic_rows_loader,
+                    runtime_provider_rows_loader=runtime_provider_rows_loader,
+                    provider_registry_loader=provider_registry_loader,
+                )
         return
     console.print(
         f"[red]❌ Unknown category '{category}'. "
-        "Valid: guards, edits, adapters, datasets, list, all[/red]"
+        "Valid: guards, edits, adapters, runtime-providers, datasets, list, all[/red]"
     )
     raise typer.Exit(2)
 
@@ -773,5 +893,6 @@ def handle_plugins_category(
 __all__ = [
     "gather_adapter_rows",
     "gather_generic_rows",
+    "gather_runtime_provider_rows",
     "handle_plugins_category",
 ]

@@ -340,6 +340,9 @@ hf_hqq = "invarlock.plugins:HF_HQQ_Adapter"
 hf_quanto = "invarlock.plugins:HF_Quanto_Adapter"
 hf_ct = "invarlock.plugins:HF_CompressedTensors_Adapter"
 
+[project.entry-points."invarlock.runtime_providers"]
+hf_transformers = "invarlock.runtime_providers.hf_transformers:HFTransformersProvider"
+
 # Console scripts
 [project.scripts]
 invarlock = "invarlock.cli.app:app"

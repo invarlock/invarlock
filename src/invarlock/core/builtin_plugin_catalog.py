@@ -26,6 +26,14 @@ class BuiltinPluginSpec:
 
 
 BUILTIN_PLUGIN_CATALOG: dict[str, tuple[BuiltinPluginSpec, ...]] = {
+    "runtime_providers": (
+        BuiltinPluginSpec(
+            name="hf_transformers",
+            module="invarlock.runtime_providers.hf_transformers",
+            class_name="HFTransformersProvider",
+            required_deps=("torch", "transformers"),
+        ),
+    ),
     "adapters": (
         BuiltinPluginSpec(
             name="hf_causal",

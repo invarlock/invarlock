@@ -196,7 +196,7 @@ def test_registry_ignores_identical_entry_points_from_its_own_distribution(
             )
             for spec in builtin_plugin_specs(plugin_type)
         ]
-        for plugin_type in ("adapters", "edits", "guards")
+        for plugin_type in ("adapters", "edits", "guards", "runtime_providers")
     }
     monkeypatch.setattr(reg, "entry_points", lambda: SelectEntryPoints(**groups))
 
@@ -210,6 +210,9 @@ def test_registry_ignores_identical_entry_points_from_its_own_distribution(
     }
     assert set(registry.list_guards()) == {
         spec.name for spec in builtin_plugin_specs("guards")
+    }
+    assert set(registry.list_runtime_providers()) == {
+        spec.name for spec in builtin_plugin_specs("runtime_providers")
     }
     assert registry.get_plugin_info("hf_auto", "adapters")["status"] == "Built-in"
 

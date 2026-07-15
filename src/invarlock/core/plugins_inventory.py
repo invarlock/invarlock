@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from invarlock.core.builtin_plugin_catalog import builtin_plugin_support_metadata
 
-PluginCategory = Literal["adapters", "guards", "edits"]
+PluginCategory = Literal["adapters", "guards", "edits", "runtime_providers"]
 InventoryRow = dict[str, Any]
 _INVENTORY_PROBE_ERRORS = (
     AttributeError,
@@ -331,6 +331,42 @@ def gather_generic_inventory_rows(
     return rows
 
 
+def gather_runtime_provider_inventory_rows(*, registry: Any) -> list[InventoryRow]:
+    """Return provider metadata without importing provider or backend modules."""
+
+    list_providers = getattr(registry, "list_runtime_providers", None)
+    names = list(list_providers()) if callable(list_providers) else []
+    rows: list[InventoryRow] = []
+    for name in names:
+        info = registry.get_plugin_info(name, "runtime_providers")
+        module = str(info.get("module") or "")
+        builtin = module.startswith("invarlock.runtime_providers")
+        rows.append(
+            {
+                "name": name,
+                "backend": "transformers" if name == "hf_transformers" else None,
+                "backend_version": None,
+                "support": "core" if builtin else "optional",
+                "origin": "core" if builtin else "plugin",
+                "mode": "runtime-provider",
+                "status": "ready" if info.get("available") else "needs_extra",
+                "enable": (
+                    "pip install 'invarlock[hf]'" if name == "hf_transformers" else ""
+                ),
+                "required_extra": (
+                    "invarlock[hf]" if name == "hf_transformers" else None
+                ),
+                "module": module,
+                "entry_point": info.get("entry_point"),
+                **_support_metadata(
+                    plugin_type="runtime_providers", name=name, info=info
+                ),
+            }
+        )
+    rows.sort(key=lambda row: (str(row["support"]), str(row["name"])))
+    return rows
+
+
 def filter_inventory_rows(
     rows: list[InventoryRow],
     only: str | None,
@@ -401,6 +437,27 @@ def generic_inventory_json_items(
     ]
 
 
+def runtime_provider_inventory_json_items(
+    rows: list[InventoryRow],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "name": row.get("name"),
+            "kind": "runtime_provider",
+            "module": row.get("module"),
+            "entry_point": row.get("entry_point"),
+            "origin": _module_origin(str(row.get("module") or "")),
+            "status": row.get("status"),
+            "required_extra": row.get("required_extra"),
+            "support_tier": row.get("support_tier"),
+            "strict_assurance_allowed": row.get("strict_assurance_allowed"),
+            "maintained_catalog": row.get("maintained_catalog"),
+            "deployment_claim": row.get("deployment_claim"),
+        }
+        for row in rows
+    ]
+
+
 def combined_plugins_json_items(
     *,
     adapter_rows: list[InventoryRow],
@@ -453,6 +510,8 @@ __all__ = [
     "filter_inventory_rows",
     "gather_adapter_inventory_rows",
     "gather_generic_inventory_rows",
+    "gather_runtime_provider_inventory_rows",
     "generic_inventory_json_items",
     "is_minimal_plugins_view",
+    "runtime_provider_inventory_json_items",
 ]

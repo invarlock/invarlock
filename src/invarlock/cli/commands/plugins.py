@@ -31,6 +31,9 @@ from .plugins_rendering import (
     gather_generic_rows as _rendering_gather_generic_rows,
 )
 from .plugins_rendering import (
+    gather_runtime_provider_rows as _rendering_gather_runtime_provider_rows,
+)
+from .plugins_rendering import (
     handle_plugins_category as _rendering_handle_plugins_category,
 )
 
@@ -48,7 +51,7 @@ _PLUGIN_COMMAND_ERRORS = (
 
 # Group: plugins
 plugins_app = typer.Typer(
-    help="Inspect available adapters, guards, edits, and datasets.",
+    help="Inspect available adapters, guards, edits, runtime providers, and datasets.",
 )
 _plugin_package_importable = _plugins_extras._plugin_package_importable
 _package_version_at_least = _plugins_extras._package_version_at_least
@@ -148,6 +151,10 @@ def _gather_generic_rows(registry: Any, plugin_type: str) -> list[dict[str, Any]
     )
 
 
+def _gather_runtime_provider_rows(registry: Any) -> list[dict[str, Any]]:
+    return _rendering_gather_runtime_provider_rows(registry)
+
+
 def _handle_plugins_category(
     *,
     category: str | None,
@@ -171,6 +178,7 @@ def _handle_plugins_category(
         console=console,
         adapter_rows_loader=_gather_adapter_rows,
         generic_rows_loader=_gather_generic_rows,
+        runtime_provider_rows_loader=_gather_runtime_provider_rows,
         provider_registry_loader=_load_provider_registry_map,
     )
 
@@ -225,7 +233,8 @@ def plugins_command(
 @plugins_app.command("list")
 def _plugins_list(
     category: str | None = typer.Argument(
-        None, help="Category: adapters|guards|edits|plugins|datasets"
+        None,
+        help="Category: adapters|guards|edits|runtime-providers|plugins|datasets",
     ),
     json_out: bool = typer.Option(False, "--json", help="Emit JSON output"),
     verbose: bool = typer.Option(False, "--verbose", help="Verbose table output"),
@@ -345,6 +354,35 @@ def _plugins_adapters(
         json_out=json_out,
         explain=explain,
         hide_unsupported=hide_unsupported,
+        allow_third_party_plugins=allow_third_party_plugins,
+    )
+
+
+@plugins_app.command("runtime-providers")
+def _plugins_runtime_providers(
+    only: str | None = typer.Option(
+        None,
+        "--only",
+        help="Filter: missing|ready|core|optional|core_supported|third_party",
+    ),
+    verbose: bool = typer.Option(False, "--verbose", help="Verbose table output"),
+    json_out: bool = typer.Option(False, "--json", help="Emit JSON output"),
+    explain: str | None = typer.Option(
+        None, "--explain", help="Explain a specific runtime provider"
+    ),
+    allow_third_party_plugins: bool = typer.Option(
+        False,
+        "--allow-third-party-plugins",
+        help="Allow third-party plugin discovery for this command.",
+    ),
+):
+    """List runtime-provider connectors without importing their backends."""
+    return plugins_command(
+        "runtime-providers",
+        only=only,
+        verbose=verbose,
+        json_out=json_out,
+        explain=explain,
         allow_third_party_plugins=allow_third_party_plugins,
     )
 
