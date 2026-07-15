@@ -49,6 +49,9 @@ def test_build_uses_pinned_tp1_recipe(
     assert build[build.index("--max_seq_len") + 1] == "9"
     assert build[build.index("--max_num_tokens") + 1] == "9"
     assert build[build.index("--opt_num_tokens") + 1] == "8"
+    assert build[build.index("--output_timing_cache") + 1] == (
+        "/tmp/invarlock-tensorrt-llm-model.cache"
+    )
 
 
 def test_build_rejects_unpinned_source(tmp_path: Path) -> None:

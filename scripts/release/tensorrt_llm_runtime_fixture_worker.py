@@ -179,6 +179,8 @@ def build_fixture(
             "9",
             "--opt_num_tokens",
             "8",
+            "--output_timing_cache",
+            "/tmp/invarlock-tensorrt-llm-model.cache",
         ),
         timeout=3600,
     )
