@@ -37,6 +37,7 @@ nav:
       - Report Outline: reference/report-outline.md
       - Environment Variables: reference/env-vars.md
       - Model Adapters: reference/model-adapters.md
+      - Runtime Providers: reference/runtime-providers.md
       - Model Family Catalog: reference/model-family-catalog.md
       - Public Contracts: reference/contracts.md
       - Configuration Schema: reference/config-schema.md

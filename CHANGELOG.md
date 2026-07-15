@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a first-party runtime-provider ABI and registry with built-in Hugging
+  Face support through the optional `[hf]` extra and process-isolated
+  GGUF/llama.cpp and TensorRT-LLM connectors. Machine-readable inventory
+  distinguishes connector availability, backend delivery, and the metadata-only
+  `runtime_qualification: not_probed` state. GGUF and TensorRT-LLM use the
+  `first_party_experimental` plugin-maturity tier; connector readiness and
+  strict-contract eligibility do not qualify a backend, image, platform, or
+  model artifact.
+- Added installed `build-schedule`, `prepare-binding`, `build-policy`,
+  `run-side`, and `verify-pair` commands for the native providers. They derive
+  canonical schedules and role bindings, authorize exact per-role inputs,
+  produce each strict side separately, and replay the baseline/subject pair into
+  a positive digest-only receipt. Strict Hugging Face runtime-behavior evidence
+  uses the provider-owned exact model/artifact-bound scorer through the Python
+  API, while normal `evaluate` behavior is unchanged. Cross-runtime claims are
+  limited to policy-bound exact-match behavior and do not imply weight,
+  activation, numerical, performance, export, or backend equivalence.
+- Added pinned native runtime-image qualification targets. GGUF requires its
+  two-container behavior black-box before assigning the stable local tag.
+  TensorRT-LLM requires a CUDA smoke plus reviewed engine-tree, tokenizer, and
+  fixed-output digests; its canary requires byte-identical provider evidence
+  across two fresh sessions. The isolated runner requires InvarLock's
+  deterministic execution marker and fixed decoding settings, and records CUDA
+  runtime version separately from driver version. Failed qualification leaves
+  the existing stable local tag unchanged, and TensorRT-LLM still requires
+  separate NVIDIA platform and real-engine qualification.
 - Added policy-bound `observe` and `enforce` authority for spectral, RMT, and
   variance findings in `policy-pack-v2`. Observation mode retains complete
   guard execution, provenance, replay, and reporting while leaving primary
@@ -47,6 +73,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Strengthened cross-runtime behavioral authorization in `policy-pack-v3` with
+  directed baseline and subject bindings for the schedule, provider, artifact
+  format and identity, outer runtime image, and execution-settings digest.
+  Strict side verification reloads and cross-checks the provider receipt and
+  scoring observation before paired replay, and exact-match scoring compares
+  literal typed values without coercion. Side publication is
+  descriptor-relative, atomic, and no-clobber; it checks staging and parent
+  identities immediately around publication and rolls back if a directory is
+  replaced during the operation. Portable cross-runtime comparisons use one
+  sequence per scheduled record (`batch_size=1`); same-artifact no-change
+  comparisons remain valid when the directed policy authorizes them, without
+  claiming producer independence.
 - Replaced the `published_basis` support-tier name with
   `maintained_catalog`, separating maintained lane eligibility from the
   independently reported `available` and `not_created` evidence states. This
@@ -71,16 +109,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guard, provenance, and appendix structure.
 - Clarified that runtime-manifest binding and image-digest matching establish
   declared identity consistency, not execution attestation.
-- Consolidated catalog evidence execution around the repository-owned lane
-  command and retired overlapping sweep and campaign orchestration surfaces.
+- Standardized catalog evidence execution on the repository-owned lane command.
 - Hardened public-evidence archive inspection to reject unsafe paths, duplicate
   members, and non-regular entries, and to recompute the unique regular-file
   count and byte total before accepting an external asset.
 - Published strictly verified frozen-v1 evidence packs for 31 model-catalog
   lanes through a hash-bound GitHub Release asset and compact source/wheel
-  index, and
-  aligned the remaining catalog rows with the **Evidence not yet created**
-  status used by the support matrix and documentation. These are `noop`
+  index. The remaining catalog rows use the **Evidence not yet created** status
+  from the support matrix and documentation. These are `noop`
   same-checkpoint compatibility runs covering the evidence mechanics;
   transformed-subject detection and effectiveness remain separate experimental
   claims. The current verifier accepts the frozen-v1 packs through its explicit
@@ -94,18 +130,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   evidence status.
 - Updated the pinned CodeQL, uv setup, Ruff, and Setuptools validation
   toolchain.
+- Extended isolated installed-wheel release preflight to reject checkout or
+  namespace-package leakage, import the shipped runtime modules, validate the
+  exact first-party provider inventory and command surface, and smoke schedule
+  and directed-policy construction.
 
 ### Removed
 
-- Removed the superseded tracked public-evidence corpus, compatibility
-  summaries, and historical failure fixtures after replacing them with compact
-  catalog indexes and hash-bound release-asset distribution.
-- Removed the legacy model-evidence sweep workflow, remote queue and scheduler
-  stack, campaign runner, and overlapping evidence-workflow wrappers after
-  consolidating execution around the catalog-bound lane command.
-- Removed duplicate tiny fine-tuning and PEFT materializers plus superseded
-  evidence-pack internals and guard-overhead guidance after replacing them with
-  immutable training profiles and current primary-metric impact documentation.
+- Removed full public evidence packs from source and wheel distributions; the
+  compact catalog index now binds the corresponding GitHub Release asset.
+- Removed superseded evidence-generation entry points in favor of the
+  catalog-bound lane command.
+- Removed duplicate tiny fine-tuning and PEFT materializers in favor of the
+  immutable training profiles.
 
 ### Fixed
 

@@ -45,6 +45,15 @@ evidence, and render the outcome for people and CI.
 recomputes the acceptance decision with independently supplied inputs. `report
 html` turns the canonical JSON into a review-friendly document.
 
+For deployment-format checks, the experimental runtime-provider workflow can
+produce separate Hugging Face, GGUF/llama.cpp, or TensorRT-LLM sides and replay
+a policy-scoped `exact_match` comparison. The installed native commands cover
+GGUF and TensorRT-LLM; strict Hugging Face runtime-behavior evidence uses the
+provider-owned scorer through the Python API, while `evaluate` remains its
+normal CLI path. See
+[Runtime Providers](docs/reference/runtime-providers.md) for its runtime-image
+requirements and narrower claim boundary.
+
 ## One Checkpoint Comparison
 
 Install the Hugging Face evaluation surface:
@@ -234,6 +243,7 @@ pip install "invarlock[probes]"
 - [Quickstart](docs/user-guide/quickstart.md)
 - [Compare & Evaluate (BYOE)](docs/user-guide/compare-and-evaluate.md)
 - [CLI Reference](docs/reference/cli.md)
+- [Runtime Providers](docs/reference/runtime-providers.md)
 - [Evidence Packs](docs/user-guide/evidence-packs.md)
 - [Trust Model](docs/assurance/14-trust-model.md)
 - [Assurance Case](docs/assurance/00-assurance-case.md)

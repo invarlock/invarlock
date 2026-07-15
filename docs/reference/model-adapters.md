@@ -69,6 +69,9 @@ public evidence support.
 
 Adapter capability and catalog status are recorded separately so users can see
 both the reusable implementation surface and the maintained evidence lanes.
+These lane tiers are distinct from the plugin-maturity `support_tier` values in
+`plugins-v2` inventory rows; see
+[Contracts](contracts.md#lane-support-tiers-and-plugin-maturity).
 
 ## Concepts
 
