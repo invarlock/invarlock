@@ -308,8 +308,11 @@ This diagnostic does not:
 - replace partner-specific acceptance criteria or independent review.
 
 If the partner's actual artifact is outside the Hugging Face/PyTorch checkpoint
-path, record that as an unsupported runtime boundary instead of converting it
-silently and claiming the original runtime was evaluated.
+path, record it as unsupported by this diagnostic instead of converting it
+silently and claiming the original runtime was evaluated. For experimental
+GGUF/llama.cpp and TensorRT-LLM exact-match behavior workflows, use the
+[runtime-provider guide](../reference/runtime-providers.md). ONNX, CoreML, and
+black-box serving endpoints remain outside the current provider surface.
 
 ## Related documentation
 
